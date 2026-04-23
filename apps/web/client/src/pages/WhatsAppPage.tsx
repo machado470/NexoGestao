@@ -1,20 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
-import {
-  AlertTriangle,
-  Check,
-  CheckCheck,
-  CircleArrowRight,
-  Clock3,
-  MessageCircleWarning,
-  Search,
-  Send,
-  Siren,
-  UserRound,
-  Workflow,
-  XCircle,
-} from "lucide-react";
+import { Check, CheckCheck, CircleDashed, Clock3, MessageCircle, Search, Send, Sparkles, Workflow, XCircle } from "lucide-react";
 
 import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
@@ -25,34 +12,19 @@ import { cn } from "@/lib/utils";
 import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
 import { Button } from "@/components/design-system";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  AppPageShell,
-  AppSectionCard,
-  AppSkeleton,
-  AppTimeline,
-  AppTimelineItem,
-  AppToolbar,
-} from "@/components/app-system";
+import { AppPageShell, AppSectionCard, AppSkeleton, AppTimeline, AppTimelineItem, AppToolbar } from "@/components/app-system";
 import {
   AppEmptyState,
   AppPageEmptyState,
   AppPageErrorState,
   AppPageLoadingState,
-  AppNextActionCard,
   AppOperationalHeader,
   AppPriorityBadge,
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
 
-type ConversationFilter =
-  | "all"
-  | "no_reply"
-  | "billing"
-  | "appointment"
-  | "service_order"
-  | "failures"
-  | "resolved";
+type ConversationFilter = "all" | "no_reply" | "billing" | "appointment" | "service_order" | "failures" | "resolved";
 type MessageSendStatus = "queued" | "sent" | "delivered" | "failed" | "unknown";
 type MessageKind = "incoming" | "outgoing" | "automation" | "event";
 type Severity = "healthy" | "attention" | "critical";
@@ -87,7 +59,7 @@ const QUICK_ACTIONS = [
 
 const FILTERS: Array<{ value: ConversationFilter; label: string }> = [
   { value: "all", label: "Todas" },
-  { value: "no_reply", label: "Não respondidos" },
+  { value: "no_reply", label: "Não respondidas" },
   { value: "billing", label: "Cobranças" },
   { value: "appointment", label: "Agendamentos" },
   { value: "service_order", label: "O.S." },
@@ -161,12 +133,6 @@ function riskLabel(severity: Severity) {
   return "Saudável";
 }
 
-function toneFromSeverity(severity: Severity) {
-  if (severity === "critical") return "danger" as const;
-  if (severity === "attention") return "warning" as const;
-  return "success" as const;
-}
-
 function nextBestAction(snapshot: {
   hasFailed: boolean;
   hasOverdueCharge: boolean;
@@ -192,6 +158,19 @@ function nextBestAction(snapshot: {
   return { title: "Conversa resolvida", description: "Sem bloqueios críticos agora. Mantenha monitoramento contextual.", cta: "Acompanhar" };
 }
 
+function WhatsStatusBadge({ label }: { label: string }) {
+  return <AppStatusBadge label={label} />;
+}
+
+function WhatsContextCard({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]/70 p-4">
+      <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">{title}</p>
+      <div className="mt-2">{children}</div>
+    </section>
+  );
+}
+
 export default function WhatsAppPage() {
   const [location, navigate] = useLocation();
   const utils = trpc.useUtils();
@@ -213,10 +192,7 @@ export default function WhatsAppPage() {
 
   const selectedCustomer = customers.find(item => String(item?.id) === selectedCustomerId);
 
-  const messagesQuery = trpc.nexo.whatsapp.messages.useQuery(
-    { customerId: selectedCustomerId },
-    { enabled: Boolean(selectedCustomerId), retry: false }
-  );
+  const messagesQuery = trpc.nexo.whatsapp.messages.useQuery({ customerId: selectedCustomerId }, { enabled: Boolean(selectedCustomerId), retry: false });
   const sendMutation = trpc.nexo.whatsapp.send.useMutation();
 
   const selectedMessages = useMemo(() => normalizeArrayPayload<any>(messagesQuery.data), [messagesQuery.data]);
@@ -257,29 +233,12 @@ export default function WhatsAppPage() {
         const hasFailed = customerId === selectedCustomerId && selectedFailedCount > 0;
         const isAwaitingReply = noReplyDays >= 2;
         const isResolved = !hasFailed && !hasOverdueCharge && !hasServiceOrderRisk && !isAwaitingReply;
-        const workflowStatus = hasFailed
-          ? "falha"
-          : isAwaitingReply
-            ? "aguardando resposta"
-            : isResolved
-              ? "resolvido"
-              : "sem ação";
+        const workflowStatus = hasFailed ? "falha" : isAwaitingReply ? "aguardando resposta" : isResolved ? "resolvido" : "sem ação";
 
-        const priorityScore =
-          Number(hasFailed) * 7 +
-          Number(hasOverdueCharge) * 6 +
-          Number(hasServiceOrderRisk) * 4 +
-          Number(hasScheduled) * 3 +
-          Number(isAwaitingReply) * 3;
+        const priorityScore = Number(hasFailed) * 7 + Number(hasOverdueCharge) * 6 + Number(hasServiceOrderRisk) * 4 + Number(hasScheduled) * 3 + Number(isAwaitingReply) * 3;
 
         const severity = severityFromScore(priorityScore);
-        const contextType = hasOverdueCharge
-          ? "cobrança"
-          : hasScheduled
-            ? "agendamento"
-            : hasServiceOrderRisk
-              ? "O.S."
-              : "relacionamento";
+        const contextType = hasOverdueCharge ? "cobrança" : hasScheduled ? "agendamento" : hasServiceOrderRisk ? "O.S." : "relacionamento";
 
         const bestAction = nextBestAction({
           hasFailed,
@@ -295,15 +254,12 @@ export default function WhatsAppPage() {
           phone: String(customer?.phone ?? "—"),
           snippet: String(lastMessage?.content ?? bestAction.description),
           lastMessageAt: lastMessage?.createdAt ?? customer?.lastContactAt,
-          lastStatus: lastMessage?._deliveryStatus ?? "unknown",
           contextType,
           workflowStatus,
           severity,
           priorityScore,
           isAwaitingReply,
-          noReplyDays,
           hasOverdueCharge,
-          hasServiceOrderRisk,
           hasScheduled,
           hasFailed,
           isResolved,
@@ -327,7 +283,7 @@ export default function WhatsAppPage() {
         if (activeFilter === "no_reply") return conversation.isAwaitingReply;
         if (activeFilter === "billing") return conversation.hasOverdueCharge;
         if (activeFilter === "appointment") return conversation.hasScheduled;
-        if (activeFilter === "service_order") return conversation.hasServiceOrderRisk;
+        if (activeFilter === "service_order") return conversation.serviceOrder && ["AT_RISK", "OVERDUE", "BLOCKED"].includes(String(conversation.serviceOrder.status ?? "").toUpperCase());
         if (activeFilter === "failures") return conversation.hasFailed;
         if (activeFilter === "resolved") return conversation.isResolved;
         return true;
@@ -347,64 +303,44 @@ export default function WhatsAppPage() {
     const failures = conversations.filter(item => item.hasFailed).length;
     const billing = conversations.filter(item => item.hasOverdueCharge).length;
     const appointments = conversations.filter(item => item.hasScheduled).length;
-    const critical = conversations.filter(item => item.severity === "critical").length;
 
     return [
       {
         id: "waiting",
-        title: `${noReply} cliente(s) aguardando resposta`,
-        description: "Follow-up pendente vira perda de contexto e atraso de operação.",
-        severity: noReply > 0 ? "attention" : "healthy",
-        cta: "Ver não respondidos",
-        action: () => setActiveFilter("no_reply"),
+        label: "Aguardando resposta",
+        value: noReply,
+        description: "Follow-up operacional pendente.",
+        action: () => setActiveFilter("no_reply" as ConversationFilter),
       },
       {
         id: "failures",
-        title: `${failures} falha(s) de envio`,
-        description: "Mensagens não entregues exigem retry imediato.",
-        severity: failures > 0 ? "critical" : "healthy",
-        cta: "Abrir falhas",
-        action: () => setActiveFilter("failures"),
+        label: "Falhas de envio",
+        value: failures,
+        description: "Mensagens exigem retry imediato.",
+        action: () => setActiveFilter("failures" as ConversationFilter),
       },
       {
         id: "billing",
-        title: `${billing} cobrança(s) ignorada(s)`,
-        description: "Financeiro em risco com conversa sem conclusão.",
-        severity: billing > 0 ? "critical" : "healthy",
-        cta: "Abrir cobranças",
-        action: () => setActiveFilter("billing"),
+        label: "Cobranças pendentes",
+        value: billing,
+        description: "Conversas com impacto no caixa.",
+        action: () => setActiveFilter("billing" as ConversationFilter),
       },
       {
         id: "appointments",
-        title: `${appointments} confirmação(ões) pendente(s)`,
-        description: "Confirme agora para reduzir no-show e retrabalho.",
-        severity: appointments > 0 ? "attention" : "healthy",
-        cta: "Ver agendamentos",
-        action: () => setActiveFilter("appointment"),
-      },
-      {
-        id: "critical",
-        title: `${critical} conversa(s) crítica(s)`,
-        description: "Maior risco combinado de relacionamento, execução e caixa.",
-        severity: critical > 0 ? "critical" : "healthy",
-        cta: "Prioridade máxima",
-        action: () => setActiveFilter("all"),
+        label: "Agendamentos hoje",
+        value: appointments,
+        description: "Confirmações para reduzir no-show.",
+        action: () => setActiveFilter("appointment" as ConversationFilter),
       },
     ] as const;
-  }, [conversations]);
+  }, [conversations, setActiveFilter]);
 
   const conversationPeriodLabel = useMemo(() => {
     const total = conversations.length;
     const pending = conversations.filter(item => !item.isResolved).length;
-    const critical = conversations.filter(item => item.severity === "critical").length;
-    return `Hoje · ${total} conversas monitoradas · ${pending} pendências · ${critical} críticas`;
+    return `Hoje · ${total} conversas · ${pending} com pendência`;
   }, [conversations]);
-
-  const selectedNextActionSeverity = selectedConversation?.severity === "critical"
-    ? "critical"
-    : selectedConversation?.severity === "attention"
-      ? "high"
-      : "medium";
 
   usePageDiagnostics({
     page: "whatsapp",
@@ -451,11 +387,7 @@ export default function WhatsAppPage() {
   if (customersQuery.error && customers.length === 0) {
     return (
       <AppPageShell>
-        <AppPageErrorState
-          description="Não foi possível carregar o canal operacional do WhatsApp."
-          actionLabel="Tentar novamente"
-          onAction={() => void customersQuery.refetch()}
-        />
+        <AppPageErrorState description="Não foi possível carregar o canal operacional do WhatsApp." actionLabel="Tentar novamente" onAction={() => void customersQuery.refetch()} />
       </AppPageShell>
     );
   }
@@ -475,91 +407,57 @@ export default function WhatsAppPage() {
     <AppPageShell>
       <AppOperationalHeader
         title="WhatsApp"
-        description="Camada de execução da comunicação operacional: prioridade, contexto e ação em um único fluxo."
+        description="Central de execução operacional por conversa: decisão rápida com contexto real do cliente ao pagamento."
         contextChips={
           <>
-            <AppStatusBadge label={conversationPeriodLabel} />
-            <AppStatusBadge label={`${conversations.filter(item => item.workflowStatus === "aguardando resposta").length} aguardando resposta`} />
-            <AppStatusBadge label={`${conversations.filter(item => item.workflowStatus === "falha").length} falha(s)`} />
+            <WhatsStatusBadge label={conversationPeriodLabel} />
+            <WhatsStatusBadge label="Canal conectado" />
           </>
         }
-        primaryAction={
-          <Button
-            type="button"
-            onClick={() => setContent("Olá! Iniciando atendimento operacional contextual pelo Nexo.")}
-          >
-            Nova comunicação operacional
-          </Button>
-        }
+        primaryAction={<Button type="button" onClick={() => setContent("Olá! Iniciando atendimento operacional contextual pelo Nexo.")}>Nova comunicação</Button>}
       />
 
-      <AppSectionBlock title="Atenção imediata" subtitle="Curto, acionável e orientado à execução." compact>
-        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
-          {communicationAlerts.map(alert => (
-            <article
-              key={alert.id}
-              className={cn(
-                "rounded-xl border p-3",
-                alert.severity === "critical"
-                  ? "border-rose-500/30 bg-rose-500/10"
-                  : alert.severity === "attention"
-                    ? "border-amber-500/30 bg-amber-500/10"
-                    : "border-[var(--border-subtle)] bg-[var(--surface-elevated)]/35"
-              )}
-            >
-              <p className="text-sm font-semibold text-[var(--text-primary)]">{alert.title}</p>
-              <p className="mt-1 text-xs text-[var(--text-secondary)]">{alert.description}</p>
-              <Button className="mt-3 h-8" type="button" variant="outline" size="sm" onClick={alert.action}>
-                {alert.cta}
-              </Button>
-            </article>
-          ))}
-        </div>
-      </AppSectionBlock>
-
-      <AppSectionBlock title="Próxima melhor ação" subtitle="Resposta recomendada para destravar comunicação e ciclo operacional." compact>
-        {selectedConversation ? (
-          <AppNextActionCard
-            title={selectedConversation.bestAction.title}
-            description={selectedConversation.bestAction.description}
-            severity={selectedNextActionSeverity}
-            metadata={selectedConversation.contextType}
-            automationStatus={selectedConversation.hasFailed ? "Automação alerta falha ativa" : "Automação pronta para follow-up e priorização"}
-            action={{
-              label: selectedConversation.bestAction.cta,
-              onClick: () => void sendMessage(selectedConversation.bestAction.description),
-            }}
-          />
-        ) : (
-          <p className="text-sm text-[var(--text-muted)]">Selecione uma conversa para recomendar a próxima execução.</p>
-        )}
-      </AppSectionBlock>
-
-      <div className="grid min-h-[72vh] gap-4 xl:grid-cols-[320px_minmax(0,1fr)_320px]">
-        <AppSectionBlock title="Lista de conversas" subtitle="Inbox inteligente, priorizada por consequência operacional." className="h-full">
-          <AppToolbar className="mb-3 items-center gap-2 px-3 py-2">
-            <p className="text-xs text-[var(--text-muted)]">{filteredConversations.length} conversa(s) neste recorte</p>
-            <div className="ml-auto flex items-center gap-1.5">
-              <Button type="button" variant="outline" size="sm" onClick={() => setActiveFilter("all")}>
-                Todas
-              </Button>
-              <Button type="button" variant="outline" size="sm" onClick={() => setActiveFilter("resolved")}>
-                Resolvidas
-              </Button>
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {communicationAlerts.map(alert => (
+          <button
+            key={alert.id}
+            type="button"
+            onClick={alert.action}
+            className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]/70 p-3 text-left transition-colors hover:bg-[var(--surface-elevated)]/65"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-[var(--text-muted)]">{alert.label}</p>
+              <CircleDashed className="size-3.5 text-[var(--text-muted)]" />
             </div>
-          </AppToolbar>
+            <p className="mt-1 text-xl font-semibold leading-none text-[var(--text-primary)]">{alert.value}</p>
+            <p className="mt-1 line-clamp-2 text-xs text-[var(--text-secondary)]">{alert.description}</p>
+          </button>
+        ))}
+      </section>
 
-          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-2">
-            <div className="mb-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              <div className="flex min-w-max items-center gap-1.5">
+      <div className="grid min-h-[calc(100vh-270px)] gap-4 xl:grid-cols-[minmax(280px,20vw)_minmax(0,1fr)_minmax(300px,23vw)] 2xl:grid-cols-[minmax(320px,18vw)_minmax(0,1fr)_minmax(340px,20vw)]">
+        <AppSectionBlock title="Inbox operacional" subtitle="Fila priorizada por consequência operacional." className="h-full p-4">
+          <div className="space-y-3">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--text-muted)]" />
+              <input
+                value={searchTerm}
+                onChange={event => setSearchTerm(event.target.value)}
+                placeholder="Buscar cliente ou telefone"
+                className="h-10 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] pl-9 pr-3 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--border-emphasis)]"
+              />
+            </div>
+
+            <div className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="flex min-w-max items-center gap-2">
                 {FILTERS.map(filter => (
                   <button
                     key={filter.value}
                     type="button"
                     className={cn(
-                      "rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
+                      "h-8 rounded-xl border px-3 text-xs font-medium transition-colors",
                       activeFilter === filter.value
-                        ? "border-[color-mix(in_srgb,var(--accent-primary)_72%,black)] bg-[var(--accent-primary)] text-white"
+                        ? "border-[var(--border-emphasis)] bg-[var(--surface-elevated)] text-[var(--text-primary)]"
                         : "border-[var(--border-subtle)] bg-[var(--surface-primary)]/45 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                     )}
                     onClick={() => setActiveFilter(filter.value)}
@@ -569,350 +467,239 @@ export default function WhatsAppPage() {
                 ))}
               </div>
             </div>
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--text-muted)]" />
-              <input
-                value={searchTerm}
-                onChange={event => setSearchTerm(event.target.value)}
-                placeholder="Buscar cliente ou telefone"
-                className="h-9 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] pl-9 pr-3 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--border-emphasis)]"
-              />
-            </div>
-          </div>
 
-          <div className="mt-3 max-h-[56vh] space-y-2 overflow-y-auto pr-1">
-            {customersQuery.isFetching ? (
-              <div className="space-y-2">
-                {Array.from({ length: 5 }).map((_, idx) => (
-                  <AppSkeleton key={idx} className="h-20 rounded-xl" />
-                ))}
-              </div>
-            ) : filteredConversations.length === 0 ? (
-              <AppEmptyState
-                title="Nenhuma conversa nesse filtro"
-                description="Ajuste o recorte para voltar ao atendimento prioritário." 
-              />
-            ) : (
-              filteredConversations.map(conversation => (
-                <button
-                  key={conversation.id}
-                  type="button"
-                  onClick={() => setSelectedCustomerId(conversation.id)}
-                  className={cn(
-                    "w-full rounded-xl border p-3 text-left",
-                    selectedConversation?.id === conversation.id
-                      ? "border-[var(--border-emphasis)] bg-[var(--surface-elevated)]/55"
-                      : "border-[var(--border-subtle)] bg-[var(--surface-primary)]/70 hover:bg-[var(--surface-elevated)]/45"
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-[var(--text-primary)]">{conversation.name}</p>
-                      <p className="text-xs text-[var(--text-muted)]">{conversation.phone}</p>
+            <div className="max-h-[calc(100vh-420px)] space-y-2 overflow-y-auto pr-1">
+              {customersQuery.isFetching ? (
+                <div className="space-y-2">
+                  {Array.from({ length: 5 }).map((_, idx) => (
+                    <AppSkeleton key={idx} className="h-20 rounded-xl" />
+                  ))}
+                </div>
+              ) : filteredConversations.length === 0 ? (
+                <AppEmptyState title="Nenhuma conversa no filtro" description="Ajuste o recorte para voltar à fila operacional." />
+              ) : (
+                filteredConversations.map(conversation => (
+                  <button
+                    key={conversation.id}
+                    type="button"
+                    onClick={() => setSelectedCustomerId(conversation.id)}
+                    className={cn(
+                      "w-full rounded-2xl border p-3 text-left transition-colors",
+                      selectedConversation?.id === conversation.id
+                        ? "border-[var(--border-emphasis)] bg-[var(--surface-elevated)]/65"
+                        : "border-[var(--border-subtle)] bg-[var(--surface-primary)]/70 hover:bg-[var(--surface-elevated)]/45"
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-[var(--text-primary)]">{conversation.name}</p>
+                        <p className="text-xs text-[var(--text-muted)]">{conversation.phone}</p>
+                      </div>
+                      <p className="text-[11px] text-[var(--text-muted)]">{fmtTime(conversation.lastMessageAt)}</p>
                     </div>
-                    <div className="text-right">
+                    <p className="mt-2 line-clamp-2 text-xs text-[var(--text-secondary)]">{conversation.snippet}</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
                       <AppPriorityBadge label={riskLabel(conversation.severity)} />
-                      <p className="mt-1 text-[11px] text-[var(--text-muted)]">{fmtTime(conversation.lastMessageAt)}</p>
+                      <WhatsStatusBadge label={conversation.contextType} />
+                      <WhatsStatusBadge label={conversation.workflowStatus} />
                     </div>
-                  </div>
-
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <AppStatusBadge label={`Tipo: ${conversation.contextType}`} />
-                    <AppStatusBadge label={`Status: ${conversation.workflowStatus}`} />
-                    {conversation.hasOverdueCharge ? <AppStatusBadge label="Cobrança ignorada" /> : null}
-                    {conversation.hasScheduled ? <AppStatusBadge label="Confirmação pendente" /> : null}
-                  </div>
-
-                  <p className="mt-2 line-clamp-2 text-xs text-[var(--text-secondary)]">{conversation.snippet}</p>
-                  <div className="mt-2 flex items-center justify-between gap-2">
-                    <p className="text-[11px] text-[var(--text-muted)]">Tempo: {fmtTime(conversation.lastMessageAt)} · Prioridade: {riskLabel(conversation.severity)}</p>
-                    <span className="text-[11px] font-medium text-[var(--text-secondary)]">{conversation.bestAction.cta}</span>
-                  </div>
-                </button>
-              ))
-            )}
+                  </button>
+                ))
+              )}
+            </div>
           </div>
         </AppSectionBlock>
 
-        <AppSectionCard className="space-y-3 p-0 xl:col-span-1">
-          <AppSectionBlock
-            title="Área de conversa"
-            subtitle="Menos chat, mais execução contextual com status de envio e CTA operacional."
-            className="h-full border-0 bg-transparent p-4"
-          >
-            {!selectedConversation ? (
-              <AppEmptyState
-                title="Selecione uma conversa"
-                description="Escolha um cliente para executar confirmação, cobrança, atualização de O.S. ou follow-up."
-              />
-            ) : (
-              <div className="grid h-full grid-rows-[auto_minmax(0,1fr)_auto] gap-3">
-                <header className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]/70 p-3">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-semibold text-[var(--text-primary)]">{selectedConversation.name}</p>
-                      <p className="text-xs text-[var(--text-muted)]">{selectedConversation.phone}</p>
-                    </div>
-                    <div className="flex flex-wrap justify-end gap-2">
-                      <AppStatusBadge label={selectedConversation.contextType} />
-                      <AppStatusBadge label={riskLabel(selectedConversation.severity)} />
-                    </div>
+        <AppSectionCard className="overflow-hidden rounded-3xl border border-[var(--border-subtle)] p-0">
+          {!selectedConversation ? (
+            <div className="grid h-full place-items-center p-6">
+              <AppEmptyState title="Selecione uma conversa" description="Escolha um cliente para executar confirmação, cobrança ou atualização de O.S." />
+            </div>
+          ) : (
+            <div className="grid h-full grid-rows-[auto_minmax(0,1fr)_auto_auto]">
+              <header className="border-b border-[var(--border-subtle)] bg-[var(--surface-primary)]/75 px-5 py-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">{selectedConversation.name}</p>
+                    <p className="text-xs text-[var(--text-muted)]">{selectedConversation.phone}</p>
                   </div>
-
-                  <div className="mt-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)]/35 px-3 py-2">
-                    <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Próxima melhor ação</p>
-                    <p className="text-sm font-medium text-[var(--text-primary)]">{selectedConversation.bestAction.title}</p>
-                    <p className="text-xs text-[var(--text-secondary)]">{selectedConversation.bestAction.description}</p>
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <WhatsStatusBadge label={selectedConversation.contextType} />
+                    <WhatsStatusBadge label={selectedConversation.hasOverdueCharge ? "Cobrança pendente" : "Sem pendência crítica"} />
+                    <WhatsStatusBadge label={selectedConversation.isAwaitingReply ? "Aguardando resposta" : "Fluxo ativo"} />
                   </div>
-                </header>
-
-                <div className="max-h-[44vh] space-y-3 overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/60 p-3">
-                  {messagesQuery.isLoading ? (
-                    <div className="space-y-2">
-                      {Array.from({ length: 4 }).map((_, idx) => (
-                        <AppSkeleton key={idx} className="h-14 rounded-xl" />
-                      ))}
-                    </div>
-                  ) : messagesQuery.error ? (
-                    <AppPageErrorState
-                      title="Falha ao carregar mensagens"
-                      description="Não conseguimos carregar o histórico desta conversa agora."
-                      actionLabel="Tentar novamente"
-                      onAction={() => void messagesQuery.refetch()}
-                    />
-                  ) : sortedMessages.length === 0 ? (
-                    <AppEmptyState
-                      title="Conversa sem mensagens"
-                      description="Use templates operacionais para iniciar contato com objetivo claro."
-                    />
-                  ) : (
-                    sortedMessages.map(message => {
-                      if (message._kind === "event") {
-                        return (
-                          <div key={String(message?.id)} className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
-                            <Workflow className="size-3.5" />
-                            <span>{String(message?.content ?? "Evento operacional")}</span>
-                            <span className="ml-auto">{fmtTime(message?.createdAt)}</span>
-                          </div>
-                        );
-                      }
-
-                      const incoming = message._kind === "incoming";
-                      const status = message._deliveryStatus as MessageSendStatus;
-
-                      return (
-                        <div key={String(message?.id)} className={cn("flex", incoming ? "justify-start" : "justify-end")}>
-                          <div
-                            className={cn(
-                              "max-w-[85%] rounded-xl border px-3 py-2",
-                              incoming
-                                ? "border-[var(--border-subtle)] bg-[var(--surface-primary)]"
-                                : "border-[var(--border-emphasis)] bg-[var(--surface-elevated)]/45"
-                            )}
-                          >
-                            <div className="mb-1 flex items-center gap-1 text-[11px] text-[var(--text-muted)]">
-                              <UserRound className="size-3" />
-                              <span>{incoming ? "Cliente" : message._kind === "automation" ? "Automação" : "Operação"}</span>
-                            </div>
-                            <p className="text-sm text-[var(--text-primary)]">{String(message?.content ?? "")}</p>
-                            <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-[var(--text-muted)]">
-                              <span>{fmtTime(message?.createdAt)}</span>
-                              {!incoming ? (
-                                <span className={cn("inline-flex items-center gap-1", status === "failed" ? "text-rose-500" : "text-[var(--text-muted)]")}>
-                                  {status === "queued" ? <Clock3 className="size-3.5" /> : null}
-                                  {status === "sent" ? <Check className="size-3.5" /> : null}
-                                  {status === "delivered" ? <CheckCheck className="size-3.5" /> : null}
-                                  {status === "failed" ? <XCircle className="size-3.5" /> : null}
-                                  {statusLabel(status)}
-                                </span>
-                              ) : null}
-                            </div>
-                            {status === "failed" ? (
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                className="mt-2 h-7"
-                                onClick={() => void sendMessage(String(message?.content ?? ""))}
-                              >
-                                Retry
-                              </Button>
-                            ) : null}
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
                 </div>
+              </header>
 
-                <footer className="space-y-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]/80 p-3">
-                  <div className="flex flex-wrap gap-2">
-                    {QUICK_ACTIONS.map(action => (
-                      <Button key={action.key} type="button" size="sm" variant="outline" onClick={() => setContent(action.content)}>
-                        {action.label}
-                      </Button>
+              <div className="space-y-3 overflow-y-auto bg-[var(--surface-base)]/55 px-6 py-4">
+                {messagesQuery.isLoading ? (
+                  <div className="space-y-2">
+                    {Array.from({ length: 4 }).map((_, idx) => (
+                      <AppSkeleton key={idx} className="h-14 rounded-xl" />
                     ))}
                   </div>
-                  <div className="flex items-end gap-2">
-                    <Textarea
-                      value={content}
-                      onChange={event => setContent(event.target.value)}
-                      placeholder="Mensagem com objetivo operacional e vínculo explícito..."
-                      className="min-h-[64px] resize-none"
-                    />
-                    <Button type="button" className="h-10" disabled={sendMutation.isPending || content.trim().length < 2} onClick={() => void sendMessage()}>
-                      <Send className="mr-1 size-4" />
-                      Enviar
-                    </Button>
-                  </div>
-                </footer>
+                ) : messagesQuery.error ? (
+                  <AppPageErrorState
+                    title="Falha ao carregar mensagens"
+                    description="Não conseguimos carregar o histórico desta conversa agora."
+                    actionLabel="Tentar novamente"
+                    onAction={() => void messagesQuery.refetch()}
+                  />
+                ) : sortedMessages.length === 0 ? (
+                  <AppEmptyState title="Conversa sem mensagens" description="Use templates operacionais para iniciar contato com objetivo claro." />
+                ) : (
+                  sortedMessages.map(message => {
+                    if (message._kind === "event") {
+                      return (
+                        <div key={String(message?.id)} className="mx-auto flex max-w-[66%] items-center gap-2 text-xs text-[var(--text-muted)]">
+                          <Workflow className="size-3.5" />
+                          <span>{String(message?.content ?? "Evento operacional")}</span>
+                          <span className="ml-auto">{fmtTime(message?.createdAt)}</span>
+                        </div>
+                      );
+                    }
+
+                    const incoming = message._kind === "incoming";
+                    const status = message._deliveryStatus as MessageSendStatus;
+
+                    return (
+                      <div key={String(message?.id)} className={cn("flex", incoming ? "justify-start" : "justify-end")}>
+                        <div
+                          className={cn(
+                            "max-w-[66%] rounded-2xl border px-4 py-3",
+                            incoming
+                              ? "border-[var(--border-subtle)] bg-[var(--surface-primary)]"
+                              : "border-[var(--border-emphasis)] bg-[var(--surface-elevated)]/60"
+                          )}
+                        >
+                          <p className="text-sm leading-6 text-[var(--text-primary)]">{String(message?.content ?? "")}</p>
+                          <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-[var(--text-muted)]">
+                            <span>{fmtTime(message?.createdAt)}</span>
+                            {!incoming ? (
+                              <span className="inline-flex items-center gap-1">
+                                {status === "queued" ? <Clock3 className="size-3.5" /> : null}
+                                {status === "sent" ? <Check className="size-3.5" /> : null}
+                                {status === "delivered" ? <CheckCheck className="size-3.5" /> : null}
+                                {status === "failed" ? <XCircle className="size-3.5" /> : null}
+                                {statusLabel(status)}
+                              </span>
+                            ) : null}
+                          </div>
+                          {status === "failed" ? (
+                            <Button type="button" size="sm" variant="outline" className="mt-2 h-7" onClick={() => void sendMessage(String(message?.content ?? ""))}>
+                              Retry
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
-            )}
-          </AppSectionBlock>
+
+              <div className="overflow-x-auto border-t border-[var(--border-subtle)] bg-[var(--surface-primary)]/75 px-4 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <div className="flex min-w-max items-center gap-2">
+                  {QUICK_ACTIONS.map(action => (
+                    <Button key={action.key} type="button" size="sm" variant="outline" className="h-8 rounded-xl" onClick={() => setContent(action.content)}>
+                      {action.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <footer className="border-t border-[var(--border-subtle)] bg-[var(--surface-base)]/90 p-3">
+                <div className="flex items-end gap-2">
+                  <Button type="button" variant="outline" className="h-11 px-3" onClick={() => setContent(value => `${value}${value ? "\n" : ""}`)}>
+                    <Sparkles className="size-4" />
+                  </Button>
+                  <Textarea
+                    value={content}
+                    onChange={event => setContent(event.target.value)}
+                    placeholder="Descreva a ação operacional vinculando cliente, agenda, O.S. ou cobrança..."
+                    className="min-h-[52px] resize-none rounded-xl"
+                  />
+                  <Button type="button" className="h-11 px-4" disabled={sendMutation.isPending || content.trim().length < 2} onClick={() => void sendMessage()}>
+                    <Send className="mr-1 size-4" />
+                    Executar envio
+                  </Button>
+                </div>
+              </footer>
+            </div>
+          )}
         </AppSectionCard>
 
-        <AppSectionBlock
-          title="Contexto operacional"
-          subtitle="Apoio da conversa com cliente, agenda, O.S., financeiro e timeline."
-          className="h-full"
-        >
+        <AppSectionBlock title="Contexto operacional" subtitle="Cliente, agenda, O.S., financeiro e timeline no mesmo campo de ação." className="h-full p-4">
           {!selectedConversation ? (
-            <AppEmptyState
-              title="Sem contexto ativo"
-              description="Selecione uma conversa para exibir os vínculos operacionais laterais."
-            />
+            <AppEmptyState title="Sem contexto ativo" description="Selecione uma conversa para exibir vínculos operacionais." />
           ) : (
-            <div className="space-y-3 text-sm">
-              <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]/70 p-3">
-                <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Cliente</p>
+            <div className="max-h-[calc(100vh-420px)] space-y-3 overflow-y-auto pr-1 text-sm">
+              <WhatsContextCard title="Cliente">
                 <p className="text-sm font-semibold text-[var(--text-primary)]">{selectedConversation.name}</p>
                 <p className="text-xs text-[var(--text-secondary)]">{selectedConversation.phone}</p>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  <AppStatusBadge label={riskLabel(selectedConversation.severity)} />
-                  <AppStatusBadge label={selectedConversation.isAwaitingReply ? "Aguardando resposta" : "Contato em dia"} />
+                  <WhatsStatusBadge label={riskLabel(selectedConversation.severity)} />
+                  <WhatsStatusBadge label={selectedConversation.isAwaitingReply ? "Aguardando resposta" : "Contato em dia"} />
                 </div>
-                <div className="mt-2">
-                  <Button type="button" size="sm" variant="outline" onClick={() => navigate(`/customers/${selectedConversation.id}`)}>
-                    Abrir cliente
-                  </Button>
-                </div>
-              </section>
+                <Button type="button" size="sm" variant="outline" className="mt-3" onClick={() => navigate(`/customers/${selectedConversation.id}`)}>Ver cliente</Button>
+              </WhatsContextCard>
 
-              <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]/70 p-3">
-                <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Agendamento</p>
+              <WhatsContextCard title="Próximo agendamento">
                 <p className="text-sm text-[var(--text-primary)]">
-                  {selectedConversation.hasScheduled
-                    ? `Próximo atendimento vinculado · ${String(selectedConversation.serviceOrder?.status ?? "SCHEDULED")}`
-                    : "Sem agendamento confirmado"}
+                  {selectedConversation.hasScheduled ? "Atendimento em aberto para confirmação." : "Sem agendamento confirmado agora."}
                 </p>
-                <div className="mt-2 flex gap-2">
-                  <Button type="button" size="sm" variant="outline" onClick={() => navigate("/appointments")}>Confirmar/Reagendar</Button>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button type="button" size="sm" variant="outline" onClick={() => navigate("/appointments")}>Ver agendamento</Button>
+                  <Button type="button" size="sm" variant="outline" onClick={() => void sendMessage("Confirmando seu horário de atendimento. Posso seguir com a janela planejada?")}>Confirmar</Button>
                 </div>
-              </section>
+              </WhatsContextCard>
 
-              <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]/70 p-3">
-                <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">O.S.</p>
+              <WhatsContextCard title="Ordem de serviço">
                 <p className="text-sm text-[var(--text-primary)]">
-                  {selectedConversation.serviceOrder
-                    ? `Status atual: ${String(selectedConversation.serviceOrder?.status ?? "OPEN")}`
-                    : "Sem O.S. em andamento"}
+                  {selectedConversation.serviceOrder ? `Status: ${String(selectedConversation.serviceOrder?.status ?? "OPEN")}` : "Nenhuma O.S. vinculada ativa."}
                 </p>
-                <Button type="button" size="sm" variant="outline" className="mt-2" onClick={() => navigate("/service-orders")}>Abrir O.S.</Button>
-              </section>
+                <Button type="button" size="sm" variant="outline" className="mt-3" onClick={() => navigate("/service-orders")}>Ver O.S.</Button>
+              </WhatsContextCard>
 
-              <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]/70 p-3">
-                <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Financeiro</p>
+              <WhatsContextCard title="Financeiro">
                 <p className="text-sm text-[var(--text-primary)]">
                   {selectedConversation.hasOverdueCharge
-                    ? `${selectedConversation.overdueCharges.length} cobrança(s) vencida(s) · ${fmtCurrency(selectedConversation.financialPendingCents)}`
+                    ? `${selectedConversation.overdueCharges.length} vencida(s) · ${fmtCurrency(selectedConversation.financialPendingCents)}`
                     : selectedConversation.pendingCharges.length > 0
-                      ? `${selectedConversation.pendingCharges.length} cobrança(s) pendente(s) · ${fmtCurrency(selectedConversation.financialPendingCents)}`
-                      : "Sem pendência financeira crítica"}
+                      ? `${selectedConversation.pendingCharges.length} pendente(s) · ${fmtCurrency(selectedConversation.financialPendingCents)}`
+                      : "Sem pendência crítica"}
                 </p>
                 <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                  Vencimento mais próximo: {fmtDateTime(selectedConversation.overdueCharges[0]?.dueDate ?? selectedConversation.pendingCharges[0]?.dueDate)}
+                  Vencimento: {fmtDateTime(selectedConversation.overdueCharges[0]?.dueDate ?? selectedConversation.pendingCharges[0]?.dueDate)}
                 </p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <Button type="button" size="sm" variant="outline" onClick={() => void sendMessage("Olá! Estou cuidando do seu atendimento agora e sigo no mesmo fio para resolver hoje.")}>Responder</Button>
-                  <Button type="button" size="sm" variant="outline" onClick={() => void sendMessage("Olá! Posso confirmar sua presença no agendamento para mantermos a execução no horário?")}>Confirmar</Button>
-                  <Button type="button" size="sm" variant="outline" onClick={() => void sendMessage("Olá! Temos pendência em aberto e posso te apoiar no pagamento agora por este link.")}>Cobrar</Button>
-                  <Button type="button" size="sm" variant="outline" onClick={() => void sendMessage("Olá! Reforçando a pendência em aberto. Posso te apoiar com o pagamento agora?")}>Reenviar link</Button>
-                  <Button type="button" size="sm" variant="outline" onClick={() => navigate("/finances")}>Abrir financeiro</Button>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button type="button" size="sm" variant="outline" onClick={() => void sendMessage("Identificamos pendência em aberto. Posso enviar o link para regularização agora?")}>Cobrar</Button>
+                  <Button type="button" size="sm" variant="outline" onClick={() => navigate("/finances")}>Ver cobrança</Button>
                 </div>
-              </section>
+              </WhatsContextCard>
 
-              <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]/70 p-3">
-                <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Timeline operacional</p>
-                <AppTimeline className="mt-2 space-y-2">
+              <WhatsContextCard title="Timeline curta">
+                <AppTimeline className="space-y-2">
                   <AppTimelineItem className="p-2.5">
-                    <p className="text-xs font-semibold text-[var(--text-primary)]">Mensagem enviada</p>
-                    <p className="text-xs text-[var(--text-secondary)]">Último envio em {fmtDateTime(sortedMessages[sortedMessages.length - 1]?.createdAt ?? selectedCustomer?.lastContactAt)}.</p>
+                    <p className="text-xs font-semibold text-[var(--text-primary)]">Última interação registrada</p>
+                    <p className="text-xs text-[var(--text-secondary)]">{fmtDateTime(sortedMessages[sortedMessages.length - 1]?.createdAt ?? selectedCustomer?.lastContactAt)}</p>
                   </AppTimelineItem>
                   {selectedConversation.hasFailed ? (
                     <AppTimelineItem className="p-2.5">
-                      <p className="text-xs font-semibold text-rose-500">Falha de envio identificada</p>
-                      <p className="text-xs text-[var(--text-secondary)]">Retry disponível na conversa para restauração do fluxo.</p>
-                    </AppTimelineItem>
-                  ) : null}
-                  {selectedConversation.hasOverdueCharge ? (
-                    <AppTimelineItem className="p-2.5">
-                      <p className="text-xs font-semibold text-[var(--text-primary)]">Cobrança enviada</p>
-                      <p className="text-xs text-[var(--text-secondary)]">Pendência financeira segue aberta e requer follow-up.</p>
-                    </AppTimelineItem>
-                  ) : null}
-                  {selectedConversation.hasScheduled ? (
-                    <AppTimelineItem className="p-2.5">
-                      <p className="text-xs font-semibold text-[var(--text-primary)]">Confirmação de agendamento pendente</p>
-                      <p className="text-xs text-[var(--text-secondary)]">Acione template de confirmação para fechar presença.</p>
+                      <p className="text-xs font-semibold text-[var(--text-primary)]">Retry disponível</p>
+                      <p className="text-xs text-[var(--text-secondary)]">Falha de envio em aberto na conversa.</p>
                     </AppTimelineItem>
                   ) : null}
                 </AppTimeline>
-              </section>
+              </WhatsContextCard>
             </div>
           )}
         </AppSectionBlock>
       </div>
 
-      <AppSectionBlock title="Automações operacionais" subtitle="Sugestão de resposta, follow-up, alerta de falha e priorização automática." compact>
-        <div className="grid gap-3 md:grid-cols-4">
-          <article className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]/55 p-3">
-            <p className="text-xs font-semibold text-[var(--text-primary)]">Sugestão de resposta</p>
-            <p className="mt-1 text-xs text-[var(--text-secondary)]">Templates orientados por contexto de agenda, O.S. e financeiro.</p>
-          </article>
-          <article className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]/55 p-3">
-            <p className="text-xs font-semibold text-[var(--text-primary)]">Follow-up automático</p>
-            <p className="mt-1 text-xs text-[var(--text-secondary)]">Conversas sem retorno entram em fila priorizada após 48h.</p>
-          </article>
-          <article className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]/55 p-3">
-            <p className="text-xs font-semibold text-[var(--text-primary)]">Alerta de falha</p>
-            <p className="mt-1 text-xs text-[var(--text-secondary)]">Falhas de entrega sobem para atenção imediata com retry direto.</p>
-          </article>
-          <article className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]/55 p-3">
-            <p className="text-xs font-semibold text-[var(--text-primary)]">Priorização automática</p>
-            <p className="mt-1 text-xs text-[var(--text-secondary)]">Fila ordenada por risco combinado de resposta, execução e caixa.</p>
-          </article>
-        </div>
-      </AppSectionBlock>
-
-      <div className="grid gap-3 md:grid-cols-4">
-        <Button type="button" variant="outline" onClick={() => setActiveFilter("all")} className="justify-start">
-          <Search className="mr-2 size-4" /> Ver inbox completa
-        </Button>
-        <Button type="button" variant="outline" onClick={() => setActiveFilter("billing")} className="justify-start">
-          <Siren className="mr-2 size-4" /> Abrir cobranças críticas
-        </Button>
-        <Button type="button" variant="outline" onClick={() => setActiveFilter("no_reply")} className="justify-start">
-          <MessageCircleWarning className="mr-2 size-4" /> Ver não respondidos
-        </Button>
-        <Button type="button" variant="outline" onClick={() => setActiveFilter("failures")} className="justify-start">
-          <AlertTriangle className="mr-2 size-4" /> Ver falhas de entrega
-        </Button>
-      </div>
-
-      <AppToolbar className="mt-3 gap-2 px-3 py-2">
-        <p className="text-xs text-[var(--text-secondary)]">Preparado para automações: confirmação de agenda, lembrete, cobrança, retry, follow-up e registro em timeline.</p>
+      <AppToolbar className="gap-2 px-3 py-2">
+        <p className="text-xs text-[var(--text-secondary)]">Fluxo reforçado: cliente → agendamento → O.S. → cobrança → pagamento.</p>
         <Button type="button" size="sm" variant="outline" onClick={() => selectedConversation && void sendMessage(selectedConversation.bestAction.description)} disabled={!selectedConversation}>
-          <CircleArrowRight className="mr-1 size-4" /> Executar próxima ação
+          <MessageCircle className="mr-1 size-4" /> Executar próxima ação
         </Button>
       </AppToolbar>
     </AppPageShell>
