@@ -38,7 +38,6 @@ import {
   AppStatusBadge,
 } from "@/components/internal-page-system";
 import { SecondaryButton } from "@/components/design-system";
-import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import { inRange, safeDate } from "@/lib/operational/kpi";
 import {
   buildCompactOperationalTimeline,
@@ -50,7 +49,6 @@ import { toast } from "sonner";
 
 type TabKey = "agenda" | "confirmed" | "pending" | "conflicts" | "history";
 type WindowFilter = "all" | "today" | "tomorrow" | "week" | "overdue";
-type ViewMode = "operational_list" | "calendar_macro" | "timeline_day";
 
 type AppointmentLike = {
   id?: string;
@@ -112,10 +110,6 @@ export default function AppointmentsPage() {
   const [windowFilter, setWindowFilter] = useOperationalMemoryState<WindowFilter>(
     "nexo.appointments.window-filter.v1",
     "today"
-  );
-  const [viewMode, setViewMode] = useOperationalMemoryState<ViewMode>(
-    "nexo.appointments.view-mode.v1",
-    "operational_list"
   );
   const [customerFilter, setCustomerFilter] = useOperationalMemoryState(
     "nexo.appointments.customer-filter.v1",
@@ -376,19 +370,12 @@ export default function AppointmentsPage() {
   const weekCount = appointmentWithContext.filter(({ item }) => inRange(safeDate(item?.startsAt), dayStart, weekEnd)).length;
   const responseRiskCount = filteredAppointments.filter(({ requiresCommunication }) => requiresCommunication).length;
   const criticalWindowEmpty = todayCount === 0;
-  const overloadCount = appointmentWithContext.filter(
-    ({ item }) => inRange(safeDate(item?.startsAt), dayStart, dayEnd)
-  ).length > 12;
-  const agendaHealth: "Saudável" | "Atenção" | "Crítica" | "Vazia" =
-    criticalWindowEmpty
-      ? "Vazia"
-      : delayedCount > 0 || conflictCount > 0
-        ? "Crítica"
-        : unconfirmedCount > 0 || overloadCount
-          ? "Atenção"
-          : "Saudável";
+  const confirmedTodayCount = appointmentWithContext.filter(
+    ({ item }) =>
+      inRange(safeDate(item?.startsAt), dayStart, dayEnd) && String(item?.status ?? "").toUpperCase() === "CONFIRMED"
+  ).length;
+  const confirmationRate = todayCount > 0 ? Math.round((confirmedTodayCount / todayCount) * 100) : 0;
 
-  const availableSlots = Math.max(0, 10 - todayCount);
   const alertItems = [
     {
       key: "unconfirmed",
@@ -437,6 +424,30 @@ export default function AppointmentsPage() {
       actionLabel: "Criar agendamento",
     },
   ];
+
+  const immediateAttention = [...alertItems]
+    .map(item => ({
+      ...item,
+      severityScore: item.severity === "critical" ? 3 : item.severity === "warning" ? 2 : 1,
+    }))
+    .sort((a, b) => b.severityScore - a.severityScore)
+    .slice(0, 3);
+
+  const nextBestEntry =
+    filteredAppointments.find(({ decision, isDelayed, hasConflict }) => decision.intent !== "none" && (isDelayed || hasConflict)) ??
+    filteredAppointments.find(({ decision }) => decision.intent !== "none") ??
+    null;
+
+  const nextBestAction = nextBestEntry
+    ? {
+        title: `${nextBestEntry.decision.title} — ${String(nextBestEntry.item?.customer?.name ?? "Cliente")}`,
+        when: safeDate(nextBestEntry.item?.startsAt)?.toLocaleString("pt-BR") ?? "Horário não informado",
+        reason: nextBestEntry.decision.reason,
+        impact: nextBestEntry.decision.impact,
+        intent: nextBestEntry.decision.intent,
+        ctaLabel: resolveOperationalActionLabel(nextBestEntry.decision.title),
+      }
+    : null;
 
   useEffect(() => {
     if (filteredAppointments.length === 0) {
@@ -586,14 +597,6 @@ export default function AppointmentsPage() {
     }
   };
 
-  const headerCta = (() => {
-    if (activeTab === "confirmed") return { label: "Converter em O.S.", onClick: () => navigate("/service-orders") };
-    if (activeTab === "pending") return { label: "Confirmar / contatar", onClick: () => navigate("/whatsapp") };
-    if (activeTab === "conflicts") return { label: "Reorganizar agenda", onClick: () => setWindowFilter("overdue") };
-    if (activeTab === "history") return { label: "Voltar para agenda", onClick: () => setActiveTab("agenda") };
-    return { label: "Novo agendamento", onClick: () => setOpenCreate(true) };
-  })();
-
   const selectedCustomerName =
     customerFilter === "all"
       ? ""
@@ -603,9 +606,14 @@ export default function AppointmentsPage() {
     <PageWrapper title="Agenda operacional" subtitle="Confirme, execute e avance para O.S. sem sair da agenda.">
       <AppPageShell className="space-y-3">
         <AppOperationalHeader
-          title="Agendamentos · controle do tempo operacional"
-          description={`Hoje ${todayCount} · Não confirmados ${unconfirmedCount} · Conflitos ${conflictCount} · Atrasados ${delayedCount}.`}
-          primaryAction={<ActionFeedbackButton state="idle" idleLabel={headerCta.label} onClick={headerCta.onClick} />}
+          title="Agendamentos"
+          description="Organize o tempo da operação, evite conflitos e prepare a execução."
+          primaryAction={<ActionFeedbackButton state="idle" idleLabel="Novo agendamento" onClick={() => setOpenCreate(true)} />}
+          secondaryActions={
+            <SecondaryButton type="button" onClick={() => navigate("/calendar")}>
+              Ver calendário
+            </SecondaryButton>
+          }
           contextChips={
             <>
               <AppStatusBadge
@@ -623,26 +631,16 @@ export default function AppointmentsPage() {
               />
             
             <AppStatusBadge label={`${todayCount} hoje`} />
-            <AppStatusBadge label={`${unconfirmedCount} não confirmados`} />
-            <AppStatusBadge label={`${conflictCount} conflitos`} />
-            <AppStatusBadge label={`${delayedCount} atrasados`} />
+              <AppStatusBadge label={`${unconfirmedCount} não confirmados`} />
+              <AppStatusBadge label={`${conflictCount} conflitos`} />
+              <AppStatusBadge label={`${delayedCount} atrasados`} />
             </>
           }
         />
-        <OperationalTopCard
-          className="hidden"
-          contextLabel="Direção operacional"
-          title="Agenda operacional consolidada"
-          description="Compatibilidade estrutural do sistema."
-        />
 
-        <AppSectionBlock
-          title="Alertas operacionais da agenda"
-          subtitle="Leitura objetiva de risco com ação direta sem sair da tela."
-          compact
-        >
-          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
-            {alertItems.map(alert => (
+        <AppSectionBlock title="Atenção imediata" subtitle="Principais desvios da agenda com resposta direta." compact>
+          <div className="grid gap-2 md:grid-cols-3">
+            {immediateAttention.map(alert => (
               <AppSectionCard key={alert.key} className="rounded-lg p-0">
                 <button
                   type="button"
@@ -665,23 +663,55 @@ export default function AppointmentsPage() {
             ))}
           </div>
         </AppSectionBlock>
+        <AppSectionBlock title="Próxima melhor ação" subtitle="Recomendação contextual para reduzir risco operacional agora.">
+          {nextBestAction ? (
+            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)]/40 p-4">
+              <p className="text-sm font-semibold text-[var(--text-primary)]">{nextBestAction.title}</p>
+              <p className="mt-1 text-xs text-[var(--text-secondary)]">Quando: {nextBestAction.when}</p>
+              <p className="mt-2 text-xs text-[var(--text-secondary)]">Motivo: {nextBestAction.reason}</p>
+              <p className="mt-1 text-xs text-[var(--text-secondary)]">Impacto: {nextBestAction.impact}</p>
+              <div className="mt-3">
+                <SecondaryButton
+                  type="button"
+                  className={OPERATIONAL_PRIMARY_CTA_CLASS}
+                  onClick={() => void runInlineAction(nextBestAction.intent)}
+                  disabled={updateAppointment.isPending}
+                >
+                  {nextBestAction.ctaLabel}
+                </SecondaryButton>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-[var(--text-muted)]">Sem recomendação crítica no momento. Agenda em estabilidade operacional.</p>
+          )}
+        </AppSectionBlock>
 
-        <AppSectionBlock title="Modos de visualização" subtitle="Lista operacional é padrão. Calendário e timeline apoiam leitura macro." compact>
-          <div className="flex flex-wrap gap-2">
-            {[
-              { value: "operational_list", label: "Lista operacional" },
-              { value: "calendar_macro", label: "Calendário macro" },
-              { value: "timeline_day", label: "Timeline do dia" },
-            ].map(mode => (
-              <button
-                key={mode.value}
-                type="button"
-                className={appSelectionPillClasses(viewMode === mode.value)}
-                onClick={() => setViewMode(mode.value as ViewMode)}
-              >
-                {mode.label}
-              </button>
-            ))}
+        <AppSectionBlock title="KPIs operacionais" subtitle="Leitura rápida de volume, confirmação e risco do período." compact>
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+            <AppSectionCard className="rounded-lg p-3">
+              <p className="text-[11px] text-[var(--text-muted)]">Agendamentos do dia</p>
+              <p className="text-xl font-semibold text-[var(--text-primary)]">{todayCount}</p>
+              <p className="text-[11px] text-[var(--text-secondary)]">Semana ativa: {weekCount} agendamentos.</p>
+            </AppSectionCard>
+            <AppSectionCard className="rounded-lg p-3">
+              <p className="text-[11px] text-[var(--text-muted)]">Confirmados</p>
+              <p className="text-xl font-semibold text-[var(--text-primary)]">{confirmedTodayCount}</p>
+              <p className="text-[11px] text-[var(--text-secondary)]">Taxa do dia em {confirmationRate}%.</p>
+            </AppSectionCard>
+            <AppSectionCard className="rounded-lg p-3">
+              <p className="text-[11px] text-[var(--text-muted)]">Em atraso</p>
+              <p className="text-xl font-semibold text-[var(--text-primary)]">{delayedCount}</p>
+              <p className="text-[11px] text-[var(--text-secondary)]">
+                {delayedCount > 0 ? "Exige atualização imediata de status." : "Sem atraso no recorte atual."}
+              </p>
+            </AppSectionCard>
+            <AppSectionCard className="rounded-lg p-3">
+              <p className="text-[11px] text-[var(--text-muted)]">Taxa de confirmação</p>
+              <p className="text-xl font-semibold text-[var(--text-primary)]">{confirmationRate}%</p>
+              <p className="text-[11px] text-[var(--text-secondary)]">
+                {confirmationRate >= 80 ? "Acima do mínimo operacional." : "Abaixo do alvo de 80%."}
+              </p>
+            </AppSectionCard>
           </div>
         </AppSectionBlock>
 
@@ -841,35 +871,6 @@ export default function AppointmentsPage() {
 
         <div className="space-y-4">
           <AppSectionBlock
-            title="Leitura de carga e tempo operacional"
-            subtitle="Sem BI pesado: visão direta de volume, horários livres e risco de atraso."
-            compact
-          >
-            <div className="grid gap-2 md:grid-cols-5">
-              <div className="rounded-lg border border-[var(--border-subtle)] p-3">
-                <p className="text-[11px] text-[var(--text-muted)]">Carga do dia</p>
-                <p className="text-lg font-semibold text-[var(--text-primary)]">{todayCount}</p>
-              </div>
-              <div className="rounded-lg border border-[var(--border-subtle)] p-3">
-                <p className="text-[11px] text-[var(--text-muted)]">Horários livres</p>
-                <p className="text-lg font-semibold text-[var(--text-primary)]">{availableSlots}</p>
-              </div>
-              <div className="rounded-lg border border-[var(--border-subtle)] p-3">
-                <p className="text-[11px] text-[var(--text-muted)]">Conflitos</p>
-                <p className="text-lg font-semibold text-[var(--text-primary)]">{conflictCount}</p>
-              </div>
-              <div className="rounded-lg border border-[var(--border-subtle)] p-3">
-                <p className="text-[11px] text-[var(--text-muted)]">Concentração excessiva</p>
-                <p className="text-lg font-semibold text-[var(--text-primary)]">{overloadCount ? "Sim" : "Não"}</p>
-              </div>
-              <div className="rounded-lg border border-[var(--border-subtle)] p-3">
-                <p className="text-[11px] text-[var(--text-muted)]">Risco de atraso</p>
-                <p className="text-lg font-semibold text-[var(--text-primary)]">{delayedCount > 0 ? "Alto" : "Baixo"}</p>
-              </div>
-            </div>
-          </AppSectionBlock>
-
-          <AppSectionBlock
             title={
               activeTab === "agenda"
                 ? "Visão diária da agenda"
@@ -893,57 +894,6 @@ export default function AppointmentsPage() {
               />
             ) : filteredAppointments.length === 0 ? (
               <AppPageEmptyState title="Nenhum dado disponível ainda" description="Ação recomendada: criar agendamento" />
-            ) : viewMode === "calendar_macro" ? (
-              <div className="space-y-3">
-                <p className="text-xs text-[var(--text-secondary)]">
-                  Calendário como leitura macro. Para produtividade, mantenha a lista operacional como modo padrão.
-                </p>
-                <div className="grid gap-2 md:grid-cols-2">
-                  {filteredAppointments.slice(0, 8).map(({ item, serviceName, ownerName, isDelayed }) => (
-                    <button
-                      key={String(item?.id)}
-                      type="button"
-                      className="rounded-lg border border-[var(--border-subtle)] p-3 text-left hover:border-[var(--border-strong)]"
-                      onClick={() => setFocusedAppointmentId(String(item?.id ?? ""))}
-                    >
-                      <p className="text-sm font-semibold text-[var(--text-primary)]">
-                        {safeDate(item?.startsAt)?.toLocaleString("pt-BR") ?? "Sem horário"}
-                      </p>
-                      <p className="text-xs text-[var(--text-secondary)]">{String(item?.customer?.name ?? "Cliente")}</p>
-                      <p className="text-[11px] text-[var(--text-muted)]">{serviceName} · {ownerName}</p>
-                      <p className={`mt-1 text-[11px] ${isDelayed ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`}>
-                        {isDelayed ? "Em atraso" : "Dentro da janela"}
-                      </p>
-                    </button>
-                  ))}
-                </div>
-                <SecondaryButton type="button" onClick={() => navigate("/calendar")}>
-                  Abrir visão completa de calendário
-                </SecondaryButton>
-              </div>
-            ) : viewMode === "timeline_day" ? (
-              <div className="space-y-2">
-                {filteredAppointments
-                  .slice()
-                  .sort((a, b) => (safeDate(a.item?.startsAt)?.getTime() ?? 0) - (safeDate(b.item?.startsAt)?.getTime() ?? 0))
-                  .slice(0, 12)
-                  .map(({ item, operationalState, decision }) => (
-                    <button
-                      key={String(item?.id)}
-                      type="button"
-                      className="w-full rounded-lg border border-[var(--border-subtle)] p-3 text-left hover:border-[var(--border-strong)]"
-                      onClick={() => setFocusedAppointmentId(String(item?.id ?? ""))}
-                    >
-                      <p className="text-xs font-semibold text-[var(--text-primary)]">
-                        {safeDate(item?.startsAt)?.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) ?? "—"} ·{" "}
-                        {String(item?.customer?.name ?? "Cliente")}
-                      </p>
-                      <p className="text-[11px] text-[var(--text-secondary)]">
-                        {operationalState} · Próxima melhor ação: {decision.title}
-                      </p>
-                    </button>
-                  ))}
-              </div>
             ) : (
               <AppDataTable>
                 <table className="w-full table-fixed text-sm">
@@ -1104,8 +1054,8 @@ export default function AppointmentsPage() {
           </AppSectionBlock>
 
           <AppSectionBlock
-            title="Workspace operacional do agendamento"
-            subtitle="Contexto contínuo para decidir, comunicar e avançar para execução sem romper o fluxo da lista."
+            title="Contexto do agendamento (preparação do detalhe)"
+            subtitle="Estrutura pronta para evoluir o detalhe com cliente, histórico, mensagens e vínculo de O.S."
             compact
           >
             {focused ? (
@@ -1167,6 +1117,16 @@ export default function AppointmentsPage() {
                 </div>
 
                 <div className="grid gap-3 md:grid-cols-2">
+                  <section className="rounded-lg border border-[var(--border-subtle)] p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Resumo do agendamento</p>
+                    <p className="mt-1 text-sm text-[var(--text-primary)]">
+                      Data/hora: {safeDate(focused.item?.startsAt)?.toLocaleString("pt-BR") ?? "Não informada"}
+                    </p>
+                    <p className="mt-1 text-sm text-[var(--text-primary)]">Status: {focused.operationalState}</p>
+                    <p className="mt-1 text-sm text-[var(--text-primary)]">
+                      Endereço: {String(focused.item?.notes ?? "Definir no detalhe do agendamento.")}
+                    </p>
+                  </section>
                   <section className="rounded-lg border border-[var(--border-subtle)] p-3">
                     <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Contexto da agenda</p>
                     <p className="mt-1 text-sm text-[var(--text-primary)]">
