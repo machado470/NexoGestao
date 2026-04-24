@@ -253,7 +253,7 @@ const statusUi: Record<ConversationStatus, { label: string; dot: string }> = {
   failed: { label: "Falha", dot: "bg-rose-400" },
 };
 
-const ROW_HEIGHT = 110;
+const ROW_HEIGHT = 124;
 
 const topStats = [
   {
@@ -318,47 +318,47 @@ const ConversationRow = memo(function ConversationRow({
   const status = statusUi[conversation.status] ?? statusUi.ok;
 
   return (
-    <div style={style} className="px-1 py-1">
+    <div style={style} className="px-1 py-1.5">
       <button
         type="button"
         onClick={() => onSelect(conversation.customerId)}
         className={cn(
-          "w-full rounded-xl border px-3 py-2 text-left transition",
+          "w-full rounded-2xl border px-3.5 py-3 text-left transition",
           selectedId === conversation.customerId
-            ? "border-sky-400/60 bg-indigo-950/40"
+            ? "border-sky-400/60 bg-gradient-to-r from-indigo-900/55 via-indigo-950/55 to-slate-900/45 shadow-[0_10px_28px_-20px_rgba(56,189,248,0.9)]"
             : "border-white/10 bg-[var(--surface-primary)]/35 hover:border-white/20"
         )}
       >
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-2">
-            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-indigo-500/30 text-xs font-semibold">
+        <div className="flex items-start justify-between gap-2.5">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-indigo-500/30 text-sm font-semibold">
               {conversation.name.slice(0, 1)}
             </div>
             <div className="min-w-0">
-              <p className="truncate text-xs font-semibold">
+              <p className="truncate text-sm font-semibold">
                 {conversation.name}
               </p>
               {conversation.badge ? (
-                <p className="truncate text-[10px] text-violet-300">
+                <p className="truncate text-[11px] text-violet-300">
                   {conversation.badge}
                 </p>
               ) : null}
             </div>
           </div>
-          <span className="text-[10px] text-[var(--text-muted)]">
+          <span className="text-[11px] text-[var(--text-muted)]">
             {fmtTime(conversation.lastMessageAt)}
           </span>
         </div>
-        <p className="mt-1 line-clamp-1 text-[11px] text-[var(--text-secondary)]">
+        <p className="mt-2 line-clamp-1 text-xs text-[var(--text-secondary)]">
           {conversation.lastMessage}
         </p>
-        <div className="mt-1.5 flex items-center justify-between text-[10px] text-[var(--text-muted)]">
-          <span className="inline-flex items-center gap-1">
-            <span className={cn("h-1.5 w-1.5 rounded-full", status.dot)} />
+        <div className="mt-2.5 flex items-center justify-between text-[11px] text-[var(--text-muted)]">
+          <span className="inline-flex items-center gap-1.5">
+            <span className={cn("h-2 w-2 rounded-full", status.dot)} />
             {status.label}
           </span>
           {conversation.unreadCount ? (
-            <span className="rounded-full bg-orange-500/25 px-1.5 py-0.5 text-[10px] text-orange-200">
+            <span className="rounded-full border border-orange-300/30 bg-orange-500/25 px-1.5 py-0.5 text-[10px] leading-none text-orange-100">
               {conversation.unreadCount}
             </span>
           ) : null}
@@ -370,11 +370,11 @@ const ConversationRow = memo(function ConversationRow({
 
 function TopOperationalStats() {
   return (
-    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
       {topStats.map(item => (
         <article
           key={item.label}
-          className="rounded-xl border border-white/10 bg-[var(--surface-primary)]/45 px-2.5 py-2"
+          className="rounded-xl border border-white/10 bg-[var(--surface-primary)]/45 px-3 py-2.5"
         >
           <div className="flex items-center gap-1.5">
             <item.icon className={cn("size-3.5", item.tone)} />
@@ -425,9 +425,9 @@ function ConversationsList({
   const visibleRows = rows.slice(startIndex, startIndex + visibleCount);
 
   return (
-    <aside className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--surface-primary)]/45 p-2">
-      <div className="shrink-0 space-y-2">
-        <div className="flex items-center gap-2 rounded-xl border border-white/10 px-2 py-1.5">
+    <aside className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--surface-primary)]/45 p-3">
+      <div className="shrink-0 space-y-2.5">
+        <div className="flex items-center gap-2 rounded-xl border border-white/10 px-2.5 py-2">
           <Search className="size-3.5 text-[var(--text-muted)]" />
           <input
             value={search}
@@ -436,13 +436,13 @@ function ConversationsList({
             className="h-7 w-full bg-transparent text-xs outline-none"
           />
         </div>
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap gap-1.5">
           {FILTERS.slice(0, 3).map(item => (
             <button
               key={item.value}
               type="button"
               className={cn(
-                "h-7 rounded-full border px-2.5 text-[11px]",
+                "h-7.5 rounded-full border px-2.5 text-[11px]",
                 filter === item.value
                   ? "border-white/60 bg-white/10"
                   : "border-white/10 text-[var(--text-muted)]"
@@ -456,7 +456,7 @@ function ConversationsList({
       </div>
       <div
         ref={viewportRef}
-        className="mt-2 flex-1 min-h-0 overflow-y-auto"
+        className="mt-2.5 flex-1 min-h-0 overflow-y-auto"
         onScroll={e => setScrollTop(e.currentTarget.scrollTop)}
       >
         {rows.length === 0 ? (
@@ -517,41 +517,41 @@ function ChatPanel({
 
   return (
     <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--surface-base)]/55">
-      <header className="shrink-0 flex items-center justify-between border-b border-white/10 px-3 py-3">
-        <div className="flex items-center gap-2">
-          <div className="flex size-9 items-center justify-center rounded-full bg-indigo-500/30 text-xs font-semibold">
+      <header className="shrink-0 flex items-center justify-between border-b border-white/10 px-4 py-3.5">
+        <div className="flex items-center gap-3">
+          <div className="flex size-11 items-center justify-center rounded-full bg-indigo-500/30 text-sm font-semibold">
             {conversation?.name?.slice(0, 1) ?? "-"}
           </div>
           <div>
-            <p className="text-xs font-semibold">
+            <p className="text-sm font-semibold">
               {conversation?.name ?? "Selecione uma conversa"}
             </p>
-            <p className="text-[11px] text-[var(--text-muted)]">
+            <p className="text-xs text-[var(--text-muted)]">
               {conversation?.phone ?? ""}
             </p>
           </div>
           {conversation ? (
-            <span className="rounded-full bg-amber-500/20 px-2 py-1 text-[10px] text-amber-200">
+            <span className="rounded-full border border-amber-400/25 bg-amber-500/15 px-2.5 py-1 text-[10px] font-medium tracking-wide text-amber-100">
               COBRANÇA PENDENTE
             </span>
           ) : null}
         </div>
-        <div className="flex items-center gap-1 text-[var(--text-muted)]">
-          <button type="button" className="rounded-lg p-1 hover:bg-white/10">
-            <Star className="size-4" />
+        <div className="flex items-center gap-1.5 text-[var(--text-muted)]">
+          <button type="button" className="rounded-lg p-1.5 hover:bg-white/10">
+            <Star className="size-4.5" />
           </button>
-          <button type="button" className="rounded-lg p-1 hover:bg-white/10">
-            <Info className="size-4" />
+          <button type="button" className="rounded-lg p-1.5 hover:bg-white/10">
+            <Info className="size-4.5" />
           </button>
-          <button type="button" className="rounded-lg p-1 hover:bg-white/10">
-            <EllipsisVertical className="size-4" />
+          <button type="button" className="rounded-lg p-1.5 hover:bg-white/10">
+            <EllipsisVertical className="size-4.5" />
           </button>
         </div>
       </header>
 
       <div
         ref={messagesRef}
-        className="flex-1 min-h-0 overflow-y-auto px-3 py-3"
+        className="flex-1 min-h-0 overflow-y-auto px-4 py-4"
         onScroll={event => {
           const target = event.currentTarget;
           if (target.scrollTop < 80 && hasMore && !isLoadingMore) onLoadMore();
@@ -563,13 +563,13 @@ function ChatPanel({
             description="Escolha um cliente para executar cobrança, lembrete ou confirmação."
           />
         ) : isLoading ? (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {Array.from({ length: 5 }).map((_, idx) => (
               <AppSkeleton key={idx} className="h-12 rounded-xl" />
             ))}
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-3.5">
             <p className="text-center text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
               Hoje
             </p>
@@ -596,14 +596,14 @@ function ChatPanel({
                 >
                   <div
                     className={cn(
-                      "max-w-[70%] rounded-xl px-3 py-2 text-sm",
+                      "rounded-2xl border px-4 py-3 text-sm leading-relaxed shadow-sm",
                       outgoing
-                        ? "bg-emerald-900/45"
-                        : "border border-white/10 bg-slate-900/70"
+                        ? "max-w-[58%] border-emerald-300/10 bg-emerald-900/45"
+                        : "max-w-[62%] border-white/10 bg-slate-900/70"
                     )}
                   >
                     <p>{message.text}</p>
-                    <p className="mt-1 flex items-center justify-end gap-1 text-[10px] text-[var(--text-muted)]">
+                    <p className="mt-2 flex items-center justify-end gap-1 text-[10px] text-[var(--text-muted)]/85">
                       {message.at}
                       {outgoing && message.delivered ? (
                         <CheckCheck className="size-3" />
@@ -617,7 +617,7 @@ function ChatPanel({
         )}
       </div>
 
-      <div className="shrink-0 flex items-center gap-2 overflow-x-auto border-t border-white/10 px-2 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="shrink-0 flex items-center gap-2 overflow-x-auto border-t border-white/10 px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {TEMPLATES.map(template => (
           <Button
             key={template}
@@ -632,7 +632,7 @@ function ChatPanel({
         ))}
       </div>
 
-      <footer className="shrink-0 flex items-center gap-2 border-t border-white/10 px-2 py-1.5">
+      <footer className="shrink-0 mt-auto flex items-center gap-2 border-t border-white/10 px-3 py-2.5">
         <button type="button" className="rounded-lg p-2 hover:bg-white/10">
           <MessageCircleMore className="size-4" />
         </button>
@@ -669,15 +669,15 @@ function ContextPanel({
   sendMessage: (preset?: string) => void;
 }) {
   return (
-    <aside className="h-full min-h-0 min-w-0 overflow-y-auto rounded-2xl border border-white/10 bg-[var(--surface-primary)]/45 p-2.5">
+    <aside className="h-full min-h-0 min-w-0 overflow-y-auto rounded-2xl border border-white/10 bg-[var(--surface-primary)]/45 p-3">
       {!conversation ? (
         <AppEmptyState
           title="Sem contexto ativo"
           description="Selecione uma conversa para abrir contexto operacional."
         />
       ) : (
-        <div className="space-y-2 text-xs">
-          <section className="rounded-xl border border-white/10 p-3">
+        <div className="space-y-3 text-xs">
+          <section className="rounded-xl border border-white/10 p-3.5">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
               Cliente
             </p>
@@ -689,12 +689,12 @@ function ContextPanel({
               type="button"
               size="sm"
               variant="outline"
-              className="mt-2 h-7 text-[11px]"
+              className="mt-3 h-7 text-[11px]"
             >
               Ver cliente
             </Button>
           </section>
-          <section className="rounded-xl border border-white/10 p-3">
+          <section className="rounded-xl border border-white/10 p-3.5">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
               Próximo agendamento
             </p>
@@ -702,19 +702,19 @@ function ContextPanel({
             <p className="text-[11px] text-[var(--text-muted)]">
               24/04/2026 às 14:00
             </p>
-            <span className="mt-1 inline-flex rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] text-amber-200">
+            <span className="mt-1 inline-flex whitespace-nowrap rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] text-amber-200">
               PENDENTE CONFIRMAÇÃO
             </span>
             <Button
               type="button"
               size="sm"
               variant="outline"
-              className="mt-2 h-7 text-[11px]"
+              className="mt-3 h-7 text-[11px]"
             >
               Ver agendamento
             </Button>
           </section>
-          <section className="rounded-xl border border-white/10 p-3">
+          <section className="rounded-xl border border-white/10 p-3.5">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
               Ordens de serviço
             </p>
@@ -727,12 +727,12 @@ function ContextPanel({
               type="button"
               size="sm"
               variant="outline"
-              className="mt-2 h-7 text-[11px]"
+              className="mt-3 h-7 text-[11px]"
             >
               Ver O.S.
             </Button>
           </section>
-          <section className="rounded-xl border border-white/10 p-3">
+          <section className="rounded-xl border border-white/10 p-3.5">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
               Financeiro
             </p>
@@ -740,7 +740,7 @@ function ContextPanel({
             <p className="text-[11px] text-[var(--text-muted)]">
               Vencimento: 20/04/2026
             </p>
-            <span className="mt-1 inline-flex rounded-full bg-rose-500/20 px-2 py-0.5 text-[10px] text-rose-200">
+            <span className="mt-1 inline-flex whitespace-nowrap rounded-full bg-rose-500/20 px-2 py-0.5 text-[10px] text-rose-200">
               ATRASADA 3 DIAS
             </span>
             <p className="mt-1 text-[11px]">Valor: R$ 480,00</p>
@@ -748,12 +748,12 @@ function ContextPanel({
               type="button"
               size="sm"
               variant="outline"
-              className="mt-2 h-7 text-[11px]"
+              className="mt-3 h-7 text-[11px]"
             >
               Ver cobrança
             </Button>
           </section>
-          <section className="rounded-xl border border-white/10 p-3">
+          <section className="rounded-xl border border-white/10 p-3.5">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
               Última interação
             </p>
@@ -762,15 +762,15 @@ function ContextPanel({
               Link de pagamento
             </p>
             <p className="text-[11px] text-[var(--text-muted)]">Hoje, 09:40</p>
-            <span className="mt-1 inline-flex rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] text-emerald-200">
+            <span className="mt-1 inline-flex whitespace-nowrap rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] text-emerald-200">
               Entregue
             </span>
           </section>
-          <section className="rounded-xl border border-white/10 p-3">
+          <section className="rounded-xl border border-white/10 p-3.5">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
               Ações rápidas
             </p>
-            <div className="mt-2 grid grid-cols-1 gap-1.5">
+            <div className="mt-2.5 grid grid-cols-1 gap-2 sm:grid-cols-2">
               <Button
                 type="button"
                 size="sm"
@@ -1030,7 +1030,7 @@ export default function WhatsAppPage() {
 
   return (
     <AppPageShell className="px-3 py-3">
-      <div className="flex min-h-0 flex-col gap-2 overflow-y-auto xl:h-[calc(100vh-88px)] xl:overflow-hidden">
+      <div className="flex min-h-0 flex-col gap-3 overflow-y-auto">
         <AppPageHeader className="flex shrink-0 items-center justify-between rounded-2xl border border-white/10 bg-[var(--surface-primary)]/55 px-3 py-2">
           <div className="flex items-center gap-2">
             <h1 className="text-sm font-semibold">WhatsApp</h1>
@@ -1048,11 +1048,11 @@ export default function WhatsAppPage() {
           </div>
         </AppPageHeader>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-2">
+        <div className="flex min-h-0 flex-1 flex-col gap-3">
           <div className="shrink-0">
             <TopOperationalStats />
           </div>
-          <div className="grid h-full min-h-[420px] flex-1 grid-cols-1 gap-2 overflow-hidden xl:min-h-[520px] xl:grid-cols-[320px_minmax(0,1fr)_320px]">
+          <div className="grid h-full min-h-[640px] flex-1 grid-cols-1 gap-3 overflow-hidden xl:min-h-[680px] xl:grid-cols-[340px_minmax(520px,1fr)_340px]">
             <ConversationsList
               rows={filteredConversations}
               selectedId={selectedCustomerId}
