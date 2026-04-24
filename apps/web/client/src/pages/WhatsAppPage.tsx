@@ -219,11 +219,11 @@ function WhatsContextCard({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]/65 p-3">
+    <section className="rounded-lg border border-[color:rgba(255,255,255,0.05)] bg-[var(--surface-primary)]/45 p-3">
       <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
         {title}
       </p>
-      <div className="mt-1.5">{children}</div>
+      <div className="mt-1">{children}</div>
     </section>
   );
 }
@@ -630,7 +630,7 @@ export default function WhatsAppPage() {
 
   return (
     <AppPageShell>
-      <section className="flex items-center justify-between rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]/75 px-4 py-2">
+      <section className="flex items-center justify-between rounded-lg border border-[color:rgba(255,255,255,0.05)] bg-[var(--surface-primary)]/55 px-3 py-1.5">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-base font-semibold text-[var(--text-primary)]">
@@ -700,10 +700,10 @@ export default function WhatsAppPage() {
               key={alert.id}
               type="button"
               onClick={alert.action}
-              className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]/70 px-3 py-2 text-left"
+              className="rounded-lg border border-[color:rgba(255,255,255,0.05)] bg-[var(--surface-primary)]/45 px-2.5 py-1.5 text-left"
             >
               <div className="flex items-center gap-2">
-                <span className="rounded-md bg-[var(--surface-elevated)]/70 p-1.5 text-[var(--text-muted)]">
+                <span className="rounded-md bg-[var(--surface-elevated)]/55 p-1.5 text-[var(--text-muted)]">
                   <Icon className="size-3.5" />
                 </span>
                 <div>
@@ -715,7 +715,7 @@ export default function WhatsAppPage() {
                   </p>
                 </div>
               </div>
-              <p className="mt-1 text-[11px] text-[var(--text-secondary)]">
+              <p className="mt-0.5 text-[11px] text-[var(--text-secondary)]">
                 {alert.description}
               </p>
             </button>
@@ -723,8 +723,8 @@ export default function WhatsAppPage() {
         })}
       </section>
 
-      <div className="grid min-h-[calc(100vh-290px)] gap-3 xl:grid-cols-[300px_minmax(0,1fr)_320px] 2xl:grid-cols-[320px_minmax(0,1fr)_340px]">
-        <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]/70 p-2.5">
+      <div className="grid min-h-[calc(100vh-260px)] gap-3 xl:grid-cols-[300px_minmax(0,1fr)_320px] 2xl:grid-cols-[320px_minmax(0,1fr)_340px]">
+        <section className="rounded-xl border border-[color:rgba(255,255,255,0.05)] bg-[var(--surface-primary)]/45 p-2">
           <div className="space-y-2">
             <div className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-[var(--text-muted)]" />
@@ -732,7 +732,7 @@ export default function WhatsAppPage() {
                 value={searchTerm}
                 onChange={event => setSearchTerm(event.target.value)}
                 placeholder="Buscar conversa..."
-                className="h-8 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] pl-8 pr-2 text-xs outline-none focus:border-[var(--border-emphasis)]"
+                className="h-9 w-full rounded-lg border border-[color:rgba(255,255,255,0.06)] bg-[var(--surface-base)]/75 pl-8 pr-2 text-xs outline-none focus:border-[var(--border-emphasis)]"
               />
             </div>
             <div className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -744,8 +744,8 @@ export default function WhatsAppPage() {
                     className={cn(
                       "h-7 rounded-lg border px-2.5 text-[11px]",
                       activeFilter === filter.value
-                        ? "border-[var(--border-emphasis)] bg-[var(--surface-elevated)] text-[var(--text-primary)]"
-                        : "border-[var(--border-subtle)] text-[var(--text-secondary)]"
+                        ? "border-[var(--border-emphasis)] bg-[var(--surface-elevated)]/75 text-[var(--text-primary)]"
+                        : "border-[color:rgba(255,255,255,0.05)] text-[var(--text-secondary)]"
                     )}
                     onClick={() => setActiveFilter(filter.value)}
                   >
@@ -754,7 +754,7 @@ export default function WhatsAppPage() {
                 ))}
               </div>
             </div>
-            <div className="max-h-[calc(100vh-395px)] space-y-1.5 overflow-y-auto pr-0.5">
+            <div className="max-h-[calc(100vh-365px)] space-y-1.5 overflow-y-auto pr-0.5">
               {customersQuery.isFetching ? (
                 <div className="space-y-1.5">
                   {Array.from({ length: 6 }).map((_, idx) => (
@@ -773,10 +773,10 @@ export default function WhatsAppPage() {
                     type="button"
                     onClick={() => setSelectedCustomerId(conversation.id)}
                     className={cn(
-                      "w-full rounded-lg border px-2.5 py-2 text-left",
+                      "w-full rounded-xl border px-2.5 py-2 text-left",
                       selectedConversation?.id === conversation.id
-                        ? "border-[var(--border-emphasis)] bg-[var(--surface-elevated)]/75"
-                        : "border-[var(--border-subtle)] bg-[var(--surface-primary)]/35 hover:bg-[var(--surface-elevated)]/35"
+                        ? "border-[var(--border-emphasis)] bg-[var(--surface-elevated)]/70"
+                        : "border-[color:rgba(255,255,255,0.03)] bg-[var(--surface-primary)]/20 hover:bg-[var(--surface-elevated)]/30"
                     )}
                   >
                     <div className="flex items-start gap-2">
@@ -816,7 +816,7 @@ export default function WhatsAppPage() {
           </div>
         </section>
 
-        <section className="grid min-h-[calc(100vh-290px)] grid-rows-[auto_minmax(0,1fr)_auto_auto] rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/70">
+        <section className="grid min-h-[calc(100vh-260px)] grid-rows-[auto_minmax(0,1fr)_auto_auto] rounded-2xl border border-[color:rgba(255,255,255,0.05)] bg-[var(--surface-base)]/45">
           {!selectedConversation ? (
             <div className="grid h-full place-items-center p-6">
               <AppEmptyState
@@ -826,7 +826,7 @@ export default function WhatsAppPage() {
             </div>
           ) : (
             <>
-              <header className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-2">
+              <header className="flex items-center justify-between border-b border-[color:rgba(255,255,255,0.05)] px-3.5 py-1.5">
                 <div className="flex items-center gap-2.5">
                   <span className="grid size-8 place-items-center rounded-full bg-[var(--surface-elevated)] text-[10px] font-semibold">
                     {initials(selectedConversation.name)}
@@ -840,7 +840,7 @@ export default function WhatsAppPage() {
                     </p>
                   </div>
                   {selectedConversation.hasOverdueCharge ? (
-                    <span className="rounded-full border border-rose-500/30 bg-rose-500/10 px-2 py-0.5 text-[10px] font-medium text-rose-300">
+                    <span className="rounded-full border border-rose-500/25 bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-medium text-rose-300">
                       COBRANÇA PENDENTE
                     </span>
                   ) : null}
@@ -848,7 +848,7 @@ export default function WhatsAppPage() {
                 <div className="flex items-center gap-1.5 text-[var(--text-muted)]">
                   <button
                     type="button"
-                    className="rounded-md border border-[var(--border-subtle)] p-1.5"
+                    className="rounded-md border border-[color:rgba(255,255,255,0.08)] p-1.5"
                   >
                     <Star className="size-3.5" />
                   </button>
@@ -866,8 +866,8 @@ export default function WhatsAppPage() {
                   </button>
                 </div>
               </header>
-              <div className="space-y-3 overflow-y-auto px-4 py-3">
-                <p className="mx-auto w-fit rounded-full border border-[var(--border-subtle)] bg-[var(--surface-primary)]/60 px-2 py-0.5 text-[10px] text-[var(--text-muted)]">
+              <div className="space-y-2.5 overflow-y-auto px-3.5 py-2.5">
+                <p className="mx-auto w-fit rounded-full border border-[color:rgba(255,255,255,0.05)] bg-[var(--surface-primary)]/45 px-2 py-0.5 text-[10px] text-[var(--text-muted)]">
                   Hoje
                 </p>
                 {messagesQuery.isLoading ? (
@@ -894,7 +894,7 @@ export default function WhatsAppPage() {
                       return (
                         <div
                           key={String(message?.id)}
-                          className="mx-auto max-w-[70%] rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-primary)]/55 px-3 py-1.5 text-center text-[11px] text-[var(--text-muted)]"
+                          className="mx-auto max-w-[66%] rounded-lg border border-[color:rgba(255,255,255,0.05)] bg-[var(--surface-primary)]/40 px-3 py-1.5 text-center text-[11px] text-[var(--text-muted)]"
                         >
                           {String(message?.content ?? "Evento operacional")} ·{" "}
                           {fmtTime(message?.createdAt)}
@@ -912,10 +912,10 @@ export default function WhatsAppPage() {
                       >
                         <div
                           className={cn(
-                            "max-w-[56%] rounded-2xl px-3.5 py-2.5",
+                            "max-w-[54%] rounded-2xl px-3 py-2",
                             incoming
-                              ? "bg-[var(--surface-primary)] border border-[var(--border-subtle)]"
-                              : "border border-emerald-500/30 bg-emerald-900/30"
+                              ? "border border-[color:rgba(255,255,255,0.05)] bg-[var(--surface-primary)]/70"
+                              : "border border-emerald-500/20 bg-emerald-900/35"
                           )}
                         >
                           <p className="text-sm leading-5 text-[var(--text-primary)]">
@@ -959,7 +959,7 @@ export default function WhatsAppPage() {
                   })
                 )}
               </div>
-              <div className="overflow-x-auto border-y border-[var(--border-subtle)] bg-[var(--surface-primary)]/55 px-3 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="overflow-x-auto border-y border-[color:rgba(255,255,255,0.05)] bg-[var(--surface-primary)]/40 px-2.5 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 <div className="flex min-w-max items-center gap-1.5">
                   {QUICK_ACTIONS.slice(0, 4).map(action => (
                     <Button
@@ -967,7 +967,7 @@ export default function WhatsAppPage() {
                       type="button"
                       size="sm"
                       variant="outline"
-                      className="h-7 rounded-lg px-2.5 text-[11px]"
+                      className="h-8 rounded-lg border-[color:rgba(255,255,255,0.08)] px-2.5 text-[11px]"
                       onClick={() => setContent(action.content)}
                     >
                       {action.label}
@@ -977,14 +977,14 @@ export default function WhatsAppPage() {
                     type="button"
                     size="sm"
                     variant="outline"
-                    className="h-7 rounded-lg px-2"
+                    className="h-8 rounded-lg border-[color:rgba(255,255,255,0.08)] px-2"
                   >
                     <MoreHorizontal className="size-3.5" />
                   </Button>
                 </div>
               </div>
-              <footer className="border-t border-[var(--border-subtle)] bg-[var(--surface-base)]/90 p-2.5">
-                <div className="flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]/65 px-2 py-1.5">
+              <footer className="border-t border-[color:rgba(255,255,255,0.05)] bg-[var(--surface-base)]/80 p-2">
+                <div className="flex items-center gap-1.5 rounded-xl border border-[color:rgba(255,255,255,0.08)] bg-[var(--surface-primary)]/55 px-2 py-1">
                   <button
                     type="button"
                     className="rounded-md p-1 text-[var(--text-muted)]"
@@ -998,18 +998,18 @@ export default function WhatsAppPage() {
                     value={content}
                     onChange={event => setContent(event.target.value)}
                     placeholder="Digite sua mensagem..."
-                    className="h-8 flex-1 bg-transparent text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
+                    className="h-7 flex-1 bg-transparent text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
                   />
                   <button
                     type="button"
-                    className="rounded-md border border-[var(--border-subtle)] p-1 text-[var(--text-muted)]"
+                    className="rounded-md border border-[color:rgba(255,255,255,0.08)] p-1 text-[var(--text-muted)]"
                   >
                     <Workflow className="size-4" />
                   </button>
                   <Button
                     type="button"
                     size="sm"
-                    className="h-8 px-3"
+                    className="h-8 w-8 rounded-full px-0"
                     disabled={
                       sendMutation.isPending || content.trim().length < 2
                     }
@@ -1023,14 +1023,14 @@ export default function WhatsAppPage() {
           )}
         </section>
 
-        <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]/70 p-2.5">
+        <section className="rounded-xl border border-[color:rgba(255,255,255,0.05)] bg-[var(--surface-primary)]/45 p-2">
           {!selectedConversation ? (
             <AppEmptyState
               title="Sem contexto ativo"
               description="Selecione uma conversa para exibir vínculos operacionais."
             />
           ) : (
-            <div className="max-h-[calc(100vh-390px)] space-y-2 overflow-y-auto pr-0.5">
+            <div className="max-h-[calc(100vh-360px)] space-y-2 overflow-y-auto pr-0.5">
               <p className="px-1 text-[11px] font-medium text-[var(--text-muted)]">
                 Contexto operacional
               </p>
@@ -1045,7 +1045,7 @@ export default function WhatsAppPage() {
                   type="button"
                   size="sm"
                   variant="outline"
-                  className="mt-2 h-7 text-[11px]"
+                  className="mt-2 h-7 border-[color:rgba(255,255,255,0.08)] text-[11px]"
                   onClick={() =>
                     navigate(`/customers/${selectedConversation.id}`)
                   }
@@ -1063,7 +1063,7 @@ export default function WhatsAppPage() {
                   type="button"
                   size="sm"
                   variant="outline"
-                  className="mt-2 h-7 text-[11px]"
+                  className="mt-2 h-7 border-[color:rgba(255,255,255,0.08)] text-[11px]"
                   onClick={() => navigate("/appointments")}
                 >
                   Ver agendamento
@@ -1079,7 +1079,7 @@ export default function WhatsAppPage() {
                   type="button"
                   size="sm"
                   variant="outline"
-                  className="mt-2 h-7 text-[11px]"
+                  className="mt-2 h-7 border-[color:rgba(255,255,255,0.08)] text-[11px]"
                   onClick={() => navigate("/service-orders")}
                 >
                   Ver O.S.
@@ -1102,7 +1102,7 @@ export default function WhatsAppPage() {
                   type="button"
                   size="sm"
                   variant="outline"
-                  className="mt-2 h-7 text-[11px]"
+                  className="mt-2 h-7 border-[color:rgba(255,255,255,0.08)] text-[11px]"
                   onClick={() => navigate("/finances")}
                 >
                   Ver cobrança
@@ -1125,7 +1125,7 @@ export default function WhatsAppPage() {
                     type="button"
                     size="sm"
                     variant="outline"
-                    className="h-7 text-[11px]"
+                    className="h-7 border-[color:rgba(255,255,255,0.08)] text-[11px]"
                     onClick={() =>
                       void sendMessage(
                         "Identificamos pendência em aberto. Posso enviar o link para regularização agora?"
@@ -1138,7 +1138,7 @@ export default function WhatsAppPage() {
                     type="button"
                     size="sm"
                     variant="outline"
-                    className="h-7 text-[11px]"
+                    className="h-7 border-[color:rgba(255,255,255,0.08)] text-[11px]"
                   >
                     Registrar pagamento
                   </Button>
@@ -1146,7 +1146,7 @@ export default function WhatsAppPage() {
                     type="button"
                     size="sm"
                     variant="outline"
-                    className="h-7 text-[11px]"
+                    className="h-7 border-[color:rgba(255,255,255,0.08)] text-[11px]"
                   >
                     Atualizar O.S.
                   </Button>
@@ -1154,7 +1154,7 @@ export default function WhatsAppPage() {
                     type="button"
                     size="sm"
                     variant="outline"
-                    className="h-7 text-[11px]"
+                    className="h-7 border-[color:rgba(255,255,255,0.08)] text-[11px]"
                   >
                     Mais ações
                   </Button>
@@ -1165,13 +1165,10 @@ export default function WhatsAppPage() {
         </section>
       </div>
 
-      <footer className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]/70 px-3 py-2">
-        <div className="grid gap-2 md:grid-cols-5">
+      <footer className="rounded-lg border border-[color:rgba(255,255,255,0.05)] bg-[var(--surface-primary)]/45 px-2.5 py-1.5">
+        <div className="grid rounded-lg border border-[color:rgba(255,255,255,0.04)] bg-[var(--surface-primary)]/25 md:grid-cols-5 md:[&>div+div]:border-l md:[&>div+div]:border-[color:rgba(255,255,255,0.05)]">
           {footerMetrics.map(metric => (
-            <div
-              key={metric.label}
-              className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-primary)]/45 px-2.5 py-2"
-            >
+            <div key={metric.label} className="px-2.5 py-2">
               <p className="text-[10px] text-[var(--text-muted)]">
                 {metric.label}
               </p>
@@ -1184,7 +1181,7 @@ export default function WhatsAppPage() {
             </div>
           ))}
         </div>
-        <p className="mt-2 text-[11px] text-[var(--text-secondary)]">
+        <p className="mt-1.5 text-[11px] text-[var(--text-secondary)]">
           Fluxo reforçado: cliente → agendamento → O.S. → cobrança → pagamento.{" "}
           {conversationPeriodLabel}
         </p>
