@@ -723,8 +723,8 @@ export default function WhatsAppPage() {
         })}
       </section>
 
-      <div className="grid min-h-[calc(100vh-260px)] min-w-0 gap-3 xl:grid-cols-[300px_minmax(0,1fr)_320px] 2xl:grid-cols-[320px_minmax(0,1fr)_340px]">
-        <section className="min-w-0 rounded-xl border border-[color:rgba(255,255,255,0.05)] bg-[var(--surface-primary)]/45 p-2">
+      <div className="grid min-h-[calc(100vh-260px)] min-w-0 max-w-none gap-[10px] xl:grid-cols-[300px_minmax(0,1fr)_310px] 2xl:grid-cols-[315px_minmax(0,1fr)_320px]">
+        <section className="min-w-0 rounded-xl border border-[color:rgba(255,255,255,0.05)] bg-[var(--surface-primary)]/45 p-3">
           <div className="space-y-2">
             <div className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-[var(--text-muted)]" />
@@ -1023,7 +1023,7 @@ export default function WhatsAppPage() {
           )}
         </section>
 
-        <section className="min-w-0 rounded-xl border border-[color:rgba(255,255,255,0.05)] bg-[var(--surface-primary)]/45 p-2">
+        <section className="min-w-0 rounded-xl border border-[color:rgba(255,255,255,0.05)] bg-[var(--surface-primary)]/45 p-3">
           {!selectedConversation ? (
             <AppEmptyState
               title="Sem contexto ativo"
@@ -1031,7 +1031,7 @@ export default function WhatsAppPage() {
             />
           ) : (
             <div className="max-h-[calc(100vh-360px)] space-y-2 overflow-y-auto pr-0.5">
-              <p className="px-1 text-[11px] font-medium text-[var(--text-muted)]">
+              <p className="px-0.5 text-[11px] font-medium text-[var(--text-muted)]">
                 Contexto operacional
               </p>
               <WhatsContextCard title="Cliente">
@@ -1165,10 +1165,10 @@ export default function WhatsAppPage() {
         </section>
       </div>
 
-      <footer className="rounded-lg border border-[color:rgba(255,255,255,0.05)] bg-[var(--surface-primary)]/45 px-2.5 py-1.5">
+      <footer className="rounded-lg border border-[color:rgba(255,255,255,0.05)] bg-[var(--surface-primary)]/45 px-2 py-1.5">
         <div className="grid rounded-lg border border-[color:rgba(255,255,255,0.04)] bg-[var(--surface-primary)]/25 md:grid-cols-5 md:[&>div+div]:border-l md:[&>div+div]:border-[color:rgba(255,255,255,0.05)]">
           {footerMetrics.map(metric => (
-            <div key={metric.label} className="px-2.5 py-2">
+            <div key={metric.label} className="px-2 py-2">
               <p className="text-[10px] text-[var(--text-muted)]">
                 {metric.label}
               </p>
