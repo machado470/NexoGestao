@@ -11,20 +11,21 @@ import { toast } from "sonner";
 import {
   AlertTriangle,
   CalendarClock,
-  Check,
   CheckCheck,
   Circle,
   Clock3,
   EllipsisVertical,
   Info,
+  Bell,
   MessageCircleMore,
   Paperclip,
+  PanelLeftClose,
   Search,
   Send,
   Star,
+  UserCircle2,
   Volume2,
   Wallet,
-  Zap,
 } from "lucide-react";
 
 import { trpc } from "@/lib/trpc";
@@ -325,13 +326,13 @@ const ConversationRow = memo(function ConversationRow({
         className={cn(
           "w-full rounded-2xl border px-3.5 py-3 text-left transition",
           selectedId === conversation.customerId
-            ? "border-sky-400/60 bg-gradient-to-r from-indigo-900/55 via-indigo-950/55 to-slate-900/45 shadow-[0_10px_28px_-20px_rgba(56,189,248,0.9)]"
-            : "border-white/10 bg-[var(--surface-primary)]/35 hover:border-white/20"
+            ? "border-indigo-400/55 bg-indigo-900/30 shadow-[0_8px_18px_-16px_rgba(79,70,229,0.9)]"
+            : "border-white/10 bg-[#111A28]/88 hover:border-white/20"
         )}
       >
         <div className="flex items-start justify-between gap-2.5">
           <div className="flex min-w-0 items-center gap-2.5">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-indigo-500/30 text-sm font-semibold">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-indigo-500/25 text-sm font-semibold">
               {conversation.name.slice(0, 1)}
             </div>
             <div className="min-w-0">
@@ -339,7 +340,7 @@ const ConversationRow = memo(function ConversationRow({
                 {conversation.name}
               </p>
               {conversation.badge ? (
-                <p className="truncate text-[11px] text-violet-300">
+                <p className="truncate text-[11px] text-indigo-300/90">
                   {conversation.badge}
                 </p>
               ) : null}
@@ -358,7 +359,7 @@ const ConversationRow = memo(function ConversationRow({
             {status.label}
           </span>
           {conversation.unreadCount ? (
-            <span className="rounded-full border border-orange-300/30 bg-orange-500/25 px-1.5 py-0.5 text-[10px] leading-none text-orange-100">
+            <span className="rounded-full border border-amber-400/35 bg-amber-500/20 px-1.5 py-0.5 text-[10px] leading-none text-amber-100">
               {conversation.unreadCount}
             </span>
           ) : null}
@@ -372,10 +373,7 @@ function TopOperationalStats() {
   return (
     <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
       {topStats.map(item => (
-        <article
-          key={item.label}
-          className="rounded-xl border border-white/10 bg-[var(--surface-primary)]/45 px-3 py-2.5"
-        >
+        <article key={item.label} className="rounded-xl border border-white/10 bg-[#111A28]/90 px-3 py-2.5">
           <div className="flex items-center gap-1.5">
             <item.icon className={cn("size-3.5", item.tone)} />
             <p className={cn("text-[11px]", item.tone)}>{item.label}</p>
@@ -425,9 +423,9 @@ function ConversationsList({
   const visibleRows = rows.slice(startIndex, startIndex + visibleCount);
 
   return (
-    <aside className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--surface-primary)]/45 p-3">
+    <aside className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#111A28]/92 p-3">
       <div className="shrink-0 space-y-2.5">
-        <div className="flex items-center gap-2 rounded-xl border border-white/10 px-2.5 py-2">
+        <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#0E1522]/70 px-2.5 py-2">
           <Search className="size-3.5 text-[var(--text-muted)]" />
           <input
             value={search}
@@ -444,8 +442,8 @@ function ConversationsList({
               className={cn(
                 "h-7.5 rounded-full border px-2.5 text-[11px]",
                 filter === item.value
-                  ? "border-white/60 bg-white/10"
-                  : "border-white/10 text-[var(--text-muted)]"
+                  ? "border-indigo-300/40 bg-indigo-500/15 text-indigo-100"
+                  : "border-white/10 bg-[#0E1522]/60 text-[var(--text-muted)]"
               )}
               onClick={() => onFilter(item.value)}
             >
@@ -516,10 +514,10 @@ function ChatPanel({
   }, [conversation?.customerId]);
 
   return (
-    <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--surface-base)]/55">
-      <header className="shrink-0 flex items-center justify-between border-b border-white/10 px-4 py-3.5">
+    <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#141D2B]/90">
+      <header className="shrink-0 flex items-center justify-between border-b border-white/10 bg-[#111A28]/45 px-4 py-3.5">
         <div className="flex items-center gap-3">
-          <div className="flex size-11 items-center justify-center rounded-full bg-indigo-500/30 text-sm font-semibold">
+          <div className="flex size-11 items-center justify-center rounded-full border border-white/10 bg-indigo-500/25 text-sm font-semibold">
             {conversation?.name?.slice(0, 1) ?? "-"}
           </div>
           <div>
@@ -531,7 +529,7 @@ function ChatPanel({
             </p>
           </div>
           {conversation ? (
-            <span className="rounded-full border border-amber-400/25 bg-amber-500/15 px-2.5 py-1 text-[10px] font-medium tracking-wide text-amber-100">
+            <span className="rounded-full border border-amber-400/30 bg-amber-500/15 px-2.5 py-1 text-[10px] font-medium tracking-wide text-amber-100">
               COBRANÇA PENDENTE
             </span>
           ) : null}
@@ -551,7 +549,7 @@ function ChatPanel({
 
       <div
         ref={messagesRef}
-        className="flex-1 min-h-0 overflow-y-auto px-4 py-4"
+        className="flex-1 min-h-0 overflow-y-auto bg-[#0E1522]/55 px-4 py-4"
         onScroll={event => {
           const target = event.currentTarget;
           if (target.scrollTop < 80 && hasMore && !isLoadingMore) onLoadMore();
@@ -598,8 +596,8 @@ function ChatPanel({
                     className={cn(
                       "rounded-2xl border px-4 py-3 text-sm leading-relaxed shadow-sm",
                       outgoing
-                        ? "max-w-[58%] border-emerald-300/10 bg-emerald-900/45"
-                        : "max-w-[62%] border-white/10 bg-slate-900/70"
+                        ? "max-w-[58%] border-emerald-400/20 bg-emerald-900/55"
+                        : "max-w-[62%] border-white/10 bg-slate-900/80"
                     )}
                   >
                     <p>{message.text}</p>
@@ -617,14 +615,14 @@ function ChatPanel({
         )}
       </div>
 
-      <div className="shrink-0 flex items-center gap-2 overflow-x-auto border-t border-white/10 px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="shrink-0 flex items-center gap-2 overflow-x-auto border-t border-white/10 bg-[#111A28]/55 px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {TEMPLATES.map(template => (
           <Button
             key={template}
             type="button"
             size="sm"
             variant="outline"
-            className="h-8 rounded-lg text-[11px]"
+            className="h-8 rounded-xl border-white/10 bg-[#0E1522]/70 text-[11px] hover:bg-[#182334]"
             onClick={() => setContent(template)}
           >
             {template}
@@ -632,7 +630,7 @@ function ChatPanel({
         ))}
       </div>
 
-      <footer className="shrink-0 mt-auto flex items-center gap-2 border-t border-white/10 px-3 py-2.5">
+      <footer className="shrink-0 mt-auto flex items-center gap-2 border-t border-white/10 bg-[#111A28]/70 px-3 py-2.5">
         <button type="button" className="rounded-lg p-2 hover:bg-white/10">
           <MessageCircleMore className="size-4" />
         </button>
@@ -643,12 +641,12 @@ function ChatPanel({
           value={content}
           onChange={event => setContent(event.target.value)}
           placeholder="Digite sua mensagem..."
-          className="h-9 w-full rounded-xl border border-white/10 bg-transparent px-3 text-sm outline-none"
+          className="h-9 w-full rounded-xl border border-white/10 bg-[#0B111C]/65 px-3 text-sm outline-none placeholder:text-[var(--text-muted)]/70"
         />
         <Button
           type="button"
           size="sm"
-          className="h-9 rounded-full bg-emerald-600 px-3 hover:bg-emerald-500"
+          className="h-9 rounded-full bg-emerald-600/85 px-3 hover:bg-emerald-500"
           onClick={() => sendMessage()}
         >
           <Send className="size-3.5" />
@@ -669,7 +667,7 @@ function ContextPanel({
   sendMessage: (preset?: string) => void;
 }) {
   return (
-    <aside className="h-full min-h-0 min-w-0 overflow-y-auto rounded-2xl border border-white/10 bg-[var(--surface-primary)]/45 p-3">
+    <aside className="h-full min-h-0 min-w-0 overflow-y-auto rounded-2xl border border-white/10 bg-[#111A28]/92 p-3">
       {!conversation ? (
         <AppEmptyState
           title="Sem contexto ativo"
@@ -677,7 +675,7 @@ function ContextPanel({
         />
       ) : (
         <div className="space-y-3 text-xs">
-          <section className="rounded-xl border border-white/10 p-3.5">
+          <section className="rounded-xl border border-white/10 bg-[#141D2B]/78 p-3.5">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
               Cliente
             </p>
@@ -694,7 +692,7 @@ function ContextPanel({
               Ver cliente
             </Button>
           </section>
-          <section className="rounded-xl border border-white/10 p-3.5">
+          <section className="rounded-xl border border-white/10 bg-[#141D2B]/78 p-3.5">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
               Próximo agendamento
             </p>
@@ -714,7 +712,7 @@ function ContextPanel({
               Ver agendamento
             </Button>
           </section>
-          <section className="rounded-xl border border-white/10 p-3.5">
+          <section className="rounded-xl border border-white/10 bg-[#141D2B]/78 p-3.5">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
               Ordens de serviço
             </p>
@@ -732,7 +730,7 @@ function ContextPanel({
               Ver O.S.
             </Button>
           </section>
-          <section className="rounded-xl border border-white/10 p-3.5">
+          <section className="rounded-xl border border-white/10 bg-[#141D2B]/78 p-3.5">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
               Financeiro
             </p>
@@ -753,7 +751,7 @@ function ContextPanel({
               Ver cobrança
             </Button>
           </section>
-          <section className="rounded-xl border border-white/10 p-3.5">
+          <section className="rounded-xl border border-white/10 bg-[#141D2B]/78 p-3.5">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
               Última interação
             </p>
@@ -766,7 +764,7 @@ function ContextPanel({
               Entregue
             </span>
           </section>
-          <section className="rounded-xl border border-white/10 p-3.5">
+          <section className="rounded-xl border border-white/10 bg-[#141D2B]/78 p-3.5">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
               Ações rápidas
             </p>
@@ -818,7 +816,7 @@ function WhatsAppMetricsFooter() {
       {footerMetrics.map(([label, value]) => (
         <article
           key={label}
-          className="rounded-xl border border-white/10 bg-[var(--surface-primary)]/45 px-2.5 py-1.5"
+          className="rounded-xl border border-white/10 bg-[#111A28]/90 px-2.5 py-1.5"
         >
           <p className="text-[10px] text-[var(--text-muted)]">{label}</p>
           <p className="text-xs font-semibold">{value}</p>
@@ -1029,26 +1027,44 @@ export default function WhatsAppPage() {
     | undefined;
 
   return (
-    <AppPageShell className="px-3 py-3">
-      <div className="flex min-h-0 flex-col gap-3 overflow-y-auto">
-        <AppPageHeader className="flex shrink-0 items-center justify-between rounded-2xl border border-white/10 bg-[var(--surface-primary)]/55 px-3 py-2">
-          <div className="flex items-center gap-2">
-            <h1 className="text-sm font-semibold">WhatsApp</h1>
-            <p className="text-[11px] text-[var(--text-muted)]">
-              Canal de execução operacional
-            </p>
+    <AppPageShell className="h-full overflow-hidden bg-[#0B111C] px-3 py-3">
+      <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
+        <AppPageHeader className="flex shrink-0 items-center justify-between rounded-2xl border border-white/10 bg-[#111A28]/92 px-3 py-2">
+          <div className="flex items-center gap-2.5">
+            <button type="button" className="rounded-lg border border-white/10 bg-[#0E1522]/70 p-1.5 text-[var(--text-muted)] hover:bg-[#182334]">
+              <PanelLeftClose className="size-4" />
+            </button>
+            <div>
+              <h1 className="text-sm font-semibold">WhatsApp</h1>
+              <p className="text-[11px] text-[var(--text-muted)]">
+                Canal de execução operacional
+              </p>
+            </div>
+            <div className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-300">
+              <Circle className="size-2.5 fill-current" /> Online
+            </div>
             {isDemoMode ? (
-              <span className="rounded-full border border-white/20 px-2 py-0.5 text-[10px] text-[var(--text-muted)]">
+              <span className="rounded-full border border-amber-400/25 bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-100">
                 Dados piloto
               </span>
             ) : null}
           </div>
-          <div className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-300">
-            <Circle className="size-2.5 fill-current" /> Online
+          <div className="flex items-center gap-2">
+            <div className="hidden items-center gap-2 rounded-xl border border-white/10 bg-[#0E1522]/70 px-2.5 py-1.5 md:flex">
+              <Search className="size-3.5 text-[var(--text-muted)]" />
+              <input placeholder="Buscar..." className="w-36 bg-transparent text-xs outline-none placeholder:text-[var(--text-muted)]/70" />
+            </div>
+            <button type="button" className="rounded-lg border border-white/10 bg-[#0E1522]/70 p-1.5 text-[var(--text-muted)] hover:bg-[#182334]">
+              <Bell className="size-4" />
+            </button>
+            <button type="button" className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-[#0E1522]/70 px-2 py-1.5 text-xs hover:bg-[#182334]">
+              <UserCircle2 className="size-4 text-indigo-300" />
+              Paula
+            </button>
           </div>
         </AppPageHeader>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-3">
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
           <div className="shrink-0">
             <TopOperationalStats />
           </div>
