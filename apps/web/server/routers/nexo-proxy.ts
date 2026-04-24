@@ -712,13 +712,43 @@ export const nexoProxyRouter = router({
   }),
 
   whatsapp: router({
-    messages: protectedProcedure
-      .input(z.object({ customerId: z.string() }))
+    conversations: protectedProcedure.query(async ({ ctx }) => {
+      return authedGet(ctx as CtxLike, '/whatsapp/conversations');
+    }),
+
+    messagesFeed: protectedProcedure
+      .input(
+        z.object({
+          customerId: z.string(),
+          cursor: z.string().optional(),
+          limit: z.number().int().min(1).max(100).optional(),
+        })
+      )
       .query(async ({ ctx, input }) => {
         return authedGet(
           ctx as CtxLike,
-          `/whatsapp/messages/${input.customerId}`
+          `/whatsapp/messages/${input.customerId}`,
+          {
+            cursor: input.cursor,
+            limit: input.limit,
+          }
         );
+      }),
+
+    messages: protectedProcedure
+      .input(
+        z.object({
+          customerId: z.string(),
+          limit: z.number().int().min(1).max(100).optional(),
+        })
+      )
+      .query(async ({ ctx, input }) => {
+        const payload = await authedGet(
+          ctx as CtxLike,
+          `/whatsapp/messages/${input.customerId}`,
+          { limit: input.limit ?? 50 }
+        );
+        return Array.isArray(payload) ? payload : (payload as any)?.items ?? [];
       }),
 
     send: protectedProcedure.input(whatsappSendInput).mutation(async ({ ctx, input }) => {

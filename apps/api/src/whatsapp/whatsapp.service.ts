@@ -41,6 +41,9 @@ function isPrismaP1017(err: any): boolean {
   )
 }
 
+export type ConversationStatus = 'awaiting' | 'ok' | 'failed'
+export type ConversationContextType = 'charge' | 'appointment' | 'os'
+
 @Injectable()
 export class WhatsAppService {
   private readonly logger = new Logger(WhatsAppService.name)
@@ -141,6 +144,172 @@ export class WhatsAppService {
 
   async findById(id: string) {
     return this.prisma.whatsAppMessage.findUnique({ where: { id } })
+  }
+
+  async listConversations(orgId: string) {
+    const [customers, latestMessages, failedMessages, overdueCharges, nextAppointments, activeServiceOrders] =
+      await Promise.all([
+        this.prisma.customer.findMany({
+          where: { orgId, active: true },
+          select: {
+            id: true,
+            name: true,
+            updatedAt: true,
+          },
+        }),
+        this.prisma.whatsAppMessage.findMany({
+          where: { orgId },
+          orderBy: [{ customerId: 'asc' }, { createdAt: 'desc' }],
+          distinct: ['customerId'],
+          select: {
+            customerId: true,
+            createdAt: true,
+            status: true,
+            renderedText: true,
+          },
+        }),
+        this.prisma.whatsAppMessage.groupBy({
+          by: ['customerId'],
+          where: {
+            orgId,
+            status: WhatsAppMessageStatus.FAILED,
+          },
+          _count: { _all: true },
+        }),
+        this.prisma.charge.groupBy({
+          by: ['customerId'],
+          where: {
+            orgId,
+            status: 'OVERDUE',
+          },
+          _count: { _all: true },
+          _sum: { amountCents: true },
+        }),
+        this.prisma.appointment.findMany({
+          where: {
+            orgId,
+            status: {
+              in: ['SCHEDULED', 'CONFIRMED'],
+            },
+          },
+          orderBy: { startsAt: 'asc' },
+          distinct: ['customerId'],
+          select: {
+            customerId: true,
+            startsAt: true,
+          },
+        }),
+        this.prisma.serviceOrder.findMany({
+          where: {
+            orgId,
+            status: {
+              in: ['OPEN', 'ASSIGNED', 'IN_PROGRESS'],
+            },
+          },
+          orderBy: { updatedAt: 'desc' },
+          distinct: ['customerId'],
+          select: {
+            customerId: true,
+            status: true,
+            updatedAt: true,
+          },
+        }),
+      ])
+
+    const latestByCustomer = new Map(latestMessages.map((item) => [item.customerId, item]))
+    const failedByCustomer = new Map(
+      failedMessages.map((item) => [item.customerId, Number(item._count._all ?? 0)]),
+    )
+    const overdueByCustomer = new Map(
+      overdueCharges.map((item) => [
+        item.customerId,
+        {
+          count: Number(item._count._all ?? 0),
+          totalCents: Number(item._sum.amountCents ?? 0),
+        },
+      ]),
+    )
+    const appointmentByCustomer = new Map(
+      nextAppointments.map((item) => [item.customerId, item.startsAt]),
+    )
+    const serviceOrderByCustomer = new Map(activeServiceOrders.map((item) => [item.customerId, item]))
+
+    const now = Date.now()
+
+    return customers
+      .map((customer) => {
+        const lastMessage = latestByCustomer.get(customer.id)
+        const failedCount = failedByCustomer.get(customer.id) ?? 0
+        const overdue = overdueByCustomer.get(customer.id)
+        const appointmentDate = appointmentByCustomer.get(customer.id)
+        const activeOrder = serviceOrderByCustomer.get(customer.id)
+
+        const lastMessageAt = lastMessage?.createdAt ?? customer.updatedAt
+        const lastContactDays = Math.floor((now - new Date(lastMessageAt).getTime()) / 86_400_000)
+        const isAwaiting = lastContactDays >= 2
+
+        const contextType: ConversationContextType = overdue
+          ? 'charge'
+          : appointmentDate
+            ? 'appointment'
+            : 'os'
+
+        const status: ConversationStatus = failedCount > 0 ? 'failed' : isAwaiting ? 'awaiting' : 'ok'
+
+        const priorityScore =
+          failedCount * 8 +
+          Number(Boolean(overdue)) * 6 +
+          Number(Boolean(appointmentDate)) * 3 +
+          Number(Boolean(activeOrder)) * 2 +
+          Number(isAwaiting) * 3
+
+        return {
+          customerId: customer.id,
+          name: customer.name,
+          lastMessage: lastMessage?.renderedText ?? 'Sem mensagem recente',
+          lastMessageAt,
+          status,
+          contextType,
+          priorityScore,
+          context: {
+            nextAppointmentAt: appointmentDate ?? null,
+            activeServiceOrderStatus: activeOrder?.status ?? null,
+            overdueAmountCents: overdue?.totalCents ?? 0,
+            overdueCount: overdue?.count ?? 0,
+          },
+        }
+      })
+      .sort((a, b) => {
+        if (b.priorityScore !== a.priorityScore) return b.priorityScore - a.priorityScore
+        return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime()
+      })
+  }
+
+  async getMessagesFeed(params: {
+    orgId: string
+    customerId: string
+    limit?: number
+    cursor?: string
+  }) {
+    const limit = Math.min(Math.max(params.limit ?? 20, 1), 100)
+    const rows = await this.prisma.whatsAppMessage.findMany({
+      where: {
+        orgId: params.orgId,
+        customerId: params.customerId,
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      cursor: params.cursor ? { id: params.cursor } : undefined,
+      skip: params.cursor ? 1 : 0,
+      take: limit + 1,
+    })
+
+    const hasMore = rows.length > limit
+    const sliced = hasMore ? rows.slice(0, limit) : rows
+
+    return {
+      items: sliced,
+      nextCursor: hasMore ? sliced[sliced.length - 1]?.id ?? null : null,
+    }
   }
 
   private async reconnectIfNeeded(err: any) {
