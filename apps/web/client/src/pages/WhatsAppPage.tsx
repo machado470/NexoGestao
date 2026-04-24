@@ -370,20 +370,20 @@ const ConversationRow = memo(function ConversationRow({
 
 function TopOperationalStats() {
   return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
       {topStats.map(item => (
         <article
           key={item.label}
-          className="rounded-xl border border-white/10 bg-[var(--surface-primary)]/45 p-3"
+          className="rounded-xl border border-white/10 bg-[var(--surface-primary)]/45 px-2.5 py-2"
         >
-          <div className="flex items-center gap-2">
-            <item.icon className={cn("size-4", item.tone)} />
-            <p className={cn("text-xs", item.tone)}>{item.label}</p>
+          <div className="flex items-center gap-1.5">
+            <item.icon className={cn("size-3.5", item.tone)} />
+            <p className={cn("text-[11px]", item.tone)}>{item.label}</p>
           </div>
-          <p className="mt-1 text-2xl font-semibold leading-none">
+          <p className="mt-1 text-xl font-semibold leading-none">
             {item.value}
           </p>
-          <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+          <p className="mt-0.5 text-[10px] text-[var(--text-muted)]">
             {item.detail}
           </p>
         </article>
@@ -814,14 +814,14 @@ function ContextPanel({
 
 function WhatsAppMetricsFooter() {
   return (
-    <div className="shrink-0 grid gap-2 md:grid-cols-3 xl:grid-cols-5">
+    <div className="hidden shrink-0 gap-2 md:grid-cols-3 xl:max-h-[56px] xl:grid-cols-5 2xl:grid">
       {footerMetrics.map(([label, value]) => (
         <article
           key={label}
-          className="rounded-xl border border-white/10 bg-[var(--surface-primary)]/45 px-3 py-2"
+          className="rounded-xl border border-white/10 bg-[var(--surface-primary)]/45 px-2.5 py-1.5"
         >
-          <p className="text-[11px] text-[var(--text-muted)]">{label}</p>
-          <p className="text-sm font-semibold">{value}</p>
+          <p className="text-[10px] text-[var(--text-muted)]">{label}</p>
+          <p className="text-xs font-semibold">{value}</p>
         </article>
       ))}
     </div>
@@ -1030,31 +1030,29 @@ export default function WhatsAppPage() {
 
   return (
     <AppPageShell className="px-3 py-3">
-      <div className="flex flex-col overflow-y-auto xl:h-[calc(100vh-var(--altura-topbar,72px))] xl:min-h-0 xl:overflow-hidden">
-        <AppPageHeader className="mb-3 flex min-h-14 shrink-0 items-center justify-between rounded-2xl border border-white/10 bg-[var(--surface-primary)]/55 px-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-sm font-semibold">WhatsApp</h1>
-              {isDemoMode ? (
-                <span className="rounded-full border border-white/20 px-2 py-0.5 text-[10px] text-[var(--text-muted)]">
-                  Dados piloto
-                </span>
-              ) : null}
-            </div>
-            <p className="text-xs text-[var(--text-muted)]">
+      <div className="flex min-h-0 flex-col gap-2 overflow-y-auto xl:h-[calc(100vh-88px)] xl:overflow-hidden">
+        <AppPageHeader className="flex shrink-0 items-center justify-between rounded-2xl border border-white/10 bg-[var(--surface-primary)]/55 px-3 py-2">
+          <div className="flex items-center gap-2">
+            <h1 className="text-sm font-semibold">WhatsApp</h1>
+            <p className="text-[11px] text-[var(--text-muted)]">
               Canal de execução operacional
             </p>
+            {isDemoMode ? (
+              <span className="rounded-full border border-white/20 px-2 py-0.5 text-[10px] text-[var(--text-muted)]">
+                Dados piloto
+              </span>
+            ) : null}
           </div>
           <div className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-300">
             <Circle className="size-2.5 fill-current" /> Online
           </div>
         </AppPageHeader>
 
-        <div className="flex min-h-0 flex-col space-y-4">
+        <div className="flex min-h-0 flex-1 flex-col gap-2">
           <div className="shrink-0">
             <TopOperationalStats />
           </div>
-          <div className="grid grid-cols-1 gap-4 xl:min-h-0 xl:flex-1 xl:grid-cols-[320px_minmax(0,1fr)_320px] xl:overflow-hidden">
+          <div className="grid h-full min-h-[420px] flex-1 grid-cols-1 gap-2 overflow-hidden xl:min-h-[520px] xl:grid-cols-[320px_minmax(0,1fr)_320px]">
             <ConversationsList
               rows={filteredConversations}
               selectedId={selectedCustomerId}
