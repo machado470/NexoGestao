@@ -146,7 +146,7 @@ interface MainLayoutProps {
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "nexo:app-shell:sidebar-collapsed";
 const SIDEBAR_EXPANDED_WIDTH = 292;
-const SIDEBAR_COLLAPSED_WIDTH = 72;
+const SIDEBAR_COLLAPSED_WIDTH = 88;
 
 export function MainLayout({ children }: MainLayoutProps) {
   // KPI/top-metrics são definidos por página (dashboard forte, módulos contextuais).
@@ -384,7 +384,10 @@ export function MainLayout({ children }: MainLayoutProps) {
                 ? `fixed inset-y-0 left-0 w-[304px] ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`
                 : "fixed inset-y-0 left-0"
             }`}
-            style={!isMobile ? { width: `${desktopSidebarWidth}px` } : undefined}
+            style={{
+              width: !isMobile ? `${desktopSidebarWidth}px` : undefined,
+              backgroundColor: "var(--app-sidebar-surface, var(--app-sidebar))",
+            }}
           >
             <div
               className={`nexo-sidebar-header border-b border-[var(--border)] py-2 ${
@@ -508,9 +511,14 @@ export function MainLayout({ children }: MainLayoutProps) {
           </NexoSidebar>
 
           <div
-            data-sidebar-collapsed={!isMobile ? "true" : "false"}
+            data-sidebar-collapsed={!isMobile && sidebarCollapsed ? "true" : "false"}
+            data-sidebar-expanded={!isMobile && !sidebarCollapsed ? "true" : "false"}
             className="flex min-w-0 flex-1 flex-col"
-            style={!isMobile ? { marginLeft: `${SIDEBAR_COLLAPSED_WIDTH}px` } : undefined}
+            style={
+              !isMobile
+                ? { marginLeft: "calc(var(--sidebar-collapsed-width, 88px) + 12px)" }
+                : undefined
+            }
           >
             <NexoTopbar className="z-20 nexo-state-transition">
               <div className="nexo-topbar-grid">
