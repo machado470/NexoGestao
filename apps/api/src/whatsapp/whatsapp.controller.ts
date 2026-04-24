@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Headers,
+  Query,
   Param,
   Patch,
   Post,
@@ -59,11 +60,22 @@ export class WhatsAppController {
   async getMessages(
     @Org() orgId: string,
     @Param('customerId') customerId: string,
+    @Query('cursor') cursor?: string,
+    @Query('limit') limit?: string,
   ) {
-    return this.prisma.whatsAppMessage.findMany({
-      where: { orgId, customerId },
-      orderBy: { createdAt: 'desc' },
+    const parsedLimit = Number(limit)
+    return this.whatsapp.getMessagesFeed({
+      orgId,
+      customerId,
+      cursor: cursor ? String(cursor) : undefined,
+      limit: Number.isFinite(parsedLimit) ? parsedLimit : undefined,
     })
+  }
+
+  @Get('conversations')
+  @Roles('ADMIN')
+  async getConversations(@Org() orgId: string) {
+    return this.whatsapp.listConversations(orgId)
   }
 
   @Post('messages')
