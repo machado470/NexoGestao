@@ -897,11 +897,12 @@
   }
 
   .nexo-page-shell {
-    @apply mx-auto w-full max-w-[1420px] pb-28 md:pb-12;
-    padding: var(--nexo-space-page-padding-y) var(--nexo-space-page-padding-x);
+    @apply w-full min-w-0 pb-28 md:pb-12;
+    padding: var(--nexo-space-page-padding-y) 1rem;
     gap: var(--nexo-space-section-gap);
     display: flex;
     flex-direction: column;
+    scrollbar-gutter: stable;
   }
 
   .nexo-page-header {
@@ -944,7 +945,7 @@
   }
 
   .nexo-topbar-grid {
-    @apply mx-auto grid w-full max-w-[1680px] grid-cols-1 gap-3 px-4 py-3 md:px-6 md:py-3.5;
+    @apply grid w-full grid-cols-1 gap-3 px-4 py-3 md:px-5 md:py-3.5;
   }
 
   .nexo-topbar-meta {
@@ -1703,15 +1704,16 @@ html {
     background: var(--bg-app);
     box-shadow: none;
     min-width: 0;
+    width: 100%;
     max-width: 100%;
-    overflow-x: visible;
+    overflow-x: clip;
+    scrollbar-gutter: stable;
   }
 
   .nexo-page-shell {
-    max-width: 1560px;
     width: 100%;
     min-width: 0;
-    padding: 1.25rem;
+    padding: 1.25rem 1rem;
     padding-bottom: 2.5rem;
     gap: 1.25rem;
     overflow-x: clip;

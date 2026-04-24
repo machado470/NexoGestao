@@ -723,8 +723,8 @@ export default function WhatsAppPage() {
         })}
       </section>
 
-      <div className="grid min-h-[calc(100vh-260px)] gap-3 xl:grid-cols-[300px_minmax(0,1fr)_320px] 2xl:grid-cols-[320px_minmax(0,1fr)_340px]">
-        <section className="rounded-xl border border-[color:rgba(255,255,255,0.05)] bg-[var(--surface-primary)]/45 p-2">
+      <div className="grid min-h-[calc(100vh-260px)] min-w-0 gap-3 xl:grid-cols-[300px_minmax(0,1fr)_320px] 2xl:grid-cols-[320px_minmax(0,1fr)_340px]">
+        <section className="min-w-0 rounded-xl border border-[color:rgba(255,255,255,0.05)] bg-[var(--surface-primary)]/45 p-2">
           <div className="space-y-2">
             <div className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-[var(--text-muted)]" />
@@ -816,7 +816,7 @@ export default function WhatsAppPage() {
           </div>
         </section>
 
-        <section className="grid min-h-[calc(100vh-260px)] grid-rows-[auto_minmax(0,1fr)_auto_auto] rounded-2xl border border-[color:rgba(255,255,255,0.05)] bg-[var(--surface-base)]/45">
+        <section className="grid min-h-[calc(100vh-260px)] min-w-0 grid-rows-[auto_minmax(0,1fr)_auto_auto] rounded-2xl border border-[color:rgba(255,255,255,0.05)] bg-[var(--surface-base)]/45">
           {!selectedConversation ? (
             <div className="grid h-full place-items-center p-6">
               <AppEmptyState
@@ -1023,7 +1023,7 @@ export default function WhatsAppPage() {
           )}
         </section>
 
-        <section className="rounded-xl border border-[color:rgba(255,255,255,0.05)] bg-[var(--surface-primary)]/45 p-2">
+        <section className="min-w-0 rounded-xl border border-[color:rgba(255,255,255,0.05)] bg-[var(--surface-primary)]/45 p-2">
           {!selectedConversation ? (
             <AppEmptyState
               title="Sem contexto ativo"
