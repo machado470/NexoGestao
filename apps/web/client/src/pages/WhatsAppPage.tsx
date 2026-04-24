@@ -724,7 +724,7 @@ export default function WhatsAppPage() {
         })}
       </section>
 
-      <div className="grid min-h-[calc(100vh-254px)] min-w-0 gap-2 xl:grid-cols-[300px_minmax(0,1fr)_320px] 2xl:grid-cols-[315px_minmax(0,1fr)_330px]">
+      <div className="grid min-h-[calc(100vh-254px)] min-w-0 gap-2 xl:grid-cols-[320px_minmax(0,1fr)_340px] 2xl:grid-cols-[340px_minmax(0,1fr)_360px]">
         <section className="min-w-0 rounded-2xl border border-[color:rgba(255,255,255,0.05)] bg-[var(--surface-primary)]/42 p-2.5">
           <div className="space-y-2">
             <div className="relative">
