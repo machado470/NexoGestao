@@ -667,15 +667,15 @@ function ContextPanel({
   sendMessage: (preset?: string) => void;
 }) {
   return (
-    <aside className="h-full min-h-0 min-w-0 overflow-y-auto rounded-2xl border border-white/10 bg-[#111A28]/92 p-3">
+    <aside className="h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden rounded-2xl border border-white/10 bg-[#111A28]/92">
       {!conversation ? (
         <AppEmptyState
           title="Sem contexto ativo"
           description="Selecione uma conversa para abrir contexto operacional."
         />
       ) : (
-        <div className="space-y-3 text-xs">
-          <section className="rounded-xl border border-white/10 bg-[#141D2B]/78 p-3.5">
+        <div className="text-xs">
+          <section className="border-b border-white/[0.06] px-3.5 py-3">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
               Cliente
             </p>
@@ -692,7 +692,7 @@ function ContextPanel({
               Ver cliente
             </Button>
           </section>
-          <section className="rounded-xl border border-white/10 bg-[#141D2B]/78 p-3.5">
+          <section className="border-b border-white/[0.06] px-3.5 py-3">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
               Próximo agendamento
             </p>
@@ -712,7 +712,7 @@ function ContextPanel({
               Ver agendamento
             </Button>
           </section>
-          <section className="rounded-xl border border-white/10 bg-[#141D2B]/78 p-3.5">
+          <section className="border-b border-white/[0.06] px-3.5 py-3">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
               Ordens de serviço
             </p>
@@ -730,7 +730,7 @@ function ContextPanel({
               Ver O.S.
             </Button>
           </section>
-          <section className="rounded-xl border border-white/10 bg-[#141D2B]/78 p-3.5">
+          <section className="border-b border-white/[0.06] px-3.5 py-3">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
               Financeiro
             </p>
@@ -751,7 +751,7 @@ function ContextPanel({
               Ver cobrança
             </Button>
           </section>
-          <section className="rounded-xl border border-white/10 bg-[#141D2B]/78 p-3.5">
+          <section className="border-b border-white/[0.06] px-3.5 py-3">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
               Última interação
             </p>
@@ -764,16 +764,16 @@ function ContextPanel({
               Entregue
             </span>
           </section>
-          <section className="rounded-xl border border-white/10 bg-[#141D2B]/78 p-3.5">
+          <section className="px-3.5 py-3">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
               Ações rápidas
             </p>
-            <div className="mt-2.5 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="mt-2.5 grid grid-cols-1 gap-2 sm:grid-cols-[repeat(2,minmax(0,1fr))]">
               <Button
                 type="button"
                 size="sm"
                 variant="outline"
-                className="h-8 justify-start text-[11px]"
+                className="h-8 w-full justify-start truncate px-2.5 text-[10px] sm:text-[11px]"
                 onClick={() => sendMessage("Cobrança")}
               >
                 Enviar cobrança
@@ -782,7 +782,7 @@ function ContextPanel({
                 type="button"
                 size="sm"
                 variant="outline"
-                className="h-8 justify-start text-[11px]"
+                className="h-8 w-full justify-start truncate px-2.5 text-[10px] sm:text-[11px]"
               >
                 Registrar pagamento
               </Button>
@@ -790,7 +790,7 @@ function ContextPanel({
                 type="button"
                 size="sm"
                 variant="outline"
-                className="h-8 justify-start text-[11px]"
+                className="h-8 w-full justify-start truncate px-2.5 text-[10px] sm:text-[11px]"
               >
                 Atualizar O.S.
               </Button>
@@ -798,7 +798,7 @@ function ContextPanel({
                 type="button"
                 size="sm"
                 variant="outline"
-                className="h-8 justify-start text-[11px]"
+                className="h-8 w-full justify-start truncate px-2.5 text-[10px] sm:text-[11px]"
               >
                 Mais ações
               </Button>
