@@ -898,7 +898,8 @@
 
   .nexo-page-shell {
     @apply w-full min-w-0 pb-28 md:pb-12;
-    padding: var(--nexo-space-page-padding-y) 1rem;
+    max-width: none;
+    padding: var(--nexo-space-page-padding-y) 0.75rem;
     gap: var(--nexo-space-section-gap);
     display: flex;
     flex-direction: column;
@@ -1713,7 +1714,8 @@ html {
   .nexo-page-shell {
     width: 100%;
     min-width: 0;
-    padding: 1.25rem 1rem;
+    max-width: none;
+    padding: 1.25rem 0.75rem;
     padding-bottom: 2.5rem;
     gap: 1.25rem;
     overflow-x: clip;
@@ -3000,7 +3002,7 @@ html {
   }
 
   .app-root .nexo-app-content {
-    padding-left: 0.25rem;
+    padding-left: 0.5rem;
   }
 
   @media (min-width: 768px) {

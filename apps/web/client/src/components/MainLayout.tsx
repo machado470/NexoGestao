@@ -516,7 +516,7 @@ export function MainLayout({ children }: MainLayoutProps) {
             className="flex min-w-0 flex-1 flex-col"
             style={
               !isMobile
-                ? { marginLeft: "calc(var(--sidebar-collapsed-width, 88px) + 12px)" }
+                ? { marginLeft: "var(--sidebar-collapsed-width, 88px)" }
                 : undefined
             }
           >
