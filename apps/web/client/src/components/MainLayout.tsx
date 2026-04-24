@@ -146,7 +146,7 @@ interface MainLayoutProps {
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "nexo:app-shell:sidebar-collapsed";
 const SIDEBAR_EXPANDED_WIDTH = 292;
-const SIDEBAR_COLLAPSED_WIDTH = 92;
+const SIDEBAR_COLLAPSED_WIDTH = 72;
 
 export function MainLayout({ children }: MainLayoutProps) {
   // KPI/top-metrics são definidos por página (dashboard forte, módulos contextuais).
@@ -367,11 +367,19 @@ export function MainLayout({ children }: MainLayoutProps) {
             onClick={() => setMobileMenuOpen(false)}
           />
         ) : null}
+        {!isMobile && !sidebarCollapsed ? (
+          <button
+            type="button"
+            aria-label="Recolher menu lateral"
+            className="fixed inset-0 z-30 bg-slate-950/20 nexo-state-transition"
+            onClick={() => setSidebarCollapsed(true)}
+          />
+        ) : null}
 
         <div className="flex min-h-screen w-full">
           <NexoSidebar
             data-scrollbar="nexo"
-            className={`nexo-sidebar z-40 flex shrink-0 flex-col overflow-hidden transition-[width,transform] duration-200 ease-out ${
+            className={`nexo-sidebar z-40 flex shrink-0 flex-col overflow-hidden shadow-lg transition-[width,transform] duration-200 ease-out ${
               isMobile
                 ? `fixed inset-y-0 left-0 w-[304px] ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`
                 : "fixed inset-y-0 left-0"
@@ -500,9 +508,9 @@ export function MainLayout({ children }: MainLayoutProps) {
           </NexoSidebar>
 
           <div
-            data-sidebar-collapsed={!isMobile && sidebarCollapsed ? "true" : "false"}
-            className="flex min-w-0 flex-1 flex-col transition-[margin-left] duration-200 ease-out"
-            style={!isMobile ? { marginLeft: `${desktopSidebarWidth}px` } : undefined}
+            data-sidebar-collapsed={!isMobile ? "true" : "false"}
+            className="flex min-w-0 flex-1 flex-col"
+            style={!isMobile ? { marginLeft: `${SIDEBAR_COLLAPSED_WIDTH}px` } : undefined}
           >
             <NexoTopbar className="z-20 nexo-state-transition">
               <div className="nexo-topbar-grid">
