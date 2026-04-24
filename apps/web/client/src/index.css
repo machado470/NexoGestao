@@ -2766,6 +2766,7 @@ html {
 @layer base {
   .app-root,
   .nexo-app.app-root {
+    --sidebar-collapsed-width: 88px;
     --app-bg: #f2f6fb;
     --app-shell: #eef3f9;
     --app-surface: #f7fafe;
@@ -2775,6 +2776,7 @@ html {
     --app-text: #12243f;
     --app-muted: #5f7796;
     --app-sidebar: #e9f0f8;
+    --app-sidebar-surface: #e9f0f8;
     --app-topbar: #f5f8fc;
     --app-overlay-bg: #ffffff;
     --app-overlay-surface: #ffffff;
@@ -2794,6 +2796,7 @@ html {
     --app-text: #f0f4ff;
     --app-muted: #8fa5c8;
     --app-sidebar: #0b1122;
+    --app-sidebar-surface: #0b1122;
     --app-topbar: #101a2d;
     --app-overlay-bg: #111d2e;
     --app-overlay-surface: #152036;
@@ -2841,7 +2844,8 @@ html {
   }
 
   .app-root .nexo-sidebar {
-    background: var(--app-sidebar);
+    background: var(--app-sidebar-surface, var(--app-sidebar));
+    opacity: 1;
     border-right: 1px solid var(--app-border);
     box-shadow: 14px 0 28px rgba(44, 74, 108, 0.08);
   }
@@ -2908,7 +2912,7 @@ html {
 
   .app-root.dark .nexo-sidebar,
   .app-root[data-theme="dark"] .nexo-sidebar {
-    background: var(--app-sidebar);
+    background: var(--app-sidebar-surface, var(--app-sidebar));
     border-right-color: var(--app-border);
     box-shadow: 18px 0 34px rgba(2, 6, 23, 0.42);
   }
@@ -2944,6 +2948,8 @@ html {
 @layer components {
   .app-root .nexo-topbar {
     min-height: 64px;
+    position: relative;
+    z-index: 10;
   }
 
   .app-root .nexo-topbar-grid {
@@ -2954,6 +2960,10 @@ html {
 
   .app-root [data-sidebar-collapsed="true"] .nexo-topbar-grid {
     padding-inline: 0.75rem;
+  }
+
+  .app-root [data-sidebar-expanded="true"] .nexo-topbar {
+    z-index: 0;
   }
 
   .app-root .nexo-topbar-content-grid {
@@ -2987,6 +2997,10 @@ html {
 
   .app-root .nexo-search-input {
     padding-inline: 0.625rem;
+  }
+
+  .app-root .nexo-app-content {
+    padding-left: 0.25rem;
   }
 
   @media (min-width: 768px) {
