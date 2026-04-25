@@ -42,6 +42,7 @@ import {
 import { BrandSignature } from "@/components/BrandSignature";
 import { AppShell } from "@/components/AppShell";
 import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
+import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -318,6 +319,7 @@ export function MainLayout({ children }: MainLayoutProps) {
   );
 
   const currentMeta = useMemo(() => getPageMeta(location), [location]);
+  const isWhatsAppRoute = isRouteActive(location, "/whatsapp");
   const desktopSidebarWidth = sidebarCollapsed
     ? SIDEBAR_COLLAPSED_WIDTH
     : SIDEBAR_EXPANDED_WIDTH;
@@ -675,7 +677,13 @@ export function MainLayout({ children }: MainLayoutProps) {
               </div>
             </NexoTopbar>
 
-            <NexoMainContainer>
+            <NexoMainContainer
+              className={cn(
+                isWhatsAppRoute
+                  ? "mt-0 overflow-hidden px-3 pb-0 pt-0 md:mt-0 md:px-4 md:pb-0"
+                  : undefined
+              )}
+            >
               {children}
             </NexoMainContainer>
           </div>

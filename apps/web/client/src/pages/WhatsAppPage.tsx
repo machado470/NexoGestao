@@ -500,7 +500,7 @@ function ChatPanel({
 
       <div
         ref={messagesRef}
-        className="scrollbar-thin-nexo flex-1 min-h-0 overflow-y-auto bg-transparent px-5 pb-2 pt-4"
+        className="scrollbar-thin-nexo flex-1 min-h-0 overflow-y-auto bg-transparent px-5 pb-1 pt-4"
         onScroll={event => {
           const target = event.currentTarget;
           if (target.scrollTop < 80 && hasMore && !isLoadingMore) onLoadMore();
@@ -881,7 +881,7 @@ export default function WhatsAppPage() {
     | undefined;
 
   return (
-    <AppPageShell className="h-[calc(100vh-5rem)] min-h-0 overflow-hidden bg-[#0B111C] px-3 pb-2 pt-3">
+    <AppPageShell className="h-[calc(100vh-5rem)] min-h-0 overflow-hidden bg-[#0B111C] px-3 pb-0 pt-3">
       <div className="grid h-full min-h-0 grid-cols-1 gap-4 overflow-hidden bg-transparent xl:grid-cols-[minmax(260px,300px)_minmax(0,1fr)_minmax(280px,320px)]">
         <div className="h-full min-h-0 min-w-0 overflow-hidden">
           <ConversationsList
