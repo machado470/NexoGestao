@@ -208,6 +208,15 @@
   }
 }
 
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 :root {
   --bg-app: #080c18;
   --bg-sidebar: #0b1122;
