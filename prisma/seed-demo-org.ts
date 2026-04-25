@@ -5,6 +5,10 @@ import {
   PaymentMethod,
   PrismaClient,
   ServiceOrderStatus,
+  WhatsAppContextType,
+  WhatsAppConversationPriority,
+  WhatsAppConversationStatus,
+  WhatsAppDirection,
   WhatsAppEntityType,
   WhatsAppMessageStatus,
   WhatsAppMessageType,
@@ -322,28 +326,77 @@ async function createTimelineIfMissing(params: {
   })
 }
 
+async function ensureConversation(params: {
+  orgId: string
+  customerId?: string
+  phone: string
+  status?: WhatsAppConversationStatus
+  priority?: WhatsAppConversationPriority
+  contextType?: WhatsAppContextType
+  contextId?: string
+  title?: string
+}) {
+  const existing = await prisma.whatsAppConversation.findFirst({
+    where: { orgId: params.orgId, customerId: params.customerId ?? null, phone: params.phone },
+  })
+
+  if (existing) {
+    return prisma.whatsAppConversation.update({
+      where: { id: existing.id },
+      data: {
+        status: params.status ?? existing.status,
+        priority: params.priority ?? existing.priority,
+        contextType: params.contextType ?? existing.contextType,
+        contextId: params.contextId ?? existing.contextId,
+        title: params.title ?? existing.title,
+      },
+    })
+  }
+
+  return prisma.whatsAppConversation.create({
+    data: {
+      orgId: params.orgId,
+      customerId: params.customerId ?? null,
+      phone: params.phone,
+      status: params.status ?? 'OPEN',
+      priority: params.priority ?? 'NORMAL',
+      contextType: params.contextType ?? 'GENERAL',
+      contextId: params.contextId ?? null,
+      title: params.title ?? null,
+    },
+  })
+}
+
 async function createWhatsAppIfMissing(params: {
   orgId: string
-  customerId: string
+  conversationId: string
+  customerId?: string
   toPhone: string
+  fromPhone?: string
   entityType: WhatsAppEntityType
   entityId: string
   messageType: WhatsAppMessageType
   messageKey: string
   renderedText: string
   status?: WhatsAppMessageStatus
+  direction?: WhatsAppDirection
 }) {
-  const existing = await prisma.whatsAppMessage.findUnique({
-    where: { messageKey: params.messageKey },
+  const existing = await prisma.whatsAppMessage.findFirst({
+    where: { orgId: params.orgId, messageKey: params.messageKey },
   })
 
   if (existing) {
     return prisma.whatsAppMessage.update({
       where: { id: existing.id },
       data: {
+        conversationId: params.conversationId,
+        customerId: params.customerId ?? null,
         toPhone: params.toPhone,
+        fromPhone: params.fromPhone ?? null,
         renderedText: params.renderedText,
+        content: params.renderedText,
         status: params.status ?? existing.status,
+        direction: params.direction ?? existing.direction,
       },
     })
   }
@@ -351,20 +404,49 @@ async function createWhatsAppIfMissing(params: {
   return prisma.whatsAppMessage.create({
     data: {
       orgId: params.orgId,
-      customerId: params.customerId,
+      conversationId: params.conversationId,
+      customerId: params.customerId ?? null,
       toPhone: params.toPhone,
+      fromPhone: params.fromPhone ?? null,
       entityType: params.entityType,
       entityId: params.entityId,
       messageType: params.messageType,
       messageKey: params.messageKey,
       renderedText: params.renderedText,
+      content: params.renderedText,
+      direction: params.direction ?? 'OUTBOUND',
       status: params.status ?? WhatsAppMessageStatus.SENT,
+      sentAt: params.status === 'SENT' ? new Date() : null,
+      failedAt: params.status === 'FAILED' ? new Date() : null,
     },
   })
 }
 
+
+async function ensureDefaultWhatsAppTemplates(orgId: string) {
+  const templates = [
+    ['appointment_confirmation', 'Confirmação de agendamento', 'APPOINTMENT_CONFIRMATION', 'Olá {{customerName}}, seu agendamento está confirmado para {{appointmentDate}} às {{appointmentTime}}.'],
+    ['appointment_reminder', 'Lembrete de agendamento', 'APPOINTMENT_REMINDER', 'Lembrete: atendimento em {{appointmentDate}} às {{appointmentTime}}.'],
+    ['payment_reminder', 'Lembrete de cobrança', 'PAYMENT_REMINDER', 'Existe cobrança pendente de {{chargeAmount}} com vencimento {{chargeDueDate}}.'],
+    ['payment_link', 'Link de pagamento', 'PAYMENT_LINK', 'Use este link para pagar: {{paymentLink}}.'],
+    ['payment_confirmation', 'Pagamento confirmado', 'PAYMENT_CONFIRMATION', 'Pagamento confirmado com sucesso.'],
+    ['service_update', 'Atualização da O.S.', 'SERVICE_UPDATE', 'Atualização da ordem {{serviceOrderNumber}}.'],
+    ['manual_followup', 'Follow-up manual', 'MANUAL', 'Seguimos à disposição para ajudar.'],
+  ] as const
+
+  for (const [key, name, messageType, content] of templates) {
+    await prisma.whatsAppTemplate.upsert({
+      where: { orgId_key: { orgId, key } },
+      create: { orgId, key, name, messageType, body: content, content, isActive: true },
+      update: { name, messageType, body: content, content, isActive: true },
+    })
+  }
+}
+
 export async function seedDemoOrg(orgId: string) {
   const now = new Date()
+
+  await ensureDefaultWhatsAppTemplates(orgId)
 
   const c1 = await upsertCustomer({
     orgId,
@@ -469,17 +551,119 @@ export async function seedDemoOrg(orgId: string) {
     paidAt: atHour(now, -3, 15, 0),
   })
 
+  const convChargeOverdue = await ensureConversation({
+    orgId,
+    customerId: c1.id,
+    phone: c1.phone,
+    status: 'OPEN',
+    priority: 'CRITICAL',
+    contextType: 'CHARGE',
+    contextId: charge1.id,
+    title: 'Cobrança vencida',
+  })
+
+  const convAppointment = await ensureConversation({
+    orgId,
+    customerId: c2.id,
+    phone: c2.phone,
+    status: 'PENDING',
+    priority: 'HIGH',
+    contextType: 'APPOINTMENT',
+    contextId: apt2.id,
+    title: 'Confirmação de agendamento pendente',
+  })
+
+  const convService = await ensureConversation({
+    orgId,
+    customerId: c3.id,
+    phone: c3.phone,
+    status: 'OPEN',
+    priority: 'NORMAL',
+    contextType: 'SERVICE_ORDER',
+    contextId: so2.id,
+    title: 'O.S. em andamento',
+  })
+
+  const convFailed = await ensureConversation({
+    orgId,
+    customerId: c3.id,
+    phone: c3.phone,
+    status: 'FAILED',
+    priority: 'HIGH',
+    contextType: 'CHARGE',
+    contextId: charge2.id,
+    title: 'Falha de envio',
+  })
+
   await createWhatsAppIfMissing({
     orgId,
+    conversationId: convChargeOverdue.id,
+    customerId: c1.id,
+    toPhone: c1.phone,
+    entityType: 'CHARGE',
+    entityId: charge1.id,
+    messageType: 'PAYMENT_REMINDER',
+    messageKey: `seed-demo-org:payment-reminder:${orgId}:${charge1.id}`,
+    renderedText: 'Olá Ana, sua cobrança está vencida. Podemos te enviar um novo link?',
+    status: 'SENT',
+    direction: 'OUTBOUND',
+  })
+
+  await createWhatsAppIfMissing({
+    orgId,
+    conversationId: convChargeOverdue.id,
+    customerId: c1.id,
+    toPhone: c1.phone,
+    fromPhone: c1.phone,
+    entityType: 'CUSTOMER',
+    entityId: c1.id,
+    messageType: 'MANUAL',
+    messageKey: `seed-demo-org:customer-reply:${orgId}:${c1.id}`,
+    renderedText: 'Recebi! Vou pagar ainda hoje.',
+    status: 'DELIVERED',
+    direction: 'INBOUND',
+  })
+
+  await createWhatsAppIfMissing({
+    orgId,
+    conversationId: convAppointment.id,
+    customerId: c2.id,
+    toPhone: c2.phone,
+    entityType: 'APPOINTMENT',
+    entityId: apt2.id,
+    messageType: 'APPOINTMENT_REMINDER',
+    messageKey: `seed-demo-org:appointment-reminder:${orgId}:${apt2.id}`,
+    renderedText: 'Carlos, confirmando seu horário de amanhã às 14h.',
+    status: 'QUEUED',
+    direction: 'OUTBOUND',
+  })
+
+  await createWhatsAppIfMissing({
+    orgId,
+    conversationId: convService.id,
+    customerId: c3.id,
+    toPhone: c3.phone,
+    entityType: 'SERVICE_ORDER',
+    entityId: so2.id,
+    messageType: 'SERVICE_UPDATE',
+    messageKey: `seed-demo-org:service-update:${orgId}:${so2.id}`,
+    renderedText: 'Atualização da O.S.: implantação em andamento com equipe técnica.',
+    status: 'SENT',
+    direction: 'OUTBOUND',
+  })
+
+  await createWhatsAppIfMissing({
+    orgId,
+    conversationId: convFailed.id,
     customerId: c3.id,
     toPhone: c3.phone,
     entityType: 'CHARGE',
     entityId: charge2.id,
     messageType: 'PAYMENT_CONFIRMATION',
     messageKey: `seed-demo-org:payment-confirmation:${orgId}:${charge2.id}`,
-    renderedText:
-      'Pagamento confirmado com sucesso. Obrigado pela confiança no atendimento da NexoGestão.',
-    status: WhatsAppMessageStatus.SENT,
+    renderedText: 'Pagamento confirmado com sucesso. Obrigado pela confiança no atendimento da NexoGestão.',
+    status: 'FAILED',
+    direction: 'OUTBOUND',
   })
 
   const adminPerson = await prisma.person.findFirst({
