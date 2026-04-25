@@ -479,11 +479,6 @@ function ChatPanel({
               {conversation?.phone ?? ""}
             </p>
           </div>
-          {conversation ? (
-            <span className="rounded-full border border-amber-400/25 bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-100">
-              Cobrança pendente
-            </span>
-          ) : null}
         </div>
         <div className="flex items-center gap-1.5 text-[var(--text-muted)]">
           <button type="button" className="rounded-lg p-1.5 hover:bg-white/10">
