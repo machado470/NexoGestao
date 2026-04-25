@@ -400,7 +400,7 @@ function ConversationsList({
       </div>
       <div
         ref={viewportRef}
-        className="mt-2 flex-1 min-h-0 overflow-y-auto pr-1"
+        className="scrollbar-none mt-2 flex-1 min-h-0 overflow-y-auto pr-1"
         onScroll={e => setScrollTop(e.currentTarget.scrollTop)}
       >
         {rows.length === 0 ? (
@@ -495,7 +495,7 @@ function ChatPanel({
 
       <div
         ref={messagesRef}
-        className="flex-1 overflow-y-auto min-h-0 bg-transparent px-5 py-4"
+        className="scrollbar-none flex-1 min-h-0 overflow-y-auto bg-transparent px-5 pb-2 pt-4"
         onScroll={event => {
           const target = event.currentTarget;
           if (target.scrollTop < 80 && hasMore && !isLoadingMore) onLoadMore();
@@ -613,7 +613,7 @@ function ContextPanel({
   sendMessage: (preset?: string) => void;
 }) {
   return (
-    <aside className="h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden bg-white/[0.015] p-2.5">
+    <aside className="scrollbar-none h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden bg-white/[0.015] p-2.5">
       {!conversation ? (
         <AppEmptyState
           title="Sem contexto ativo"
@@ -876,7 +876,7 @@ export default function WhatsAppPage() {
     | undefined;
 
   return (
-    <AppPageShell className="h-full min-h-0 overflow-hidden bg-[#0B111C] px-3 py-3">
+    <AppPageShell className="h-full min-h-0 overflow-hidden bg-[#0B111C] px-3 pb-2 pt-3">
       <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
         <div className="flex shrink-0 items-center justify-between rounded-2xl bg-white/[0.03] px-4 py-2.5">
           <div className="flex items-center gap-2.5">
