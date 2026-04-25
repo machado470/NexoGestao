@@ -32,8 +32,10 @@ model Organization {
   tracks                  Track[]
   users                   User[]
   usageMetrics            UsageMetric[]
+  whatsAppConversations   WhatsAppConversation[]
   whatsAppMessages        WhatsAppMessage[]
   whatsAppTemplates       WhatsAppTemplate[]
+  whatsAppWebhookEvents   WhatsAppWebhookEvent[]
 
   subscription Subscription?
   executionConfig OrganizationExecutionConfig?
@@ -321,8 +323,9 @@ model Customer {
   org              Organization      @relation(fields: [orgId], references: [id])
   invoices         Invoice[]
   serviceOrders    ServiceOrder[]
-  whatsAppMessages WhatsAppMessage[]
-  timelineEvents   TimelineEvent[]
+  whatsAppConversations WhatsAppConversation[]
+  whatsAppMessages      WhatsAppMessage[]
+  timelineEvents        TimelineEvent[]
 
   @@index([orgId, createdAt])
   @@index([orgId, active, createdAt])
@@ -564,40 +567,110 @@ model Referral {
   org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 }
 
+model WhatsAppConversation {
+  id             String                      @id @default(uuid())
+  orgId          String
+  customerId     String?
+  phone          String
+  title          String?
+  status         WhatsAppConversationStatus  @default(OPEN)
+  priority       WhatsAppConversationPriority @default(NORMAL)
+  contextType    WhatsAppContextType         @default(GENERAL)
+  contextId      String?
+  lastMessageAt  DateTime?
+  lastInboundAt  DateTime?
+  lastOutboundAt DateTime?
+  unreadCount    Int                         @default(0)
+  createdAt      DateTime                    @default(now())
+  updatedAt      DateTime                    @updatedAt
+
+  org       Organization      @relation(fields: [orgId], references: [id])
+  customer  Customer?         @relation(fields: [customerId], references: [id])
+  messages  WhatsAppMessage[]
+
+  @@index([orgId, customerId])
+  @@index([orgId, status])
+  @@index([orgId, contextType, contextId])
+  @@index([orgId, lastMessageAt])
+  @@index([orgId, priority, unreadCount, lastMessageAt])
+}
+
 model WhatsAppTemplate {
-  id        String         @id @default(uuid())
-  orgId     String
-  channel   MessageChannel @default(WHATSAPP)
-  key       String
-  name      String
-  body      String
-  isActive  Boolean        @default(true)
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+  id          String              @id @default(uuid())
+  orgId       String
+  channel     MessageChannel      @default(WHATSAPP)
+  key         String
+  name        String
+  messageType WhatsAppMessageType @default(MANUAL)
+  body        String
+  content     String?
+  isActive    Boolean             @default(true)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
 
   org Organization @relation(fields: [orgId], references: [id])
+
+  @@unique([orgId, key])
+  @@index([orgId, isActive])
 }
 
 model WhatsAppMessage {
-  id                String                @id @default(uuid())
+  id                String                 @id @default(uuid())
   orgId             String
-  customerId        String
-  channel           MessageChannel        @default(WHATSAPP)
+  conversationId    String?
+  customerId        String?
+  channel           MessageChannel         @default(WHATSAPP)
+  direction         WhatsAppDirection      @default(OUTBOUND)
   entityType        WhatsAppEntityType
   entityId          String
   messageType       WhatsAppMessageType
-  messageKey        String                @unique
-  status            WhatsAppMessageStatus @default(QUEUED)
+  messageKey        String?                @unique
+  status            WhatsAppMessageStatus  @default(QUEUED)
   toPhone           String
+  fromPhone         String?
   renderedText      String
+  content           String?
   provider          String?
   providerMessageId String?
   errorCode         String?
   errorMessage      String?
-  createdAt         DateTime              @default(now())
+  metadata          Json?
+  sentAt            DateTime?
+  deliveredAt       DateTime?
+  readAt            DateTime?
+  failedAt          DateTime?
+  lockedAt          DateTime?
+  lockedBy          String?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
 
-  customer Customer     @relation(fields: [customerId], references: [id])
-  org      Organization @relation(fields: [orgId], references: [id])
+  conversation WhatsAppConversation? @relation(fields: [conversationId], references: [id])
+  customer     Customer?             @relation(fields: [customerId], references: [id])
+  org          Organization          @relation(fields: [orgId], references: [id])
+
+  @@index([orgId, customerId, createdAt])
+  @@index([orgId, conversationId, createdAt])
+  @@index([orgId, status, createdAt])
+  @@index([orgId, entityType, entityId, createdAt])
+  @@index([orgId, messageType, createdAt])
+  @@index([orgId, status, lockedAt, createdAt])
+}
+
+model WhatsAppWebhookEvent {
+  id          String                 @id @default(uuid())
+  orgId       String?
+  provider    String
+  eventType   String
+  payload     Json
+  processedAt DateTime?
+  status      WhatsAppWebhookStatus  @default(RECEIVED)
+  errorMessage String?
+  createdAt   DateTime               @default(now())
+
+  org Organization? @relation(fields: [orgId], references: [id])
+
+  @@index([provider, createdAt])
+  @@index([orgId, status, createdAt])
 }
 
 model Plan {
@@ -797,25 +870,69 @@ enum MessageChannel {
   WHATSAPP
 }
 
-enum WhatsAppMessageStatus {
-  QUEUED
-  SENT
+enum WhatsAppConversationStatus {
+  OPEN
+  PENDING
+  RESOLVED
   FAILED
-  CANCELED
-  SENDING
 }
 
-enum WhatsAppEntityType {
+enum WhatsAppConversationPriority {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
+enum WhatsAppContextType {
+  CUSTOMER
   APPOINTMENT
   SERVICE_ORDER
   CHARGE
+  PAYMENT
+  GENERAL
+}
+
+enum WhatsAppDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum WhatsAppWebhookStatus {
+  RECEIVED
+  PROCESSED
+  FAILED
+}
+
+enum WhatsAppMessageStatus {
+  QUEUED
+  SENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+  CANCELED
+}
+
+enum WhatsAppEntityType {
+  CUSTOMER
+  APPOINTMENT
+  SERVICE_ORDER
+  CHARGE
+  PAYMENT
+  GENERAL
 }
 
 enum WhatsAppMessageType {
   APPOINTMENT_CONFIRMATION
-  REMIND_24H
+  APPOINTMENT_REMINDER
+  SERVICE_UPDATE
   PAYMENT_LINK
   PAYMENT_REMINDER
+  PAYMENT_CONFIRMATION
+  CUSTOMER_NOTIFICATION
+  MANUAL
+  REMIND_24H
   RECEIPT
   EXECUTION_CONFIRMATION
 }

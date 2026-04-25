@@ -32,9 +32,9 @@ export class WhatsAppDispatcherJob {
 
       for (const message of claimed) {
         try {
-          const result = await this.provider.send({
+          const result = await this.provider.sendText({
             toPhone: message.toPhone,
-            text: message.renderedText,
+            text: message.content ?? message.renderedText,
           })
 
           if (!isWhatsAppSendError(result)) {

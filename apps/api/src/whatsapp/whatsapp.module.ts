@@ -8,14 +8,23 @@ import { QueueModule } from '../queue/queue.module'
 import { WhatsAppProcessor } from '../queue/processors/whatsapp.processor'
 import { TimelineModule } from '../timeline/timeline.module'
 import { QuotasModule } from '../quotas/quotas.module'
+import { WhatsAppTemplateService } from './whatsapp-template.service'
+import { WhatsAppContextService } from './whatsapp-context.service'
+import { WhatsAppAutomationService } from './whatsapp-automation.service'
 
-const testControllers =
-  process.env.NODE_ENV === 'production' ? [] : [WhatsAppTestController]
+const testControllers = process.env.NODE_ENV === 'production' ? [] : [WhatsAppTestController]
 
 @Module({
   imports: [PrismaModule, QueueModule, TimelineModule, QuotasModule],
   controllers: [...testControllers, WhatsAppController],
-  providers: [WhatsAppService, WhatsAppDispatcherJob, WhatsAppProcessor],
-  exports: [WhatsAppService],
+  providers: [
+    WhatsAppService,
+    WhatsAppTemplateService,
+    WhatsAppContextService,
+    WhatsAppAutomationService,
+    WhatsAppDispatcherJob,
+    WhatsAppProcessor,
+  ],
+  exports: [WhatsAppService, WhatsAppTemplateService, WhatsAppContextService, WhatsAppAutomationService],
 })
 export class WhatsAppModule {}

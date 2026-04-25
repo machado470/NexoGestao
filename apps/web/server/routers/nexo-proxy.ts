@@ -317,7 +317,7 @@ const whatsappSendInput = z.object({
   content: z.string().min(1),
   toPhone: z.string().optional(),
   receiverNumber: z.string().optional(),
-  entityType: z.enum(["CUSTOMER", "APPOINTMENT", "SERVICE_ORDER", "CHARGE"]).optional(),
+  entityType: z.enum(["CUSTOMER", "APPOINTMENT", "SERVICE_ORDER", "CHARGE", "PAYMENT", "GENERAL"]).optional(),
   entityId: z.string().optional(),
   messageType: z
     .enum([
@@ -325,8 +325,12 @@ const whatsappSendInput = z.object({
       "SERVICE_UPDATE",
       "PAYMENT_REMINDER",
       "PAYMENT_CONFIRMATION",
-      "EXECUTION_CONFIRMATION",
       "CUSTOMER_NOTIFICATION",
+      "MANUAL",
+      "PAYMENT_LINK",
+      "APPOINTMENT_REMINDER",
+      "PAYMENT_CONFIRMATION",
+      "EXECUTION_CONFIRMATION",
     ])
     .optional(),
   idempotencyKey: z.string().min(8).optional(),
@@ -712,53 +716,48 @@ export const nexoProxyRouter = router({
   }),
 
   whatsapp: router({
-    conversations: protectedProcedure.query(async ({ ctx }) => {
-      return authedGet(ctx as CtxLike, '/whatsapp/conversations');
+    listConversations: protectedProcedure.input(anyInput).query(async ({ ctx, input }) => {
+      return authedGet(ctx as CtxLike, '/whatsapp/conversations', input ?? {});
     }),
 
-    messagesFeed: protectedProcedure
-      .input(
-        z.object({
-          customerId: z.string(),
-          cursor: z.string().optional(),
-          limit: z.number().int().min(1).max(100).optional(),
-        })
-      )
-      .query(async ({ ctx, input }) => {
-        return authedGet(
-          ctx as CtxLike,
-          `/whatsapp/messages/${input.customerId}`,
-          {
-            cursor: input.cursor,
-            limit: input.limit,
-          }
-        );
-      }),
+    getConversation: protectedProcedure
+      .input(z.object({ id: z.string().min(1) }))
+      .query(async ({ ctx, input }) => authedGet(ctx as CtxLike, `/whatsapp/conversations/${input.id}`)),
 
-    messages: protectedProcedure
-      .input(
-        z.object({
-          customerId: z.string(),
-          limit: z.number().int().min(1).max(100).optional(),
-        })
-      )
-      .query(async ({ ctx, input }) => {
-        const payload = await authedGet(
-          ctx as CtxLike,
-          `/whatsapp/messages/${input.customerId}`,
-          { limit: input.limit ?? 50 }
-        );
-        return Array.isArray(payload) ? payload : (payload as any)?.items ?? [];
-      }),
+    getMessages: protectedProcedure
+      .input(z.object({ conversationId: z.string().min(1) }))
+      .query(async ({ ctx, input }) => authedGet(ctx as CtxLike, `/whatsapp/conversations/${input.conversationId}/messages`)),
 
-    send: protectedProcedure.input(whatsappSendInput).mutation(async ({ ctx, input }) => {
-      return authedPost(
-        ctx as CtxLike,
-        "/whatsapp/messages",
-        input,
-        input.idempotencyKey ? { "Idempotency-Key": input.idempotencyKey } : undefined
-      );
+    getContext: protectedProcedure
+      .input(z.object({ conversationId: z.string().min(1) }))
+      .query(async ({ ctx, input }) => authedGet(ctx as CtxLike, `/whatsapp/conversations/${input.conversationId}/context`)),
+
+    sendMessage: protectedProcedure
+      .input(z.object({ conversationId: z.string().min(1), customerId: z.string().optional(), content: z.string().min(1), toPhone: z.string().optional(), entityType: z.string().optional(), entityId: z.string().optional(), messageType: z.string().optional() }))
+      .mutation(async ({ ctx, input }) => authedPost(ctx as CtxLike, `/whatsapp/conversations/${input.conversationId}/messages`, input)),
+
+    sendTemplate: protectedProcedure
+      .input(z.object({ templateKey: z.string().min(1), customerId: z.string().optional(), conversationId: z.string().optional(), context: z.record(z.string(), z.any()).optional(), toPhone: z.string().optional(), entityType: z.string().optional(), entityId: z.string().optional(), messageType: z.string().optional() }))
+      .mutation(async ({ ctx, input }) => authedPost(ctx as CtxLike, '/whatsapp/messages/template', input)),
+
+    retryMessage: protectedProcedure
+      .input(z.object({ id: z.string().min(1) }))
+      .mutation(async ({ ctx, input }) => authedPost(ctx as CtxLike, `/whatsapp/messages/${input.id}/retry`)),
+
+    updateConversationStatus: protectedProcedure
+      .input(z.object({ id: z.string().min(1), status: z.enum(['PENDING', 'RESOLVED']) }))
+      .mutation(async ({ ctx, input }) => authedPatch(ctx as CtxLike, `/whatsapp/conversations/${input.id}/status`, { status: input.status })),
+
+    health: protectedProcedure.query(async ({ ctx }) => authedGet(ctx as CtxLike, '/whatsapp/health')),
+
+    // backward compatibility
+    conversations: protectedProcedure.query(async ({ ctx }) => authedGet(ctx as CtxLike, '/whatsapp/conversations')),
+    messagesFeed: protectedProcedure.input(z.object({ customerId: z.string(), cursor: z.string().optional(), limit: z.number().int().min(1).max(100).optional() })).query(async ({ ctx, input }) => authedGet(ctx as CtxLike, `/whatsapp/messages/${input.customerId}`, { cursor: input.cursor, limit: input.limit })),
+    messages: protectedProcedure.input(z.object({ customerId: z.string(), limit: z.number().int().min(1).max(100).optional() })).query(async ({ ctx, input }) => {
+      const payload = await authedGet(ctx as CtxLike, `/whatsapp/messages/${input.customerId}`, { limit: input.limit ?? 50 })
+      return Array.isArray(payload) ? payload : (payload as any)?.items ?? []
     }),
+    send: protectedProcedure.input(whatsappSendInput).mutation(async ({ ctx, input }) => authedPost(ctx as CtxLike, '/whatsapp/messages', input, input.idempotencyKey ? { 'Idempotency-Key': input.idempotencyKey } : undefined)),
   }),
 
   demo: router({

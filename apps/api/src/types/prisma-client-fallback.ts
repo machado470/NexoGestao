@@ -28,11 +28,11 @@ export const NotificationType = makeEnum(['CHARGE_OVERDUE','SERVICE_OVERDUE','PA
 export type NotificationType = (typeof NotificationType)[keyof typeof NotificationType]
 export const OperationalStateValue = makeEnum(['NORMAL', 'WARNING', 'RESTRICTED', 'SUSPENDED'] as const)
 export type OperationalStateValue = (typeof OperationalStateValue)[keyof typeof OperationalStateValue]
-export const WhatsAppEntityType = makeEnum(['APPOINTMENT', 'SERVICE_ORDER', 'CHARGE'] as const)
+export const WhatsAppEntityType = makeEnum(['CUSTOMER','APPOINTMENT', 'SERVICE_ORDER', 'CHARGE','PAYMENT','GENERAL'] as const)
 export type WhatsAppEntityType = (typeof WhatsAppEntityType)[keyof typeof WhatsAppEntityType]
-export const WhatsAppMessageStatus = makeEnum(['QUEUED', 'SENDING', 'SENT', 'FAILED', 'CANCELED'] as const)
+export const WhatsAppMessageStatus = makeEnum(['QUEUED', 'SENDING', 'SENT', 'DELIVERED', 'READ', 'FAILED', 'CANCELED'] as const)
 export type WhatsAppMessageStatus = (typeof WhatsAppMessageStatus)[keyof typeof WhatsAppMessageStatus]
-export const WhatsAppMessageType = makeEnum(['APPOINTMENT_CONFIRMATION','REMIND_24H','PAYMENT_LINK','PAYMENT_REMINDER','RECEIPT','EXECUTION_CONFIRMATION'] as const)
+export const WhatsAppMessageType = makeEnum(['APPOINTMENT_CONFIRMATION','APPOINTMENT_REMINDER','SERVICE_UPDATE','PAYMENT_LINK','PAYMENT_REMINDER','PAYMENT_CONFIRMATION','CUSTOMER_NOTIFICATION','MANUAL','REMIND_24H','RECEIPT','EXECUTION_CONFIRMATION'] as const)
 export type WhatsAppMessageType = (typeof WhatsAppMessageType)[keyof typeof WhatsAppMessageType]
 
 export const AutomationTrigger = makeEnum(['SERVICE_ORDER_COMPLETED','PAYMENT_OVERDUE','APPOINTMENT_CREATED'] as const)

@@ -1,8 +1,32 @@
-// apps/api/src/whatsapp/providers/whatsapp.provider.ts
+export type ProviderHealthStatus = 'configured' | 'misconfigured' | 'configured_mock'
 
-export type WhatsAppSendInput = {
+export type WhatsAppProviderHealth = {
+  provider: string
+  status: ProviderHealthStatus
+  missingEnv: string[]
+}
+
+export type WhatsAppSendTextInput = {
   toPhone: string
   text: string
+  metadata?: Record<string, unknown>
+}
+
+export type WhatsAppSendTemplateInput = {
+  toPhone: string
+  templateKey: string
+  renderedText: string
+  variables?: Record<string, unknown>
+}
+
+export type ParsedWebhookMessage = {
+  eventType: string
+  fromPhone: string | null
+  toPhone: string | null
+  content: string | null
+  providerMessageId: string | null
+  timestamp: Date | null
+  metadata?: Record<string, unknown>
 }
 
 export type WhatsAppSendSuccessResult = {
@@ -16,27 +40,26 @@ export type WhatsAppSendErrorResult = {
   provider: string
   errorCode: string
   errorMessage: string
+  fatal?: boolean
 }
 
-export type WhatsAppSendResult =
-  | WhatsAppSendSuccessResult
-  | WhatsAppSendErrorResult
+export type WhatsAppSendResult = WhatsAppSendSuccessResult | WhatsAppSendErrorResult
 
 export interface WhatsAppProvider {
-  send(input: WhatsAppSendInput): Promise<WhatsAppSendResult>
+  sendText(input: WhatsAppSendTextInput): Promise<WhatsAppSendResult>
+  sendTemplate(input: WhatsAppSendTemplateInput): Promise<WhatsAppSendResult>
+  parseWebhook(payload: unknown): ParsedWebhookMessage[]
+  getProviderName(): string
+  checkHealth(): WhatsAppProviderHealth
 }
 
-export function isWhatsAppSendError(
-  result: WhatsAppSendResult,
-): result is WhatsAppSendErrorResult {
+export function isWhatsAppSendError(result: WhatsAppSendResult): result is WhatsAppSendErrorResult {
   return result.ok === false
 }
 
-/**
- * Erros fatais não devem voltar para fila em loop infinito.
- * Ex.: credenciais ausentes/inválidas, assinatura da instância expirada/inativa.
- */
 export function isFatalWhatsAppSendError(result: WhatsAppSendErrorResult): boolean {
+  if (result.fatal) return true
+
   const normalizedCode = (result.errorCode ?? '').toUpperCase()
   const normalizedMessage = (result.errorMessage ?? '').toLowerCase()
 

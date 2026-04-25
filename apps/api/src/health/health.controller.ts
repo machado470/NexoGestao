@@ -159,6 +159,7 @@ export class HealthController {
         mode: whatsappReadiness.mode,
         credentialsReady: whatsappReadiness.credentialsReady,
         missingEnv: whatsappReadiness.missingEnv,
+        queueAvailable: Boolean(this.queueService),
       },
     }
   }
