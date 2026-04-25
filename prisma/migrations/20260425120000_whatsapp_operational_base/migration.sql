@@ -53,7 +53,7 @@ CREATE TABLE "WhatsAppWebhookEvent" (
 
 -- Existing table evolution
 ALTER TABLE "WhatsAppTemplate"
-  ADD COLUMN IF NOT EXISTS "messageType" "WhatsAppMessageType" NOT NULL DEFAULT 'MANUAL',
+  ADD COLUMN IF NOT EXISTS "messageType" "WhatsAppMessageType",
   ADD COLUMN IF NOT EXISTS "content" TEXT;
 
 UPDATE "WhatsAppTemplate" SET "content" = "body" WHERE "content" IS NULL;
