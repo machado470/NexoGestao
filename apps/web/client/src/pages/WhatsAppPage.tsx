@@ -10,17 +10,13 @@ import { useLocation } from "wouter";
 import { toast } from "sonner";
 import {
   CheckCheck,
-  Circle,
   EllipsisVertical,
   Info,
-  Bell,
   MessageCircleMore,
   Paperclip,
-  PanelLeftClose,
   Search,
   Send,
   Star,
-  UserCircle2,
   Volume2,
 } from "lucide-react";
 
@@ -886,77 +882,38 @@ export default function WhatsAppPage() {
 
   return (
     <AppPageShell className="h-[calc(100vh-5rem)] min-h-0 overflow-hidden bg-[#0B111C] px-3 pb-2 pt-3">
-      <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
-        <div className="flex shrink-0 items-center justify-between rounded-2xl bg-white/[0.03] px-4 py-2.5">
-          <div className="flex items-center gap-2.5">
-            <button type="button" className="rounded-lg bg-white/[0.02] p-1.5 text-[var(--text-muted)] hover:bg-white/[0.05]">
-              <PanelLeftClose className="size-4" />
-            </button>
-            <div>
-              <h1 className="text-sm font-semibold">WhatsApp</h1>
-              <p className="text-[11px] text-[var(--text-muted)]">
-                Canal de execução conectado ao contexto de operação.
-              </p>
-            </div>
-            <div className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-300">
-              <Circle className="size-2.5 fill-current" /> Online
-            </div>
-            {isDemoMode ? (
-              <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-100">
-                Dados piloto
-              </span>
-            ) : null}
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="hidden items-center gap-2 rounded-xl bg-white/[0.02] px-2.5 py-1.5 md:flex">
-              <Search className="size-3.5 text-[var(--text-muted)]" />
-              <input placeholder="Buscar..." className="w-36 bg-transparent text-xs outline-none placeholder:text-[var(--text-muted)]/70" />
-            </div>
-            <button type="button" className="rounded-lg bg-white/[0.02] p-1.5 text-[var(--text-muted)] hover:bg-white/[0.05]">
-              <Bell className="size-4" />
-            </button>
-            <button type="button" className="inline-flex items-center gap-1.5 rounded-xl bg-white/[0.02] px-2 py-1.5 text-xs hover:bg-white/[0.05]">
-              <UserCircle2 className="size-4 text-[var(--accent-primary)]" />
-              Paula
-            </button>
-          </div>
+      <div className="grid h-full min-h-0 grid-cols-1 gap-4 overflow-hidden bg-transparent xl:grid-cols-[minmax(260px,300px)_minmax(0,1fr)_minmax(280px,320px)]">
+        <div className="h-full min-h-0 min-w-0 overflow-hidden">
+          <ConversationsList
+            rows={filteredConversations}
+            selectedId={selectedCustomerId}
+            onSelect={setSelectedCustomerId}
+            filter={activeFilter}
+            onFilter={setActiveFilter}
+            search={searchTerm}
+            onSearch={setSearchTerm}
+          />
         </div>
-
-        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
-          <div className="grid h-full min-h-0 flex-1 grid-cols-1 gap-4 overflow-hidden bg-transparent xl:grid-cols-[minmax(260px,300px)_minmax(0,1fr)_minmax(280px,320px)]">
-            <div className="h-full min-h-0 min-w-0 overflow-hidden">
-              <ConversationsList
-                rows={filteredConversations}
-                selectedId={selectedCustomerId}
-                onSelect={setSelectedCustomerId}
-                filter={activeFilter}
-                onFilter={setActiveFilter}
-                search={searchTerm}
-                onSearch={setSearchTerm}
-              />
-            </div>
-            <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
-              <ChatPanel
-                conversation={selectedConversation}
-                messages={messages}
-                isLoading={messagesFeedQuery.isLoading && !isDemoMode}
-                isLoadingMore={messagesFeedQuery.isFetching && Boolean(cursor)}
-                hasMore={Boolean(nextCursor)}
-                onLoadMore={() => {
-                  if (nextCursor) setCursor(nextCursor);
-                }}
-                content={content}
-                setContent={setContent}
-                sendMessage={sendMessage}
-              />
-            </div>
-            <div className="hidden h-full min-h-0 min-w-0 overflow-hidden xl:block">
-              <ContextPanel
-                conversation={selectedConversation}
-                sendMessage={sendMessage}
-              />
-            </div>
-          </div>
+        <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+          <ChatPanel
+            conversation={selectedConversation}
+            messages={messages}
+            isLoading={messagesFeedQuery.isLoading && !isDemoMode}
+            isLoadingMore={messagesFeedQuery.isFetching && Boolean(cursor)}
+            hasMore={Boolean(nextCursor)}
+            onLoadMore={() => {
+              if (nextCursor) setCursor(nextCursor);
+            }}
+            content={content}
+            setContent={setContent}
+            sendMessage={sendMessage}
+          />
+        </div>
+        <div className="hidden h-full min-h-0 min-w-0 overflow-hidden xl:block">
+          <ContextPanel
+            conversation={selectedConversation}
+            sendMessage={sendMessage}
+          />
         </div>
       </div>
     </AppPageShell>
