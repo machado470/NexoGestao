@@ -9,11 +9,8 @@ import {
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import {
-  AlertTriangle,
-  CalendarClock,
   CheckCheck,
   Circle,
-  Clock3,
   EllipsisVertical,
   Info,
   Bell,
@@ -25,7 +22,6 @@ import {
   Star,
   UserCircle2,
   Volume2,
-  Wallet,
 } from "lucide-react";
 
 import { trpc } from "@/lib/trpc";
@@ -35,7 +31,6 @@ import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/design-system";
 import {
-  AppPageHeader,
   AppPageShell,
   AppSkeleton,
 } from "@/components/app-system";
@@ -256,45 +251,6 @@ const statusUi: Record<ConversationStatus, { label: string; dot: string }> = {
 
 const ROW_HEIGHT = 124;
 
-const topStats = [
-  {
-    label: "Aguardando resposta",
-    value: "6",
-    detail: "2 acima de 30 min",
-    icon: Clock3,
-    tone: "text-amber-300",
-  },
-  {
-    label: "Falhas de envio",
-    value: "2",
-    detail: "requer ação manual",
-    icon: AlertTriangle,
-    tone: "text-rose-300",
-  },
-  {
-    label: "Cobranças pendentes",
-    value: "3",
-    detail: "R$ 1.240,00 em aberto",
-    icon: Wallet,
-    tone: "text-violet-300",
-  },
-  {
-    label: "Agendamentos hoje",
-    value: "1",
-    detail: "14:00 confirmado",
-    icon: CalendarClock,
-    tone: "text-[var(--accent-primary)]",
-  },
-];
-
-const footerMetrics = [
-  ["Tempo médio resposta", "42 min"],
-  ["Conversas abertas", "18"],
-  ["Taxa de resposta", "92%"],
-  ["Mensagens enviadas", "156"],
-  ["Falhas de envio", "2"],
-] as const;
-
 function fmtTime(value?: string | null) {
   if (!value) return "--:--";
   const date = new Date(value);
@@ -324,15 +280,22 @@ const ConversationRow = memo(function ConversationRow({
         type="button"
         onClick={() => onSelect(conversation.customerId)}
         className={cn(
-          "w-full rounded-xl border px-3.5 py-3 text-left transition",
+          "w-full rounded-2xl border px-3.5 py-3.5 text-left transition",
           selectedId === conversation.customerId
-            ? "border-[var(--accent-primary)]/40 bg-[var(--accent-soft)]/40"
-            : "border-white/[0.04] bg-white/[0.02] hover:border-white/[0.12]"
+            ? "border-[var(--accent-primary)]/55 bg-[var(--accent-soft)]/35 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]"
+            : "border-white/[0.05] bg-white/[0.015] hover:border-white/[0.12]"
         )}
       >
         <div className="flex items-start justify-between gap-2.5">
           <div className="flex min-w-0 items-center gap-2.5">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-full border border-[var(--accent-primary)]/25 bg-[var(--accent-soft)]/60 text-sm font-semibold text-[var(--accent-primary)]">
+            <div
+              className={cn(
+                "flex size-10 shrink-0 items-center justify-center rounded-full border text-sm font-semibold",
+                selectedId === conversation.customerId
+                  ? "border-[var(--accent-primary)]/55 bg-[var(--accent-soft)]/70 text-[var(--accent-primary)]"
+                  : "border-white/[0.12] bg-white/[0.04] text-[var(--text-secondary)]"
+              )}
+            >
               {conversation.name.slice(0, 1)}
             </div>
             <div className="min-w-0">
@@ -369,27 +332,6 @@ const ConversationRow = memo(function ConversationRow({
   );
 });
 
-function TopOperationalStats() {
-  return (
-    <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
-      {topStats.map(item => (
-        <article key={item.label} className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2.5">
-          <div className="flex items-center gap-1.5">
-            <item.icon className={cn("size-3.5", item.tone)} />
-            <p className={cn("text-[11px]", item.tone)}>{item.label}</p>
-          </div>
-          <p className="mt-1 text-xl font-semibold leading-none">
-            {item.value}
-          </p>
-          <p className="mt-0.5 text-[10px] text-[var(--text-muted)]">
-            {item.detail}
-          </p>
-        </article>
-      ))}
-    </div>
-  );
-}
-
 function ConversationsList({
   rows,
   selectedId,
@@ -423,8 +365,12 @@ function ConversationsList({
   const visibleRows = rows.slice(startIndex, startIndex + visibleCount);
 
   return (
-    <aside className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-transparent px-3 py-3">
+    <aside className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-transparent p-3">
       <div className="shrink-0 space-y-2.5 border-b border-white/[0.06] pb-3">
+        <div className="flex items-center justify-between">
+          <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Inbox</p>
+          <button type="button" className="rounded-lg border border-white/[0.08] bg-white/[0.02] px-2 py-1 text-[10px] text-[var(--text-muted)] hover:bg-white/[0.05]">Filtros</button>
+        </div>
         <div className="flex items-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-2">
           <Search className="size-3.5 text-[var(--text-muted)]" />
           <input
@@ -515,7 +461,7 @@ function ChatPanel({
 
   return (
     <section className="flex h-full min-h-0 flex-col overflow-hidden bg-transparent">
-      <header className="shrink-0 flex items-center justify-between border-b border-white/[0.06] px-4 py-3.5">
+      <header className="shrink-0 flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
         <div className="flex items-center gap-3">
           <div className="flex size-11 items-center justify-center rounded-full border border-[var(--accent-primary)]/25 bg-[var(--accent-soft)]/60 text-sm font-semibold text-[var(--accent-primary)]">
             {conversation?.name?.slice(0, 1) ?? "-"}
@@ -529,8 +475,8 @@ function ChatPanel({
             </p>
           </div>
           {conversation ? (
-            <span className="rounded-full border border-amber-400/30 bg-amber-500/15 px-2.5 py-1 text-[10px] font-medium tracking-wide text-amber-100">
-              COBRANÇA PENDENTE
+            <span className="rounded-full border border-amber-400/25 bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-100">
+              Cobrança pendente
             </span>
           ) : null}
         </div>
@@ -597,7 +543,7 @@ function ChatPanel({
                       "rounded-2xl border px-4 py-3 text-sm leading-relaxed shadow-sm",
                       outgoing
                         ? "max-w-[58%] border-emerald-400/20 bg-emerald-900/55"
-                        : "max-w-[62%] border-white/10 bg-slate-900/80"
+                        : "max-w-[64%] border-white/[0.08] bg-white/[0.03]"
                     )}
                   >
                     <p>{message.text}</p>
@@ -667,162 +613,65 @@ function ContextPanel({
   sendMessage: (preset?: string) => void;
 }) {
   return (
-    <aside className="h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden bg-transparent">
+    <aside className="h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden bg-transparent p-3">
       {!conversation ? (
         <AppEmptyState
           title="Sem contexto ativo"
           description="Selecione uma conversa para abrir contexto operacional."
         />
       ) : (
-        <div className="text-xs">
-          <section className="border-b border-white/[0.06] px-4 py-4">
-            <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-              Cliente
-            </p>
+        <div className="space-y-3 text-xs">
+          <section className="rounded-2xl border border-white/[0.08] bg-white/[0.02] px-4 py-3.5">
+            <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Cliente</p>
             <p className="mt-1 font-semibold">João Silva</p>
-            <p className="text-[11px] text-[var(--text-muted)]">
-              5511999998888
-            </p>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="mt-3 h-7 text-[11px]"
-            >
-              Ver cliente
-            </Button>
+            <p className="text-[11px] text-[var(--text-muted)]">5511999998888</p>
+            <Button type="button" size="sm" variant="outline" className="mt-3 h-7 text-[11px]">Ver cliente</Button>
           </section>
-          <section className="border-b border-white/[0.06] px-4 py-4">
-            <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-              Próximo agendamento
-            </p>
+
+          <section className="rounded-2xl border border-white/[0.08] bg-white/[0.02] px-4 py-3.5">
+            <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Próximo agendamento</p>
             <p className="mt-1 font-medium">Manutenção preventiva</p>
-            <p className="text-[11px] text-[var(--text-muted)]">
-              24/04/2026 às 14:00
-            </p>
-            <span className="mt-1 inline-flex whitespace-nowrap rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] text-amber-200">
-              PENDENTE CONFIRMAÇÃO
-            </span>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="mt-3 h-7 text-[11px]"
-            >
-              Ver agendamento
-            </Button>
+            <p className="text-[11px] text-[var(--text-muted)]">24/04/2026 às 14:00</p>
+            <span className="mt-1 inline-flex whitespace-nowrap rounded-full border border-amber-400/30 bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-100">Pendente confirmação</span>
+            <Button type="button" size="sm" variant="outline" className="mt-3 h-7 text-[11px]">Ver agendamento</Button>
           </section>
-          <section className="border-b border-white/[0.06] px-4 py-4">
-            <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-              Ordens de serviço
-            </p>
+
+          <section className="rounded-2xl border border-white/[0.08] bg-white/[0.02] px-4 py-3.5">
+            <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Ordem de serviço</p>
             <p className="mt-1 font-medium">OS #236</p>
-            <p className="text-[11px] text-[var(--text-muted)]">Em andamento</p>
-            <p className="text-[11px] text-[var(--text-muted)]">
-              Técnico: William Machado
-            </p>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="mt-3 h-7 text-[11px]"
-            >
-              Ver O.S.
-            </Button>
+            <p className="text-[11px] text-[var(--text-muted)]">Status: Em andamento</p>
+            <p className="text-[11px] text-[var(--text-muted)]">Técnico: William Machado</p>
+            <Button type="button" size="sm" variant="outline" className="mt-3 h-7 text-[11px]">Ver O.S.</Button>
           </section>
-          <section className="border-b border-white/[0.06] px-4 py-4">
-            <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-              Financeiro
-            </p>
+
+          <section className="rounded-2xl border border-white/[0.08] bg-white/[0.02] px-4 py-3.5">
+            <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Cobrança</p>
             <p className="mt-1 font-medium">Cobrança #1247</p>
-            <p className="text-[11px] text-[var(--text-muted)]">
-              Vencimento: 20/04/2026
-            </p>
-            <span className="mt-1 inline-flex whitespace-nowrap rounded-full bg-rose-500/20 px-2 py-0.5 text-[10px] text-rose-200">
-              ATRASADA 3 DIAS
-            </span>
-            <p className="mt-1 text-[11px]">Valor: R$ 480,00</p>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="mt-3 h-7 text-[11px]"
-            >
-              Ver cobrança
-            </Button>
+            <p className="text-[11px] text-[var(--text-muted)]">Vencimento: 20/04/2026</p>
+            <p className="text-[11px]">Valor: R$ 480,00</p>
+            <span className="mt-1 inline-flex whitespace-nowrap rounded-full border border-rose-400/35 bg-rose-500/10 px-2 py-0.5 text-[10px] text-rose-100">Atrasada 3 dias</span>
+            <Button type="button" size="sm" variant="outline" className="mt-3 h-7 text-[11px]">Ver cobrança</Button>
           </section>
-          <section className="border-b border-white/[0.06] px-4 py-4">
-            <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-              Última interação
-            </p>
+
+          <section className="rounded-2xl border border-white/[0.08] bg-white/[0.02] px-4 py-3.5">
+            <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Última interação</p>
             <p className="mt-1">Mensagem enviada</p>
-            <p className="text-[11px] text-[var(--text-muted)]">
-              Link de pagamento
-            </p>
             <p className="text-[11px] text-[var(--text-muted)]">Hoje, 09:40</p>
-            <span className="mt-1 inline-flex whitespace-nowrap rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] text-emerald-200">
-              Entregue
-            </span>
+            <span className="mt-1 inline-flex whitespace-nowrap rounded-full border border-emerald-400/35 bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-100">Entregue</span>
           </section>
-          <section className="px-4 py-4">
-            <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-              Ações rápidas
-            </p>
+
+          <section className="rounded-2xl border border-white/[0.08] bg-white/[0.02] px-4 py-3.5">
+            <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Ações rápidas</p>
             <div className="mt-2.5 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-8 w-full min-w-0 justify-start truncate px-2.5 text-[10px] sm:text-[11px]"
-                onClick={() => sendMessage("Cobrança")}
-              >
-                Enviar cobrança
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-8 w-full min-w-0 justify-start truncate px-2.5 text-[10px] sm:text-[11px]"
-              >
-                Registrar pagamento
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-8 w-full min-w-0 justify-start truncate px-2.5 text-[10px] sm:text-[11px]"
-              >
-                Atualizar O.S.
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-8 w-full min-w-0 justify-start truncate px-2.5 text-[10px] sm:text-[11px]"
-              >
-                Mais ações
-              </Button>
+              <Button type="button" size="sm" variant="outline" className="h-8 w-full min-w-0 justify-start truncate px-2.5 text-[11px]" onClick={() => sendMessage("Cobrança")}>Enviar cobrança</Button>
+              <Button type="button" size="sm" variant="outline" className="h-8 w-full min-w-0 justify-start truncate px-2.5 text-[11px]">Registrar pagamento</Button>
+              <Button type="button" size="sm" variant="outline" className="h-8 w-full min-w-0 justify-start truncate px-2.5 text-[11px]" onClick={() => sendMessage("Lembrete")}>Enviar lembrete</Button>
+              <Button type="button" size="sm" variant="outline" className="h-8 w-full min-w-0 justify-start truncate px-2.5 text-[11px]">Mais ações</Button>
             </div>
           </section>
         </div>
       )}
     </aside>
-  );
-}
-
-function WhatsAppMetricsFooter() {
-  return (
-    <div className="hidden shrink-0 gap-2 md:grid-cols-3 xl:max-h-[56px] xl:grid-cols-5 2xl:grid">
-      {footerMetrics.map(([label, value]) => (
-        <article
-          key={label}
-          className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-2.5 py-1.5"
-        >
-          <p className="text-[10px] text-[var(--text-muted)]">{label}</p>
-          <p className="text-xs font-semibold">{value}</p>
-        </article>
-      ))}
-    </div>
   );
 }
 
@@ -1029,7 +878,7 @@ export default function WhatsAppPage() {
   return (
     <AppPageShell className="h-full overflow-hidden bg-[#0B111C] px-3 py-3">
       <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
-        <AppPageHeader className="flex shrink-0 items-center justify-between rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2">
+        <div className="flex shrink-0 items-center justify-between rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-2.5">
           <div className="flex items-center gap-2.5">
             <button type="button" className="rounded-lg border border-white/[0.08] bg-white/[0.02] p-1.5 text-[var(--text-muted)] hover:bg-white/[0.05]">
               <PanelLeftClose className="size-4" />
@@ -1037,7 +886,7 @@ export default function WhatsAppPage() {
             <div>
               <h1 className="text-sm font-semibold">WhatsApp</h1>
               <p className="text-[11px] text-[var(--text-muted)]">
-                Canal de execução operacional
+                Canal de execução conectado ao contexto de operação.
               </p>
             </div>
             <div className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-300">
@@ -1062,14 +911,11 @@ export default function WhatsAppPage() {
               Paula
             </button>
           </div>
-        </AppPageHeader>
+        </div>
 
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
-          <div className="shrink-0">
-            <TopOperationalStats />
-          </div>
-          <div className="grid h-full min-h-[640px] flex-1 grid-cols-1 overflow-hidden bg-[#0B111C] xl:min-h-[680px] xl:grid-cols-[340px_minmax(520px,1fr)_340px]">
-            <div className="min-w-0 border-r border-white/[0.06]">
+          <div className="grid h-full min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden bg-[#0B111C] xl:grid-cols-[minmax(300px,340px)_minmax(0,1fr)_minmax(320px,380px)]">
+            <div className="min-w-0 rounded-2xl border border-white/[0.06] bg-white/[0.015]">
               <ConversationsList
                 rows={filteredConversations}
                 selectedId={selectedCustomerId}
@@ -1080,7 +926,7 @@ export default function WhatsAppPage() {
                 onSearch={setSearchTerm}
               />
             </div>
-            <div className="min-w-0 border-r border-white/[0.06]">
+            <div className="min-w-0 rounded-2xl border border-white/[0.06] bg-white/[0.015]">
               <ChatPanel
                 conversation={selectedConversation}
                 messages={messages}
@@ -1095,14 +941,13 @@ export default function WhatsAppPage() {
                 sendMessage={sendMessage}
               />
             </div>
-            <div className="min-w-0">
+            <div className="hidden min-w-0 xl:block">
               <ContextPanel
                 conversation={selectedConversation}
                 sendMessage={sendMessage}
               />
             </div>
           </div>
-          <WhatsAppMetricsFooter />
         </div>
       </div>
     </AppPageShell>
