@@ -249,7 +249,7 @@ const statusUi: Record<ConversationStatus, { label: string; dot: string }> = {
   failed: { label: "Falha", dot: "bg-rose-400" },
 };
 
-const ROW_HEIGHT = 124;
+const ROW_HEIGHT = 106;
 
 function fmtTime(value?: string | null) {
   if (!value) return "--:--";
@@ -275,22 +275,22 @@ const ConversationRow = memo(function ConversationRow({
   const status = statusUi[conversation.status] ?? statusUi.ok;
 
   return (
-    <div style={style} className="px-1 py-1.5">
+    <div style={style} className="px-0.5 py-1">
       <button
         type="button"
         onClick={() => onSelect(conversation.customerId)}
         className={cn(
-          "w-full rounded-2xl border px-3.5 py-3.5 text-left transition",
+          "w-full rounded-xl border px-3 py-2.5 text-left transition",
           selectedId === conversation.customerId
-            ? "border-[var(--accent-primary)]/55 bg-[var(--accent-soft)]/35 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]"
+            ? "border-[var(--accent-primary)]/40 bg-[var(--accent-soft)]/28 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]"
             : "border-white/[0.05] bg-white/[0.015] hover:border-white/[0.12]"
         )}
       >
-        <div className="flex items-start justify-between gap-2.5">
-          <div className="flex min-w-0 items-center gap-2.5">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2">
             <div
               className={cn(
-                "flex size-10 shrink-0 items-center justify-center rounded-full border text-sm font-semibold",
+                "flex size-8 shrink-0 items-center justify-center rounded-full border text-xs font-semibold",
                 selectedId === conversation.customerId
                   ? "border-[var(--accent-primary)]/55 bg-[var(--accent-soft)]/70 text-[var(--accent-primary)]"
                   : "border-white/[0.12] bg-white/[0.04] text-[var(--text-secondary)]"
@@ -313,10 +313,10 @@ const ConversationRow = memo(function ConversationRow({
             {fmtTime(conversation.lastMessageAt)}
           </span>
         </div>
-        <p className="mt-2 line-clamp-1 text-xs text-[var(--text-secondary)]">
+        <p className="mt-1.5 line-clamp-1 text-xs text-[var(--text-secondary)]">
           {conversation.lastMessage}
         </p>
-        <div className="mt-2.5 flex items-center justify-between text-[11px] text-[var(--text-muted)]">
+        <div className="mt-2 flex items-center justify-between text-[11px] text-[var(--text-muted)]">
           <span className="inline-flex items-center gap-1.5">
             <span className={cn("h-2 w-2 rounded-full", status.dot)} />
             {status.label}
@@ -365,13 +365,13 @@ function ConversationsList({
   const visibleRows = rows.slice(startIndex, startIndex + visibleCount);
 
   return (
-    <aside className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-transparent p-3">
-      <div className="shrink-0 space-y-2.5 border-b border-white/[0.06] pb-3">
+    <aside className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-white/[0.05] bg-white/[0.015] p-2.5">
+      <div className="shrink-0 space-y-2 border-b border-white/[0.05] pb-2.5">
         <div className="flex items-center justify-between">
           <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Inbox</p>
           <button type="button" className="rounded-lg border border-white/[0.08] bg-white/[0.02] px-2 py-1 text-[10px] text-[var(--text-muted)] hover:bg-white/[0.05]">Filtros</button>
         </div>
-        <div className="flex items-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-2">
+        <div className="flex items-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-1.5">
           <Search className="size-3.5 text-[var(--text-muted)]" />
           <input
             value={search}
@@ -400,7 +400,7 @@ function ConversationsList({
       </div>
       <div
         ref={viewportRef}
-        className="mt-2.5 flex-1 min-h-0 overflow-y-auto pr-1"
+        className="mt-2 flex-1 min-h-0 overflow-y-auto pr-1"
         onScroll={e => setScrollTop(e.currentTarget.scrollTop)}
       >
         {rows.length === 0 ? (
@@ -460,10 +460,10 @@ function ChatPanel({
   }, [conversation?.customerId]);
 
   return (
-    <section className="flex h-full min-h-0 flex-col overflow-hidden bg-transparent">
-      <header className="shrink-0 flex items-center justify-between border-b border-white/[0.06] px-4 py-3">
+    <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-white/[0.05] bg-white/[0.015]">
+      <header className="shrink-0 flex items-center justify-between border-b border-white/[0.05] px-4 py-2.5">
         <div className="flex items-center gap-3">
-          <div className="flex size-11 items-center justify-center rounded-full border border-[var(--accent-primary)]/25 bg-[var(--accent-soft)]/60 text-sm font-semibold text-[var(--accent-primary)]">
+          <div className="flex size-10 items-center justify-center rounded-full border border-[var(--accent-primary)]/25 bg-[var(--accent-soft)]/60 text-sm font-semibold text-[var(--accent-primary)]">
             {conversation?.name?.slice(0, 1) ?? "-"}
           </div>
           <div>
@@ -495,7 +495,7 @@ function ChatPanel({
 
       <div
         ref={messagesRef}
-        className="flex-1 min-h-0 overflow-y-auto bg-transparent px-4 py-4"
+        className="flex-1 min-h-0 overflow-y-auto bg-transparent px-5 py-4"
         onScroll={event => {
           const target = event.currentTarget;
           if (target.scrollTop < 80 && hasMore && !isLoadingMore) onLoadMore();
@@ -542,8 +542,8 @@ function ChatPanel({
                     className={cn(
                       "rounded-2xl border px-4 py-3 text-sm leading-relaxed shadow-sm",
                       outgoing
-                        ? "max-w-[58%] border-emerald-400/20 bg-emerald-900/55"
-                        : "max-w-[64%] border-white/[0.08] bg-white/[0.03]"
+                        ? "max-w-[66%] border-emerald-400/20 bg-emerald-900/55"
+                        : "max-w-[68%] border-white/[0.08] bg-white/[0.03]"
                     )}
                   >
                     <p>{message.text}</p>
@@ -561,7 +561,7 @@ function ChatPanel({
         )}
       </div>
 
-      <div className="shrink-0 flex items-center gap-2 overflow-x-auto border-t border-white/[0.06] bg-white/[0.02] px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="shrink-0 flex flex-wrap items-center gap-2 border-t border-white/[0.05] bg-white/[0.02] px-3 py-2">
         {TEMPLATES.map(template => (
           <Button
             key={template}
@@ -576,7 +576,7 @@ function ChatPanel({
         ))}
       </div>
 
-      <footer className="shrink-0 mt-auto flex items-center gap-2 border-t border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
+      <footer className="shrink-0 mt-auto flex items-center gap-1.5 overflow-x-hidden border-t border-white/[0.05] bg-white/[0.02] px-3 py-2.5">
         <button type="button" className="rounded-lg p-2 hover:bg-white/10">
           <MessageCircleMore className="size-4" />
         </button>
@@ -587,7 +587,7 @@ function ChatPanel({
           value={content}
           onChange={event => setContent(event.target.value)}
           placeholder="Digite sua mensagem..."
-          className="h-9 w-full rounded-lg border border-white/[0.08] bg-white/[0.02] px-3 text-sm outline-none placeholder:text-[var(--text-muted)]/70"
+          className="h-9 min-w-0 flex-1 rounded-lg border border-white/[0.08] bg-white/[0.02] px-3 text-sm outline-none placeholder:text-[var(--text-muted)]/70"
         />
         <Button
           type="button"
@@ -597,7 +597,7 @@ function ChatPanel({
         >
           <Send className="size-3.5" />
         </Button>
-        <button type="button" className="rounded-lg p-2 hover:bg-white/10">
+        <button type="button" className="shrink-0 rounded-lg p-2 hover:bg-white/10">
           <Volume2 className="size-4" />
         </button>
       </footer>
@@ -613,22 +613,22 @@ function ContextPanel({
   sendMessage: (preset?: string) => void;
 }) {
   return (
-    <aside className="h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden bg-transparent p-3">
+    <aside className="h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden rounded-2xl border border-white/[0.05] bg-white/[0.015] p-2.5">
       {!conversation ? (
         <AppEmptyState
           title="Sem contexto ativo"
           description="Selecione uma conversa para abrir contexto operacional."
         />
       ) : (
-        <div className="space-y-3 text-xs">
-          <section className="rounded-2xl border border-white/[0.08] bg-white/[0.02] px-4 py-3.5">
+        <div className="space-y-2.5 text-xs">
+          <section className="rounded-xl border border-white/[0.07] bg-white/[0.02] px-3 py-2.5">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Cliente</p>
             <p className="mt-1 font-semibold">João Silva</p>
             <p className="text-[11px] text-[var(--text-muted)]">5511999998888</p>
             <Button type="button" size="sm" variant="outline" className="mt-3 h-7 text-[11px]">Ver cliente</Button>
           </section>
 
-          <section className="rounded-2xl border border-white/[0.08] bg-white/[0.02] px-4 py-3.5">
+          <section className="rounded-xl border border-white/[0.07] bg-white/[0.02] px-3 py-2.5">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Próximo agendamento</p>
             <p className="mt-1 font-medium">Manutenção preventiva</p>
             <p className="text-[11px] text-[var(--text-muted)]">24/04/2026 às 14:00</p>
@@ -636,7 +636,7 @@ function ContextPanel({
             <Button type="button" size="sm" variant="outline" className="mt-3 h-7 text-[11px]">Ver agendamento</Button>
           </section>
 
-          <section className="rounded-2xl border border-white/[0.08] bg-white/[0.02] px-4 py-3.5">
+          <section className="rounded-xl border border-white/[0.07] bg-white/[0.02] px-3 py-2.5">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Ordem de serviço</p>
             <p className="mt-1 font-medium">OS #236</p>
             <p className="text-[11px] text-[var(--text-muted)]">Status: Em andamento</p>
@@ -644,7 +644,7 @@ function ContextPanel({
             <Button type="button" size="sm" variant="outline" className="mt-3 h-7 text-[11px]">Ver O.S.</Button>
           </section>
 
-          <section className="rounded-2xl border border-white/[0.08] bg-white/[0.02] px-4 py-3.5">
+          <section className="rounded-xl border border-white/[0.07] bg-white/[0.02] px-3 py-2.5">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Cobrança</p>
             <p className="mt-1 font-medium">Cobrança #1247</p>
             <p className="text-[11px] text-[var(--text-muted)]">Vencimento: 20/04/2026</p>
@@ -653,16 +653,16 @@ function ContextPanel({
             <Button type="button" size="sm" variant="outline" className="mt-3 h-7 text-[11px]">Ver cobrança</Button>
           </section>
 
-          <section className="rounded-2xl border border-white/[0.08] bg-white/[0.02] px-4 py-3.5">
+          <section className="rounded-xl border border-white/[0.07] bg-white/[0.02] px-3 py-2.5">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Última interação</p>
             <p className="mt-1">Mensagem enviada</p>
             <p className="text-[11px] text-[var(--text-muted)]">Hoje, 09:40</p>
             <span className="mt-1 inline-flex whitespace-nowrap rounded-full border border-emerald-400/35 bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-100">Entregue</span>
           </section>
 
-          <section className="rounded-2xl border border-white/[0.08] bg-white/[0.02] px-4 py-3.5">
+          <section className="rounded-xl border border-white/[0.07] bg-white/[0.02] px-3 py-2.5">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Ações rápidas</p>
-            <div className="mt-2.5 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="mt-2.5 grid grid-cols-1 gap-2">
               <Button type="button" size="sm" variant="outline" className="h-8 w-full min-w-0 justify-start truncate px-2.5 text-[11px]" onClick={() => sendMessage("Cobrança")}>Enviar cobrança</Button>
               <Button type="button" size="sm" variant="outline" className="h-8 w-full min-w-0 justify-start truncate px-2.5 text-[11px]">Registrar pagamento</Button>
               <Button type="button" size="sm" variant="outline" className="h-8 w-full min-w-0 justify-start truncate px-2.5 text-[11px]" onClick={() => sendMessage("Lembrete")}>Enviar lembrete</Button>
@@ -914,8 +914,8 @@ export default function WhatsAppPage() {
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
-          <div className="grid h-full min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden bg-[#0B111C] xl:grid-cols-[minmax(300px,340px)_minmax(0,1fr)_minmax(320px,380px)]">
-            <div className="min-w-0 rounded-2xl border border-white/[0.06] bg-white/[0.015]">
+          <div className="grid h-full min-h-0 flex-1 grid-cols-1 gap-4 overflow-hidden bg-transparent xl:grid-cols-[minmax(260px,300px)_minmax(0,1fr)_minmax(280px,320px)]">
+            <div className="min-w-0">
               <ConversationsList
                 rows={filteredConversations}
                 selectedId={selectedCustomerId}
@@ -926,7 +926,7 @@ export default function WhatsAppPage() {
                 onSearch={setSearchTerm}
               />
             </div>
-            <div className="min-w-0 rounded-2xl border border-white/[0.06] bg-white/[0.015]">
+            <div className="min-w-0">
               <ChatPanel
                 conversation={selectedConversation}
                 messages={messages}
