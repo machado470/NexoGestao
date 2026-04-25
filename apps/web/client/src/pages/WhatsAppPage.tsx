@@ -280,10 +280,10 @@ const ConversationRow = memo(function ConversationRow({
         type="button"
         onClick={() => onSelect(conversation.customerId)}
         className={cn(
-          "w-full rounded-xl border px-3 py-2.5 text-left transition",
+          "w-full rounded-xl px-3 py-2.5 text-left transition",
           selectedId === conversation.customerId
-            ? "border-[var(--accent-primary)]/40 bg-[var(--accent-soft)]/28 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]"
-            : "border-white/[0.05] bg-white/[0.015] hover:border-white/[0.12]"
+            ? "bg-[var(--accent-soft)]/28"
+            : "bg-white/[0.015] hover:bg-white/[0.045]"
         )}
       >
         <div className="flex items-start justify-between gap-2">
@@ -365,13 +365,13 @@ function ConversationsList({
   const visibleRows = rows.slice(startIndex, startIndex + visibleCount);
 
   return (
-    <aside className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-white/[0.05] bg-white/[0.015] p-2.5">
-      <div className="shrink-0 space-y-2 border-b border-white/[0.05] pb-2.5">
+    <aside className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-white/[0.015] p-2.5">
+      <div className="shrink-0 space-y-2 pb-2.5">
         <div className="flex items-center justify-between">
           <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Inbox</p>
-          <button type="button" className="rounded-lg border border-white/[0.08] bg-white/[0.02] px-2 py-1 text-[10px] text-[var(--text-muted)] hover:bg-white/[0.05]">Filtros</button>
+          <button type="button" className="rounded-lg bg-white/[0.02] px-2 py-1 text-[10px] text-[var(--text-muted)] hover:bg-white/[0.05]">Filtros</button>
         </div>
-        <div className="flex items-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-1.5">
+        <div className="flex items-center gap-2 rounded-lg bg-white/[0.02] px-2.5 py-1.5">
           <Search className="size-3.5 text-[var(--text-muted)]" />
           <input
             value={search}
@@ -386,10 +386,10 @@ function ConversationsList({
               key={item.value}
               type="button"
               className={cn(
-                "h-7.5 rounded-full border px-2.5 text-[11px]",
+                "h-7.5 rounded-full px-2.5 text-[11px]",
                 filter === item.value
-                  ? "border-[var(--accent-primary)]/45 bg-[var(--accent-soft)]/45 text-[var(--accent-primary)]"
-                  : "border-white/[0.06] bg-white/[0.02] text-[var(--text-muted)]"
+                  ? "bg-[var(--accent-soft)]/45 text-[var(--accent-primary)]"
+                  : "bg-white/[0.02] text-[var(--text-muted)]"
               )}
               onClick={() => onFilter(item.value)}
             >
@@ -460,8 +460,8 @@ function ChatPanel({
   }, [conversation?.customerId]);
 
   return (
-    <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-white/[0.05] bg-white/[0.015]">
-      <header className="shrink-0 flex items-center justify-between border-b border-white/[0.05] px-4 py-2.5">
+    <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-white/[0.015]">
+      <header className="shrink-0 flex items-center justify-between px-4 py-2.5">
         <div className="flex items-center gap-3">
           <div className="flex size-10 items-center justify-center rounded-full border border-[var(--accent-primary)]/25 bg-[var(--accent-soft)]/60 text-sm font-semibold text-[var(--accent-primary)]">
             {conversation?.name?.slice(0, 1) ?? "-"}
@@ -561,7 +561,7 @@ function ChatPanel({
         )}
       </div>
 
-      <div className="shrink-0 flex flex-wrap items-center gap-2 border-t border-white/[0.05] bg-white/[0.02] px-3 py-2">
+      <div className="shrink-0 flex flex-wrap items-center gap-2 bg-white/[0.02] px-3 py-2">
         {TEMPLATES.map(template => (
           <Button
             key={template}
@@ -576,7 +576,7 @@ function ChatPanel({
         ))}
       </div>
 
-      <footer className="shrink-0 mt-auto flex items-center gap-1.5 overflow-x-hidden border-t border-white/[0.05] bg-white/[0.02] px-3 py-2.5">
+      <footer className="shrink-0 mt-auto flex items-center gap-1.5 overflow-x-hidden bg-white/[0.02] px-3 py-2.5">
         <button type="button" className="rounded-lg p-2 hover:bg-white/10">
           <MessageCircleMore className="size-4" />
         </button>
@@ -587,7 +587,7 @@ function ChatPanel({
           value={content}
           onChange={event => setContent(event.target.value)}
           placeholder="Digite sua mensagem..."
-          className="h-9 min-w-0 flex-1 rounded-lg border border-white/[0.08] bg-white/[0.02] px-3 text-sm outline-none placeholder:text-[var(--text-muted)]/70"
+          className="h-9 min-w-0 flex-1 rounded-lg bg-white/[0.02] px-3 text-sm outline-none placeholder:text-[var(--text-muted)]/70"
         />
         <Button
           type="button"
@@ -613,22 +613,22 @@ function ContextPanel({
   sendMessage: (preset?: string) => void;
 }) {
   return (
-    <aside className="h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden rounded-2xl border border-white/[0.05] bg-white/[0.015] p-2.5">
+    <aside className="h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden bg-white/[0.015] p-2.5">
       {!conversation ? (
         <AppEmptyState
           title="Sem contexto ativo"
           description="Selecione uma conversa para abrir contexto operacional."
         />
       ) : (
-        <div className="space-y-2.5 text-xs">
-          <section className="rounded-xl border border-white/[0.07] bg-white/[0.02] px-3 py-2.5">
+        <div className="space-y-5 text-xs">
+          <section className="px-1 py-1">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Cliente</p>
             <p className="mt-1 font-semibold">João Silva</p>
             <p className="text-[11px] text-[var(--text-muted)]">5511999998888</p>
             <Button type="button" size="sm" variant="outline" className="mt-3 h-7 text-[11px]">Ver cliente</Button>
           </section>
 
-          <section className="rounded-xl border border-white/[0.07] bg-white/[0.02] px-3 py-2.5">
+          <section className="px-1 py-1">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Próximo agendamento</p>
             <p className="mt-1 font-medium">Manutenção preventiva</p>
             <p className="text-[11px] text-[var(--text-muted)]">24/04/2026 às 14:00</p>
@@ -636,7 +636,7 @@ function ContextPanel({
             <Button type="button" size="sm" variant="outline" className="mt-3 h-7 text-[11px]">Ver agendamento</Button>
           </section>
 
-          <section className="rounded-xl border border-white/[0.07] bg-white/[0.02] px-3 py-2.5">
+          <section className="px-1 py-1">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Ordem de serviço</p>
             <p className="mt-1 font-medium">OS #236</p>
             <p className="text-[11px] text-[var(--text-muted)]">Status: Em andamento</p>
@@ -644,7 +644,7 @@ function ContextPanel({
             <Button type="button" size="sm" variant="outline" className="mt-3 h-7 text-[11px]">Ver O.S.</Button>
           </section>
 
-          <section className="rounded-xl border border-white/[0.07] bg-white/[0.02] px-3 py-2.5">
+          <section className="px-1 py-1">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Cobrança</p>
             <p className="mt-1 font-medium">Cobrança #1247</p>
             <p className="text-[11px] text-[var(--text-muted)]">Vencimento: 20/04/2026</p>
@@ -653,14 +653,14 @@ function ContextPanel({
             <Button type="button" size="sm" variant="outline" className="mt-3 h-7 text-[11px]">Ver cobrança</Button>
           </section>
 
-          <section className="rounded-xl border border-white/[0.07] bg-white/[0.02] px-3 py-2.5">
+          <section className="px-1 py-1">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Última interação</p>
             <p className="mt-1">Mensagem enviada</p>
             <p className="text-[11px] text-[var(--text-muted)]">Hoje, 09:40</p>
             <span className="mt-1 inline-flex whitespace-nowrap rounded-full border border-emerald-400/35 bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-100">Entregue</span>
           </section>
 
-          <section className="rounded-xl border border-white/[0.07] bg-white/[0.02] px-3 py-2.5">
+          <section className="px-1 py-1">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Ações rápidas</p>
             <div className="mt-2.5 grid grid-cols-1 gap-2">
               <Button type="button" size="sm" variant="outline" className="h-8 w-full min-w-0 justify-start truncate px-2.5 text-[11px]" onClick={() => sendMessage("Cobrança")}>Enviar cobrança</Button>
@@ -878,9 +878,9 @@ export default function WhatsAppPage() {
   return (
     <AppPageShell className="h-full overflow-hidden bg-[#0B111C] px-3 py-3">
       <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
-        <div className="flex shrink-0 items-center justify-between rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-2.5">
+        <div className="flex shrink-0 items-center justify-between rounded-2xl bg-white/[0.03] px-4 py-2.5">
           <div className="flex items-center gap-2.5">
-            <button type="button" className="rounded-lg border border-white/[0.08] bg-white/[0.02] p-1.5 text-[var(--text-muted)] hover:bg-white/[0.05]">
+            <button type="button" className="rounded-lg bg-white/[0.02] p-1.5 text-[var(--text-muted)] hover:bg-white/[0.05]">
               <PanelLeftClose className="size-4" />
             </button>
             <div>
@@ -889,24 +889,24 @@ export default function WhatsAppPage() {
                 Canal de execução conectado ao contexto de operação.
               </p>
             </div>
-            <div className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-300">
+            <div className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-300">
               <Circle className="size-2.5 fill-current" /> Online
             </div>
             {isDemoMode ? (
-              <span className="rounded-full border border-amber-400/25 bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-100">
+              <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-100">
                 Dados piloto
               </span>
             ) : null}
           </div>
           <div className="flex items-center gap-2">
-            <div className="hidden items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.02] px-2.5 py-1.5 md:flex">
+            <div className="hidden items-center gap-2 rounded-xl bg-white/[0.02] px-2.5 py-1.5 md:flex">
               <Search className="size-3.5 text-[var(--text-muted)]" />
               <input placeholder="Buscar..." className="w-36 bg-transparent text-xs outline-none placeholder:text-[var(--text-muted)]/70" />
             </div>
-            <button type="button" className="rounded-lg border border-white/[0.08] bg-white/[0.02] p-1.5 text-[var(--text-muted)] hover:bg-white/[0.05]">
+            <button type="button" className="rounded-lg bg-white/[0.02] p-1.5 text-[var(--text-muted)] hover:bg-white/[0.05]">
               <Bell className="size-4" />
             </button>
-            <button type="button" className="inline-flex items-center gap-1.5 rounded-xl border border-white/[0.08] bg-white/[0.02] px-2 py-1.5 text-xs hover:bg-white/[0.05]">
+            <button type="button" className="inline-flex items-center gap-1.5 rounded-xl bg-white/[0.02] px-2 py-1.5 text-xs hover:bg-white/[0.05]">
               <UserCircle2 className="size-4 text-[var(--accent-primary)]" />
               Paula
             </button>
