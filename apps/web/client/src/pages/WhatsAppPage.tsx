@@ -249,7 +249,7 @@ const TEMPLATES = [
 
 const statusUi: Record<ConversationStatus, { label: string; dot: string }> = {
   awaiting: { label: "Aguardando", dot: "bg-amber-400" },
-  pending: { label: "Pendente", dot: "bg-sky-400" },
+  pending: { label: "Pendente", dot: "bg-[var(--accent-primary)]" },
   ok: { label: "OK", dot: "bg-emerald-400" },
   failed: { label: "Falha", dot: "bg-rose-400" },
 };
@@ -283,7 +283,7 @@ const topStats = [
     value: "1",
     detail: "14:00 confirmado",
     icon: CalendarClock,
-    tone: "text-sky-300",
+    tone: "text-[var(--accent-primary)]",
   },
 ];
 
@@ -326,13 +326,13 @@ const ConversationRow = memo(function ConversationRow({
         className={cn(
           "w-full rounded-xl border px-3.5 py-3 text-left transition",
           selectedId === conversation.customerId
-            ? "border-indigo-400/35 bg-indigo-500/[0.14]"
+            ? "border-[var(--accent-primary)]/40 bg-[var(--accent-soft)]/40"
             : "border-white/[0.04] bg-white/[0.02] hover:border-white/[0.12]"
         )}
       >
         <div className="flex items-start justify-between gap-2.5">
           <div className="flex min-w-0 items-center gap-2.5">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-indigo-500/25 text-sm font-semibold">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-full border border-[var(--accent-primary)]/25 bg-[var(--accent-soft)]/60 text-sm font-semibold text-[var(--accent-primary)]">
               {conversation.name.slice(0, 1)}
             </div>
             <div className="min-w-0">
@@ -340,7 +340,7 @@ const ConversationRow = memo(function ConversationRow({
                 {conversation.name}
               </p>
               {conversation.badge ? (
-                <p className="truncate text-[11px] text-indigo-300/90">
+                <p className="truncate text-[11px] text-[var(--accent-primary)]/90">
                   {conversation.badge}
                 </p>
               ) : null}
@@ -442,7 +442,7 @@ function ConversationsList({
               className={cn(
                 "h-7.5 rounded-full border px-2.5 text-[11px]",
                 filter === item.value
-                  ? "border-indigo-300/40 bg-indigo-500/15 text-indigo-100"
+                  ? "border-[var(--accent-primary)]/45 bg-[var(--accent-soft)]/45 text-[var(--accent-primary)]"
                   : "border-white/[0.06] bg-white/[0.02] text-[var(--text-muted)]"
               )}
               onClick={() => onFilter(item.value)}
@@ -517,7 +517,7 @@ function ChatPanel({
     <section className="flex h-full min-h-0 flex-col overflow-hidden bg-transparent">
       <header className="shrink-0 flex items-center justify-between border-b border-white/[0.06] px-4 py-3.5">
         <div className="flex items-center gap-3">
-          <div className="flex size-11 items-center justify-center rounded-full border border-white/10 bg-indigo-500/25 text-sm font-semibold">
+          <div className="flex size-11 items-center justify-center rounded-full border border-[var(--accent-primary)]/25 bg-[var(--accent-soft)]/60 text-sm font-semibold text-[var(--accent-primary)]">
             {conversation?.name?.slice(0, 1) ?? "-"}
           </div>
           <div>
@@ -1058,7 +1058,7 @@ export default function WhatsAppPage() {
               <Bell className="size-4" />
             </button>
             <button type="button" className="inline-flex items-center gap-1.5 rounded-xl border border-white/[0.08] bg-white/[0.02] px-2 py-1.5 text-xs hover:bg-white/[0.05]">
-              <UserCircle2 className="size-4 text-indigo-300" />
+              <UserCircle2 className="size-4 text-[var(--accent-primary)]" />
               Paula
             </button>
           </div>
