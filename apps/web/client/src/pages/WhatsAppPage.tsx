@@ -495,7 +495,7 @@ function ChatPanel({
 
       <div
         ref={messagesRef}
-        className="flex-1 min-h-0 overflow-y-auto bg-transparent px-5 py-4"
+        className="flex-1 overflow-y-auto min-h-0 bg-transparent px-5 py-4"
         onScroll={event => {
           const target = event.currentTarget;
           if (target.scrollTop < 80 && hasMore && !isLoadingMore) onLoadMore();
@@ -876,7 +876,7 @@ export default function WhatsAppPage() {
     | undefined;
 
   return (
-    <AppPageShell className="h-full overflow-hidden bg-[#0B111C] px-3 py-3">
+    <AppPageShell className="h-full min-h-0 overflow-hidden bg-[#0B111C] px-3 py-3">
       <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
         <div className="flex shrink-0 items-center justify-between rounded-2xl bg-white/[0.03] px-4 py-2.5">
           <div className="flex items-center gap-2.5">
@@ -926,7 +926,7 @@ export default function WhatsAppPage() {
                 onSearch={setSearchTerm}
               />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 h-full min-h-0 flex flex-col">
               <ChatPanel
                 conversation={selectedConversation}
                 messages={messages}
