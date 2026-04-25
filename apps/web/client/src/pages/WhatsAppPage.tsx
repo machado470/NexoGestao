@@ -459,6 +459,15 @@ function ChatPanel({
     node.scrollTop = node.scrollHeight;
   }, [conversation?.customerId]);
 
+  useEffect(() => {
+    const node = messagesRef.current;
+    if (!node || !conversation) return;
+    node.scrollTo({
+      top: node.scrollHeight,
+      behavior: "smooth",
+    });
+  }, [conversation?.customerId, messages.length]);
+
   return (
     <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-white/[0.015]">
       <header className="shrink-0 flex items-center justify-between px-4 py-2.5">
@@ -576,7 +585,7 @@ function ChatPanel({
         ))}
       </div>
 
-      <footer className="shrink-0 mt-auto flex items-center gap-1.5 overflow-x-hidden bg-white/[0.02] px-3 py-2.5">
+      <footer className="shrink-0 mt-0 flex items-center gap-1.5 overflow-x-hidden bg-white/[0.02] px-3 py-2.5">
         <button type="button" className="rounded-lg p-2 hover:bg-white/10">
           <MessageCircleMore className="size-4" />
         </button>
@@ -876,7 +885,7 @@ export default function WhatsAppPage() {
     | undefined;
 
   return (
-    <AppPageShell className="h-full min-h-0 overflow-hidden bg-[#0B111C] px-3 pb-2 pt-3">
+    <AppPageShell className="h-[calc(100vh-5rem)] min-h-0 overflow-hidden bg-[#0B111C] px-3 pb-2 pt-3">
       <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
         <div className="flex shrink-0 items-center justify-between rounded-2xl bg-white/[0.03] px-4 py-2.5">
           <div className="flex items-center gap-2.5">
@@ -915,7 +924,7 @@ export default function WhatsAppPage() {
 
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
           <div className="grid h-full min-h-0 flex-1 grid-cols-1 gap-4 overflow-hidden bg-transparent xl:grid-cols-[minmax(260px,300px)_minmax(0,1fr)_minmax(280px,320px)]">
-            <div className="min-w-0">
+            <div className="h-full min-h-0 min-w-0 overflow-hidden">
               <ConversationsList
                 rows={filteredConversations}
                 selectedId={selectedCustomerId}
@@ -926,7 +935,7 @@ export default function WhatsAppPage() {
                 onSearch={setSearchTerm}
               />
             </div>
-            <div className="min-w-0 h-full min-h-0 flex flex-col">
+            <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
               <ChatPanel
                 conversation={selectedConversation}
                 messages={messages}
@@ -941,7 +950,7 @@ export default function WhatsAppPage() {
                 sendMessage={sendMessage}
               />
             </div>
-            <div className="hidden min-w-0 xl:block">
+            <div className="hidden h-full min-h-0 min-w-0 overflow-hidden xl:block">
               <ContextPanel
                 conversation={selectedConversation}
                 sendMessage={sendMessage}
