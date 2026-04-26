@@ -10,7 +10,7 @@ import {
 import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
-import { Button, SecondaryButton } from "@/components/design-system";
+import { Button } from "@/components/design-system";
 import { AppPageShell, AppRowActionsDropdown } from "@/components/app-system";
 import {
   AppFiltersBar,
@@ -108,6 +108,10 @@ export default function ServiceOrdersPage() {
     string | null
   >("nexo.service-orders.selected-id.v5", null);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<{
+    orderId: string;
+    type: "start" | "complete" | "charge";
+  } | null>(null);
 
   const utils = trpc.useUtils();
 
@@ -319,6 +323,8 @@ export default function ServiceOrdersPage() {
   }, [enrichedOrders]);
 
   const anyActionPending = updateMutation.isPending || generateChargeMutation.isPending;
+  const isPendingAction = (orderId: string, type: "start" | "complete" | "charge") =>
+    pendingAction?.orderId === orderId && pendingAction.type === type;
 
   async function refreshEverything() {
     await Promise.all([
@@ -335,6 +341,7 @@ export default function ServiceOrdersPage() {
       return;
     }
     try {
+      setPendingAction({ orderId, type: "start" });
       setActionFeedback("Iniciando O.S...");
       await updateMutation.mutateAsync({ id: orderId, status: "IN_PROGRESS" });
       setActionFeedback("O.S. iniciada com sucesso.");
@@ -345,6 +352,8 @@ export default function ServiceOrdersPage() {
         error instanceof Error ? error.message : "Não foi possível iniciar a O.S.";
       setActionFeedback(`Ação indisponível: ${message}`);
       toast.error(message);
+    } finally {
+      setPendingAction(null);
     }
   }
 
@@ -354,6 +363,7 @@ export default function ServiceOrdersPage() {
       return;
     }
     try {
+      setPendingAction({ orderId, type: "complete" });
       setActionFeedback("Concluindo O.S...");
       await updateMutation.mutateAsync({ id: orderId, status: "DONE" });
       await refreshEverything();
@@ -373,6 +383,8 @@ export default function ServiceOrdersPage() {
         error instanceof Error ? error.message : "Não foi possível concluir a O.S.";
       setActionFeedback(`Ação indisponível: ${message}`);
       toast.error(message);
+    } finally {
+      setPendingAction(null);
     }
   }
 
@@ -382,6 +394,7 @@ export default function ServiceOrdersPage() {
       return;
     }
     try {
+      setPendingAction({ orderId, type: "charge" });
       setActionFeedback("Gerando cobrança...");
       await generateChargeMutation.mutateAsync({ id: orderId });
       setActionFeedback("Cobrança gerada com sucesso.");
@@ -392,6 +405,8 @@ export default function ServiceOrdersPage() {
         error instanceof Error ? error.message : "Não foi possível gerar cobrança.";
       setActionFeedback(`Ação indisponível: ${message}`);
       toast.error(message);
+    } finally {
+      setPendingAction(null);
     }
   }
 
@@ -531,14 +546,15 @@ export default function ServiceOrdersPage() {
                             <AppRowActionsDropdown
                               triggerLabel="Ações da O.S."
                               items={[
-                                { label: "Ver O.S.", onSelect: () => setSelectedOrderId(item.id) },
                                 {
                                   label: capabilities.start ? "Iniciar" : "Iniciar (indisponível)",
+                                  tone: "primary",
                                   onSelect: () => void handleStart(item.id),
                                   disabled: !canStart || anyActionPending,
                                 },
                                 {
                                   label: capabilities.complete ? "Concluir" : "Concluir (indisponível)",
+                                  tone: "primary",
                                   onSelect: () => void handleComplete(item.id),
                                   disabled: !canComplete || anyActionPending,
                                 },
@@ -546,9 +562,21 @@ export default function ServiceOrdersPage() {
                                   label: capabilities.generateCharge
                                     ? "Gerar cobrança"
                                     : "Gerar cobrança (indisponível)",
+                                  tone: "primary",
                                   onSelect: () => void handleGenerateCharge(item.id),
                                   disabled: !canGenerateCharge || anyActionPending,
                                 },
+                                {
+                                  label: capabilities.edit ? "Editar" : "Editar (indisponível)",
+                                  tone: "primary",
+                                  onSelect: () => setEditingId(item.id),
+                                  disabled: !capabilities.edit,
+                                },
+                                {
+                                  type: "separator",
+                                  label: "Navegação",
+                                },
+                                { label: "Abrir O.S.", onSelect: () => setSelectedOrderId(item.id) },
                                 {
                                   label: "Enviar WhatsApp",
                                   onSelect: () =>
@@ -559,11 +587,6 @@ export default function ServiceOrdersPage() {
                                 {
                                   label: "Ver cliente",
                                   onSelect: () => navigate(`/customers?customerId=${item.customerId}`),
-                                },
-                                {
-                                  label: capabilities.edit ? "Editar" : "Editar (indisponível)",
-                                  onSelect: () => setEditingId(item.id),
-                                  disabled: !capabilities.edit,
                                 },
                               ]}
                             />
@@ -692,9 +715,11 @@ export default function ServiceOrdersPage() {
                   </article>
 
                   <div className="flex flex-wrap gap-2 pt-1">
-                    <SecondaryButton
+                    <Button
                       type="button"
                       onClick={() => void handleStart(selectedOrder.id)}
+                      isLoading={isPendingAction(selectedOrder.id, "start")}
+                      loadingLabel="Iniciando..."
                       disabled={
                         !capabilities.start ||
                         !["OPEN", "ASSIGNED"].includes(selectedOrder.status) ||
@@ -702,10 +727,12 @@ export default function ServiceOrdersPage() {
                       }
                     >
                       {capabilities.start ? "Iniciar" : "Iniciar (indisponível)"}
-                    </SecondaryButton>
+                    </Button>
                     <Button
                       type="button"
                       onClick={() => void handleComplete(selectedOrder.id)}
+                      isLoading={isPendingAction(selectedOrder.id, "complete")}
+                      loadingLabel="Concluindo..."
                       disabled={
                         !capabilities.complete ||
                         selectedOrder.status !== "IN_PROGRESS" ||
@@ -714,9 +741,11 @@ export default function ServiceOrdersPage() {
                     >
                       {capabilities.complete ? "Concluir" : "Concluir (indisponível)"}
                     </Button>
-                    <SecondaryButton
+                    <Button
                       type="button"
                       onClick={() => void handleGenerateCharge(selectedOrder.id)}
+                      isLoading={isPendingAction(selectedOrder.id, "charge")}
+                      loadingLabel="Gerando..."
                       disabled={
                         !capabilities.generateCharge ||
                         selectedOrder.status !== "DONE" ||
@@ -727,9 +756,10 @@ export default function ServiceOrdersPage() {
                       {capabilities.generateCharge
                         ? "Cobrar / Gerar cobrança"
                         : "Cobrança (indisponível)"}
-                    </SecondaryButton>
-                    <SecondaryButton
+                    </Button>
+                    <Button
                       type="button"
+                      variant="outline"
                       onClick={() =>
                         navigate(
                           `/whatsapp?customerId=${selectedOrder.customerId}&serviceOrderId=${selectedOrder.id}`
@@ -737,13 +767,14 @@ export default function ServiceOrdersPage() {
                       }
                     >
                       Enviar WhatsApp
-                    </SecondaryButton>
-                    <SecondaryButton
+                    </Button>
+                    <Button
                       type="button"
+                      variant="outline"
                       onClick={() => navigate(`/customers?customerId=${selectedOrder.customerId}`)}
                     >
                       Abrir cliente
-                    </SecondaryButton>
+                    </Button>
                   </div>
 
                   {actionFeedback ? (
