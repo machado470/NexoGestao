@@ -333,7 +333,7 @@ export default function CustomersPage() {
       title="Clientes"
       subtitle="Centro operacional de relacionamento e histórico por cliente."
     >
-      <div className="flex h-[calc(100vh-5rem)] min-h-0 flex-col gap-3 overflow-hidden">
+      <div className="flex flex-col gap-3">
         <AppOperationalHeader
           title="Clientes"
           description="Central de relacionamento, execução e histórico operacional por cliente."
@@ -377,11 +377,11 @@ export default function CustomersPage() {
           ))}
         </AppFiltersBar>
 
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden lg:grid-cols-[minmax(360px,420px)_minmax(0,1fr)]">
+        <div className="flex flex-col gap-3">
           <AppSectionBlock
             title="Carteira operacional"
             subtitle="Visão densa com ações por cliente."
-            className="flex h-full min-h-0 flex-col"
+            className="flex flex-col"
           >
             {isLoading ? (
               <AppPageLoadingState description="Carregando clientes..." />
@@ -411,8 +411,8 @@ export default function CustomersPage() {
                 description="Nenhum cliente corresponde aos filtros e termo pesquisado."
               />
             ) : (
-              <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-                <div className="space-y-2">
+              <div className="space-y-2">
+                <div className="grid grid-cols-1 gap-2 lg:grid-cols-2 2xl:grid-cols-3">
                   {displayedCustomers.map(customer => {
                     const customerId = String(customer.id ?? "");
                     const aggregate = byCustomer.get(customerId);
@@ -564,7 +564,7 @@ export default function CustomersPage() {
           <AppSectionBlock
             title="Detalhe do cliente"
             subtitle="Resumo, status e histórico operacional conectado ao backend."
-            className="flex h-full min-h-0 flex-col"
+            className="flex flex-col"
           >
             {!activeCustomerId || !selectedCustomer ? (
               <AppPageEmptyState
@@ -580,7 +580,7 @@ export default function CustomersPage() {
                 onAction={() => void workspaceQuery.refetch()}
               />
             ) : (
-              <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+              <div className="space-y-3">
                 <article className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/35 p-3">
                   <p className="text-sm font-semibold text-[var(--text-primary)]">
                     {String(selectedCustomer.name ?? "Cliente")}
