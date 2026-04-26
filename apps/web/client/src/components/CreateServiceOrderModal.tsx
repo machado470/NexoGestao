@@ -284,7 +284,7 @@ export default function CreateServiceOrderModal({
       description={`${selectedCustomerName} · ${hasAmount ? summaryAmount : "Sem valor definido"}`}
       closeBlocked={createMutation.isPending}
       size="lg"
-      contentClassName="w-full max-w-[820px]"
+      contentClassName="w-full max-w-[820px] border border-white/10 bg-[#0B1220] shadow-xl shadow-black/25"
       footer={
         <>
           {createdServiceOrder ? (
@@ -333,9 +333,9 @@ export default function CreateServiceOrderModal({
           ) : null}
           {!createdServiceOrder ? (
             <>
-              <div className="mr-auto text-xs text-[var(--text-muted)]">
-                Status final: <strong>Aberta</strong> · Valor:{" "}
-                <strong>{hasAmount ? summaryAmount : "—"}</strong>
+              <div className="mr-auto flex flex-wrap gap-6 text-sm text-white/70">
+                <span>Status: <strong className="text-white">Aberta</strong></span>
+                <span>Valor: <strong className="text-white">{hasAmount ? summaryAmount : "—"}</strong></span>
               </div>
               <Button
                 type="button"
@@ -363,7 +363,7 @@ export default function CreateServiceOrderModal({
       }
     >
       {createdServiceOrder ? (
-        <section className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+        <section className="space-y-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-5">
           <h3 className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">
             Ordem de serviço criada com sucesso
           </h3>
@@ -377,8 +377,8 @@ export default function CreateServiceOrderModal({
       ) : null}
 
       {!createdServiceOrder ? (
-        <AppForm id="create-service-order-form">
-          <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/60 p-3">
+        <AppForm id="create-service-order-form" className="space-y-5">
+          <section className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
                 <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Identificador</p>
@@ -397,15 +397,15 @@ export default function CreateServiceOrderModal({
             </section>
           ) : null}
 
-          <Accordion type="multiple" defaultValue={["main", "financial"]} className="space-y-2">
-            <AccordionItem value="main" className="rounded-lg border px-3">
-              <AccordionTrigger className="py-3 text-sm font-semibold">
+          <Accordion type="multiple" defaultValue={["main", "financial"]} className="space-y-3">
+            <AccordionItem value="main" className="rounded-xl border border-white/10 bg-white/[0.02] px-4">
+              <AccordionTrigger className="py-3 text-sm font-semibold text-white">
                 Dados principais
                 <span className="ml-2 text-xs font-normal text-[var(--text-muted)]">
                   {formData.title.trim() || "Sem título"}
                 </span>
               </AccordionTrigger>
-              <AccordionContent className="space-y-3 pb-3">
+              <AccordionContent className="space-y-4 pb-4">
                 <AppField label="Cliente *">
                   <AppSelect
                     value={formData.customerId}
@@ -472,14 +472,14 @@ export default function CreateServiceOrderModal({
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="financial" className="rounded-lg border px-3">
-              <AccordionTrigger className="py-3 text-sm font-semibold">
+            <AccordionItem value="financial" className="rounded-xl border border-white/10 bg-white/[0.02] px-4">
+              <AccordionTrigger className="py-3 text-sm font-semibold text-white">
                 Financeiro
                 <span className="ml-2 text-xs font-normal text-[var(--text-muted)]">
                   {hasAmount ? summaryAmount : "Sem valor"}
                 </span>
               </AccordionTrigger>
-              <AccordionContent className="pb-3">
+              <AccordionContent className="pb-4">
                 <AppFieldGroup>
                   <AppField label="Data prevista (opcional)">
                     <AppInput
@@ -512,14 +512,14 @@ export default function CreateServiceOrderModal({
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="advanced" className="rounded-lg border px-3">
-              <AccordionTrigger className="py-3 text-sm font-semibold">
+            <AccordionItem value="advanced" className="rounded-xl border border-white/10 bg-white/[0.02] px-4">
+              <AccordionTrigger className="py-3 text-sm font-semibold text-white">
                 Avançado
                 <span className="ml-2 text-xs font-normal text-[var(--text-muted)]">
                   {formData.dueDate.trim() ? "Com vencimento" : "Sem vencimento"}
                 </span>
               </AccordionTrigger>
-              <AccordionContent className="pb-3">
+              <AccordionContent className="pb-4">
                 <AppField label="Vencimento">
                   <AppInput
                     type="datetime-local"
