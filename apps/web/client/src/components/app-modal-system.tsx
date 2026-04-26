@@ -33,6 +33,7 @@ export function BaseModal({
   fixedFooter = true,
   initialFocusRef,
   intent = "edit",
+  contentClassName,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -46,6 +47,7 @@ export function BaseModal({
   fixedFooter?: boolean;
   initialFocusRef?: RefObject<HTMLElement | null>;
   intent?: ModalIntent;
+  contentClassName?: string;
 }) {
   if (import.meta.env.DEV && intent === "detail-legacy") {
     // eslint-disable-next-line no-console
@@ -76,7 +78,8 @@ export function BaseModal({
         }}
         className={cn(
           "flex max-h-[90vh] min-h-[220px] flex-col overflow-hidden rounded-2xl border-[var(--border-subtle)]/90 p-0 shadow-[var(--app-overlay-shadow)]",
-          modalSizeMap[size]
+          modalSizeMap[size],
+          contentClassName
         )}
       >
         <ModalHeader fixed={fixedHeader}>
@@ -227,6 +230,7 @@ export function QuickActionModal({
   size = "md",
   closeBlocked = false,
   initialFocusRef,
+  contentClassName,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -237,6 +241,7 @@ export function QuickActionModal({
   size?: keyof typeof modalSizeMap;
   closeBlocked?: boolean;
   initialFocusRef?: RefObject<HTMLElement | null>;
+  contentClassName?: string;
 }) {
   return (
     <BaseModal
@@ -249,6 +254,7 @@ export function QuickActionModal({
       closeBlocked={closeBlocked}
       initialFocusRef={initialFocusRef}
       footer={footer}
+      contentClassName={contentClassName}
     >
       <div className="space-y-4">{children}</div>
     </BaseModal>
@@ -265,6 +271,7 @@ export function FormModal({
   size = "lg",
   closeBlocked = false,
   initialFocusRef,
+  contentClassName,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -275,6 +282,7 @@ export function FormModal({
   size?: keyof typeof modalSizeMap;
   closeBlocked?: boolean;
   initialFocusRef?: RefObject<HTMLElement | null>;
+  contentClassName?: string;
 }) {
   return (
     <BaseModal
@@ -287,6 +295,7 @@ export function FormModal({
       closeBlocked={closeBlocked}
       footer={footer}
       initialFocusRef={initialFocusRef}
+      contentClassName={contentClassName}
     >
       {children}
     </BaseModal>

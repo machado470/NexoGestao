@@ -18,6 +18,7 @@ type Props = {
   onRetry?: () => void;
   loadingTimeoutMs?: number;
   hasDirtyState?: boolean;
+  contentClassName?: string;
 };
 
 export default function ModalFlowShell({
@@ -35,6 +36,7 @@ export default function ModalFlowShell({
   onRetry,
   loadingTimeoutMs = 9000,
   hasDirtyState = false,
+  contentClassName,
 }: Props) {
   useEffect(() => {
     if (!open || !isSubmitting) return;
@@ -58,6 +60,7 @@ export default function ModalFlowShell({
       title={title}
       description={description}
       size="lg"
+      contentClassName={contentClassName}
       closeBlocked={closeBlocked || isSubmitting}
       footer={
         <>
