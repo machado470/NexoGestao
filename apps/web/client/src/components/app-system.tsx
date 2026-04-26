@@ -29,6 +29,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -158,7 +159,19 @@ export function AppRowActionsDropdown({
   contentClassName,
 }: {
   triggerLabel?: string;
-  items: Array<{ label: string; onSelect: () => void; disabled?: boolean }>;
+  items: Array<
+    | {
+        type?: "item";
+        label: string;
+        onSelect: () => void;
+        disabled?: boolean;
+        tone?: "default" | "primary";
+      }
+    | {
+        type: "separator";
+        label?: string;
+      }
+  >;
   contentClassName?: string;
 }) {
   return (
@@ -180,16 +193,36 @@ export function AppRowActionsDropdown({
         collisionPadding={12}
         className={cn("min-w-[220px] p-2", contentClassName)}
       >
-        {items.map(item => (
-          <DropdownMenuItem
-            key={item.label}
-            disabled={item.disabled}
-            onSelect={item.onSelect}
-            className="px-3 py-2.5"
-          >
-            {item.label}
-          </DropdownMenuItem>
-        ))}
+        {items.map((item, index) => {
+          if (item.type === "separator") {
+            return (
+              <div key={`separator-${index}`} className="space-y-1 py-1">
+                {item.label ? (
+                  <p className="px-3 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                    {item.label}
+                  </p>
+                ) : null}
+                <DropdownMenuSeparator />
+              </div>
+            );
+          }
+
+          return (
+            <DropdownMenuItem
+              key={`${item.label}-${index}`}
+              disabled={item.disabled}
+              onSelect={item.onSelect}
+              className={cn(
+                "px-3 py-2.5",
+                item.tone === "primary"
+                  ? "font-semibold text-[var(--accent-primary)] focus:text-[var(--accent-primary)]"
+                  : undefined
+              )}
+            >
+              {item.label}
+            </DropdownMenuItem>
+          );
+        })}
       </DropdownMenuContent>
     </DropdownMenu>
   );

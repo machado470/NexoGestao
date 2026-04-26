@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
+import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import CreateCustomerModal from "@/components/CreateCustomerModal";
 import EditCustomerModal from "@/components/EditCustomerModal";
@@ -107,6 +108,9 @@ export default function CustomersPage() {
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(
     null
   );
+  const [pendingEditCustomerId, setPendingEditCustomerId] = useState<
+    string | null
+  >(null);
 
   const customersQuery = trpc.nexo.customers.list.useQuery(
     { page: 1, limit: 300 },
@@ -517,7 +521,24 @@ export default function CustomersPage() {
                               contentClassName="min-w-[210px]"
                               items={[
                                 {
-                                  label: "Ver cliente",
+                                  label:
+                                    pendingEditCustomerId === customerId
+                                      ? "Editando..."
+                                      : "Editar",
+                                  tone: "primary",
+                                  onSelect: () => {
+                                    setPendingEditCustomerId(customerId);
+                                    setEditingCustomerId(customerId);
+                                    toast.success("Editor de cliente aberto.");
+                                  },
+                                  disabled: pendingEditCustomerId === customerId,
+                                },
+                                {
+                                  type: "separator",
+                                  label: "Navegação",
+                                },
+                                {
+                                  label: "Abrir cliente",
                                   onSelect: () => setActiveCustomerId(customerId),
                                 },
                                 {
@@ -535,20 +556,15 @@ export default function CustomersPage() {
                                     ),
                                 },
                                 {
-                                  label: "Cobrar",
-                                  onSelect: () =>
-                                    navigate(`/finances?customerId=${customerId}`),
-                                },
-                                {
                                   label: "Enviar WhatsApp",
                                   onSelect: () =>
                                     navigate(`/whatsapp?customerId=${customerId}`),
                                 },
                                 {
-                                  label: "Editar",
+                                  label: "Abrir cobrança",
                                   onSelect: () =>
-                                    setEditingCustomerId(customerId),
-                                },
+                                    navigate(`/finances?customerId=${customerId}`),
+                                }
                               ]}
                             />
                           </div>
@@ -602,6 +618,7 @@ export default function CustomersPage() {
                 <div className="grid grid-cols-2 gap-2">
                   <Button
                     size="sm"
+                    variant="outline"
                     onClick={() =>
                       navigate(`/appointments?customerId=${activeCustomerId}`)
                     }
@@ -624,7 +641,7 @@ export default function CustomersPage() {
                       navigate(`/finances?customerId=${activeCustomerId}`)
                     }
                   >
-                    Cobrar
+                    Abrir cobrança
                   </Button>
                   <Button
                     size="sm"
@@ -706,11 +723,16 @@ export default function CustomersPage() {
         <EditCustomerModal
           open={Boolean(editingCustomerId)}
           customerId={editingCustomerId}
-          onClose={() => setEditingCustomerId(null)}
+          onClose={() => {
+            setEditingCustomerId(null);
+            setPendingEditCustomerId(null);
+          }}
           onSaved={async saved => {
             setEditingCustomerId(null);
+            setPendingEditCustomerId(null);
             await customersQuery.refetch();
             if (saved?.id) setActiveCustomerId(String(saved.id));
+            toast.success("Cliente atualizado com sucesso.");
           }}
         />
       </div>
