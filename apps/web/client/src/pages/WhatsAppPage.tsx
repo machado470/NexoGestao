@@ -355,8 +355,22 @@ function ConversationsList({
             ))}
           </div>
         ) : rows.length === 0 ? (
-          <div className="px-2 py-4 text-xs text-[var(--text-muted)]">
-            {hasError ? "Não foi possível carregar conversas" : "Nenhuma conversa encontrada"}
+          <div className="rounded-lg border border-white/[0.06] bg-white/[0.01] px-2.5 py-3">
+            <div className="mb-2 h-px w-full bg-white/[0.06]" />
+            <p className="text-xs text-[var(--text-secondary)]">
+              {hasError
+                ? "Não foi possível carregar conversas"
+                : search.trim()
+                  ? "Nenhuma conversa encontrada para esta busca."
+                  : "Nenhuma conversa ainda."}
+            </p>
+            <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+              {hasError
+                ? "Tente novamente em instantes."
+                : search.trim()
+                  ? "Limpe a busca ou altere os filtros."
+                  : "As conversas reais aparecerão aqui quando clientes responderem ou mensagens forem enviadas."}
+            </p>
           </div>
         ) : (
           <div style={{ height: totalHeight, position: "relative" }}>
@@ -414,9 +428,22 @@ function ChatPanel({
   if (!conversation) {
     return (
       <section className="flex h-full min-h-0 min-w-0 items-center justify-center overflow-hidden bg-white/[0.015]">
-        <div className="text-center">
+        <div className="max-w-md rounded-2xl border border-white/[0.06] bg-white/[0.015] px-5 py-5 text-center">
+          <div className="mx-auto mb-3 h-8 w-8 rounded-full border border-white/[0.12] bg-white/[0.03]" />
           <p className="text-sm font-semibold">Selecione uma conversa</p>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">Escolha uma conversa para continuar.</p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            Quando houver mensagens, você poderá responder, enviar cobranças e acompanhar o contexto operacional por aqui.
+          </p>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-1.5">
+            {["Cobranças", "Agendamentos", "O.S."].map(item => (
+              <span
+                key={item}
+                className="rounded-full border border-white/[0.1] bg-white/[0.02] px-2.5 py-1 text-[10px] text-[var(--text-muted)]"
+              >
+                {item}
+              </span>
+            ))}
+          </div>
         </div>
         {error ? <p className="absolute bottom-2 px-3 pb-2 text-[11px] text-rose-300">{error}</p> : null}
       </section>
@@ -551,7 +578,18 @@ function ContextPanel({
   if (!conversation || !context) {
     return (
       <aside className="scrollbar-thin-nexo h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden bg-white/[0.015] p-2.5" id="whatsapp-context-panel">
-        <div className="px-1 py-4 text-xs text-[var(--text-muted)]">Sem contexto ativo.</div>
+        <section className="rounded-xl border border-white/[0.06] bg-white/[0.01] px-3 py-3">
+          <p className="text-xs font-semibold">Sem contexto ativo</p>
+          <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+            Selecione uma conversa para ver cliente, agendamento, O.S. e cobrança vinculados.
+          </p>
+          <div className="mt-3 space-y-1.5 text-[11px] text-[var(--text-muted)]">
+            <p>Cliente — aguardando conversa</p>
+            <p>Próximo agendamento — aguardando contexto</p>
+            <p>Cobrança aberta — aguardando contexto</p>
+            <p>Última interação — aguardando conversa</p>
+          </div>
+        </section>
       </aside>
     );
   }
