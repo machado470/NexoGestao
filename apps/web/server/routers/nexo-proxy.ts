@@ -745,7 +745,7 @@ export const nexoProxyRouter = router({
       .mutation(async ({ ctx, input }) => authedPost(ctx as CtxLike, `/whatsapp/messages/${input.id}/retry`)),
 
     updateConversationStatus: protectedProcedure
-      .input(z.object({ id: z.string().min(1), status: z.enum(['PENDING', 'RESOLVED']) }))
+      .input(z.object({ id: z.string().min(1), status: z.enum(['OPEN', 'PENDING', 'RESOLVED']) }))
       .mutation(async ({ ctx, input }) => authedPatch(ctx as CtxLike, `/whatsapp/conversations/${input.id}/status`, { status: input.status })),
 
     health: protectedProcedure.query(async ({ ctx }) => authedGet(ctx as CtxLike, '/whatsapp/health')),
