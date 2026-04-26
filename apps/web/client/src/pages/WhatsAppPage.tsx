@@ -26,7 +26,6 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/design-system";
 import { AppPageShell, AppSkeleton } from "@/components/app-system";
 import {
-  AppEmptyState,
   AppPageErrorState,
   AppPageLoadingState,
 } from "@/components/internal-page-system";
@@ -284,6 +283,7 @@ function ConversationsList({
   search,
   onSearch,
   isLoading,
+  hasError,
 }: {
   rows: Conversation[];
   selectedId: string;
@@ -293,6 +293,7 @@ function ConversationsList({
   search: string;
   onSearch: (next: string) => void;
   isLoading: boolean;
+  hasError: boolean;
 }) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
@@ -355,10 +356,9 @@ function ConversationsList({
             ))}
           </div>
         ) : rows.length === 0 ? (
-          <AppEmptyState
-            title="Inbox sem conversas"
-            description="Ajuste filtros para visualizar a fila operacional."
-          />
+          <div className="px-2 py-4 text-xs text-[var(--text-muted)]">
+            {hasError ? "Não foi possível carregar conversas" : "Nenhuma conversa encontrada"}
+          </div>
         ) : (
           <div style={{ height: totalHeight, position: "relative" }}>
             <div style={{ transform: `translateY(${startIndex * ROW_HEIGHT}px)` }}>
@@ -439,10 +439,7 @@ function ChatPanel({
 
       <div ref={messagesRef} className="scrollbar-thin-nexo flex-1 min-h-0 overflow-y-auto bg-transparent px-5 pb-1 pt-4">
         {!conversation ? (
-          <AppEmptyState
-            title="Selecione uma conversa"
-            description="Escolha um cliente para executar cobrança, lembrete ou confirmação."
-          />
+          <div className="px-1 py-4 text-xs text-[var(--text-muted)]">Selecione uma conversa para continuar.</div>
         ) : isLoading ? (
           <div className="space-y-3">
             {Array.from({ length: 5 }).map((_, idx) => (
@@ -450,7 +447,7 @@ function ChatPanel({
             ))}
           </div>
         ) : messages.length === 0 ? (
-          <AppEmptyState title="Sem mensagens" description="Essa conversa ainda não possui mensagens." />
+          <div className="px-1 py-4 text-xs text-[var(--text-muted)]">Sem mensagens nesta conversa.</div>
         ) : (
           <div className="space-y-3.5">
             {messages.map(message => {
@@ -480,46 +477,51 @@ function ChatPanel({
         )}
       </div>
 
-      <div className="shrink-0 flex flex-wrap items-center gap-2 bg-white/[0.02] px-3 py-2">
-        {TEMPLATES.map(template => (
-          <Button
-            key={template}
-            type="button"
-            size="sm"
-            variant="outline"
-            className="h-8 rounded-lg border-white/[0.08] bg-white/[0.02] text-[11px] hover:bg-white/[0.05]"
-            onClick={() => setContent(template)}
-          >
-            {template}
-          </Button>
-        ))}
-      </div>
+      {conversation ? (
+        <>
+          <div className="shrink-0 flex flex-wrap items-center gap-2 bg-white/[0.02] px-3 py-2">
+            {TEMPLATES.map(template => (
+              <Button
+                key={template}
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 rounded-lg border-white/[0.08] bg-white/[0.02] text-[11px] hover:bg-white/[0.05]"
+                onClick={() => setContent(template)}
+              >
+                {template}
+              </Button>
+            ))}
+          </div>
 
-      <footer className="shrink-0 mt-0 flex items-center gap-1.5 overflow-x-hidden bg-white/[0.02] px-3 py-2.5">
-        <button type="button" className="rounded-lg p-2 hover:bg-white/10">
-          <MessageCircleMore className="size-4" />
-        </button>
-        <button type="button" className="rounded-lg p-2 hover:bg-white/10">
-          <Paperclip className="size-4" />
-        </button>
-        <input
-          value={content}
-          onChange={event => setContent(event.target.value)}
-          placeholder="Digite sua mensagem..."
-          className="h-9 min-w-0 flex-1 rounded-lg bg-white/[0.02] px-3 text-sm outline-none placeholder:text-[var(--text-muted)]/70"
-        />
-        <Button
-          type="button"
-          size="sm"
-          className="h-9 rounded-full bg-emerald-600/85 px-3 hover:bg-emerald-500"
-          onClick={sendMessage}
-        >
-          <Send className="size-3.5" />
-        </Button>
-        <button type="button" className="shrink-0 rounded-lg p-2 hover:bg-white/10">
-          <Volume2 className="size-4" />
-        </button>
-      </footer>
+          <footer className="shrink-0 mt-0 flex items-center gap-1.5 overflow-x-hidden bg-white/[0.02] px-3 py-2.5">
+            <button type="button" className="rounded-lg p-2 hover:bg-white/10">
+              <MessageCircleMore className="size-4" />
+            </button>
+            <button type="button" className="rounded-lg p-2 hover:bg-white/10">
+              <Paperclip className="size-4" />
+            </button>
+            <input
+              value={content}
+              onChange={event => setContent(event.target.value)}
+              placeholder="Digite sua mensagem..."
+              className="h-9 min-w-0 flex-1 rounded-lg bg-white/[0.02] px-3 text-sm outline-none placeholder:text-[var(--text-muted)]/70"
+            />
+            <Button
+              type="button"
+              size="sm"
+              disabled={!conversation}
+              className="h-9 rounded-full bg-emerald-600/85 px-3 hover:bg-emerald-500 disabled:opacity-50"
+              onClick={sendMessage}
+            >
+              <Send className="size-3.5" />
+            </Button>
+            <button type="button" className="shrink-0 rounded-lg p-2 hover:bg-white/10">
+              <Volume2 className="size-4" />
+            </button>
+          </footer>
+        </>
+      ) : null}
       {error ? <p className="px-3 pb-2 text-[11px] text-rose-300">{error}</p> : null}
     </section>
   );
@@ -549,10 +551,7 @@ function ContextPanel({
   return (
     <aside className="scrollbar-thin-nexo h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden bg-white/[0.015] p-2.5" id="whatsapp-context-panel">
       {!conversation ? (
-        <AppEmptyState
-          title="Sem contexto ativo"
-          description="Selecione uma conversa para abrir contexto operacional."
-        />
+        <div className="px-1 py-4 text-xs text-[var(--text-muted)]">Sem contexto ativo.</div>
       ) : isLoading ? (
         <div className="space-y-3">
           {Array.from({ length: 5 }).map((_, idx) => (
@@ -711,14 +710,17 @@ export default function WhatsAppPage() {
   );
 
   useEffect(() => {
-    if (!selectedConversationId && conversations[0]?.id) {
-      setSelectedConversationId(conversations[0].id);
-      return;
-    }
     if (selectedConversationId && !conversations.some(item => item.id === selectedConversationId)) {
       setSelectedConversationId(conversations[0]?.id ?? "");
     }
   }, [conversations, selectedConversationId, setSelectedConversationId]);
+
+  useEffect(() => {
+    if (!selectedConversationId) {
+      setContent("");
+      setComposerError(null);
+    }
+  }, [selectedConversationId, setContent]);
 
   const conversationDetailsQuery = trpc.nexo.whatsapp.getConversation.useQuery(
     { id: selectedConversationId },
@@ -936,6 +938,7 @@ export default function WhatsAppPage() {
             search={searchTerm}
             onSearch={setSearchTerm}
             isLoading={conversationsQuery.isLoading || conversationsQuery.isFetching}
+            hasError={Boolean(conversationsQuery.error)}
           />
         </div>
 
