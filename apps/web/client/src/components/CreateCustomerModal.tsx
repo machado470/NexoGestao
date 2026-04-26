@@ -256,7 +256,7 @@ export default function CreateCustomerModal({
       isSubmitting={createCustomer.isPending}
       closeBlocked={createCustomer.isPending}
       hasDirtyState={hasDraft}
-      contentClassName="w-full max-w-[720px]"
+      contentClassName="w-full max-w-[760px] border border-white/10 bg-[#0B1220] shadow-xl shadow-black/25"
       footer={
         createdCustomer ? (
           <>
@@ -310,11 +310,16 @@ export default function CreateCustomerModal({
           </>
         ) : (
           <>
-            <div className="mr-auto text-xs text-[var(--text-muted)]">
-              Status final: <strong>Cadastro inicial</strong> · Próximo passo:{" "}
-              <strong>
-                {nextStep === "only_register" ? "Somente registro" : "Operacional"}
-              </strong>
+            <div className="mr-auto flex flex-wrap gap-6 text-sm text-white/70">
+              <span>
+                Status: <strong className="text-white">Cadastro inicial</strong>
+              </span>
+              <span>
+                Próximo passo:{" "}
+                <strong className="text-white">
+                  {nextStep === "only_register" ? "Somente registro" : "Operacional"}
+                </strong>
+              </span>
             </div>
             <Button
               type="button"
@@ -344,7 +349,7 @@ export default function CreateCustomerModal({
         )
       }
     >
-      <div className="space-y-3 pb-1">
+      <div className="space-y-5 pb-1">
         {createdCustomer ? (
           <section className="space-y-3 rounded-xl border border-[color-mix(in_srgb,var(--success)_26%,var(--border))] bg-[color-mix(in_srgb,var(--success)_8%,var(--surface-base))] p-4">
             <p className="text-sm font-semibold text-[var(--text-primary)]">
@@ -362,66 +367,66 @@ export default function CreateCustomerModal({
 
         {!createdCustomer ? (
           <>
-            <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/60 p-3">
+            <section className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
               <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Contexto</p>
               <p className="text-sm text-[var(--text-primary)]">Cliente em cadastro · próximo passo {nextStep === "only_register" ? "apenas registrar" : "operacional"}</p>
             </section>
 
-            <Accordion type="multiple" defaultValue={["main"]} className="space-y-2">
-              <AccordionItem value="main" className="rounded-lg border px-3">
-                <AccordionTrigger className="py-3 text-sm font-semibold">
+            <Accordion type="multiple" defaultValue={["main"]} className="space-y-3">
+              <AccordionItem value="main" className="rounded-xl border border-white/10 bg-white/[0.02] px-4">
+                <AccordionTrigger className="py-3 text-sm font-semibold text-white">
                   Dados principais
                   <span className="ml-2 text-xs font-normal text-[var(--text-muted)]">
                     {name.trim() || "Sem nome"} · {phone.trim() || "Sem telefone"}
                   </span>
                 </AccordionTrigger>
-                <AccordionContent className="space-y-3 pb-3">
+                <AccordionContent className="space-y-4 pb-4">
                   <div className="space-y-2">
                     <Label htmlFor="customer-name">Nome *</Label>
-                    <Input id="customer-name" value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Cliente Demo" />
+                    <Input id="customer-name" className="border-white/10 bg-white/[0.04] text-white placeholder:text-white/40 hover:border-white/20 focus-visible:border-orange-500/40 focus-visible:ring-[3px] focus-visible:ring-orange-500/30" value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Cliente Demo" />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="customer-phone">Telefone / WhatsApp *</Label>
-                    <Input id="customer-phone" value={phone} onChange={e => setPhone(e.target.value)} placeholder="Ex: +5547999999999" />
+                    <Input id="customer-phone" className="border-white/10 bg-white/[0.04] text-white placeholder:text-white/40 hover:border-white/20 focus-visible:border-orange-500/40 focus-visible:ring-[3px] focus-visible:ring-orange-500/30" value={phone} onChange={e => setPhone(e.target.value)} placeholder="Ex: +5547999999999" />
                     <p className="text-xs text-[var(--text-muted)]">Pode mandar com +55 ou só números. O backend normaliza.</p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="customer-email">Email</Label>
-                    <Input id="customer-email" value={email} onChange={e => setEmail(e.target.value)} placeholder="cliente@demo.com" type="email" />
+                    <Input id="customer-email" className="border-white/10 bg-white/[0.04] text-white placeholder:text-white/40 hover:border-white/20 focus-visible:border-orange-500/40 focus-visible:ring-[3px] focus-visible:ring-orange-500/30" value={email} onChange={e => setEmail(e.target.value)} placeholder="cliente@demo.com" type="email" />
                   </div>
                 </AccordionContent>
               </AccordionItem>
 
-              <AccordionItem value="financial" className="rounded-lg border px-3">
-                <AccordionTrigger className="py-3 text-sm font-semibold">
+              <AccordionItem value="financial" className="rounded-xl border border-white/10 bg-white/[0.02] px-4">
+                <AccordionTrigger className="py-3 text-sm font-semibold text-white">
                   Financeiro
                   <span className="ml-2 text-xs font-normal text-[var(--text-muted)]">
                     {cpfCnpj.trim() || "Sem CPF/CNPJ"}
                   </span>
                 </AccordionTrigger>
-                <AccordionContent className="space-y-3 pb-3">
+                <AccordionContent className="space-y-4 pb-4">
                   <div className="space-y-2">
                     <Label htmlFor="customer-cpf-cnpj">CPF/CNPJ</Label>
-                    <Input id="customer-cpf-cnpj" value={cpfCnpj} onChange={e => setCpfCnpj(e.target.value)} placeholder="Ex.: 123.456.789-00 ou 12.345.678/0001-99" />
+                    <Input id="customer-cpf-cnpj" className="border-white/10 bg-white/[0.04] text-white placeholder:text-white/40 hover:border-white/20 focus-visible:border-orange-500/40 focus-visible:ring-[3px] focus-visible:ring-orange-500/30" value={cpfCnpj} onChange={e => setCpfCnpj(e.target.value)} placeholder="Ex.: 123.456.789-00 ou 12.345.678/0001-99" />
                   </div>
                 </AccordionContent>
               </AccordionItem>
 
-              <AccordionItem value="advanced" className="rounded-lg border px-3">
-                <AccordionTrigger className="py-3 text-sm font-semibold">
+              <AccordionItem value="advanced" className="rounded-xl border border-white/10 bg-white/[0.02] px-4">
+                <AccordionTrigger className="py-3 text-sm font-semibold text-white">
                   Avançado
                   <span className="ml-2 text-xs font-normal text-[var(--text-muted)]">
                     {address.trim() || notes.trim() ? "Com observações" : "Sem detalhes"}
                   </span>
                 </AccordionTrigger>
-                <AccordionContent className="space-y-3 pb-3">
+                <AccordionContent className="space-y-4 pb-4">
                   <div className="space-y-2">
                     <Label htmlFor="customer-address">Endereço</Label>
-                    <Textarea id="customer-address" value={address} onChange={e => setAddress(e.target.value)} placeholder="Ex.: Rua X, 123, Bairro, Cidade" rows={2} />
+                    <Textarea id="customer-address" className="rounded-lg border-white/10 bg-white/[0.04] text-white placeholder:text-white/40 hover:border-white/20 focus-visible:border-orange-500/40 focus-visible:ring-[3px] focus-visible:ring-orange-500/30" value={address} onChange={e => setAddress(e.target.value)} placeholder="Ex.: Rua X, 123, Bairro, Cidade" rows={2} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="customer-notes">Observações</Label>
-                    <Textarea id="customer-notes" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Informações úteis sobre o cliente" rows={3} />
+                    <Textarea id="customer-notes" className="rounded-lg border-white/10 bg-white/[0.04] text-white placeholder:text-white/40 hover:border-white/20 focus-visible:border-orange-500/40 focus-visible:ring-[3px] focus-visible:ring-orange-500/30" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Informações úteis sobre o cliente" rows={3} />
                   </div>
                 </AccordionContent>
               </AccordionItem>
@@ -458,10 +463,10 @@ export default function CreateCustomerModal({
                     key={option.id}
                     type="button"
                     onClick={() => setNextStep(option.id)}
-                    className={`min-h-[88px] rounded-lg border p-3 text-left transition-colors ${
+                    className={`min-h-[88px] rounded-xl border p-4 text-left transition-colors ${
                       nextStep === option.id
-                        ? "border-[var(--accent-primary)] bg-[var(--accent-soft)]/55"
-                        : "border-[var(--border-subtle)] hover:border-[var(--accent-primary)]/35"
+                        ? "border-orange-500/40 bg-orange-500/10"
+                        : "border-white/10 bg-white/[0.02] hover:border-white/20"
                     }`}
                   >
                     <p className="text-sm font-medium text-[var(--text-primary)]">

@@ -113,7 +113,7 @@ export function ModalHeader({
   return (
     <DialogHeader
       className={cn(
-        "border-b border-[var(--border-subtle)] px-6 py-4",
+        "border-b border-[var(--border-subtle)] px-6 py-5",
         fixed ? "shrink-0" : ""
       )}
     >
@@ -132,7 +132,7 @@ export function ModalBody({
   return (
     <div
       className={cn(
-        "nexo-modal-body min-h-0 flex-1 overflow-y-auto px-6 py-4",
+        "nexo-modal-body min-h-0 flex-1 overflow-y-auto px-6 py-5",
         className
       )}
     >
