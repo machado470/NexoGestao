@@ -16,7 +16,6 @@ import {
   CalendarDays,
   Wallet,
   AlertCircle,
-  Pencil,
   Flag,
   User,
   FileText,
@@ -464,13 +463,19 @@ export default function EditServiceOrderModal({
         className="max-h-[90vh] max-w-2xl overflow-hidden border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-0 shadow-sm dark:bg-[var(--surface-base)]"
       >
         <DialogHeader className="border-b border-gray-200 px-6 py-6 dark:border-zinc-800">
-          <DialogTitle className="flex items-center gap-2 text-xl text-gray-900 dark:text-white">
-            <Pencil className="h-5 w-5 text-orange-500" />
-            Editar Ordem de Serviço
-          </DialogTitle>
-          <DialogDescription className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Ajuste dados operacionais, responsável, fechamento e base financeira da O.S.
-          </DialogDescription>
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <DialogTitle className="text-lg text-gray-900 dark:text-white">
+                O.S. #{serviceOrderId ?? "—"}
+              </DialogTitle>
+              <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getStatusBadgeClass(formData.status)}`}>
+                {getStatusLabel(formData.status)}
+              </span>
+            </div>
+            <DialogDescription className="text-sm text-gray-500 dark:text-gray-400">
+              {(serviceOrder?.customer?.name ?? "Cliente não identificado")} · {formData.amount.trim() ? formatCurrencyFromInput(formData.amount) : "Sem valor"}
+            </DialogDescription>
+          </div>
         </DialogHeader>
         {getServiceOrder.isLoading ? (
           <div className="flex min-h-[220px] flex-col items-center justify-center gap-3">
@@ -492,8 +497,26 @@ export default function EditServiceOrderModal({
             </Button>
           </div>
         ) : (
-        <div className="max-h-[70vh] overflow-y-auto p-6">
+        <div className="max-h-[70vh] overflow-y-auto p-5">
           <div className="space-y-6">
+            <Button
+              onClick={() => void submitUpdate()}
+              disabled={updateServiceOrder.isPending || getServiceOrder.isLoading || !isDirty}
+              className="w-full bg-orange-500 text-white hover:bg-orange-600"
+              type="button"
+            >
+              {updateServiceOrder.isPending ? (
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Salvando...
+                </span>
+              ) : formData.status === "DONE" ? (
+                "Concluir O.S."
+              ) : (
+                "Salvar alteração"
+              )}
+            </Button>
+
             <section className="rounded-xl border border-gray-200 p-4 dark:border-zinc-800">
               <SectionTitle
                 icon={ClipboardList}
@@ -792,49 +815,31 @@ export default function EditServiceOrderModal({
               </section>
             ) : null}
 
-            <section className="rounded-xl border border-gray-200 p-4 dark:border-zinc-800">
-              <SectionTitle
-                icon={Wallet}
-                title="Base financeira"
-                subtitle="Mantenha valor e vencimento alinhados para o fechamento com cobrança."
-              />
-
+            <details className="rounded-xl border border-gray-200 p-4 dark:border-zinc-800">
+              <summary className="cursor-pointer list-none">
+                <SectionTitle
+                  icon={Wallet}
+                  title="Financeiro"
+                  subtitle="Mantenha valor e vencimento alinhados para o fechamento com cobrança."
+                />
+              </summary>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-white">
                     Valor (R$)
                   </label>
-                  <input
-                    inputMode="decimal"
-                    className="w-full rounded-lg border border-gray-300 bg-[var(--surface-elevated)] p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-[var(--border-subtle)] dark:bg-zinc-950 dark:text-white"
-                    value={formData.amount}
-                    onChange={(e) =>
-                      setFormData((state) => ({ ...state, amount: e.target.value }))
-                    }
-                    disabled={updateServiceOrder.isPending || isPersistedClosed}
-                  />
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    Valor atual: {formatCurrencyFromInput(formData.amount)}
-                  </p>
+                  <input inputMode="decimal" className="w-full rounded-lg border border-gray-300 bg-[var(--surface-elevated)] p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-[var(--border-subtle)] dark:bg-zinc-950 dark:text-white" value={formData.amount} onChange={(e) => setFormData((state) => ({ ...state, amount: e.target.value }))} disabled={updateServiceOrder.isPending || isPersistedClosed} />
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Valor atual: {formatCurrencyFromInput(formData.amount)}</p>
                 </div>
-
                 <div>
                   <label className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-white">
                     <CalendarDays className="h-4 w-4 text-gray-500" />
                     Vencimento
                   </label>
-                  <input
-                    type="datetime-local"
-                    className="w-full rounded-lg border border-gray-300 bg-[var(--surface-elevated)] p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-[var(--border-subtle)] dark:bg-zinc-950 dark:text-white"
-                    value={formData.dueDate}
-                    onChange={(e) =>
-                      setFormData((state) => ({ ...state, dueDate: e.target.value }))
-                    }
-                    disabled={updateServiceOrder.isPending || isPersistedClosed}
-                  />
+                  <input type="datetime-local" className="w-full rounded-lg border border-gray-300 bg-[var(--surface-elevated)] p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 dark:border-[var(--border-subtle)] dark:bg-zinc-950 dark:text-white" value={formData.dueDate} onChange={(e) => setFormData((state) => ({ ...state, dueDate: e.target.value }))} disabled={updateServiceOrder.isPending || isPersistedClosed} />
                 </div>
               </div>
-            </section>
+            </details>
 
             <section className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4 dark:border-zinc-800 dark:bg-[var(--surface-base)]">
               <div className="mb-3 flex items-center gap-2">
@@ -909,7 +914,10 @@ export default function EditServiceOrderModal({
           </div>
         </div>
         )}
-        <DialogFooter className="flex gap-2 border-t border-gray-200 p-6 sm:justify-start dark:border-zinc-800">
+        <DialogFooter className="flex gap-2 border-t border-gray-200 p-4 sm:justify-start dark:border-zinc-800">
+          <div className="mr-auto text-xs text-gray-500 dark:text-gray-400">
+            Status final: <strong>{getStatusLabel(formData.status)}</strong> · Valor: <strong>{formData.amount.trim() ? formatCurrencyFromInput(formData.amount) : "—"}</strong>
+          </div>
           {serviceOrderId ? (
             <Button
               type="button"

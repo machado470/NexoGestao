@@ -21,6 +21,12 @@ import {
   AppSelect,
   AppTextarea,
 } from "@/components/app-system";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 type Props = {
   open?: boolean;
@@ -121,6 +127,10 @@ export default function CreateServiceOrderModal({
   }, [formData]);
 
   const hasAmount = formData.amount.trim().length > 0;
+  const selectedCustomerName =
+    customers.find((customer) => customer.id === formData.customerId)?.name ??
+    "Cliente não definido";
+  const summaryAmount = formatCurrencyFromInput(formData.amount);
 
   const handleClose = () => {
     if (createMutation.isPending) return;
@@ -271,7 +281,7 @@ export default function CreateServiceOrderModal({
       open={resolvedOpen}
       onOpenChange={(open) => (!open ? handleClose() : undefined)}
       title="Nova O.S."
-      description="Registre a ordem de serviço no padrão operacional dos modais internos."
+      description={`${selectedCustomerName} · ${hasAmount ? summaryAmount : "Sem valor definido"}`}
       closeBlocked={createMutation.isPending}
       size="lg"
       footer={
@@ -339,9 +349,7 @@ export default function CreateServiceOrderModal({
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Criando...
                   </span>
-                ) : (
-                  "Criar O.S."
-                )}
+                ) : "Salvar alteração"}
               </Button>
             </>
           ) : null}
@@ -364,107 +372,160 @@ export default function CreateServiceOrderModal({
 
       {!createdServiceOrder ? (
         <AppForm id="create-service-order-form">
+          <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/60 p-3">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Identificador</p>
+                <p className="text-sm font-semibold text-[var(--text-primary)]">Nova O.S.</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Cliente</p>
+                <p className="text-sm font-medium text-[var(--text-primary)]">{selectedCustomerName}</p>
+              </div>
+            </div>
+          </section>
+
+          <Button
+            type="button"
+            onClick={() => void submit()}
+            disabled={createMutation.isPending || !canSubmit}
+            className="w-full bg-orange-500 text-white hover:bg-orange-600"
+          >
+            {createMutation.isPending ? (
+              <span className="inline-flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Criando...
+              </span>
+            ) : (
+              "Salvar alteração"
+            )}
+          </Button>
+
           {customers.length === 0 ? (
             <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
               Você precisa ter ao menos um cliente para criar uma O.S. Cadastre um cliente e volte aqui.
             </section>
           ) : null}
 
-          <AppField label="Cliente *">
-            <AppSelect
-              value={formData.customerId}
-              onValueChange={(customerId) =>
-                setFormData((state) => ({ ...state, customerId }))
-              }
-              placeholder="Selecione um cliente"
-              options={customers.map((customer) => ({
-                value: customer.id,
-                label: customer.name,
-              }))}
-            />
-          </AppField>
+          <Accordion type="multiple" defaultValue={["main", "financial"]} className="space-y-2">
+            <AccordionItem value="main" className="rounded-lg border px-3">
+              <AccordionTrigger className="py-3 text-sm font-semibold">Dados principais</AccordionTrigger>
+              <AccordionContent className="space-y-3 pb-3">
+                <AppField label="Cliente *">
+                  <AppSelect
+                    value={formData.customerId}
+                    onValueChange={(customerId) =>
+                      setFormData((state) => ({ ...state, customerId }))
+                    }
+                    placeholder="Selecione um cliente"
+                    options={customers.map((customer) => ({
+                      value: customer.id,
+                      label: customer.name,
+                    }))}
+                  />
+                </AppField>
 
-          <AppField label="Responsável pela execução">
-            <div className="space-y-1.5">
-              <AppSelect
-                value={formData.assignedToPersonId || undefined}
-                onValueChange={(assignedToPersonId) =>
-                  setFormData((state) => ({ ...state, assignedToPersonId }))
-                }
-                placeholder="Selecione um colaborador"
-                options={people.map((person) => ({
-                  value: person.id,
-                  label: person.name,
-                }))}
-              />
-              {formData.assignedToPersonId ? (
-                <button
-                  type="button"
-                  className="text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
-                  onClick={() =>
-                    setFormData((state) => ({ ...state, assignedToPersonId: "" }))
-                  }
-                >
-                  Limpar responsável
-                </button>
-              ) : null}
-            </div>
-          </AppField>
+                <AppField label="Responsável pela execução">
+                  <div className="space-y-1.5">
+                    <AppSelect
+                      value={formData.assignedToPersonId || undefined}
+                      onValueChange={(assignedToPersonId) =>
+                        setFormData((state) => ({ ...state, assignedToPersonId }))
+                      }
+                      placeholder="Selecione um colaborador"
+                      options={people.map((person) => ({
+                        value: person.id,
+                        label: person.name,
+                      }))}
+                    />
+                    {formData.assignedToPersonId ? (
+                      <button
+                        type="button"
+                        className="text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
+                        onClick={() =>
+                          setFormData((state) => ({ ...state, assignedToPersonId: "" }))
+                        }
+                      >
+                        Limpar responsável
+                      </button>
+                    ) : null}
+                  </div>
+                </AppField>
 
-          <AppField label="Serviço que será feito *">
-            <AppInput
-              placeholder="Ex: Manutenção elétrica no quadro do condomínio"
-              value={formData.title}
-              onChange={(e) =>
-                setFormData((state) => ({ ...state, title: e.target.value }))
-              }
-              disabled={createMutation.isPending}
-            />
-          </AppField>
+                <AppField label="Serviço que será feito *">
+                  <AppInput
+                    placeholder="Ex: Manutenção elétrica no quadro do condomínio"
+                    value={formData.title}
+                    onChange={(e) =>
+                      setFormData((state) => ({ ...state, title: e.target.value }))
+                    }
+                    disabled={createMutation.isPending}
+                  />
+                </AppField>
 
-          <AppField label="Detalhes para a equipe">
-            <AppTextarea
-              placeholder="Ex: Levar escada, trocar disjuntor e testar iluminação da área comum."
-              rows={3}
-              value={formData.description}
-              onChange={(e) =>
-                setFormData((state) => ({ ...state, description: e.target.value }))
-              }
-              disabled={createMutation.isPending}
-            />
-          </AppField>
+                <AppField label="Detalhes para a equipe">
+                  <AppTextarea
+                    placeholder="Ex: Levar escada, trocar disjuntor e testar iluminação da área comum."
+                    rows={3}
+                    value={formData.description}
+                    onChange={(e) =>
+                      setFormData((state) => ({ ...state, description: e.target.value }))
+                    }
+                    disabled={createMutation.isPending}
+                  />
+                </AppField>
+              </AccordionContent>
+            </AccordionItem>
 
-          <AppFieldGroup>
-            <AppField label="Data prevista (opcional)">
-              <AppInput
-                type="datetime-local"
-                value={formData.scheduledFor}
-                onChange={(e) =>
-                  setFormData((state) => ({ ...state, scheduledFor: e.target.value }))
-                }
-                disabled={createMutation.isPending}
-              />
-              {appointmentId ? (
-                <AppInlineHint>
-                  Sugestão: esta O.S. pode herdar contexto do agendamento #{appointmentId}.
-                </AppInlineHint>
-              ) : null}
-            </AppField>
-            <AppField label="Valor (R$)">
-              <AppInput
-                inputMode="decimal"
-                placeholder="Ex: 890,00"
-                value={formData.amount}
-                onChange={(e) =>
-                  setFormData((state) => ({ ...state, amount: e.target.value }))
-                }
-                disabled={createMutation.isPending}
-              />
-              <AppInlineHint>
-                Valor atual: {formatCurrencyFromInput(formData.amount)}
-              </AppInlineHint>
-            </AppField>
-          </AppFieldGroup>
+            <AccordionItem value="financial" className="rounded-lg border px-3">
+              <AccordionTrigger className="py-3 text-sm font-semibold">Financeiro</AccordionTrigger>
+              <AccordionContent className="pb-3">
+                <AppFieldGroup>
+                  <AppField label="Data prevista (opcional)">
+                    <AppInput
+                      type="datetime-local"
+                      value={formData.scheduledFor}
+                      onChange={(e) =>
+                        setFormData((state) => ({ ...state, scheduledFor: e.target.value }))
+                      }
+                      disabled={createMutation.isPending}
+                    />
+                    {appointmentId ? (
+                      <AppInlineHint>
+                        Sugestão: esta O.S. pode herdar contexto do agendamento #{appointmentId}.
+                      </AppInlineHint>
+                    ) : null}
+                  </AppField>
+                  <AppField label="Valor (R$)">
+                    <AppInput
+                      inputMode="decimal"
+                      placeholder="Ex: 890,00"
+                      value={formData.amount}
+                      onChange={(e) =>
+                        setFormData((state) => ({ ...state, amount: e.target.value }))
+                      }
+                      disabled={createMutation.isPending}
+                    />
+                    <AppInlineHint>Valor atual: {summaryAmount}</AppInlineHint>
+                  </AppField>
+                </AppFieldGroup>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="advanced" className="rounded-lg border px-3">
+              <AccordionTrigger className="py-3 text-sm font-semibold">Avançado</AccordionTrigger>
+              <AccordionContent className="pb-3">
+                <AppField label="Vencimento">
+                  <AppInput
+                    type="datetime-local"
+                    value={formData.dueDate}
+                    onChange={(e) => setFormData((state) => ({ ...state, dueDate: e.target.value }))}
+                    disabled={createMutation.isPending}
+                  />
+                </AppField>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
 
           {hasAmount ? (
             <p className="text-xs text-[var(--text-muted)]">
