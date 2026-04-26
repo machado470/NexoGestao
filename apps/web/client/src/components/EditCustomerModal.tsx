@@ -15,6 +15,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { normalizeObjectPayload } from "@/lib/query-helpers";
 import { useCriticalActionGuard } from "@/hooks/useCriticalActionGuard";
 import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
@@ -133,6 +139,13 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
   const canSubmit = useMemo(() => {
     return name.trim().length >= 2 && phone.trim().length >= 10 && isDirty;
   }, [isDirty, name, phone]);
+  const operationalSummary = useMemo(
+    () => ({
+      status: active ? "Ativo" : "Inativo",
+      contact: phone.trim().length > 0 ? phone : "Sem telefone",
+    }),
+    [active, phone]
+  );
 
   const submit = async () => {
     if (!idStr) return;
@@ -222,14 +235,23 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
         }}
         className="max-h-[90vh] max-w-3xl overflow-hidden border-[var(--border-subtle)] bg-[var(--card-bg)] p-0 text-[var(--text-primary)] shadow-2xl backdrop-blur"
       >
-        <DialogHeader className="border-b border-zinc-800/90 px-6 py-5">
-          <DialogTitle className="text-xl font-semibold">Editar Cliente</DialogTitle>
-          <DialogDescription className="text-[var(--text-muted)]">
-            Atualize os dados mantendo consistência com o padrão visual moderno.
-          </DialogDescription>
+        <DialogHeader className="border-b border-zinc-800/90 px-5 py-4">
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <DialogTitle className="text-lg font-semibold">
+                Cliente #{idStr ?? "novo"}
+              </DialogTitle>
+              <span className="rounded-full bg-[var(--surface-base)] px-2.5 py-1 text-xs font-medium text-[var(--text-secondary)]">
+                {operationalSummary.status}
+              </span>
+            </div>
+            <DialogDescription className="text-sm text-[var(--text-muted)]">
+              {name.trim() || "Sem nome definido"} · {operationalSummary.contact}
+            </DialogDescription>
+          </div>
         </DialogHeader>
 
-        <div className="space-y-4 overflow-y-auto px-6 py-5">
+        <div className="space-y-3 overflow-y-auto px-5 py-4">
           {customerQuery.isLoading && !customer ? (
             <div className="flex items-center justify-center py-8 text-sm text-[var(--text-muted)]">
               <Loader2 className="mr-2 h-5 w-5 animate-spin text-orange-500" />
@@ -253,74 +275,51 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
               </Button>
             </div>
           ) : (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="edit-customer-name">Nome *</Label>
-                <Input
-                  id="edit-customer-name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="border-[var(--border-subtle)] bg-[var(--surface-base)]"
-                  placeholder="Ex: Cliente Demo"
-                />
-              </div>
+            <Accordion type="multiple" defaultValue={["main", "advanced"]} className="space-y-2">
+              <AccordionItem value="main" className="rounded-lg border px-3">
+                <AccordionTrigger className="py-3 text-sm font-semibold">Dados principais</AccordionTrigger>
+                <AccordionContent className="space-y-3 pb-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-customer-name">Nome *</Label>
+                    <Input id="edit-customer-name" value={name} onChange={(e) => setName(e.target.value)} className="border-[var(--border-subtle)] bg-[var(--surface-base)]" placeholder="Ex: Cliente Demo" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-customer-phone">Telefone / WhatsApp *</Label>
+                    <Input id="edit-customer-phone" value={phone} onChange={(e) => setPhone(e.target.value)} className="border-[var(--border-subtle)] bg-[var(--surface-base)]" placeholder="Ex: +5547999999999" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-customer-email">Email</Label>
+                    <Input id="edit-customer-email" value={email} onChange={(e) => setEmail(e.target.value)} className="border-[var(--border-subtle)] bg-[var(--surface-base)]" placeholder="cliente@demo.com" type="email" />
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
 
-              <div className="space-y-2">
-                <Label htmlFor="edit-customer-phone">Telefone / WhatsApp *</Label>
-                <Input
-                  id="edit-customer-phone"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="border-[var(--border-subtle)] bg-[var(--surface-base)]"
-                  placeholder="Ex: +5547999999999"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="edit-customer-email">Email</Label>
-                <Input
-                  id="edit-customer-email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="border-[var(--border-subtle)] bg-[var(--surface-base)]"
-                  placeholder="cliente@demo.com"
-                  type="email"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="edit-customer-notes">Observações</Label>
-                <Textarea
-                  id="edit-customer-notes"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className="border-[var(--border-subtle)] bg-[var(--surface-base)]"
-                  placeholder="Informações úteis sobre o cliente"
-                  rows={4}
-                />
-              </div>
-
-              <div className="flex items-center justify-between rounded-xl border border-zinc-800 bg-[var(--surface-base)]/60 px-4 py-3">
-                <div>
-                  <p className="text-sm font-medium text-[var(--text-primary)]">Cliente ativo</p>
-                  <p className="text-xs text-[var(--text-muted)]">Desative para tirar o cliente do fluxo sem apagar histórico.</p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setActive((prev) => !prev)}
-                  className={`inline-flex min-w-[88px] items-center justify-center rounded-full px-3 py-2 text-xs font-medium transition-colors ${
-                    active ? "bg-green-900/40 text-green-300" : "bg-[var(--surface-base)] text-[var(--text-secondary)]"
-                  }`}
-                >
-                  {active ? "Ativo" : "Inativo"}
-                </button>
-              </div>
-            </>
+              <AccordionItem value="advanced" className="rounded-lg border px-3">
+                <AccordionTrigger className="py-3 text-sm font-semibold">Avançado</AccordionTrigger>
+                <AccordionContent className="space-y-3 pb-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-customer-notes">Observações</Label>
+                    <Textarea id="edit-customer-notes" value={notes} onChange={(e) => setNotes(e.target.value)} className="border-[var(--border-subtle)] bg-[var(--surface-base)]" placeholder="Informações úteis sobre o cliente" rows={4} />
+                  </div>
+                  <div className="flex items-center justify-between rounded-xl border border-zinc-800 bg-[var(--surface-base)]/60 px-4 py-3">
+                    <div>
+                      <p className="text-sm font-medium text-[var(--text-primary)]">Cliente ativo</p>
+                      <p className="text-xs text-[var(--text-muted)]">Desative para tirar o cliente do fluxo sem apagar histórico.</p>
+                    </div>
+                    <button type="button" onClick={() => setActive((prev) => !prev)} className={`inline-flex min-w-[88px] items-center justify-center rounded-full px-3 py-2 text-xs font-medium transition-colors ${active ? "bg-green-900/40 text-green-300" : "bg-[var(--surface-base)] text-[var(--text-secondary)]"}`}>
+                      {active ? "Ativo" : "Inativo"}
+                    </button>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           )}
         </div>
 
-        <DialogFooter className="border-t border-zinc-800/90 px-6 py-4">
+        <DialogFooter className="border-t border-zinc-800/90 px-5 py-3">
+          <div className="mr-auto text-xs text-[var(--text-muted)]">
+            Status final: <strong>{operationalSummary.status}</strong>
+          </div>
           <Button type="button" variant="outline" onClick={handleClose}>
             Cancelar
           </Button>
