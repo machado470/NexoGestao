@@ -460,9 +460,9 @@ export default function EditServiceOrderModal({
         onInteractOutside={(event) => {
           if (updateServiceOrder.isPending) event.preventDefault();
         }}
-        className="max-h-[90vh] max-w-2xl overflow-hidden border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-0 shadow-sm dark:bg-[var(--surface-base)]"
+        className="flex max-h-[90vh] w-full max-w-[820px] flex-col overflow-hidden border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-0 shadow-sm dark:bg-[var(--surface-base)]"
       >
-        <DialogHeader className="border-b border-gray-200 px-6 py-6 dark:border-zinc-800">
+        <DialogHeader className="shrink-0 border-b border-[var(--border-subtle)] px-6 py-4 dark:border-zinc-800">
           <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <DialogTitle className="text-lg text-gray-900 dark:text-white">
@@ -497,25 +497,25 @@ export default function EditServiceOrderModal({
             </Button>
           </div>
         ) : (
-        <div className="max-h-[70vh] overflow-y-auto p-5">
+        <div className="min-h-0 flex-1 overflow-y-auto p-5">
           <div className="space-y-6">
-            <Button
-              onClick={() => void submitUpdate()}
-              disabled={updateServiceOrder.isPending || getServiceOrder.isLoading || !isDirty}
-              className="w-full bg-orange-500 text-white hover:bg-orange-600"
-              type="button"
-            >
-              {updateServiceOrder.isPending ? (
-                <span className="inline-flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Salvando...
-                </span>
-              ) : formData.status === "DONE" ? (
-                "Concluir O.S."
-              ) : (
-                "Salvar alteração"
-              )}
-            </Button>
+            {formData.status === "DONE" ? (
+              <Button
+                onClick={() => void submitUpdate()}
+                disabled={updateServiceOrder.isPending || getServiceOrder.isLoading || !isDirty}
+                className="w-full bg-orange-500 text-white hover:bg-orange-600"
+                type="button"
+              >
+                {updateServiceOrder.isPending ? (
+                  <span className="inline-flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Concluindo...
+                  </span>
+                ) : (
+                  "Concluir O.S."
+                )}
+              </Button>
+            ) : null}
 
             <section className="rounded-xl border border-gray-200 p-4 dark:border-zinc-800">
               <SectionTitle
@@ -914,10 +914,23 @@ export default function EditServiceOrderModal({
           </div>
         </div>
         )}
-        <DialogFooter className="flex gap-2 border-t border-gray-200 p-4 sm:justify-start dark:border-zinc-800">
+        <DialogFooter className="shrink-0 gap-2 border-t border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 sm:justify-start dark:border-zinc-800 dark:bg-[var(--surface-base)]">
           <div className="mr-auto text-xs text-gray-500 dark:text-gray-400">
             Status final: <strong>{getStatusLabel(formData.status)}</strong> · Valor: <strong>{formData.amount.trim() ? formatCurrencyFromInput(formData.amount) : "—"}</strong>
           </div>
+          <Button
+            onClick={() => {
+              if (isDirty && !window.confirm("Existem alterações não salvas. Deseja descartar?")) {
+                return;
+              }
+              onClose();
+            }}
+            variant="outline"
+            type="button"
+            disabled={updateServiceOrder.isPending || getServiceOrder.isLoading}
+          >
+            Cancelar
+          </Button>
           {serviceOrderId ? (
             <Button
               type="button"
@@ -934,7 +947,7 @@ export default function EditServiceOrderModal({
           <Button
             onClick={() => void submitUpdate()}
             disabled={updateServiceOrder.isPending || getServiceOrder.isLoading || !isDirty}
-            className="flex-1 bg-orange-500 text-white hover:bg-orange-600"
+            className="bg-orange-500 text-white hover:bg-orange-600"
             type="button"
           >
             {updateServiceOrder.isPending ? (
@@ -947,19 +960,6 @@ export default function EditServiceOrderModal({
             )}
           </Button>
 
-          <Button
-            onClick={() => {
-              if (isDirty && !window.confirm("Existem alterações não salvas. Deseja descartar?")) {
-                return;
-              }
-              onClose();
-            }}
-            variant="outline"
-            type="button"
-            disabled={updateServiceOrder.isPending || getServiceOrder.isLoading}
-          >
-            Cancelar
-          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

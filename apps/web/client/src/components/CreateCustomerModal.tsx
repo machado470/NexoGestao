@@ -256,6 +256,7 @@ export default function CreateCustomerModal({
       isSubmitting={createCustomer.isPending}
       closeBlocked={createCustomer.isPending}
       hasDirtyState={hasDraft}
+      contentClassName="w-full max-w-[720px]"
       footer={
         createdCustomer ? (
           <>
@@ -309,6 +310,12 @@ export default function CreateCustomerModal({
           </>
         ) : (
           <>
+            <div className="mr-auto text-xs text-[var(--text-muted)]">
+              Status final: <strong>Cadastro inicial</strong> · Próximo passo:{" "}
+              <strong>
+                {nextStep === "only_register" ? "Somente registro" : "Operacional"}
+              </strong>
+            </div>
             <Button
               type="button"
               variant="outline"
@@ -362,7 +369,12 @@ export default function CreateCustomerModal({
 
             <Accordion type="multiple" defaultValue={["main"]} className="space-y-2">
               <AccordionItem value="main" className="rounded-lg border px-3">
-                <AccordionTrigger className="py-3 text-sm font-semibold">Dados principais</AccordionTrigger>
+                <AccordionTrigger className="py-3 text-sm font-semibold">
+                  Dados principais
+                  <span className="ml-2 text-xs font-normal text-[var(--text-muted)]">
+                    {name.trim() || "Sem nome"} · {phone.trim() || "Sem telefone"}
+                  </span>
+                </AccordionTrigger>
                 <AccordionContent className="space-y-3 pb-3">
                   <div className="space-y-2">
                     <Label htmlFor="customer-name">Nome *</Label>
@@ -381,7 +393,12 @@ export default function CreateCustomerModal({
               </AccordionItem>
 
               <AccordionItem value="financial" className="rounded-lg border px-3">
-                <AccordionTrigger className="py-3 text-sm font-semibold">Financeiro</AccordionTrigger>
+                <AccordionTrigger className="py-3 text-sm font-semibold">
+                  Financeiro
+                  <span className="ml-2 text-xs font-normal text-[var(--text-muted)]">
+                    {cpfCnpj.trim() || "Sem CPF/CNPJ"}
+                  </span>
+                </AccordionTrigger>
                 <AccordionContent className="space-y-3 pb-3">
                   <div className="space-y-2">
                     <Label htmlFor="customer-cpf-cnpj">CPF/CNPJ</Label>
@@ -391,7 +408,12 @@ export default function CreateCustomerModal({
               </AccordionItem>
 
               <AccordionItem value="advanced" className="rounded-lg border px-3">
-                <AccordionTrigger className="py-3 text-sm font-semibold">Avançado</AccordionTrigger>
+                <AccordionTrigger className="py-3 text-sm font-semibold">
+                  Avançado
+                  <span className="ml-2 text-xs font-normal text-[var(--text-muted)]">
+                    {address.trim() || notes.trim() ? "Com observações" : "Sem detalhes"}
+                  </span>
+                </AccordionTrigger>
                 <AccordionContent className="space-y-3 pb-3">
                   <div className="space-y-2">
                     <Label htmlFor="customer-address">Endereço</Label>

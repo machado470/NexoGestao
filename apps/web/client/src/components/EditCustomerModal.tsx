@@ -4,14 +4,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/design-system";
 import { customerSchema } from "@/lib/validations";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { FormModal } from "@/components/app-modal-system";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -225,33 +218,41 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
   };
 
   return (
-    <Dialog open={open} onOpenChange={(nextOpen) => (!nextOpen ? handleClose() : undefined)}>
-      <DialogContent
-        onEscapeKeyDown={(event) => {
-          if (updateMutation.isPending) event.preventDefault();
-        }}
-        onInteractOutside={(event) => {
-          if (updateMutation.isPending) event.preventDefault();
-        }}
-        className="max-h-[90vh] max-w-3xl overflow-hidden border-[var(--border-subtle)] bg-[var(--card-bg)] p-0 text-[var(--text-primary)] shadow-2xl backdrop-blur"
-      >
-        <DialogHeader className="border-b border-zinc-800/90 px-5 py-4">
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <DialogTitle className="text-lg font-semibold">
-                Cliente #{idStr ?? "novo"}
-              </DialogTitle>
-              <span className="rounded-full bg-[var(--surface-base)] px-2.5 py-1 text-xs font-medium text-[var(--text-secondary)]">
-                {operationalSummary.status}
-              </span>
-            </div>
-            <DialogDescription className="text-sm text-[var(--text-muted)]">
-              {name.trim() || "Sem nome definido"} · {operationalSummary.contact}
-            </DialogDescription>
+    <FormModal
+      open={open}
+      onOpenChange={(nextOpen) => (!nextOpen ? handleClose() : undefined)}
+      title={`Cliente #${idStr ?? "novo"}`}
+      description={`${name.trim() || "Sem nome definido"} · ${operationalSummary.contact} · ${operationalSummary.status}`}
+      closeBlocked={updateMutation.isPending}
+      contentClassName="w-full max-w-[720px]"
+      footer={
+        <>
+          <div className="mr-auto text-xs text-[var(--text-muted)]">
+            Status final: <strong>{operationalSummary.status}</strong>
           </div>
-        </DialogHeader>
+          <Button type="button" variant="outline" onClick={handleClose}>
+            Cancelar
+          </Button>
 
-        <div className="space-y-3 overflow-y-auto px-5 py-4">
+          <Button
+            type="button"
+            onClick={submit}
+            disabled={updateMutation.isPending || customerQuery.isLoading || !canSubmit}
+            className="bg-orange-500 text-white hover:bg-orange-600"
+          >
+            {updateMutation.isPending ? (
+              <span className="inline-flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Salvando...
+              </span>
+            ) : (
+              "Salvar"
+            )}
+          </Button>
+        </>
+      }
+    >
+        <div className="space-y-3">
           {customerQuery.isLoading && !customer ? (
             <div className="flex items-center justify-center py-8 text-sm text-[var(--text-muted)]">
               <Loader2 className="mr-2 h-5 w-5 animate-spin text-orange-500" />
@@ -277,7 +278,12 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
           ) : (
             <Accordion type="multiple" defaultValue={["main", "advanced"]} className="space-y-2">
               <AccordionItem value="main" className="rounded-lg border px-3">
-                <AccordionTrigger className="py-3 text-sm font-semibold">Dados principais</AccordionTrigger>
+                <AccordionTrigger className="py-3 text-sm font-semibold">
+                  Dados principais
+                  <span className="ml-2 text-xs font-normal text-[var(--text-muted)]">
+                    {name.trim() || "Sem nome"} · {phone.trim() || "Sem telefone"}
+                  </span>
+                </AccordionTrigger>
                 <AccordionContent className="space-y-3 pb-3">
                   <div className="space-y-2">
                     <Label htmlFor="edit-customer-name">Nome *</Label>
@@ -295,7 +301,12 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
               </AccordionItem>
 
               <AccordionItem value="advanced" className="rounded-lg border px-3">
-                <AccordionTrigger className="py-3 text-sm font-semibold">Avançado</AccordionTrigger>
+                <AccordionTrigger className="py-3 text-sm font-semibold">
+                  Avançado
+                  <span className="ml-2 text-xs font-normal text-[var(--text-muted)]">
+                    {active ? "Cliente ativo" : "Cliente inativo"}
+                  </span>
+                </AccordionTrigger>
                 <AccordionContent className="space-y-3 pb-3">
                   <div className="space-y-2">
                     <Label htmlFor="edit-customer-notes">Observações</Label>
@@ -315,32 +326,6 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
             </Accordion>
           )}
         </div>
-
-        <DialogFooter className="border-t border-zinc-800/90 px-5 py-3">
-          <div className="mr-auto text-xs text-[var(--text-muted)]">
-            Status final: <strong>{operationalSummary.status}</strong>
-          </div>
-          <Button type="button" variant="outline" onClick={handleClose}>
-            Cancelar
-          </Button>
-
-          <Button
-            type="button"
-            onClick={submit}
-            disabled={updateMutation.isPending || customerQuery.isLoading || !canSubmit}
-            className="bg-orange-500 text-white hover:bg-orange-600"
-          >
-            {updateMutation.isPending ? (
-              <span className="inline-flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Salvando...
-              </span>
-            ) : (
-              "Salvar"
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    </FormModal>
   );
 }
