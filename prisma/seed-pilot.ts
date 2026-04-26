@@ -1,11 +1,19 @@
 import {
   AppointmentStatus,
   ChargeStatus,
+  MessageChannel,
   PaymentMethod,
   PlanName,
   PrismaClient,
   ServiceOrderStatus,
   UserRole,
+  WhatsAppContextType,
+  WhatsAppConversationPriority,
+  WhatsAppConversationStatus,
+  WhatsAppDirection,
+  WhatsAppEntityType,
+  WhatsAppMessageStatus,
+  WhatsAppMessageType,
 } from '@prisma/client'
 
 import bcrypt from 'bcryptjs'
@@ -757,6 +765,187 @@ async function ensureBusinessSubscription(orgId: string) {
   })
 }
 
+async function upsertWhatsAppTemplate(params: {
+  orgId: string
+  key: string
+  name: string
+  messageType: WhatsAppMessageType
+  body: string
+}) {
+  return prisma.whatsAppTemplate.upsert({
+    where: {
+      orgId_key: {
+        orgId: params.orgId,
+        key: params.key,
+      },
+    },
+    update: {
+      channel: MessageChannel.WHATSAPP,
+      name: params.name,
+      messageType: params.messageType,
+      body: params.body,
+      content: params.body,
+      isActive: true,
+    },
+    create: {
+      orgId: params.orgId,
+      channel: MessageChannel.WHATSAPP,
+      key: params.key,
+      name: params.name,
+      messageType: params.messageType,
+      body: params.body,
+      content: params.body,
+      isActive: true,
+    },
+  })
+}
+
+async function upsertWhatsAppConversation(params: {
+  orgId: string
+  customerId?: string
+  phone: string
+  title: string
+  status: WhatsAppConversationStatus
+  priority: WhatsAppConversationPriority
+  contextType: WhatsAppContextType
+  contextId: string
+  lastMessageAt?: Date | null
+  lastInboundAt?: Date | null
+  lastOutboundAt?: Date | null
+  unreadCount: number
+}) {
+  const existing = await prisma.whatsAppConversation.findFirst({
+    where: {
+      orgId: params.orgId,
+      contextType: params.contextType,
+      contextId: params.contextId,
+    },
+  })
+
+  if (existing) {
+    return prisma.whatsAppConversation.update({
+      where: { id: existing.id },
+      data: {
+        customerId: params.customerId,
+        phone: params.phone,
+        title: params.title,
+        status: params.status,
+        priority: params.priority,
+        contextType: params.contextType,
+        contextId: params.contextId,
+        lastMessageAt: params.lastMessageAt,
+        lastInboundAt: params.lastInboundAt,
+        lastOutboundAt: params.lastOutboundAt,
+        unreadCount: params.unreadCount,
+      },
+    })
+  }
+
+  return prisma.whatsAppConversation.create({
+    data: {
+      orgId: params.orgId,
+      customerId: params.customerId,
+      phone: params.phone,
+      title: params.title,
+      status: params.status,
+      priority: params.priority,
+      contextType: params.contextType,
+      contextId: params.contextId,
+      lastMessageAt: params.lastMessageAt,
+      lastInboundAt: params.lastInboundAt,
+      lastOutboundAt: params.lastOutboundAt,
+      unreadCount: params.unreadCount,
+    },
+  })
+}
+
+async function upsertWhatsAppMessage(params: {
+  orgId: string
+  conversationId: string
+  customerId?: string
+  direction: WhatsAppDirection
+  entityType: WhatsAppEntityType
+  entityId: string
+  messageType: WhatsAppMessageType
+  messageKey: string
+  status: WhatsAppMessageStatus
+  toPhone: string
+  fromPhone?: string
+  renderedText: string
+  provider?: string
+  providerMessageId?: string
+  errorCode?: string
+  errorMessage?: string
+  sentAt?: Date
+  deliveredAt?: Date
+  readAt?: Date
+  failedAt?: Date
+  createdAt?: Date
+  metadata?: Record<string, unknown>
+}) {
+  const existing = await prisma.whatsAppMessage.findUnique({
+    where: { messageKey: params.messageKey },
+  })
+
+  if (existing) {
+    return prisma.whatsAppMessage.update({
+      where: { id: existing.id },
+      data: {
+        orgId: params.orgId,
+        conversationId: params.conversationId,
+        customerId: params.customerId,
+        direction: params.direction,
+        entityType: params.entityType,
+        entityId: params.entityId,
+        messageType: params.messageType,
+        status: params.status,
+        toPhone: params.toPhone,
+        fromPhone: params.fromPhone,
+        renderedText: params.renderedText,
+        content: params.renderedText,
+        provider: params.provider,
+        providerMessageId: params.providerMessageId,
+        errorCode: params.errorCode,
+        errorMessage: params.errorMessage,
+        sentAt: params.sentAt,
+        deliveredAt: params.deliveredAt,
+        readAt: params.readAt,
+        failedAt: params.failedAt,
+        metadata: params.metadata,
+      },
+    })
+  }
+
+  return prisma.whatsAppMessage.create({
+    data: {
+      orgId: params.orgId,
+      conversationId: params.conversationId,
+      customerId: params.customerId,
+      channel: MessageChannel.WHATSAPP,
+      direction: params.direction,
+      entityType: params.entityType,
+      entityId: params.entityId,
+      messageType: params.messageType,
+      messageKey: params.messageKey,
+      status: params.status,
+      toPhone: params.toPhone,
+      fromPhone: params.fromPhone,
+      renderedText: params.renderedText,
+      content: params.renderedText,
+      provider: params.provider,
+      providerMessageId: params.providerMessageId,
+      errorCode: params.errorCode,
+      errorMessage: params.errorMessage,
+      sentAt: params.sentAt,
+      deliveredAt: params.deliveredAt,
+      readAt: params.readAt,
+      failedAt: params.failedAt,
+      createdAt: params.createdAt,
+      metadata: params.metadata,
+    },
+  })
+}
+
 export async function seedPilot() {
   const now = new Date()
   const baseDate = atHour(now, 0, 0, 0)
@@ -864,6 +1053,34 @@ export async function seedPilot() {
   for (const customer of customerSeeds) {
     customers.push(await upsertCustomer(org.id, customer))
   }
+
+  const joaoSilva = await upsertCustomer(org.id, {
+    name: 'João Silva',
+    phone: '5511998877661',
+    email: 'joao.silva@cliente-piloto.com.br',
+    notes: 'Cliente piloto de cobrança no WhatsApp.',
+  })
+
+  const helenaMartins = await upsertCustomer(org.id, {
+    name: 'Helena Martins',
+    phone: '5511911345501',
+    email: 'helena.martins@cliente-piloto.com.br',
+    notes: 'Cliente piloto de confirmação de agendamento no WhatsApp.',
+  })
+
+  const carlosAlberto = await upsertCustomer(org.id, {
+    name: 'Carlos Alberto',
+    phone: '5511970012299',
+    email: 'carlos.alberto@cliente-piloto.com.br',
+    notes: 'Cliente piloto de atualização de ordem de serviço no WhatsApp.',
+  })
+
+  const beatrizLima = await upsertCustomer(org.id, {
+    name: 'Beatriz Lima',
+    phone: '5511985516633',
+    email: 'beatriz.lima@cliente-piloto.com.br',
+    notes: 'Cliente piloto para simulação de falha de envio no WhatsApp.',
+  })
 
   const appointments = await seedPilotAppointments({
     orgId: org.id,
@@ -1035,6 +1252,311 @@ export async function seedPilot() {
     dueDate: atHour(now, 2, 12, 0),
     status: ChargeStatus.PENDING,
     notes: 'OS concluída aguardando processamento no contas a pagar da escola.',
+  })
+
+  const chargeJoao = await upsertStandaloneCharge({
+    orgId: org.id,
+    customerId: joaoSilva.id,
+    amountCents: 48000,
+    dueDate: atHour(now, -3, 12, 0),
+    status: ChargeStatus.OVERDUE,
+    notes: 'Cobrança operacional piloto vencida há 3 dias.',
+  })
+
+  const appointmentHelena = await upsertAppointment({
+    idempotencyKey: `pilot:${org.id}:appointment:whatsapp:helena:amanha-14h`,
+    orgId: org.id,
+    customerId: helenaMartins.id,
+    startsAt: atHour(now, 1, 14, 0),
+    endsAt: atHour(now, 1, 15, 0),
+    status: AppointmentStatus.SCHEDULED,
+    notes: 'Agendamento piloto para confirmação via WhatsApp.',
+  })
+
+  const serviceOrderCarlos = await upsertServiceOrder({
+    orgId: org.id,
+    customerId: carlosAlberto.id,
+    assignedToPersonId: operatorPerson?.id,
+    title: 'OS-WHATSAPP-001 - Atendimento técnico em andamento',
+    description: 'Ordem de serviço operacional utilizada para timeline do WhatsApp.',
+    amountCents: 93000,
+    dueDate: atHour(now, 6, 18, 0),
+    status: ServiceOrderStatus.IN_PROGRESS,
+    priority: 2,
+    scheduledFor: atHour(now, 0, 10, 0),
+  })
+
+  const whatsappTemplates = [
+    {
+      key: 'appointment_confirmation',
+      name: 'Confirmação de agendamento',
+      messageType: WhatsAppMessageType.APPOINTMENT_CONFIRMATION,
+      body: 'Olá {{nome}}, seu agendamento está confirmado para {{data_hora}}.',
+    },
+    {
+      key: 'appointment_reminder',
+      name: 'Lembrete de agendamento',
+      messageType: WhatsAppMessageType.APPOINTMENT_REMINDER,
+      body: 'Olá {{nome}}, lembrando seu agendamento para {{data_hora}}.',
+    },
+    {
+      key: 'payment_reminder',
+      name: 'Lembrete de pagamento',
+      messageType: WhatsAppMessageType.PAYMENT_REMINDER,
+      body: 'Olá {{nome}}, identificamos uma cobrança em aberto no valor de {{valor}}.',
+    },
+    {
+      key: 'payment_link',
+      name: 'Envio de link de pagamento',
+      messageType: WhatsAppMessageType.PAYMENT_LINK,
+      body: 'Segue seu link para pagamento: {{link_pagamento}}',
+    },
+    {
+      key: 'payment_confirmation',
+      name: 'Confirmação de pagamento',
+      messageType: WhatsAppMessageType.PAYMENT_CONFIRMATION,
+      body: 'Pagamento confirmado com sucesso. Obrigado, {{nome}}!',
+    },
+    {
+      key: 'service_update',
+      name: 'Atualização de serviço',
+      messageType: WhatsAppMessageType.SERVICE_UPDATE,
+      body: 'Atualização da sua ordem de serviço: {{status_os}}.',
+    },
+    {
+      key: 'manual_followup',
+      name: 'Follow-up manual',
+      messageType: WhatsAppMessageType.MANUAL,
+      body: 'Olá {{nome}}, estamos acompanhando seu atendimento.',
+    },
+  ] as const
+
+  for (const template of whatsappTemplates) {
+    await upsertWhatsAppTemplate({
+      orgId: org.id,
+      key: template.key,
+      name: template.name,
+      messageType: template.messageType,
+      body: template.body,
+    })
+  }
+
+  const conversationChargeLastOutbound = atHour(now, -1, 10, 15)
+  const conversationChargeLastInbound = atHour(now, -1, 10, 18)
+  const chargeConversation = await upsertWhatsAppConversation({
+    orgId: org.id,
+    customerId: joaoSilva.id,
+    phone: joaoSilva.phone ?? '5511998877661',
+    title: 'Cobrança vencida - João Silva',
+    status: WhatsAppConversationStatus.PENDING,
+    priority: WhatsAppConversationPriority.HIGH,
+    contextType: WhatsAppContextType.CHARGE,
+    contextId: chargeJoao.id,
+    lastMessageAt: conversationChargeLastInbound,
+    lastOutboundAt: conversationChargeLastOutbound,
+    lastInboundAt: conversationChargeLastInbound,
+    unreadCount: 0,
+  })
+
+  await upsertWhatsAppMessage({
+    orgId: org.id,
+    conversationId: chargeConversation.id,
+    customerId: joaoSilva.id,
+    direction: WhatsAppDirection.OUTBOUND,
+    entityType: WhatsAppEntityType.CHARGE,
+    entityId: chargeJoao.id,
+    messageType: WhatsAppMessageType.PAYMENT_REMINDER,
+    messageKey: `pilot:${org.id}:wa:joao:cobranca:outbound`,
+    status: WhatsAppMessageStatus.DELIVERED,
+    toPhone: joaoSilva.phone ?? '5511998877661',
+    fromPhone: 'NEXOGESTAO',
+    renderedText: 'Olá João, segue o lembrete da cobrança em aberto.',
+    provider: 'mock-provider',
+    providerMessageId: `pilot-${org.slug}-joao-out-01`,
+    sentAt: conversationChargeLastOutbound,
+    deliveredAt: new Date(conversationChargeLastOutbound.getTime() + 30_000),
+    createdAt: conversationChargeLastOutbound,
+    metadata: { seedScenario: 'whatsapp_charge_overdue' },
+  })
+
+  await upsertWhatsAppMessage({
+    orgId: org.id,
+    conversationId: chargeConversation.id,
+    customerId: joaoSilva.id,
+    direction: WhatsAppDirection.INBOUND,
+    entityType: WhatsAppEntityType.CHARGE,
+    entityId: chargeJoao.id,
+    messageType: WhatsAppMessageType.MANUAL,
+    messageKey: `pilot:${org.id}:wa:joao:cobranca:inbound`,
+    status: WhatsAppMessageStatus.READ,
+    toPhone: 'NEXOGESTAO',
+    fromPhone: joaoSilva.phone ?? '5511998877661',
+    renderedText: 'Vou efetuar o pagamento hoje.',
+    provider: 'mock-provider',
+    providerMessageId: `pilot-${org.slug}-joao-in-01`,
+    sentAt: conversationChargeLastInbound,
+    deliveredAt: new Date(conversationChargeLastInbound.getTime() + 20_000),
+    readAt: new Date(conversationChargeLastInbound.getTime() + 60_000),
+    createdAt: conversationChargeLastInbound,
+    metadata: { seedScenario: 'whatsapp_charge_overdue' },
+  })
+
+  const appointmentLastOutbound = atHour(now, 0, 9, 10)
+  const appointmentLastInbound = atHour(now, 0, 9, 14)
+  const appointmentConversation = await upsertWhatsAppConversation({
+    orgId: org.id,
+    customerId: helenaMartins.id,
+    phone: helenaMartins.phone ?? '5511911345501',
+    title: 'Confirmação de agendamento - Helena Martins',
+    status: WhatsAppConversationStatus.PENDING,
+    priority: WhatsAppConversationPriority.HIGH,
+    contextType: WhatsAppContextType.APPOINTMENT,
+    contextId: appointmentHelena.id,
+    lastMessageAt: appointmentLastInbound,
+    lastOutboundAt: appointmentLastOutbound,
+    lastInboundAt: appointmentLastInbound,
+    unreadCount: 0,
+  })
+
+  await upsertWhatsAppMessage({
+    orgId: org.id,
+    conversationId: appointmentConversation.id,
+    customerId: helenaMartins.id,
+    direction: WhatsAppDirection.OUTBOUND,
+    entityType: WhatsAppEntityType.APPOINTMENT,
+    entityId: appointmentHelena.id,
+    messageType: WhatsAppMessageType.APPOINTMENT_REMINDER,
+    messageKey: `pilot:${org.id}:wa:helena:appointment:outbound`,
+    status: WhatsAppMessageStatus.DELIVERED,
+    toPhone: helenaMartins.phone ?? '5511911345501',
+    fromPhone: 'NEXOGESTAO',
+    renderedText:
+      'Olá Helena, passando para confirmar seu agendamento de amanhã às 14:00.',
+    provider: 'mock-provider',
+    providerMessageId: `pilot-${org.slug}-helena-out-01`,
+    sentAt: appointmentLastOutbound,
+    deliveredAt: new Date(appointmentLastOutbound.getTime() + 40_000),
+    createdAt: appointmentLastOutbound,
+    metadata: { seedScenario: 'whatsapp_appointment_pending' },
+  })
+
+  await upsertWhatsAppMessage({
+    orgId: org.id,
+    conversationId: appointmentConversation.id,
+    customerId: helenaMartins.id,
+    direction: WhatsAppDirection.INBOUND,
+    entityType: WhatsAppEntityType.APPOINTMENT,
+    entityId: appointmentHelena.id,
+    messageType: WhatsAppMessageType.MANUAL,
+    messageKey: `pilot:${org.id}:wa:helena:appointment:inbound`,
+    status: WhatsAppMessageStatus.DELIVERED,
+    toPhone: 'NEXOGESTAO',
+    fromPhone: helenaMartins.phone ?? '5511911345501',
+    renderedText: 'Obrigada, até amanhã.',
+    provider: 'mock-provider',
+    providerMessageId: `pilot-${org.slug}-helena-in-01`,
+    sentAt: appointmentLastInbound,
+    deliveredAt: new Date(appointmentLastInbound.getTime() + 15_000),
+    createdAt: appointmentLastInbound,
+    metadata: { seedScenario: 'whatsapp_appointment_pending' },
+  })
+
+  const serviceOrderLastOutbound = atHour(now, 0, 11, 25)
+  const serviceOrderLastInbound = atHour(now, 0, 11, 31)
+  const serviceOrderConversation = await upsertWhatsAppConversation({
+    orgId: org.id,
+    customerId: carlosAlberto.id,
+    phone: carlosAlberto.phone ?? '5511970012299',
+    title: 'Atualização de O.S. - Carlos Alberto',
+    status: WhatsAppConversationStatus.OPEN,
+    priority: WhatsAppConversationPriority.NORMAL,
+    contextType: WhatsAppContextType.SERVICE_ORDER,
+    contextId: serviceOrderCarlos.id,
+    lastMessageAt: serviceOrderLastInbound,
+    lastOutboundAt: serviceOrderLastOutbound,
+    lastInboundAt: serviceOrderLastInbound,
+    unreadCount: 0,
+  })
+
+  await upsertWhatsAppMessage({
+    orgId: org.id,
+    conversationId: serviceOrderConversation.id,
+    customerId: carlosAlberto.id,
+    direction: WhatsAppDirection.OUTBOUND,
+    entityType: WhatsAppEntityType.SERVICE_ORDER,
+    entityId: serviceOrderCarlos.id,
+    messageType: WhatsAppMessageType.SERVICE_UPDATE,
+    messageKey: `pilot:${org.id}:wa:carlos:service-order:outbound`,
+    status: WhatsAppMessageStatus.SENT,
+    toPhone: carlosAlberto.phone ?? '5511970012299',
+    fromPhone: 'NEXOGESTAO',
+    renderedText: 'Carlos, sua ordem de serviço está em andamento.',
+    provider: 'mock-provider',
+    providerMessageId: `pilot-${org.slug}-carlos-out-01`,
+    sentAt: serviceOrderLastOutbound,
+    deliveredAt: new Date(serviceOrderLastOutbound.getTime() + 45_000),
+    createdAt: serviceOrderLastOutbound,
+    metadata: { seedScenario: 'whatsapp_service_order_in_progress' },
+  })
+
+  await upsertWhatsAppMessage({
+    orgId: org.id,
+    conversationId: serviceOrderConversation.id,
+    customerId: carlosAlberto.id,
+    direction: WhatsAppDirection.INBOUND,
+    entityType: WhatsAppEntityType.SERVICE_ORDER,
+    entityId: serviceOrderCarlos.id,
+    messageType: WhatsAppMessageType.MANUAL,
+    messageKey: `pilot:${org.id}:wa:carlos:service-order:inbound`,
+    status: WhatsAppMessageStatus.DELIVERED,
+    toPhone: 'NEXOGESTAO',
+    fromPhone: carlosAlberto.phone ?? '5511970012299',
+    renderedText: 'Perfeito, obrigado.',
+    provider: 'mock-provider',
+    providerMessageId: `pilot-${org.slug}-carlos-in-01`,
+    sentAt: serviceOrderLastInbound,
+    deliveredAt: new Date(serviceOrderLastInbound.getTime() + 20_000),
+    createdAt: serviceOrderLastInbound,
+    metadata: { seedScenario: 'whatsapp_service_order_in_progress' },
+  })
+
+  const failedLastOutbound = atHour(now, 0, 8, 50)
+  const failedConversation = await upsertWhatsAppConversation({
+    orgId: org.id,
+    customerId: beatrizLima.id,
+    phone: beatrizLima.phone ?? '5511985516633',
+    title: 'Falha de envio - Beatriz Lima',
+    status: WhatsAppConversationStatus.FAILED,
+    priority: WhatsAppConversationPriority.HIGH,
+    contextType: WhatsAppContextType.GENERAL,
+    contextId: `pilot:${org.id}:general:beatriz-lima`,
+    lastMessageAt: failedLastOutbound,
+    lastOutboundAt: failedLastOutbound,
+    lastInboundAt: null,
+    unreadCount: 0,
+  })
+
+  await upsertWhatsAppMessage({
+    orgId: org.id,
+    conversationId: failedConversation.id,
+    customerId: beatrizLima.id,
+    direction: WhatsAppDirection.OUTBOUND,
+    entityType: WhatsAppEntityType.GENERAL,
+    entityId: `pilot:${org.id}:general:beatriz-lima`,
+    messageType: WhatsAppMessageType.MANUAL,
+    messageKey: `pilot:${org.id}:wa:beatriz:failed:outbound`,
+    status: WhatsAppMessageStatus.FAILED,
+    toPhone: beatrizLima.phone ?? '5511985516633',
+    fromPhone: 'NEXOGESTAO',
+    renderedText: 'Olá Beatriz, tentamos enviar uma atualização do seu atendimento.',
+    provider: 'mock-provider',
+    providerMessageId: `pilot-${org.slug}-beatriz-out-01`,
+    errorCode: 'PROVIDER_MOCK_FAILED',
+    errorMessage: 'Falha simulada de envio no provider mock',
+    sentAt: failedLastOutbound,
+    failedAt: new Date(failedLastOutbound.getTime() + 35_000),
+    createdAt: failedLastOutbound,
+    metadata: { seedScenario: 'whatsapp_failed_delivery' },
   })
 
   const year = now.getFullYear()
@@ -1409,6 +1931,48 @@ export async function seedPilot() {
       amountCents: pendingStandaloneCharge.amountCents,
       dueDate: pendingStandaloneCharge.dueDate.toISOString(),
       status: pendingStandaloneCharge.status,
+    },
+  })
+
+  await createTimelineIfMissing({
+    orgId: org.id,
+    action: 'WHATSAPP_MESSAGE_SENT',
+    description: 'Mensagem de cobrança enviada para João Silva.',
+    personId: financePerson?.id,
+    customerId: joaoSilva.id,
+    chargeId: chargeJoao.id,
+    metadata: {
+      channel: 'WHATSAPP',
+      contextType: 'CHARGE',
+      conversationStatus: 'PENDING',
+    },
+  })
+
+  await createTimelineIfMissing({
+    orgId: org.id,
+    action: 'WHATSAPP_INBOUND_RECEIVED',
+    description: 'Resposta recebida de Helena Martins confirmando agendamento.',
+    personId: operatorPerson?.id,
+    customerId: helenaMartins.id,
+    appointmentId: appointmentHelena.id,
+    metadata: {
+      channel: 'WHATSAPP',
+      contextType: 'APPOINTMENT',
+      conversationStatus: 'PENDING',
+    },
+  })
+
+  await createTimelineIfMissing({
+    orgId: org.id,
+    action: 'WHATSAPP_MESSAGE_FAILED',
+    description: 'Falha simulada no envio de mensagem para Beatriz Lima.',
+    personId: operatorPerson?.id,
+    customerId: beatrizLima.id,
+    metadata: {
+      channel: 'WHATSAPP',
+      contextType: 'GENERAL',
+      errorMessage: 'Falha simulada de envio no provider mock',
+      conversationStatus: 'FAILED',
     },
   })
 
