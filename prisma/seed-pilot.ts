@@ -1415,7 +1415,7 @@ export async function seedPilot() {
     lastMessageAt: appointmentLastInbound,
     lastOutboundAt: appointmentLastOutbound,
     lastInboundAt: appointmentLastInbound,
-    unreadCount: 0,
+    unreadCount: 1,
   })
 
   await upsertWhatsAppMessage({
@@ -1475,7 +1475,7 @@ export async function seedPilot() {
     lastMessageAt: serviceOrderLastInbound,
     lastOutboundAt: serviceOrderLastOutbound,
     lastInboundAt: serviceOrderLastInbound,
-    unreadCount: 0,
+    unreadCount: 1,
   })
 
   await upsertWhatsAppMessage({
@@ -1959,6 +1959,20 @@ export async function seedPilot() {
       channel: 'WHATSAPP',
       contextType: 'APPOINTMENT',
       conversationStatus: 'PENDING',
+    },
+  })
+
+  await createTimelineIfMissing({
+    orgId: org.id,
+    action: 'WHATSAPP_MESSAGE_SENT',
+    description: 'Atualização de O.S. enviada para Carlos Alberto.',
+    personId: operatorPerson?.id,
+    customerId: carlosAlberto.id,
+    serviceOrderId: serviceOrderCarlos.id,
+    metadata: {
+      channel: 'WHATSAPP',
+      contextType: 'SERVICE_ORDER',
+      conversationStatus: 'OPEN',
     },
   })
 
