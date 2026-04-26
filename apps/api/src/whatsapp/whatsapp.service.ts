@@ -40,10 +40,15 @@ export class WhatsAppService {
   ) {}
 
   async listConversations(orgId: string, filters: any = {}) {
+    const statusFilter =
+      filters.status
+      ?? (filters.onlyFailed ? 'FAILED' : undefined)
+      ?? (filters.onlyPending ? 'PENDING' : undefined)
+
     const where: Prisma.WhatsAppConversationWhereInput = {
       orgId,
       customerId: filters.customerId ?? undefined,
-      status: filters.status ?? undefined,
+      status: statusFilter,
       priority: filters.priority ?? undefined,
       contextType: filters.contextType ?? undefined,
       unreadCount: filters.onlyUnread ? { gt: 0 } : undefined,
@@ -225,9 +230,19 @@ export class WhatsAppService {
     return this.prisma.whatsAppConversation.updateMany({ where: { id: conversationId, orgId }, data: { status: 'PENDING' } })
   }
 
+  async updateConversationStatus(orgId: string, conversationId: string, status: WhatsAppConversationStatus) {
+    return this.prisma.whatsAppConversation.updateMany({
+      where: { id: conversationId, orgId },
+      data: { status },
+    })
+  }
+
   async retryFailedMessage(orgId: string, messageId: string) {
     const message = await this.prisma.whatsAppMessage.findFirst({ where: { id: messageId, orgId } })
     if (!message) throw new BadRequestException('Mensagem não encontrada')
+    if (message.status !== 'FAILED') {
+      throw new BadRequestException('Apenas mensagens com status FAILED podem ser reenviadas')
+    }
 
     await this.prisma.whatsAppMessage.update({ where: { id: messageId }, data: { status: 'QUEUED', failedAt: null, errorMessage: null, errorCode: null } })
     await this.queueService.addJob(QUEUE_NAMES.WHATSAPP, 'dispatch-message', { messageId }, { jobId: `whatsapp:dispatch:retry:${messageId}` })

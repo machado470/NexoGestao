@@ -895,10 +895,6 @@ export default function WhatsAppPage() {
       await refreshAll();
       toast.success(`Conversa atualizada para ${status}.`);
     } catch (error: any) {
-      if (status === "OPEN") {
-        toast.error("Reabertura ainda não suportada pelo backend atual.");
-        return;
-      }
       toast.error(error?.message ?? "Falha ao atualizar conversa.");
     }
   };

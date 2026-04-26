@@ -29,7 +29,7 @@
     "dev:logs": "./scripts/dev-logs.sh"
   },
   "prisma": {
-    "seed": "tsx prisma/seed-pilot.ts"
+    "seed": "tsx prisma/seed.ts"
   },
   "devDependencies": {
     "prisma": "5.22.0",

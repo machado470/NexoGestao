@@ -97,9 +97,8 @@ export class WhatsAppController {
     @Param('id') id: string,
     @Body('status') status: WhatsAppConversationStatus,
   ) {
-    if (status === 'RESOLVED') return this.whatsapp.markConversationResolved(orgId, id)
-    if (status === 'PENDING') return this.whatsapp.markConversationPending(orgId, id)
-    throw new BadRequestException('status deve ser RESOLVED ou PENDING')
+    if (!status) throw new BadRequestException('status é obrigatório')
+    return this.whatsapp.updateConversationStatus(orgId, id, status)
   }
 
   @Post('webhook/:provider')
