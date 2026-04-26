@@ -7,8 +7,6 @@ import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { Button } from "@/components/design-system";
 import { FormModal } from "@/components/app-modal-system";
 import {
-  AppEmptyState,
-  AppErrorState,
   AppField,
   AppForm,
   AppInput,
@@ -19,6 +17,14 @@ import {
   AppTimelineItem,
 } from "@/components/app-system";
 import CreateServiceOrderModal from "@/components/CreateServiceOrderModal";
+import {
+  AppFiltersBar,
+  AppOperationalHeader,
+  AppPageEmptyState,
+  AppPageErrorState,
+  AppPageLoadingState,
+  AppSectionBlock,
+} from "@/components/internal-page-system";
 
 type AppointmentStatus = "SCHEDULED" | "CONFIRMED" | "CANCELED" | "DONE" | "NO_SHOW";
 type FilterKey = "all" | "today" | "tomorrow" | "week" | "unconfirmed" | "confirmed" | "overdue" | "canceled";
@@ -152,7 +158,6 @@ export default function AppointmentsPage() {
   const tomorrowStart = new Date(dayStart); tomorrowStart.setDate(tomorrowStart.getDate() + 1);
   const tomorrowEnd = new Date(dayEnd); tomorrowEnd.setDate(tomorrowEnd.getDate() + 1);
   const weekEnd = new Date(dayEnd); weekEnd.setDate(weekEnd.getDate() + 7);
-  const periodStart = new Date(dayStart); periodStart.setDate(periodStart.getDate() - 7);
 
   const mapped = useMemo(() => appointments.map((item) => {
     const start = asDate(item.startsAt);
@@ -204,13 +209,6 @@ export default function AppointmentsPage() {
   }, [queryParams.appointmentId, filtered, selectedAppointmentId]);
 
   const selected = filtered.find((row) => String(row.item.id ?? "") === String(selectedAppointmentId ?? "")) ?? null;
-
-  const stats = useMemo(() => ({
-    unconfirmed: mapped.filter((row) => row.status === "SCHEDULED").length,
-    soon: mapped.filter((row) => row.startsSoon).length,
-    overdue: mapped.filter((row) => row.isOverdue).length,
-    canceled: mapped.filter((row) => row.status === "CANCELED" && row.start && row.start >= periodStart).length,
-  }), [mapped, periodStart]);
 
   const [form, setForm] = useState({ customerId: "", date: "", time: "", status: "SCHEDULED" as AppointmentStatus, notes: "", assignedToPersonId: "", durationMinutes: "60" });
 
@@ -295,87 +293,185 @@ export default function AppointmentsPage() {
       subtitle="controle do tempo, confirmação e preparação da execução"
       primaryAction={<Button className="bg-orange-500 text-white hover:bg-orange-400" onClick={() => { setEditing(null); setOpenModal(true); }}>Novo agendamento</Button>}
     >
-      <div className="space-y-4">
-        <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4">
-          <h1 className="text-xl font-semibold text-[var(--text-primary)]">Agendamentos</h1>
-          <p className="text-sm text-[var(--text-muted)]">controle do tempo, confirmação e preparação da execução</p>
-          <p className="mt-2 text-sm text-[var(--text-secondary)]">Total real: {mapped.length} agendamento(s)</p>
-        </section>
+      <div className="flex flex-col gap-3">
+        <AppOperationalHeader
+          title="Agendamentos"
+          description="Controle do tempo, confirmação e preparação da execução."
+          primaryAction={
+            <Button className="bg-orange-500 text-white hover:bg-orange-400" onClick={() => { setEditing(null); setOpenModal(true); }}>
+              Novo agendamento
+            </Button>
+          }
+        >
+          <div className="grid gap-2 md:grid-cols-[1fr_auto]">
+            <AppInput
+              value={queryText}
+              onChange={(event) => setQueryText(event.target.value)}
+              placeholder="Buscar cliente, observação ou serviço"
+              className="h-9"
+            />
+            <div className="flex h-9 items-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 text-xs text-[var(--text-secondary)]">
+              {mapped.length} agendamento(s)
+            </div>
+          </div>
+        </AppOperationalHeader>
 
-        <section className="grid gap-3 md:grid-cols-4">
-          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3"><p className="text-xs text-[var(--text-muted)]">Não confirmados</p><p className="text-lg font-semibold">{stats.unconfirmed}</p></div>
-          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3"><p className="text-xs text-[var(--text-muted)]">Próximos</p><p className="text-lg font-semibold">{stats.soon}</p></div>
-          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3"><p className="text-xs text-[var(--text-muted)]">Atrasados</p><p className="text-lg font-semibold">{stats.overdue}</p></div>
-          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3"><p className="text-xs text-[var(--text-muted)]">Cancelados (período)</p><p className="text-lg font-semibold">{stats.canceled}</p></div>
-        </section>
-
-        <section className="flex flex-wrap gap-2">
+        <AppFiltersBar className="shrink-0 gap-2 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-3">
           {FILTERS.map((filter) => (
-            <button key={filter.key} type="button" onClick={() => setSelectedFilter(filter.key)} className={`rounded-full border px-3 py-1 text-xs ${selectedFilter === filter.key ? "border-orange-400 text-orange-300" : "border-[var(--border-subtle)] text-[var(--text-muted)]"}`}>
+            <button
+              key={filter.key}
+              type="button"
+              onClick={() => setSelectedFilter(filter.key)}
+              className={`h-8 rounded-md px-3 text-xs font-medium transition-colors ${
+                selectedFilter === filter.key
+                  ? "bg-[var(--accent-soft)] text-[var(--accent-primary)]"
+                  : "bg-[var(--surface-subtle)] text-[var(--text-secondary)]"
+              }`}
+            >
               {filter.label}
             </button>
           ))}
-          <AppInput value={queryText} onChange={(event) => setQueryText(event.target.value)} placeholder="Buscar cliente, observação, serviço" className="ml-auto w-full md:w-72" />
-        </section>
+        </AppFiltersBar>
 
         {successMessage ? <p className="text-sm text-emerald-400">{successMessage}</p> : null}
 
-        {loading ? <p className="text-sm text-[var(--text-muted)]">Carregando agendamentos...</p> : null}
-        {hasError ? <AppErrorState message="Erro ao carregar dados operacionais de agendamentos." /> : null}
-        {!loading && !hasError && mapped.length === 0 ? <AppEmptyState title="Sem agendamentos" description="Não há agendamentos cadastrados no backend para este ambiente." /> : null}
-        {!loading && !hasError && mapped.length > 0 && filtered.length === 0 ? <AppEmptyState title="Busca sem resultado" description="Nenhum agendamento encontrado para o filtro atual." /> : null}
-
-        {!loading && !hasError && filtered.length > 0 ? (
-          <section className="space-y-3">
-            {filtered.map((row) => {
-              const status = mapStatus(row.item.status);
-              const orderId = row.order?.id ? String(row.order.id) : null;
-              return (
-                <article key={String(row.item.id)} className={`rounded-2xl border p-4 ${selectedAppointmentId === String(row.item.id) ? "border-orange-400" : "border-[var(--border-subtle)]"}`}>
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <button type="button" className="space-y-1 text-left" onClick={() => setSelectedAppointmentId(String(row.item.id ?? ""))}>
-                      <p className="text-sm font-medium text-[var(--text-primary)]">{formatDateTime(row.item.startsAt)} · {row.customerName}</p>
-                      <p className="text-xs text-[var(--text-muted)]">{row.item.title || row.item.notes || "Sem observação"}</p>
-                      <p className="text-xs text-[var(--text-muted)]">Responsável: {row.ownerName} · Duração: {durationLabel(row.item.startsAt, row.item.endsAt)}</p>
-                      <p className="text-xs text-[var(--text-muted)]">{orderId ? `O.S. #${orderId}` : "sem O.S."}</p>
-                    </button>
-                    <div className="flex items-center gap-2">
-                      <AppStatusBadge label={status.label} tone={status.tone} />
-                      <AppRowActionsDropdown
-                        triggerLabel="Ações do agendamento"
-                        items={[
-                          { label: "Confirmar", onSelect: () => void updateStatus(String(row.item.id), "CONFIRMED"), disabled: !row.item.id, tone: "primary" },
-                          { label: "Cancelar", onSelect: () => void updateStatus(String(row.item.id), "CANCELED"), disabled: !row.item.id },
-                          { label: "Editar/Remarcar", onSelect: () => { setEditing(row.item); setOpenModal(true); }, disabled: !row.item.id },
-                          { label: "Criar O.S.", onSelect: () => { setSelectedAppointmentId(String(row.item.id)); setOpenServiceOrderModal(true); }, disabled: !row.item.id },
-                          { type: "separator" },
-                          { label: "Abrir cliente", onSelect: () => navigate(`/customers?customerId=${row.customerId}`), disabled: !row.customerId },
-                          { label: "Enviar WhatsApp", onSelect: () => navigate(`/whatsapp?customerId=${row.customerId}&appointmentId=${row.item.id}`), disabled: !row.customerId || !row.item.id },
-                          { label: "Abrir O.S.", onSelect: () => orderId ? navigate(`/service-orders?customerId=${row.customerId}&appointmentId=${row.item.id}`) : undefined, disabled: !orderId },
-                        ]}
-                      />
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
-          </section>
-        ) : null}
-
-        <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4">
-          <h2 className="text-base font-semibold text-[var(--text-primary)]">Detalhe do agendamento</h2>
-          {!selected ? (
-            <p className="mt-2 text-sm text-[var(--text-muted)]">Selecione um agendamento para ver contexto operacional.</p>
+        <AppSectionBlock
+          title="Carteira operacional"
+          subtitle="Visão compacta de execução com leitura rápida por card."
+          className="flex flex-col"
+        >
+          {loading ? (
+            <AppPageLoadingState description="Carregando agendamentos..." />
+          ) : hasError ? (
+            <AppPageErrorState
+              description="Erro ao carregar dados operacionais de agendamentos."
+              actionLabel="Tentar novamente"
+              onAction={() => {
+                void Promise.all([
+                  appointmentsQuery.refetch(),
+                  customersQuery.refetch(),
+                  peopleQuery.refetch(),
+                  serviceOrdersQuery.refetch(),
+                ]);
+              }}
+            />
+          ) : mapped.length === 0 ? (
+            <AppPageEmptyState
+              title="Sem agendamentos"
+              description="Não há agendamentos cadastrados no backend para este ambiente."
+            />
+          ) : filtered.length === 0 ? (
+            <AppPageEmptyState
+              title="Busca sem resultado"
+              description="Nenhum agendamento encontrado para o filtro atual."
+            />
           ) : (
-            <div className="mt-3 space-y-2 text-sm">
-              <p><strong>Cliente:</strong> {selected.customerName}</p>
-              <p><strong>Data/hora:</strong> {formatDateTime(selected.item.startsAt)}</p>
-              <p><strong>Status:</strong> {mapStatus(selected.item.status).label}</p>
-              <p><strong>Observações:</strong> {selected.item.notes || "—"}</p>
-              <p><strong>Responsável:</strong> {selected.ownerName}</p>
-              <p><strong>O.S. vinculada:</strong> {selected.order?.id ? `#${selected.order.id}` : "sem O.S."}</p>
+            <div className="grid grid-cols-1 gap-2 lg:grid-cols-2 2xl:grid-cols-3">
+              {filtered.map((row) => {
+                const status = mapStatus(row.item.status);
+                const orderId = row.order?.id ? String(row.order.id) : null;
+                const appointmentId = String(row.item.id ?? "");
+                const isSelected = selectedAppointmentId === appointmentId;
+                return (
+                  <article
+                    key={appointmentId}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setSelectedAppointmentId(appointmentId)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        setSelectedAppointmentId(appointmentId);
+                      }
+                    }}
+                    className={`rounded-lg border p-3 transition-colors ${
+                      isSelected
+                        ? "border-orange-500 bg-[var(--accent-soft)]/30"
+                        : "border-[var(--border-subtle)] bg-[var(--surface-base)] hover:bg-[var(--surface-subtle)]/60"
+                    }`}
+                  >
+                    <div className="flex min-w-0 items-start gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <p className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--text-primary)]">
+                            {row.customerName}
+                          </p>
+                          <span className="shrink-0 whitespace-nowrap">
+                            <AppStatusBadge label={status.label} tone={status.tone} />
+                          </span>
+                        </div>
 
-              <div className="flex flex-wrap gap-2 pt-2">
+                        <p className="mt-0.5 truncate text-[11px] text-[var(--text-secondary)]">
+                          {formatDateTime(row.item.startsAt)}
+                        </p>
+                        <p className="mt-2 truncate text-xs text-[var(--text-secondary)]">
+                          {row.item.title || row.item.notes || "Sem observação"}
+                        </p>
+                        <p className="mt-1 truncate text-xs text-[var(--text-secondary)]">
+                          Responsável: <span className="text-[var(--text-primary)]">{row.ownerName}</span>
+                        </p>
+                        <p className="mt-1 truncate text-xs text-[var(--text-secondary)]">
+                          Duração: <span className="text-[var(--text-primary)]">{durationLabel(row.item.startsAt, row.item.endsAt)}</span>
+                        </p>
+                        <p className="mt-1 truncate text-xs text-[var(--text-secondary)]">
+                          {orderId ? `O.S. #${orderId}` : "Sem O.S."}
+                        </p>
+                      </div>
+
+                      <div className="shrink-0" onClick={(event) => event.stopPropagation()}>
+                        <AppRowActionsDropdown
+                          triggerLabel="Ações do agendamento"
+                          items={[
+                            { label: "Confirmar", onSelect: () => void updateStatus(String(row.item.id), "CONFIRMED"), disabled: !row.item.id, tone: "primary" },
+                            { label: "Cancelar", onSelect: () => void updateStatus(String(row.item.id), "CANCELED"), disabled: !row.item.id },
+                            { label: "Editar/Remarcar", onSelect: () => { setEditing(row.item); setOpenModal(true); }, disabled: !row.item.id },
+                            { label: "Criar O.S.", onSelect: () => { setSelectedAppointmentId(String(row.item.id)); setOpenServiceOrderModal(true); }, disabled: !row.item.id },
+                            { type: "separator" },
+                            { label: "Abrir cliente", onSelect: () => navigate(`/customers?customerId=${row.customerId}`), disabled: !row.customerId },
+                            { label: "Enviar WhatsApp", onSelect: () => navigate(`/whatsapp?customerId=${row.customerId}&appointmentId=${row.item.id}`), disabled: !row.customerId || !row.item.id },
+                            { label: "Abrir O.S.", onSelect: () => orderId ? navigate(`/service-orders?customerId=${row.customerId}&appointmentId=${row.item.id}`) : undefined, disabled: !orderId },
+                          ]}
+                        />
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </AppSectionBlock>
+
+        <AppSectionBlock
+          title="Detalhe do agendamento"
+          subtitle="Resumo, histórico e ações operacionais do agendamento selecionado."
+          className="flex flex-col"
+        >
+          {!selected ? (
+            <AppPageEmptyState
+              title="Selecione um agendamento"
+              description="Escolha um card da carteira para abrir os detalhes operacionais."
+            />
+          ) : (
+            <div className="space-y-3">
+              <article className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/35 p-3">
+                <p className="text-sm font-semibold text-[var(--text-primary)]">
+                  {selected.customerName}
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                  {formatDateTime(selected.item.startsAt)} · {mapStatus(selected.item.status).label}
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  Responsável: {selected.ownerName} · Duração: {durationLabel(selected.item.startsAt, selected.item.endsAt)}
+                </p>
+                <p className="mt-2 text-xs text-[var(--text-secondary)]">
+                  Observações: {selected.item.notes || "—"}
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                  O.S. vinculada: {selected.order?.id ? `#${selected.order.id}` : "sem O.S."}
+                </p>
+              </article>
+
+              <div className="flex flex-wrap gap-2">
                 <Button size="sm" onClick={() => void updateStatus(String(selected.item.id), "CONFIRMED")} disabled={!selected.item.id}>Confirmar</Button>
                 <Button size="sm" variant="outline" onClick={() => void updateStatus(String(selected.item.id), "CANCELED")} disabled={!selected.item.id}>Cancelar</Button>
                 <Button size="sm" variant="outline" onClick={() => { setEditing(selected.item); setOpenModal(true); }} disabled={!selected.item.id}>Remarcar/Editar</Button>
@@ -384,7 +480,7 @@ export default function AppointmentsPage() {
                 <Button size="sm" variant="outline" onClick={() => navigate(`/customers?customerId=${selected.customerId}`)} disabled={!selected.customerId}>Abrir cliente</Button>
               </div>
 
-              <div className="pt-2">
+              <div className="pt-1">
                 <p className="mb-2 text-xs uppercase text-[var(--text-muted)]">Timeline / histórico</p>
                 {queryParams.customerId ? (
                   <AppTimeline>
@@ -402,7 +498,7 @@ export default function AppointmentsPage() {
               </div>
             </div>
           )}
-        </section>
+        </AppSectionBlock>
       </div>
 
       <FormModal
