@@ -26,7 +26,6 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/design-system";
 import { AppPageShell, AppSkeleton } from "@/components/app-system";
 import {
-  AppPageErrorState,
   AppPageLoadingState,
 } from "@/components/internal-page-system";
 
@@ -286,7 +285,7 @@ function ConversationsList({
   hasError,
 }: {
   rows: Conversation[];
-  selectedId: string;
+  selectedId: string | null;
   onSelect: (id: string) => void;
   filter: ConversationFilter;
   onFilter: (next: ConversationFilter) => void;
@@ -412,6 +411,18 @@ function ChatPanel({
     node.scrollTop = node.scrollHeight;
   }, [conversation?.id, messages.length]);
 
+  if (!conversation) {
+    return (
+      <section className="flex h-full min-h-0 min-w-0 items-center justify-center overflow-hidden bg-white/[0.015]">
+        <div className="text-center">
+          <p className="text-sm font-semibold">Selecione uma conversa</p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">Escolha uma conversa para continuar.</p>
+        </div>
+        {error ? <p className="absolute bottom-2 px-3 pb-2 text-[11px] text-rose-300">{error}</p> : null}
+      </section>
+    );
+  }
+
   return (
     <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-white/[0.015]">
       <header className="shrink-0 flex items-center justify-between px-4 py-2.5">
@@ -438,9 +449,7 @@ function ChatPanel({
       </header>
 
       <div ref={messagesRef} className="scrollbar-thin-nexo flex-1 min-h-0 overflow-y-auto bg-transparent px-5 pb-1 pt-4">
-        {!conversation ? (
-          <div className="px-1 py-4 text-xs text-[var(--text-muted)]">Selecione uma conversa para continuar.</div>
-        ) : isLoading ? (
+        {isLoading ? (
           <div className="space-y-3">
             {Array.from({ length: 5 }).map((_, idx) => (
               <AppSkeleton key={idx} className="h-12 rounded-xl" />
@@ -477,51 +486,46 @@ function ChatPanel({
         )}
       </div>
 
-      {conversation ? (
-        <>
-          <div className="shrink-0 flex flex-wrap items-center gap-2 bg-white/[0.02] px-3 py-2">
-            {TEMPLATES.map(template => (
-              <Button
-                key={template}
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-8 rounded-lg border-white/[0.08] bg-white/[0.02] text-[11px] hover:bg-white/[0.05]"
-                onClick={() => setContent(template)}
-              >
-                {template}
-              </Button>
-            ))}
-          </div>
+      <div className="shrink-0 flex flex-wrap items-center gap-2 bg-white/[0.02] px-3 py-2">
+        {TEMPLATES.map(template => (
+          <Button
+            key={template}
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-8 rounded-lg border-white/[0.08] bg-white/[0.02] text-[11px] hover:bg-white/[0.05]"
+            onClick={() => setContent(template)}
+          >
+            {template}
+          </Button>
+        ))}
+      </div>
 
-          <footer className="shrink-0 mt-0 flex items-center gap-1.5 overflow-x-hidden bg-white/[0.02] px-3 py-2.5">
-            <button type="button" className="rounded-lg p-2 hover:bg-white/10">
-              <MessageCircleMore className="size-4" />
-            </button>
-            <button type="button" className="rounded-lg p-2 hover:bg-white/10">
-              <Paperclip className="size-4" />
-            </button>
-            <input
-              value={content}
-              onChange={event => setContent(event.target.value)}
-              placeholder="Digite sua mensagem..."
-              className="h-9 min-w-0 flex-1 rounded-lg bg-white/[0.02] px-3 text-sm outline-none placeholder:text-[var(--text-muted)]/70"
-            />
-            <Button
-              type="button"
-              size="sm"
-              disabled={!conversation}
-              className="h-9 rounded-full bg-emerald-600/85 px-3 hover:bg-emerald-500 disabled:opacity-50"
-              onClick={sendMessage}
-            >
-              <Send className="size-3.5" />
-            </Button>
-            <button type="button" className="shrink-0 rounded-lg p-2 hover:bg-white/10">
-              <Volume2 className="size-4" />
-            </button>
-          </footer>
-        </>
-      ) : null}
+      <footer className="shrink-0 mt-0 flex items-center gap-1.5 overflow-x-hidden bg-white/[0.02] px-3 py-2.5">
+        <button type="button" className="rounded-lg p-2 hover:bg-white/10">
+          <MessageCircleMore className="size-4" />
+        </button>
+        <button type="button" className="rounded-lg p-2 hover:bg-white/10">
+          <Paperclip className="size-4" />
+        </button>
+        <input
+          value={content}
+          onChange={event => setContent(event.target.value)}
+          placeholder="Digite sua mensagem..."
+          className="h-9 min-w-0 flex-1 rounded-lg bg-white/[0.02] px-3 text-sm outline-none placeholder:text-[var(--text-muted)]/70"
+        />
+        <Button
+          type="button"
+          size="sm"
+          className="h-9 rounded-full bg-emerald-600/85 px-3 hover:bg-emerald-500"
+          onClick={sendMessage}
+        >
+          <Send className="size-3.5" />
+        </Button>
+        <button type="button" className="shrink-0 rounded-lg p-2 hover:bg-white/10">
+          <Volume2 className="size-4" />
+        </button>
+      </footer>
       {error ? <p className="px-3 pb-2 text-[11px] text-rose-300">{error}</p> : null}
     </section>
   );
@@ -544,15 +548,21 @@ function ContextPanel({
   onSendReminder: () => void;
   onMoreActions: () => void;
 }) {
-  const hasCharge = Boolean(context?.openCharge?.id);
+  if (!conversation || !context) {
+    return (
+      <aside className="scrollbar-thin-nexo h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden bg-white/[0.015] p-2.5" id="whatsapp-context-panel">
+        <div className="px-1 py-4 text-xs text-[var(--text-muted)]">Sem contexto ativo.</div>
+      </aside>
+    );
+  }
+
+  const hasCharge = Boolean(context.openCharge?.id);
   const hasAppointment = Boolean(context?.nextAppointment?.id);
   const hasServiceOrder = Boolean(context?.activeServiceOrder?.id);
 
   return (
     <aside className="scrollbar-thin-nexo h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden bg-white/[0.015] p-2.5" id="whatsapp-context-panel">
-      {!conversation ? (
-        <div className="px-1 py-4 text-xs text-[var(--text-muted)]">Sem contexto ativo.</div>
-      ) : isLoading ? (
+      {isLoading ? (
         <div className="space-y-3">
           {Array.from({ length: 5 }).map((_, idx) => (
             <AppSkeleton key={idx} className="h-20 rounded-xl" />
@@ -663,9 +673,9 @@ export default function WhatsAppPage() {
   const [location, setLocation] = useLocation();
   const searchParams = new URLSearchParams(location.split("?")[1] ?? "");
 
-  const [selectedConversationId, setSelectedConversationId] = useOperationalMemoryState(
+  const [selectedConversationId, setSelectedConversationId] = useOperationalMemoryState<string | null>(
     "nexo.whatsapp.selected-conversation.v1",
-    searchParams.get("conversationId") ?? ""
+    searchParams.get("conversationId") ?? null
   );
   const [searchTerm, setSearchTerm] = useOperationalMemoryState("nexo.whatsapp.search.v2", "");
   const [activeFilter, setActiveFilter] = useOperationalMemoryState<ConversationFilter>(
@@ -710,8 +720,12 @@ export default function WhatsAppPage() {
   );
 
   useEffect(() => {
-    if (selectedConversationId && !conversations.some(item => item.id === selectedConversationId)) {
-      setSelectedConversationId(conversations[0]?.id ?? "");
+    if (conversations.length === 0) {
+      if (selectedConversationId !== null) setSelectedConversationId(null);
+      return;
+    }
+    if (!selectedConversationId || !conversations.some(item => item.id === selectedConversationId)) {
+      setSelectedConversationId(conversations[0]?.id ?? null);
     }
   }, [conversations, selectedConversationId, setSelectedConversationId]);
 
@@ -723,16 +737,16 @@ export default function WhatsAppPage() {
   }, [selectedConversationId, setContent]);
 
   const conversationDetailsQuery = trpc.nexo.whatsapp.getConversation.useQuery(
-    { id: selectedConversationId },
+    { id: selectedConversationId ?? "" },
     { enabled: Boolean(selectedConversationId), retry: false }
   );
 
   const messagesQuery = trpc.nexo.whatsapp.getMessages.useQuery(
-    { conversationId: selectedConversationId },
+    { conversationId: selectedConversationId ?? "" },
     { enabled: Boolean(selectedConversationId), retry: false }
   );
   const contextQuery = trpc.nexo.whatsapp.getContext.useQuery(
-    { conversationId: selectedConversationId },
+    { conversationId: selectedConversationId ?? "" },
     { enabled: Boolean(selectedConversationId), retry: false }
   );
 
@@ -742,10 +756,10 @@ export default function WhatsAppPage() {
   const retryMessageMutation = trpc.nexo.whatsapp.retryMessage.useMutation();
 
   const messages = useMemo(
-    () => (Array.isArray(messagesQuery.data) ? messagesQuery.data.map(mapMessage).reverse() : []),
-    [messagesQuery.data]
+    () => (selectedConversationId && Array.isArray(messagesQuery.data) ? messagesQuery.data.map(mapMessage).reverse() : []),
+    [messagesQuery.data, selectedConversationId]
   );
-  const context = (contextQuery.data ?? null) as WhatsAppContext | null;
+  const context = (selectedConversationId ? contextQuery.data ?? null : null) as WhatsAppContext | null;
 
   const refreshAll = async () => {
     await Promise.all([
@@ -794,6 +808,7 @@ export default function WhatsAppPage() {
   };
 
   const handleTemplateChip = (template: string) => {
+    if (!selectedConversationId) return;
     setContent(buildTemplateText(template, context));
   };
 
@@ -913,18 +928,6 @@ export default function WhatsAppPage() {
     );
   }
 
-  if (conversationsQuery.error && conversations.length === 0) {
-    return (
-      <AppPageShell>
-        <AppPageErrorState
-          description="Não foi possível carregar a operação de WhatsApp."
-          actionLabel="Tentar novamente"
-          onAction={() => void conversationsQuery.refetch()}
-        />
-      </AppPageShell>
-    );
-  }
-
   return (
     <AppPageShell className="h-[calc(100vh-5rem)] min-h-0 overflow-hidden bg-[#0B111C] px-3 pb-0 pt-3">
       <div className="grid h-full min-h-0 grid-cols-1 gap-4 overflow-hidden bg-transparent xl:grid-cols-[minmax(260px,300px)_minmax(0,1fr)_minmax(280px,320px)]">
@@ -950,6 +953,7 @@ export default function WhatsAppPage() {
             sendMessage={handleManualSend}
             content={content}
             setContent={value => {
+              if (!selectedConversationId) return;
               const mapping: Record<string, string> = {
                 "Confirmação de agendamento": buildTemplateText("Confirmação de agendamento", context),
                 Lembrete: buildTemplateText("Lembrete", context),
@@ -967,7 +971,7 @@ export default function WhatsAppPage() {
               setLocalFavorites(prev => ({ ...prev, [selectedConversationId]: !prev[selectedConversationId] }));
               // TODO: conectar favorite quando Conversation tiver campo isFavorite
             }}
-            isFavorite={Boolean(localFavorites[selectedConversationId])}
+            isFavorite={Boolean(localFavorites[selectedConversationId ?? ""])}
             onInfo={() => {
               setIsContextVisible(true);
               document.getElementById("whatsapp-context-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
