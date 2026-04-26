@@ -401,7 +401,7 @@ export default function ServiceOrdersPage() {
         title="Ordens de Serviço"
         subtitle="Execução, status e cobrança dos serviços."
       >
-        <div className="flex h-[calc(100vh-5rem)] min-h-0 flex-col gap-3 overflow-hidden">
+        <div className="flex flex-col gap-3">
           <AppOperationalHeader
             title="Ordens de Serviço"
             description="Execução, status e cobrança dos serviços"
@@ -444,11 +444,11 @@ export default function ServiceOrdersPage() {
             ))}
           </AppFiltersBar>
 
-          <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden lg:grid-cols-[minmax(320px,420px)_minmax(0,1fr)]">
+          <div className="flex flex-col gap-3">
             <AppSectionBlock
               title="Carteira de O.S."
               subtitle="Lista compacta para execução operacional"
-              className="flex h-full min-h-0 flex-col"
+              className="flex flex-col"
             >
               {isLoading ? (
                 <AppPageLoadingState description="Carregando ordens de serviço..." />
@@ -471,7 +471,7 @@ export default function ServiceOrdersPage() {
                   }
                 />
               ) : (
-                <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+                <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
                   {filteredOrders.map(item => {
                     const canStart = capabilities.start && ["OPEN", "ASSIGNED"].includes(item.status);
                     const canComplete = capabilities.complete && item.status === "IN_PROGRESS";
@@ -579,7 +579,7 @@ export default function ServiceOrdersPage() {
             <AppSectionBlock
               title="Detalhe da O.S."
               subtitle="Resumo, execução, agenda, cobrança e histórico"
-              className="flex h-full min-h-0 flex-col"
+              className="flex flex-col"
             >
               {!selectedOrder ? (
                 <AppPageEmptyState
@@ -587,7 +587,7 @@ export default function ServiceOrdersPage() {
                   description="Ao selecionar, o painel mostra execução, cliente, agenda, cobrança e histórico."
                 />
               ) : (
-                <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+                <div className="space-y-3">
                   <article className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/35 p-3">
                     <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Resumo</p>
                     <h2 className="text-lg font-semibold text-[var(--text-primary)]">
