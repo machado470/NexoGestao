@@ -418,37 +418,13 @@ function ChatPanel({
   error?: string | null;
 }) {
   const messagesRef = useRef<HTMLDivElement | null>(null);
+  const hasConversation = Boolean(conversation);
 
   useEffect(() => {
     const node = messagesRef.current;
     if (!node) return;
     node.scrollTop = node.scrollHeight;
   }, [conversation?.id, messages.length]);
-
-  if (!conversation) {
-    return (
-      <section className="flex h-full min-h-0 min-w-0 items-center justify-center overflow-hidden bg-white/[0.015]">
-        <div className="max-w-md rounded-2xl border border-white/[0.06] bg-white/[0.015] px-5 py-5 text-center">
-          <div className="mx-auto mb-3 h-8 w-8 rounded-full border border-white/[0.12] bg-white/[0.03]" />
-          <p className="text-sm font-semibold">Selecione uma conversa</p>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">
-            Quando houver mensagens, você poderá responder, enviar cobranças e acompanhar o contexto operacional por aqui.
-          </p>
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-1.5">
-            {["Cobranças", "Agendamentos", "O.S."].map(item => (
-              <span
-                key={item}
-                className="rounded-full border border-white/[0.1] bg-white/[0.02] px-2.5 py-1 text-[10px] text-[var(--text-muted)]"
-              >
-                {item}
-              </span>
-            ))}
-          </div>
-        </div>
-        {error ? <p className="absolute bottom-2 px-3 pb-2 text-[11px] text-rose-300">{error}</p> : null}
-      </section>
-    );
-  }
 
   return (
     <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-white/[0.015]">
@@ -459,24 +435,43 @@ function ChatPanel({
           </div>
           <div>
             <p className="text-sm font-semibold">{conversation?.name ?? "Selecione uma conversa"}</p>
-            <p className="text-xs text-[var(--text-muted)]">{conversation?.phone ?? ""}</p>
+            <p className="text-xs text-[var(--text-muted)]">{conversation?.phone ?? "Nenhuma conversa ativa"}</p>
           </div>
         </div>
         <div className="flex items-center gap-1.5 text-[var(--text-muted)]">
-          <button type="button" className="rounded-lg p-1.5 hover:bg-white/10" onClick={onToggleFavorite}>
+          <button
+            type="button"
+            className="rounded-lg p-1.5 enabled:hover:bg-white/10 disabled:opacity-45"
+            onClick={onToggleFavorite}
+            disabled={!hasConversation}
+          >
             <Star className={cn("size-4.5", isFavorite ? "fill-yellow-400 text-yellow-300" : "")} />
           </button>
-          <button type="button" className="rounded-lg p-1.5 hover:bg-white/10" onClick={onInfo}>
+          <button
+            type="button"
+            className="rounded-lg p-1.5 enabled:hover:bg-white/10 disabled:opacity-45"
+            onClick={onInfo}
+            disabled={!hasConversation}
+          >
             <Info className="size-4.5" />
           </button>
-          <button type="button" className="rounded-lg p-1.5 hover:bg-white/10" onClick={onMoreActions}>
+          <button
+            type="button"
+            className="rounded-lg p-1.5 enabled:hover:bg-white/10 disabled:opacity-45"
+            onClick={onMoreActions}
+            disabled={!hasConversation}
+          >
             <EllipsisVertical className="size-4.5" />
           </button>
         </div>
       </header>
 
       <div ref={messagesRef} className="scrollbar-thin-nexo flex-1 min-h-0 overflow-y-auto bg-transparent px-5 pb-1 pt-4">
-        {isLoading ? (
+        {!hasConversation ? (
+          <div className="flex h-full items-center justify-center px-1 py-4 text-xs text-[var(--text-muted)]">
+            Selecione uma conversa para continuar.
+          </div>
+        ) : isLoading ? (
           <div className="space-y-3">
             {Array.from({ length: 5 }).map((_, idx) => (
               <AppSkeleton key={idx} className="h-12 rounded-xl" />
@@ -513,43 +508,59 @@ function ChatPanel({
         )}
       </div>
 
-      <div className="shrink-0 flex flex-wrap items-center gap-2 bg-white/[0.02] px-3 py-2">
-        {TEMPLATES.map(template => (
-          <Button
-            key={template}
-            type="button"
-            size="sm"
-            variant="outline"
-            className="h-8 rounded-lg border-white/[0.08] bg-white/[0.02] text-[11px] hover:bg-white/[0.05]"
-            onClick={() => setContent(template)}
-          >
-            {template}
-          </Button>
-        ))}
-      </div>
+      {hasConversation ? (
+        <div className="shrink-0 flex flex-wrap items-center gap-2 bg-white/[0.02] px-3 py-2">
+          {TEMPLATES.map(template => (
+            <Button
+              key={template}
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8 rounded-lg border-white/[0.08] bg-white/[0.02] text-[11px] hover:bg-white/[0.05]"
+              onClick={() => setContent(template)}
+            >
+              {template}
+            </Button>
+          ))}
+        </div>
+      ) : null}
 
       <footer className="shrink-0 mt-0 flex items-center gap-1.5 overflow-x-hidden bg-white/[0.02] px-3 py-2.5">
-        <button type="button" className="rounded-lg p-2 hover:bg-white/10">
+        <button
+          type="button"
+          className="rounded-lg p-2 enabled:hover:bg-white/10 disabled:opacity-45"
+          disabled={!hasConversation}
+        >
           <MessageCircleMore className="size-4" />
         </button>
-        <button type="button" className="rounded-lg p-2 hover:bg-white/10">
+        <button
+          type="button"
+          className="rounded-lg p-2 enabled:hover:bg-white/10 disabled:opacity-45"
+          disabled={!hasConversation}
+        >
           <Paperclip className="size-4" />
         </button>
         <input
           value={content}
-          onChange={event => setContent(event.target.value)}
-          placeholder="Digite sua mensagem..."
+          onChange={event => hasConversation && setContent(event.target.value)}
+          placeholder={hasConversation ? "Digite sua mensagem..." : "Selecione uma conversa para responder..."}
+          disabled={!hasConversation}
           className="h-9 min-w-0 flex-1 rounded-lg bg-white/[0.02] px-3 text-sm outline-none placeholder:text-[var(--text-muted)]/70"
         />
         <Button
           type="button"
           size="sm"
-          className="h-9 rounded-full bg-emerald-600/85 px-3 hover:bg-emerald-500"
+          className="h-9 rounded-full bg-emerald-600/85 px-3 hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-45"
           onClick={sendMessage}
+          disabled={!hasConversation}
         >
           <Send className="size-3.5" />
         </Button>
-        <button type="button" className="shrink-0 rounded-lg p-2 hover:bg-white/10">
+        <button
+          type="button"
+          className="shrink-0 rounded-lg p-2 enabled:hover:bg-white/10 disabled:opacity-45"
+          disabled={!hasConversation}
+        >
           <Volume2 className="size-4" />
         </button>
       </footer>
