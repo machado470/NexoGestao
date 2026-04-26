@@ -3,7 +3,10 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import CreateCustomerModal from "@/components/CreateCustomerModal";
 import EditCustomerModal from "@/components/EditCustomerModal";
-import { normalizeArrayPayload, normalizeObjectPayload } from "@/lib/query-helpers";
+import {
+  normalizeArrayPayload,
+  normalizeObjectPayload,
+} from "@/lib/query-helpers";
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
 import { Button } from "@/components/design-system";
@@ -32,12 +35,18 @@ type Workspace = {
   timeline?: Record<string, any>[];
 };
 
-type CustomerFilter = "all" | "pending" | "open_os" | "no_recent_contact" | "risk";
+type CustomerFilter =
+  | "all"
+  | "pending"
+  | "open_os"
+  | "no_recent_contact"
+  | "risk";
 
 function formatCurrency(cents?: number) {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
-    Number(cents ?? 0) / 100
-  );
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(Number(cents ?? 0) / 100);
 }
 
 function toDate(value: unknown): Date | null {
@@ -58,7 +67,11 @@ function customerStatus(input: {
   daysWithoutContact: number;
 }) {
   if (input.overdue > 0 || input.daysWithoutContact >= 30) return "Em risco";
-  if (input.pending > 0 || input.hasOpenServiceOrder || input.daysWithoutContact >= 15)
+  if (
+    input.pending > 0 ||
+    input.hasOpenServiceOrder ||
+    input.daysWithoutContact >= 15
+  )
     return "Com pendência";
   return "Saudável";
 }
@@ -67,7 +80,9 @@ function normalizeWorkspace(input: unknown): Workspace {
   const raw = normalizeObjectPayload<any>(input) ?? {};
   return {
     customer: normalizeObjectPayload(raw.customer) ?? {},
-    appointments: normalizeArrayPayload(raw.appointments ?? raw.customerAppointments),
+    appointments: normalizeArrayPayload(
+      raw.appointments ?? raw.customerAppointments
+    ),
     serviceOrders: normalizeArrayPayload(raw.serviceOrders ?? raw.orders),
     charges: normalizeArrayPayload(raw.charges ?? raw.finance),
     timeline: normalizeArrayPayload(raw.timeline ?? raw.events),
@@ -76,24 +91,44 @@ function normalizeWorkspace(input: unknown): Workspace {
 
 export default function CustomersPage() {
   const [location, navigate] = useLocation();
-  const [searchTerm, setSearchTerm] = useOperationalMemoryState("nexo.customers.search.v2", "");
-  const [activeFilter, setActiveFilter] = useOperationalMemoryState<CustomerFilter>(
-    "nexo.customers.filter.v2",
-    "all"
+  const [searchTerm, setSearchTerm] = useOperationalMemoryState(
+    "nexo.customers.search.v2",
+    ""
   );
-  const [activeCustomerId, setActiveCustomerId] = useOperationalMemoryState<string | null>(
-    "nexo.customers.active-id.v2",
+  const [activeFilter, setActiveFilter] =
+    useOperationalMemoryState<CustomerFilter>(
+      "nexo.customers.filter.v2",
+      "all"
+    );
+  const [activeCustomerId, setActiveCustomerId] = useOperationalMemoryState<
+    string | null
+  >("nexo.customers.active-id.v2", null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editingCustomerId, setEditingCustomerId] = useState<string | null>(
     null
   );
-  const [createOpen, setCreateOpen] = useState(false);
-  const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
 
-  const customersQuery = trpc.nexo.customers.list.useQuery({ page: 1, limit: 300 }, { retry: false });
-  const appointmentsQuery = trpc.nexo.appointments.list.useQuery({ page: 1, limit: 500 }, { retry: false });
-  const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery({ page: 1, limit: 500 }, { retry: false });
-  const chargesQuery = trpc.finance.charges.list.useQuery({ page: 1, limit: 500 }, { retry: false });
+  const customersQuery = trpc.nexo.customers.list.useQuery(
+    { page: 1, limit: 300 },
+    { retry: false }
+  );
+  const appointmentsQuery = trpc.nexo.appointments.list.useQuery(
+    { page: 1, limit: 500 },
+    { retry: false }
+  );
+  const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery(
+    { page: 1, limit: 500 },
+    { retry: false }
+  );
+  const chargesQuery = trpc.finance.charges.list.useQuery(
+    { page: 1, limit: 500 },
+    { retry: false }
+  );
 
-  const customers = useMemo(() => normalizeArrayPayload<Customer>(customersQuery.data), [customersQuery.data]);
+  const customers = useMemo(
+    () => normalizeArrayPayload<Customer>(customersQuery.data),
+    [customersQuery.data]
+  );
   const appointments = useMemo(
     () => normalizeArrayPayload<Appointment>(appointmentsQuery.data),
     [appointmentsQuery.data]
@@ -102,14 +137,20 @@ export default function CustomersPage() {
     () => normalizeArrayPayload<ServiceOrder>(serviceOrdersQuery.data),
     [serviceOrdersQuery.data]
   );
-  const charges = useMemo(() => normalizeArrayPayload<Charge>(chargesQuery.data), [chargesQuery.data]);
+  const charges = useMemo(
+    () => normalizeArrayPayload<Charge>(chargesQuery.data),
+    [chargesQuery.data]
+  );
 
   const workspaceQuery = trpc.nexo.customers.workspace.useQuery(
     { id: activeCustomerId ?? "" },
     { enabled: Boolean(activeCustomerId), retry: false }
   );
 
-  const workspace = useMemo(() => normalizeWorkspace(workspaceQuery.data), [workspaceQuery.data]);
+  const workspace = useMemo(
+    () => normalizeWorkspace(workspaceQuery.data),
+    [workspaceQuery.data]
+  );
 
   const byCustomer = useMemo(() => {
     const map = new Map<
@@ -142,8 +183,13 @@ export default function CustomersPage() {
       if (!customerId || !map.has(customerId)) continue;
       const current = map.get(customerId)!;
       current.appointments.push(item);
-      const touchDate = toDate(item.updatedAt ?? item.startsAt ?? item.createdAt);
-      if (touchDate && (!current.lastInteractionAt || touchDate > current.lastInteractionAt)) {
+      const touchDate = toDate(
+        item.updatedAt ?? item.startsAt ?? item.createdAt
+      );
+      if (
+        touchDate &&
+        (!current.lastInteractionAt || touchDate > current.lastInteractionAt)
+      ) {
         current.lastInteractionAt = touchDate;
       }
     }
@@ -153,8 +199,13 @@ export default function CustomersPage() {
       if (!customerId || !map.has(customerId)) continue;
       const current = map.get(customerId)!;
       current.serviceOrders.push(item);
-      const touchDate = toDate(item.updatedAt ?? item.createdAt ?? item.scheduledFor);
-      if (touchDate && (!current.lastInteractionAt || touchDate > current.lastInteractionAt)) {
+      const touchDate = toDate(
+        item.updatedAt ?? item.createdAt ?? item.scheduledFor
+      );
+      if (
+        touchDate &&
+        (!current.lastInteractionAt || touchDate > current.lastInteractionAt)
+      ) {
         current.lastInteractionAt = touchDate;
       }
     }
@@ -174,8 +225,13 @@ export default function CustomersPage() {
         current.pending += 1;
         current.pendingCents += cents;
       }
-      const touchDate = toDate(item.updatedAt ?? item.createdAt ?? item.dueDate);
-      if (touchDate && (!current.lastInteractionAt || touchDate > current.lastInteractionAt)) {
+      const touchDate = toDate(
+        item.updatedAt ?? item.createdAt ?? item.dueDate
+      );
+      if (
+        touchDate &&
+        (!current.lastInteractionAt || touchDate > current.lastInteractionAt)
+      ) {
         current.lastInteractionAt = touchDate;
       }
     }
@@ -207,7 +263,9 @@ export default function CustomersPage() {
 
       const lastInteraction = aggregate.lastInteractionAt;
       const daysWithoutContact = lastInteraction
-        ? Math.floor((now.getTime() - lastInteraction.getTime()) / (1000 * 60 * 60 * 24))
+        ? Math.floor(
+            (now.getTime() - lastInteraction.getTime()) / (1000 * 60 * 60 * 24)
+          )
         : 999;
       const hasOpenServiceOrder = aggregate.serviceOrders.some(order => {
         const status = String(order.status ?? "").toUpperCase();
@@ -220,9 +278,14 @@ export default function CustomersPage() {
         daysWithoutContact,
       });
 
-      if (activeFilter === "pending" && !(aggregate.pending > 0 || aggregate.overdue > 0)) return false;
+      if (
+        activeFilter === "pending" &&
+        !(aggregate.pending > 0 || aggregate.overdue > 0)
+      )
+        return false;
       if (activeFilter === "open_os" && !hasOpenServiceOrder) return false;
-      if (activeFilter === "no_recent_contact" && daysWithoutContact < 15) return false;
+      if (activeFilter === "no_recent_contact" && daysWithoutContact < 15)
+        return false;
       if (activeFilter === "risk" && status !== "Em risco") return false;
 
       if (!query) return true;
@@ -234,7 +297,8 @@ export default function CustomersPage() {
   }, [activeFilter, byCustomer, customers, searchTerm]);
 
   const isLoading = customersQuery.isLoading && customers.length === 0;
-  const hasBlockingError = Boolean(customersQuery.error) && customers.length === 0;
+  const hasBlockingError =
+    Boolean(customersQuery.error) && customers.length === 0;
 
   usePageDiagnostics({
     page: "customers",
@@ -245,7 +309,9 @@ export default function CustomersPage() {
   });
 
   useEffect(() => {
-    const queryCustomerId = new URLSearchParams(location.split("?")[1] ?? "").get("customerId");
+    const queryCustomerId = new URLSearchParams(
+      location.split("?")[1] ?? ""
+    ).get("customerId");
     if (queryCustomerId) {
       setActiveCustomerId(queryCustomerId);
       return;
@@ -256,17 +322,24 @@ export default function CustomersPage() {
   }, [activeCustomerId, displayedCustomers, location, setActiveCustomerId]);
 
   const selectedCustomer = useMemo(
-    () => customers.find(item => String(item.id) === String(activeCustomerId)) ?? null,
+    () =>
+      customers.find(item => String(item.id) === String(activeCustomerId)) ??
+      null,
     [activeCustomerId, customers]
   );
 
   return (
-    <PageWrapper title="Clientes" subtitle="Centro operacional de relacionamento e histórico por cliente.">
-      <div className="space-y-4">
+    <PageWrapper
+      title="Clientes"
+      subtitle="Centro operacional de relacionamento e histórico por cliente."
+    >
+      <div className="flex h-[calc(100vh-5rem)] min-h-0 flex-col gap-3 overflow-hidden">
         <AppOperationalHeader
           title="Clientes"
           description="Central de relacionamento, execução e histórico operacional por cliente."
-          primaryAction={<Button onClick={() => setCreateOpen(true)}>Novo cliente</Button>}
+          primaryAction={
+            <Button onClick={() => setCreateOpen(true)}>Novo cliente</Button>
+          }
         >
           <div className="grid gap-2 md:grid-cols-[1fr_auto]">
             <input
@@ -281,7 +354,7 @@ export default function CustomersPage() {
           </div>
         </AppOperationalHeader>
 
-        <AppFiltersBar className="gap-2 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-3">
+        <AppFiltersBar className="shrink-0 gap-2 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-3">
           {[
             { key: "all", label: "Todos" },
             { key: "pending", label: "Com pendência" },
@@ -304,13 +377,19 @@ export default function CustomersPage() {
           ))}
         </AppFiltersBar>
 
-        <div className="grid gap-4 2xl:grid-cols-[1.15fr_0.85fr]">
-          <AppSectionBlock title="Carteira operacional" subtitle="Visão densa com ações por cliente.">
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden lg:grid-cols-[minmax(320px,380px)_minmax(0,1fr)]">
+          <AppSectionBlock
+            title="Carteira operacional"
+            subtitle="Visão densa com ações por cliente."
+            className="flex h-full min-h-0 flex-col"
+          >
             {isLoading ? (
               <AppPageLoadingState description="Carregando clientes..." />
             ) : hasBlockingError ? (
               <AppPageErrorState
-                description={customersQuery.error?.message ?? "Falha ao carregar clientes."}
+                description={
+                  customersQuery.error?.message ?? "Falha ao carregar clientes."
+                }
                 actionLabel="Tentar novamente"
                 onAction={() => void customersQuery.refetch()}
               />
@@ -321,7 +400,9 @@ export default function CustomersPage() {
                   description="Cadastre o primeiro cliente para iniciar o relacionamento operacional."
                 />
                 <div className="flex justify-center">
-                  <Button onClick={() => setCreateOpen(true)}>Criar primeiro cliente</Button>
+                  <Button onClick={() => setCreateOpen(true)}>
+                    Criar primeiro cliente
+                  </Button>
                 </div>
               </div>
             ) : displayedCustomers.length === 0 ? (
@@ -330,109 +411,187 @@ export default function CustomersPage() {
                 description="Nenhum cliente corresponde aos filtros e termo pesquisado."
               />
             ) : (
-              <AppDataTable>
-                <table className="w-full table-fixed text-sm">
-                  <thead className="bg-[var(--surface-elevated)] text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                    <tr>
-                      <th className="w-[20%] px-4 py-2.5">Nome</th>
-                      <th className="w-[20%] px-4 py-2.5">Contato</th>
-                      <th className="w-[18%] px-4 py-2.5">Último serviço</th>
-                      <th className="w-[16%] px-4 py-2.5">Próximo agendamento</th>
-                      <th className="w-[12%] px-4 py-2.5">Saldo pendente</th>
-                      <th className="w-[8%] px-4 py-2.5">Status</th>
-                      <th className="w-[96px] px-4 py-2.5 text-right">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {displayedCustomers.map(customer => {
-                      const customerId = String(customer.id ?? "");
-                      const aggregate = byCustomer.get(customerId);
-                      if (!aggregate) return null;
+              <div className="min-h-0 flex-1 overflow-hidden">
+                <div className="h-full min-h-0">
+                  <AppDataTable>
+                    <div className="max-h-[100%] overflow-y-auto">
+                      <table className="w-full table-fixed text-sm">
+                        <thead className="sticky top-0 z-10 bg-[var(--surface-elevated)] text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                          <tr>
+                            <th className="w-[20%] px-4 py-2.5">Nome</th>
+                            <th className="w-[20%] px-4 py-2.5">Contato</th>
+                            <th className="w-[18%] px-4 py-2.5">
+                              Último serviço
+                            </th>
+                            <th className="w-[16%] px-4 py-2.5">
+                              Próximo agendamento
+                            </th>
+                            <th className="w-[12%] px-4 py-2.5">
+                              Saldo pendente
+                            </th>
+                            <th className="w-[8%] px-4 py-2.5">Status</th>
+                            <th className="w-[96px] px-4 py-2.5 text-right">
+                              Ações
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {displayedCustomers.map(customer => {
+                            const customerId = String(customer.id ?? "");
+                            const aggregate = byCustomer.get(customerId);
+                            if (!aggregate) return null;
 
-                      const now = new Date();
-                      const lastInteraction = aggregate.lastInteractionAt;
-                      const daysWithoutContact = lastInteraction
-                        ? Math.floor((now.getTime() - lastInteraction.getTime()) / (1000 * 60 * 60 * 24))
-                        : 999;
-                      const hasOpenServiceOrder = aggregate.serviceOrders.some(order => {
-                        const status = String(order.status ?? "").toUpperCase();
-                        return ["OPEN", "ASSIGNED", "IN_PROGRESS"].includes(status);
-                      });
-                      const status = customerStatus({
-                        overdue: aggregate.overdue,
-                        pending: aggregate.pending,
-                        hasOpenServiceOrder,
-                        daysWithoutContact,
-                      });
+                            const now = new Date();
+                            const lastInteraction = aggregate.lastInteractionAt;
+                            const daysWithoutContact = lastInteraction
+                              ? Math.floor(
+                                  (now.getTime() - lastInteraction.getTime()) /
+                                    (1000 * 60 * 60 * 24)
+                                )
+                              : 999;
+                            const hasOpenServiceOrder =
+                              aggregate.serviceOrders.some(order => {
+                                const status = String(
+                                  order.status ?? ""
+                                ).toUpperCase();
+                                return [
+                                  "OPEN",
+                                  "ASSIGNED",
+                                  "IN_PROGRESS",
+                                ].includes(status);
+                              });
+                            const status = customerStatus({
+                              overdue: aggregate.overdue,
+                              pending: aggregate.pending,
+                              hasOpenServiceOrder,
+                              daysWithoutContact,
+                            });
 
-                      const lastService = aggregate.serviceOrders[0];
-                      const nextAppointment = aggregate.appointments.find(item => {
-                        const startsAt = toDate(item.startsAt);
-                        return startsAt && startsAt.getTime() >= Date.now();
-                      });
+                            const lastService = aggregate.serviceOrders[0];
+                            const nextAppointment = aggregate.appointments.find(
+                              item => {
+                                const startsAt = toDate(item.startsAt);
+                                return (
+                                  startsAt && startsAt.getTime() >= Date.now()
+                                );
+                              }
+                            );
 
-                      return (
-                        <tr
-                          key={customerId}
-                          className={`border-t border-[var(--border-subtle)] hover:bg-[var(--surface-subtle)]/60 ${
-                            customerId === activeCustomerId ? "bg-[var(--accent-soft)]/40" : ""
-                          }`}
-                          onClick={() => setActiveCustomerId(customerId)}
-                        >
-                          <td className="px-4 py-3">
-                            <p className="truncate font-medium text-[var(--text-primary)]">{String(customer.name ?? "Sem nome")}</p>
-                            {(aggregate.overdue > 0 || aggregate.pending > 0) && (
-                              <p className="mt-1 text-[11px] text-rose-500">
-                                {aggregate.overdue > 0
-                                  ? `${aggregate.overdue} vencida(s)`
-                                  : `${aggregate.pending} pendente(s)`}
-                              </p>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-xs text-[var(--text-secondary)]">
-                            <p className="truncate">{String(customer.phone ?? "Sem telefone")}</p>
-                            <p className="truncate text-[var(--text-muted)]">{String(customer.email ?? "Sem e-mail")}</p>
-                          </td>
-                          <td className="px-4 py-3 text-xs text-[var(--text-secondary)]">
-                            {lastService
-                              ? `${String(lastService.title ?? "O.S.")} · ${String(lastService.status ?? "-")}`
-                              : "Nenhum serviço registrado"}
-                          </td>
-                          <td className="px-4 py-3 text-xs text-[var(--text-secondary)]">
-                            {nextAppointment
-                              ? formatDateTime(nextAppointment.startsAt)
-                              : "Sem agendamento futuro"}
-                          </td>
-                          <td className="px-4 py-3 text-xs text-[var(--text-secondary)]">
-                            {aggregate.pendingCents > 0 ? formatCurrency(aggregate.pendingCents) : "Sem saldo pendente"}
-                          </td>
-                          <td className="px-4 py-3">
-                            <AppStatusBadge label={status} />
-                          </td>
-                          <td className="px-4 py-3 text-right" onClick={event => event.stopPropagation()}>
-                            <AppRowActionsDropdown
-                              triggerLabel="Mais ações"
-                              contentClassName="min-w-[210px]"
-                              items={[
-                                { label: "Ver cliente", onSelect: () => setActiveCustomerId(customerId) },
-                                { label: "Agendar", onSelect: () => navigate(`/appointments?customerId=${customerId}`) },
-                                { label: "Abrir O.S.", onSelect: () => navigate(`/service-orders?customerId=${customerId}`) },
-                                { label: "Cobrar", onSelect: () => navigate(`/finances?customerId=${customerId}`) },
-                                { label: "Enviar WhatsApp", onSelect: () => navigate(`/whatsapp?customerId=${customerId}`) },
-                                { label: "Editar", onSelect: () => setEditingCustomerId(customerId) },
-                              ]}
-                            />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </AppDataTable>
+                            return (
+                              <tr
+                                key={customerId}
+                                className={`border-t border-[var(--border-subtle)] hover:bg-[var(--surface-subtle)]/60 ${
+                                  customerId === activeCustomerId
+                                    ? "bg-[var(--accent-soft)]/40"
+                                    : ""
+                                }`}
+                                onClick={() => setActiveCustomerId(customerId)}
+                              >
+                                <td className="px-4 py-3">
+                                  <p className="truncate font-medium text-[var(--text-primary)]">
+                                    {String(customer.name ?? "Sem nome")}
+                                  </p>
+                                  {(aggregate.overdue > 0 ||
+                                    aggregate.pending > 0) && (
+                                    <p className="mt-1 text-[11px] text-rose-500">
+                                      {aggregate.overdue > 0
+                                        ? `${aggregate.overdue} vencida(s)`
+                                        : `${aggregate.pending} pendente(s)`}
+                                    </p>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3 text-xs text-[var(--text-secondary)]">
+                                  <p className="truncate">
+                                    {String(customer.phone ?? "Sem telefone")}
+                                  </p>
+                                  <p className="truncate text-[var(--text-muted)]">
+                                    {String(customer.email ?? "Sem e-mail")}
+                                  </p>
+                                </td>
+                                <td className="px-4 py-3 text-xs text-[var(--text-secondary)]">
+                                  {lastService
+                                    ? `${String(lastService.title ?? "O.S.")} · ${String(lastService.status ?? "-")}`
+                                    : "Nenhum serviço registrado"}
+                                </td>
+                                <td className="px-4 py-3 text-xs text-[var(--text-secondary)]">
+                                  {nextAppointment
+                                    ? formatDateTime(nextAppointment.startsAt)
+                                    : "Sem agendamento futuro"}
+                                </td>
+                                <td className="px-4 py-3 text-xs text-[var(--text-secondary)]">
+                                  {aggregate.pendingCents > 0
+                                    ? formatCurrency(aggregate.pendingCents)
+                                    : "Sem saldo pendente"}
+                                </td>
+                                <td className="px-4 py-3">
+                                  <AppStatusBadge label={status} />
+                                </td>
+                                <td
+                                  className="px-4 py-3 text-right"
+                                  onClick={event => event.stopPropagation()}
+                                >
+                                  <AppRowActionsDropdown
+                                    triggerLabel="Mais ações"
+                                    contentClassName="min-w-[210px]"
+                                    items={[
+                                      {
+                                        label: "Ver cliente",
+                                        onSelect: () =>
+                                          setActiveCustomerId(customerId),
+                                      },
+                                      {
+                                        label: "Agendar",
+                                        onSelect: () =>
+                                          navigate(
+                                            `/appointments?customerId=${customerId}`
+                                          ),
+                                      },
+                                      {
+                                        label: "Abrir O.S.",
+                                        onSelect: () =>
+                                          navigate(
+                                            `/service-orders?customerId=${customerId}`
+                                          ),
+                                      },
+                                      {
+                                        label: "Cobrar",
+                                        onSelect: () =>
+                                          navigate(
+                                            `/finances?customerId=${customerId}`
+                                          ),
+                                      },
+                                      {
+                                        label: "Enviar WhatsApp",
+                                        onSelect: () =>
+                                          navigate(
+                                            `/whatsapp?customerId=${customerId}`
+                                          ),
+                                      },
+                                      {
+                                        label: "Editar",
+                                        onSelect: () =>
+                                          setEditingCustomerId(customerId),
+                                      },
+                                    ]}
+                                  />
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </AppDataTable>
+                </div>
+              </div>
             )}
           </AppSectionBlock>
 
-          <AppSectionBlock title="Detalhe do cliente" subtitle="Resumo, status e histórico operacional conectado ao backend.">
+          <AppSectionBlock
+            title="Detalhe do cliente"
+            subtitle="Resumo, status e histórico operacional conectado ao backend."
+            className="flex h-full min-h-0 flex-col"
+          >
             {!activeCustomerId || !selectedCustomer ? (
               <AppPageEmptyState
                 title="Selecione um cliente"
@@ -447,42 +606,108 @@ export default function CustomersPage() {
                 onAction={() => void workspaceQuery.refetch()}
               />
             ) : (
-              <div className="space-y-3">
+              <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
                 <article className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/35 p-3">
-                  <p className="text-sm font-semibold text-[var(--text-primary)]">{String(selectedCustomer.name ?? "Cliente")}</p>
-                  <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                    {String(selectedCustomer.phone ?? "Sem telefone")} · {String(selectedCustomer.email ?? "Sem e-mail")}
+                  <p className="text-sm font-semibold text-[var(--text-primary)]">
+                    {String(selectedCustomer.name ?? "Cliente")}
                   </p>
-                  <p className="mt-1 text-xs text-[var(--text-muted)]">Status: {String(selectedCustomer.active ? "Ativo" : "Inativo")}</p>
-                  <p className="mt-2 text-xs text-[var(--text-secondary)]">Observações: {String(selectedCustomer.notes ?? "Sem observações")}</p>
+                  <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                    {String(selectedCustomer.phone ?? "Sem telefone")} ·{" "}
+                    {String(selectedCustomer.email ?? "Sem e-mail")}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">
+                    Status:{" "}
+                    {String(selectedCustomer.active ? "Ativo" : "Inativo")}
+                  </p>
+                  <p className="mt-2 text-xs text-[var(--text-secondary)]">
+                    Observações:{" "}
+                    {String(selectedCustomer.notes ?? "Sem observações")}
+                  </p>
                 </article>
 
                 <div className="grid grid-cols-2 gap-2">
-                  <Button size="sm" onClick={() => navigate(`/appointments?customerId=${activeCustomerId}`)}>Agendar</Button>
-                  <Button size="sm" variant="outline" onClick={() => navigate(`/service-orders?customerId=${activeCustomerId}`)}>Abrir O.S.</Button>
-                  <Button size="sm" variant="outline" onClick={() => navigate(`/finances?customerId=${activeCustomerId}`)}>Cobrar</Button>
-                  <Button size="sm" variant="outline" onClick={() => navigate(`/whatsapp?customerId=${activeCustomerId}`)}>Enviar WhatsApp</Button>
+                  <Button
+                    size="sm"
+                    onClick={() =>
+                      navigate(`/appointments?customerId=${activeCustomerId}`)
+                    }
+                  >
+                    Agendar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      navigate(`/service-orders?customerId=${activeCustomerId}`)
+                    }
+                  >
+                    Abrir O.S.
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      navigate(`/finances?customerId=${activeCustomerId}`)
+                    }
+                  >
+                    Cobrar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      navigate(`/whatsapp?customerId=${activeCustomerId}`)
+                    }
+                  >
+                    Enviar WhatsApp
+                  </Button>
                 </div>
 
                 <article className="rounded-xl border border-[var(--border-subtle)] p-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Timeline recente</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                    Timeline recente
+                  </p>
                   <ul className="mt-2 space-y-1.5 text-xs text-[var(--text-secondary)]">
-                    {(workspace.timeline ?? []).slice(0, 6).map((event, index) => (
-                      <li key={`${String(event.id ?? "event")}-${index}`} className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/30 p-2">
-                        <p className="font-medium text-[var(--text-primary)]">{String(event.description ?? event.title ?? "Evento")}</p>
-                        <p className="text-[11px] text-[var(--text-muted)]">{formatDateTime(event.occurredAt ?? event.createdAt)}</p>
-                      </li>
-                    ))}
-                    {(workspace.timeline ?? []).length === 0 ? <li>Sem eventos para este cliente.</li> : null}
+                    {(workspace.timeline ?? [])
+                      .slice(0, 6)
+                      .map((event, index) => (
+                        <li
+                          key={`${String(event.id ?? "event")}-${index}`}
+                          className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/30 p-2"
+                        >
+                          <p className="font-medium text-[var(--text-primary)]">
+                            {String(
+                              event.description ?? event.title ?? "Evento"
+                            )}
+                          </p>
+                          <p className="text-[11px] text-[var(--text-muted)]">
+                            {formatDateTime(
+                              event.occurredAt ?? event.createdAt
+                            )}
+                          </p>
+                        </li>
+                      ))}
+                    {(workspace.timeline ?? []).length === 0 ? (
+                      <li>Sem eventos para este cliente.</li>
+                    ) : null}
                   </ul>
                 </article>
 
                 <article className="rounded-xl border border-[var(--border-subtle)] p-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Blocos conectados</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                    Blocos conectados
+                  </p>
                   <ul className="mt-2 space-y-1 text-xs text-[var(--text-secondary)]">
-                    <li>Agendamentos: {(workspace.appointments ?? []).length}</li>
-                    <li>Ordens de serviço: {(workspace.serviceOrders ?? []).length}</li>
-                    <li>Financeiro (cobranças): {(workspace.charges ?? []).length}</li>
+                    <li>
+                      Agendamentos: {(workspace.appointments ?? []).length}
+                    </li>
+                    <li>
+                      Ordens de serviço:{" "}
+                      {(workspace.serviceOrders ?? []).length}
+                    </li>
+                    <li>
+                      Financeiro (cobranças): {(workspace.charges ?? []).length}
+                    </li>
                     <li>WhatsApp: disponível via navegação contextual.</li>
                   </ul>
                 </article>
