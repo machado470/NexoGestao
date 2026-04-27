@@ -20,7 +20,6 @@ import {
   AppPageEmptyState,
   AppSectionBlock,
   AppStatusBadge,
-  appSelectionPillClasses,
 } from "@/components/internal-page-system";
 import CreateServiceOrderModal from "@/components/CreateServiceOrderModal";
 import EditServiceOrderModal from "@/components/EditServiceOrderModal";
@@ -447,7 +446,11 @@ export default function ServiceOrdersPage() {
               <button
                 key={filter.key}
                 type="button"
-                className={appSelectionPillClasses(activeFilter === filter.key)}
+                className={`h-8 rounded-md px-3 text-xs font-medium transition-colors ${
+                  activeFilter === filter.key
+                    ? "bg-[var(--accent-soft)] text-[var(--accent-primary)]"
+                    : "bg-[var(--surface-subtle)] text-[var(--text-secondary)] hover:bg-[var(--surface-subtle)]/80 hover:text-[var(--text-primary)]"
+                }`}
                 onClick={() => setActiveFilter(filter.key as ServiceOrdersFilter)}
               >
                 {filter.label}
