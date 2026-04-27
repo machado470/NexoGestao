@@ -231,7 +231,10 @@ export function CreateChargeModal({
             "A próxima ação já está pronta: enviar agora no WhatsApp.",
             {
               label: "Enviar WhatsApp",
-              onClick: () => navigate("/whatsapp"),
+              onClick: () =>
+                navigate(
+                  `/whatsapp?customerId=${customerId}&chargeId=${String((created as any)?.id ?? "")}`
+                ),
             }
           );
         } else {

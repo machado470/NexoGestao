@@ -58,6 +58,13 @@ type Conversation = {
   priority: WhatsAppPriority;
   unreadCount: number;
   contextId?: string | null;
+  operationalStatus?: string;
+  contextHint?: string | null;
+  hasPendingCharge?: boolean;
+  hasUpcomingAppointment?: boolean;
+  hasActiveServiceOrder?: boolean;
+  hasFailedDelivery?: boolean;
+  isVirtual?: boolean;
 };
 
 type ChatMessage = {
@@ -110,11 +117,14 @@ const FILTERS: Array<{ value: ConversationFilter; label: string; count: string }
   { value: "failures", label: "Falhas", count: "" },
 ];
 
-const TEMPLATES = [
-  "Confirmação de agendamento",
-  "Lembrete",
-  "Cobrança simples",
-  "Link de pagamento",
+const TEMPLATES: Array<{ label: string; templateKey?: string }> = [
+  { label: "Confirmação de agendamento", templateKey: "appointment_reminder" },
+  { label: "Lembrete de agendamento", templateKey: "appointment_reminder" },
+  { label: "Atualização de O.S.", templateKey: "service_update" },
+  { label: "Cobrança pendente", templateKey: "payment_reminder" },
+  { label: "Link de pagamento", templateKey: "payment_link" },
+  { label: "Confirmação de pagamento" },
+  { label: "Mensagem livre", templateKey: "manual_followup" },
 ];
 
 const statusUi: Record<WhatsAppConversationStatus, { label: string; dot: string }> = {
@@ -125,6 +135,9 @@ const statusUi: Record<WhatsAppConversationStatus, { label: string; dot: string 
 };
 
 const ROW_HEIGHT = 106;
+const NO_APPOINTMENT_TEXT = "Sem agendamento futuro";
+const NO_SERVICE_ORDER_TEXT = "Nenhuma O.S. ativa";
+const NO_CHARGE_TEXT = "Nenhuma cobrança pendente";
 
 function fmtDateTime(value?: string | null) {
   if (!value) return "--";
@@ -150,6 +163,17 @@ function fmtTime(value?: string | null) {
 
 function mapConversation(item: any): Conversation {
   const customerName = item?.customer?.name ?? item?.title ?? "Sem nome";
+  const hasPendingCharge = item?.contextType === "CHARGE" && ["OPEN", "PENDING"].includes(String(item?.status ?? "OPEN"));
+  const hasUpcomingAppointment = item?.contextType === "APPOINTMENT";
+  const hasActiveServiceOrder = item?.contextType === "SERVICE_ORDER";
+  const hasFailedDelivery = item?.status === "FAILED";
+  const operationalStatus = hasFailedDelivery
+    ? "Falha"
+    : item?.unreadCount > 0
+      ? "Aguardando resposta"
+      : hasPendingCharge || hasUpcomingAppointment || hasActiveServiceOrder
+        ? "Com pendência"
+        : "Resolvido";
   return {
     id: String(item?.id ?? ""),
     conversationId: String(item?.id ?? ""),
@@ -164,6 +188,13 @@ function mapConversation(item: any): Conversation {
     priority: (item?.priority ?? "NORMAL") as WhatsAppPriority,
     unreadCount: Number(item?.unreadCount ?? 0),
     contextId: item?.contextId ?? null,
+    operationalStatus,
+    contextHint: item?.title ?? item?.lastMessagePreview ?? null,
+    hasPendingCharge,
+    hasUpcomingAppointment,
+    hasActiveServiceOrder,
+    hasFailedDelivery,
+    isVirtual: false,
   };
 }
 
@@ -187,6 +218,21 @@ function resolveEntityFromContext(context?: WhatsAppContext | null) {
   return { entityType: "GENERAL", entityId: undefined };
 }
 
+function getOperationalStatus(conversation: Conversation) {
+  if (conversation.conversationId) return conversation.operationalStatus ?? "Resolvido";
+  return "Sem conversa ativa";
+}
+
+function priorityScore(conversation: Conversation) {
+  if (!conversation.conversationId) return 700;
+  if (conversation.hasFailedDelivery || conversation.status === "FAILED") return 100;
+  if (conversation.unreadCount > 0) return 200;
+  if (conversation.hasPendingCharge || conversation.contextType === "CHARGE") return 300;
+  if (conversation.hasUpcomingAppointment || conversation.contextType === "APPOINTMENT") return 400;
+  if (conversation.hasActiveServiceOrder || conversation.contextType === "SERVICE_ORDER") return 500;
+  return 600;
+}
+
 function buildTemplateText(template: string, context?: WhatsAppContext | null) {
   const customerName = context?.customer?.name ?? "cliente";
   const appointmentDate = context?.nextAppointment?.scheduledAt
@@ -200,11 +246,23 @@ function buildTemplateText(template: string, context?: WhatsAppContext | null) {
   if (template === "Confirmação de agendamento") {
     return `Olá ${customerName}, confirmando seu agendamento em ${appointmentDate}.`;
   }
-  if (template === "Lembrete") {
+  if (template === "Lembrete" || template === "Lembrete de agendamento") {
     return `Olá ${customerName}, passando para lembrar do seu atendimento/pendência.`;
   }
   if (template === "Cobrança simples") {
     return `Olá ${customerName}, identificamos uma cobrança em aberto (${chargeAmount}, vencimento ${chargeDueDate}).`;
+  }
+  if (template === "Cobrança pendente") {
+    return `Olá ${customerName}, sua cobrança (${chargeAmount}) segue pendente. Vencimento: ${chargeDueDate}.`;
+  }
+  if (template === "Atualização de O.S.") {
+    return `Olá ${customerName}, atualizando sua ordem de serviço: status ${context?.activeServiceOrder?.status ?? "em andamento"}.`;
+  }
+  if (template === "Confirmação de pagamento") {
+    return `Olá ${customerName}, pagamento confirmado com sucesso.`;
+  }
+  if (template === "Mensagem livre") {
+    return `Olá ${customerName}, tudo bem?`;
   }
   if (template === "Link de pagamento") {
     return `Olá ${customerName}, segue o link para pagamento: ${context?.openCharge?.paymentLink ?? "(link indisponível)"}`;
@@ -224,6 +282,7 @@ const ConversationRow = memo(function ConversationRow({
   style: CSSProperties;
 }) {
   const status = statusUi[conversation.status] ?? statusUi.OPEN;
+  const operational = getOperationalStatus(conversation);
 
   return (
     <div style={style} className="px-0.5 py-1">
@@ -251,6 +310,7 @@ const ConversationRow = memo(function ConversationRow({
             </div>
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">{conversation.name}</p>
+              <p className="truncate text-[11px] text-[var(--text-muted)]">{conversation.phone ?? "Telefone não informado"}</p>
               {conversation.title ? (
                 <p className="truncate text-[11px] text-[var(--accent-primary)]/90">{conversation.title}</p>
               ) : null}
@@ -258,11 +318,11 @@ const ConversationRow = memo(function ConversationRow({
           </div>
           <span className="text-[11px] text-[var(--text-muted)]">{fmtTime(conversation.lastMessageAt)}</span>
         </div>
-        <p className="mt-1.5 line-clamp-1 text-xs text-[var(--text-secondary)]">{conversation.lastMessage}</p>
+        <p className="mt-1.5 line-clamp-1 text-xs text-[var(--text-secondary)]">{conversation.contextHint ?? conversation.lastMessage}</p>
         <div className="mt-2 flex items-center justify-between text-[11px] text-[var(--text-muted)]">
           <span className="inline-flex items-center gap-1.5">
             <span className={cn("h-2 w-2 rounded-full", status.dot)} />
-            {status.label} · {conversation.priority}
+            {operational}
           </span>
           {conversation.unreadCount ? (
             <span className="rounded-full border border-amber-400/35 bg-amber-500/20 px-1.5 py-0.5 text-[10px] leading-none text-amber-100">
@@ -285,6 +345,7 @@ function ConversationsList({
   onSearch,
   isLoading,
   hasError,
+  emptyStateMessage,
 }: {
   rows: Conversation[];
   selectedId: string | null;
@@ -295,6 +356,7 @@ function ConversationsList({
   onSearch: (next: string) => void;
   isLoading: boolean;
   hasError: boolean;
+  emptyStateMessage: string;
 }) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
@@ -362,9 +424,7 @@ function ConversationsList({
             <p className="text-xs text-[var(--text-secondary)]">
               {hasError
                 ? "Não foi possível carregar conversas"
-                : search.trim()
-                  ? "Nenhuma conversa encontrada para esta busca."
-                  : "Nenhuma conversa ainda."}
+                : emptyStateMessage}
             </p>
             <p className="mt-1 text-[11px] text-[var(--text-muted)]">
               {hasError
@@ -381,7 +441,7 @@ function ConversationsList({
                 <ConversationRow
                   key={conversation.id}
                   conversation={conversation}
-                  selectedId={selectedId}
+                  selectedId={selectedId ?? ""}
                   onSelect={onSelect}
                   style={{ height: ROW_HEIGHT }}
                 />
@@ -408,6 +468,12 @@ function ChatPanel({
   onInfo,
   onMoreActions,
   error,
+  onOpenCustomer,
+  onOpenFinance,
+  onOpenAppointment,
+  onOpenServiceOrder,
+  onFillTemplate,
+  canMarkAsPaid,
 }: {
   conversation?: Conversation;
   canCompose: boolean;
@@ -422,6 +488,12 @@ function ChatPanel({
   onInfo: () => void;
   onMoreActions: () => void;
   error?: string | null;
+  onOpenCustomer: () => void;
+  onOpenFinance: () => void;
+  onOpenAppointment: () => void;
+  onOpenServiceOrder: () => void;
+  onFillTemplate: (template: string) => void;
+  canMarkAsPaid: boolean;
 }) {
   const messagesRef = useRef<HTMLDivElement | null>(null);
   const hasConversation = Boolean(conversation);
@@ -442,6 +514,14 @@ function ChatPanel({
           <div>
             <p className="text-sm font-semibold">{conversation?.name ?? "Selecione uma conversa"}</p>
             <p className="text-xs text-[var(--text-muted)]">{conversation?.phone ?? "Nenhuma conversa ativa"}</p>
+            {conversation?.conversationId ? (
+              <p className="text-[10px] text-[var(--text-muted)]">{conversation.title ?? getOperationalStatus(conversation)}</p>
+            ) : null}
+            {!conversation?.conversationId && conversation ? (
+              <span className="mt-1 inline-flex rounded-full border border-amber-300/25 bg-amber-300/10 px-2 py-0.5 text-[10px] text-amber-100">
+                Sem conversa ativa
+              </span>
+            ) : null}
           </div>
         </div>
         <div className="flex items-center gap-1.5 text-[var(--text-muted)]">
@@ -475,7 +555,7 @@ function ChatPanel({
       <div ref={messagesRef} className="scrollbar-thin-nexo flex-1 min-h-0 overflow-y-auto bg-transparent px-5 pb-1 pt-4">
         {!hasConversation ? (
           <div className="flex h-full items-center justify-center px-1 py-4 text-xs text-[var(--text-muted)]">
-            Selecione uma conversa para continuar.
+            Selecione um cliente ou conversa para continuar.
           </div>
         ) : isLoading ? (
           <div className="space-y-3">
@@ -493,7 +573,7 @@ function ChatPanel({
                 <div key={message.id} className={cn("flex", outgoing ? "justify-end" : "justify-start")}>
                   <div
                     className={cn(
-                      "rounded-2xl border px-4 py-3 text-sm leading-relaxed shadow-sm",
+                      "rounded-2xl border px-4 py-3 text-sm leading-relaxed",
                       outgoing
                         ? "max-w-[66%] border-emerald-400/20 bg-emerald-900/55"
                         : "max-w-[68%] border-white/[0.08] bg-white/[0.03]"
@@ -515,17 +595,34 @@ function ChatPanel({
       </div>
 
       {hasConversation ? (
+        <div className="shrink-0 grid grid-cols-2 gap-1.5 border-y border-white/[0.06] bg-white/[0.01] px-3 py-2">
+          <Button type="button" size="sm" variant="outline" className="h-7 text-[11px]" onClick={() => onFillTemplate("Mensagem livre")}>Enviar mensagem</Button>
+          <Button type="button" size="sm" variant="outline" className="h-7 text-[11px]" onClick={onOpenCustomer}>Abrir cliente</Button>
+          <Button type="button" size="sm" variant="outline" className="h-7 text-[11px]" onClick={() => onFillTemplate("Cobrança pendente")}>Enviar cobrança</Button>
+          <Button type="button" size="sm" variant="outline" className="h-7 text-[11px]" onClick={() => onFillTemplate("Link de pagamento")}>Reenviar cobrança</Button>
+          <Button type="button" size="sm" variant="outline" className="h-7 text-[11px]" onClick={onOpenFinance}>Abrir financeiro</Button>
+          <Button type="button" size="sm" variant="outline" className="h-7 text-[11px]" disabled={!canMarkAsPaid}>Marcar como pago</Button>
+          <Button type="button" size="sm" variant="outline" className="h-7 text-[11px]" onClick={() => onFillTemplate("Confirmação de agendamento")}>Confirmar agendamento</Button>
+          <Button type="button" size="sm" variant="outline" className="h-7 text-[11px]" onClick={() => onFillTemplate("Lembrete de agendamento")}>Enviar lembrete</Button>
+          <Button type="button" size="sm" variant="outline" className="h-7 text-[11px]" onClick={onOpenAppointment}>Abrir agendamento</Button>
+          <Button type="button" size="sm" variant="outline" className="h-7 text-[11px]" onClick={() => onFillTemplate("Atualização de O.S.")}>Atualizar status</Button>
+          <Button type="button" size="sm" variant="outline" className="h-7 text-[11px]" onClick={() => onFillTemplate("Atualização de O.S.")}>Avisar conclusão</Button>
+          <Button type="button" size="sm" variant="outline" className="h-7 text-[11px]" onClick={onOpenServiceOrder}>Abrir O.S.</Button>
+        </div>
+      ) : null}
+
+      {hasConversation ? (
         <div className="shrink-0 flex flex-wrap items-center gap-2 bg-white/[0.02] px-3 py-2">
           {TEMPLATES.map(template => (
             <Button
-              key={template}
+              key={template.label}
               type="button"
               size="sm"
               variant="outline"
               className="h-8 rounded-lg border-white/[0.08] bg-white/[0.02] text-[11px] hover:bg-white/[0.05]"
-              onClick={() => setContent(template)}
+              onClick={() => onFillTemplate(template.label)}
             >
-              {template}
+              {template.label}
             </Button>
           ))}
         </div>
@@ -578,21 +675,29 @@ function ChatPanel({
 function ContextPanel({
   context,
   conversation,
+  selectedCustomer,
   isLoading,
   onNavigate,
   onSendCharge,
   onSendReminder,
   onMoreActions,
+  highlightedChargeId,
+  highlightedAppointmentId,
+  highlightedServiceOrderId,
 }: {
   context?: WhatsAppContext | null;
   conversation?: Conversation;
+  selectedCustomer?: any | null;
   isLoading: boolean;
   onNavigate: (path: string) => void;
   onSendCharge: () => void;
   onSendReminder: () => void;
   onMoreActions: () => void;
+  highlightedChargeId?: string | null;
+  highlightedAppointmentId?: string | null;
+  highlightedServiceOrderId?: string | null;
 }) {
-  if (!conversation || !context) {
+  if (!conversation && !selectedCustomer) {
     return (
       <aside className="scrollbar-thin-nexo h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden bg-white/[0.015] p-2.5" id="whatsapp-context-panel">
         <section className="rounded-xl border border-white/[0.06] bg-white/[0.01] px-3 py-3">
@@ -611,7 +716,7 @@ function ContextPanel({
     );
   }
 
-  const hasCharge = Boolean(context.openCharge?.id);
+  const hasCharge = Boolean(context?.openCharge?.id);
   const hasAppointment = Boolean(context?.nextAppointment?.id);
   const hasServiceOrder = Boolean(context?.activeServiceOrder?.id);
 
@@ -627,8 +732,8 @@ function ContextPanel({
         <div className="space-y-5 text-xs">
           <section className="px-1 py-1">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Cliente</p>
-            <p className="mt-1 font-semibold">{context?.customer?.name ?? conversation.name}</p>
-            <p className="text-[11px] text-[var(--text-muted)]">{context?.customer?.phone ?? conversation.phone ?? "--"}</p>
+            <p className="mt-1 font-semibold">{context?.customer?.name ?? selectedCustomer?.name ?? conversation?.name ?? "Sem nome"}</p>
+            <p className="text-[11px] text-[var(--text-muted)]">{context?.customer?.phone ?? selectedCustomer?.phone ?? conversation?.phone ?? "--"}</p>
             <Button
               type="button"
               size="sm"
@@ -642,9 +747,12 @@ function ContextPanel({
 
           <section className="px-1 py-1">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Próximo agendamento</p>
-            <p className="mt-1 font-medium">{context?.nextAppointment?.serviceName ?? "Sem agendamento"}</p>
-            <p className="text-[11px] text-[var(--text-muted)]">{fmtDateTime(context?.nextAppointment?.scheduledAt)}</p>
+            <p className="mt-1 font-medium">{context?.nextAppointment?.serviceName ?? NO_APPOINTMENT_TEXT}</p>
+            <p className="text-[11px] text-[var(--text-muted)]">{context?.nextAppointment?.scheduledAt ? fmtDateTime(context?.nextAppointment?.scheduledAt) : NO_APPOINTMENT_TEXT}</p>
             <span className="mt-1 inline-flex whitespace-nowrap rounded-full border border-amber-400/30 bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-100">{context?.nextAppointment?.status ?? "--"}</span>
+            {highlightedAppointmentId && context?.nextAppointment?.id === highlightedAppointmentId ? (
+              <p className="mt-1 text-[10px] text-[var(--accent-primary)]">Sugestão: Confirmar agendamento.</p>
+            ) : null}
             <Button
               type="button"
               size="sm"
@@ -659,9 +767,12 @@ function ContextPanel({
 
           <section className="px-1 py-1">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Ordem de serviço</p>
-            <p className="mt-1 font-medium">{context?.activeServiceOrder?.number ? `OS #${context.activeServiceOrder.number}` : "Sem O.S. ativa"}</p>
+            <p className="mt-1 font-medium">{context?.activeServiceOrder?.number ? `OS #${context.activeServiceOrder.number}` : NO_SERVICE_ORDER_TEXT}</p>
             <p className="text-[11px] text-[var(--text-muted)]">Status: {context?.activeServiceOrder?.status ?? "--"}</p>
             <p className="text-[11px] text-[var(--text-muted)]">Técnico: {context?.activeServiceOrder?.technician ?? "--"}</p>
+            {highlightedServiceOrderId && context?.activeServiceOrder?.id === highlightedServiceOrderId ? (
+              <p className="mt-1 text-[10px] text-[var(--accent-primary)]">Sugestão: Atualizar cliente sobre serviço.</p>
+            ) : null}
             <Button
               type="button"
               size="sm"
@@ -676,12 +787,15 @@ function ContextPanel({
 
           <section className="px-1 py-1">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Cobrança</p>
-            <p className="mt-1 font-medium">{context?.openCharge?.id ? `Cobrança #${context.openCharge.id}` : "Sem cobrança aberta"}</p>
+            <p className="mt-1 font-medium">{context?.openCharge?.id ? `Cobrança #${context.openCharge.id}` : NO_CHARGE_TEXT}</p>
             <p className="text-[11px] text-[var(--text-muted)]">Vencimento: {fmtDateTime(context?.openCharge?.dueDate)}</p>
             <p className="text-[11px]">
               Valor: {context?.openCharge?.amount ? `R$ ${(context.openCharge.amount / 100).toFixed(2).replace(".", ",")}` : "--"}
             </p>
             <span className="mt-1 inline-flex whitespace-nowrap rounded-full border border-rose-400/35 bg-rose-500/10 px-2 py-0.5 text-[10px] text-rose-100">{context?.openCharge?.status ?? "--"}</span>
+            {highlightedChargeId && context?.openCharge?.id === highlightedChargeId ? (
+              <p className="mt-1 text-[10px] text-[var(--accent-primary)]">Sugestão: Enviar cobrança.</p>
+            ) : null}
             <Button
               type="button"
               size="sm"
@@ -726,9 +840,12 @@ function ContextPanel({
 
 export default function WhatsAppPage() {
   const [location, setLocation] = useLocation();
-  const searchParams = new URLSearchParams(location.split("?")[1] ?? "");
+  const searchParams = useMemo(() => new URLSearchParams(location.split("?")[1] ?? ""), [location]);
   const queryConversationId = searchParams.get("conversationId");
   const queryCustomerId = searchParams.get("customerId");
+  const queryChargeId = searchParams.get("chargeId");
+  const queryAppointmentId = searchParams.get("appointmentId");
+  const queryServiceOrderId = searchParams.get("serviceOrderId");
 
   const [selectedConversationId, setSelectedConversationId] = useOperationalMemoryState<string | null>(
     "nexo.whatsapp.selected-conversation.v1",
@@ -744,6 +861,8 @@ export default function WhatsAppPage() {
   const [isContextVisible, setIsContextVisible] = useState(true);
   const [composerError, setComposerError] = useState<string | null>(null);
   const [localFavorites, setLocalFavorites] = useState<Record<string, boolean>>({});
+  const didAutoSelectFromQueryRef = useRef(false);
+  const hasManualSelectionRef = useRef(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchTerm), 350);
@@ -771,12 +890,33 @@ export default function WhatsAppPage() {
     [conversationsQuery.data]
   );
   const customersQuery = trpc.nexo.customers.list.useQuery({ page: 1, limit: 500 }, { retry: false });
+  const appointmentsQuery = trpc.nexo.appointments.list.useQuery(undefined, { retry: false });
+  const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery({ page: 1, limit: 500 }, { retry: false });
+  const chargesQuery = trpc.finance.charges.list.useQuery({ page: 1, limit: 500 }, { retry: false });
   const customers = useMemo(() => {
     const raw = customersQuery.data as any;
     if (Array.isArray(raw)) return raw;
     if (Array.isArray(raw?.items)) return raw.items;
     return [];
   }, [customersQuery.data]);
+  const appointments = useMemo(() => {
+    const raw = appointmentsQuery.data as any;
+    if (Array.isArray(raw)) return raw;
+    if (Array.isArray(raw?.items)) return raw.items;
+    return [];
+  }, [appointmentsQuery.data]);
+  const serviceOrders = useMemo(() => {
+    const raw = serviceOrdersQuery.data as any;
+    if (Array.isArray(raw)) return raw;
+    if (Array.isArray(raw?.items)) return raw.items;
+    return [];
+  }, [serviceOrdersQuery.data]);
+  const charges = useMemo(() => {
+    const raw = chargesQuery.data as any;
+    if (Array.isArray(raw)) return raw;
+    if (Array.isArray(raw?.items)) return raw.items;
+    return [];
+  }, [chargesQuery.data]);
 
   const conversationCustomerIds = useMemo(
     () => new Set(conversations.map(item => item.customerId).filter(Boolean) as string[]),
@@ -800,8 +940,15 @@ export default function WhatsAppPage() {
           priority: "LOW",
           unreadCount: 0,
           contextId: String(customer.id),
+          operationalStatus: "Sem conversa ativa",
+          contextHint: "Sem conversa ativa",
+          hasPendingCharge: charges.some((charge: any) => String(charge?.customerId ?? "") === String(customer.id) && ["PENDING", "OVERDUE"].includes(String(charge?.status ?? ""))),
+          hasUpcomingAppointment: appointments.some((appointment: any) => String(appointment?.customerId ?? "") === String(customer.id) && String(appointment?.status ?? "").toUpperCase() !== "CANCELED"),
+          hasActiveServiceOrder: serviceOrders.some((serviceOrder: any) => String(serviceOrder?.customerId ?? "") === String(customer.id) && !["DONE", "CANCELED"].includes(String(serviceOrder?.status ?? "").toUpperCase())),
+          hasFailedDelivery: false,
+          isVirtual: true,
         })),
-    [conversationCustomerIds, customers]
+    [appointments, charges, conversationCustomerIds, customers, serviceOrders]
   );
   const allInboxRows = useMemo(
     () => [...conversations, ...(activeFilter === "all" ? customersWithoutConversation : [])],
@@ -810,11 +957,12 @@ export default function WhatsAppPage() {
   const filteredRows = useMemo(() => {
     const query = debouncedSearch.trim().toLowerCase();
     return allInboxRows.filter(item => {
+      const searchable = [item.name, item.phone ?? "", item.lastMessage, item.title ?? "", item.contextHint ?? ""].join(" ").toLowerCase();
       const matchesSearch = !query
-        || [item.name, item.phone ?? "", item.lastMessage, item.title ?? ""].join(" ").toLowerCase().includes(query);
+        || searchable.includes(query);
       if (!matchesSearch) return false;
       if (activeFilter === "all") return true;
-      if (!item.conversationId) return false;
+      if (!item.conversationId) return Boolean(query);
       if (activeFilter === "no_reply") return item.unreadCount > 0;
       if (activeFilter === "billing") return item.status === "PENDING";
       if (activeFilter === "failures") return item.status === "FAILED";
@@ -822,8 +970,19 @@ export default function WhatsAppPage() {
       if (activeFilter === "appointments") return item.contextType === "APPOINTMENT";
       if (activeFilter === "service_orders") return item.contextType === "SERVICE_ORDER";
       return true;
+    }).sort((a, b) => {
+      const scoreDiff = priorityScore(a) - priorityScore(b);
+      if (scoreDiff !== 0) return scoreDiff;
+      const aDate = new Date(a.lastMessageAt ?? 0).getTime();
+      const bDate = new Date(b.lastMessageAt ?? 0).getTime();
+      return bDate - aDate;
     });
   }, [activeFilter, allInboxRows, debouncedSearch]);
+  const emptyStateMessage = useMemo(() => {
+    if (debouncedSearch.trim()) return "Nenhum resultado para esta busca.";
+    if (activeFilter === "failures") return "Nenhuma falha encontrada.";
+    return "Nenhum cliente encontrado.";
+  }, [activeFilter, debouncedSearch]);
 
   const selectedConversation = useMemo(
     () =>
@@ -834,14 +993,49 @@ export default function WhatsAppPage() {
   const selectedConversationRecordId = selectedConversation?.conversationId ?? null;
 
   useEffect(() => {
+    if (hasManualSelectionRef.current) return;
+    const conversationsReady = !conversationsQuery.isLoading && !conversationsQuery.isFetching;
+    const customersReady = !customersQuery.isLoading && !customersQuery.isFetching;
+    if ((queryCustomerId || queryConversationId) && !didAutoSelectFromQueryRef.current && conversationsReady && customersReady && !selectedConversationId) {
+      if (queryConversationId) {
+        const byConversation = allInboxRows.find(item => item.conversationId === queryConversationId || item.id === queryConversationId);
+        if (byConversation) {
+          setSelectedConversationId(byConversation.id);
+          didAutoSelectFromQueryRef.current = true;
+          return;
+        }
+      }
+      if (queryCustomerId) {
+        const existingConversation = allInboxRows.find(item => item.customerId === queryCustomerId && Boolean(item.conversationId));
+        const virtualCustomer = allInboxRows.find(item => item.id === `customer:${queryCustomerId}`);
+        const nextSelectionId = existingConversation?.id ?? virtualCustomer?.id ?? null;
+        if (nextSelectionId) {
+          setSelectedConversationId(nextSelectionId);
+        }
+      }
+      didAutoSelectFromQueryRef.current = true;
+      return;
+    }
+
     if (filteredRows.length === 0) {
       if (selectedConversationId !== null) setSelectedConversationId(null);
       return;
     }
-    if (!selectedConversationId || !filteredRows.some(item => item.id === selectedConversationId)) {
+    if (!selectedConversationId || !allInboxRows.some(item => item.id === selectedConversationId)) {
       setSelectedConversationId(filteredRows[0]?.id ?? null);
     }
-  }, [filteredRows, selectedConversationId, setSelectedConversationId]);
+  }, [
+    allInboxRows,
+    conversationsQuery.isFetching,
+    conversationsQuery.isLoading,
+    customersQuery.isFetching,
+    customersQuery.isLoading,
+    filteredRows,
+    queryConversationId,
+    queryCustomerId,
+    selectedConversationId,
+    setSelectedConversationId,
+  ]);
 
   useEffect(() => {
     if (!selectedConversationId) {
@@ -889,8 +1083,28 @@ export default function WhatsAppPage() {
     [messagesQuery.data, selectedConversationRecordId]
   );
   const selectedCustomer = useMemo(
-    () => customers.find((customer: any) => String(customer?.id ?? "") === String(selectedConversation?.customerId ?? "")) ?? null,
-    [customers, selectedConversation?.customerId]
+    () => {
+      const activeCustomerId = selectedConversation?.customerId ?? queryCustomerId ?? "";
+      return customers.find((customer: any) => String(customer?.id ?? "") === String(activeCustomerId)) ?? null;
+    },
+    [customers, queryCustomerId, selectedConversation?.customerId]
+  );
+  const selectedCustomerCharge = useMemo(
+    () => charges.find((charge: any) => String(charge?.customerId ?? "") === String(selectedCustomer?.id ?? "") && ["PENDING", "OVERDUE"].includes(String(charge?.status ?? "").toUpperCase()))
+      ?? charges.find((charge: any) => String(charge?.id ?? "") === String(queryChargeId ?? "")) ?? null,
+    [charges, queryChargeId, selectedCustomer?.id]
+  );
+  const selectedCustomerAppointment = useMemo(
+    () => appointments.find((appointment: any) => String(appointment?.id ?? "") === String(queryAppointmentId ?? ""))
+      ?? appointments.find((appointment: any) => String(appointment?.customerId ?? "") === String(selectedCustomer?.id ?? "") && String(appointment?.status ?? "").toUpperCase() !== "CANCELED")
+      ?? null,
+    [appointments, queryAppointmentId, selectedCustomer?.id]
+  );
+  const selectedCustomerServiceOrder = useMemo(
+    () => serviceOrders.find((serviceOrder: any) => String(serviceOrder?.id ?? "") === String(queryServiceOrderId ?? ""))
+      ?? serviceOrders.find((serviceOrder: any) => String(serviceOrder?.customerId ?? "") === String(selectedCustomer?.id ?? "") && !["DONE", "CANCELED"].includes(String(serviceOrder?.status ?? "").toUpperCase()))
+      ?? null,
+    [queryServiceOrderId, selectedCustomer?.id, serviceOrders]
   );
   const context = useMemo(() => {
     if (selectedConversationRecordId) return (contextQuery.data ?? null) as WhatsAppContext | null;
@@ -901,10 +1115,43 @@ export default function WhatsAppPage() {
           name: String(selectedCustomer.name ?? selectedConversation?.name ?? "Sem nome"),
           phone: selectedCustomer.phone ? String(selectedCustomer.phone) : undefined,
         },
+        nextAppointment: selectedCustomerAppointment
+          ? {
+            id: String(selectedCustomerAppointment.id),
+            scheduledAt: selectedCustomerAppointment.startsAt ?? selectedCustomerAppointment.scheduledAt,
+            status: selectedCustomerAppointment.status,
+            serviceName: selectedCustomerAppointment.serviceName ?? null,
+          }
+          : null,
+        activeServiceOrder: selectedCustomerServiceOrder
+          ? {
+            id: String(selectedCustomerServiceOrder.id),
+            number: selectedCustomerServiceOrder.number ? String(selectedCustomerServiceOrder.number) : null,
+            status: selectedCustomerServiceOrder.status,
+            technician: selectedCustomerServiceOrder.technicianName ?? null,
+          }
+          : null,
+        openCharge: selectedCustomerCharge
+          ? {
+            id: String(selectedCustomerCharge.id),
+            amount: Number(selectedCustomerCharge.amountCents ?? selectedCustomerCharge.amount ?? 0),
+            dueDate: selectedCustomerCharge.dueDate,
+            status: selectedCustomerCharge.status,
+            paymentLink: selectedCustomerCharge.paymentLink ?? null,
+          }
+          : null,
       } as WhatsAppContext;
     }
     return null;
-  }, [contextQuery.data, selectedConversation?.name, selectedConversationRecordId, selectedCustomer]);
+  }, [
+    contextQuery.data,
+    selectedConversation?.name,
+    selectedConversationRecordId,
+    selectedCustomer,
+    selectedCustomerAppointment,
+    selectedCustomerCharge,
+    selectedCustomerServiceOrder,
+  ]);
 
   const destinationPhone = useMemo(
     () => String(context?.customer?.phone ?? selectedConversation?.phone ?? selectedCustomer?.phone ?? "").trim(),
@@ -913,7 +1160,7 @@ export default function WhatsAppPage() {
   const canComposeForSelected = Boolean(selectedConversationId) && Boolean(destinationPhone);
   const composePlaceholder = selectedConversation
     ? selectedConversationRecordId
-      ? "Digite sua mensagem..."
+      ? "Responder conversa..."
       : "Iniciar conversa com este cliente..."
     : "Selecione uma conversa para responder...";
 
@@ -927,6 +1174,7 @@ export default function WhatsAppPage() {
   };
 
   const handleSelectConversation = (conversationId: string) => {
+    hasManualSelectionRef.current = true;
     setSelectedConversationId(conversationId);
     setContent("");
     setComposerError(null);
@@ -943,7 +1191,7 @@ export default function WhatsAppPage() {
       return;
     }
     if (!destinationPhone) {
-      setComposerError("Cliente sem telefone válido. Cadastre um número para iniciar a conversa.");
+      setComposerError("Este cliente não possui telefone cadastrado.");
       return;
     }
     const finalContent = content.trim();
@@ -965,7 +1213,15 @@ export default function WhatsAppPage() {
         messageType: "MANUAL",
       });
       setContent("");
-      await conversationsQuery.refetch();
+      const refreshedConversations = await conversationsQuery.refetch();
+      const refreshedRows = Array.isArray(refreshedConversations.data)
+        ? refreshedConversations.data.map(mapConversation)
+        : [];
+      const resolvedConversation = refreshedRows.find(item => String(item.customerId ?? "") === String(customerId ?? ""));
+      if (resolvedConversation?.id) {
+        setSelectedConversationId(resolvedConversation.id);
+      }
+      // TODO(timeline): validar evento MESSAGE_SENT/PAYMENT_LINK_SENT quando endpoint de timeline expuser rastreamento dedicado.
       await Promise.all([messagesQuery.refetch(), contextQuery.refetch(), conversationDetailsQuery.refetch()]);
     } catch (error: any) {
       console.error(error);
@@ -987,7 +1243,7 @@ export default function WhatsAppPage() {
       return;
     }
     if (!destinationPhone) {
-      toast.error("Cliente sem telefone válido. Cadastre um número para iniciar a conversa.");
+      toast.error("Este cliente não possui telefone cadastrado.");
       return;
     }
     try {
@@ -1009,7 +1265,14 @@ export default function WhatsAppPage() {
           serviceOrderNumber: context?.activeServiceOrder?.number,
         },
       });
-      await conversationsQuery.refetch();
+      const refreshedConversations = await conversationsQuery.refetch();
+      const refreshedRows = Array.isArray(refreshedConversations.data)
+        ? refreshedConversations.data.map(mapConversation)
+        : [];
+      const resolvedConversation = refreshedRows.find(item => String(item.customerId ?? "") === String(customerId ?? ""));
+      if (resolvedConversation?.id) {
+        setSelectedConversationId(resolvedConversation.id);
+      }
       await Promise.all([messagesQuery.refetch(), contextQuery.refetch(), conversationDetailsQuery.refetch()]);
       toast.success("Template enviado.");
     } catch (error: any) {
@@ -1119,6 +1382,7 @@ export default function WhatsAppPage() {
               && filteredRows.length === 0
             }
             hasError={Boolean(conversationsQuery.error) || Boolean(customersQuery.error)}
+            emptyStateMessage={emptyStateMessage}
           />
         </div>
 
@@ -1131,20 +1395,7 @@ export default function WhatsAppPage() {
             isLoading={messagesQuery.isLoading || messagesQuery.isFetching}
             sendMessage={handleManualSend}
             content={content}
-            setContent={value => {
-              if (!selectedConversationId) return;
-              const mapping: Record<string, string> = {
-                "Confirmação de agendamento": buildTemplateText("Confirmação de agendamento", context),
-                Lembrete: buildTemplateText("Lembrete", context),
-                "Cobrança simples": buildTemplateText("Cobrança simples", context),
-                "Link de pagamento": buildTemplateText("Link de pagamento", context),
-              };
-              if (mapping[value]) {
-                handleTemplateChip(value);
-                return;
-              }
-              setContent(value);
-            }}
+            setContent={value => setContent(value)}
             onToggleFavorite={() => {
               if (!selectedConversationId) return;
               setLocalFavorites(prev => ({ ...prev, [selectedConversationId]: !prev[selectedConversationId] }));
@@ -1157,6 +1408,12 @@ export default function WhatsAppPage() {
             }}
             onMoreActions={handleMoreActions}
             error={composerError}
+            onOpenCustomer={() => setLocation(context?.customer?.id ? `/customers?customerId=${context.customer.id}` : "/customers")}
+            onOpenFinance={() => setLocation(context?.openCharge?.id ? `/finances?chargeId=${context.openCharge.id}` : "/finances")}
+            onOpenAppointment={() => setLocation(context?.nextAppointment?.id ? `/appointments?appointmentId=${context.nextAppointment.id}` : "/appointments")}
+            onOpenServiceOrder={() => setLocation(context?.activeServiceOrder?.id ? `/service-orders?serviceOrderId=${context.activeServiceOrder.id}` : "/service-orders")}
+            onFillTemplate={handleTemplateChip}
+            canMarkAsPaid={Boolean(context?.openCharge?.id)}
           />
         </div>
 
@@ -1164,11 +1421,15 @@ export default function WhatsAppPage() {
           <ContextPanel
             conversation={selectedConversation}
             context={context}
+            selectedCustomer={selectedCustomer}
             isLoading={contextQuery.isLoading || contextQuery.isFetching}
             onNavigate={setLocation}
             onSendCharge={handleSendCharge}
             onSendReminder={handleSendReminder}
             onMoreActions={handleMoreActions}
+            highlightedChargeId={queryChargeId}
+            highlightedAppointmentId={queryAppointmentId}
+            highlightedServiceOrderId={queryServiceOrderId}
           />
         </div>
       </div>
