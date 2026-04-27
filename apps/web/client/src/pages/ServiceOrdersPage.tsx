@@ -69,12 +69,12 @@ function getStatusLabel(status: string) {
 }
 
 function getStatusTone(status: string, isOverdue: boolean) {
-  if (isOverdue) return "Atrasada";
-  if (status === "DONE") return "Concluída";
-  if (status === "IN_PROGRESS") return "Em andamento";
-  if (["OPEN", "ASSIGNED"].includes(status)) return "Aberta";
-  if (status === "CANCELED") return "Cancelada";
-  return "Sem status";
+  if (isOverdue) return "Em risco";
+  if (status === "DONE") return "Concluído";
+  if (status === "IN_PROGRESS") return "Atenção";
+  if (["OPEN", "ASSIGNED"].includes(status)) return "Pendente";
+  if (status === "CANCELED") return "Bloqueado";
+  return "Pendente";
 }
 
 function safeText(value: unknown, fallback = "—") {
@@ -486,7 +486,7 @@ export default function ServiceOrdersPage() {
                   }
                 />
               ) : (
-                <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
+                <div className="grid grid-cols-1 gap-2 lg:grid-cols-2 2xl:grid-cols-2">
                   {filteredOrders.map(item => {
                     const canStart = capabilities.start && ["OPEN", "ASSIGNED"].includes(item.status);
                     const canComplete = capabilities.complete && item.status === "IN_PROGRESS";
@@ -505,42 +505,50 @@ export default function ServiceOrdersPage() {
                             setSelectedOrderId(item.id);
                           }
                         }}
-                        className={`rounded-lg border p-3 text-left transition ${
+                        className={`rounded-lg border p-3 text-left transition-colors ${
                           selectedOrder?.id === item.id
-                            ? "border-[var(--accent-primary)] bg-[var(--accent-soft)]/35"
+                            ? "border-orange-500 bg-white/[0.03]"
                             : "border-[var(--border-subtle)] bg-[var(--surface-base)] hover:bg-[var(--surface-subtle)]/70"
                         }`}
                       >
-                        <div className="flex items-start gap-2">
+                        <div className="flex min-w-0 items-start gap-2">
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="min-w-0">
+                            <div className="flex min-w-0 items-start justify-between gap-2">
+                              <div className="min-w-0 flex-1">
                                 <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
-                                  #{item.code}
+                                  #{item.code} · {item.title}
                                 </p>
-                                <p className="truncate text-xs text-[var(--text-secondary)]">
+                                <p className="mt-0.5 truncate text-[11px] text-[var(--text-secondary)]">
                                   {item.customerName}
                                 </p>
                               </div>
-                              <span className="shrink-0 whitespace-nowrap">
+                              <span className="shrink-0 whitespace-nowrap pt-0.5">
                                 <AppStatusBadge label={getStatusTone(item.status, item.isOverdue)} />
                               </span>
                             </div>
 
-                            <p className="mt-1 line-clamp-2 text-xs text-[var(--text-secondary)]">
-                              {item.title}
+                            <p className="mt-1 truncate text-xs text-[var(--text-secondary)]">
+                              {item.description}
                             </p>
 
                             <div className="mt-2 grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] text-[var(--text-muted)]">
-                              <span>Prazo: {item.dueDateLabel}</span>
-                              <span>Valor: {formatCurrency(item.amountCents)}</span>
-                              <span className="truncate">Status: {item.statusLabel}</span>
-                              <span>{item.hasCharge ? "Com cobrança" : "Sem cobrança"}</span>
+                              <span className="truncate">Prazo: {item.dueDateLabel}</span>
+                              <span className="truncate">Valor: {formatCurrency(item.amountCents)}</span>
+                              <span className="truncate">Execução: {item.statusLabel}</span>
+                              <span
+                                className={`truncate ${
+                                  item.hasCharge
+                                    ? "text-[var(--text-muted)]"
+                                    : "text-amber-400/90"
+                                }`}
+                              >
+                                {item.hasCharge ? "Com cobrança" : "Sem cobrança"}
+                              </span>
                             </div>
                           </div>
 
                           <div
-                            className="shrink-0"
+                            className="shrink-0 pt-0.5"
                             onClick={event => event.stopPropagation()}
                           >
                             <AppRowActionsDropdown
