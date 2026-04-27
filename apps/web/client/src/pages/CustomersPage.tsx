@@ -333,7 +333,7 @@ export default function CustomersPage() {
   );
 
   return (
-    <PageWrapper title="Clientes">
+    <PageWrapper title="Clientes" showOperationalHeader={false}>
       <div className="flex flex-col gap-4">
         <AppOperationalHeader
           title="Clientes"
