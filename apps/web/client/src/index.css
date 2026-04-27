@@ -327,7 +327,7 @@
   --nexo-title-font: "DM Sans", "Inter", system-ui, sans-serif;
   --nexo-body-font: "DM Sans", "Inter", system-ui, sans-serif;
   --nexo-space-page-padding-x: 1.5rem;
-  --nexo-space-page-padding-y: 1.5rem;
+  --nexo-space-page-padding-y: 0.5rem;
   --nexo-space-section-gap: 1.25rem;
   --nexo-space-card-padding: 1rem;
   --nexo-space-toolbar-gap: 0.625rem;
@@ -1747,7 +1747,7 @@ html {
     width: 100%;
     min-width: 0;
     max-width: none;
-    padding: 1.25rem 0.75rem;
+    padding: 0.5rem 0.75rem;
     padding-bottom: 2.5rem;
     gap: 1.25rem;
     overflow-x: clip;
