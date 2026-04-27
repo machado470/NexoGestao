@@ -338,6 +338,7 @@ export default function CustomersPage() {
         <AppOperationalHeader
           title="Clientes"
           description="Central de relacionamento, execução e histórico operacional por cliente."
+          density="compact"
           primaryAction={
             <Button onClick={() => setCreateOpen(true)}>Novo cliente</Button>
           }

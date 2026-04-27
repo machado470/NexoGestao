@@ -415,6 +415,7 @@ export default function ServiceOrdersPage() {
           <AppOperationalHeader
             title="Ordens de Serviço"
             description="Execução, status e cobrança dos serviços."
+            density="compact"
             primaryAction={
               <Button type="button" onClick={() => setOpenCreate(true)}>
                 Nova O.S.

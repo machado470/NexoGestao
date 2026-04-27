@@ -293,6 +293,7 @@ export default function AppointmentsPage() {
         <AppOperationalHeader
           title="Agendamentos"
           description="Controle do tempo, confirmação e preparação da execução"
+          density="compact"
           primaryAction={
             <Button className="bg-orange-500 text-white hover:bg-orange-400" onClick={() => { setEditing(null); setOpenModal(true); }}>
               Novo agendamento
