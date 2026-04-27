@@ -412,14 +412,11 @@ export default function ServiceOrdersPage() {
 
   return (
     <AppPageShell>
-      <PageWrapper
-        title="Ordens de Serviço"
-        subtitle="Execução, status e cobrança dos serviços."
-      >
+      <PageWrapper title="Ordens de Serviço">
         <div className="flex flex-col gap-3">
           <AppOperationalHeader
             title="Ordens de Serviço"
-            description="Execução, status e cobrança dos serviços"
+            description="Execução, status e cobrança dos serviços."
             primaryAction={
               <Button type="button" onClick={() => setOpenCreate(true)}>
                 Nova O.S.
