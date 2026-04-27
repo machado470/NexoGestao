@@ -46,6 +46,7 @@ type MessageStatus = "QUEUED" | "SENT" | "DELIVERED" | "READ" | "FAILED";
 
 type Conversation = {
   id: string;
+  conversationId?: string | null;
   customerId?: string | null;
   name: string;
   phone?: string | null;
@@ -151,6 +152,7 @@ function mapConversation(item: any): Conversation {
   const customerName = item?.customer?.name ?? item?.title ?? "Sem nome";
   return {
     id: String(item?.id ?? ""),
+    conversationId: String(item?.id ?? ""),
     customerId: item?.customerId ?? item?.customer?.id ?? null,
     name: String(customerName),
     phone: item?.phone ?? item?.customer?.phone ?? null,
@@ -721,10 +723,12 @@ function ContextPanel({
 export default function WhatsAppPage() {
   const [location, setLocation] = useLocation();
   const searchParams = new URLSearchParams(location.split("?")[1] ?? "");
+  const queryConversationId = searchParams.get("conversationId");
+  const queryCustomerId = searchParams.get("customerId");
 
   const [selectedConversationId, setSelectedConversationId] = useOperationalMemoryState<string | null>(
     "nexo.whatsapp.selected-conversation.v1",
-    searchParams.get("conversationId") ?? null
+    queryConversationId ?? (queryCustomerId ? `customer:${queryCustomerId}` : null)
   );
   const [searchTerm, setSearchTerm] = useOperationalMemoryState("nexo.whatsapp.search.v2", "");
   const [activeFilter, setActiveFilter] = useOperationalMemoryState<ConversationFilter>(
@@ -743,7 +747,7 @@ export default function WhatsAppPage() {
   }, [searchTerm]);
 
   const filtersInput = useMemo(() => {
-    const input: Record<string, unknown> = { search: debouncedSearch || undefined };
+    const input: Record<string, unknown> = {};
     if (activeFilter === "no_reply") input.onlyUnread = true;
     if (activeFilter === "billing") input.onlyPending = true;
     if (activeFilter === "failures") input.onlyFailed = true;
@@ -762,21 +766,78 @@ export default function WhatsAppPage() {
     () => (Array.isArray(conversationsQuery.data) ? conversationsQuery.data.map(mapConversation) : []),
     [conversationsQuery.data]
   );
+  const customersQuery = trpc.nexo.customers.list.useQuery({ page: 1, limit: 500 }, { retry: false });
+  const customers = useMemo(() => {
+    const raw = customersQuery.data as any;
+    if (Array.isArray(raw)) return raw;
+    if (Array.isArray(raw?.items)) return raw.items;
+    return [];
+  }, [customersQuery.data]);
+
+  const conversationCustomerIds = useMemo(
+    () => new Set(conversations.map(item => item.customerId).filter(Boolean) as string[]),
+    [conversations]
+  );
+  const customersWithoutConversation = useMemo(
+    () =>
+      customers
+        .filter((customer: any) => customer?.id && !conversationCustomerIds.has(String(customer.id)))
+        .map((customer: any): Conversation => ({
+          id: `customer:${String(customer.id)}`,
+          conversationId: null,
+          customerId: String(customer.id),
+          name: String(customer?.name ?? "Sem nome"),
+          phone: customer?.phone ? String(customer.phone) : null,
+          title: "Sem conversa ativa",
+          lastMessage: "Sem conversa ativa",
+          lastMessageAt: null,
+          status: "OPEN",
+          contextType: "GENERAL",
+          priority: "LOW",
+          unreadCount: 0,
+          contextId: String(customer.id),
+        })),
+    [conversationCustomerIds, customers]
+  );
+  const allInboxRows = useMemo(
+    () => [...conversations, ...(activeFilter === "all" ? customersWithoutConversation : [])],
+    [activeFilter, conversations, customersWithoutConversation]
+  );
+  const filteredRows = useMemo(() => {
+    const query = debouncedSearch.trim().toLowerCase();
+    return allInboxRows.filter(item => {
+      const matchesSearch = !query
+        || [item.name, item.phone ?? "", item.lastMessage, item.title ?? ""].join(" ").toLowerCase().includes(query);
+      if (!matchesSearch) return false;
+      if (activeFilter === "all") return true;
+      if (!item.conversationId) return false;
+      if (activeFilter === "no_reply") return item.unreadCount > 0;
+      if (activeFilter === "billing") return item.status === "PENDING";
+      if (activeFilter === "failures") return item.status === "FAILED";
+      if (activeFilter === "charges") return item.contextType === "CHARGE";
+      if (activeFilter === "appointments") return item.contextType === "APPOINTMENT";
+      if (activeFilter === "service_orders") return item.contextType === "SERVICE_ORDER";
+      return true;
+    });
+  }, [activeFilter, allInboxRows, debouncedSearch]);
 
   const selectedConversation = useMemo(
-    () => conversations.find(item => item.id === selectedConversationId),
-    [conversations, selectedConversationId]
+    () =>
+      filteredRows.find(item => item.id === selectedConversationId)
+      ?? allInboxRows.find(item => item.id === selectedConversationId),
+    [allInboxRows, filteredRows, selectedConversationId]
   );
+  const selectedConversationRecordId = selectedConversation?.conversationId ?? null;
 
   useEffect(() => {
-    if (conversations.length === 0) {
+    if (filteredRows.length === 0) {
       if (selectedConversationId !== null) setSelectedConversationId(null);
       return;
     }
-    if (!selectedConversationId || !conversations.some(item => item.id === selectedConversationId)) {
-      setSelectedConversationId(conversations[0]?.id ?? null);
+    if (!selectedConversationId || !filteredRows.some(item => item.id === selectedConversationId)) {
+      setSelectedConversationId(filteredRows[0]?.id ?? null);
     }
-  }, [conversations, selectedConversationId, setSelectedConversationId]);
+  }, [filteredRows, selectedConversationId, setSelectedConversationId]);
 
   useEffect(() => {
     if (!selectedConversationId) {
@@ -786,17 +847,17 @@ export default function WhatsAppPage() {
   }, [selectedConversationId, setContent]);
 
   const conversationDetailsQuery = trpc.nexo.whatsapp.getConversation.useQuery(
-    { id: selectedConversationId ?? "" },
-    { enabled: Boolean(selectedConversationId), retry: false }
+    { id: selectedConversationRecordId ?? "" },
+    { enabled: Boolean(selectedConversationRecordId), retry: false }
   );
 
   const messagesQuery = trpc.nexo.whatsapp.getMessages.useQuery(
-    { conversationId: selectedConversationId ?? "" },
-    { enabled: Boolean(selectedConversationId), retry: false }
+    { conversationId: selectedConversationRecordId ?? "" },
+    { enabled: Boolean(selectedConversationRecordId), retry: false }
   );
   const contextQuery = trpc.nexo.whatsapp.getContext.useQuery(
-    { conversationId: selectedConversationId ?? "" },
-    { enabled: Boolean(selectedConversationId), retry: false }
+    { conversationId: selectedConversationRecordId ?? "" },
+    { enabled: Boolean(selectedConversationRecordId), retry: false }
   );
 
   const sendMessageMutation = trpc.nexo.whatsapp.sendMessage.useMutation();
@@ -805,10 +866,29 @@ export default function WhatsAppPage() {
   const retryMessageMutation = trpc.nexo.whatsapp.retryMessage.useMutation();
 
   const messages = useMemo(
-    () => (selectedConversationId && Array.isArray(messagesQuery.data) ? messagesQuery.data.map(mapMessage).reverse() : []),
-    [messagesQuery.data, selectedConversationId]
+    () =>
+      selectedConversationRecordId && Array.isArray(messagesQuery.data)
+        ? messagesQuery.data.map(mapMessage).reverse()
+        : [],
+    [messagesQuery.data, selectedConversationRecordId]
   );
-  const context = (selectedConversationId ? contextQuery.data ?? null : null) as WhatsAppContext | null;
+  const selectedCustomer = useMemo(
+    () => customers.find((customer: any) => String(customer?.id ?? "") === String(selectedConversation?.customerId ?? "")) ?? null,
+    [customers, selectedConversation?.customerId]
+  );
+  const context = useMemo(() => {
+    if (selectedConversationRecordId) return (contextQuery.data ?? null) as WhatsAppContext | null;
+    if (selectedCustomer) {
+      return {
+        customer: {
+          id: String(selectedCustomer.id),
+          name: String(selectedCustomer.name ?? selectedConversation?.name ?? "Sem nome"),
+          phone: selectedCustomer.phone ? String(selectedCustomer.phone) : undefined,
+        },
+      } as WhatsAppContext;
+    }
+    return null;
+  }, [contextQuery.data, selectedConversation?.name, selectedConversationRecordId, selectedCustomer]);
 
   const refreshAll = async () => {
     await Promise.all([
@@ -830,6 +910,10 @@ export default function WhatsAppPage() {
       setComposerError("Selecione uma conversa antes de enviar.");
       return;
     }
+    if (!selectedConversationRecordId) {
+      setComposerError("Este cliente ainda está sem conversa ativa.");
+      return;
+    }
     const finalContent = content.trim();
     if (!finalContent) {
       setComposerError("Digite uma mensagem antes de enviar.");
@@ -840,7 +924,7 @@ export default function WhatsAppPage() {
     try {
       const entity = resolveEntityFromContext(context);
       await sendMessageMutation.mutateAsync({
-        conversationId: selectedConversationId,
+        conversationId: selectedConversationRecordId,
         customerId: context?.customer?.id ?? selectedConversation?.customerId ?? undefined,
         content: finalContent,
         entityType: entity.entityType,
@@ -862,12 +946,12 @@ export default function WhatsAppPage() {
   };
 
   const handleSendTemplate = async (templateKey: string) => {
-    if (!selectedConversationId) return;
+    if (!selectedConversationId || !selectedConversationRecordId) return;
     try {
       const entity = resolveEntityFromContext(context);
       await sendTemplateMutation.mutateAsync({
         templateKey,
-        conversationId: selectedConversationId,
+        conversationId: selectedConversationRecordId,
         customerId: context?.customer?.id ?? selectedConversation?.customerId ?? undefined,
         entityType: entity.entityType,
         entityId: entity.entityId,
@@ -889,9 +973,9 @@ export default function WhatsAppPage() {
   };
 
   const handleConversationStatus = async (status: "PENDING" | "RESOLVED" | "OPEN") => {
-    if (!selectedConversationId) return;
+    if (!selectedConversationRecordId) return;
     try {
-      await updateStatusMutation.mutateAsync({ id: selectedConversationId, status: status as any });
+      await updateStatusMutation.mutateAsync({ id: selectedConversationRecordId, status: status as any });
       await refreshAll();
       toast.success(`Conversa atualizada para ${status}.`);
     } catch (error: any) {
@@ -962,7 +1046,7 @@ export default function WhatsAppPage() {
     await handleSendTemplate("manual_followup");
   };
 
-  if (conversationsQuery.isLoading && conversations.length === 0) {
+  if (conversationsQuery.isLoading && customersQuery.isLoading && allInboxRows.length === 0) {
     return (
       <AppPageShell>
         <AppPageLoadingState
@@ -978,15 +1062,18 @@ export default function WhatsAppPage() {
       <div className="grid h-full min-h-0 grid-cols-1 gap-4 overflow-hidden bg-transparent xl:grid-cols-[minmax(260px,300px)_minmax(0,1fr)_minmax(280px,320px)]">
         <div className="h-full min-h-0 min-w-0 overflow-hidden">
           <ConversationsList
-            rows={conversations}
+            rows={filteredRows}
             selectedId={selectedConversationId}
             onSelect={handleSelectConversation}
             filter={activeFilter}
             onFilter={setActiveFilter}
             search={searchTerm}
             onSearch={setSearchTerm}
-            isLoading={conversationsQuery.isLoading || conversationsQuery.isFetching}
-            hasError={Boolean(conversationsQuery.error)}
+            isLoading={
+              (conversationsQuery.isLoading || conversationsQuery.isFetching || customersQuery.isLoading || customersQuery.isFetching)
+              && filteredRows.length === 0
+            }
+            hasError={Boolean(conversationsQuery.error) || Boolean(customersQuery.error)}
           />
         </div>
 
