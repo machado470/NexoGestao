@@ -81,6 +81,7 @@ export function AppOperationalHeader({
   contextChips,
   children,
   className,
+  density = "default",
 }: {
   title: ReactNode;
   description?: ReactNode;
@@ -89,19 +90,23 @@ export function AppOperationalHeader({
   contextChips?: ReactNode;
   children?: ReactNode;
   className?: string;
+  density?: "default" | "compact";
 }) {
+  const isCompact = density === "compact";
+
   return (
     <section
       className={cn(
-        "rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] px-6 py-5",
+        "rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] px-6",
+        isCompact ? "py-4" : "py-5",
         className
       )}
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className={cn("flex flex-wrap items-start justify-between", isCompact ? "gap-2.5" : "gap-3")}>
         <div className="min-w-0 flex-1">
           <h1 className="nexo-page-header-title">{title}</h1>
           {description ? (
-            <p className="nexo-page-header-description mt-1">{description}</p>
+            <p className={cn("nexo-page-header-description", isCompact ? "mt-0.5" : "mt-1")}>{description}</p>
           ) : null}
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
@@ -111,11 +116,11 @@ export function AppOperationalHeader({
       </div>
 
       {contextChips ? (
-        <div className="mt-3 flex flex-wrap items-center gap-2">{contextChips}</div>
+        <div className={cn("flex flex-wrap items-center gap-2", isCompact ? "mt-2.5" : "mt-3")}>{contextChips}</div>
       ) : null}
 
       {children ? (
-        <div className="mt-3 border-t border-[var(--border-subtle)] pt-3">{children}</div>
+        <div className={cn("border-t border-[var(--border-subtle)]", isCompact ? "mt-2.5 pt-2.5" : "mt-3 pt-3")}>{children}</div>
       ) : null}
     </section>
   );
