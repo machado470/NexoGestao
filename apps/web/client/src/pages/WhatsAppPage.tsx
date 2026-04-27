@@ -396,6 +396,8 @@ function ConversationsList({
 
 function ChatPanel({
   conversation,
+  canCompose,
+  composePlaceholder,
   messages,
   isLoading,
   sendMessage,
@@ -408,6 +410,8 @@ function ChatPanel({
   error,
 }: {
   conversation?: Conversation;
+  canCompose: boolean;
+  composePlaceholder: string;
   messages: ChatMessage[];
   isLoading: boolean;
   sendMessage: () => void;
@@ -544,9 +548,9 @@ function ChatPanel({
         </button>
         <input
           value={content}
-          onChange={event => hasConversation && setContent(event.target.value)}
-          placeholder={hasConversation ? "Digite sua mensagem..." : "Selecione uma conversa para responder..."}
-          disabled={!hasConversation}
+          onChange={event => canCompose && setContent(event.target.value)}
+          placeholder={hasConversation ? composePlaceholder : "Selecione uma conversa para responder..."}
+          disabled={!hasConversation || !canCompose}
           className="h-9 min-w-0 flex-1 rounded-lg bg-white/[0.02] px-3 text-sm outline-none placeholder:text-[var(--text-muted)]/70"
         />
         <Button
@@ -554,7 +558,7 @@ function ChatPanel({
           size="sm"
           className="h-9 rounded-full bg-emerald-600/85 px-3 hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-45"
           onClick={sendMessage}
-          disabled={!hasConversation}
+          disabled={!hasConversation || !canCompose}
         >
           <Send className="size-3.5" />
         </Button>
@@ -846,6 +850,18 @@ export default function WhatsAppPage() {
     }
   }, [selectedConversationId, setContent]);
 
+  useEffect(() => {
+    if (!selectedConversationId?.startsWith("customer:")) return;
+    const customerId = selectedConversation?.customerId;
+    if (!customerId) return;
+    const existingConversation = conversations.find(
+      (item) => item.customerId === customerId && Boolean(item.conversationId)
+    );
+    if (existingConversation?.id && existingConversation.id !== selectedConversationId) {
+      setSelectedConversationId(existingConversation.id);
+    }
+  }, [conversations, selectedConversation?.customerId, selectedConversationId, setSelectedConversationId]);
+
   const conversationDetailsQuery = trpc.nexo.whatsapp.getConversation.useQuery(
     { id: selectedConversationRecordId ?? "" },
     { enabled: Boolean(selectedConversationRecordId), retry: false }
@@ -890,6 +906,17 @@ export default function WhatsAppPage() {
     return null;
   }, [contextQuery.data, selectedConversation?.name, selectedConversationRecordId, selectedCustomer]);
 
+  const destinationPhone = useMemo(
+    () => String(context?.customer?.phone ?? selectedConversation?.phone ?? selectedCustomer?.phone ?? "").trim(),
+    [context?.customer?.phone, selectedConversation?.phone, selectedCustomer?.phone]
+  );
+  const canComposeForSelected = Boolean(selectedConversationId) && Boolean(destinationPhone);
+  const composePlaceholder = selectedConversation
+    ? selectedConversationRecordId
+      ? "Digite sua mensagem..."
+      : "Iniciar conversa com este cliente..."
+    : "Selecione uma conversa para responder...";
+
   const refreshAll = async () => {
     await Promise.all([
       conversationsQuery.refetch(),
@@ -910,8 +937,13 @@ export default function WhatsAppPage() {
       setComposerError("Selecione uma conversa antes de enviar.");
       return;
     }
-    if (!selectedConversationRecordId) {
-      setComposerError("Este cliente ainda está sem conversa ativa.");
+    const customerId = context?.customer?.id ?? selectedConversation?.customerId ?? undefined;
+    if (!selectedConversationRecordId && !customerId) {
+      setComposerError("Não foi possível identificar o cliente para iniciar a conversa.");
+      return;
+    }
+    if (!destinationPhone) {
+      setComposerError("Cliente sem telefone válido. Cadastre um número para iniciar a conversa.");
       return;
     }
     const finalContent = content.trim();
@@ -924,15 +956,17 @@ export default function WhatsAppPage() {
     try {
       const entity = resolveEntityFromContext(context);
       await sendMessageMutation.mutateAsync({
-        conversationId: selectedConversationRecordId,
-        customerId: context?.customer?.id ?? selectedConversation?.customerId ?? undefined,
+        conversationId: selectedConversationRecordId ?? undefined,
+        customerId,
+        toPhone: destinationPhone,
         content: finalContent,
         entityType: entity.entityType,
-        entityId: entity.entityId,
+        entityId: entity.entityId ?? customerId ?? undefined,
         messageType: "MANUAL",
       });
       setContent("");
-      await refreshAll();
+      await conversationsQuery.refetch();
+      await Promise.all([messagesQuery.refetch(), contextQuery.refetch(), conversationDetailsQuery.refetch()]);
     } catch (error: any) {
       console.error(error);
       setComposerError(error?.message ?? "Falha ao enviar mensagem.");
@@ -946,15 +980,25 @@ export default function WhatsAppPage() {
   };
 
   const handleSendTemplate = async (templateKey: string) => {
-    if (!selectedConversationId || !selectedConversationRecordId) return;
+    if (!selectedConversationId) return;
+    const customerId = context?.customer?.id ?? selectedConversation?.customerId ?? undefined;
+    if (!selectedConversationRecordId && !customerId) {
+      toast.error("Não foi possível identificar o cliente para iniciar a conversa.");
+      return;
+    }
+    if (!destinationPhone) {
+      toast.error("Cliente sem telefone válido. Cadastre um número para iniciar a conversa.");
+      return;
+    }
     try {
       const entity = resolveEntityFromContext(context);
       await sendTemplateMutation.mutateAsync({
         templateKey,
-        conversationId: selectedConversationRecordId,
-        customerId: context?.customer?.id ?? selectedConversation?.customerId ?? undefined,
+        conversationId: selectedConversationRecordId ?? undefined,
+        customerId,
+        toPhone: destinationPhone,
         entityType: entity.entityType,
-        entityId: entity.entityId,
+        entityId: entity.entityId ?? customerId ?? undefined,
         context: {
           customerName: context?.customer?.name,
           appointmentDate: context?.nextAppointment?.scheduledAt,
@@ -965,7 +1009,8 @@ export default function WhatsAppPage() {
           serviceOrderNumber: context?.activeServiceOrder?.number,
         },
       });
-      await refreshAll();
+      await conversationsQuery.refetch();
+      await Promise.all([messagesQuery.refetch(), contextQuery.refetch(), conversationDetailsQuery.refetch()]);
       toast.success("Template enviado.");
     } catch (error: any) {
       toast.error(error?.message ?? "Falha ao enviar template.");
@@ -1080,6 +1125,8 @@ export default function WhatsAppPage() {
         <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
           <ChatPanel
             conversation={selectedConversation}
+            canCompose={canComposeForSelected}
+            composePlaceholder={composePlaceholder}
             messages={messages}
             isLoading={messagesQuery.isLoading || messagesQuery.isFetching}
             sendMessage={handleManualSend}

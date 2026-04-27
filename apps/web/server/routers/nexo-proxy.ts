@@ -733,8 +733,23 @@ export const nexoProxyRouter = router({
       .query(async ({ ctx, input }) => authedGet(ctx as CtxLike, `/whatsapp/conversations/${input.conversationId}/context`)),
 
     sendMessage: protectedProcedure
-      .input(z.object({ conversationId: z.string().min(1), customerId: z.string().optional(), content: z.string().min(1), toPhone: z.string().optional(), entityType: z.string().optional(), entityId: z.string().optional(), messageType: z.string().optional() }))
-      .mutation(async ({ ctx, input }) => authedPost(ctx as CtxLike, `/whatsapp/conversations/${input.conversationId}/messages`, input)),
+      .input(z.object({
+        conversationId: z.string().min(1).optional(),
+        customerId: z.string().min(1).optional(),
+        content: z.string().min(1),
+        toPhone: z.string().optional(),
+        entityType: z.string().optional(),
+        entityId: z.string().optional(),
+        messageType: z.string().optional(),
+      }).refine((value) => Boolean(value.conversationId || value.customerId), {
+        message: 'conversationId ou customerId é obrigatório',
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (input.conversationId) {
+          return authedPost(ctx as CtxLike, `/whatsapp/conversations/${input.conversationId}/messages`, input)
+        }
+        return authedPost(ctx as CtxLike, '/whatsapp/messages', input)
+      }),
 
     sendTemplate: protectedProcedure
       .input(z.object({ templateKey: z.string().min(1), customerId: z.string().optional(), conversationId: z.string().optional(), context: z.record(z.string(), z.any()).optional(), toPhone: z.string().optional(), entityType: z.string().optional(), entityId: z.string().optional(), messageType: z.string().optional() }))
