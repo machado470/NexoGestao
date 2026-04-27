@@ -288,15 +288,11 @@ export default function AppointmentsPage() {
   const hasError = appointmentsQuery.isError || customersQuery.isError || peopleQuery.isError || serviceOrdersQuery.isError;
 
   return (
-    <PageWrapper
-      title="Agendamentos"
-      subtitle="controle do tempo, confirmação e preparação da execução"
-      primaryAction={<Button className="bg-orange-500 text-white hover:bg-orange-400" onClick={() => { setEditing(null); setOpenModal(true); }}>Novo agendamento</Button>}
-    >
-      <div className="flex flex-col gap-3">
+    <PageWrapper title="Agendamentos" showOperationalHeader={false}>
+      <div className="flex flex-col gap-4">
         <AppOperationalHeader
           title="Agendamentos"
-          description="Controle do tempo, confirmação e preparação da execução."
+          description="Controle do tempo, confirmação e preparação da execução"
           primaryAction={
             <Button className="bg-orange-500 text-white hover:bg-orange-400" onClick={() => { setEditing(null); setOpenModal(true); }}>
               Novo agendamento

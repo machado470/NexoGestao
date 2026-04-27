@@ -11,7 +11,7 @@ import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { Button } from "@/components/design-system";
-import { AppPageShell, AppRowActionsDropdown } from "@/components/app-system";
+import { AppRowActionsDropdown } from "@/components/app-system";
 import {
   AppFiltersBar,
   AppOperationalHeader,
@@ -411,9 +411,8 @@ export default function ServiceOrdersPage() {
   }
 
   return (
-    <AppPageShell>
-      <PageWrapper title="Ordens de Serviço">
-        <div className="flex flex-col gap-3">
+    <PageWrapper title="Ordens de Serviço" showOperationalHeader={false}>
+      <div className="flex flex-col gap-4">
           <AppOperationalHeader
             title="Ordens de Serviço"
             description="Execução, status e cobrança dos serviços."
@@ -456,7 +455,7 @@ export default function ServiceOrdersPage() {
             ))}
           </AppFiltersBar>
 
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-4">
             <AppSectionBlock
               title="Carteira de O.S."
               subtitle="Lista compacta para execução operacional"
@@ -822,7 +821,6 @@ export default function ServiceOrdersPage() {
             name: safeText(item?.name, "Pessoa"),
           }))}
         />
-      </PageWrapper>
-    </AppPageShell>
+    </PageWrapper>
   );
 }

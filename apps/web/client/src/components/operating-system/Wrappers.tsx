@@ -9,6 +9,7 @@ type PageWrapperProps = {
   subtitle?: ReactNode;
   primaryAction?: ReactNode;
   breadcrumb?: Array<{ label: string; href?: string }>;
+  showOperationalHeader?: boolean;
   children: ReactNode;
 };
 
@@ -17,16 +18,19 @@ export function PageWrapper({
   subtitle,
   primaryAction,
   breadcrumb,
+  showOperationalHeader = true,
   children,
 }: PageWrapperProps) {
   return (
     <PageShell>
       <div className="space-y-4 md:space-y-5">
-        <OperationalHeader
-          description={subtitle}
-          primaryAction={primaryAction}
-          breadcrumb={breadcrumb}
-        />
+        {showOperationalHeader ? (
+          <OperationalHeader
+            description={subtitle}
+            primaryAction={primaryAction}
+            breadcrumb={breadcrumb}
+          />
+        ) : null}
         {children}
       </div>
     </PageShell>
