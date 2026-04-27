@@ -93,7 +93,7 @@ export function AppOperationalHeader({
   return (
     <section
       className={cn(
-        "rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3.5 md:p-4",
+        "rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] px-6 py-5",
         className
       )}
     >
