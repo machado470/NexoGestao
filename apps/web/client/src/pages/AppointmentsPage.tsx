@@ -23,6 +23,7 @@ import {
   AppPageEmptyState,
   AppPageErrorState,
   AppPageLoadingState,
+  AppPagination,
   AppSectionBlock,
 } from "@/components/internal-page-system";
 
@@ -96,6 +97,8 @@ export default function AppointmentsPage() {
   const [editing, setEditing] = useState<AppointmentRow | null>(null);
   const [openServiceOrderModal, setOpenServiceOrderModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 8;
 
   const queryParams = useMemo(() => {
     const queryString = location.includes("?") ? location.split("?")[1] : "";
@@ -199,6 +202,19 @@ export default function AppointmentsPage() {
 
     return [...base].sort((a, b) => (b.start?.getTime() ?? 0) - (a.start?.getTime() ?? 0));
   }, [mapped, queryParams.customerId, selectedFilter, queryText, dayStart, dayEnd, tomorrowStart, tomorrowEnd, weekEnd]);
+  const paginatedAppointments = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [currentPage, filtered, pageSize]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [queryText, queryParams.customerId, selectedFilter]);
+
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+    if (currentPage > totalPages) setCurrentPage(1);
+  }, [currentPage, filtered.length, pageSize]);
 
   useEffect(() => {
     if (queryParams.appointmentId) {
@@ -363,8 +379,9 @@ export default function AppointmentsPage() {
               description="Nenhum agendamento encontrado para o filtro atual."
             />
           ) : (
-            <div className="grid grid-cols-1 gap-2 lg:grid-cols-2 2xl:grid-cols-3">
-              {filtered.map((row) => {
+            <>
+              <div className="grid grid-cols-1 gap-2 lg:grid-cols-2 2xl:grid-cols-3">
+                {paginatedAppointments.map((row) => {
                 const status = mapStatus(row.item.status);
                 const orderId = row.order?.id ? String(row.order.id) : null;
                 const appointmentId = String(row.item.id ?? "");
@@ -433,8 +450,15 @@ export default function AppointmentsPage() {
                     </div>
                   </article>
                 );
-              })}
-            </div>
+                })}
+              </div>
+              <AppPagination
+                currentPage={currentPage}
+                totalItems={filtered.length}
+                pageSize={pageSize}
+                onPageChange={setCurrentPage}
+              />
+            </>
           )}
         </AppSectionBlock>
 

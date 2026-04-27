@@ -3,6 +3,8 @@ import {
   ArrowDownRight,
   ArrowRight,
   ArrowUpRight,
+  ChevronLeft,
+  ChevronRight,
   ChevronDown,
   CircleCheck,
   Inbox,
@@ -179,6 +181,133 @@ export function AppSecondaryTabs<T extends string>({
         })}
       </div>
     </nav>
+  );
+}
+
+type AppPaginationProps = {
+  currentPage: number;
+  totalItems: number;
+  pageSize?: number;
+  onPageChange: (page: number) => void;
+  className?: string;
+};
+
+function buildPagination(currentPage: number, totalPages: number) {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }
+
+  if (currentPage <= 4) {
+    return [1, 2, 3, 4, 5, "...", totalPages] as const;
+  }
+
+  if (currentPage >= totalPages - 3) {
+    return [
+      1,
+      "...",
+      totalPages - 4,
+      totalPages - 3,
+      totalPages - 2,
+      totalPages - 1,
+      totalPages,
+    ] as const;
+  }
+
+  return [1, "...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages] as const;
+}
+
+export function AppPagination({
+  currentPage,
+  totalItems,
+  pageSize = 8,
+  onPageChange,
+  className,
+}: AppPaginationProps) {
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const safePage = Math.min(Math.max(currentPage, 1), totalPages);
+  const startItem = totalItems === 0 ? 0 : (safePage - 1) * pageSize + 1;
+  const endItem = totalItems === 0 ? 0 : Math.min(safePage * pageSize, totalItems);
+  const pages = buildPagination(safePage, totalPages);
+
+  const baseButtonClass =
+    "inline-flex h-8 min-w-8 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-40";
+
+  return (
+    <div
+      className={cn(
+        "mt-2 flex flex-col gap-2 border-t border-[var(--border-subtle)] pt-3 sm:flex-row sm:items-center sm:justify-between",
+        className
+      )}
+    >
+      <p className="text-xs text-[var(--text-muted)]">
+        Mostrando {startItem}–{endItem} de {totalItems} registros
+      </p>
+
+      <div className="hidden items-center gap-1 sm:flex">
+        <button
+          type="button"
+          className={baseButtonClass}
+          disabled={safePage === 1}
+          onClick={() => onPageChange(safePage - 1)}
+          aria-label="Página anterior"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        {pages.map((item, index) =>
+          item === "..." ? (
+            <span key={`ellipsis-${index}`} className="px-1 text-xs text-[var(--text-muted)]">
+              ...
+            </span>
+          ) : (
+            <button
+              key={`page-${item}`}
+              type="button"
+              onClick={() => onPageChange(item)}
+              className={cn(
+                baseButtonClass,
+                safePage === item
+                  ? "border-[var(--accent-primary)] bg-[var(--accent-soft)] text-[var(--accent-primary)]"
+                  : undefined
+              )}
+              aria-current={safePage === item ? "page" : undefined}
+            >
+              {item}
+            </button>
+          )
+        )}
+        <button
+          type="button"
+          className={baseButtonClass}
+          disabled={safePage === totalPages}
+          onClick={() => onPageChange(safePage + 1)}
+          aria-label="Próxima página"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="flex items-center justify-end gap-2 sm:hidden">
+        <button
+          type="button"
+          className={baseButtonClass}
+          disabled={safePage === 1}
+          onClick={() => onPageChange(safePage - 1)}
+        >
+          Anterior
+        </button>
+        <span className="text-xs font-medium text-[var(--text-secondary)]">
+          {safePage}/{totalPages}
+        </span>
+        <button
+          type="button"
+          className={baseButtonClass}
+          disabled={safePage === totalPages}
+          onClick={() => onPageChange(safePage + 1)}
+        >
+          Próxima
+        </button>
+      </div>
+    </div>
   );
 }
 

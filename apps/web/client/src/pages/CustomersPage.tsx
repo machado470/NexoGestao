@@ -19,6 +19,7 @@ import {
   AppPageEmptyState,
   AppPageErrorState,
   AppPageLoadingState,
+  AppPagination,
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
@@ -91,6 +92,7 @@ function normalizeWorkspace(input: unknown): Workspace {
 }
 
 export default function CustomersPage() {
+  const pageSize = 8;
   const [location, navigate] = useLocation();
   const [searchTerm, setSearchTerm] = useOperationalMemoryState(
     "nexo.customers.search.v2",
@@ -111,6 +113,7 @@ export default function CustomersPage() {
   const [pendingEditCustomerId, setPendingEditCustomerId] = useState<
     string | null
   >(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const customersQuery = trpc.nexo.customers.list.useQuery(
     { page: 1, limit: 300 },
@@ -303,6 +306,21 @@ export default function CustomersPage() {
   const isLoading = customersQuery.isLoading && customers.length === 0;
   const hasBlockingError =
     Boolean(customersQuery.error) && customers.length === 0;
+  const paginatedCustomers = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return displayedCustomers.slice(start, start + pageSize);
+  }, [currentPage, displayedCustomers, pageSize]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeFilter, searchTerm]);
+
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(displayedCustomers.length / pageSize));
+    if (currentPage > totalPages) {
+      setCurrentPage(1);
+    }
+  }, [currentPage, displayedCustomers.length, pageSize]);
 
   usePageDiagnostics({
     page: "customers",
@@ -415,7 +433,7 @@ export default function CustomersPage() {
             ) : (
               <div className="space-y-2">
                 <div className="grid grid-cols-1 gap-2 lg:grid-cols-2 2xl:grid-cols-3">
-                  {displayedCustomers.map(customer => {
+                  {paginatedCustomers.map(customer => {
                     const customerId = String(customer.id ?? "");
                     const aggregate = byCustomer.get(customerId);
                     if (!aggregate) return null;
@@ -571,6 +589,12 @@ export default function CustomersPage() {
                     );
                   })}
                 </div>
+                <AppPagination
+                  currentPage={currentPage}
+                  totalItems={displayedCustomers.length}
+                  pageSize={pageSize}
+                  onPageChange={setCurrentPage}
+                />
               </div>
             )}
           </AppSectionBlock>

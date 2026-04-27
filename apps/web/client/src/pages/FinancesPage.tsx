@@ -11,6 +11,7 @@ import {
   AppPageErrorState,
   AppPageHeader,
   AppPageLoadingState,
+  AppPagination,
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
@@ -91,6 +92,8 @@ export default function FinancesPage() {
   const [openCreate, setOpenCreate] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 8;
   const [selectedChargeId, setSelectedChargeId] = useState<string | null>(null);
   const [openPayModalFor, setOpenPayModalFor] = useState<ChargeRecord | null>(null);
   const [openEditModalFor, setOpenEditModalFor] = useState<ChargeRecord | null>(null);
@@ -176,6 +179,19 @@ export default function FinancesPage() {
       return true;
     });
   }, [scopedCharges, searchTerm, statusFilter]);
+  const paginatedCharges = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredCharges.slice(start, start + pageSize);
+  }, [currentPage, filteredCharges, pageSize]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, queryParams.customerId, queryParams.serviceOrderId]);
+
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(filteredCharges.length / pageSize));
+    if (currentPage > totalPages) setCurrentPage(1);
+  }, [currentPage, filteredCharges.length, pageSize]);
 
   const hasFiltersContext = Boolean(queryParams.customerId || queryParams.serviceOrderId);
 
@@ -518,8 +534,9 @@ export default function FinancesPage() {
           ) : null}
 
           {!allQueriesLoading && !allQueriesErrored && filteredCharges.length > 0 ? (
-            <AppDataTable>
-              <table className="w-full min-w-[980px] text-sm">
+            <>
+              <AppDataTable>
+                <table className="w-full min-w-[980px] text-sm">
                 <thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]">
                   <tr>
                     <th className="p-2.5 text-left">Cliente</th>
@@ -533,7 +550,7 @@ export default function FinancesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredCharges.map((row) => (
+                  {paginatedCharges.map((row) => (
                     <tr
                       key={String(row?.id ?? "")}
                       className="cursor-pointer border-t border-[var(--border-subtle)]"
@@ -591,8 +608,15 @@ export default function FinancesPage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
-            </AppDataTable>
+                </table>
+              </AppDataTable>
+              <AppPagination
+                currentPage={currentPage}
+                totalItems={filteredCharges.length}
+                pageSize={pageSize}
+                onPageChange={setCurrentPage}
+              />
+            </>
           ) : null}
         </AppSectionBlock>
 

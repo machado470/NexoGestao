@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { AlertTriangle, ArrowRight } from "lucide-react";
 import { Button } from "@/components/design-system";
@@ -11,6 +11,7 @@ import {
   AppPageErrorState,
   AppOperationalHeader,
   AppPageLoadingState,
+  AppPagination,
   AppPageShell,
   AppSectionBlock,
   AppStatusBadge,
@@ -101,6 +102,8 @@ export default function PeoplePage() {
   const [riskFilter, setRiskFilter] = useOperationalMemoryState<"all" | "alto-risco">("nexo.people.risk-filter.v1", "all");
   const [searchValue, setSearchValue] = useOperationalMemoryState("nexo.people.search-filter.v1", "");
   const [workStateFilter, setWorkStateFilter] = useOperationalMemoryState<"all" | "sobrecarregado" | "parado">("nexo.people.work-state-filter.v1", "all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 8;
 
   const canLoadPeople = isAuthenticated;
 
@@ -260,6 +263,19 @@ export default function PeoplePage() {
     () => [...filteredRows].sort((a, b) => (b.riskLevel === "alto" ? 3 : b.riskLevel === "medio" ? 2 : 1) - (a.riskLevel === "alto" ? 3 : a.riskLevel === "medio" ? 2 : 1) || b.workload - a.workload),
     [filteredRows]
   );
+  const paginatedPeople = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return sortedByPriority.slice(start, start + pageSize);
+  }, [currentPage, pageSize, sortedByPriority]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [delayFilter, loadFilter, riskFilter, roleFilter, searchValue, statusFilter, workStateFilter]);
+
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(sortedByPriority.length / pageSize));
+    if (currentPage > totalPages) setCurrentPage(1);
+  }, [currentPage, pageSize, sortedByPriority.length]);
 
   const selectedPerson = useMemo(
     () => sortedByPriority.find(item => item.id === selectedPersonId) ?? sortedByPriority[0] ?? null,
@@ -616,8 +632,9 @@ export default function PeoplePage() {
                     description="Ajuste os filtros para enxergar responsáveis e agir sobre carga, atraso e risco."
                   />
                 ) : (
-                  <AppDataTable>
-                    <table className="w-full min-w-[1040px] text-sm">
+                  <>
+                    <AppDataTable>
+                      <table className="w-full min-w-[1040px] text-sm">
                       <thead>
                         <tr className="border-b border-[var(--border-subtle)] text-left text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
                           <th className="px-3 py-2">Pessoa</th>
@@ -630,7 +647,7 @@ export default function PeoplePage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {sortedByPriority.map(row => (
+                        {paginatedPeople.map(row => (
                           <tr key={row.id} className="border-b border-[var(--border-subtle)]/60 align-top">
                             <td className="px-3 py-2 text-[var(--text-primary)]">
                               <p className="font-medium">{row.name}</p>
@@ -669,8 +686,15 @@ export default function PeoplePage() {
                           </tr>
                         ))}
                       </tbody>
-                    </table>
-                  </AppDataTable>
+                      </table>
+                    </AppDataTable>
+                    <AppPagination
+                      currentPage={currentPage}
+                      totalItems={sortedByPriority.length}
+                      pageSize={pageSize}
+                      onPageChange={setCurrentPage}
+                    />
+                  </>
                 )}
               </AppSectionBlock>
 

@@ -18,6 +18,7 @@ import {
   AppPageLoadingState,
   AppPageErrorState,
   AppPageEmptyState,
+  AppPagination,
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
@@ -82,6 +83,7 @@ function safeText(value: unknown, fallback = "—") {
 }
 
 export default function ServiceOrdersPage() {
+  const pageSize = 8;
   const [location, navigate] = useLocation();
   const params = useMemo(
     () => new URLSearchParams(location.split("?")[1] ?? ""),
@@ -107,6 +109,7 @@ export default function ServiceOrdersPage() {
     string | null
   >("nexo.service-orders.selected-id.v5", null);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const [pendingAction, setPendingAction] = useState<{
     orderId: string;
     type: "start" | "complete" | "charge";
@@ -276,6 +279,19 @@ export default function ServiceOrdersPage() {
       return true;
     });
   }, [activeFilter, enrichedOrders, searchTerm, urlCustomerId]);
+  const paginatedOrders = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredOrders.slice(start, start + pageSize);
+  }, [currentPage, filteredOrders, pageSize]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeFilter, searchTerm, urlCustomerId]);
+
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
+    if (currentPage > totalPages) setCurrentPage(1);
+  }, [currentPage, filteredOrders.length, pageSize]);
 
   useEffect(() => {
     if (urlServiceOrderId && enrichedOrders.some(item => item.id === urlServiceOrderId)) {
@@ -486,8 +502,9 @@ export default function ServiceOrdersPage() {
                   }
                 />
               ) : (
-                <div className="grid grid-cols-1 gap-2 lg:grid-cols-2 2xl:grid-cols-2">
-                  {filteredOrders.map(item => {
+                <>
+                  <div className="grid grid-cols-1 gap-2 lg:grid-cols-2 2xl:grid-cols-2">
+                    {paginatedOrders.map(item => {
                     const canStart = capabilities.start && ["OPEN", "ASSIGNED"].includes(item.status);
                     const canComplete = capabilities.complete && item.status === "IN_PROGRESS";
                     const canGenerateCharge =
@@ -602,8 +619,15 @@ export default function ServiceOrdersPage() {
                         </div>
                       </article>
                     );
-                  })}
-                </div>
+                    })}
+                  </div>
+                  <AppPagination
+                    currentPage={currentPage}
+                    totalItems={filteredOrders.length}
+                    pageSize={pageSize}
+                    onPageChange={setCurrentPage}
+                  />
+                </>
               )}
             </AppSectionBlock>
 
