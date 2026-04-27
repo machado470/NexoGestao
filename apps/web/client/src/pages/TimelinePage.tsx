@@ -19,6 +19,7 @@ import { PageWrapper } from "@/components/operating-system/Wrappers";
 import {
   AppNextActionCard,
   AppOperationalHeader,
+  AppPagination,
   AppPageEmptyState,
   AppPageErrorState,
   AppPageLoadingState,
@@ -51,6 +52,7 @@ type ModuleFilter =
 type SeverityFilter = "all" | "critical" | "high" | "medium" | "low";
 
 const PAGE_SIZE = 12;
+const LIST_PAGE_SIZE = 8;
 
 const MODULE_OPTIONS: Array<{ value: ModuleFilter; label: string }> = [
   { value: "all", label: "Todos os módulos" },
@@ -244,6 +246,7 @@ export default function TimelinePage() {
   const [responsibleFilter, setResponsibleFilter] = useState("all");
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("all");
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [hasMore, setHasMore] = useState(true);
@@ -378,6 +381,28 @@ export default function TimelinePage() {
     searchValue,
     severityFilter,
   ]);
+  const paginatedFilteredEvents = useMemo(() => {
+    const start = (currentPage - 1) * LIST_PAGE_SIZE;
+    return filteredEvents.slice(start, start + LIST_PAGE_SIZE);
+  }, [currentPage, filteredEvents]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    clientFilter,
+    entityFilter,
+    eventTypeFilter,
+    moduleFilter,
+    periodFilter,
+    responsibleFilter,
+    searchValue,
+    severityFilter,
+  ]);
+
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(filteredEvents.length / LIST_PAGE_SIZE));
+    if (currentPage > totalPages) setCurrentPage(1);
+  }, [currentPage, filteredEvents.length]);
 
   const selectedEvent = useMemo(
     () =>
@@ -393,7 +418,7 @@ export default function TimelinePage() {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
 
-    filteredEvents.forEach(event => {
+    paginatedFilteredEvents.forEach(event => {
       const date = new Date(String(event?.createdAt ?? ""));
       let key = "Sem data";
       if (!Number.isNaN(date.getTime())) {
@@ -410,7 +435,7 @@ export default function TimelinePage() {
     });
 
     return Array.from(groups.entries());
-  }, [filteredEvents]);
+  }, [paginatedFilteredEvents]);
 
   const summary = useMemo(() => {
     const critical = filteredEvents.filter(
@@ -849,7 +874,7 @@ export default function TimelinePage() {
 
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-xs text-[var(--text-muted)]">
-                    Exibindo {filteredEvents.length} evento(s) · lote de {PAGE_SIZE}.
+                    Exibindo lote de ingestão {PAGE_SIZE} evento(s).
                   </span>
                   <Button
                     type="button"
@@ -864,6 +889,12 @@ export default function TimelinePage() {
                         : "Sem mais eventos"}
                   </Button>
                 </div>
+                <AppPagination
+                  currentPage={currentPage}
+                  totalItems={filteredEvents.length}
+                  pageSize={LIST_PAGE_SIZE}
+                  onPageChange={setCurrentPage}
+                />
               </div>
             )}
           </AppSectionBlock>
