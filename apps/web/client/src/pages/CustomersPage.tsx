@@ -334,7 +334,7 @@ export default function CustomersPage() {
 
   return (
     <PageWrapper title="Clientes">
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-4 pt-6">
         <AppOperationalHeader
           title="Clientes"
           description="Central de relacionamento, execução e histórico operacional por cliente."

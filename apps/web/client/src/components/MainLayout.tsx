@@ -70,77 +70,6 @@ function isRouteActive(location: string, route: string) {
   return location === route || location.startsWith(`${route}/`);
 }
 
-const pageMeta: Record<string, { title: string; subtitle: string }> = {
-  "/executive-dashboard": {
-    title: "Dashboard",
-    subtitle: "",
-  },
-  "/customers": {
-    title: "Clientes",
-    subtitle: "Relacionamento, contexto e próxima ação por cliente.",
-  },
-  "/appointments": {
-    title: "Agendamentos",
-    subtitle: "Confirmação, pontualidade e entrada do fluxo operacional.",
-  },
-  "/calendar": {
-    title: "Calendário",
-    subtitle: "Visão temporal para distribuir capacidade de execução.",
-  },
-  "/service-orders": {
-    title: "Ordens de Serviço",
-    subtitle: "Pipeline operacional com prioridade, estágio e ação.",
-  },
-  "/finances": {
-    title: "Financeiro",
-    subtitle: "Cobrança, recebimento e risco financeiro operacional.",
-  },
-  "/whatsapp": {
-    title: "WhatsApp",
-    subtitle: "Canal de execução conectado ao contexto de operação.",
-  },
-  "/timeline": {
-    title: "Timeline",
-    subtitle: "Rastreabilidade completa dos eventos críticos.",
-  },
-  "/governance": {
-    title: "Governança",
-    subtitle: "Leitura de risco, políticas e estado institucional.",
-  },
-  "/people": {
-    title: "Pessoas",
-    subtitle: "Times, distribuição de carga e capacidade operacional.",
-  },
-  "/billing": {
-    title: "Planos",
-    subtitle: "Assinatura do Nexo, cobrança e método de pagamento da sua empresa.",
-  },
-  "/settings": {
-    title: "Configurações",
-    subtitle: "Parâmetros globais da organização e preferências.",
-  },
-  "/profile": {
-    title: "Perfil",
-    subtitle: "Identidade, permissões e contexto operacional do usuário.",
-  },
-};
-
-function getPageMeta(location: string) {
-  const exact = pageMeta[location];
-  if (exact) return exact;
-
-  const matched = Object.entries(pageMeta).find(([route]) =>
-    isRouteActive(location, route)
-  );
-
-  return (
-    matched?.[1] ?? {
-      title: "NexoGestão",
-      subtitle: "Sistema operacional para execução, cobrança e governança.",
-    }
-  );
-}
-
 interface MainLayoutProps {
   children: React.ReactNode;
 }
@@ -318,7 +247,6 @@ export function MainLayout({ children }: MainLayoutProps) {
     [role]
   );
 
-  const currentMeta = useMemo(() => getPageMeta(location), [location]);
   const isWhatsAppRoute = isRouteActive(location, "/whatsapp");
   const desktopSidebarWidth = sidebarCollapsed
     ? SIDEBAR_COLLAPSED_WIDTH
@@ -535,20 +463,9 @@ export function MainLayout({ children }: MainLayoutProps) {
                         <Menu className="h-5 w-5" />
                       </button>
                     ) : null}
-                    <div className="nexo-topbar-meta min-w-0">
-                      <p className="truncate text-[15px] font-semibold tracking-tight text-[var(--text-primary)] md:text-base">
-                        {currentMeta.title}
-                      </p>
-                      {currentMeta.subtitle ? (
-                        <p className="truncate text-xs text-[var(--text-muted)]">
-                          {currentMeta.subtitle}
-                        </p>
-                      ) : null}
+                    <div className="nexo-topbar-search-slot min-w-0 self-center">
+                      <GlobalSearch />
                     </div>
-                  </div>
-
-                  <div className="nexo-topbar-search-slot min-w-0 self-center">
-                    <GlobalSearch />
                   </div>
 
                   <div className="flex items-center justify-end gap-1.5 md:gap-2">

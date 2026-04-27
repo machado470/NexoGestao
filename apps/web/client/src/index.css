@@ -3039,12 +3039,12 @@ html {
 
   @media (min-width: 768px) {
     .app-root .nexo-topbar-content-grid {
-      grid-template-columns: minmax(180px, 0.9fr) minmax(280px, 460px) auto;
+      grid-template-columns: minmax(280px, 460px) auto;
       gap: 0.625rem;
     }
 
     .app-root [data-sidebar-collapsed="true"] .nexo-topbar-content-grid {
-      grid-template-columns: minmax(180px, 0.8fr) minmax(260px, 420px) auto;
+      grid-template-columns: minmax(260px, 420px) auto;
     }
   }
 }
