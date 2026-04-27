@@ -411,7 +411,7 @@ export default function ServiceOrdersPage() {
 
   return (
     <PageWrapper title="Ordens de Serviço" showOperationalHeader={false}>
-      <div className="flex flex-col gap-4 pt-6">
+      <div className="flex flex-col gap-4 pt-2">
           <AppOperationalHeader
             title="Ordens de Serviço"
             description="Execução, status e cobrança dos serviços."
