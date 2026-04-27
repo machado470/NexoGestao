@@ -289,7 +289,7 @@ export default function AppointmentsPage() {
 
   return (
     <PageWrapper title="Agendamentos" showOperationalHeader={false}>
-      <div className="flex flex-col gap-4 pt-2">
+      <div className="flex flex-col gap-4">
         <AppOperationalHeader
           title="Agendamentos"
           description="Controle do tempo, confirmação e preparação da execução"

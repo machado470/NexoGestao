@@ -52,7 +52,7 @@ export function AppPageShell({
 }: ComponentProps<"section">) {
   return (
     <section
-      className={cn("nexo-page-shell w-full min-w-0 max-w-none pt-2 md:pt-2.5 flex flex-col gap-4", className)}
+      className={cn("nexo-page-shell w-full min-w-0 max-w-none flex flex-col gap-4", className)}
       {...props}
     />
   );
