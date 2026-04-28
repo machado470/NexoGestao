@@ -168,6 +168,8 @@ async function upsertUser(orgId: string, user: PilotUser) {
 }
 
 async function upsertCustomer(orgId: string, customer: CustomerSeed) {
+  const phone = customer.phone?.trim() ?? ''
+
   const existing = await prisma.customer.findFirst({
     where: {
       orgId,
@@ -180,7 +182,7 @@ async function upsertCustomer(orgId: string, customer: CustomerSeed) {
       where: { id: existing.id },
       data: {
         name: customer.name,
-        phone: customer.phone ?? null,
+        phone,
         notes: customer.notes,
         active: true,
       },
@@ -189,9 +191,9 @@ async function upsertCustomer(orgId: string, customer: CustomerSeed) {
 
   return prisma.customer.create({
     data: {
-      orgId,
+      org: { connect: { id: orgId } },
       name: customer.name,
-      phone: customer.phone ?? null,
+      phone,
       email: customer.email.toLowerCase(),
       notes: customer.notes,
       active: true,
