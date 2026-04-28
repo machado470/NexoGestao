@@ -1,6 +1,7 @@
 import {
   memo,
   type CSSProperties,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -951,14 +952,43 @@ export default function WhatsAppPage() {
         })),
     [appointments, charges, conversationCustomerIds, customers, serviceOrders]
   );
+  const buildVirtualRowFromCustomer = useCallback((customer: any): Conversation => ({
+    id: `customer:${String(customer.id)}`,
+    conversationId: null,
+    customerId: String(customer.id),
+    name: String(customer?.name ?? "Sem nome"),
+    phone: customer?.phone ? String(customer.phone) : null,
+    title: "Sem conversa ativa",
+    lastMessage: "Sem conversa ativa",
+    lastMessageAt: null,
+    status: "OPEN",
+    contextType: "GENERAL",
+    priority: "LOW",
+    unreadCount: 0,
+    contextId: String(customer.id),
+    operationalStatus: "Sem conversa ativa",
+    contextHint: "Sem conversa ativa",
+    hasPendingCharge: charges.some((charge: any) => String(charge?.customerId ?? "") === String(customer.id) && ["PENDING", "OVERDUE"].includes(String(charge?.status ?? ""))),
+    hasUpcomingAppointment: appointments.some((appointment: any) => String(appointment?.customerId ?? "") === String(customer.id) && String(appointment?.status ?? "").toUpperCase() !== "CANCELED"),
+    hasActiveServiceOrder: serviceOrders.some((serviceOrder: any) => String(serviceOrder?.customerId ?? "") === String(customer.id) && !["DONE", "CANCELED"].includes(String(serviceOrder?.status ?? "").toUpperCase())),
+    hasFailedDelivery: false,
+    isVirtual: true,
+  }), [appointments, charges, serviceOrders]);
   const allInboxRows = useMemo(
-    () => [...conversations, ...(activeFilter === "all" ? customersWithoutConversation : [])],
-    [activeFilter, conversations, customersWithoutConversation]
+    () => [...conversations, ...customersWithoutConversation],
+    [conversations, customersWithoutConversation]
   );
   const filteredRows = useMemo(() => {
     const query = debouncedSearch.trim().toLowerCase();
     return allInboxRows.filter(item => {
-      const searchable = [item.name, item.phone ?? "", item.lastMessage, item.title ?? "", item.contextHint ?? ""].join(" ").toLowerCase();
+      const searchable = [
+        item.name,
+        item.phone ?? "",
+        item.lastMessage,
+        item.title ?? "",
+        item.contextHint ?? "",
+        item.operationalStatus ?? "",
+      ].join(" ").toLowerCase();
       const matchesSearch = !query
         || searchable.includes(query);
       if (!matchesSearch) return false;
@@ -979,6 +1009,13 @@ export default function WhatsAppPage() {
       return bDate - aDate;
     });
   }, [activeFilter, allInboxRows, debouncedSearch]);
+  useEffect(() => {
+    console.debug("[WhatsAppPage][inbox-debug]", {
+      customersWithoutConversation: customersWithoutConversation.length,
+      allInboxRows: allInboxRows.length,
+      filteredRows: filteredRows.length,
+    });
+  }, [allInboxRows.length, customersWithoutConversation.length, filteredRows.length]);
   const emptyStateMessage = useMemo(() => {
     if (debouncedSearch.trim()) return "Nenhum resultado para esta busca.";
     if (activeFilter === "failures") return "Nenhuma falha encontrada.";
@@ -1008,10 +1045,14 @@ export default function WhatsAppPage() {
       }
       if (queryCustomerId) {
         const existingConversation = allInboxRows.find(item => item.customerId === queryCustomerId && Boolean(item.conversationId));
-        const virtualCustomer = allInboxRows.find(item => item.id === `customer:${queryCustomerId}`);
-        const nextSelectionId = existingConversation?.id ?? virtualCustomer?.id ?? null;
-        if (nextSelectionId) {
-          setSelectedConversationId(nextSelectionId);
+        const virtualCustomer = allInboxRows.find(item => item.id === `customer:${queryCustomerId}`)
+          ?? (() => {
+            const customer = customers.find((item: any) => String(item?.id ?? "") === String(queryCustomerId));
+            return customer ? buildVirtualRowFromCustomer(customer) : null;
+          })();
+        const nextSelection = existingConversation ?? virtualCustomer;
+        if (nextSelection?.id) {
+          setSelectedConversationId(nextSelection.id);
         }
       }
       didAutoSelectFromQueryRef.current = true;
@@ -1032,6 +1073,8 @@ export default function WhatsAppPage() {
     queryCustomerId,
     selectedConversationId,
     setSelectedConversationId,
+    buildVirtualRowFromCustomer,
+    customers,
   ]);
 
   useEffect(() => {
