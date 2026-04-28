@@ -863,6 +863,7 @@ export default function WhatsAppPage() {
   const [localFavorites, setLocalFavorites] = useState<Record<string, boolean>>({});
   const didAutoSelectFromQueryRef = useRef(false);
   const hasManualSelectionRef = useRef(false);
+  const shouldPromoteVirtualSelectionRef = useRef(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchTerm), 350);
@@ -996,7 +997,7 @@ export default function WhatsAppPage() {
     if (hasManualSelectionRef.current) return;
     const conversationsReady = !conversationsQuery.isLoading && !conversationsQuery.isFetching;
     const customersReady = !customersQuery.isLoading && !customersQuery.isFetching;
-    if ((queryCustomerId || queryConversationId) && !didAutoSelectFromQueryRef.current && conversationsReady && customersReady && !selectedConversationId) {
+    if ((queryCustomerId || queryConversationId) && !didAutoSelectFromQueryRef.current && conversationsReady && customersReady) {
       if (queryConversationId) {
         const byConversation = allInboxRows.find(item => item.conversationId === queryConversationId || item.id === queryConversationId);
         if (byConversation) {
@@ -1017,11 +1018,7 @@ export default function WhatsAppPage() {
       return;
     }
 
-    if (filteredRows.length === 0) {
-      if (selectedConversationId !== null) setSelectedConversationId(null);
-      return;
-    }
-    if (!selectedConversationId || !allInboxRows.some(item => item.id === selectedConversationId)) {
+    if (!selectedConversationId && filteredRows.length > 0) {
       setSelectedConversationId(filteredRows[0]?.id ?? null);
     }
   }, [
@@ -1046,12 +1043,14 @@ export default function WhatsAppPage() {
 
   useEffect(() => {
     if (!selectedConversationId?.startsWith("customer:")) return;
+    if (!shouldPromoteVirtualSelectionRef.current) return;
     const customerId = selectedConversation?.customerId;
     if (!customerId) return;
     const existingConversation = conversations.find(
       (item) => item.customerId === customerId && Boolean(item.conversationId)
     );
     if (existingConversation?.id && existingConversation.id !== selectedConversationId) {
+      shouldPromoteVirtualSelectionRef.current = false;
       setSelectedConversationId(existingConversation.id);
     }
   }, [conversations, selectedConversation?.customerId, selectedConversationId, setSelectedConversationId]);
@@ -1072,8 +1071,6 @@ export default function WhatsAppPage() {
 
   const sendMessageMutation = trpc.nexo.whatsapp.sendMessage.useMutation();
   const sendTemplateMutation = trpc.nexo.whatsapp.sendTemplate.useMutation();
-  const updateStatusMutation = trpc.nexo.whatsapp.updateConversationStatus.useMutation();
-  const retryMessageMutation = trpc.nexo.whatsapp.retryMessage.useMutation();
 
   const messages = useMemo(
     () =>
@@ -1164,15 +1161,6 @@ export default function WhatsAppPage() {
       : "Iniciar conversa com este cliente..."
     : "Selecione uma conversa para responder...";
 
-  const refreshAll = async () => {
-    await Promise.all([
-      conversationsQuery.refetch(),
-      messagesQuery.refetch(),
-      contextQuery.refetch(),
-      conversationDetailsQuery.refetch(),
-    ]);
-  };
-
   const handleSelectConversation = (conversationId: string) => {
     hasManualSelectionRef.current = true;
     setSelectedConversationId(conversationId);
@@ -1213,6 +1201,7 @@ export default function WhatsAppPage() {
         messageType: "MANUAL",
       });
       setContent("");
+      shouldPromoteVirtualSelectionRef.current = !selectedConversationRecordId;
       const refreshedConversations = await conversationsQuery.refetch();
       const refreshedRows = Array.isArray(refreshedConversations.data)
         ? refreshedConversations.data.map(mapConversation)
@@ -1265,6 +1254,7 @@ export default function WhatsAppPage() {
           serviceOrderNumber: context?.activeServiceOrder?.number,
         },
       });
+      shouldPromoteVirtualSelectionRef.current = !selectedConversationRecordId;
       const refreshedConversations = await conversationsQuery.refetch();
       const refreshedRows = Array.isArray(refreshedConversations.data)
         ? refreshedConversations.data.map(mapConversation)
@@ -1280,54 +1270,8 @@ export default function WhatsAppPage() {
     }
   };
 
-  const handleConversationStatus = async (status: "PENDING" | "RESOLVED" | "OPEN") => {
-    if (!selectedConversationRecordId) return;
-    try {
-      await updateStatusMutation.mutateAsync({ id: selectedConversationRecordId, status: status as any });
-      await refreshAll();
-      toast.success(`Conversa atualizada para ${status}.`);
-    } catch (error: any) {
-      toast.error(error?.message ?? "Falha ao atualizar conversa.");
-    }
-  };
-
-  const retryFailedMessages = async () => {
-    const failed = messages.filter(item => item.status === "FAILED");
-    if (failed.length === 0) {
-      toast.message("Nenhuma mensagem com falha nesta conversa.");
-      return;
-    }
-
-    await Promise.all(failed.map(item => retryMessageMutation.mutateAsync({ id: item.id })));
-    await refreshAll();
-    toast.success("Reenvio de falhas solicitado.");
-  };
-
-  const handleCopyPhone = async () => {
-    const phone = selectedConversation?.phone ?? context?.customer?.phone;
-    if (!phone) return;
-    await navigator.clipboard.writeText(phone);
-    toast.success("Telefone copiado.");
-  };
-
   const handleMoreActions = async () => {
-    const answer = window.prompt(
-      "Ação: resolved | pending | reopen | retry | copy | customer | finance",
-      "resolved"
-    );
-    if (!answer) return;
-    if (answer === "resolved") return handleConversationStatus("RESOLVED");
-    if (answer === "pending") return handleConversationStatus("PENDING");
-    if (answer === "reopen") return handleConversationStatus("OPEN");
-    if (answer === "retry") return retryFailedMessages();
-    if (answer === "copy") return handleCopyPhone();
-    if (answer === "customer") {
-      setLocation(context?.customer?.id ? `/customers?customerId=${context.customer.id}` : "/customers");
-      return;
-    }
-    if (answer === "finance") {
-      setLocation(context?.openCharge?.id ? `/finances?chargeId=${context.openCharge.id}` : "/finances");
-    }
+    toast.message("Use as ações rápidas do painel para alterar status, reenviar, copiar telefone ou navegar no contexto.");
   };
 
   const handleSendCharge = async () => {
