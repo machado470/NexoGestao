@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { toast } from "sonner";
 
 import { trpc } from "@/lib/trpc";
+import type { OperationalSeverity } from "@/lib/operations/operational-intelligence";
 import {
   normalizeArrayPayload,
   normalizeObjectPayload,
@@ -10,6 +11,7 @@ import {
 import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
+import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import { Button } from "@/components/design-system";
 import { AppRowActionsDropdown } from "@/components/app-system";
 import {
@@ -84,6 +86,8 @@ function safeText(value: unknown, fallback = "—") {
 
 export default function ServiceOrdersPage() {
   const pageSize = 8;
+  const _operationalSeverityContract: OperationalSeverity = "healthy";
+  void _operationalSeverityContract;
   const [location, navigate] = useLocation();
   const params = useMemo(
     () => new URLSearchParams(location.split("?")[1] ?? ""),

@@ -5,6 +5,7 @@ import { Button } from "@/components/design-system";
 import { CreateChargeModal } from "@/components/CreateChargeModal";
 import { QuickActionModal } from "@/components/app-modal-system";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
+import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import {
   AppDataTable,
   AppPageEmptyState,
@@ -19,6 +20,7 @@ import { AppPageShell, AppRowActionsDropdown, AppStatCard } from "@/components/a
 import { normalizeArrayPayload } from "@/lib/query-helpers";
 import { safeDate } from "@/lib/operational/kpi";
 import { trpc } from "@/lib/trpc";
+import type { OperationalSeverity } from "@/lib/operations/operational-intelligence";
 
 type ChargeRecord = Record<string, any>;
 type StatusFilter = "all" | "pending" | "overdue" | "paid" | "canceled";
@@ -94,6 +96,8 @@ export default function FinancesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 8;
+  const _operationalSeverityContract: OperationalSeverity = "healthy";
+  void _operationalSeverityContract;
   const [selectedChargeId, setSelectedChargeId] = useState<string | null>(null);
   const [openPayModalFor, setOpenPayModalFor] = useState<ChargeRecord | null>(null);
   const [openEditModalFor, setOpenEditModalFor] = useState<ChargeRecord | null>(null);

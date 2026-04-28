@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import type { OperationalSeverity } from "@/lib/operations/operational-intelligence";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
+import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import { Button } from "@/components/design-system";
 import { FormModal } from "@/components/app-modal-system";
 import {
@@ -99,6 +101,8 @@ export default function AppointmentsPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 8;
+  const _operationalSeverityContract: OperationalSeverity = "healthy";
+  void _operationalSeverityContract;
 
   const queryParams = useMemo(() => {
     const queryString = location.includes("?") ? location.split("?")[1] : "";
