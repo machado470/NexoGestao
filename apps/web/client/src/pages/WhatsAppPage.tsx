@@ -627,78 +627,76 @@ function ChatPanel({
         )}
       </div>
 
-      {hasConversation ? (
-        <div className="shrink-0 grid grid-cols-2 gap-1.5 border-y border-white/[0.06] bg-white/[0.01] px-3 py-2">
-          <Button type="button" size="sm" variant="outline" className="h-7 text-[11px]" onClick={() => onFillTemplate("Mensagem livre")}>Enviar mensagem</Button>
-          <Button type="button" size="sm" variant="outline" className="h-7 text-[11px]" onClick={onOpenCustomer}>Abrir cliente</Button>
-          <Button type="button" size="sm" variant="outline" className="h-7 text-[11px]" onClick={() => onFillTemplate("Cobrança pendente")}>Enviar cobrança</Button>
-          <Button type="button" size="sm" variant="outline" className="h-7 text-[11px]" onClick={() => onFillTemplate("Link de pagamento")}>Reenviar cobrança</Button>
-          <Button type="button" size="sm" variant="outline" className="h-7 text-[11px]" onClick={onOpenFinance}>Abrir financeiro</Button>
-          <Button type="button" size="sm" variant="outline" className="h-7 text-[11px]" disabled={!canMarkAsPaid}>Marcar como pago</Button>
-          <Button type="button" size="sm" variant="outline" className="h-7 text-[11px]" onClick={() => onFillTemplate("Confirmação de agendamento")}>Confirmar agendamento</Button>
-          <Button type="button" size="sm" variant="outline" className="h-7 text-[11px]" onClick={() => onFillTemplate("Lembrete de agendamento")}>Enviar lembrete</Button>
-          <Button type="button" size="sm" variant="outline" className="h-7 text-[11px]" onClick={onOpenAppointment}>Abrir agendamento</Button>
-          <Button type="button" size="sm" variant="outline" className="h-7 text-[11px]" onClick={() => onFillTemplate("Atualização de O.S.")}>Atualizar status</Button>
-          <Button type="button" size="sm" variant="outline" className="h-7 text-[11px]" onClick={() => onFillTemplate("Atualização de O.S.")}>Avisar conclusão</Button>
-          <Button type="button" size="sm" variant="outline" className="h-7 text-[11px]" onClick={onOpenServiceOrder}>Abrir O.S.</Button>
-        </div>
-      ) : null}
+      <footer className="shrink-0 mt-0 border-y border-white/[0.06] bg-white/[0.02]">
+        {hasConversation ? (
+          <div className="flex flex-wrap items-center gap-2 px-3 py-2.5">
+            <Button type="button" size="sm" variant="outline" className="h-8 text-[11px]" onClick={() => onFillTemplate("Mensagem livre")}>Enviar mensagem</Button>
+            <Button type="button" size="sm" variant="outline" className="h-8 text-[11px]" onClick={() => onFillTemplate("Cobrança pendente")}>Enviar cobrança</Button>
+            <Button type="button" size="sm" variant="outline" className="h-8 text-[11px]" onClick={() => onFillTemplate("Lembrete de agendamento")}>Enviar lembrete</Button>
+            <Button type="button" size="sm" variant="outline" className="h-8 text-[11px]" onClick={onOpenCustomer}>Abrir cliente</Button>
+            <Button type="button" size="sm" variant="outline" className="h-8 text-[11px]" onClick={onOpenFinance}>Abrir financeiro</Button>
+            <Button type="button" size="sm" variant="outline" className="h-8 text-[11px]" onClick={onMoreActions}>Mais ações</Button>
+          </div>
+        ) : null}
 
-      {hasConversation ? (
-        <div className="shrink-0 flex flex-wrap items-center gap-2 bg-white/[0.02] px-3 py-2">
-          {TEMPLATES.map(template => (
-            <Button
-              key={template.label}
-              type="button"
-              size="sm"
-              variant="outline"
-              className="h-8 rounded-lg border-white/[0.08] bg-white/[0.02] text-[11px] hover:bg-white/[0.05]"
-              onClick={() => onFillTemplate(template.label)}
-            >
-              {template.label}
-            </Button>
-          ))}
-        </div>
-      ) : null}
+        {hasConversation ? (
+          <div className="scrollbar-thin-nexo overflow-x-auto border-t border-white/[0.06] px-3 py-2">
+            <div className="flex min-w-max items-center gap-2">
+              {TEMPLATES.map(template => (
+                <Button
+                  key={template.label}
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-8 shrink-0 rounded-full border-white/[0.08] bg-white/[0.02] px-3 text-[11px] hover:bg-white/[0.05]"
+                  onClick={() => onFillTemplate(template.label)}
+                >
+                  {template.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
-      <footer className="shrink-0 mt-0 flex items-center gap-1.5 overflow-x-hidden bg-white/[0.02] px-3 py-2.5">
-        <button
-          type="button"
-          className="rounded-lg p-2 enabled:hover:bg-white/10 disabled:opacity-45"
-          disabled={!hasConversation}
-        >
-          <MessageCircleMore className="size-4" />
-        </button>
-        <button
-          type="button"
-          className="rounded-lg p-2 enabled:hover:bg-white/10 disabled:opacity-45"
-          disabled={!hasConversation}
-        >
-          <Paperclip className="size-4" />
-        </button>
-        <input
-          value={content}
-          onChange={event => canCompose && setContent(event.target.value)}
-          placeholder={hasConversation ? composePlaceholder : "Selecione uma conversa para responder..."}
-          disabled={!hasConversation || !canCompose}
-          className="h-9 min-w-0 flex-1 rounded-lg bg-white/[0.02] px-3 text-sm outline-none placeholder:text-[var(--text-muted)]/70"
-        />
-        <Button
-          type="button"
-          size="sm"
-          className="h-9 rounded-full bg-emerald-600/85 px-3 hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-45"
-          onClick={sendMessage}
-          disabled={!hasConversation || !canCompose}
-        >
-          <Send className="size-3.5" />
-        </Button>
-        <button
-          type="button"
-          className="shrink-0 rounded-lg p-2 enabled:hover:bg-white/10 disabled:opacity-45"
-          disabled={!hasConversation}
-        >
-          <Volume2 className="size-4" />
-        </button>
+        <div className="flex items-center gap-2 border-t border-white/[0.06] px-3 py-2.5">
+          <button
+            type="button"
+            className="rounded-lg p-2 enabled:hover:bg-white/10 disabled:opacity-45"
+            disabled={!hasConversation}
+          >
+            <MessageCircleMore className="size-4" />
+          </button>
+          <button
+            type="button"
+            className="rounded-lg p-2 enabled:hover:bg-white/10 disabled:opacity-45"
+            disabled={!hasConversation}
+          >
+            <Paperclip className="size-4" />
+          </button>
+          <input
+            value={content}
+            onChange={event => canCompose && setContent(event.target.value)}
+            placeholder={hasConversation ? composePlaceholder : "Selecione uma conversa para responder..."}
+            disabled={!hasConversation || !canCompose}
+            className="h-9 min-w-0 flex-1 rounded-lg bg-white/[0.02] px-3 text-sm outline-none placeholder:text-[var(--text-muted)]/70"
+          />
+          <Button
+            type="button"
+            size="sm"
+            className="h-9 rounded-full bg-emerald-600/85 px-3 hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-45"
+            onClick={sendMessage}
+            disabled={!hasConversation || !canCompose}
+          >
+            <Send className="size-3.5" />
+          </Button>
+          <button
+            type="button"
+            className="shrink-0 rounded-lg p-2 enabled:hover:bg-white/10 disabled:opacity-45"
+            disabled={!hasConversation}
+          >
+            <Volume2 className="size-4" />
+          </button>
+        </div>
       </footer>
       {error ? <p className="px-3 pb-2 text-[11px] text-rose-300">{error}</p> : null}
     </section>
