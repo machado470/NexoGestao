@@ -48,9 +48,10 @@ type ConversationFilter =
 
 type WhatsAppConversationStatus = "OPEN" | "PENDING" | "RESOLVED" | "FAILED";
 type WhatsAppPriority = "LOW" | "NORMAL" | "HIGH" | "CRITICAL";
-type ContextType = "CHARGE" | "APPOINTMENT" | "SERVICE_ORDER" | "GENERAL";
+type ContextType = "CUSTOMER" | "CHARGE" | "APPOINTMENT" | "SERVICE_ORDER" | "PAYMENT" | "GENERAL";
 type MessageDirection = "INBOUND" | "OUTBOUND";
 type MessageStatus = "QUEUED" | "SENT" | "DELIVERED" | "READ" | "FAILED";
+type OperationalMessageType = "GENERAL" | "APPOINTMENT_CONFIRMATION" | "APPOINTMENT_REMINDER" | "SERVICE_UPDATE" | "PAYMENT_LINK" | "PAYMENT_REMINDER" | "PAYMENT_CONFIRMATION" | "CUSTOMER_NOTIFICATION";
 type Customer = { id?: string | number; name?: string; phone?: string | null; [key: string]: any };
 
 type Conversation = {
@@ -83,6 +84,8 @@ type ChatMessage = {
   content: string;
   createdAt?: string | null;
   status: MessageStatus;
+  messageType?: string | null;
+  errorMessage?: string | null;
 };
 
 type WhatsAppContext = {
@@ -241,7 +244,18 @@ function mapMessage(item: any): ChatMessage {
     content: String(item?.renderedText ?? item?.content ?? ""),
     createdAt: item?.createdAt ?? null,
     status: (item?.status ?? "QUEUED") as MessageStatus,
+    messageType: item?.messageType ?? null,
+    errorMessage: item?.errorMessage ?? item?.lastError ?? null,
   };
+}
+
+function resolveMessageTypeFromContext(context?: WhatsAppContext | null): OperationalMessageType {
+  if (context?.openCharge?.id && context?.openCharge?.paymentLink) return "PAYMENT_LINK";
+  if (context?.openCharge?.id && (context?.openCharge?.daysOverdue ?? 0) > 0) return "PAYMENT_REMINDER";
+  if (context?.openCharge?.id) return "CUSTOMER_NOTIFICATION";
+  if (context?.nextAppointment?.id) return "APPOINTMENT_REMINDER";
+  if (context?.activeServiceOrder?.id) return "SERVICE_UPDATE";
+  return "GENERAL";
 }
 
 function resolveEntityFromContext(context?: WhatsAppContext | null) {
@@ -619,11 +633,14 @@ function ChatPanel({
                   >
                     <p>{message.content}</p>
                     <p className="mt-2 flex items-center justify-end gap-1 text-[10px] text-[var(--text-muted)]/85">
-                      {fmtTime(message.createdAt)} · {message.status}
+                      {fmtTime(message.createdAt)} · {message.status}{message.messageType ? ` · ${message.messageType}` : ""}
                       {outgoing && ["DELIVERED", "READ"].includes(message.status) ? (
                         <CheckCheck className="size-3" />
                       ) : null}
                     </p>
+                    {message.status === "FAILED" ? (
+                      <p className="mt-1 text-[10px] text-rose-300">{message.errorMessage ?? "Falha de entrega. Use reenviar nas ações."}</p>
+                    ) : null}
                   </div>
                 </div>
               );
@@ -1230,6 +1247,7 @@ export default function WhatsAppPage() {
 
   const sendMessageMutation = trpc.nexo.whatsapp.sendMessage.useMutation();
   const sendTemplateMutation = trpc.nexo.whatsapp.sendTemplate.useMutation();
+  const retryMessageMutation = trpc.nexo.whatsapp.retryMessage.useMutation();
 
   const messages = useMemo(
     () =>
@@ -1357,7 +1375,7 @@ export default function WhatsAppPage() {
         content: finalContent,
         entityType: entity.entityType,
         entityId: entity.entityId ?? customerId ?? undefined,
-        messageType: "MANUAL",
+        messageType: resolveMessageTypeFromContext(context),
       });
       setContent("");
       shouldPromoteVirtualSelectionRef.current = !selectedConversationRecordId;
@@ -1429,8 +1447,23 @@ export default function WhatsAppPage() {
     }
   };
 
+  const handleRetryLastFailed = async () => {
+    const failed = [...messages].reverse().find((item) => item.status === "FAILED");
+    if (!failed?.id) {
+      toast.message("Nenhuma mensagem com falha para reenviar.");
+      return;
+    }
+    try {
+      await retryMessageMutation.mutateAsync({ id: failed.id });
+      await Promise.all([messagesQuery.refetch(), conversationsQuery.refetch(), contextQuery.refetch()]);
+      toast.success("Reenvio solicitado com sucesso.");
+    } catch (error: any) {
+      toast.error(error?.message ?? "Não foi possível reenviar a mensagem.");
+    }
+  };
+
   const handleMoreActions = async () => {
-    toast.message("Use as ações rápidas do painel para alterar status, reenviar, copiar telefone ou navegar no contexto.");
+    await handleRetryLastFailed();
   };
 
   const handleSendCharge = async () => {
