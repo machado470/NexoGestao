@@ -19,6 +19,7 @@ import { CommercialPolicyService, isCommercialBlocked } from '../common/commerci
 import { createWhatsAppProvider } from './providers/provider.factory'
 import { WhatsAppTemplateService } from './whatsapp-template.service'
 import { WhatsAppContextService } from './whatsapp-context.service'
+import { buildCommunicationFailureSignal } from '../governance/communication-failure.signal'
 
 export function buildDeterministicMessageKey(input: { entityType: WhatsAppEntityType; entityId: string; messageType: WhatsAppMessageType }) {
   return `${input.entityType}:${input.entityId}:${input.messageType}`
@@ -258,6 +259,12 @@ export class WhatsAppService {
 
     await this.prisma.whatsAppMessage.update({ where: { id: messageId }, data: { status: 'QUEUED', failedAt: null, errorMessage: null, errorCode: null } })
     await this.queueService.addJob(QUEUE_NAMES.WHATSAPP, 'dispatch-message', { messageId }, { jobId: `whatsapp:dispatch:retry:${messageId}` })
+    await this.logMessageTimelineEventOnce({
+      orgId,
+      messageId,
+      action: 'MESSAGE_RETRY_REQUESTED',
+      errorMessage: message.errorMessage ?? null,
+    })
     return { ok: true, messageId }
   }
 
@@ -426,7 +433,7 @@ export class WhatsAppService {
   }
 
   async markSent(params: { id: string; provider: string; providerMessageId: string }) {
-    return this.prisma.whatsAppMessage.update({
+    const updated = await this.prisma.whatsAppMessage.update({
       where: { id: params.id },
       data: {
         status: 'SENT',
@@ -437,10 +444,31 @@ export class WhatsAppService {
         errorMessage: null,
       },
     })
+    await this.logMessageTimelineEventOnce({
+      orgId: updated.orgId,
+      messageId: updated.id,
+      action: 'MESSAGE_SENT',
+    })
+    const byTypeAction = this.getMessageTypeTimelineAction(updated.messageType)
+    if (byTypeAction) {
+      await this.logMessageTimelineEventOnce({
+        orgId: updated.orgId,
+        messageId: updated.id,
+        action: byTypeAction,
+      })
+    }
+    return updated
   }
 
   async markFailedTerminal(params: { id: string; provider: string; errorCode: string; errorMessage: string }) {
-    return this.prisma.whatsAppMessage.update({ where: { id: params.id }, data: { status: 'FAILED', provider: params.provider, errorCode: params.errorCode, errorMessage: params.errorMessage, failedAt: new Date() } })
+    const updated = await this.prisma.whatsAppMessage.update({ where: { id: params.id }, data: { status: 'FAILED', provider: params.provider, errorCode: params.errorCode, errorMessage: params.errorMessage, failedAt: new Date() } })
+    await this.logMessageTimelineEventOnce({
+      orgId: updated.orgId,
+      messageId: updated.id,
+      action: 'MESSAGE_FAILED',
+      errorMessage: updated.errorMessage ?? params.errorMessage,
+    })
+    return updated
   }
 
   async markFailedAndRequeue(params: { id: string; provider: string; errorCode: string; errorMessage: string }) {
@@ -502,5 +530,58 @@ export class WhatsAppService {
         lastOutboundAt: input.lastOutboundAt,
       },
     })
+  }
+
+  private getMessageTypeTimelineAction(messageType: WhatsAppMessageType | null | undefined): string | null {
+    if (messageType === 'PAYMENT_LINK') return 'PAYMENT_LINK_SENT'
+    if (messageType === 'APPOINTMENT_REMINDER') return 'APPOINTMENT_REMINDER_SENT'
+    if (messageType === 'SERVICE_UPDATE') return 'SERVICE_UPDATE_SENT'
+    return null
+  }
+
+  private async logMessageTimelineEventOnce(input: {
+    orgId: string
+    messageId: string
+    action: string
+    errorMessage?: string | null
+  }) {
+    const message = await this.prisma.whatsAppMessage.findFirst({
+      where: { id: input.messageId, orgId: input.orgId },
+    })
+    if (!message) return null
+
+    const existing = await this.prisma.timelineEvent.findFirst({
+      where: {
+        orgId: input.orgId,
+        action: input.action,
+        metadata: {
+          path: ['messageId'],
+          equals: input.messageId,
+        },
+      },
+      select: { id: true },
+    })
+    if (existing?.id) return null
+
+    const communicationSignal = await buildCommunicationFailureSignal(this.prisma, {
+      orgId: input.orgId,
+      customerId: message.customerId ?? null,
+    })
+
+    return this.timeline.log({
+      orgId: input.orgId,
+      action: input.action,
+      customerId: message.customerId ?? null,
+      metadata: {
+        messageId: message.id,
+        providerMessageId: message.providerMessageId ?? null,
+        messageType: message.messageType ?? null,
+        errorMessage: input.errorMessage ?? message.errorMessage ?? null,
+        entityType: message.entityType ?? null,
+        entityId: message.entityId ?? null,
+        customerId: message.customerId ?? null,
+        governanceSignal: communicationSignal,
+      },
+    }).catch(() => null)
   }
 }
