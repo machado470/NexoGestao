@@ -27,8 +27,15 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/design-system";
 import { AppPageShell, AppSkeleton } from "@/components/app-system";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   AppPageLoadingState,
 } from "@/components/internal-page-system";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 type ConversationFilter =
   | "all"
@@ -120,15 +127,13 @@ const FILTERS: Array<{ value: ConversationFilter; label: string; count: string }
   { value: "failures", label: "Falhas", count: "" },
 ];
 
-const TEMPLATES: Array<{ label: string; templateKey?: string }> = [
-  { label: "Confirmação de agendamento", templateKey: "appointment_reminder" },
-  { label: "Lembrete de agendamento", templateKey: "appointment_reminder" },
-  { label: "Atualização de O.S.", templateKey: "service_update" },
-  { label: "Cobrança pendente", templateKey: "payment_reminder" },
-  { label: "Link de pagamento", templateKey: "payment_link" },
-  { label: "Confirmação de pagamento" },
-  { label: "Mensagem livre", templateKey: "manual_followup" },
-];
+const QUICK_COMPOSER_TEMPLATES = [
+  "Cobrança pendente",
+  "Lembrete de agendamento",
+  "Confirmação de agendamento",
+  "Atualização de O.S.",
+  "Mensagem livre",
+] as const;
 
 const statusUi: Record<WhatsAppConversationStatus, { label: string; dot: string }> = {
   OPEN: { label: "Aberta", dot: "bg-amber-400" },
@@ -628,37 +633,57 @@ function ChatPanel({
       </div>
 
       <footer className="shrink-0 mt-0 border-y border-white/[0.06] bg-white/[0.02]">
-        {hasConversation ? (
-          <div className="flex flex-wrap items-center gap-2 px-3 py-2.5">
-            <Button type="button" size="sm" variant="outline" className="h-8 text-[11px]" onClick={() => onFillTemplate("Mensagem livre")}>Enviar mensagem</Button>
-            <Button type="button" size="sm" variant="outline" className="h-8 text-[11px]" onClick={() => onFillTemplate("Cobrança pendente")}>Enviar cobrança</Button>
-            <Button type="button" size="sm" variant="outline" className="h-8 text-[11px]" onClick={() => onFillTemplate("Lembrete de agendamento")}>Enviar lembrete</Button>
-            <Button type="button" size="sm" variant="outline" className="h-8 text-[11px]" onClick={onOpenCustomer}>Abrir cliente</Button>
-            <Button type="button" size="sm" variant="outline" className="h-8 text-[11px]" onClick={onOpenFinance}>Abrir financeiro</Button>
-            <Button type="button" size="sm" variant="outline" className="h-8 text-[11px]" onClick={onMoreActions}>Mais ações</Button>
-          </div>
-        ) : null}
-
-        {hasConversation ? (
-          <div className="scrollbar-thin-nexo overflow-x-auto border-t border-white/[0.06] px-3 py-2">
-            <div className="flex min-w-max items-center gap-2">
-              {TEMPLATES.map(template => (
-                <Button
-                  key={template.label}
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-8 shrink-0 rounded-full border-white/[0.08] bg-white/[0.02] px-3 text-[11px] hover:bg-white/[0.05]"
-                  onClick={() => onFillTemplate(template.label)}
-                >
-                  {template.label}
-                </Button>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
         <div className="flex items-center gap-2 border-t border-white/[0.06] px-3 py-2.5">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-9 shrink-0 px-3 text-[11px]"
+                disabled={!hasConversation}
+              >
+                Enviar mensagem
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-72 p-2">
+              <div className="space-y-1">
+                {QUICK_COMPOSER_TEMPLATES.map((template) => (
+                  <Button
+                    key={template}
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 w-full justify-start px-2 text-[11px]"
+                    onClick={() => onFillTemplate(template)}
+                  >
+                    {template}
+                  </Button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-9 shrink-0 px-3 text-[11px]"
+                disabled={!hasConversation}
+              >
+                Mais ações
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuItem onClick={onOpenCustomer}>Abrir cliente</DropdownMenuItem>
+              <DropdownMenuItem onClick={onOpenFinance}>Abrir financeiro</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onFillTemplate("Cobrança pendente")}>Enviar cobrança</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onFillTemplate("Confirmação de agendamento")}>Confirmar agendamento</DropdownMenuItem>
+              <DropdownMenuItem onClick={onMoreActions}>Atualizar status</DropdownMenuItem>
+              <DropdownMenuItem onClick={onOpenServiceOrder}>Abrir O.S.</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <button
             type="button"
             className="rounded-lg p-2 enabled:hover:bg-white/10 disabled:opacity-45"
