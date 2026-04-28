@@ -35,7 +35,7 @@ type PilotUser = {
 
 type CustomerSeed = {
   name: string
-  phone: string
+  phone?: string | null
   email: string
   notes: string
 }
@@ -180,7 +180,7 @@ async function upsertCustomer(orgId: string, customer: CustomerSeed) {
       where: { id: existing.id },
       data: {
         name: customer.name,
-        phone: customer.phone,
+        phone: customer.phone ?? null,
         notes: customer.notes,
         active: true,
       },
@@ -191,7 +191,7 @@ async function upsertCustomer(orgId: string, customer: CustomerSeed) {
     data: {
       orgId,
       name: customer.name,
-      phone: customer.phone,
+      phone: customer.phone ?? null,
       email: customer.email.toLowerCase(),
       notes: customer.notes,
       active: true,
@@ -1046,6 +1046,12 @@ export async function seedPilot() {
       phone: '5511945670033',
       email: 'financeiro@centertech.com.br',
       notes: 'Chamados de TI e rede com SLA de 24h.',
+    },
+    {
+      name: 'Cliente Sem Telefone',
+      phone: null,
+      email: 'sem.telefone@cliente-piloto.com.br',
+      notes: 'Cliente de teste para validar bloqueio de envio sem telefone.',
     },
   ]
 

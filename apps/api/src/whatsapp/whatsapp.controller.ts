@@ -78,6 +78,9 @@ export class WhatsAppController {
     @User() user: any,
     @Body() body: any,
   ) {
+    if (!body?.conversationId && !body?.customerId) {
+      throw new BadRequestException('conversationId ou customerId é obrigatório')
+    }
     const userId = user?.userId ?? user?.sub ?? null
     return this.whatsapp.sendTemplateMessage(orgId, userId, body)
   }

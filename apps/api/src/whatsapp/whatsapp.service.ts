@@ -112,7 +112,7 @@ export class WhatsAppService {
     await this.timeline.log({
       orgId,
       action: 'WHATSAPP_MESSAGE_SENT',
-      customerId: input.customerId ?? null,
+      customerId: queued.message?.customerId ?? input.customerId ?? null,
       metadata: {
         actorUserId: userId,
         messageId: queued.message?.id ?? null,
@@ -147,6 +147,10 @@ export class WhatsAppService {
       ? await this.prisma.customer.findFirst({ where: { id: input.customerId, orgId }, select: { id: true, phone: true } })
       : null
 
+    if (input.customerId && !customer) {
+      throw new BadRequestException('Cliente não encontrado para envio de WhatsApp')
+    }
+
     const toPhone = String(input.toPhone ?? customer?.phone ?? '').trim()
     if (!toPhone) throw new BadRequestException('Telefone de destino não informado')
 
@@ -156,21 +160,29 @@ export class WhatsAppService {
       throw new BadRequestException(`Envio bloqueado por política comercial: ${commercialLimit.reasonCode}`)
     }
 
-    const conversation = await this.resolveOrCreateConversation(
-      orgId,
-      input.customerId ?? null,
-      toPhone,
-      { contextType: input.entityType ?? 'GENERAL', contextId: input.entityId ?? null },
-    )
+    const conversation = input.conversationId
+      ? await this.prisma.whatsAppConversation.findFirst({
+          where: { id: String(input.conversationId), orgId },
+        })
+      : await this.resolveOrCreateConversation(
+          orgId,
+          input.customerId ?? null,
+          toPhone,
+          { contextType: input.entityType ?? 'GENERAL', contextId: input.entityId ?? null },
+        )
+
+    if (!conversation) {
+      throw new BadRequestException('Conversa não encontrada para envio de WhatsApp')
+    }
 
     const message = await this.prisma.whatsAppMessage.create({
       data: {
         orgId,
         conversationId: conversation.id,
-        customerId: input.customerId ?? null,
+        customerId: input.customerId ?? conversation.customerId ?? null,
         direction: 'OUTBOUND',
         entityType: (input.entityType ?? 'GENERAL') as WhatsAppEntityType,
-        entityId: String(input.entityId ?? input.customerId ?? conversation.id),
+        entityId: String(input.entityId ?? input.customerId ?? conversation.customerId ?? conversation.id),
         messageType: (input.messageType ?? 'MANUAL') as WhatsAppMessageType,
         messageKey: input.messageKey ?? null,
         toPhone,
@@ -338,12 +350,17 @@ export class WhatsAppService {
   ) {
     const normalizedContextType = this.toContextType(context.contextType)
 
+    const normalizedPhone = this.normalizePhone(phone)
+    const phoneTail = normalizedPhone?.slice(-8) ?? null
+
     const existing = await this.prisma.whatsAppConversation.findFirst({
       where: {
         orgId,
         OR: [
           customerId ? { customerId } : undefined,
           { phone },
+          normalizedPhone ? { phone: normalizedPhone } : undefined,
+          phoneTail ? { phone: { endsWith: phoneTail } } : undefined,
         ].filter(Boolean) as Prisma.WhatsAppConversationWhereInput[],
       },
       orderBy: { updatedAt: 'desc' },
