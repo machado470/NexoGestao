@@ -402,6 +402,11 @@ export default function FinancesPage() {
       toast.error("ação indisponível neste ambiente");
       return;
     }
+    if (String(charge.status ?? "").toUpperCase() === "PAID") {
+      toast.info("Cobrança já paga. Use WhatsApp apenas para comunicação pós-pagamento.");
+      navigate(`/whatsapp?customerId=${charge.customerId}`);
+      return;
+    }
     navigate(`/whatsapp?customerId=${charge.customerId}&chargeId=${charge.id ?? ""}`);
   }
 

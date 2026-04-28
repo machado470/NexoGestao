@@ -448,9 +448,14 @@ export function getTimelineEventLabel(event: TimelineEventLike) {
     GOVERNANCE_RUN_COMPLETED: "Governança concluída",
     OPERATIONAL_STATE_CHANGED: "Estado operacional alterado",
     MESSAGE_SENT: "Mensagem enviada",
+    MESSAGE_FAILED: "Falha no envio da mensagem",
+    MESSAGE_RETRY_REQUESTED: "Retry de mensagem solicitado",
     PAYMENT_LINK_SENT: "Link de pagamento enviado",
+    APPOINTMENT_REMINDER_SENT: "Lembrete de agendamento enviado",
+    SERVICE_UPDATE_SENT: "Atualização da O.S. enviada",
   };
 
+  // TODO(whatsapp-events): remover fallback quando backend padronizar todos os eventos de WhatsApp/Comunicação.
   const fallback = key.split("_").join(" ").trim();
   return labels[key] ?? (fallback || "Evento");
 }

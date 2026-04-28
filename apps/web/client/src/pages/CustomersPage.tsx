@@ -311,6 +311,15 @@ export default function CustomersPage() {
     return displayedCustomers.slice(start, start + pageSize);
   }, [currentPage, displayedCustomers, pageSize]);
 
+  function openCustomerWhatsApp(customer: Customer, chargeId?: string | null) {
+    const customerId = String(customer?.id ?? "");
+    if (!customerId) return toast.error("Cliente sem identificador para abrir WhatsApp.");
+    if (!String(customer?.phone ?? "").trim()) {
+      return toast.error("Cliente sem telefone/WhatsApp cadastrado.");
+    }
+    navigate(`/whatsapp?customerId=${customerId}${chargeId ? `&chargeId=${chargeId}` : ""}`);
+  }
+
   useEffect(() => {
     setCurrentPage(1);
   }, [activeFilter, searchTerm]);
@@ -574,7 +583,10 @@ export default function CustomersPage() {
                                 {
                                   label: "Enviar WhatsApp",
                                   onSelect: () =>
-                                    navigate(`/whatsapp?customerId=${customerId}`),
+                                    openCustomerWhatsApp(
+                                      customer,
+                                      String(aggregate.charges.find(charge => ["OVERDUE", "PENDING"].includes(String(charge?.status ?? "").toUpperCase()))?.id ?? "") || null
+                                    ),
                                 },
                                 {
                                   label: "Abrir cobrança",
@@ -669,7 +681,10 @@ export default function CustomersPage() {
                     size="sm"
                     variant="outline"
                     onClick={() =>
-                      navigate(`/whatsapp?customerId=${activeCustomerId}`)
+                      openCustomerWhatsApp(
+                        selectedCustomer,
+                        String((workspace.charges ?? []).find(charge => ["OVERDUE", "PENDING"].includes(String(charge?.status ?? "").toUpperCase()))?.id ?? "") || null
+                      )
                     }
                   >
                     Enviar WhatsApp

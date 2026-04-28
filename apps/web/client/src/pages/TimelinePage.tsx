@@ -587,7 +587,7 @@ export default function TimelinePage() {
     ]);
 
     const content = [headers, ...rows]
-      .map(cols => cols.map(col => `"${String(col).replaceAll('"', '""')}"`).join(","))
+      .map(cols => cols.map(col => `"${String(col).split('"').join('""')}"`).join(","))
       .join("\n");
 
     const blob = new Blob([content], { type: "text/csv;charset=utf-8" });
