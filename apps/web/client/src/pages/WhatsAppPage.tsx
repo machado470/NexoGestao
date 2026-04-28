@@ -44,6 +44,7 @@ type WhatsAppPriority = "LOW" | "NORMAL" | "HIGH" | "CRITICAL";
 type ContextType = "CHARGE" | "APPOINTMENT" | "SERVICE_ORDER" | "GENERAL";
 type MessageDirection = "INBOUND" | "OUTBOUND";
 type MessageStatus = "QUEUED" | "SENT" | "DELIVERED" | "READ" | "FAILED";
+type Customer = { id?: string | number; name?: string; phone?: string | null; [key: string]: any };
 
 type Conversation = {
   id: string;
@@ -66,6 +67,7 @@ type Conversation = {
   hasActiveServiceOrder?: boolean;
   hasFailedDelivery?: boolean;
   isVirtual?: boolean;
+  customer?: { id?: string; name?: string; phone?: string | null } | null;
 };
 
 type ChatMessage = {
@@ -140,6 +142,27 @@ const NO_APPOINTMENT_TEXT = "Sem agendamento futuro";
 const NO_SERVICE_ORDER_TEXT = "Nenhuma O.S. ativa";
 const NO_CHARGE_TEXT = "Nenhuma cobrança pendente";
 
+function normalizeCustomersPayload(payload: unknown): Customer[] {
+  const raw = payload as any;
+  if (Array.isArray(raw)) return raw;
+  if (!raw || typeof raw !== "object") return [];
+
+  if (Array.isArray(raw.data)) return raw.data;
+  if (Array.isArray(raw.items)) return raw.items;
+  if (Array.isArray(raw?.data?.items)) return raw.data.items;
+  if (Array.isArray(raw?.data?.data)) return raw.data.data;
+  if (Array.isArray(raw?.data?.data?.items)) return raw.data.data.items;
+
+  if (Array.isArray(raw?.result?.data)) return raw.result.data;
+  if (Array.isArray(raw?.result?.data?.items)) return raw.result.data.items;
+  if (Array.isArray(raw?.result?.data?.json)) return raw.result.data.json;
+  if (Array.isArray(raw?.result?.data?.json?.data)) return raw.result.data.json.data;
+  if (Array.isArray(raw?.result?.data?.json?.items)) return raw.result.data.json.items;
+  if (Array.isArray(raw?.result?.data?.json?.data?.items)) return raw.result.data.json.data.items;
+
+  return [];
+}
+
 function fmtDateTime(value?: string | null) {
   if (!value) return "--";
   const date = new Date(value);
@@ -196,6 +219,13 @@ function mapConversation(item: any): Conversation {
     hasActiveServiceOrder,
     hasFailedDelivery,
     isVirtual: false,
+    customer: item?.customer
+      ? {
+        id: item?.customer?.id ? String(item.customer.id) : undefined,
+        name: item?.customer?.name ? String(item.customer.name) : undefined,
+        phone: item?.customer?.phone ? String(item.customer.phone) : undefined,
+      }
+      : null,
   };
 }
 
@@ -346,6 +376,7 @@ function ConversationsList({
   onSearch,
   isLoading,
   hasError,
+  errorMessage,
   emptyStateMessage,
 }: {
   rows: Conversation[];
@@ -357,6 +388,7 @@ function ConversationsList({
   onSearch: (next: string) => void;
   isLoading: boolean;
   hasError: boolean;
+  errorMessage?: string;
   emptyStateMessage: string;
 }) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -424,7 +456,7 @@ function ConversationsList({
             <div className="mb-2 h-px w-full bg-white/[0.06]" />
             <p className="text-xs text-[var(--text-secondary)]">
               {hasError
-                ? "Não foi possível carregar conversas"
+                ? (errorMessage ?? "Não foi possível carregar conversas")
                 : emptyStateMessage}
             </p>
             <p className="mt-1 text-[11px] text-[var(--text-muted)]">
@@ -891,16 +923,17 @@ export default function WhatsAppPage() {
     () => (Array.isArray(conversationsQuery.data) ? conversationsQuery.data.map(mapConversation) : []),
     [conversationsQuery.data]
   );
-  const customersQuery = trpc.nexo.customers.list.useQuery({ page: 1, limit: 500 }, { retry: false });
+  const customersQuery = trpc.nexo.customers.list.useQuery(
+    { page: 1, limit: 300 },
+    { retry: false, enabled: true }
+  );
   const appointmentsQuery = trpc.nexo.appointments.list.useQuery(undefined, { retry: false });
   const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery({ page: 1, limit: 500 }, { retry: false });
   const chargesQuery = trpc.finance.charges.list.useQuery({ page: 1, limit: 500 }, { retry: false });
-  const customers = useMemo(() => {
-    const raw = customersQuery.data as any;
-    if (Array.isArray(raw)) return raw;
-    if (Array.isArray(raw?.items)) return raw.items;
-    return [];
-  }, [customersQuery.data]);
+  const customers = useMemo(
+    () => normalizeCustomersPayload(customersQuery.data),
+    [customersQuery.data]
+  );
   const appointments = useMemo(() => {
     const raw = appointmentsQuery.data as any;
     if (Array.isArray(raw)) return raw;
@@ -921,7 +954,12 @@ export default function WhatsAppPage() {
   }, [chargesQuery.data]);
 
   const conversationCustomerIds = useMemo(
-    () => new Set(conversations.map(item => item.customerId).filter(Boolean) as string[]),
+    () =>
+      new Set(
+        conversations
+          .map(item => item.customerId ?? item.customer?.id ?? null)
+          .filter((id): id is string => Boolean(id))
+      ),
     [conversations]
   );
   const customersWithoutConversation = useMemo(
@@ -949,6 +987,11 @@ export default function WhatsAppPage() {
           hasActiveServiceOrder: serviceOrders.some((serviceOrder: any) => String(serviceOrder?.customerId ?? "") === String(customer.id) && !["DONE", "CANCELED"].includes(String(serviceOrder?.status ?? "").toUpperCase())),
           hasFailedDelivery: false,
           isVirtual: true,
+          customer: {
+            id: String(customer.id),
+            name: String(customer?.name ?? "Sem nome"),
+            phone: customer?.phone ? String(customer.phone) : null,
+          },
         })),
     [appointments, charges, conversationCustomerIds, customers, serviceOrders]
   );
@@ -973,6 +1016,11 @@ export default function WhatsAppPage() {
     hasActiveServiceOrder: serviceOrders.some((serviceOrder: any) => String(serviceOrder?.customerId ?? "") === String(customer.id) && !["DONE", "CANCELED"].includes(String(serviceOrder?.status ?? "").toUpperCase())),
     hasFailedDelivery: false,
     isVirtual: true,
+    customer: {
+      id: String(customer.id),
+      name: String(customer?.name ?? "Sem nome"),
+      phone: customer?.phone ? String(customer.phone) : null,
+    },
   }), [appointments, charges, serviceOrders]);
   const allInboxRows = useMemo(
     () => [...conversations, ...customersWithoutConversation],
@@ -982,10 +1030,11 @@ export default function WhatsAppPage() {
     const query = debouncedSearch.trim().toLowerCase();
     return allInboxRows.filter(item => {
       const searchable = [
-        item.name,
+        item.customer?.name ?? item.name,
+        item.customer?.phone ?? item.phone ?? "",
+        item.title ?? "",
         item.phone ?? "",
         item.lastMessage,
-        item.title ?? "",
         item.contextHint ?? "",
         item.operationalStatus ?? "",
       ].join(" ").toLowerCase();
@@ -1010,17 +1059,55 @@ export default function WhatsAppPage() {
     });
   }, [activeFilter, allInboxRows, debouncedSearch]);
   useEffect(() => {
-    console.debug("[WhatsAppPage][inbox-debug]", {
-      customersWithoutConversation: customersWithoutConversation.length,
-      allInboxRows: allInboxRows.length,
-      filteredRows: filteredRows.length,
+    if (!import.meta.env.DEV) return;
+    console.debug("[WhatsAppPage][customers-debug]", {
+      queryParams: {
+        customerId: queryCustomerId,
+        conversationId: queryConversationId,
+        chargeId: queryChargeId,
+        appointmentId: queryAppointmentId,
+        serviceOrderId: queryServiceOrderId,
+      },
+      rawCustomersQueryData: customersQuery.data,
+      normalizedCustomersLength: customers.length,
+      firstNormalizedCustomer: customers[0] ?? null,
+      conversationsLength: conversations.length,
+      customersWithoutConversationLength: customersWithoutConversation.length,
+      allInboxRowsLength: allInboxRows.length,
+      filteredRowsLength: filteredRows.length,
     });
-  }, [allInboxRows.length, customersWithoutConversation.length, filteredRows.length]);
+  }, [
+    allInboxRows.length,
+    conversations.length,
+    customers,
+    customersQuery.data,
+    customersWithoutConversation.length,
+    filteredRows.length,
+    queryAppointmentId,
+    queryChargeId,
+    queryConversationId,
+    queryCustomerId,
+    queryServiceOrderId,
+  ]);
   const emptyStateMessage = useMemo(() => {
-    if (debouncedSearch.trim()) return "Nenhum resultado para esta busca.";
+    if (customersQuery.error) return "Erro ao carregar clientes";
+    if (!customersQuery.isLoading && !customersQuery.isFetching && customers.length === 0) {
+      return "Nenhum cliente carregado";
+    }
+    if (allInboxRows.length > 0 && filteredRows.length === 0) return "Nenhum resultado para esta busca";
+    if (debouncedSearch.trim()) return "Nenhum resultado para esta busca";
     if (activeFilter === "failures") return "Nenhuma falha encontrada.";
     return "Nenhum cliente encontrado.";
-  }, [activeFilter, debouncedSearch]);
+  }, [
+    activeFilter,
+    allInboxRows.length,
+    customers.length,
+    customersQuery.error,
+    customersQuery.isFetching,
+    customersQuery.isLoading,
+    debouncedSearch,
+    filteredRows.length,
+  ]);
 
   const selectedConversation = useMemo(
     () =>
@@ -1050,6 +1137,12 @@ export default function WhatsAppPage() {
             const customer = customers.find((item: any) => String(item?.id ?? "") === String(queryCustomerId));
             return customer ? buildVirtualRowFromCustomer(customer) : null;
           })();
+        if (!existingConversation && !virtualCustomer && import.meta.env.DEV) {
+          console.debug("[WhatsAppPage] customerId from URL not found in customers dataset", {
+            queryCustomerId,
+            normalizedCustomersLength: customers.length,
+          });
+        }
         const nextSelection = existingConversation ?? virtualCustomer;
         if (nextSelection?.id) {
           setSelectedConversationId(nextSelection.id);
@@ -1369,6 +1462,7 @@ export default function WhatsAppPage() {
               && filteredRows.length === 0
             }
             hasError={Boolean(conversationsQuery.error) || Boolean(customersQuery.error)}
+            errorMessage={customersQuery.error ? "Erro ao carregar clientes" : "Não foi possível carregar conversas"}
             emptyStateMessage={emptyStateMessage}
           />
         </div>
