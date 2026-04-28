@@ -24,6 +24,7 @@ import {
 import { trpc } from "@/lib/trpc";
 import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
 import { cn } from "@/lib/utils";
+import { priorityRank, resolveInboxPriority, type GovernanceSignal, type InboxPriority } from "@/lib/whatsappInboxPriority";
 import { Button } from "@/components/design-system";
 import { AppPageShell, AppSkeleton } from "@/components/app-system";
 import {
@@ -47,7 +48,7 @@ type ConversationFilter =
   | "service_orders";
 
 type WhatsAppConversationStatus = "OPEN" | "PENDING" | "RESOLVED" | "FAILED";
-type WhatsAppPriority = "LOW" | "NORMAL" | "HIGH" | "CRITICAL";
+type WhatsAppPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 type ContextType = "CUSTOMER" | "CHARGE" | "APPOINTMENT" | "SERVICE_ORDER" | "PAYMENT" | "GENERAL";
 type MessageDirection = "INBOUND" | "OUTBOUND";
 type MessageStatus = "QUEUED" | "SENT" | "DELIVERED" | "READ" | "FAILED";
@@ -66,6 +67,10 @@ type Conversation = {
   status: WhatsAppConversationStatus;
   contextType: ContextType;
   priority: WhatsAppPriority;
+  governanceSignal?: GovernanceSignal | null;
+  failedMessageCount?: number;
+  lastFailedAt?: string | null;
+  hasNoResponse?: boolean;
   unreadCount: number;
   contextId?: string | null;
   operationalStatus?: string;
@@ -198,14 +203,23 @@ function mapConversation(item: any): Conversation {
   const hasPendingCharge = item?.contextType === "CHARGE" && ["OPEN", "PENDING"].includes(String(item?.status ?? "OPEN"));
   const hasUpcomingAppointment = item?.contextType === "APPOINTMENT";
   const hasActiveServiceOrder = item?.contextType === "SERVICE_ORDER";
-  const hasFailedDelivery = item?.status === "FAILED";
+  const governanceSignal = (item?.metadata?.governanceSignal ?? null) as GovernanceSignal | null;
+  const hasFailedDelivery = item?.status === "FAILED" || Boolean(governanceSignal?.communicationFailure);
+  const hasNoResponse = item?.unreadCount > 0 || hasPendingCharge;
   const operationalStatus = hasFailedDelivery
     ? "Falha"
-    : item?.unreadCount > 0
+    : hasNoResponse
       ? "Aguardando resposta"
       : hasPendingCharge || hasUpcomingAppointment || hasActiveServiceOrder
         ? "Com pendência"
         : "Resolvido";
+  const priority = resolveInboxPriority({
+    hasFailedDelivery,
+    hasPendingCharge,
+    isAwaitingReply: hasNoResponse,
+    isResolved: String(item?.status ?? "") === "RESOLVED",
+    governanceSignal,
+  });
   return {
     id: String(item?.id ?? ""),
     conversationId: String(item?.id ?? ""),
@@ -217,7 +231,7 @@ function mapConversation(item: any): Conversation {
     lastMessageAt: item?.lastMessageAt ?? null,
     status: (item?.status ?? "OPEN") as WhatsAppConversationStatus,
     contextType: (item?.contextType ?? "GENERAL") as ContextType,
-    priority: (item?.priority ?? "NORMAL") as WhatsAppPriority,
+    priority,
     unreadCount: Number(item?.unreadCount ?? 0),
     contextId: item?.contextId ?? null,
     operationalStatus,
@@ -226,6 +240,10 @@ function mapConversation(item: any): Conversation {
     hasUpcomingAppointment,
     hasActiveServiceOrder,
     hasFailedDelivery,
+    governanceSignal,
+    failedMessageCount: governanceSignal?.failedMessageCount ?? undefined,
+    lastFailedAt: governanceSignal?.lastFailedAt ?? null,
+    hasNoResponse,
     isVirtual: false,
     customer: item?.customer
       ? {
@@ -274,13 +292,39 @@ function getOperationalStatus(conversation: Conversation) {
 }
 
 function priorityScore(conversation: Conversation) {
-  if (!conversation.conversationId) return 700;
-  if (conversation.hasFailedDelivery || conversation.status === "FAILED") return 100;
-  if (conversation.unreadCount > 0) return 200;
-  if (conversation.hasPendingCharge || conversation.contextType === "CHARGE") return 300;
-  if (conversation.hasUpcomingAppointment || conversation.contextType === "APPOINTMENT") return 400;
-  if (conversation.hasActiveServiceOrder || conversation.contextType === "SERVICE_ORDER") return 500;
-  return 600;
+  if (!conversation.conversationId) return 900;
+  const rank = priorityRank(conversation.priority as InboxPriority);
+  return rank * 100;
+}
+
+
+function getConversationBadges(conversation: Conversation) {
+  const badges: string[] = [];
+  if (conversation.hasFailedDelivery) badges.push("Falha");
+  if (conversation.hasNoResponse) badges.push("Sem resposta");
+  if (conversation.hasPendingCharge) badges.push("Cobrança pendente");
+  return badges;
+}
+
+function buildSuggestedAction(conversation?: Conversation, context?: WhatsAppContext | null) {
+  if (!conversation) return null;
+  if (conversation.hasFailedDelivery) return { key: "retry", label: "Reenviar mensagem" };
+  if (conversation.hasPendingCharge && conversation.hasNoResponse) return { key: "charge", label: "Cobrar novamente" };
+  if (context?.nextAppointment?.id && String(context?.nextAppointment?.status ?? "").toUpperCase() !== "CONFIRMED") {
+    return { key: "appointment", label: "Confirmar agendamento" };
+  }
+  return null;
+}
+
+function timeAgoLabel(value?: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const minutes = Math.max(1, Math.floor((Date.now() - date.getTime()) / 60000));
+  if (minutes < 60) return `${minutes} min atrás`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h atrás`;
+  return `${Math.floor(hours / 24)}d atrás`;
 }
 
 function buildTemplateText(template: string, context?: WhatsAppContext | null) {
@@ -333,6 +377,7 @@ const ConversationRow = memo(function ConversationRow({
 }) {
   const status = statusUi[conversation.status] ?? statusUi.OPEN;
   const operational = getOperationalStatus(conversation);
+  const badges = getConversationBadges(conversation);
 
   return (
     <div style={style} className="px-0.5 py-1">
@@ -374,6 +419,13 @@ const ConversationRow = memo(function ConversationRow({
             <span className={cn("h-2 w-2 rounded-full", status.dot)} />
             {operational}
           </span>
+          {badges.length ? (
+            <div className="flex flex-wrap justify-end gap-1">
+              {badges.slice(0, 3).map((badge) => (
+                <span key={badge} className="rounded-full border border-white/15 bg-white/10 px-1.5 py-0.5 text-[10px] leading-none text-white/90">{badge}</span>
+              ))}
+            </div>
+          ) : null}
           {conversation.unreadCount ? (
             <span className="rounded-full border border-amber-400/35 bg-amber-500/20 px-1.5 py-0.5 text-[10px] leading-none text-amber-100">
               {conversation.unreadCount}
@@ -526,6 +578,9 @@ function ChatPanel({
   onOpenServiceOrder,
   onFillTemplate,
   canMarkAsPaid,
+  suggestedActionLabel,
+  governanceAlert,
+  onRunSuggestedAction,
 }: {
   conversation?: Conversation;
   canCompose: boolean;
@@ -546,6 +601,9 @@ function ChatPanel({
   onOpenServiceOrder: () => void;
   onFillTemplate: (template: string) => void;
   canMarkAsPaid: boolean;
+  suggestedActionLabel?: string | null;
+  governanceAlert?: string | null;
+  onRunSuggestedAction: () => void;
 }) {
   const messagesRef = useRef<HTMLDivElement | null>(null);
   const hasConversation = Boolean(conversation);
@@ -603,6 +661,15 @@ function ChatPanel({
           </button>
         </div>
       </header>
+
+      {suggestedActionLabel || governanceAlert ? (
+        <div className="mx-4 mb-2 rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs">
+          {suggestedActionLabel ? (
+            <button type="button" onClick={onRunSuggestedAction} className="font-medium text-amber-100 underline-offset-2 hover:underline">{suggestedActionLabel}</button>
+          ) : null}
+          {governanceAlert ? <p className="mt-1 text-[11px] text-amber-200/90">{governanceAlert}</p> : null}
+        </div>
+      ) : null}
 
       <div ref={messagesRef} className="scrollbar-thin-nexo flex-1 min-h-0 overflow-y-auto bg-transparent px-5 pb-1 pt-4">
         {!hasConversation ? (
@@ -1327,6 +1394,20 @@ export default function WhatsAppPage() {
     selectedCustomerServiceOrder,
   ]);
 
+  const suggestedAction = useMemo(
+    () => buildSuggestedAction(selectedConversation, context),
+    [context, selectedConversation]
+  );
+  const governanceAlert = useMemo(() => {
+    if (!selectedConversation) return null;
+    if (!selectedConversation.governanceSignal?.communicationFailure && !selectedConversation.hasFailedDelivery) return null;
+    const parts = ["Sinal de governança: falha de comunicação"]; 
+    if ((selectedConversation.failedMessageCount ?? 0) > 1) parts.push(`${selectedConversation.failedMessageCount} falhas acumuladas`);
+    const failedAgo = timeAgoLabel(selectedConversation.lastFailedAt);
+    if (failedAgo) parts.push(`última falha ${failedAgo}`);
+    return parts.join(" • ");
+  }, [selectedConversation]);
+
   const destinationPhone = useMemo(
     () => String(context?.customer?.phone ?? selectedConversation?.phone ?? selectedCustomer?.phone ?? "").trim(),
     [context?.customer?.phone, selectedConversation?.phone, selectedCustomer?.phone]
@@ -1551,6 +1632,13 @@ export default function WhatsAppPage() {
             onOpenServiceOrder={() => setLocation(context?.activeServiceOrder?.id ? `/service-orders?serviceOrderId=${context.activeServiceOrder.id}` : "/service-orders")}
             onFillTemplate={handleTemplateChip}
             canMarkAsPaid={Boolean(context?.openCharge?.id)}
+            suggestedActionLabel={suggestedAction?.label ?? null}
+            governanceAlert={governanceAlert}
+            onRunSuggestedAction={() => {
+              if (suggestedAction?.key === "retry") { void handleRetryLastFailed(); return; }
+              if (suggestedAction?.key === "charge") { void handleSendCharge(); return; }
+              if (suggestedAction?.key === "appointment") { handleTemplateChip("Confirmação de agendamento"); }
+            }}
           />
         </div>
 
