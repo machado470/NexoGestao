@@ -80,17 +80,43 @@ export class WhatsAppService {
     })
     const hasMore = items.length > take
     const sliced = hasMore ? items.slice(0, take) : items
+    const customerIds = [...new Set(sliced.map((item) => item.customerId).filter(Boolean) as string[])]
+    const conversationIds = sliced.map((item) => item.id)
+    const [failedGroups, pendingChargesByCustomer, overdueChargesByCustomer, appointmentsByCustomer, serviceOrdersByCustomer] = await Promise.all([
+      this.prisma.whatsAppMessage.groupBy({ by: ['conversationId'], where: { orgId, conversationId: { in: conversationIds }, status: 'FAILED' }, _count: { _all: true } }),
+      this.prisma.charge.groupBy({ by: ['customerId'], where: { orgId, customerId: { in: customerIds }, status: 'PENDING' }, _count: { _all: true } }),
+      this.prisma.charge.groupBy({ by: ['customerId'], where: { orgId, customerId: { in: customerIds }, status: 'OVERDUE' }, _count: { _all: true } }),
+      this.prisma.appointment.groupBy({ by: ['customerId'], where: { orgId, customerId: { in: customerIds }, status: { in: ['SCHEDULED', 'CONFIRMED'] } }, _count: { _all: true } }),
+      this.prisma.serviceOrder.groupBy({ by: ['customerId'], where: { orgId, customerId: { in: customerIds }, status: { in: ['OPEN', 'ASSIGNED', 'IN_PROGRESS'] } }, _count: { _all: true } }),
+    ])
+    const failedMap = new Map(failedGroups.map((g) => [g.conversationId, g._count._all]))
+    const pendingMap = new Map(pendingChargesByCustomer.map((g) => [g.customerId, g._count._all]))
+    const overdueMap = new Map(overdueChargesByCustomer.map((g) => [g.customerId, g._count._all]))
+    const appointmentMap = new Map(appointmentsByCustomer.map((g) => [g.customerId, g._count._all]))
+    const serviceOrderMap = new Map(serviceOrdersByCustomer.map((g) => [g.customerId, g._count._all]))
     return {
       items: sliced.map((item) => ({
       ...item,
-      priority: this.calculateInboxPriority(item),
+      priority: this.calculateInboxPriority(item, {
+        hasPendingCharge: (pendingMap.get(item.customerId ?? '') ?? 0) > 0,
+        hasOverdueCharge: (overdueMap.get(item.customerId ?? '') ?? 0) > 0,
+        failedMessageCount: failedMap.get(item.id) ?? 0,
+      }),
       lastMessage: item.lastMessageAt,
       noResponseSince: item.lastInboundAt && (!item.lastOutboundAt || item.lastInboundAt > item.lastOutboundAt) ? item.lastInboundAt : null,
-      failedMessageCount: 0,
+      noResponseMinutes: item.lastInboundAt && (!item.lastOutboundAt || item.lastInboundAt > item.lastOutboundAt) ? Math.floor((Date.now() - item.lastInboundAt.getTime()) / 60000) : null,
+      noResponseHours: item.lastInboundAt && (!item.lastOutboundAt || item.lastInboundAt > item.lastOutboundAt) ? Number(((Date.now() - item.lastInboundAt.getTime()) / 3600000).toFixed(1)) : null,
+      failedMessageCount: failedMap.get(item.id) ?? 0,
+      nextAction: this.resolveNextAction({
+        failedMessageCount: failedMap.get(item.id) ?? 0,
+        hasPendingCharge: (pendingMap.get(item.customerId ?? '') ?? 0) > 0 || (overdueMap.get(item.customerId ?? '') ?? 0) > 0,
+        hasUpcomingAppointment: (appointmentMap.get(item.customerId ?? '') ?? 0) > 0,
+        hasActiveServiceOrder: (serviceOrderMap.get(item.customerId ?? '') ?? 0) > 0,
+      }),
       flags: {
-        hasPendingCharge: false,
+        hasPendingCharge: (pendingMap.get(item.customerId ?? '') ?? 0) > 0 || (overdueMap.get(item.customerId ?? '') ?? 0) > 0,
         hasNoResponse: item.status === 'WAITING_CUSTOMER',
-        hasFailure: item.status === 'FAILED',
+        hasFailure: item.status === 'FAILED' || (failedMap.get(item.id) ?? 0) > 0,
       },
       })),
       nextCursor: hasMore ? sliced[sliced.length - 1]?.id ?? null : null,
@@ -370,11 +396,20 @@ export class WhatsAppService {
     return { provider: providerName, processed: results.length, results }
   }
 
-  private calculateInboxPriority(item: { status: WhatsAppConversationStatus; lastInboundAt: Date | null; lastOutboundAt: Date | null; updatedAt: Date }): WhatsAppConversationPriority {
+  private calculateInboxPriority(item: { status: WhatsAppConversationStatus; lastInboundAt: Date | null; lastOutboundAt: Date | null; updatedAt: Date }, signals: { hasPendingCharge: boolean; hasOverdueCharge: boolean; failedMessageCount: number }): WhatsAppConversationPriority {
+    const hasNoResponse = Boolean(item.lastInboundAt && (!item.lastOutboundAt || item.lastInboundAt > item.lastOutboundAt))
     if (item.status === 'RESOLVED') return 'LOW'
-    if (item.status === 'FAILED') return 'CRITICAL'
-    if (item.lastInboundAt && (!item.lastOutboundAt || item.lastInboundAt > item.lastOutboundAt)) return 'HIGH'
+    if ((signals.hasOverdueCharge && hasNoResponse) || item.status === 'FAILED' || signals.failedMessageCount >= 2) return 'CRITICAL'
+    if (signals.hasPendingCharge || hasNoResponse) return 'HIGH'
     return 'NORMAL'
+  }
+
+  private resolveNextAction(input: { failedMessageCount: number; hasPendingCharge: boolean; hasUpcomingAppointment: boolean; hasActiveServiceOrder: boolean }) {
+    if (input.failedMessageCount > 0) return 'RETRY_MESSAGE'
+    if (input.hasPendingCharge) return 'SEND_PAYMENT_REMINDER'
+    if (input.hasUpcomingAppointment) return 'CONFIRM_APPOINTMENT'
+    if (input.hasActiveServiceOrder) return 'SEND_SERVICE_UPDATE'
+    return 'SEND_SERVICE_UPDATE'
   }
 
   async buildConversationFromCustomer(orgId: string, customerId: string) {

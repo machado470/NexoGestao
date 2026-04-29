@@ -11,13 +11,16 @@ type PriorityInput = {
   hasPendingCharge: boolean;
   isAwaitingReply: boolean;
   isResolved: boolean;
+  hasOverdueCharge?: boolean;
+  noResponseSince?: string | Date | null;
   governanceSignal?: GovernanceSignal | null;
 };
 
 export function resolveInboxPriority(input: PriorityInput): InboxPriority {
-  if (input.hasFailedDelivery || input.governanceSignal?.communicationFailure) return "CRITICAL";
-  if (input.hasPendingCharge) return "HIGH";
-  if (input.isAwaitingReply) return "HIGH";
+  const failedCount = input.governanceSignal?.failedMessageCount ?? 0;
+  const hasNoResponse = Boolean(input.isAwaitingReply || input.noResponseSince);
+  if ((input.hasOverdueCharge && hasNoResponse) || input.hasFailedDelivery || failedCount >= 2 || input.governanceSignal?.communicationFailure) return "CRITICAL";
+  if (input.hasPendingCharge || hasNoResponse) return "HIGH";
   if (input.isResolved) return "LOW";
   return "MEDIUM";
 }
