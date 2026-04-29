@@ -63,7 +63,7 @@ export class WhatsAppService {
       ]
     }
 
-    return this.prisma.whatsAppConversation.findMany({
+    const items = await this.prisma.whatsAppConversation.findMany({
       where,
       include: { customer: { select: { id: true, name: true, phone: true } } },
       orderBy: [
@@ -73,6 +73,7 @@ export class WhatsAppService {
         { lastMessageAt: 'desc' },
       ],
     })
+    return items.map((item) => ({ ...item, priority: this.calculateInboxPriority(item) }))
   }
 
   async getConversation(orgId: string, conversationId: string) {
@@ -274,6 +275,17 @@ export class WhatsAppService {
 
     const results: any[] = []
     for (const item of parsed) {
+      if (item.eventType !== 'MESSAGE_RECEIVED' && item.providerMessageId) {
+        const status = item.eventType === 'MESSAGE_DELIVERED' ? 'DELIVERED' : item.eventType === 'MESSAGE_READ' ? 'READ' : item.eventType === 'MESSAGE_FAILED' ? 'FAILED' : null
+        if (status) {
+          const existing = await this.prisma.whatsAppMessage.findFirst({ where: { providerMessageId: item.providerMessageId } })
+          if (existing) {
+            await this.updateMessageStatus(existing.orgId, { id: existing.id, status: status as WhatsAppMessageStatus, errorMessage: item.content ?? undefined })
+            results.push({ associated: true, updatedMessageId: existing.id, eventType: item.eventType })
+            continue
+          }
+        }
+      }
       const phone = this.normalizePhone(item.fromPhone)
       const customer = phone
         ? await this.prisma.customer.findFirst({ where: { phone: { contains: phone.slice(-8) } }, select: { id: true, orgId: true, phone: true } })
@@ -337,6 +349,13 @@ export class WhatsAppService {
     }
 
     return { provider: providerName, processed: results.length, results }
+  }
+
+  private calculateInboxPriority(item: { status: WhatsAppConversationStatus; lastInboundAt: Date | null; lastOutboundAt: Date | null; updatedAt: Date }): WhatsAppConversationPriority {
+    if (item.status === 'RESOLVED') return 'LOW'
+    if (item.status === 'FAILED') return 'CRITICAL'
+    if (item.lastInboundAt && (!item.lastOutboundAt || item.lastInboundAt > item.lastOutboundAt)) return 'HIGH'
+    return 'NORMAL'
   }
 
   async buildConversationFromCustomer(orgId: string, customerId: string) {

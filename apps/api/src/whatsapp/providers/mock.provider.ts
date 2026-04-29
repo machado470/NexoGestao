@@ -10,7 +10,8 @@ import {
 export class MockWhatsAppProvider implements WhatsAppProvider {
   private readonly providerName = 'mock'
 
-  async send(input: WhatsAppSendTextInput): Promise<WhatsAppSendResult> {
+  async send(input: WhatsAppSendTextInput): Promise<WhatsAppSendResult> { return this.sendMessage(input) }
+  async sendMessage(input: WhatsAppSendTextInput): Promise<WhatsAppSendResult> {
     return this.sendText(input)
   }
 
@@ -44,7 +45,7 @@ export class MockWhatsAppProvider implements WhatsAppProvider {
     if (!phone && !text) return []
 
     return [{
-      eventType: String(data.eventType ?? 'message.received'),
+      eventType: this.mapProviderStatus(String(data.eventType ?? 'message.received')),
       fromPhone: phone,
       toPhone: String(data.to ?? '').trim() || null,
       content: text,
@@ -52,6 +53,16 @@ export class MockWhatsAppProvider implements WhatsAppProvider {
       timestamp: new Date(),
       metadata: data,
     }]
+  }
+  verifyWebhookSignature(): boolean {
+    return true
+  }
+  mapProviderStatus(status: string): ParsedWebhookMessage['eventType'] {
+    const normalized = status.toLowerCase()
+    if (normalized.includes('read')) return 'MESSAGE_READ'
+    if (normalized.includes('deliver')) return 'MESSAGE_DELIVERED'
+    if (normalized.includes('fail')) return 'MESSAGE_FAILED'
+    return 'MESSAGE_RECEIVED'
   }
 
   getProviderName(): string {

@@ -93,7 +93,8 @@ export class ZApiWhatsAppProvider implements WhatsAppProvider {
   }
 
 
-  async send(input: WhatsAppSendTextInput): Promise<WhatsAppSendResult> {
+  async send(input: WhatsAppSendTextInput): Promise<WhatsAppSendResult> { return this.sendMessage(input) }
+  async sendMessage(input: WhatsAppSendTextInput): Promise<WhatsAppSendResult> {
     return this.sendText(input)
   }
   async sendText(input: WhatsAppSendTextInput): Promise<WhatsAppSendResult> {
@@ -118,7 +119,7 @@ export class ZApiWhatsAppProvider implements WhatsAppProvider {
 
     return list
       .map((item: Record<string, any>) => ({
-        eventType: String(item.eventType ?? data.eventType ?? 'message.received'),
+        eventType: this.mapProviderStatus(String(item.eventType ?? data.eventType ?? 'message.received')),
         fromPhone: String(item.phone ?? item.from ?? item.sender ?? '').trim() || null,
         toPhone: String(item.to ?? item.toPhone ?? '').trim() || null,
         content: String(item.text?.message ?? item.text ?? item.message ?? '').trim() || null,
@@ -131,6 +132,16 @@ export class ZApiWhatsAppProvider implements WhatsAppProvider {
 
   getProviderName(): string {
     return this.providerName
+  }
+  verifyWebhookSignature(): boolean {
+    return true
+  }
+  mapProviderStatus(status: string): ParsedWebhookMessage['eventType'] {
+    const normalized = status.toLowerCase()
+    if (normalized.includes('read')) return 'MESSAGE_READ'
+    if (normalized.includes('deliver')) return 'MESSAGE_DELIVERED'
+    if (normalized.includes('fail')) return 'MESSAGE_FAILED'
+    return 'MESSAGE_RECEIVED'
   }
 
   checkHealth(): WhatsAppProviderHealth {

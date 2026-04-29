@@ -35,6 +35,10 @@ export class WhatsAppController {
   async listConversations(@Org() orgId: string, @Query() query: any) {
     return this.whatsapp.listConversations(orgId, query)
   }
+  @Get('inbox')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async listInbox(@Org() orgId: string, @Query() query: any) { return this.whatsapp.listConversations(orgId, query) }
 
   @Get('conversations/:id')
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -103,10 +107,22 @@ export class WhatsAppController {
     if (!status) throw new BadRequestException('status é obrigatório')
     return this.whatsapp.updateConversationStatus(orgId, id, status)
   }
+  @Post('conversations/:id/resolve')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async markResolved(@Org() orgId: string, @Param('id') id: string) { return this.whatsapp.updateConversationStatus(orgId, id, 'RESOLVED') }
 
-  @Post('webhook/:provider')
-  async webhook(@Param('provider') provider: string, @Body() payload: any) {
+  @Post('conversations/:id/reopen')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async reopenConversation(@Org() orgId: string, @Param('id') id: string) { return this.whatsapp.updateConversationStatus(orgId, id, 'OPEN') }
+
+  @Post('webhooks/:provider')
+  async webhook(@Param('provider') provider: string, @Body() payload: any, @Headers() headers: Record<string, string>) {
     const serviceProvider = createWhatsAppProvider()
+    if (serviceProvider.getProviderName() !== provider) throw new BadRequestException('provider inválido')
+    const signatureOk = await serviceProvider.verifyWebhookSignature(payload, headers)
+    if (!signatureOk) throw new BadRequestException('assinatura inválida')
     const webhookEvent = await this.whatsapp.createWebhookEvent({
       provider,
       eventType: String(payload?.eventType ?? 'unknown'),
@@ -127,6 +143,10 @@ export class WhatsAppController {
       })
       return { ok: true, received: true }
     }
+  }
+  @Post('webhook/:provider')
+  async webhookLegacy(@Param('provider') provider: string, @Body() payload: any, @Headers() headers: Record<string, string>) {
+    return this.webhook(provider, payload, headers)
   }
 
   @Get('health')

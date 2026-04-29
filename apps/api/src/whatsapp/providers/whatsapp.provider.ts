@@ -20,7 +20,7 @@ export type WhatsAppSendTemplateInput = {
 }
 
 export type ParsedWebhookMessage = {
-  eventType: string
+  eventType: 'MESSAGE_DELIVERED' | 'MESSAGE_READ' | 'MESSAGE_FAILED' | 'MESSAGE_RECEIVED'
   fromPhone: string | null
   toPhone: string | null
   content: string | null
@@ -46,9 +46,12 @@ export type WhatsAppSendErrorResult = {
 export type WhatsAppSendResult = WhatsAppSendSuccessResult | WhatsAppSendErrorResult
 
 export interface WhatsAppProvider {
+  sendMessage(input: WhatsAppSendTextInput): Promise<WhatsAppSendResult>
   sendText(input: WhatsAppSendTextInput): Promise<WhatsAppSendResult>
   sendTemplate(input: WhatsAppSendTemplateInput): Promise<WhatsAppSendResult>
   parseWebhook(payload: unknown): ParsedWebhookMessage[]
+  verifyWebhookSignature(payload: unknown, headers?: Record<string, string | string[] | undefined>): Promise<boolean> | boolean
+  mapProviderStatus(status: string): ParsedWebhookMessage['eventType']
   getProviderName(): string
   checkHealth(): WhatsAppProviderHealth
 }
