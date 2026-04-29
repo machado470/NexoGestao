@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { WhatsAppMessageType } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
+import { renderTemplate } from './template.util'
 
 const DEFAULT_TEMPLATES: Array<{ key: string; name: string; messageType: WhatsAppMessageType; content: string }> = [
   { key: 'appointment_confirmation', name: 'Confirmação de agendamento', messageType: 'APPOINTMENT_CONFIRMATION', content: 'Olá {{customerName}}, seu agendamento foi confirmado para {{appointmentDate}} às {{appointmentTime}}.' },
@@ -52,18 +53,15 @@ export class WhatsAppTemplateService {
     }
 
     const source = template.content ?? template.body
-    const rendered = source.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_match, variable) => {
-      const value = context?.[variable]
-      if (value === undefined || value === null) {
-        this.logger.warn(`Variável ausente no template ${templateKey}: ${variable}`)
-        return ''
-      }
-      return String(value)
-    })
+    const rendered = renderTemplate(source, context)
+    for (const variable of rendered.missingVariables) {
+      this.logger.warn(`Variável ausente no template ${templateKey}: ${variable}`)
+    }
 
     return {
       template,
-      content: rendered,
+      content: rendered.content,
+      missingVariables: rendered.missingVariables,
     }
   }
 }
