@@ -76,11 +76,14 @@ export class DashboardService {
         _sum: { amountCents: true },
       }),
       this.governanceRead.getAutoScore(orgId),
+      this.prisma.whatsAppMessage.count({ where: { orgId, status: 'FAILED' } }),
+      this.prisma.whatsAppConversation.count({ where: { orgId, status: 'PENDING' } }),
+      this.prisma.charge.count({ where: { orgId, status: 'OVERDUE' } }),
     ])
 
     const [totalCustomers, createdCustomers, totalServiceOrders, openServiceOrders, overdueServiceOrders, weeklyRevenueAgg] = batch1
     const [pendingPaymentsAgg, inProgressOrders, completedOrders, riskTickets, chargesGenerated] = batch2
-    const [totalRevenue, paidRevenue, autoScore] = batch3
+    const [totalRevenue, paidRevenue, autoScore, failedMessagesCount, customersNoResponseCount, ignoredChargesCount] = batch3
 
     // Reutiliza valores já calculados para evitar redundância
     const delayedOrders = overdueServiceOrders
@@ -104,6 +107,11 @@ export class DashboardService {
       paidRevenueInCents: paidRevenue._sum.amountCents ?? 0,
       pendingRevenueInCents: pendingRevenue._sum.amountCents ?? 0,
       governance: autoScore,
+      whatsappSignals: {
+        failedMessages: failedMessagesCount,
+        customersNoResponse: customersNoResponseCount,
+        ignoredCharges: ignoredChargesCount,
+      },
     }
   }
 
