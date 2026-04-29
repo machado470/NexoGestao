@@ -592,9 +592,12 @@ model WhatsAppConversation {
   messages  WhatsAppMessage[]
 
   @@index([orgId, customerId])
+  @@index([orgId, phone])
   @@index([orgId, status])
   @@index([orgId, contextType, contextId])
   @@index([orgId, lastMessageAt])
+  @@index([orgId, customerId, lastMessageAt])
+  @@index([orgId, priority, lastMessageAt])
   @@index([orgId, priority, unreadCount, lastMessageAt])
 }
 

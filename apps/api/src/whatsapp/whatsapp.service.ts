@@ -20,6 +20,7 @@ import { createWhatsAppProvider } from './providers/provider.factory'
 import { WhatsAppTemplateService } from './whatsapp-template.service'
 import { WhatsAppContextService } from './whatsapp-context.service'
 import { buildCommunicationFailureSignal } from '../governance/communication-failure.signal'
+import { normalizePhone } from './phone.util'
 
 export function buildDeterministicMessageKey(input: { entityType: WhatsAppEntityType; entityId: string; messageType: WhatsAppMessageType }) {
   return `${input.entityType}:${input.entityId}:${input.messageType}`
@@ -63,6 +64,7 @@ export class WhatsAppService {
       ]
     }
 
+    const take = Math.min(Math.max(Number(filters.limit ?? 50), 1), 200)
     const items = await this.prisma.whatsAppConversation.findMany({
       where,
       include: { customer: { select: { id: true, name: true, phone: true } } },
@@ -72,17 +74,27 @@ export class WhatsAppService {
         { status: 'asc' },
         { lastMessageAt: 'desc' },
       ],
+      cursor: filters.cursor ? { id: String(filters.cursor) } : undefined,
+      skip: filters.cursor ? 1 : 0,
+      take: take + 1,
     })
-    return items.map((item) => ({
+    const hasMore = items.length > take
+    const sliced = hasMore ? items.slice(0, take) : items
+    return {
+      items: sliced.map((item) => ({
       ...item,
       priority: this.calculateInboxPriority(item),
       lastMessage: item.lastMessageAt,
+      noResponseSince: item.lastInboundAt && (!item.lastOutboundAt || item.lastInboundAt > item.lastOutboundAt) ? item.lastInboundAt : null,
+      failedMessageCount: 0,
       flags: {
         hasPendingCharge: false,
         hasNoResponse: item.status === 'WAITING_CUSTOMER',
         hasFailure: item.status === 'FAILED',
       },
-    }))
+      })),
+      nextCursor: hasMore ? sliced[sliced.length - 1]?.id ?? null : null,
+    }
   }
 
   async getConversation(orgId: string, conversationId: string) {
@@ -162,7 +174,7 @@ export class WhatsAppService {
       throw new BadRequestException('Cliente não encontrado para envio de WhatsApp')
     }
 
-    const toPhone = String(input.toPhone ?? customer?.phone ?? '').trim()
+    const toPhone = normalizePhone(String(input.toPhone ?? customer?.phone ?? '').trim())
     if (!toPhone) throw new BadRequestException('Telefone de destino não informado')
 
     const commercialLimit = await this.commercial.enforceMeter(orgId, 'message_sends')
@@ -297,9 +309,9 @@ export class WhatsAppService {
           }
         }
       }
-      const phone = this.normalizePhone(item.fromPhone)
+      const phone = normalizePhone(item.fromPhone)
       const customer = phone
-        ? await this.prisma.customer.findFirst({ where: { phone: { contains: phone.slice(-8) } }, select: { id: true, orgId: true, phone: true } })
+        ? await this.prisma.customer.findFirst({ where: { phone }, select: { id: true, orgId: true, phone: true } })
         : null
 
       const orgId = customer?.orgId ?? null
@@ -383,17 +395,14 @@ export class WhatsAppService {
   ) {
     const normalizedContextType = this.toContextType(context.contextType)
 
-    const normalizedPhone = this.normalizePhone(phone)
-    const phoneTail = normalizedPhone?.slice(-8) ?? null
+    const normalizedPhone = normalizePhone(phone)
 
     const existing = await this.prisma.whatsAppConversation.findFirst({
       where: {
         orgId,
         OR: [
           customerId ? { customerId } : undefined,
-          { phone },
           normalizedPhone ? { phone: normalizedPhone } : undefined,
-          phoneTail ? { phone: { endsWith: phoneTail } } : undefined,
         ].filter(Boolean) as Prisma.WhatsAppConversationWhereInput[],
       },
       orderBy: { updatedAt: 'desc' },
@@ -405,7 +414,7 @@ export class WhatsAppService {
       data: {
         orgId,
         customerId,
-        phone,
+        phone: normalizedPhone ?? phone,
         title: null,
         contextType: normalizedContextType,
         contextId: context.contextId ?? null,
@@ -537,18 +546,12 @@ export class WhatsAppService {
     return 'GENERAL'
   }
 
-  private normalizePhone(phone: string | null): string | null {
-    if (!phone) return null
-    const digits = phone.replace(/\D/g, '')
-    return digits || null
-  }
-
   private async touchConversation(
     conversationId: string,
-    input: { unreadCountIncrement?: number; lastMessageAt?: Date; lastInboundAt?: Date; lastOutboundAt?: Date; status?: WhatsAppConversationStatus },
+    input: { unreadCountIncrement?: number; lastMessageAt?: Date; lastInboundAt?: Date; lastOutboundAt?: Date; status?: WhatsAppConversationStatus; lastEventTimestamp?: Date },
   ) {
-    await this.prisma.whatsAppConversation.update({
-      where: { id: conversationId },
+    await this.prisma.whatsAppConversation.updateMany({
+      where: { id: conversationId, ...(input.lastEventTimestamp ? { updatedAt: { lt: input.lastEventTimestamp } } : {}) },
       data: {
         unreadCount: input.unreadCountIncrement ? { increment: input.unreadCountIncrement } : undefined,
         lastMessageAt: input.lastMessageAt,
