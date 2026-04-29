@@ -307,6 +307,18 @@ export default function AppointmentsPage() {
   const loading = appointmentsQuery.isLoading || customersQuery.isLoading || peopleQuery.isLoading || serviceOrdersQuery.isLoading;
   const hasError = appointmentsQuery.isError || customersQuery.isError || peopleQuery.isError || serviceOrdersQuery.isError;
 
+
+  function goToWhatsAppAppointment(customerId: string, appointmentId: string) {
+    if (!String(customerId ?? "").trim()) {
+      toast.error("Agendamento sem cliente válido para WhatsApp.");
+      return;
+    }
+    if (!String(appointmentId ?? "").trim()) {
+      toast.error("Agendamento inválido para abrir WhatsApp.");
+      return;
+    }
+    navigate(`/whatsapp?customerId=${customerId}&appointmentId=${appointmentId}&template=APPOINTMENT_REMINDER`);
+  }
   return (
     <PageWrapper title="Agendamentos" showOperationalHeader={false}>
       <div className="flex flex-col gap-4">
@@ -446,7 +458,7 @@ export default function AppointmentsPage() {
                             { label: "Criar O.S.", onSelect: () => { setSelectedAppointmentId(String(row.item.id)); setOpenServiceOrderModal(true); }, disabled: !row.item.id },
                             { type: "separator" },
                             { label: "Abrir cliente", onSelect: () => navigate(`/customers?customerId=${row.customerId}`), disabled: !row.customerId },
-                            { label: "Enviar WhatsApp", onSelect: () => navigate(`/whatsapp?customerId=${row.customerId}&appointmentId=${row.item.id}`), disabled: !row.customerId || !row.item.id },
+                            { label: "Enviar WhatsApp", onSelect: () => goToWhatsAppAppointment(String(row.customerId ?? ""), String(row.item.id ?? "")), disabled: !row.customerId || !row.item.id },
                             { label: "Abrir O.S.", onSelect: () => orderId ? navigate(`/service-orders?customerId=${row.customerId}&appointmentId=${row.item.id}`) : undefined, disabled: !orderId },
                           ]}
                         />
@@ -501,7 +513,7 @@ export default function AppointmentsPage() {
                 <Button size="sm" variant="outline" onClick={() => void updateStatus(String(selected.item.id), "CANCELED")} disabled={!selected.item.id}>Cancelar</Button>
                 <Button size="sm" variant="outline" onClick={() => { setEditing(selected.item); setOpenModal(true); }} disabled={!selected.item.id}>Remarcar/Editar</Button>
                 <Button size="sm" variant="outline" onClick={() => setOpenServiceOrderModal(true)} disabled={!selected.item.id}>Abrir/criar O.S.</Button>
-                <Button size="sm" variant="outline" onClick={() => navigate(`/whatsapp?customerId=${selected.customerId}&appointmentId=${selected.item.id}`)} disabled={!selected.customerId || !selected.item.id}>Enviar WhatsApp</Button>
+                <Button size="sm" variant="outline" onClick={() => goToWhatsAppAppointment(String(selected.customerId ?? ""), String(selected.item.id ?? ""))} disabled={!selected.customerId || !selected.item.id}>Enviar WhatsApp</Button>
                 <Button size="sm" variant="outline" onClick={() => navigate(`/customers?customerId=${selected.customerId}`)} disabled={!selected.customerId}>Abrir cliente</Button>
               </div>
 

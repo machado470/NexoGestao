@@ -429,6 +429,18 @@ export default function ServiceOrdersPage() {
     }
   }
 
+
+  function goToWhatsAppServiceOrder(customerId: string, serviceOrderId: string) {
+    if (!String(customerId ?? "").trim()) {
+      toast.error("O.S. sem cliente válido para WhatsApp.");
+      return;
+    }
+    if (!String(serviceOrderId ?? "").trim()) {
+      toast.error("O.S. inválida para abrir WhatsApp.");
+      return;
+    }
+    navigate(`/whatsapp?customerId=${customerId}&serviceOrderId=${serviceOrderId}&template=SERVICE_UPDATE`);
+  }
   return (
     <PageWrapper title="Ordens de Serviço" showOperationalHeader={false}>
       <div className="flex flex-col gap-4">
@@ -609,9 +621,7 @@ export default function ServiceOrdersPage() {
                                 {
                                   label: "Enviar WhatsApp",
                                   onSelect: () =>
-                                    navigate(
-                                      `/whatsapp?customerId=${item.customerId}&serviceOrderId=${item.id}`
-                                    ),
+                                    goToWhatsAppServiceOrder(String(item.customerId ?? ""), String(item.id ?? "")),
                                 },
                                 {
                                   label: "Ver cliente",
@@ -797,9 +807,7 @@ export default function ServiceOrdersPage() {
                       type="button"
                       variant="outline"
                       onClick={() =>
-                        navigate(
-                          `/whatsapp?customerId=${selectedOrder.customerId}&serviceOrderId=${selectedOrder.id}`
-                        )
+                        goToWhatsAppServiceOrder(String(selectedOrder.customerId ?? ""), String(selectedOrder.id ?? ""))
                       }
                     >
                       Enviar WhatsApp
