@@ -16,7 +16,7 @@ type PriorityInput = {
 
 export function resolveInboxPriority(input: PriorityInput): InboxPriority {
   if (input.hasFailedDelivery || input.governanceSignal?.communicationFailure) return "CRITICAL";
-  if (input.hasPendingCharge && input.isAwaitingReply) return "HIGH";
+  if (input.hasPendingCharge) return "HIGH";
   if (input.isAwaitingReply) return "HIGH";
   if (input.isResolved) return "LOW";
   return "MEDIUM";

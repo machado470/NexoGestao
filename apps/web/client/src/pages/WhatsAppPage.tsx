@@ -1059,6 +1059,16 @@ export default function WhatsAppPage() {
     if (Array.isArray(raw?.items)) return raw.items;
     return [];
   }, [chargesQuery.data]);
+  const deepLinkCustomerId = useMemo(() => {
+    if (queryCustomerId) return queryCustomerId;
+    const chargeCustomerId = charges.find((charge: any) => String(charge?.id ?? "") === String(queryChargeId ?? ""))?.customerId;
+    if (chargeCustomerId) return String(chargeCustomerId);
+    const appointmentCustomerId = appointments.find((appointment: any) => String(appointment?.id ?? "") === String(queryAppointmentId ?? ""))?.customerId;
+    if (appointmentCustomerId) return String(appointmentCustomerId);
+    const serviceOrderCustomerId = serviceOrders.find((serviceOrder: any) => String(serviceOrder?.id ?? "") === String(queryServiceOrderId ?? ""))?.customerId;
+    if (serviceOrderCustomerId) return String(serviceOrderCustomerId);
+    return null;
+  }, [appointments, charges, queryAppointmentId, queryChargeId, queryCustomerId, queryServiceOrderId, serviceOrders]);
 
   const conversationCustomerIds = useMemo(
     () =>
@@ -1228,7 +1238,7 @@ export default function WhatsAppPage() {
     if (hasManualSelectionRef.current) return;
     const conversationsReady = !conversationsQuery.isLoading && !conversationsQuery.isFetching;
     const customersReady = !customersQuery.isLoading && !customersQuery.isFetching;
-    if ((queryCustomerId || queryConversationId) && !didAutoSelectFromQueryRef.current && conversationsReady && customersReady) {
+    if ((deepLinkCustomerId || queryConversationId) && !didAutoSelectFromQueryRef.current && conversationsReady && customersReady) {
       if (queryConversationId) {
         const byConversation = allInboxRows.find(item => item.conversationId === queryConversationId || item.id === queryConversationId);
         if (byConversation) {
@@ -1237,16 +1247,16 @@ export default function WhatsAppPage() {
           return;
         }
       }
-      if (queryCustomerId) {
-        const existingConversation = allInboxRows.find(item => item.customerId === queryCustomerId && Boolean(item.conversationId));
-        const virtualCustomer = allInboxRows.find(item => item.id === `customer:${queryCustomerId}`)
+      if (deepLinkCustomerId) {
+        const existingConversation = allInboxRows.find(item => item.customerId === deepLinkCustomerId && Boolean(item.conversationId));
+        const virtualCustomer = allInboxRows.find(item => item.id === `customer:${deepLinkCustomerId}`)
           ?? (() => {
-            const customer = customers.find((item: any) => String(item?.id ?? "") === String(queryCustomerId));
+            const customer = customers.find((item: any) => String(item?.id ?? "") === String(deepLinkCustomerId));
             return customer ? buildVirtualRowFromCustomer(customer) : null;
           })();
         if (!existingConversation && !virtualCustomer && import.meta.env.DEV) {
           console.debug("[WhatsAppPage] customerId from URL not found in customers dataset", {
-            queryCustomerId,
+            queryCustomerId: deepLinkCustomerId,
             normalizedCustomersLength: customers.length,
           });
         }
@@ -1270,7 +1280,7 @@ export default function WhatsAppPage() {
     customersQuery.isLoading,
     filteredRows,
     queryConversationId,
-    queryCustomerId,
+    deepLinkCustomerId,
     selectedConversationId,
     setSelectedConversationId,
     buildVirtualRowFromCustomer,
@@ -1325,10 +1335,10 @@ export default function WhatsAppPage() {
   );
   const selectedCustomer = useMemo(
     () => {
-      const activeCustomerId = selectedConversation?.customerId ?? queryCustomerId ?? "";
+      const activeCustomerId = selectedConversation?.customerId ?? deepLinkCustomerId ?? "";
       return customers.find((customer: any) => String(customer?.id ?? "") === String(activeCustomerId)) ?? null;
     },
-    [customers, queryCustomerId, selectedConversation?.customerId]
+    [customers, deepLinkCustomerId, selectedConversation?.customerId]
   );
   const selectedCustomerCharge = useMemo(
     () => charges.find((charge: any) => String(charge?.customerId ?? "") === String(selectedCustomer?.id ?? "") && ["PENDING", "OVERDUE"].includes(String(charge?.status ?? "").toUpperCase()))
