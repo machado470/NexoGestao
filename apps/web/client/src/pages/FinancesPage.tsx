@@ -387,7 +387,7 @@ export default function FinancesPage() {
 
   function goToCustomer(charge: ChargeRecord) {
     if (!charge?.customerId) {
-      toast.error("ação indisponível neste ambiente");
+      toast.error("Cliente inválido para abrir WhatsApp.");
       return;
     }
     navigate(`/customers?customerId=${charge.customerId}`);
@@ -395,7 +395,7 @@ export default function FinancesPage() {
 
   function goToServiceOrder(charge: ChargeRecord) {
     if (!charge?.serviceOrderId) {
-      toast.error("ação indisponível neste ambiente");
+      toast.error("Cliente inválido para abrir WhatsApp.");
       return;
     }
     navigate(`/service-orders?customerId=${charge.customerId ?? ""}&serviceOrderId=${charge.serviceOrderId}`);
@@ -403,7 +403,7 @@ export default function FinancesPage() {
 
   function goToWhatsApp(charge: ChargeRecord) {
     if (!charge?.customerId) {
-      toast.error("ação indisponível neste ambiente");
+      toast.error("Cliente inválido para abrir WhatsApp.");
       return;
     }
     if (String(charge.status ?? "").toUpperCase() === "PAID") {
@@ -460,7 +460,7 @@ export default function FinancesPage() {
 
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="outline" onClick={() => setStatusFilter("paid")}>Ver pagas</Button>
-          <Button size="sm" variant="outline" onClick={() => setStatusFilter("pending")}>Cobrar pendentes</Button>
+          <Button size="sm" variant="outline" onClick={() => setStatusFilter("pending")}>Pendências de cobrança</Button>
           <Button size="sm" variant="outline" onClick={() => setStatusFilter("overdue")}>Priorizar atraso</Button>
         </div>
 
@@ -482,7 +482,7 @@ export default function FinancesPage() {
                   goToWhatsApp(nextBestAction);
                 }}
               >
-                Cobrar agora
+                Acionar WhatsApp
               </Button>
             </div>
           ) : (
@@ -597,7 +597,7 @@ export default function FinancesPage() {
                             },
                             { type: "separator" },
                             {
-                              label: "Cobrar via WhatsApp",
+                              label: normalizeStatus(row?.status) === "PAID" ? "WhatsApp pós-pagamento" : "Cobrar via WhatsApp",
                               onSelect: () => goToWhatsApp(row),
                               disabled: !row.customerId,
                             },
@@ -667,7 +667,7 @@ export default function FinancesPage() {
                   {cancelMutation.isPending ? "Salvando..." : "Cancelar cobrança"}
                 </Button>
                 <Button variant="outline" onClick={() => goToWhatsApp(selectedCharge)}>
-                  Cobrar / Enviar WhatsApp
+                  Enviar WhatsApp contextual
                 </Button>
                 <Button variant="outline" onClick={() => goToCustomer(selectedCharge)}>
                   Abrir cliente

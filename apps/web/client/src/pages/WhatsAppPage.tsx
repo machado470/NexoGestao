@@ -986,6 +986,7 @@ export default function WhatsAppPage() {
   const queryChargeId = searchParams.get("chargeId");
   const queryAppointmentId = searchParams.get("appointmentId");
   const queryServiceOrderId = searchParams.get("serviceOrderId");
+  const queryTemplate = searchParams.get("template");
 
   const [selectedConversationId, setSelectedConversationId] = useOperationalMemoryState<string | null>(
     "nexo.whatsapp.selected-conversation.v1",
@@ -1486,6 +1487,20 @@ export default function WhatsAppPage() {
       toast.error(error?.message ?? "Falha ao enviar mensagem.");
     }
   };
+
+  useEffect(() => {
+    if (!queryTemplate || !selectedConversationId || content.trim()) return;
+    const templateMap: Record<string, string> = {
+      APPOINTMENT_CONFIRMATION: "Confirmação de agendamento",
+      APPOINTMENT_REMINDER: "Lembrete de agendamento",
+      SERVICE_UPDATE: "Atualização de O.S.",
+      PAYMENT_LINK: "Link de pagamento",
+      PAYMENT_CONFIRMATION: "Confirmação de pagamento",
+      CUSTOMER_NOTIFICATION: "Mensagem livre",
+    };
+    const resolved = templateMap[String(queryTemplate).toUpperCase()];
+    if (resolved) setContent(buildTemplateText(resolved, context));
+  }, [queryTemplate, selectedConversationId, content, context, setContent]);
 
   const handleTemplateChip = (template: string) => {
     if (!selectedConversationId) return;
