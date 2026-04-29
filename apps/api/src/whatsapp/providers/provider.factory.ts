@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common'
 import { MockWhatsAppProvider } from './mock.provider'
+import { MetaCloudWhatsAppProvider } from './meta-cloud.provider'
 import { ZApiWhatsAppProvider } from './zapi.provider'
 import { WhatsAppProvider, WhatsAppProviderHealth } from './whatsapp.provider'
 
@@ -11,6 +12,10 @@ export class WhatsAppProviderFactory {
     if (configured === 'zapi') {
       logger.log('[WhatsApp] provider=zapi')
       return new ZApiWhatsAppProvider()
+    }
+    if (configured === 'meta_cloud') {
+      logger.log('[WhatsApp] provider=meta_cloud')
+      return new MetaCloudWhatsAppProvider()
     }
 
     if (configured !== 'mock') {
@@ -38,7 +43,7 @@ export function getWhatsAppProviderReadiness(env: NodeJS.ProcessEnv = process.en
   return {
     providerRequested: health.configuredProvider,
     providerResolved: health.provider,
-    isProviderKnown: ['mock', 'zapi'].includes(health.configuredProvider),
+    isProviderKnown: ['mock', 'zapi', 'meta_cloud'].includes(health.configuredProvider),
     mode: health.provider === 'mock' ? 'mock' : 'real',
     credentialsReady: health.status !== 'misconfigured',
     missingEnv: health.missingEnv,

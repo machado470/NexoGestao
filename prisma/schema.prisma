@@ -571,10 +571,13 @@ model WhatsAppConversation {
   id             String                      @id @default(uuid())
   orgId          String
   customerId     String?
+  provider       String?
+  providerConversationId String?
   phone          String
   title          String?
   status         WhatsAppConversationStatus  @default(OPEN)
-  priority       WhatsAppConversationPriority @default(NORMAL)
+  priority       WhatsAppConversationPriority @default(MEDIUM)
+  assignedUserId String?
   contextType    WhatsAppContextType         @default(GENERAL)
   contextId      String?
   lastMessageAt  DateTime?
@@ -872,6 +875,8 @@ enum MessageChannel {
 
 enum WhatsAppConversationStatus {
   OPEN
+  WAITING_CUSTOMER
+  WAITING_OPERATOR
   PENDING
   RESOLVED
   FAILED
@@ -879,6 +884,7 @@ enum WhatsAppConversationStatus {
 
 enum WhatsAppConversationPriority {
   LOW
+  MEDIUM
   NORMAL
   HIGH
   CRITICAL
