@@ -73,7 +73,16 @@ export class WhatsAppService {
         { lastMessageAt: 'desc' },
       ],
     })
-    return items.map((item) => ({ ...item, priority: this.calculateInboxPriority(item) }))
+    return items.map((item) => ({
+      ...item,
+      priority: this.calculateInboxPriority(item),
+      lastMessage: item.lastMessageAt,
+      flags: {
+        hasPendingCharge: false,
+        hasNoResponse: item.status === 'WAITING_CUSTOMER',
+        hasFailure: item.status === 'FAILED',
+      },
+    }))
   }
 
   async getConversation(orgId: string, conversationId: string) {
@@ -199,6 +208,7 @@ export class WhatsAppService {
     await this.touchConversation(conversation.id, {
       lastMessageAt: message.createdAt,
       lastOutboundAt: message.createdAt,
+      status: 'WAITING_CUSTOMER',
     })
 
     await this.queueService.addJob(QUEUE_NAMES.WHATSAPP, 'dispatch-message', { messageId: message.id }, { jobId: `whatsapp:dispatch:${message.id}` })
@@ -280,6 +290,7 @@ export class WhatsAppService {
         if (status) {
           const existing = await this.prisma.whatsAppMessage.findFirst({ where: { providerMessageId: item.providerMessageId } })
           if (existing) {
+            await this.logMessageTimelineEventOnce({ orgId: existing.orgId, messageId: existing.id, action: item.eventType })
             await this.updateMessageStatus(existing.orgId, { id: existing.id, status: status as WhatsAppMessageStatus, errorMessage: item.content ?? undefined })
             results.push({ associated: true, updatedMessageId: existing.id, eventType: item.eventType })
             continue
@@ -301,6 +312,15 @@ export class WhatsAppService {
         contextType: 'CUSTOMER',
         contextId: customer.id,
       })
+
+      const duplicated = item.providerMessageId
+        ? await this.prisma.whatsAppMessage.findFirst({ where: { orgId, providerMessageId: item.providerMessageId } })
+        : null
+      if (duplicated) {
+        await this.logMessageTimelineEventOnce({ orgId, messageId: duplicated.id, action: item.eventType })
+        results.push({ associated: true, orgId, customerId: customer.id, messageId: duplicated.id, duplicated: true })
+        continue
+      }
 
       const message = await this.prisma.whatsAppMessage.create({
         data: {
@@ -327,23 +347,10 @@ export class WhatsAppService {
         unreadCountIncrement: 1,
         lastMessageAt: message.createdAt,
         lastInboundAt: message.createdAt,
+        status: 'WAITING_OPERATOR',
       })
 
-      await this.timeline.log({
-        orgId,
-        action: 'WHATSAPP_INBOUND_RECEIVED',
-        customerId: customer.id,
-        metadata: {
-          messageId: message.id,
-          conversationId: conversation.id,
-          customerId: customer.id,
-          entityType: message.entityType,
-          entityId: message.entityId,
-          provider: providerName,
-          status: message.status,
-          messageType: message.messageType,
-        },
-      }).catch(() => null)
+      await this.logMessageTimelineEventOnce({ orgId, messageId: message.id, action: 'MESSAGE_RECEIVED' })
 
       results.push({ associated: true, orgId, customerId: customer.id, messageId: message.id })
     }
@@ -402,7 +409,7 @@ export class WhatsAppService {
         title: null,
         contextType: normalizedContextType,
         contextId: context.contextId ?? null,
-        status: 'OPEN',
+        status: 'WAITING_OPERATOR',
         priority: 'NORMAL',
       },
     })
@@ -538,7 +545,7 @@ export class WhatsAppService {
 
   private async touchConversation(
     conversationId: string,
-    input: { unreadCountIncrement?: number; lastMessageAt?: Date; lastInboundAt?: Date; lastOutboundAt?: Date },
+    input: { unreadCountIncrement?: number; lastMessageAt?: Date; lastInboundAt?: Date; lastOutboundAt?: Date; status?: WhatsAppConversationStatus },
   ) {
     await this.prisma.whatsAppConversation.update({
       where: { id: conversationId },
@@ -547,6 +554,7 @@ export class WhatsAppService {
         lastMessageAt: input.lastMessageAt,
         lastInboundAt: input.lastInboundAt,
         lastOutboundAt: input.lastOutboundAt,
+        status: input.status,
       },
     })
   }
@@ -600,6 +608,9 @@ export class WhatsAppService {
         entityId: message.entityId ?? null,
         customerId: message.customerId ?? null,
         governanceSignal: communicationSignal,
+        conversationId: message.conversationId ?? null,
+        direction: message.direction ?? null,
+        status: message.status ?? null,
       },
     }).catch(() => null)
   }
