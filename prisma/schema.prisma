@@ -634,7 +634,7 @@ model WhatsAppMessage {
   renderedText      String
   content           String?
   provider          String?
-  providerMessageId String?
+  providerMessageId String?               @unique
   errorCode         String?
   errorMessage      String?
   metadata          Json?
