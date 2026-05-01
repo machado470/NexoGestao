@@ -29,6 +29,9 @@ export function buildDeterministicMessageKey(input: { entityType: WhatsAppEntity
 @Injectable()
 export class WhatsAppService {
   private readonly logger = new Logger(WhatsAppService.name)
+  private logTransition(action: string, meta: Record<string, unknown>) {
+    this.logger.log(JSON.stringify({ requestId: this.requestContext.requestId, userId: this.requestContext.userId, orgId: this.requestContext.orgId, action, ...meta }))
+  }
 
   constructor(
     private readonly prisma: PrismaService,
@@ -248,6 +251,7 @@ export class WhatsAppService {
       lastOutboundAt: message.createdAt,
       status: WhatsAppConversationStatus.WAITING_CUSTOMER,
     })
+    this.logTransition('whatsapp.outbound', { conversationId: conversation.id, messageId: message.id, status: 'WAITING_CUSTOMER' })
 
     await this.queueService.addJob(QUEUE_NAMES.WHATSAPP, 'dispatch-message', { messageId: message.id }, { jobId: `whatsapp:dispatch:${message.id}` })
 
@@ -285,6 +289,7 @@ export class WhatsAppService {
   }
 
   async markConversationResolved(orgId: string, conversationId: string) {
+    this.logTransition('whatsapp.resolve', { orgId, conversationId, status: 'RESOLVED' })
     return this.prisma.whatsAppConversation.updateMany({ where: { id: conversationId, orgId }, data: { status: WhatsAppConversationStatus.RESOLVED } })
   }
 
@@ -387,6 +392,7 @@ export class WhatsAppService {
         lastInboundAt: message.createdAt,
         status: WhatsAppConversationStatus.WAITING_OPERATOR,
       })
+      this.logTransition('whatsapp.inbound', { orgId, conversationId: conversation.id, messageId: message.id, status: 'WAITING_OPERATOR' })
 
       await this.logMessageTimelineEventOnce({ orgId, messageId: message.id, action: 'MESSAGE_RECEIVED' })
 

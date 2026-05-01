@@ -87,11 +87,7 @@ class AllowAllThrottlerGuard implements CanActivate {
       envFilePath: getEnvFilePath(),
     }),
 
-    ThrottlerModule.forRoot([
-      { name: 'short', ttl: 60000, limit: 1000 },
-      { name: 'medium', ttl: 60000, limit: 1000 },
-      { name: 'long', ttl: 3600000, limit: 2000 },
-    ]),
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 10 }]),
 
     ScheduleModule.forRoot(),
 

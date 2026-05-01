@@ -94,7 +94,10 @@ export class WhatsAppProcessor implements OnModuleInit, OnModuleDestroy {
 
           throw new Error(result.errorMessage)
         },
-        { connection: this.connection },
+        {
+          connection: this.connection,
+          limiter: { max: 10, duration: 1000 },
+        },
       )
 
       this.logger.log('WhatsApp worker iniciado')

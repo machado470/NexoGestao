@@ -56,4 +56,16 @@ describe('WhatsAppService inbound/outbound', () => {
     const result = await svc.processInboundWebhook('meta_cloud', {})
     expect(result.results[0].reason).toBe('customer_not_found')
   })
+
+  it('outbound enfileira envio async', async () => {
+    const addJob = jest.fn().mockResolvedValue({ id: 'j1' })
+    const prisma: any = {
+      customer: { findFirst: jest.fn().mockResolvedValue({ id: 'c1', phone: '+5511999999999' }) },
+      whatsAppConversation: { findFirst: jest.fn().mockResolvedValue({ id: 'conv1', customerId: 'c1', phone: '+5511999999999' }), updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      whatsAppMessage: { create: jest.fn().mockResolvedValue({ id: 'm1', createdAt: new Date(), customerId: 'c1', conversationId: 'conv1', status: 'QUEUED' }) },
+    }
+    const svc = new WhatsAppService(prisma, { addJob } as any, { log: jest.fn().mockResolvedValue({}) } as any, {} as any, new TenantOperationsService(), { enforceMeter: jest.fn().mockResolvedValue({ allowed: true }) } as any)
+    await svc.enqueueMessage('org1', { customerId: 'c1', content: 'oi', entityType: 'CUSTOMER', entityId: 'c1', messageType: 'MANUAL' })
+    expect(addJob).toHaveBeenCalled()
+  })
 })
