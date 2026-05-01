@@ -1,20 +1,4 @@
-import {
-  ArgumentsHost,
-  Catch,
-  ExceptionFilter,
-  HttpException,
-  HttpStatus,
-} from '@nestjs/common'
-
-type HttpPayload =
-  | string
-  | {
-      message?: string | string[]
-      error?: string
-      statusCode?: number
-    }
-  | null
-  | undefined
+import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from '@nestjs/common'
 
 @Catch()
 export class ApiExceptionFilter implements ExceptionFilter {
@@ -24,58 +8,30 @@ export class ApiExceptionFilter implements ExceptionFilter {
     const req = ctx.getRequest()
 
     const isHttp = exception instanceof HttpException
-    const status = isHttp
-      ? exception.getStatus()
-      : HttpStatus.INTERNAL_SERVER_ERROR
-
-    const payload: HttpPayload = isHttp
-      ? (exception.getResponse() as any)
-      : null
+    const status = isHttp ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR
+    const payload = isHttp ? exception.getResponse() : null
 
     const message = this.extractMessage(payload, exception)
 
-    const code =
-      status === 401
-        ? 'UNAUTHORIZED'
-        : status === 403
-        ? 'FORBIDDEN'
-        : status === 404
-        ? 'NOT_FOUND'
-        : status === 400
-        ? 'BAD_REQUEST'
-        : status >= 500
-        ? 'INTERNAL_ERROR'
-        : 'ERROR'
-
     res.status(status).json({
-      ok: false,
-      error: {
-        code,
-        message,
-        path: req?.originalUrl ?? req?.url ?? null,
-      },
+      success: false,
+      error: message,
+      message,
+      data: null,
+      path: req?.originalUrl ?? req?.url ?? null,
+      requestId: req?.requestId ?? null,
     })
   }
 
-  private extractMessage(payload: HttpPayload, exception: unknown): string {
+  private extractMessage(payload: unknown, exception: unknown): string {
     if (typeof payload === 'string') return payload
-
     if (payload && typeof payload === 'object') {
-      const msg = payload.message
-      if (Array.isArray(msg)) return msg.join(' | ')
-      if (typeof msg === 'string') return msg
-      if (typeof payload.error === 'string') return payload.error
+      const p = payload as Record<string, unknown>
+      if (Array.isArray(p.message)) return p.message.join(' | ')
+      if (typeof p.message === 'string') return p.message
+      if (typeof p.error === 'string') return p.error
     }
-
-    if (
-      exception &&
-      typeof exception === 'object' &&
-      'message' in exception &&
-      typeof (exception as any).message === 'string'
-    ) {
-      return (exception as any).message
-    }
-
-    return 'Erro interno'
+    if (exception instanceof Error) return exception.message
+    return 'Internal server error'
   }
 }
