@@ -1,11 +1,12 @@
 import { WhatsAppService } from './whatsapp.service'
 import { TenantOperationsService } from '../common/tenant-ops/tenant-ops.service'
+import { WhatsAppConversationStatus } from '@prisma/client'
 
 describe('WhatsAppService prioridade e nextAction', () => {
   it('classifica como CRITICAL com cobrança vencida sem resposta e sugere cobrança', async () => {
     const now = new Date('2026-04-29T10:00:00Z')
     const prisma: any = {
-      whatsAppConversation: { findMany: jest.fn().mockResolvedValue([{ id: 'conv1', orgId: 'org1', customerId: 'c1', status: 'WAITING_CUSTOMER', priority: 'NORMAL', unreadCount: 1, contextType: 'CUSTOMER', updatedAt: now, lastMessageAt: now, lastInboundAt: new Date('2026-04-29T08:00:00Z'), lastOutboundAt: new Date('2026-04-29T07:00:00Z') }]) },
+      whatsAppConversation: { findMany: jest.fn().mockResolvedValue([{ id: 'conv1', orgId: 'org1', customerId: 'c1', status: WhatsAppConversationStatus.WAITING_CUSTOMER, priority: 'NORMAL', unreadCount: 1, contextType: 'CUSTOMER', updatedAt: now, lastMessageAt: now, lastInboundAt: new Date('2026-04-29T08:00:00Z'), lastOutboundAt: new Date('2026-04-29T07:00:00Z') }]) },
       whatsAppMessage: { groupBy: jest.fn().mockResolvedValue([]) },
       charge: { groupBy: jest.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([{ customerId: 'c1', _count: { _all: 1 } }]) },
       appointment: { groupBy: jest.fn().mockResolvedValue([]) },

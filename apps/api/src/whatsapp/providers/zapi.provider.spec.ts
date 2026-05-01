@@ -28,7 +28,7 @@ describe('ZApiWhatsAppProvider timeout resilience', () => {
     })
 
     expect(result.ok).toBe(false)
-    expect(result.provider).toBe('z-api')
+    expect(result.provider).toBe('zapi')
     if (result.ok) throw new Error('expected timeout error result')
     expect((result as any).errorCode).toBe('TIMEOUT')
   })
