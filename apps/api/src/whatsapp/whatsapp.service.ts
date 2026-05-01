@@ -44,8 +44,8 @@ export class WhatsAppService {
   async listConversations(orgId: string, filters: any = {}) {
     const statusFilter =
       filters.status
-      ?? (filters.onlyFailed ? 'FAILED' : undefined)
-      ?? (filters.onlyPending ? 'PENDING' : undefined)
+      ?? (filters.onlyFailed ? WhatsAppConversationStatus.FAILED : undefined)
+      ?? (filters.onlyPending ? WhatsAppConversationStatus.WAITING_CUSTOMER : undefined)
 
     const where: Prisma.WhatsAppConversationWhereInput = {
       orgId,
@@ -116,7 +116,7 @@ export class WhatsAppService {
       flags: {
         hasPendingCharge: (pendingMap.get(item.customerId ?? '') ?? 0) > 0 || (overdueMap.get(item.customerId ?? '') ?? 0) > 0,
         hasNoResponse: item.status === WhatsAppConversationStatus.WAITING_CUSTOMER,
-        hasFailure: item.status === 'FAILED' || (failedMap.get(item.id) ?? 0) > 0,
+        hasFailure: item.status === WhatsAppConversationStatus.FAILED || (failedMap.get(item.id) ?? 0) > 0,
       },
       })),
       nextCursor: hasMore ? sliced[sliced.length - 1]?.id ?? null : null,
@@ -289,7 +289,7 @@ export class WhatsAppService {
   }
 
   async markConversationPending(orgId: string, conversationId: string) {
-    return this.prisma.whatsAppConversation.updateMany({ where: { id: conversationId, orgId }, data: { status: 'PENDING' } })
+    return this.prisma.whatsAppConversation.updateMany({ where: { id: conversationId, orgId }, data: { status: WhatsAppConversationStatus.WAITING_OPERATOR } })
   }
 
   async updateConversationStatus(orgId: string, conversationId: string, status: WhatsAppConversationStatus) {
@@ -399,7 +399,7 @@ export class WhatsAppService {
   private calculateInboxPriority(item: { status: WhatsAppConversationStatus; lastInboundAt: Date | null; lastOutboundAt: Date | null; updatedAt: Date }, signals: { hasPendingCharge: boolean; hasOverdueCharge: boolean; failedMessageCount: number }): WhatsAppConversationPriority {
     const hasNoResponse = Boolean(item.lastInboundAt && (!item.lastOutboundAt || item.lastInboundAt > item.lastOutboundAt))
     if (item.status === WhatsAppConversationStatus.RESOLVED) return 'LOW'
-    if ((signals.hasOverdueCharge && hasNoResponse) || item.status === 'FAILED' || signals.failedMessageCount >= 2) return 'CRITICAL'
+    if ((signals.hasOverdueCharge && hasNoResponse) || item.status === WhatsAppConversationStatus.FAILED || signals.failedMessageCount >= 2) return 'CRITICAL'
     if (signals.hasPendingCharge || hasNoResponse) return 'HIGH'
     return 'NORMAL'
   }

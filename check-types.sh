@@ -1,2 +1,7 @@
 #!/usr/bin/env bash
-pnpm prisma generate && pnpm -r exec tsc --noEmit
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+pnpm exec prisma generate --schema prisma/schema.prisma
+pnpm --filter ./apps/api exec tsc --noEmit -p tsconfig.json
