@@ -33,6 +33,10 @@ export class WhatsAppProcessor implements OnModuleInit, OnModuleDestroy {
       this.worker = new Worker(
         QUEUE_NAMES.WHATSAPP,
         async (job: Job<any>) => {
+          const requestId = job.data?.requestId ?? 'n/a'
+          const userId = job.data?.userId ?? 'n/a'
+          const orgId = job.data?.orgId ?? 'n/a'
+
           await this.queueService.updateJobStatus({
             queue: QUEUE_NAMES.WHATSAPP,
             jobId: job.id?.toString() ?? '',
@@ -79,10 +83,20 @@ export class WhatsAppProcessor implements OnModuleInit, OnModuleDestroy {
               completed: true,
             })
 
-            this.logger.warn(
-              `WhatsApp fatal error sem retry automático jobId=${job.id?.toString() ?? ''} code=${result.errorCode}`,
+            await this.queueService.addJob(
+              QUEUE_NAMES.WHATSAPP_DLQ,
+              'whatsapp.send.dlq',
+              {
+                payload: job.data,
+                error: result.errorMessage,
+                attemptsMade: job.attemptsMade,
+                requestId,
+                userId,
+                orgId,
+              },
             )
-            return
+
+            throw new Error(`UNRECOVERABLE_WHATSAPP_ERROR:${result.errorCode}`)
           }
 
           await this.whatsApp.markFailedAndRequeue({
@@ -96,9 +110,34 @@ export class WhatsAppProcessor implements OnModuleInit, OnModuleDestroy {
         },
         {
           connection: this.connection,
+          concurrency: 5,
           limiter: { max: 10, duration: 1000 },
         },
       )
+
+      this.worker.on('failed', async (job, err) => {
+        const nextAttempt = (job?.attemptsMade ?? 0) + 1
+        const baseDelay = 1000
+        const retryDelayMs = baseDelay * 2 ** Math.max(0, nextAttempt - 1)
+        this.logger.warn(
+          `whatsapp job retry jobId=${job?.id?.toString() ?? ''} attempt=${nextAttempt} delayMs=${retryDelayMs} requestId=${job?.data?.requestId ?? 'n/a'} userId=${job?.data?.userId ?? 'n/a'} orgId=${job?.data?.orgId ?? 'n/a'} error=${err.message}`,
+        )
+
+        if (job && job.attemptsMade >= (job.opts.attempts ?? 1)) {
+          await this.queueService.addJob(
+            QUEUE_NAMES.WHATSAPP_DLQ,
+            'whatsapp.send.dlq',
+            {
+              payload: job.data,
+              error: err.message,
+              attemptsMade: job.attemptsMade,
+              requestId: job.data?.requestId,
+              userId: job.data?.userId,
+              orgId: job.data?.orgId,
+            },
+          )
+        }
+      })
 
       this.logger.log('WhatsApp worker iniciado')
     } catch (error) {

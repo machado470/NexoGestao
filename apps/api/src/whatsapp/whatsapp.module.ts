@@ -6,6 +6,7 @@ import { WhatsAppTestController } from './whatsapp.test.controller'
 import { WhatsAppController } from './whatsapp.controller'
 import { QueueModule } from '../queue/queue.module'
 import { WhatsAppProcessor } from '../queue/processors/whatsapp.processor'
+import { WhatsAppDlqProcessor } from '../queue/processors/whatsapp-dlq.processor'
 import { TimelineModule } from '../timeline/timeline.module'
 import { QuotasModule } from '../quotas/quotas.module'
 import { WhatsAppTemplateService } from './whatsapp-template.service'
@@ -26,6 +27,7 @@ const testControllers = process.env.NODE_ENV === 'production' ? [] : [WhatsAppTe
     WhatsAppAutomationService,
     WhatsAppDispatcherJob,
     WhatsAppProcessor,
+    WhatsAppDlqProcessor,
     IdempotencyCacheService,
     IdempotencyInterceptor,
   ],

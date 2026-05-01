@@ -2,6 +2,7 @@ export const QUEUE_NAMES = {
   AUTOMATION: 'automation',
   NOTIFICATIONS: 'notifications',
   WHATSAPP: 'whatsapp',
+  WHATSAPP_DLQ: 'whatsapp-dlq',
   FINANCE: 'finance',
   WEBHOOKS: 'webhooks',
 } as const
@@ -9,7 +10,7 @@ export const QUEUE_NAMES = {
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES]
 
 export const QUEUE_DEFAULT_JOB_OPTIONS = {
-  attempts: 3,
+  attempts: 5,
   backoff: {
     type: 'exponential' as const,
     delay: 1_000,
