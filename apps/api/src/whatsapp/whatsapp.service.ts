@@ -115,7 +115,7 @@ export class WhatsAppService {
       }),
       flags: {
         hasPendingCharge: (pendingMap.get(item.customerId ?? '') ?? 0) > 0 || (overdueMap.get(item.customerId ?? '') ?? 0) > 0,
-        hasNoResponse: item.status === 'WAITING_CUSTOMER',
+        hasNoResponse: item.status === WhatsAppConversationStatus.WAITING_CUSTOMER,
         hasFailure: item.status === 'FAILED' || (failedMap.get(item.id) ?? 0) > 0,
       },
       })),
@@ -246,7 +246,7 @@ export class WhatsAppService {
     await this.touchConversation(conversation.id, {
       lastMessageAt: message.createdAt,
       lastOutboundAt: message.createdAt,
-      status: 'WAITING_CUSTOMER',
+      status: WhatsAppConversationStatus.WAITING_CUSTOMER,
     })
 
     await this.queueService.addJob(QUEUE_NAMES.WHATSAPP, 'dispatch-message', { messageId: message.id }, { jobId: `whatsapp:dispatch:${message.id}` })
@@ -285,7 +285,7 @@ export class WhatsAppService {
   }
 
   async markConversationResolved(orgId: string, conversationId: string) {
-    return this.prisma.whatsAppConversation.updateMany({ where: { id: conversationId, orgId }, data: { status: 'RESOLVED' } })
+    return this.prisma.whatsAppConversation.updateMany({ where: { id: conversationId, orgId }, data: { status: WhatsAppConversationStatus.RESOLVED } })
   }
 
   async markConversationPending(orgId: string, conversationId: string) {
@@ -385,7 +385,7 @@ export class WhatsAppService {
         unreadCountIncrement: 1,
         lastMessageAt: message.createdAt,
         lastInboundAt: message.createdAt,
-        status: 'WAITING_OPERATOR',
+        status: WhatsAppConversationStatus.WAITING_OPERATOR,
       })
 
       await this.logMessageTimelineEventOnce({ orgId, messageId: message.id, action: 'MESSAGE_RECEIVED' })
@@ -398,7 +398,7 @@ export class WhatsAppService {
 
   private calculateInboxPriority(item: { status: WhatsAppConversationStatus; lastInboundAt: Date | null; lastOutboundAt: Date | null; updatedAt: Date }, signals: { hasPendingCharge: boolean; hasOverdueCharge: boolean; failedMessageCount: number }): WhatsAppConversationPriority {
     const hasNoResponse = Boolean(item.lastInboundAt && (!item.lastOutboundAt || item.lastInboundAt > item.lastOutboundAt))
-    if (item.status === 'RESOLVED') return 'LOW'
+    if (item.status === WhatsAppConversationStatus.RESOLVED) return 'LOW'
     if ((signals.hasOverdueCharge && hasNoResponse) || item.status === 'FAILED' || signals.failedMessageCount >= 2) return 'CRITICAL'
     if (signals.hasPendingCharge || hasNoResponse) return 'HIGH'
     return 'NORMAL'
@@ -453,7 +453,7 @@ export class WhatsAppService {
         title: null,
         contextType: normalizedContextType,
         contextId: context.contextId ?? null,
-        status: 'WAITING_OPERATOR',
+        status: WhatsAppConversationStatus.WAITING_OPERATOR,
         priority: 'NORMAL',
       },
     })

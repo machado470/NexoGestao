@@ -110,12 +110,12 @@ export class WhatsAppController {
   @Post('conversations/:id/resolve')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
-  async markResolved(@Org() orgId: string, @Param('id') id: string) { return this.whatsapp.updateConversationStatus(orgId, id, 'RESOLVED') }
+  async markResolved(@Org() orgId: string, @Param('id') id: string) { return this.whatsapp.updateConversationStatus(orgId, id, WhatsAppConversationStatus.RESOLVED) }
 
   @Post('conversations/:id/reopen')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
-  async reopenConversation(@Org() orgId: string, @Param('id') id: string) { return this.whatsapp.updateConversationStatus(orgId, id, 'WAITING_OPERATOR') }
+  async reopenConversation(@Org() orgId: string, @Param('id') id: string) { return this.whatsapp.updateConversationStatus(orgId, id, WhatsAppConversationStatus.WAITING_OPERATOR) }
 
   @Post('webhooks/:provider')
   async webhook(@Param('provider') provider: string, @Body() payload: any, @Headers() headers: Record<string, string>) {
