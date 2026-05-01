@@ -1,5 +1,7 @@
 import { NestFactory } from '@nestjs/core'
 import { ValidationPipe, Logger } from '@nestjs/common'
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger'
+import { ApiExceptionFilter } from './common/http/api-exception.filter'
 import helmet from 'helmet'
 
 import { AppModule } from './app.module'
@@ -42,6 +44,8 @@ async function bootstrap() {
     )
 
     app.useGlobalInterceptors(new ApiResponseInterceptor())
+    app.useGlobalFilters(new ApiExceptionFilter())
+    app.setGlobalPrefix('v1')
 
     app.useGlobalPipes(
       new ValidationPipe({
@@ -70,6 +74,17 @@ async function bootstrap() {
       ],
       exposedHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-Request-Id', 'X-Correlation-Id'],
     })
+
+    
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('NexoGestao API')
+      .setDescription('Production-ready API documentation for NexoGestao services')
+      .setVersion('1.0.0')
+      .addBearerAuth()
+      .addServer('/v1')
+      .build()
+    const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig)
+    SwaggerModule.setup('api', app, swaggerDocument)
 
     const portRaw = process.env.API_PORT || process.env.PORT || '3000'
     const port = Number(portRaw) || 3000

@@ -9,7 +9,9 @@ import {
   Post,
   Query,
   UseGuards,
+  Logger,
 } from '@nestjs/common'
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { WhatsAppConversationStatus, WhatsAppMessageStatus } from '@prisma/client'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
@@ -20,9 +22,15 @@ import { IdempotencyService } from '../common/idempotency/idempotency.service'
 import { QuotasService } from '../quotas/quotas.service'
 import { createWhatsAppProvider, getWhatsAppProviderReadiness } from './providers/provider.factory'
 import { WhatsAppService, buildDeterministicMessageKey } from './whatsapp.service'
+import { ListConversationsQueryDto, MessageFeedQueryDto, SendConversationMessageDto, SendMessageDto, SendTemplateMessageDto, UpdateConversationStatusDto, UpdateMessageStatusDto } from './dto/whatsapp.dto'
 
+@ApiTags('WhatsApp')
+@ApiBearerAuth()
 @Controller('whatsapp')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('ADMIN')
 export class WhatsAppController {
+  private readonly logger = new Logger(WhatsAppController.name)
   constructor(
     private readonly whatsapp: WhatsAppService,
     private readonly quotas: QuotasService,
@@ -30,57 +38,45 @@ export class WhatsAppController {
   ) {}
 
   @Get('conversations')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
-  async listConversations(@Org() orgId: string, @Query() query: any) {
+  @ApiOperation({ summary: 'List WhatsApp conversations' })
+  async listConversations(@Org() orgId: string, @Query() query: ListConversationsQueryDto) {
     return this.whatsapp.listConversations(orgId, query)
   }
   @Get('inbox')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
-  async listInbox(@Org() orgId: string, @Query() query: any) { return this.whatsapp.listConversations(orgId, query) }
+  async listInbox(@Org() orgId: string, @Query() query: ListConversationsQueryDto) { return this.whatsapp.listConversations(orgId, query) }
 
   @Get('conversations/:id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
   async getConversation(@Org() orgId: string, @Param('id') id: string) {
     return this.whatsapp.getConversation(orgId, id)
   }
 
   @Get('conversations/:id/messages')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
   async getConversationMessages(@Org() orgId: string, @Param('id') id: string) {
     return this.whatsapp.getMessages(orgId, id)
   }
 
   @Get('conversations/:id/context')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
   async getConversationContext(@Org() orgId: string, @Param('id') id: string) {
     return this.whatsapp.getContext(orgId, id)
   }
 
   @Post('conversations/:id/messages')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
   async sendConversationMessage(
     @Org() orgId: string,
     @User() user: any,
     @Param('id') conversationId: string,
-    @Body() body: any,
+    @Body() body: SendConversationMessageDto,
   ) {
     const userId = user?.userId ?? user?.sub ?? null
+    this.logger.log(`outbound_message conversation=${conversationId} org=${orgId} user=${userId}`)
     return this.whatsapp.sendManualMessage(orgId, userId, { ...body, conversationId })
   }
 
   @Post('messages/template')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
   async sendTemplate(
     @Org() orgId: string,
     @User() user: any,
-    @Body() body: any,
+    @Body() body: SendTemplateMessageDto,
   ) {
     if (!body?.conversationId && !body?.customerId) {
       throw new BadRequestException('conversationId ou customerId é obrigatório')
@@ -90,34 +86,26 @@ export class WhatsAppController {
   }
 
   @Post('messages/:id/retry')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
   async retry(@Org() orgId: string, @Param('id') id: string) {
     return this.whatsapp.retryFailedMessage(orgId, id)
   }
 
   @Patch('conversations/:id/status')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
   async updateConversationStatus(
     @Org() orgId: string,
     @Param('id') id: string,
-    @Body('status') status: WhatsAppConversationStatus,
+    @Body() body: UpdateConversationStatusDto,
   ) {
-    if (!status) throw new BadRequestException('status é obrigatório')
-    return this.whatsapp.updateConversationStatus(orgId, id, status)
+    return this.whatsapp.updateConversationStatus(orgId, id, body.status)
   }
   @Post('conversations/:id/resolve')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
-  async markResolved(@Org() orgId: string, @Param('id') id: string) { return this.whatsapp.updateConversationStatus(orgId, id, WhatsAppConversationStatus.RESOLVED) }
+  async markResolved(@Org() orgId: string, @Param('id') id: string) { this.logger.log(`resolve_conversation id=${id} org=${orgId}`); return this.whatsapp.updateConversationStatus(orgId, id, WhatsAppConversationStatus.RESOLVED) }
 
   @Post('conversations/:id/reopen')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
   async reopenConversation(@Org() orgId: string, @Param('id') id: string) { return this.whatsapp.updateConversationStatus(orgId, id, WhatsAppConversationStatus.WAITING_OPERATOR) }
 
   @Post('webhooks/:provider')
+  @ApiBearerAuth()
   async webhook(@Param('provider') provider: string, @Body() payload: any, @Headers() headers: Record<string, string>) {
     const serviceProvider = createWhatsAppProvider()
     if (serviceProvider.getProviderName() !== provider) throw new BadRequestException('provider inválido')
@@ -130,6 +118,7 @@ export class WhatsAppController {
     })
 
     try {
+      this.logger.log(`inbound_webhook provider=${provider}`)
       const result = await this.whatsapp.processInboundWebhook(provider, payload)
       await this.whatsapp.completeWebhookEvent(webhookEvent.id, {
         status: 'PROCESSED',
@@ -150,8 +139,6 @@ export class WhatsAppController {
   }
 
   @Get('health')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
   async health() {
     const readiness = getWhatsAppProviderReadiness(process.env)
     const provider = createWhatsAppProvider()
@@ -165,31 +152,25 @@ export class WhatsAppController {
 
   // Backward compatibility
   @Get('messages/:customerId')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
   async getMessagesByCustomer(
     @Org() orgId: string,
     @Param('customerId') customerId: string,
-    @Query('cursor') cursor?: string,
-    @Query('limit') limit?: string,
+    @Query() query: MessageFeedQueryDto,
   ) {
-    const parsedLimit = Number(limit)
     return this.whatsapp.getMessagesFeed({
       orgId,
       customerId,
-      cursor: cursor ? String(cursor) : undefined,
-      limit: Number.isFinite(parsedLimit) ? parsedLimit : undefined,
+      cursor: query.cursor ? String(query.cursor) : undefined,
+      limit: query.limit,
     })
   }
 
   @Post('messages')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
   async sendMessage(
     @Org() orgId: string,
     @User() user: any,
     @Headers('idempotency-key') idempotencyKeyHeader: string | undefined,
-    @Body() body: any,
+    @Body() body: SendMessageDto,
   ) {
     await this.quotas.validateQuota(orgId, 'SEND_MESSAGE')
 
@@ -233,13 +214,11 @@ export class WhatsAppController {
   }
 
   @Patch('messages/:id/status')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
   async updateStatus(
     @Org() orgId: string,
     @Param('id') id: string,
-    @Body('status') status: WhatsAppMessageStatus,
+    @Body() body: UpdateMessageStatusDto,
   ) {
-    return this.whatsapp.updateMessageStatus(orgId, { id, status })
+    return this.whatsapp.updateMessageStatus(orgId, { id, status: body.status })
   }
 }

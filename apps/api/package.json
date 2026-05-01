@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "nest start --watch --preserveWatchOutput",
     "dev:tsc": "pnpm exec tsc -p tsconfig.json --watch --preserveWatchOutput",
-    "prebuild": "bash ../../check-types.sh",
+    "prebuild": "pnpm run prisma:generate && bash ../../check-types.sh",
     "build": "rm -rf dist && pnpm exec nest build",
     "start": "node dist/main.js",
     "prisma:generate": "prisma generate --schema ../../prisma/schema.prisma",
@@ -56,7 +56,8 @@
     "resend": "^6.9.3",
     "rxjs": "^7.8.1",
     "stripe": "^16.0.0",
-    "uuid": "^9.0.0"
+    "uuid": "^9.0.0",
+    "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.10",
