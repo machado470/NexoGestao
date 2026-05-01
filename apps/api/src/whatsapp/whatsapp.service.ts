@@ -11,6 +11,7 @@ import {
 } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { QueueService } from '../queue/queue.service'
+import { WhatsAppObservabilityService } from '../common/metrics/whatsapp-observability.service'
 import { QUEUE_NAMES } from '../queue/queue.constants'
 import { TimelineService } from '../timeline/timeline.service'
 import { RequestContextService } from '../common/context/request-context.service'
@@ -36,6 +37,7 @@ export class WhatsAppService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly queueService: QueueService,
+    private readonly waMetrics: WhatsAppObservabilityService,
     private readonly timeline: TimelineService,
     private readonly requestContext: RequestContextService,
     private readonly tenantOps: TenantOperationsService,
@@ -256,6 +258,7 @@ export class WhatsAppService {
     await this.queueService.addJob(QUEUE_NAMES.WHATSAPP, 'dispatch-message', { messageId: message.id }, { jobId: `whatsapp:dispatch:${message.id}` })
 
     this.tenantOps.increment(orgId, 'whatsapp_queued')
+    this.waMetrics.incOutbound()
     return { created: true, message }
   }
 

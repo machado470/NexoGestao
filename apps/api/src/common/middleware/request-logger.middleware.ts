@@ -2,6 +2,7 @@ import { Injectable, NestMiddleware } from '@nestjs/common'
 import { Request, Response, NextFunction } from 'express'
 import { randomUUID } from 'crypto'
 import { MetricsService } from '../metrics/metrics.service'
+import { trace } from '@opentelemetry/api'
 
 @Injectable()
 export class RequestLoggerMiddleware implements NestMiddleware {
@@ -46,12 +47,15 @@ export class RequestLoggerMiddleware implements NestMiddleware {
       const orgId = user?.orgId ?? (req.headers['x-org-id'] as string) ?? null
       const userId = user?.userId ?? user?.sub ?? null
 
+      const activeSpan = trace.getActiveSpan()
+      const traceId = activeSpan?.spanContext().traceId ?? null
       const logData = {
         event: 'http_request',
         requestId,
         correlationId,
         userId,
         orgId,
+        traceId,
         route: `${method} ${originalUrl}`,
         status: statusCode,
         latencyMs: duration,

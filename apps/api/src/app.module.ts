@@ -37,6 +37,7 @@ import { AutomationModule } from './automation/automation.module'
 import { NotificationsModule } from './notifications/notifications.module'
 import { SubscriptionsModule } from './subscriptions/subscriptions.module'
 import { QueueModule } from './queue/queue.module'
+import { QueueBoardModule } from './queue/queue-board.module'
 // Módulos adicionados — estavam implementados mas não registrados no AppModule
 import { TimelineModule } from './timeline/timeline.module'
 import { GovernanceModule } from './governance/governance.module'
@@ -99,6 +100,7 @@ class AllowAllThrottlerGuard implements CanActivate {
     PrismaModule,
     HealthModule,
     QueueModule,
+    QueueBoardModule,
     SentryModule,
     AnalyticsModule,
     EmailModule,
