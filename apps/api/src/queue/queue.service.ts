@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common'
-import { Job, JobsOptions, Queue, QueueOptions, QueueEvents } from 'bullmq'
+import { Job, JobsOptions, JobScheduler, Queue, QueueOptions, QueueEvents } from 'bullmq'
 import IORedis from 'ioredis'
 import { PrismaService } from '../prisma/prisma.service'
 import { QUEUE_CONNECTION, QUEUE_DEFAULT_JOB_OPTIONS, QUEUE_NAMES, QueueName } from './queue.constants'
@@ -9,6 +9,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(QueueService.name)
   private readonly queueMap = new Map<QueueName, Queue>()
   private readonly queueEventsMap = new Map<QueueName, QueueEvents>()
+  private readonly schedulerMap = new Map<QueueName, JobScheduler>()
   private connectionInitPromise?: Promise<void>
   private hasLoggedAlreadyConnecting = false
   private redisEnabled = true
@@ -138,9 +139,11 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
       }
       const queue = new Queue(queueName, opts)
       const events = new QueueEvents(queueName, { connection: this.connection })
+      const scheduler = new JobScheduler(queueName, { connection: this.connection })
 
       this.queueMap.set(queueName, queue)
       this.queueEventsMap.set(queueName, events)
+      this.schedulerMap.set(queueName, scheduler)
     }
   }
 
@@ -254,6 +257,13 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
         await queue.close()
       } catch {
         // noop (modo degradado pode não abrir conexões)
+      }
+    }
+    for (const scheduler of this.schedulerMap.values()) {
+      try {
+        await scheduler.close()
+      } catch {
+        // noop
       }
     }
 

@@ -4,8 +4,8 @@ import {
   Injectable,
   NestInterceptor,
 } from '@nestjs/common'
-import { Observable, from } from 'rxjs'
-import { switchMap, tap } from 'rxjs/operators'
+import { Observable, defer, from, of } from 'rxjs'
+import { finalize, switchMap, tap } from 'rxjs/operators'
 import { IdempotencyCacheService } from './idempotency-cache.service'
 
 @Injectable()
@@ -14,17 +14,34 @@ export class IdempotencyInterceptor implements NestInterceptor {
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const req = context.switchToHttp().getRequest()
+    const res = context.switchToHttp().getResponse()
     const key = String(req.headers['x-idempotency-key'] ?? '').trim()
     if (!key) return next.handle()
 
     const scopeKey = `${req.method}:${req.originalUrl}:${key}`
-    return from(this.cache.get(scopeKey)).pipe(
+    return defer(() => from(this.cache.acquireLock(scopeKey))).pipe(
       switchMap((cached) => {
-        if (cached) return from([JSON.parse(cached)])
+        if (!cached) {
+          return from(this.cache.getResponse(scopeKey)).pipe(
+            switchMap((existing) => {
+              if (existing) {
+                res.status(existing.statusCode)
+                return of(existing.payload)
+              }
+              return next.handle()
+            }),
+          )
+        }
 
         return next.handle().pipe(
-          tap(async (response) => {
-            await this.cache.set(scopeKey, JSON.stringify(response))
+          tap(async (payload) => {
+            await this.cache.setResponse(scopeKey, {
+              statusCode: Number(res.statusCode ?? 200),
+              payload,
+            })
+          }),
+          finalize(() => {
+            void this.cache.releaseLock(scopeKey)
           }),
         )
       }),
