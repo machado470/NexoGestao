@@ -9,9 +9,11 @@ import {
   Post,
   Query,
   UseGuards,
+  UseInterceptors,
   Logger,
 } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
+import { Throttle } from '@nestjs/throttler'
 import { WhatsAppConversationStatus, WhatsAppMessageStatus } from '@prisma/client'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
@@ -23,6 +25,7 @@ import { QuotasService } from '../quotas/quotas.service'
 import { createWhatsAppProvider, getWhatsAppProviderReadiness } from './providers/provider.factory'
 import { WhatsAppService, buildDeterministicMessageKey } from './whatsapp.service'
 import { ListConversationsQueryDto, MessageFeedQueryDto, SendConversationMessageDto, SendMessageDto, SendTemplateMessageDto, UpdateConversationStatusDto, UpdateMessageStatusDto } from './dto/whatsapp.dto'
+import { IdempotencyInterceptor } from '../common/idempotency/idempotency.interceptor'
 
 @ApiTags('WhatsApp')
 @ApiBearerAuth()
@@ -61,6 +64,8 @@ export class WhatsAppController {
   }
 
   @Post('conversations/:id/messages')
+  @UseInterceptors(IdempotencyInterceptor)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   async sendConversationMessage(
     @Org() orgId: string,
     @User() user: any,
@@ -73,6 +78,8 @@ export class WhatsAppController {
   }
 
   @Post('messages/template')
+  @UseInterceptors(IdempotencyInterceptor)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   async sendTemplate(
     @Org() orgId: string,
     @User() user: any,
@@ -166,6 +173,8 @@ export class WhatsAppController {
   }
 
   @Post('messages')
+  @UseInterceptors(IdempotencyInterceptor)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   async sendMessage(
     @Org() orgId: string,
     @User() user: any,
