@@ -1,5 +1,4 @@
 import { WhatsAppService } from './whatsapp.service'
-import { TenantOperationsService } from '../common/tenant-ops/tenant-ops.service'
 import { normalizePhone } from './phone.util'
 
 jest.mock('./providers/provider.factory', () => ({
@@ -39,7 +38,7 @@ describe('WhatsAppService inbound/outbound', () => {
       },
       timelineEvent: { findFirst: jest.fn().mockResolvedValue(null) },
     }
-    const svc = new WhatsAppService(prisma, { addJob: jest.fn() } as any, { log: jest.fn().mockResolvedValue({}) } as any, {} as any, new TenantOperationsService(), { enforceMeter: jest.fn().mockResolvedValue({ allowed: true }) } as any, { enforcePolicy: jest.fn() } as any)
+    const svc = new WhatsAppService(prisma, { addJob: jest.fn() } as any, { log: jest.fn().mockResolvedValue({}) } as any, {} as any, { orgId: 'test-org', userId: 'test-user', requestId: 'test-request' } as any, { enforceMeter: jest.fn().mockResolvedValue({ allowed: true }) } as any, { enforcePolicy: jest.fn() } as any)
     await svc.processInboundWebhook('meta_cloud', {})
     await svc.processInboundWebhook('meta_cloud', {})
     expect(prisma.whatsAppMessage.create).toHaveBeenCalledTimes(1)
@@ -52,7 +51,7 @@ describe('WhatsAppService inbound/outbound', () => {
       whatsAppMessage: { findFirst: jest.fn(), count: jest.fn().mockResolvedValue(0) },
       timelineEvent: { findFirst: jest.fn().mockResolvedValue(null) },
     }
-    const svc = new WhatsAppService(prisma, { addJob: jest.fn() } as any, { log: jest.fn().mockResolvedValue({}) } as any, {} as any, new TenantOperationsService(), { enforceMeter: jest.fn().mockResolvedValue({ allowed: true }) } as any, { enforcePolicy: jest.fn() } as any)
+    const svc = new WhatsAppService(prisma, { addJob: jest.fn() } as any, { log: jest.fn().mockResolvedValue({}) } as any, {} as any, { orgId: 'test-org', userId: 'test-user', requestId: 'test-request' } as any, { enforceMeter: jest.fn().mockResolvedValue({ allowed: true }) } as any, { enforcePolicy: jest.fn() } as any)
     const result = await svc.processInboundWebhook('meta_cloud', {})
     expect(result.results[0].reason).toBe('customer_not_found')
   })
@@ -64,7 +63,7 @@ describe('WhatsAppService inbound/outbound', () => {
       whatsAppConversation: { findFirst: jest.fn().mockResolvedValue({ id: 'conv1', customerId: 'c1', phone: '+5511999999999' }), updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
       whatsAppMessage: { create: jest.fn().mockResolvedValue({ id: 'm1', createdAt: new Date(), customerId: 'c1', conversationId: 'conv1', status: 'QUEUED' }) },
     }
-    const svc = new WhatsAppService(prisma, { addJob } as any, { log: jest.fn().mockResolvedValue({}) } as any, {} as any, new TenantOperationsService(), { enforceMeter: jest.fn().mockResolvedValue({ allowed: true }) } as any, { enforcePolicy: jest.fn() } as any)
+    const svc = new WhatsAppService(prisma, { addJob } as any, { log: jest.fn().mockResolvedValue({}) } as any, {} as any, { orgId: 'test-org', userId: 'test-user', requestId: 'test-request' } as any, { enforceMeter: jest.fn().mockResolvedValue({ allowed: true }) } as any, { enforcePolicy: jest.fn() } as any)
     await svc.enqueueMessage('org1', { customerId: 'c1', content: 'oi', entityType: 'CUSTOMER', entityId: 'c1', messageType: 'MANUAL' })
     expect(addJob).toHaveBeenCalled()
   })
