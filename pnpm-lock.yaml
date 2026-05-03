@@ -123,6 +123,9 @@ importers:
       stripe:
         specifier: ^16.0.0
         version: 16.12.0
+      swagger-ui-express:
+        specifier: ^5.0.1
+        version: 5.0.1(express@4.22.1)
       uuid:
         specifier: ^9.0.0
         version: 9.0.1
@@ -6821,6 +6824,12 @@ packages:
 
   swagger-ui-dist@5.32.2:
     resolution: {integrity: sha512-t6Ns52nS8LU2hqi0+rezMjFO1ZrCsCrnommXrU7Nfrg2va2dWahdvM6TuSwzdHpG29v6BHJyU1c/UWFhgVZzVQ==}
+
+  swagger-ui-express@5.0.1:
+    resolution: {integrity: sha512-SrNU3RiBGTLLmFU8GIJdOdanJTl4TOmT27tt3bWWHppqYmAZ6IDuEuBvMU6nZq0zLEe6b/1rACXCgLZqO6ZfrA==}
+    engines: {node: '>= v0.10.32'}
+    peerDependencies:
+      express: '>=4.0.0 || >=5.0.0-beta'
 
   symbol-observable@4.0.0:
     resolution: {integrity: sha512-b19dMThMV4HVFynSAM1++gBHAbk2Tc/osgLIBZMKsyqh34jb2e8Os7T6ZW/Bt3pJFdBTd2JwAnAAEQV7rSNvcQ==}
@@ -14906,6 +14915,11 @@ snapshots:
   swagger-ui-dist@5.32.2:
     dependencies:
       '@scarf/scarf': 1.4.0
+
+  swagger-ui-express@5.0.1(express@4.22.1):
+    dependencies:
+      express: 4.22.1
+      swagger-ui-dist: 5.32.2
 
   symbol-observable@4.0.0: {}
 
