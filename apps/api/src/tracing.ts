@@ -18,7 +18,6 @@ export const otelSdk = new NodeSDK({
     getNodeAutoInstrumentations({
       '@opentelemetry/instrumentation-http': { enabled: true },
       '@opentelemetry/instrumentation-ioredis': { enabled: true },
-      '@opentelemetry/instrumentation-redis-4': { enabled: true },
       '@opentelemetry/instrumentation-pg': { enabled: true },
       '@opentelemetry/instrumentation-mysql2': { enabled: true },
       '@opentelemetry/instrumentation-nestjs-core': { enabled: true },
