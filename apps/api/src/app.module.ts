@@ -64,6 +64,7 @@ import { CommercialModule } from './commercial/commercial.module'
 
 const IS_DEVELOPMENT = (process.env.NODE_ENV ?? '').toLowerCase() === 'development'
 const IS_TEST = (process.env.NODE_ENV ?? '').toLowerCase() === 'test'
+const ENABLE_BULL_BOARD = process.env.ENABLE_BULL_BOARD === 'true'
 
 function getEnvFilePath(): string[] {
   if (IS_TEST) {
@@ -100,7 +101,7 @@ class AllowAllThrottlerGuard implements CanActivate {
     PrismaModule,
     HealthModule,
     QueueModule,
-    QueueBoardModule,
+    ...(ENABLE_BULL_BOARD ? [QueueBoardModule] : []),
     SentryModule,
     AnalyticsModule,
     EmailModule,
