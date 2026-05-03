@@ -1,8 +1,8 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "module": "CommonJS",
-    "moduleResolution": "node",
+    "module": "Node16",
+    "moduleResolution": "node16",
     "target": "ES2021",
     "outDir": "./dist",
     "rootDir": "./src",
@@ -15,7 +15,12 @@
     "noImplicitAny": false,
     "strictPropertyInitialization": false,
     "incremental": false,
-    "baseUrl": "."
+    "baseUrl": ".",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "types": [
+      "node"
+    ]
   },
   "include": [
     "src/**/*.ts"
