@@ -12,7 +12,7 @@ describe('WhatsAppService prioridade e nextAction', () => {
       appointment: { groupBy: jest.fn().mockResolvedValue([]) },
       serviceOrder: { groupBy: jest.fn().mockResolvedValue([]) },
     }
-    const svc = new WhatsAppService(prisma, { addJob: jest.fn() } as any, { log: jest.fn() } as any, {} as any, new TenantOperationsService(), { enforceMeter: jest.fn().mockResolvedValue({ allowed: true }) } as any)
+    const svc = new WhatsAppService(prisma, { addJob: jest.fn() } as any, { log: jest.fn() } as any, {} as any, new TenantOperationsService(), { enforceMeter: jest.fn().mockResolvedValue({ allowed: true }) } as any, { enforcePolicy: jest.fn() } as any)
     const res = await svc.listConversations('org1', {})
     expect(res.items[0].priority).toBe('CRITICAL')
     expect(res.items[0].nextAction).toBe('SEND_PAYMENT_REMINDER')
