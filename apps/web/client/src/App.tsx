@@ -28,7 +28,7 @@ import {
 } from "./contexts/BootProbeContext";
 import { canAny, type Permission } from "./lib/rbac";
 import { setBootPhase } from "./lib/bootPhase";
-import { extractPathname } from "./lib/routeAccess";
+import { extractPathname, isPublicOrAuthPath } from "./lib/routeAccess";
 import { pushAuditEvent, setAuditField } from "./lib/renderAudit";
 
 import Landing from "./pages/Landing";
@@ -729,21 +729,21 @@ function Router() {
 
 export type RootRouteBranch =
   | "initializing_landing"
-  | "error_screen"
+  | "bootstrap_error_landing"
   | "unauthenticated_landing"
   | "authenticated_redirect"
   | "unknown_state_fallback";
 
 export function resolveRootRouteBranch(authState: unknown): RootRouteBranch {
   if (authState === "initializing") return "initializing_landing";
-  if (authState === "error") return "error_screen";
+  if (authState === "error") return "bootstrap_error_landing";
   if (authState === "unauthenticated") return "unauthenticated_landing";
   if (authState === "authenticated") return "authenticated_redirect";
   return "unknown_state_fallback";
 }
 
 function RootRoute() {
-  const { authState, bootstrapError, payload, refresh } = useAuth();
+  const { authState, bootstrapError, payload } = useAuth();
   const [location, navigate] = useLocation();
   const pathname = extractPathname(location);
   const rootBranch = resolveRootRouteBranch(authState);
@@ -781,7 +781,7 @@ function RootRoute() {
       bootLog("[AUTH] initializing");
       return;
     }
-    if (rootBranch === "error_screen") {
+    if (rootBranch === "bootstrap_error_landing") {
       bootError("[BOOT ERROR] auth bootstrap", bootstrapError);
       return;
     }
@@ -818,28 +818,16 @@ function RootRoute() {
     );
   }
 
-  if (rootBranch === "error_screen") {
+  if (rootBranch === "bootstrap_error_landing") {
     bootLog("[ROUTER] root_render", {
       route: pathname,
-      branch: "error_screen",
-      landingRendered: false,
+      branch: "bootstrap_error_landing",
+      landingRendered: true,
     });
     return (
       <>
-        <RenderAuditMarker label="ROOT BRANCH: error_screen" />
-        <FullScreenMessage
-          title="Falha no bootstrap de autenticação"
-          description="Não foi possível validar sua sessão inicial. Tente novamente."
-          actionLabel="Tentar novamente"
-          onAction={() =>
-            void refresh().catch(error => {
-              setAuditField("errorType", "bootstrap");
-              bootError("[AUTH] refresh failed from root", {
-                message: error instanceof Error ? error.message : "Erro desconhecido",
-              });
-            })
-          }
-        />
+        <RenderAuditMarker label="ROOT BRANCH: bootstrap_error_landing" />
+        <MarketingRoute component={Landing} />
       </>
     );
   }
@@ -1078,6 +1066,9 @@ function AuthBootstrapStatus({
   onFailed: (reason: string) => void;
 }) {
   const { authState, bootstrapError } = useAuth();
+  const [location] = useLocation();
+  const pathname = extractPathname(location);
+  const isPublicRoute = isPublicOrAuthPath(pathname);
 
   useEffect(() => {
     if (import.meta.env.DEV) {
@@ -1086,6 +1077,12 @@ function AuthBootstrapStatus({
     }
     if (authState === "initializing") return;
     if (authState === "error") {
+      if (isPublicRoute) {
+        setBootPhase("AUTH_UNAUTHENTICATED");
+        onReady("unauthenticated");
+        return;
+      }
+
       setBootPhase("AUTH_ERROR");
       onFailed(
         bootstrapError instanceof Error
@@ -1107,7 +1104,7 @@ function AuthBootstrapStatus({
       return;
     }
     onFailed("Estado de autenticação inesperado durante bootstrap");
-  }, [authState, bootstrapError, onFailed, onReady]);
+  }, [authState, bootstrapError, isPublicRoute, onFailed, onReady]);
 
   return null;
 }
