@@ -38,14 +38,7 @@ import {
 } from "@/components/internal-page-system";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
-type ConversationFilter =
-  | "all"
-  | "no_reply"
-  | "billing"
-  | "failures"
-  | "charges"
-  | "appointments"
-  | "service_orders";
+type ConversationFilter = "critical_now" | "waiting_customer" | "today_commitments" | "resolved";
 
 type WhatsAppConversationStatus = "OPEN" | "PENDING" | "RESOLVED" | "FAILED";
 type WhatsAppPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
@@ -129,10 +122,10 @@ type WhatsAppContext = {
 };
 
 const FILTERS: Array<{ value: ConversationFilter; label: string; count: string }> = [
-  { value: "all", label: "Todas", count: "" },
-  { value: "no_reply", label: "Não respondidas", count: "" },
-  { value: "billing", label: "Pendências", count: "" },
-  { value: "failures", label: "Falhas", count: "" },
+  { value: "critical_now", label: "Critical now", count: "" },
+  { value: "waiting_customer", label: "Waiting customer", count: "" },
+  { value: "today_commitments", label: "Today commitments", count: "" },
+  { value: "resolved", label: "Resolved", count: "" },
 ];
 
 const QUICK_COMPOSER_TEMPLATES = [
@@ -267,7 +260,10 @@ function mapMessage(item: any): ChatMessage {
   };
 }
 
-function resolveMessageTypeFromContext(context?: WhatsAppContext | null): OperationalMessageType {
+function resolveMessageTypeFromContext(context?: WhatsAppContext | null, intent?: "PAYMENT"|"APPOINTMENT"|"SERVICE_UPDATE"|"GENERAL"): OperationalMessageType {
+  if (intent === "PAYMENT") return context?.openCharge?.paymentLink ? "PAYMENT_LINK" : "PAYMENT_REMINDER";
+  if (intent === "APPOINTMENT") return "APPOINTMENT_CONFIRMATION";
+  if (intent === "SERVICE_UPDATE") return "SERVICE_UPDATE";
   if (context?.openCharge?.id && context?.openCharge?.paymentLink) return "PAYMENT_LINK";
   if (context?.openCharge?.id && (context?.openCharge?.daysOverdue ?? 0) > 0) return "PAYMENT_REMINDER";
   if (context?.openCharge?.id) return "CUSTOMER_NOTIFICATION";
@@ -437,7 +433,7 @@ const ConversationRow = memo(function ConversationRow({
   );
 });
 
-function ConversationsList({
+function InboxQueueColumn({
   rows,
   selectedId,
   onSelect,
@@ -481,7 +477,7 @@ function ConversationsList({
     <aside className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-white/[0.015] p-2.5">
       <div className="shrink-0 space-y-2 pb-2.5">
         <div className="flex items-center justify-between">
-          <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Inbox</p>
+          <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Operational Queue</p>
           <button type="button" className="rounded-lg bg-white/[0.02] px-2 py-1 text-[10px] text-[var(--text-muted)] hover:bg-white/[0.05]">Filtros</button>
         </div>
         <div className="flex items-center gap-2 rounded-lg bg-white/[0.02] px-2.5 py-1.5">
@@ -558,7 +554,7 @@ function ConversationsList({
   );
 }
 
-function ChatPanel({
+function ExecutionChatColumn({
   conversation,
   canCompose,
   composePlaceholder,
@@ -567,6 +563,8 @@ function ChatPanel({
   sendMessage,
   content,
   setContent,
+  selectedIntent,
+  setSelectedIntent,
   onToggleFavorite,
   isFavorite,
   onInfo,
@@ -590,6 +588,8 @@ function ChatPanel({
   sendMessage: () => void;
   content: string;
   setContent: (value: string) => void;
+  selectedIntent: "PAYMENT" | "APPOINTMENT" | "SERVICE_UPDATE" | "GENERAL";
+  setSelectedIntent: (value: "PAYMENT" | "APPOINTMENT" | "SERVICE_UPDATE" | "GENERAL") => void;
   onToggleFavorite: () => void;
   isFavorite: boolean;
   onInfo: () => void;
@@ -700,7 +700,7 @@ function ChatPanel({
                   >
                     <p>{message.content}</p>
                     <p className="mt-2 flex items-center justify-end gap-1 text-[10px] text-[var(--text-muted)]/85">
-                      {fmtTime(message.createdAt)} · {message.status}{message.messageType ? ` · ${message.messageType}` : ""}
+                      {fmtTime(message.createdAt)} · Operação: {message.status}{message.messageType ? ` · ${message.messageType}` : ""}
                       {outgoing && ["DELIVERED", "READ"].includes(message.status) ? (
                         <CheckCheck className="size-3" />
                       ) : null}
@@ -782,6 +782,17 @@ function ChatPanel({
           >
             <Paperclip className="size-4" />
           </button>
+          <select
+            value={selectedIntent}
+            onChange={(event) => setSelectedIntent(event.target.value as any)}
+            className="h-9 rounded-lg bg-white/[0.02] px-2 text-xs"
+            disabled={!hasConversation}
+          >
+            <option value="PAYMENT">Payment</option>
+            <option value="APPOINTMENT">Appointment</option>
+            <option value="SERVICE_UPDATE">Service update</option>
+            <option value="GENERAL">General</option>
+          </select>
           <input
             value={content}
             onChange={event => canCompose && setContent(event.target.value)}
@@ -812,7 +823,7 @@ function ChatPanel({
   );
 }
 
-function ContextPanel({
+function OperationalContextColumn({
   context,
   conversation,
   selectedCustomer,
@@ -956,7 +967,7 @@ function ContextPanel({
           </section>
 
           <section className="px-1 py-1">
-            <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Ações rápidas</p>
+            <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Action cockpit</p>
             <div className="mt-2.5 grid grid-cols-1 gap-2">
               <Button type="button" size="sm" variant="outline" className="h-8 w-full min-w-0 justify-start truncate px-2.5 text-[11px]" onClick={onSendCharge}>Enviar cobrança</Button>
               <Button
@@ -994,10 +1005,11 @@ export default function WhatsAppPage() {
   );
   const [searchTerm, setSearchTerm] = useOperationalMemoryState("nexo.whatsapp.search.v2", "");
   const [activeFilter, setActiveFilter] = useOperationalMemoryState<ConversationFilter>(
-    "nexo.whatsapp.filter.v2",
-    "all"
+    "nexo.whatsapp.filter.v3",
+    "critical_now"
   );
   const [content, setContent] = useOperationalMemoryState("nexo.whatsapp.composer.v2", "");
+  const [selectedIntent, setSelectedIntent] = useOperationalMemoryState<"PAYMENT"|"APPOINTMENT"|"SERVICE_UPDATE"|"GENERAL">("nexo.whatsapp.intent.v1", "GENERAL");
   const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
   const [isContextVisible, setIsContextVisible] = useState(true);
   const [composerError, setComposerError] = useState<string | null>(null);
@@ -1013,12 +1025,10 @@ export default function WhatsAppPage() {
 
   const filtersInput = useMemo(() => {
     const input: Record<string, unknown> = {};
-    if (activeFilter === "no_reply") input.onlyUnread = true;
-    if (activeFilter === "billing") input.onlyPending = true;
-    if (activeFilter === "failures") input.onlyFailed = true;
-    if (activeFilter === "charges") input.contextType = "CHARGE";
-    if (activeFilter === "appointments") input.contextType = "APPOINTMENT";
-    if (activeFilter === "service_orders") input.contextType = "SERVICE_ORDER";
+    if (activeFilter === "waiting_customer") input.onlyUnread = true;
+    if (activeFilter === "critical_now") input.onlyFailed = true;
+    if (activeFilter === "today_commitments") input.onlyPending = true;
+    if (activeFilter === "resolved") input.status = "RESOLVED";
     return input;
   }, [activeFilter, debouncedSearch]);
 
@@ -1159,14 +1169,11 @@ export default function WhatsAppPage() {
       const matchesSearch = !query
         || searchable.includes(query);
       if (!matchesSearch) return false;
-      if (activeFilter === "all") return true;
+      if (activeFilter === "critical_now") return item.priority === "CRITICAL" || item.status === "FAILED";
       if (!item.conversationId) return Boolean(query);
-      if (activeFilter === "no_reply") return item.unreadCount > 0;
-      if (activeFilter === "billing") return item.status === "PENDING";
-      if (activeFilter === "failures") return item.status === "FAILED";
-      if (activeFilter === "charges") return item.contextType === "CHARGE";
-      if (activeFilter === "appointments") return item.contextType === "APPOINTMENT";
-      if (activeFilter === "service_orders") return item.contextType === "SERVICE_ORDER";
+      if (activeFilter === "waiting_customer") return item.unreadCount > 0 || item.hasNoResponse;
+      if (activeFilter === "today_commitments") return item.contextType === "APPOINTMENT" || item.contextType === "SERVICE_ORDER" || item.hasPendingCharge;
+      if (activeFilter === "resolved") return item.status === "RESOLVED";
       return true;
     }).sort((a, b) => {
       const scoreDiff = priorityScore(a) - priorityScore(b);
@@ -1214,7 +1221,7 @@ export default function WhatsAppPage() {
     }
     if (allInboxRows.length > 0 && filteredRows.length === 0) return "Nenhum resultado para esta busca";
     if (debouncedSearch.trim()) return "Nenhum resultado para esta busca";
-    if (activeFilter === "failures") return "Nenhuma falha encontrada.";
+    if (activeFilter === "critical_now") return "Nenhuma conversa crítica agora.";
     return "Nenhum cliente encontrado.";
   }, [
     activeFilter,
@@ -1423,6 +1430,7 @@ export default function WhatsAppPage() {
     () => String(context?.customer?.phone ?? selectedConversation?.phone ?? selectedCustomer?.phone ?? "").trim(),
     [context?.customer?.phone, selectedConversation?.phone, selectedCustomer?.phone]
   );
+  const hasOperationalContext = Boolean(context?.openCharge?.id || context?.nextAppointment?.id || context?.activeServiceOrder?.id || context?.customer?.id);
   const canComposeForSelected = Boolean(selectedConversationId) && Boolean(destinationPhone);
   const composePlaceholder = selectedConversation
     ? selectedConversationRecordId
@@ -1452,6 +1460,10 @@ export default function WhatsAppPage() {
       return;
     }
     const finalContent = content.trim();
+    if (!hasOperationalContext && selectedIntent !== "GENERAL") {
+      setComposerError("Selecione contexto operacional válido ou use intenção Geral.");
+      return;
+    }
     if (!finalContent) {
       setComposerError("Digite uma mensagem antes de enviar.");
       return;
@@ -1460,6 +1472,10 @@ export default function WhatsAppPage() {
 
     try {
       const entity = resolveEntityFromContext(context);
+      if (entity.entityType === "GENERAL" && selectedIntent !== "GENERAL") {
+        setComposerError("Sem entityType/entityId: use intenção Geral ou vincule contexto.");
+        return;
+      }
       await sendMessageMutation.mutateAsync({
         conversationId: selectedConversationRecordId ?? undefined,
         customerId,
@@ -1467,7 +1483,7 @@ export default function WhatsAppPage() {
         content: finalContent,
         entityType: entity.entityType,
         entityId: entity.entityId ?? customerId ?? undefined,
-        messageType: resolveMessageTypeFromContext(context),
+        messageType: resolveMessageTypeFromContext(context, selectedIntent),
       });
       setContent("");
       shouldPromoteVirtualSelectionRef.current = !selectedConversationRecordId;
@@ -1520,6 +1536,10 @@ export default function WhatsAppPage() {
     }
     try {
       const entity = resolveEntityFromContext(context);
+      if (entity.entityType === "GENERAL" && selectedIntent !== "GENERAL") {
+        setComposerError("Sem entityType/entityId: use intenção Geral ou vincule contexto.");
+        return;
+      }
       await sendTemplateMutation.mutateAsync({
         templateKey,
         conversationId: selectedConversationRecordId ?? undefined,
@@ -1611,7 +1631,7 @@ export default function WhatsAppPage() {
     <AppPageShell className="h-[calc(100vh-5rem)] min-h-0 overflow-hidden bg-[#0B111C] px-3 pb-0 pt-3">
       <div className="grid h-full min-h-0 grid-cols-1 gap-4 overflow-hidden bg-transparent xl:grid-cols-[minmax(260px,300px)_minmax(0,1fr)_minmax(280px,320px)]">
         <div className="h-full min-h-0 min-w-0 overflow-hidden">
-          <ConversationsList
+          <InboxQueueColumn
             rows={filteredRows}
             selectedId={selectedConversationId}
             onSelect={handleSelectConversation}
@@ -1630,7 +1650,7 @@ export default function WhatsAppPage() {
         </div>
 
         <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
-          <ChatPanel
+          <ExecutionChatColumn
             conversation={selectedConversation}
             canCompose={canComposeForSelected}
             composePlaceholder={composePlaceholder}
@@ -1639,6 +1659,8 @@ export default function WhatsAppPage() {
             sendMessage={handleManualSend}
             content={content}
             setContent={value => setContent(value)}
+            selectedIntent={selectedIntent}
+            setSelectedIntent={setSelectedIntent}
             onToggleFavorite={() => {
               if (!selectedConversationId) return;
               setLocalFavorites(prev => ({ ...prev, [selectedConversationId]: !prev[selectedConversationId] }));
@@ -1668,7 +1690,7 @@ export default function WhatsAppPage() {
         </div>
 
         <div className={cn("h-full min-h-0 min-w-0 overflow-hidden", isContextVisible ? "xl:block" : "hidden")}> 
-          <ContextPanel
+          <OperationalContextColumn
             conversation={selectedConversation}
             context={context}
             selectedCustomer={selectedCustomer}
