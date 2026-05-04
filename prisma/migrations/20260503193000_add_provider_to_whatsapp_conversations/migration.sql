@@ -1,0 +1,2 @@
+ALTER TABLE "WhatsAppConversation"
+ADD COLUMN IF NOT EXISTS "provider" TEXT NOT NULL DEFAULT 'mock';
