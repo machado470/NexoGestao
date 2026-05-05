@@ -23,7 +23,7 @@ import { TimelineService } from '../../src/timeline/timeline.service'
 import { OperationalStateService } from '../../src/people/operational-state.service'
 import { NotificationsService } from '../../src/notifications/notifications.service'
 import { OnboardingService } from '../../src/onboarding/onboarding.service'
-import { ExpenseCategory } from '../../src/expenses/dto/create-expense.dto'
+import { ExpenseCategory, ExpenseTypeDto } from '../../src/expenses/dto/create-expense.dto'
 import { CreateInvoiceDto, InvoiceStatus } from '../../src/invoices/dto/create-invoice.dto'
 import { LaunchType } from '../../src/launches/dto/create-launch.dto'
 import { CreateReferralDto } from '../../src/referrals/dto/create-referral.dto'
@@ -153,6 +153,7 @@ describe('ExpensesService - Regras de Domínio', () => {
       providers: [
         ExpensesService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: TimelineService, useValue: mockTimeline },
       ],
     }).compile()
 
@@ -165,8 +166,10 @@ describe('ExpensesService - Regras de Domínio', () => {
       service.create(ORG_ID, USER_ID, {
         description: 'Despesa inválida',
         amountCents: 0,
-        date: '2024-01-15',
-        category: ExpenseCategory.SUPPLIES,
+        occurredAt: '2024-01-15',
+        category: ExpenseCategory.MARKET,
+        title: 'Despesa inválida',
+        type: ExpenseTypeDto.VARIABLE,
       }),
     ).rejects.toThrow(BadRequestException)
   })
@@ -176,8 +179,10 @@ describe('ExpensesService - Regras de Domínio', () => {
       service.create(ORG_ID, USER_ID, {
         description: 'Despesa inválida',
         amountCents: -100,
-        date: '2024-01-15',
-        category: ExpenseCategory.SUPPLIES,
+        occurredAt: '2024-01-15',
+        category: ExpenseCategory.MARKET,
+        title: 'Despesa inválida',
+        type: ExpenseTypeDto.VARIABLE,
       }),
     ).rejects.toThrow(BadRequestException)
   })
@@ -188,16 +193,21 @@ describe('ExpensesService - Regras de Domínio', () => {
       orgId: ORG_ID,
       description: 'Aluguel',
       amountCents: 150000,
-      category: 'OPERATIONAL',
-      date: new Date('2024-01-15'),
+      category: 'OPERATIONS',
+      occurredAt: new Date('2024-01-15'),
+      title: 'Aluguel',
+      type: ExpenseTypeDto.FIXED,
+      recurrence: 'NONE',
     }
     mockPrisma.expense.create.mockResolvedValue(mockCreated)
 
     const result = await service.create(ORG_ID, USER_ID, {
       description: 'Aluguel',
       amountCents: 150000,
-      date: '2024-01-15',
-      category: ExpenseCategory.OPERATIONAL,
+      occurredAt: '2024-01-15',
+      category: ExpenseCategory.OPERATIONS,
+      title: 'Aluguel',
+      type: ExpenseTypeDto.FIXED,
     })
 
     expect(result).toEqual(mockCreated)
@@ -233,6 +243,7 @@ describe('InvoicesService - Transições de Status', () => {
       providers: [
         InvoicesService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: TimelineService, useValue: mockTimeline },
       ],
     }).compile()
 
@@ -453,6 +464,7 @@ describe('Multi-Tenancy - Isolamento de Dados', () => {
         ExpensesService,
         InvoicesService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: TimelineService, useValue: mockTimeline },
       ],
     }).compile()
 
