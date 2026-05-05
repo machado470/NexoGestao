@@ -55,6 +55,25 @@ const STORAGE_DIR = path.resolve(process.cwd(), ".data");
 const STORAGE_FILE = path.join(STORAGE_DIR, "execution-logs.json");
 const MAX_LOGS = 5000;
 
+function isStrictExecutionLogParsingEnabled() {
+  return ["1", "true", "yes", "y", "on"].includes(
+    (process.env.EXECUTION_LOG_STRICT_PARSE ?? "").toLowerCase().trim()
+  );
+}
+
+function logExecutionLogParseError(error: unknown, raw: string) {
+  console.error(
+    JSON.stringify({
+      event: "execution_log_parse_failed",
+      level: "error",
+      file: STORAGE_FILE,
+      rawLength: raw.length,
+      strict: isStrictExecutionLogParsingEnabled(),
+      error: error instanceof Error ? error.message : String(error),
+    })
+  );
+}
+
 async function ensureStore() {
   await fs.mkdir(STORAGE_DIR, { recursive: true });
   try {
@@ -64,14 +83,23 @@ async function ensureStore() {
   }
 }
 
-async function readLogs(): Promise<ExecutionLogRecord[]> {
+export async function readLogs(): Promise<ExecutionLogRecord[]> {
   await ensureStore();
   const raw = await fs.readFile(STORAGE_FILE, "utf8");
 
   try {
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
+    if (Array.isArray(parsed)) return parsed;
+
+    const error = new Error("Execution log storage payload is not an array");
+    logExecutionLogParseError(error, raw);
+    if (isStrictExecutionLogParsingEnabled()) throw error;
+    return [];
+  } catch (error) {
+    if ((error as Error)?.message !== "Execution log storage payload is not an array") {
+      logExecutionLogParseError(error, raw);
+    }
+    if (isStrictExecutionLogParsingEnabled()) throw error;
     return [];
   }
 }

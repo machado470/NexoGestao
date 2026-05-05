@@ -7,6 +7,7 @@ import helmet from 'helmet'
 
 import { AppModule } from './app.module'
 import { ApiResponseInterceptor } from './common/http/api-response.interceptor'
+import { getWhatsAppProviderReadiness } from './whatsapp/providers/provider.factory'
 
 function parseCorsOrigins(raw?: string): string[] {
   const v = (raw ?? '').trim()
@@ -33,6 +34,10 @@ async function bootstrap() {
           'Para previsibilidade, prefira ~/NexoGestao dentro do FS nativo do WSL.',
       )
     }
+    const whatsappReadiness = getWhatsAppProviderReadiness(process.env)
+    logger.log(
+      `[BOOT][WhatsApp] providerRequested=${whatsappReadiness.providerRequested} | providerResolved=${whatsappReadiness.providerResolved} | mode=${whatsappReadiness.mode}`,
+    )
     logger.log('[BOOT] Bootstrap iniciado: criando aplicação Nest...')
     const app = await NestFactory.create(AppModule, { rawBody: true })
     logger.log(`[BOOT] NestFactory.create concluído em ${Date.now() - bootStartedAt}ms`)

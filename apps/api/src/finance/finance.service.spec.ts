@@ -201,4 +201,45 @@ describe('FinanceService hardening', () => {
       }),
     )
   })
+
+  it('emite evento crítico PAYMENT_RECEIVED ao registrar pagamento', async () => {
+    const { service, prisma, idempotency } = buildService()
+    idempotency.begin.mockResolvedValue({ mode: 'execute', recordId: 'idem-1' })
+
+    prisma.$transaction.mockImplementation(async (cb: any) =>
+      cb({
+        charge: {
+          findFirst: jest.fn().mockResolvedValue({
+            id: 'ch-1',
+            orgId: 'org-1',
+            customerId: 'c-1',
+            serviceOrderId: 'so-1',
+            status: 'PENDING',
+          }),
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
+        payment: {
+          create: jest.fn().mockResolvedValue({ id: 'pay-1' }),
+          findFirst: jest.fn(),
+        },
+      }),
+    )
+    jest.spyOn(service, 'sendPaymentConfirmationWhatsApp').mockResolvedValue({} as any)
+
+    await service.payCharge({
+      orgId: 'org-1',
+      chargeId: 'ch-1',
+      amountCents: 1000,
+      method: 'PIX',
+    })
+
+    expect((service as any).timeline.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'PAYMENT_RECEIVED',
+        chargeId: 'ch-1',
+        serviceOrderId: 'so-1',
+      }),
+    )
+  })
+
 })

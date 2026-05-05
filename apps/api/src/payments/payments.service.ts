@@ -34,15 +34,23 @@ export class PaymentsService {
   ) {
     const secretKey =
       this.configService.get<string>('STRIPE_SECRET_KEY') ||
-      this.configService.get<string>('STRIPE_API_KEY') ||
+      this.configService.get<string>('STRIPE_KEY') ||
       ''
+    const isProduction =
+      (this.configService.get<string>('NODE_ENV') || process.env.NODE_ENV || '')
+        .toLowerCase()
+        .trim() === 'production'
+
+    if (!secretKey && isProduction) {
+      throw new Error('[Payments] STRIPE_SECRET_KEY/STRIPE_KEY é obrigatório em produção')
+    }
 
     if (secretKey) {
       this.stripe = new Stripe(secretKey, { apiVersion: '2024-06-20' })
-      this.logger.log('[BOOT] Stripe inicializado no PaymentsService')
+      this.logger.log('[BOOT][Payments] Stripe inicializado no PaymentsService')
     } else {
       this.stripe = null
-      this.logger.warn('[OPTIONAL][simulated-mode] Stripe não configurado no PaymentsService (fluxo de checkout online desabilitado)')
+      this.logger.warn('[BOOT][Payments][disabled] Stripe não configurado no PaymentsService (checkout online desabilitado)')
     }
   }
 

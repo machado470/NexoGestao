@@ -897,6 +897,23 @@ export class ServiceOrdersService {
     })
 
     if (data.status === 'DONE' && before.status !== 'DONE') {
+      await this.timeline.log({
+        orgId: params.orgId,
+        personId: params.personId,
+        action: 'SERVICE_ORDER_COMPLETED',
+        description: `Ordem de serviço concluída: ${updated.title}`,
+        customerId: updated.customerId,
+        serviceOrderId: updated.id,
+        appointmentId: updated.appointmentId ?? null,
+        metadata: {
+          actorUserId: params.updatedBy,
+          actorPersonId: params.personId,
+          updatedBy: params.updatedBy,
+          previousStatus: before.status,
+          currentStatus: updated.status,
+        },
+      })
+
       void this.analytics.track({
         orgId: params.orgId,
         userId: params.updatedBy ?? undefined,
