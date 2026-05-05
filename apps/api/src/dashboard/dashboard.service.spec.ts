@@ -32,6 +32,12 @@ const mockPrisma = {
   correctiveAction: {
     count: jest.fn(),
   },
+  whatsAppMessage: {
+    count: jest.fn(),
+  },
+  whatsAppConversation: {
+    count: jest.fn(),
+  },
 }
 
 describe('DashboardService', () => {
@@ -68,6 +74,9 @@ describe('DashboardService', () => {
       mockPrisma.payment.aggregate.mockResolvedValue({ _sum: { amountCents: 100000 } })
       mockPrisma.charge.aggregate.mockResolvedValue({ _sum: { amountCents: 50000 } })
       mockPrisma.correctiveAction.count.mockResolvedValue(2)
+      mockPrisma.whatsAppMessage.count.mockResolvedValue(0)
+      mockPrisma.whatsAppConversation.count.mockResolvedValue(0)
+      mockPrisma.charge.count.mockResolvedValue(0)
 
       const result = await service.getMetrics('org-1')
 
@@ -83,6 +92,9 @@ describe('DashboardService', () => {
       mockPrisma.payment.aggregate.mockResolvedValue({ _sum: { amountCents: 0 } })
       mockPrisma.charge.aggregate.mockResolvedValue({ _sum: { amountCents: 0 } })
       mockPrisma.correctiveAction.count.mockResolvedValue(0)
+      mockPrisma.whatsAppMessage.count.mockResolvedValue(0)
+      mockPrisma.whatsAppConversation.count.mockResolvedValue(0)
+      mockPrisma.charge.count.mockResolvedValue(0)
 
       await service.getMetrics('org-1')
       const customerCountCallsAfterFirstRequest =
