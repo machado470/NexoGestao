@@ -81,13 +81,28 @@ export class BillingService {
     private readonly quotasService: QuotasService,
   ) {
 
-    const secretKey = this.config.get<string>('STRIPE_SECRET_KEY')
+    const secretKey =
+      this.config.get<string>('STRIPE_SECRET_KEY') ||
+      this.config.get<string>('STRIPE_KEY') ||
+      ''
+    const isProduction =
+      (this.config.get<string>('NODE_ENV') || process.env.NODE_ENV || '')
+        .toLowerCase()
+        .trim() === 'production'
+
+    if (isProduction && this.isSimulatedCheckoutEnabled()) {
+      throw new Error('[Billing] BILLING_ENABLE_SIMULATED_CHECKOUT não é permitido em produção')
+    }
+
+    if (!secretKey && isProduction) {
+      throw new Error('[Billing] STRIPE_SECRET_KEY/STRIPE_KEY é obrigatório em produção')
+    }
 
     if (secretKey) {
       this.stripe = new Stripe(secretKey, { apiVersion: '2024-06-20' })
-      this.logger.log('[BOOT] Stripe inicializado')
+      this.logger.log('[BOOT][Billing] Stripe inicializado')
     } else {
-      this.logger.warn('[OPTIONAL][simulated-mode] Stripe não configurado — billing em modo simulado')
+      this.logger.warn('[BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado')
     }
 
   }
@@ -307,6 +322,14 @@ export class BillingService {
   */
 
   async simulateCheckoutSession(orgId: string, planName: PlanName) {
+
+    const isProduction =
+      (this.config.get<string>('NODE_ENV') || process.env.NODE_ENV || '')
+        .toLowerCase()
+        .trim() === 'production'
+    if (isProduction) {
+      throw new ServiceUnavailableException('Checkout simulado não é permitido em produção')
+    }
 
     this.logger.warn(`Checkout simulado para ${orgId} (${planName})`)
 

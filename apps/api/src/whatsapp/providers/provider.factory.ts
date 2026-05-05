@@ -5,23 +5,44 @@ import { ZApiWhatsAppProvider } from './zapi.provider'
 import { WhatsAppProvider, WhatsAppProviderHealth } from './whatsapp.provider'
 
 const logger = new Logger('WhatsAppProviderFactory')
+const KNOWN_PROVIDERS = ['mock', 'zapi', 'meta_cloud'] as const
+
+function isProduction(env: NodeJS.ProcessEnv): boolean {
+  return (env.NODE_ENV ?? '').toLowerCase().trim() === 'production'
+}
+
+function isTruthy(value: string | undefined): boolean {
+  return ['1', 'true', 'yes', 'y', 'on'].includes((value ?? '').toLowerCase().trim())
+}
 
 export class WhatsAppProviderFactory {
   static create(env: NodeJS.ProcessEnv = process.env): WhatsAppProvider {
     const configured = (env.WHATSAPP_PROVIDER ?? 'mock').toLowerCase().trim()
-    if (configured === 'zapi') {
-      logger.log('[WhatsApp] provider=zapi')
-      return new ZApiWhatsAppProvider()
-    }
-    if (configured === 'meta_cloud') {
-      logger.log('[WhatsApp] provider=meta_cloud')
-      return new MetaCloudWhatsAppProvider()
+
+    if (!KNOWN_PROVIDERS.includes(configured as any)) {
+      throw new Error(
+        `[WhatsApp] WHATSAPP_PROVIDER desconhecido (${configured}). Valores válidos: ${KNOWN_PROVIDERS.join(', ')}`,
+      )
     }
 
-    if (configured !== 'mock') {
-      logger.warn(`[WhatsApp] provider desconhecido (${configured}), fallback=mock`)
+    if (configured === 'mock') {
+      if (isProduction(env)) {
+        throw new Error('[WhatsApp] WHATSAPP_PROVIDER=mock não é permitido em produção')
+      }
+      if (!isTruthy(env.WHATSAPP_ALLOW_MOCK)) {
+        throw new Error('[WhatsApp] Uso de provider mock requer WHATSAPP_ALLOW_MOCK=true')
+      }
+      logger.warn('[BOOT][WhatsApp] provider=mock explicitamente habilitado')
+      return new MockWhatsAppProvider()
     }
-    return new MockWhatsAppProvider()
+
+    if (configured === 'zapi') {
+      logger.log('[BOOT][WhatsApp] provider=zapi')
+      return new ZApiWhatsAppProvider()
+    }
+
+    logger.log('[BOOT][WhatsApp] provider=meta_cloud')
+    return new MetaCloudWhatsAppProvider()
   }
 
   static health(env: NodeJS.ProcessEnv = process.env): WhatsAppProviderHealth & { configuredProvider: string } {
@@ -43,7 +64,7 @@ export function getWhatsAppProviderReadiness(env: NodeJS.ProcessEnv = process.en
   return {
     providerRequested: health.configuredProvider,
     providerResolved: health.provider,
-    isProviderKnown: ['mock', 'zapi', 'meta_cloud'].includes(health.configuredProvider),
+    isProviderKnown: KNOWN_PROVIDERS.includes(health.configuredProvider as any),
     mode: health.provider === 'mock' ? 'mock' : 'real',
     credentialsReady: health.status !== 'misconfigured',
     missingEnv: health.missingEnv,

@@ -67,4 +67,47 @@ describe('WhatsAppService inbound/outbound', () => {
     await svc.enqueueMessage('org1', { customerId: 'c1', content: 'oi', entityType: 'CUSTOMER', entityId: 'c1', messageType: 'MANUAL' })
     expect(addJob).toHaveBeenCalled()
   })
+
+  it('emite eventos críticos MESSAGE_SENT e PAYMENT_LINK_SENT ao marcar envio confirmado', async () => {
+    const timeline = { log: jest.fn().mockResolvedValue({}) }
+    const prisma: any = {
+      whatsAppMessage: {
+        update: jest.fn().mockResolvedValue({
+          id: 'm1',
+          orgId: 'org1',
+          customerId: 'c1',
+          providerMessageId: 'wamid.1',
+          messageType: 'PAYMENT_LINK',
+          entityType: 'CHARGE',
+          entityId: 'ch1',
+          conversationId: 'conv1',
+          direction: 'OUTBOUND',
+          status: 'SENT',
+          errorMessage: null,
+        }),
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'm1',
+          orgId: 'org1',
+          customerId: 'c1',
+          providerMessageId: 'wamid.1',
+          messageType: 'PAYMENT_LINK',
+          entityType: 'CHARGE',
+          entityId: 'ch1',
+          conversationId: 'conv1',
+          direction: 'OUTBOUND',
+          status: 'SENT',
+          errorMessage: null,
+        }),
+        count: jest.fn().mockResolvedValue(0),
+      },
+      timelineEvent: { findFirst: jest.fn().mockResolvedValue(null) },
+    }
+    const svc = new WhatsAppService(prisma, { addJob: jest.fn() } as any, { incOutbound: jest.fn(), incInbound: jest.fn(), incFailed: jest.fn() } as any, timeline as any, { orgId: 'test-org', userId: 'test-user', requestId: 'test-request' } as any, { increment: jest.fn() } as any, { enforceMeter: jest.fn().mockResolvedValue({ allowed: true }) } as any)
+
+    await svc.markSent({ id: 'm1', provider: 'zapi', providerMessageId: 'wamid.1' })
+
+    expect(timeline.log).toHaveBeenCalledWith(expect.objectContaining({ action: 'MESSAGE_SENT' }))
+    expect(timeline.log).toHaveBeenCalledWith(expect.objectContaining({ action: 'PAYMENT_LINK_SENT' }))
+  })
+
 })
