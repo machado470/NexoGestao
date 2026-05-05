@@ -5,6 +5,7 @@ import { WhatsAppController } from '../../src/whatsapp/whatsapp.controller'
 import { WhatsAppService } from '../../src/whatsapp/whatsapp.service'
 import { QuotasService } from '../../src/quotas/quotas.service'
 import { IdempotencyService } from '../../src/common/idempotency/idempotency.service'
+import { IdempotencyCacheService } from '../../src/common/idempotency/idempotency-cache.service'
 import { JwtAuthGuard } from '../../src/auth/jwt-auth.guard'
 import { RolesGuard } from '../../src/auth/guards/roles.guard'
 
@@ -18,6 +19,7 @@ describe('WhatsAppController integration', () => {
         { provide: WhatsAppService, useValue: { health: jest.fn(), listConversations: jest.fn().mockResolvedValue([]) } },
         { provide: QuotasService, useValue: {} },
         { provide: IdempotencyService, useValue: {} },
+        { provide: IdempotencyCacheService, useValue: { get: jest.fn(), set: jest.fn() } },
       ],
     })
     moduleBuilder.overrideGuard(JwtAuthGuard).useValue({ canActivate: () => true })
@@ -29,7 +31,7 @@ describe('WhatsAppController integration', () => {
   })
 
   afterAll(async () => {
-    await app.close()
+    if (app) await app.close()
   })
 
   it('GET /whatsapp/conversations returns successful payload', async () => {
