@@ -2,20 +2,33 @@
   "$schema": "https://turbo.build/schema.json",
   "tasks": {
     "build": {
-      "dependsOn": ["^build"],
-      "outputs": ["dist/**", "build/**"]
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        "dist/**",
+        "build/**"
+      ]
     },
     "dev": {
       "cache": false,
       "persistent": true
     },
     "api#build": {
-      "dependsOn": ["^build"],
-      "outputs": ["apps/api/dist/**"]
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        "apps/api/dist/**"
+      ]
     },
     "web#build": {
-      "dependsOn": ["^build"],
-      "outputs": ["apps/web/dist/**"]
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        "apps/web/dist/**"
+      ]
     },
     "api#dev": {
       "cache": false,
@@ -26,7 +39,21 @@
       "persistent": true
     },
     "lint": {
-      "dependsOn": ["^lint"],
+      "dependsOn": [
+        "^lint"
+      ],
+      "outputs": []
+    },
+    "test": {
+      "dependsOn": [
+        "^test"
+      ],
+      "outputs": []
+    },
+    "typecheck": {
+      "dependsOn": [
+        "^typecheck"
+      ],
       "outputs": []
     }
   }
