@@ -26,7 +26,7 @@ import { IdempotencyService } from '../common/idempotency/idempotency.service'
 import { QuotasService } from '../quotas/quotas.service'
 import { createWhatsAppProvider, getWhatsAppProviderReadiness } from './providers/provider.factory'
 import { WhatsAppService, buildDeterministicMessageKey } from './whatsapp.service'
-import { ListConversationsQueryDto, MessageFeedQueryDto, SendConversationMessageDto, SendMessageDto, SendTemplateMessageDto, UpdateConversationStatusDto, UpdateMessageStatusDto } from './dto/whatsapp.dto'
+import { ListConversationsQueryDto, ListWebhookEventsQueryDto, MessageFeedQueryDto, ReplayWebhookEventsDto, SendConversationMessageDto, SendMessageDto, SendTemplateMessageDto, UpdateConversationStatusDto, UpdateMessageStatusDto } from './dto/whatsapp.dto'
 import { IdempotencyInterceptor } from '../common/idempotency/idempotency.interceptor'
 
 @ApiTags('WhatsApp')
@@ -113,6 +113,48 @@ export class WhatsAppController {
   @Post('conversations/:id/reopen')
   async reopenConversation(@Org() orgId: string, @Param('id') id: string) { return this.whatsapp.updateConversationStatus(orgId, id, WhatsAppConversationStatus.WAITING_OPERATOR) }
 
+
+  @Get('webhook-events')
+  @ApiOperation({ summary: 'List inbound WhatsApp webhook events for admin/debug recovery' })
+  async listWebhookEvents(@Org() orgId: string, @Query() query: ListWebhookEventsQueryDto) {
+    const targetOrgId = this.resolveWebhookAdminOrgId(orgId, query.orgId)
+    return this.whatsapp.listWebhookEvents(targetOrgId, query)
+  }
+
+  @Get('webhook-events/dlq/stats')
+  @ApiOperation({ summary: 'WhatsApp inbound webhook DLQ/admin recovery stats' })
+  async getWebhookDlqStats(@Org() orgId: string, @Query('orgId') queryOrgId?: string) {
+    const targetOrgId = this.resolveWebhookAdminOrgId(orgId, queryOrgId)
+    return this.whatsapp.getWebhookDlqStats(targetOrgId)
+  }
+
+  @Post('webhook-events/replay')
+  @ApiOperation({ summary: 'Replay selected failed inbound WhatsApp webhook events' })
+  async replayWebhookEvents(@Org() orgId: string, @User() user: any, @Body() body: ReplayWebhookEventsDto) {
+    return this.whatsapp.replayWebhookEvents(orgId, {
+      ids: body.ids ?? [],
+      force: body.force,
+      requestedBy: user?.userId ?? user?.sub ?? null,
+    })
+  }
+
+  @Get('webhook-events/:id')
+  @ApiOperation({ summary: 'Show inbound WhatsApp webhook event detail' })
+  async getWebhookEventDetail(@Org() orgId: string, @Param('id') id: string, @Query('orgId') queryOrgId?: string) {
+    const targetOrgId = this.resolveWebhookAdminOrgId(orgId, queryOrgId)
+    return this.whatsapp.getWebhookEventDetail(targetOrgId, id)
+  }
+
+  @Post('webhook-events/:id/replay')
+  @ApiOperation({ summary: 'Replay one failed inbound WhatsApp webhook event' })
+  async replayWebhookEvent(@Org() orgId: string, @User() user: any, @Param('id') id: string, @Body() body: ReplayWebhookEventsDto = {}) {
+    return this.whatsapp.replayWebhookEvents(orgId, {
+      ids: [id],
+      force: body.force,
+      requestedBy: user?.userId ?? user?.sub ?? null,
+    })
+  }
+
   @Post('webhooks/:provider')
   @Public()
   @Roles()
@@ -131,6 +173,7 @@ export class WhatsAppController {
       provider,
       eventType: String(payload?.eventType ?? payload?.type ?? 'unknown'),
       payload,
+      traceId,
     })
 
     await this.whatsapp.enqueueInboundWebhook({
@@ -166,6 +209,13 @@ export class WhatsAppController {
     const orgId = String(raw ?? '').trim()
     if (!orgId) throw new BadRequestException('orgId é obrigatório para webhook WhatsApp')
     return orgId
+  }
+
+  private resolveWebhookAdminOrgId(authOrgId: string, queryOrgId?: string) {
+    const requested = String(queryOrgId ?? '').trim()
+    if (requested && requested !== authOrgId) throw new BadRequestException('orgId não pertence ao tenant autenticado')
+    if (!authOrgId?.trim()) throw new BadRequestException('orgId é obrigatório')
+    return authOrgId
   }
 
   @Get('health')
