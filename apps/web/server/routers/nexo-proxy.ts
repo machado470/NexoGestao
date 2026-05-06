@@ -800,6 +800,35 @@ export const nexoProxyRouter = router({
 
     health: protectedProcedure.query(async ({ ctx }) => authedGet(ctx as CtxLike, '/whatsapp/health')),
 
+    listPendingApprovals: protectedProcedure
+      .input(z.object({ limit: z.number().int().min(1).max(200).optional() }).optional())
+      .query(async ({ ctx, input }) => authedGet(ctx as CtxLike, '/whatsapp/action-executions/pending', input ?? {})),
+
+    listExecutionHistory: protectedProcedure
+      .input(z.object({ conversationId: z.string().min(1).optional(), limit: z.number().int().min(1).max(500).optional() }).optional())
+      .query(async ({ ctx, input }) => authedGet(ctx as CtxLike, '/whatsapp/action-executions/history', input ?? {})),
+
+    getExecutionStatus: protectedProcedure
+      .input(z.object({ id: z.string().min(1) }))
+      .query(async ({ ctx, input }) => authedGet(ctx as CtxLike, `/whatsapp/action-executions/${input.id}`)),
+
+    requestExecution: protectedProcedure
+      .input(z.object({ conversationId: z.string().min(1), suggestedAction: z.enum(['SEND_PAYMENT_LINK', 'CONFIRM_APPOINTMENT', 'RESCHEDULE_APPOINTMENT', 'SEND_SERVICE_UPDATE', 'ESCALATE_TO_OPERATOR', 'MARK_RESOLVED', 'REPLY_WITH_TEMPLATE']), executionReason: z.string().optional(), actionPayload: z.record(z.string(), z.any()).optional(), idempotencyKey: z.string().optional(), autoExecuteSafe: z.boolean().optional() }))
+      .mutation(async ({ ctx, input }) => authedPost(ctx as CtxLike, `/whatsapp/conversations/${input.conversationId}/actions`, input)),
+
+    approveExecution: protectedProcedure
+      .input(z.object({ id: z.string().min(1), reason: z.string().optional() }))
+      .mutation(async ({ ctx, input }) => authedPost(ctx as CtxLike, `/whatsapp/action-executions/${input.id}/approve`, { reason: input.reason })),
+
+    executeExecution: protectedProcedure
+      .input(z.object({ id: z.string().min(1), reason: z.string().optional() }))
+      .mutation(async ({ ctx, input }) => authedPost(ctx as CtxLike, `/whatsapp/action-executions/${input.id}/execute`, { reason: input.reason })),
+
+    cancelExecution: protectedProcedure
+      .input(z.object({ id: z.string().min(1), reason: z.string().optional() }))
+      .mutation(async ({ ctx, input }) => authedPost(ctx as CtxLike, `/whatsapp/action-executions/${input.id}/cancel`, { reason: input.reason })),
+
+
     listWebhookEvents: protectedProcedure
       .input(whatsappWebhookEventListInput.optional())
       .query(async ({ ctx, input }) => normalizeWebhookEventResponse(await authedGet(ctx as CtxLike, '/whatsapp/webhook-events', input ?? {}))),

@@ -12,10 +12,11 @@ import {
   UseInterceptors,
   Logger,
   HttpCode,
+  Optional,
 } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { Throttle } from '@nestjs/throttler'
-import { WhatsAppConversationStatus, WhatsAppMessageStatus } from '@prisma/client'
+import { WhatsAppConversationStatus, WhatsAppMessageStatus, WhatsAppSuggestedAction } from '@prisma/client'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
 import { Roles } from '../auth/decorators/roles.decorator'
@@ -26,6 +27,7 @@ import { IdempotencyService } from '../common/idempotency/idempotency.service'
 import { QuotasService } from '../quotas/quotas.service'
 import { createWhatsAppProvider, getWhatsAppProviderReadiness } from './providers/provider.factory'
 import { WhatsAppService, buildDeterministicMessageKey } from './whatsapp.service'
+import { WhatsAppExecutionService } from './whatsapp-execution.service'
 import { ListConversationsQueryDto, ListWebhookEventsQueryDto, MessageFeedQueryDto, ReplayWebhookEventsDto, SendConversationMessageDto, SendMessageDto, SendTemplateMessageDto, UpdateConversationStatusDto, UpdateMessageStatusDto } from './dto/whatsapp.dto'
 import { IdempotencyInterceptor } from '../common/idempotency/idempotency.interceptor'
 
@@ -40,6 +42,7 @@ export class WhatsAppController {
     private readonly whatsapp: WhatsAppService,
     private readonly quotas: QuotasService,
     private readonly idempotency: IdempotencyService,
+    @Optional() private readonly executions?: WhatsAppExecutionService,
   ) {}
 
   @Get('conversations')
@@ -117,6 +120,70 @@ export class WhatsAppController {
 
   @Post('conversations/:id/reopen')
   async reopenConversation(@Org() orgId: string, @Param('id') id: string) { return this.whatsapp.updateConversationStatus(orgId, id, WhatsAppConversationStatus.WAITING_OPERATOR) }
+
+
+
+
+  @Get('action-executions/pending')
+  @ApiOperation({ summary: 'List pending WhatsApp workflow approvals' })
+  async listPendingActionApprovals(@Org() orgId: string, @Query('limit') limit?: string) {
+    return this.requireExecutions().listPendingApprovals(orgId, Number(limit ?? 50))
+  }
+
+  @Get('action-executions/history')
+  @ApiOperation({ summary: 'List WhatsApp workflow execution history' })
+  async listActionExecutionHistory(
+    @Org() orgId: string,
+    @Query('conversationId') conversationId?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.requireExecutions().listHistory(orgId, conversationId, Number(limit ?? 100))
+  }
+
+  @Get('action-executions/:id')
+  @ApiOperation({ summary: 'Get WhatsApp workflow execution status/result' })
+  async getActionExecutionStatus(@Org() orgId: string, @Param('id') id: string) {
+    return this.requireExecutions().getStatus(orgId, id)
+  }
+
+  @Post('conversations/:id/actions')
+  @ApiOperation({ summary: 'Create an executable workflow from a suggested WhatsApp action' })
+  async requestActionExecution(
+    @Org() orgId: string,
+    @User() user: any,
+    @Param('id') conversationId: string,
+    @Body() body: { suggestedAction?: WhatsAppSuggestedAction; executionReason?: string; actionPayload?: Record<string, unknown>; idempotencyKey?: string; autoExecuteSafe?: boolean },
+  ) {
+    if (!body?.suggestedAction) throw new BadRequestException('suggestedAction é obrigatório')
+    return this.requireExecutions().requestExecution({
+      orgId,
+      conversationId,
+      suggestedAction: body.suggestedAction,
+      requestedBy: user?.userId ?? user?.sub ?? null,
+      executionReason: body.executionReason,
+      actionPayload: body.actionPayload,
+      idempotencyKey: body.idempotencyKey,
+      autoExecuteSafe: body.autoExecuteSafe,
+    })
+  }
+
+  @Post('action-executions/:id/approve')
+  @ApiOperation({ summary: 'Approve a pending WhatsApp workflow action' })
+  async approveActionExecution(@Org() orgId: string, @User() user: any, @Param('id') id: string, @Body() body: { reason?: string } = {}) {
+    return this.requireExecutions().approve({ orgId, executionId: id, actorUserId: user?.userId ?? user?.sub ?? null, reason: body.reason })
+  }
+
+  @Post('action-executions/:id/execute')
+  @ApiOperation({ summary: 'Execute an approved WhatsApp workflow action' })
+  async executeActionExecution(@Org() orgId: string, @User() user: any, @Param('id') id: string, @Body() body: { reason?: string } = {}) {
+    return this.requireExecutions().execute({ orgId, executionId: id, actorUserId: user?.userId ?? user?.sub ?? null, reason: body.reason })
+  }
+
+  @Post('action-executions/:id/cancel')
+  @ApiOperation({ summary: 'Cancel a WhatsApp workflow action' })
+  async cancelActionExecution(@Org() orgId: string, @User() user: any, @Param('id') id: string, @Body() body: { reason?: string } = {}) {
+    return this.requireExecutions().cancel({ orgId, executionId: id, actorUserId: user?.userId ?? user?.sub ?? null, reason: body.reason })
+  }
 
 
   @Get('webhook-events')
@@ -207,6 +274,11 @@ export class WhatsAppController {
   @HttpCode(200)
   async webhookLegacy(@Param('provider') provider: string, @Body() payload: any, @Headers() headers: Record<string, string>) {
     return this.webhook(provider, payload, headers)
+  }
+
+  private requireExecutions() {
+    if (!this.executions) throw new BadRequestException('Serviço de execução WhatsApp indisponível')
+    return this.executions
   }
 
   private extractWebhookOrgId(payload: any, headers: Record<string, string>) {
