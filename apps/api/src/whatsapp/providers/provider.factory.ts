@@ -20,9 +20,16 @@ export class WhatsAppProviderFactory {
     const configured = (env.WHATSAPP_PROVIDER ?? 'mock').toLowerCase().trim()
 
     if (!KNOWN_PROVIDERS.includes(configured as any)) {
-      throw new Error(
-        `[WhatsApp] WHATSAPP_PROVIDER desconhecido (${configured}). Valores válidos: ${KNOWN_PROVIDERS.join(', ')}`,
+      if (isProduction(env)) {
+        throw new Error(
+          `[WhatsApp] WHATSAPP_PROVIDER desconhecido (${configured}). Valores válidos: ${KNOWN_PROVIDERS.join(', ')}`,
+        )
+      }
+
+      logger.warn(
+        `[BOOT][WhatsApp][dev-fallback] WHATSAPP_PROVIDER desconhecido (${configured}); usando provider mock em desenvolvimento`,
       )
+      return new MockWhatsAppProvider()
     }
 
     if (configured === 'mock') {
@@ -30,9 +37,12 @@ export class WhatsAppProviderFactory {
         throw new Error('[WhatsApp] WHATSAPP_PROVIDER=mock não é permitido em produção')
       }
       if (!isTruthy(env.WHATSAPP_ALLOW_MOCK)) {
-        throw new Error('[WhatsApp] Uso de provider mock requer WHATSAPP_ALLOW_MOCK=true')
+        logger.warn(
+          '[BOOT][WhatsApp][dev-fallback] WHATSAPP_ALLOW_MOCK não definido; provider mock liberado somente porque NODE_ENV!=production',
+        )
+      } else {
+        logger.warn('[BOOT][WhatsApp] provider=mock explicitamente habilitado')
       }
-      logger.warn('[BOOT][WhatsApp] provider=mock explicitamente habilitado')
       return new MockWhatsAppProvider()
     }
 

@@ -1,4 +1,5 @@
 const DEFAULT_NEXO_API_URL = "http://127.0.0.1:3000";
+const API_PREFIX = "/v1";
 
 function normalizeLocalhostHostname(hostname: string): string {
   return hostname.trim().toLowerCase() === "localhost" ? "127.0.0.1" : hostname;
@@ -11,10 +12,13 @@ export function resolveNexoApiUrl(raw = process.env.NEXO_API_URL): string {
   try {
     const parsed = new URL(base);
     parsed.hostname = normalizeLocalhostHostname(parsed.hostname);
-    parsed.pathname = parsed.pathname.replace(/\/+$/, "");
+    const normalizedPathname = parsed.pathname.replace(/\/+$/, "");
+    parsed.pathname = normalizedPathname.endsWith(API_PREFIX)
+      ? normalizedPathname
+      : `${normalizedPathname}${API_PREFIX}`;
     return parsed.toString().replace(/\/+$/, "");
   } catch {
-    return fallback;
+    return `${fallback}${API_PREFIX}`;
   }
 }
 
