@@ -12,7 +12,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service'
 import { QueueService } from '../queue/queue.service'
 import { WhatsAppObservabilityService } from '../common/metrics/whatsapp-observability.service'
-import { QUEUE_NAMES } from '../queue/queue.constants'
+import { QUEUE_NAMES, WHATSAPP_QUEUE_JOB_NAMES } from '../queue/queue.constants'
 import { TimelineService } from '../timeline/timeline.service'
 import { RequestContextService } from '../common/context/request-context.service'
 import { TenantOperationsService } from '../common/tenant-ops/tenant-ops.service'
@@ -256,7 +256,7 @@ export class WhatsAppService {
     })
     this.logTransition('whatsapp.outbound', { conversationId: conversation.id, messageId: message.id, status: 'WAITING_CUSTOMER' })
 
-    await this.queueService.addJob(QUEUE_NAMES.WHATSAPP, 'dispatch-message', { messageId: message.id, orgId, requestId: this.requestContext.requestId, userId: this.requestContext.userId }, { jobId: `whatsapp:dispatch:${message.id}` })
+    await this.queueService.addJob(QUEUE_NAMES.WHATSAPP, WHATSAPP_QUEUE_JOB_NAMES.DISPATCH_MESSAGE, { messageId: message.id, orgId, requestId: this.requestContext.requestId, userId: this.requestContext.userId }, { jobId: `whatsapp:dispatch:${message.id}` })
 
     this.waMetrics.incQueuedJobs()
     this.tenantOps.increment(orgId, 'whatsapp_queued')
@@ -320,7 +320,7 @@ export class WhatsAppService {
     }
 
     await this.prisma.whatsAppMessage.update({ where: { id: messageId }, data: { status: 'QUEUED', failedAt: null, errorMessage: null, errorCode: null } })
-    await this.queueService.addJob(QUEUE_NAMES.WHATSAPP, 'dispatch-message', { messageId, orgId, requestId: this.requestContext.requestId, userId: this.requestContext.userId }, { jobId: `whatsapp:dispatch:retry:${messageId}` })
+    await this.queueService.addJob(QUEUE_NAMES.WHATSAPP, WHATSAPP_QUEUE_JOB_NAMES.DISPATCH_MESSAGE, { messageId, orgId, requestId: this.requestContext.requestId, userId: this.requestContext.userId }, { jobId: `whatsapp:dispatch:retry:${messageId}` })
     this.waMetrics.incQueuedJobs()
     await this.logMessageTimelineEventOnce({
       orgId,
@@ -693,6 +693,101 @@ export class WhatsAppService {
         eventType: input.eventType,
         payload: input.payload,
         status: 'RECEIVED',
+      },
+    })
+  }
+
+
+  async enqueueInboundWebhook(input: {
+    webhookEventId: string
+    orgId: string
+    provider: string
+    traceId: string
+    receivedAt: Date | string
+  }) {
+    if (!input.orgId?.trim()) throw new BadRequestException('orgId é obrigatório para webhook WhatsApp')
+
+    const receivedAt = input.receivedAt instanceof Date ? input.receivedAt : new Date(input.receivedAt)
+    const payload = {
+      webhookEventId: input.webhookEventId,
+      orgId: input.orgId,
+      provider: input.provider,
+      traceId: input.traceId,
+      receivedAt: receivedAt.toISOString(),
+    }
+
+    const job = await this.queueService.addJob(
+      QUEUE_NAMES.WHATSAPP,
+      WHATSAPP_QUEUE_JOB_NAMES.INBOUND_WEBHOOK,
+      payload,
+      { jobId: `whatsapp:inbound-webhook:${input.webhookEventId}` },
+    )
+
+    this.waMetrics.incInboundWebhookQueued()
+    this.logger.log(JSON.stringify({
+      action: 'whatsapp.inbound_webhook.job_queued',
+      queue: QUEUE_NAMES.WHATSAPP,
+      jobName: WHATSAPP_QUEUE_JOB_NAMES.INBOUND_WEBHOOK,
+      jobId: job.id?.toString() ?? null,
+      webhookEventId: input.webhookEventId,
+      orgId: input.orgId,
+      provider: input.provider,
+      traceId: input.traceId,
+      receivedAt: payload.receivedAt,
+    }))
+
+    return job
+  }
+
+  async processPersistedInboundWebhook(input: {
+    webhookEventId: string
+    orgId: string
+    provider: string
+    traceId?: string | null
+    receivedAt?: Date | string | null
+  }) {
+    const event = await this.prisma.whatsAppWebhookEvent.findFirst({
+      where: { id: input.webhookEventId, orgId: input.orgId, provider: input.provider },
+    })
+    if (!event) throw new BadRequestException('webhook WhatsApp persistido não encontrado')
+    if (event.status === 'PROCESSED') {
+      return { provider: input.provider, processed: 0, results: [], skipped: true, reason: 'already_processed', durationMs: 0 }
+    }
+
+    const result = await this.processInboundWebhook(input.provider, event.payload, {
+      orgId: event.orgId ?? input.orgId,
+      traceId: input.traceId ?? null,
+      webhookEventId: event.id,
+    })
+
+    await this.completeWebhookEvent(event.id, {
+      status: 'PROCESSED',
+      orgId: result.results?.find((item: any) => item.orgId)?.orgId ?? event.orgId ?? input.orgId,
+    })
+
+    return result
+  }
+
+  async recordWebhookEventAttempt(id: string, errorMessage: string) {
+    return this.prisma.whatsAppWebhookEvent.update({
+      where: { id },
+      data: {
+        retryAttempts: { increment: 1 },
+        errorMessage,
+      },
+    })
+  }
+
+  async deadLetterWebhookEvent(input: { id: string; orgId: string; errorMessage: string; attemptsMade: number }) {
+    const errorMessage = `dead_letter after ${input.attemptsMade} attempts: ${input.errorMessage}`
+    return this.prisma.whatsAppWebhookEvent.update({
+      where: { id: input.id },
+      data: {
+        status: 'FAILED',
+        orgId: input.orgId,
+        errorMessage,
+        retryAttempts: input.attemptsMade,
+        processedAt: new Date(),
       },
     })
   }

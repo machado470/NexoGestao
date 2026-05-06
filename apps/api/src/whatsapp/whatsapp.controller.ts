@@ -133,28 +133,22 @@ export class WhatsAppController {
       payload,
     })
 
-    // The HTTP acknowledgement is deliberately quick. Processing is Promise-based
-    // so it can move to a queue without changing the controller contract.
-    void this.whatsapp.processInboundWebhook(provider, payload, { orgId, traceId, webhookEventId: webhookEvent.id })
-      .then((result) => this.whatsapp.completeWebhookEvent(webhookEvent.id, {
-        status: 'PROCESSED',
-        orgId: result.results?.find((r: any) => r.orgId)?.orgId ?? orgId,
-      }))
-      .catch((error: any) => this.whatsapp.completeWebhookEvent(webhookEvent.id, {
-        status: 'FAILED',
-        orgId,
-        errorMessage: String(error?.message ?? 'parse_failed'),
-      }))
-      .finally(() => {
-        this.logger.log(JSON.stringify({
-          action: 'whatsapp.webhook.ack',
-          provider,
-          orgId,
-          traceId,
-          webhookEventId: webhookEvent.id,
-          latencyMs: Date.now() - startedAt,
-        }))
-      })
+    await this.whatsapp.enqueueInboundWebhook({
+      webhookEventId: webhookEvent.id,
+      orgId,
+      provider,
+      traceId,
+      receivedAt: webhookEvent.createdAt ?? new Date(),
+    })
+
+    this.logger.log(JSON.stringify({
+      action: 'whatsapp.webhook.ack',
+      provider,
+      orgId,
+      traceId,
+      webhookEventId: webhookEvent.id,
+      latencyMs: Date.now() - startedAt,
+    }))
 
     return { ok: true, provider: serviceProvider.getProviderName(), received: true, traceId, webhookEventId: webhookEvent.id }
   }
