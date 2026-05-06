@@ -221,4 +221,139 @@ describe('WhatsAppService inbound/outbound', () => {
     }))
   })
 
+
+  it('lista webhook events com filtros e metadados sem expor payload bruto', async () => {
+    const prisma: any = {
+      whatsAppWebhookEvent: {
+        findMany: jest.fn().mockResolvedValue([
+          { id: 'wh1', orgId: 'org1', provider: 'meta_cloud', eventType: 'MESSAGE_RECEIVED', status: 'FAILED', retryAttempts: 3, errorMessage: 'boom', processedAt: null, traceId: 'trace-1', providerMessageId: 'wamid.1', payload: { messages: [{ providerMessageId: 'wamid.1' }] }, createdAt: new Date('2026-05-06T00:00:00Z') },
+        ]),
+      },
+    }
+    const svc = new WhatsAppService(prisma, { addJob: jest.fn() } as any, {} as any, { log: jest.fn() } as any, { orgId: 'org1', userId: 'u1', requestId: 'r1' } as any, { increment: jest.fn() } as any, { enforceMeter: jest.fn() } as any)
+
+    const result = await svc.listWebhookEvents('org1', { provider: 'meta_cloud', status: 'FAILED' as any, traceId: 'trace-1', providerMessageId: 'wamid.1', createdAtFrom: '2026-05-01T00:00:00Z', createdAtTo: '2026-05-07T00:00:00Z' })
+
+    expect(prisma.whatsAppWebhookEvent.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ orgId: 'org1', provider: 'meta_cloud', status: 'FAILED', traceId: 'trace-1', providerMessageId: 'wamid.1' }),
+    }))
+    expect(result.items[0]).toEqual(expect.objectContaining({ id: 'wh1', status: 'FAILED', payloadMetadata: expect.objectContaining({ providerMessageIds: ['wamid.1'] }) }))
+    expect((result.items[0] as any).payload).toBeUndefined()
+  })
+
+  it('retorna detalhe de webhook por org com tentativas, erro, trace e metadados', async () => {
+    const prisma: any = {
+      whatsAppWebhookEvent: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'wh1', orgId: 'org1', provider: 'meta_cloud', eventType: 'MESSAGE_RECEIVED', status: 'FAILED', retryAttempts: 2, errorMessage: 'boom', processedAt: new Date('2026-05-06T00:01:00Z'), traceId: 'trace-1', providerMessageId: null, payload: { messageId: 'wamid.1', nested: true }, createdAt: new Date('2026-05-06T00:00:00Z') }),
+      },
+    }
+    const svc = new WhatsAppService(prisma, { addJob: jest.fn() } as any, {} as any, { log: jest.fn() } as any, { orgId: 'org1', userId: 'u1', requestId: 'r1' } as any, { increment: jest.fn() } as any, { enforceMeter: jest.fn() } as any)
+
+    const result = await svc.getWebhookEventDetail('org1', 'wh1')
+
+    expect(prisma.whatsAppWebhookEvent.findFirst).toHaveBeenCalledWith({ where: { id: 'wh1', orgId: 'org1' } })
+    expect(result).toEqual(expect.objectContaining({ id: 'wh1', retryAttempts: 2, errorMessage: 'boom', traceId: 'trace-1', providerMessageId: 'wamid.1', rawPayloadMetadata: expect.any(Object) }))
+  })
+
+  it('replay de webhook FAILED reenfileira usando job id único de replay', async () => {
+    const addJob = jest.fn().mockResolvedValue({ id: 'job-replay' })
+    const prisma: any = {
+      whatsAppWebhookEvent: {
+        findMany: jest.fn().mockResolvedValue([{ id: 'wh1', orgId: 'org1', provider: 'meta_cloud', status: 'FAILED', traceId: 'trace-1', createdAt: new Date('2026-05-06T00:00:00Z') }]),
+      },
+    }
+    const svc = new WhatsAppService(prisma, { addJob } as any, { incInboundWebhookQueued: jest.fn() } as any, { log: jest.fn() } as any, { orgId: 'org1', userId: 'u1', requestId: 'r1' } as any, { increment: jest.fn() } as any, { enforceMeter: jest.fn() } as any)
+
+    const result = await svc.replayWebhookEvents('org1', { ids: ['wh1'], requestedBy: 'u1' })
+
+    expect(result.ok).toBe(true)
+    expect(addJob).toHaveBeenCalledWith(
+      QUEUE_NAMES.WHATSAPP,
+      WHATSAPP_QUEUE_JOB_NAMES.INBOUND_WEBHOOK,
+      expect.objectContaining({ webhookEventId: 'wh1', orgId: 'org1', provider: 'meta_cloud', traceId: 'trace-1' }),
+      expect.objectContaining({ jobId: expect.stringMatching(/^whatsapp:inbound-webhook:wh1:replay-/) }),
+    )
+  })
+
+  it('bloqueia replay de webhook PROCESSED por padrão', async () => {
+    const prisma: any = {
+      whatsAppWebhookEvent: {
+        findMany: jest.fn().mockResolvedValue([{ id: 'wh1', orgId: 'org1', provider: 'meta_cloud', status: 'PROCESSED', traceId: 'trace-1', createdAt: new Date() }]),
+      },
+    }
+    const addJob = jest.fn()
+    const svc = new WhatsAppService(prisma, { addJob } as any, {} as any, { log: jest.fn() } as any, { orgId: 'org1', userId: 'u1', requestId: 'r1' } as any, { increment: jest.fn() } as any, { enforceMeter: jest.fn() } as any)
+
+    await expect(svc.replayWebhookEvents('org1', { ids: ['wh1'] })).rejects.toThrow('force=true')
+    expect(addJob).not.toHaveBeenCalled()
+  })
+
+  it('permite replay force=true para webhook PROCESSED', async () => {
+    const addJob = jest.fn().mockResolvedValue({ id: 'job-force' })
+    const prisma: any = {
+      whatsAppWebhookEvent: {
+        findMany: jest.fn().mockResolvedValue([{ id: 'wh1', orgId: 'org1', provider: 'meta_cloud', status: 'PROCESSED', traceId: 'trace-1', createdAt: new Date('2026-05-06T00:00:00Z') }]),
+      },
+    }
+    const svc = new WhatsAppService(prisma, { addJob } as any, { incInboundWebhookQueued: jest.fn() } as any, { log: jest.fn() } as any, { orgId: 'org1', userId: 'u1', requestId: 'r1' } as any, { increment: jest.fn() } as any, { enforceMeter: jest.fn() } as any)
+
+    await expect(svc.replayWebhookEvents('org1', { ids: ['wh1'], force: true })).resolves.toEqual(expect.objectContaining({ ok: true }))
+    expect(addJob).toHaveBeenCalled()
+  })
+
+  it('reprocessamento de replay não cria mensagem duplicada quando providerMessageId já existe', async () => {
+    const event = { id: 'wh1', orgId: 'org1', provider: 'meta_cloud', payload: {}, status: 'FAILED' }
+    const prisma: any = {
+      whatsAppWebhookEvent: {
+        findFirst: jest.fn().mockResolvedValue(event),
+        update: jest.fn().mockResolvedValue({ ...event, status: 'PROCESSED' }),
+      },
+      whatsAppMessage: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'm1', orgId: 'org1', customerId: 'c1', providerMessageId: 'wamid.1', messageType: 'MANUAL', entityType: 'CUSTOMER', entityId: 'c1', conversationId: 'conv1', direction: 'INBOUND', status: 'DELIVERED' }),
+        create: jest.fn(),
+        count: jest.fn().mockResolvedValue(0),
+      },
+      timelineEvent: { findFirst: jest.fn().mockResolvedValue({ id: 'tl1' }) },
+    }
+    const svc = new WhatsAppService(prisma, { addJob: jest.fn() } as any, { incInbound: jest.fn(), observeProcessingDuration: jest.fn() } as any, { log: jest.fn() } as any, { orgId: 'org1', userId: 'u1', requestId: 'r1' } as any, { increment: jest.fn() } as any, { enforceMeter: jest.fn() } as any)
+
+    await svc.processPersistedInboundWebhook({ webhookEventId: 'wh1', orgId: 'org1', provider: 'meta_cloud', traceId: 'trace-1' })
+
+    expect(prisma.whatsAppMessage.create).not.toHaveBeenCalled()
+    expect(prisma.whatsAppWebhookEvent.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'PROCESSED' }) }))
+  })
+
+  it('calcula estatísticas DLQ por org, provider e tentativas', async () => {
+    const oldest = new Date(Date.now() - 60000)
+    const prisma: any = {
+      whatsAppWebhookEvent: {
+        count: jest.fn().mockResolvedValue(2),
+        findFirst: jest.fn().mockResolvedValue({ id: 'wh-old', createdAt: oldest }),
+        groupBy: jest.fn()
+          .mockResolvedValueOnce([{ provider: 'meta_cloud', _count: { _all: 2 } }])
+          .mockResolvedValueOnce([{ orgId: 'org1', _count: { _all: 2 } }]),
+        aggregate: jest.fn().mockResolvedValue({ _avg: { retryAttempts: 3 }, _max: { retryAttempts: 5 }, _min: { retryAttempts: 1 } }),
+      },
+    }
+    const svc = new WhatsAppService(prisma, { addJob: jest.fn() } as any, {} as any, { log: jest.fn() } as any, { orgId: 'org1', userId: 'u1', requestId: 'r1' } as any, { increment: jest.fn() } as any, { enforceMeter: jest.fn() } as any)
+
+    const result = await svc.getWebhookDlqStats('org1')
+
+    expect(result.failedCount).toBe(2)
+    expect(result.failedByProvider).toEqual([{ provider: 'meta_cloud', count: 2 }])
+    expect(result.failedByOrg).toEqual([{ orgId: 'org1', count: 2 }])
+    expect(result.retryAttempts).toEqual({ min: 1, max: 5, avg: 3 })
+    expect(result.oldestFailedEvent?.ageMs).toBeGreaterThanOrEqual(0)
+  })
+
+  it('isola tenants ao buscar detalhes de webhook', async () => {
+    const prisma: any = {
+      whatsAppWebhookEvent: { findFirst: jest.fn().mockResolvedValue(null) },
+    }
+    const svc = new WhatsAppService(prisma, { addJob: jest.fn() } as any, {} as any, { log: jest.fn() } as any, { orgId: 'org1', userId: 'u1', requestId: 'r1' } as any, { increment: jest.fn() } as any, { enforceMeter: jest.fn() } as any)
+
+    await expect(svc.getWebhookEventDetail('org1', 'wh-other')).rejects.toThrow('webhook WhatsApp não encontrado')
+    expect(prisma.whatsAppWebhookEvent.findFirst).toHaveBeenCalledWith({ where: { id: 'wh-other', orgId: 'org1' } })
+  })
+
 })

@@ -312,6 +312,35 @@ const serviceOrderUpdateInput = z.object({
   expectedUpdatedAt: z.string().datetime().optional(),
 });
 
+
+const whatsappWebhookEventListInput = z.object({
+  orgId: z.string().min(1).optional(),
+  provider: z.string().min(1).optional(),
+  status: z.enum(['RECEIVED', 'PROCESSING', 'PROCESSED', 'FAILED']).optional(),
+  traceId: z.string().min(1).optional(),
+  providerMessageId: z.string().min(1).optional(),
+  createdAtFrom: z.string().min(1).optional(),
+  createdAtTo: z.string().min(1).optional(),
+  cursor: z.string().min(1).optional(),
+  limit: z.number().int().min(1).max(100).optional(),
+});
+
+const whatsappWebhookReplayInput = z.object({
+  ids: z.array(z.string().min(1)).optional(),
+  force: z.boolean().optional(),
+});
+
+function normalizeWebhookEventResponse(payload: any) {
+  if (!payload || typeof payload !== 'object') return payload;
+  if (Array.isArray(payload.items)) {
+    return {
+      items: payload.items.map((item: any) => ({ ...item, payloadMetadata: item.payloadMetadata ?? item.rawPayloadMetadata ?? null })),
+      nextCursor: payload.nextCursor ?? null,
+    };
+  }
+  return { ...payload, payloadMetadata: payload.payloadMetadata ?? payload.rawPayloadMetadata ?? null };
+}
+
 const whatsappSendInput = z.object({
   customerId: z.string().min(1),
   content: z.string().min(1),
@@ -766,6 +795,27 @@ export const nexoProxyRouter = router({
       .mutation(async ({ ctx, input }) => authedPatch(ctx as CtxLike, `/whatsapp/conversations/${input.id}/status`, { status: input.status })),
 
     health: protectedProcedure.query(async ({ ctx }) => authedGet(ctx as CtxLike, '/whatsapp/health')),
+
+    listWebhookEvents: protectedProcedure
+      .input(whatsappWebhookEventListInput.optional())
+      .query(async ({ ctx, input }) => normalizeWebhookEventResponse(await authedGet(ctx as CtxLike, '/whatsapp/webhook-events', input ?? {}))),
+
+    getWebhookEvent: protectedProcedure
+      .input(z.object({ id: z.string().min(1), orgId: z.string().min(1).optional() }))
+      .query(async ({ ctx, input }) => normalizeWebhookEventResponse(await authedGet(ctx as CtxLike, `/whatsapp/webhook-events/${input.id}`, input.orgId ? { orgId: input.orgId } : {}))),
+
+    replayWebhookEvent: protectedProcedure
+      .input(z.object({ id: z.string().min(1), force: z.boolean().optional() }))
+      .mutation(async ({ ctx, input }) => authedPost(ctx as CtxLike, `/whatsapp/webhook-events/${input.id}/replay`, { force: input.force })),
+
+    replayWebhookEvents: protectedProcedure
+      .input(whatsappWebhookReplayInput)
+      .mutation(async ({ ctx, input }) => authedPost(ctx as CtxLike, '/whatsapp/webhook-events/replay', input)),
+
+    webhookDlqStats: protectedProcedure
+      .input(z.object({ orgId: z.string().min(1).optional() }).optional())
+      .query(async ({ ctx, input }) => authedGet(ctx as CtxLike, '/whatsapp/webhook-events/dlq/stats', input ?? {})),
+
 
     // backward compatibility
     conversations: protectedProcedure.query(async ({ ctx }) => authedGet(ctx as CtxLike, '/whatsapp/conversations')),

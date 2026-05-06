@@ -663,20 +663,24 @@ model WhatsAppMessage {
 }
 
 model WhatsAppWebhookEvent {
-  id            String                 @id @default(uuid())
-  orgId         String?
-  provider      String
-  eventType     String
-  payload       Json
-  processedAt   DateTime?
-  status        WhatsAppWebhookStatus  @default(RECEIVED)
-  errorMessage  String?
-  retryAttempts Int                    @default(0)
-  createdAt     DateTime               @default(now())
+  id                String                 @id @default(uuid())
+  orgId             String?
+  provider          String
+  eventType         String
+  payload           Json
+  traceId           String?
+  providerMessageId String?
+  processedAt       DateTime?
+  status            WhatsAppWebhookStatus  @default(RECEIVED)
+  errorMessage      String?
+  retryAttempts     Int                    @default(0)
+  createdAt         DateTime               @default(now())
 
   org Organization? @relation(fields: [orgId], references: [id])
 
   @@index([provider, createdAt])
+  @@index([providerMessageId])
+  @@index([traceId])
   @@index([orgId, status, createdAt])
 }
 
@@ -910,6 +914,7 @@ enum WhatsAppDirection {
 
 enum WhatsAppWebhookStatus {
   RECEIVED
+  PROCESSING
   PROCESSED
   FAILED
 }
