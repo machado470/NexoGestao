@@ -36,6 +36,7 @@ model Organization {
   whatsAppMessages        WhatsAppMessage[]
   whatsAppTemplates       WhatsAppTemplate[]
   whatsAppWebhookEvents   WhatsAppWebhookEvent[]
+  whatsAppActionExecutions WhatsAppActionExecution[]
 
   subscription Subscription?
   executionConfig OrganizationExecutionConfig?
@@ -600,6 +601,7 @@ model WhatsAppConversation {
   org       Organization      @relation(fields: [orgId], references: [id])
   customer  Customer?         @relation(fields: [customerId], references: [id])
   messages  WhatsAppMessage[]
+  actionExecutions WhatsAppActionExecution[]
 
   @@index([orgId, customerId])
   @@index([orgId, phone])
@@ -611,6 +613,38 @@ model WhatsAppConversation {
   @@index([orgId, priority, unreadCount, lastMessageAt])
   @@index([orgId, intent, lastInboundAt])
   @@index([orgId, slaStatus, responseDueAt])
+}
+
+
+model WhatsAppActionExecution {
+  id                String                         @id @default(uuid())
+  orgId             String
+  conversationId    String
+  suggestedAction   WhatsAppSuggestedAction
+  status            WhatsAppActionExecutionStatus @default(PENDING_APPROVAL)
+  approvalRequired  Boolean                        @default(true)
+  approvedBy        String?
+  executedBy        String?
+  cancelledBy       String?
+  executionReason   String?
+  executionResult   Json?
+  actionPayload     Json?
+  idempotencyKey    String
+  failureReason     String?
+  approvedAt        DateTime?
+  executedAt        DateTime?
+  failedAt          DateTime?
+  cancelledAt       DateTime?
+  createdAt         DateTime                       @default(now())
+  updatedAt         DateTime                       @updatedAt
+
+  org          Organization         @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  conversation WhatsAppConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, idempotencyKey])
+  @@index([orgId, status, createdAt])
+  @@index([orgId, conversationId, createdAt])
+  @@index([orgId, suggestedAction, status, createdAt])
 }
 
 model WhatsAppTemplate {
@@ -935,6 +969,14 @@ enum WhatsAppSuggestedAction {
   ESCALATE_TO_OPERATOR
   MARK_RESOLVED
   REPLY_WITH_TEMPLATE
+}
+
+enum WhatsAppActionExecutionStatus {
+  PENDING_APPROVAL
+  APPROVED
+  EXECUTED
+  FAILED
+  CANCELLED
 }
 
 enum WhatsAppContextType {
