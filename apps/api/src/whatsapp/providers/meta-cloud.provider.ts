@@ -70,7 +70,10 @@ export class MetaCloudWhatsAppProvider implements WhatsAppProvider {
     if (!provided.startsWith('sha256=')) return false
     const digest = createHmac('sha256', this.appSecret).update(JSON.stringify(payload)).digest('hex')
     const expected = `sha256=${digest}`
-    return timingSafeEqual(Buffer.from(provided), Buffer.from(expected))
+    const providedBuffer = Buffer.from(provided)
+    const expectedBuffer = Buffer.from(expected)
+    if (providedBuffer.length !== expectedBuffer.length) return false
+    return timingSafeEqual(providedBuffer, expectedBuffer)
   }
   mapProviderStatus(status: string): ParsedWebhookMessage['eventType'] {
     const s = status.toLowerCase()

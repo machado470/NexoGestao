@@ -11,6 +11,7 @@ import {
   UseGuards,
   UseInterceptors,
   Logger,
+  HttpCode,
 } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { Throttle } from '@nestjs/throttler'
@@ -18,6 +19,7 @@ import { WhatsAppConversationStatus, WhatsAppMessageStatus } from '@prisma/clien
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
 import { Roles } from '../auth/decorators/roles.decorator'
+import { Public } from '../auth/decorators/public.decorator'
 import { Org } from '../auth/decorators/org.decorator'
 import { User } from '../auth/decorators/user.decorator'
 import { IdempotencyService } from '../common/idempotency/idempotency.service'
@@ -112,37 +114,64 @@ export class WhatsAppController {
   async reopenConversation(@Org() orgId: string, @Param('id') id: string) { return this.whatsapp.updateConversationStatus(orgId, id, WhatsAppConversationStatus.WAITING_OPERATOR) }
 
   @Post('webhooks/:provider')
-  @ApiBearerAuth()
+  @Public()
+  @Roles()
+  @HttpCode(200)
   async webhook(@Param('provider') provider: string, @Body() payload: any, @Headers() headers: Record<string, string>) {
+    const startedAt = Date.now()
+    const traceId = String(headers?.['x-request-id'] ?? headers?.['x-trace-id'] ?? `wa-${Date.now()}`).trim()
+    const orgId = this.extractWebhookOrgId(payload, headers)
     const serviceProvider = createWhatsAppProvider()
     if (serviceProvider.getProviderName() !== provider) throw new BadRequestException('provider inválido')
     const signatureOk = await serviceProvider.verifyWebhookSignature(payload, headers)
     if (!signatureOk) throw new BadRequestException('assinatura inválida')
+
     const webhookEvent = await this.whatsapp.createWebhookEvent({
+      orgId,
       provider,
-      eventType: String(payload?.eventType ?? 'unknown'),
+      eventType: String(payload?.eventType ?? payload?.type ?? 'unknown'),
       payload,
     })
 
-    try {
-      this.logger.log(`inbound_webhook provider=${provider}`)
-      const result = await this.whatsapp.processInboundWebhook(provider, payload)
-      await this.whatsapp.completeWebhookEvent(webhookEvent.id, {
+    // The HTTP acknowledgement is deliberately quick. Processing is Promise-based
+    // so it can move to a queue without changing the controller contract.
+    void this.whatsapp.processInboundWebhook(provider, payload, { orgId, traceId, webhookEventId: webhookEvent.id })
+      .then((result) => this.whatsapp.completeWebhookEvent(webhookEvent.id, {
         status: 'PROCESSED',
-        orgId: result.results?.find((r: any) => r.orgId)?.orgId ?? null,
-      })
-      return { ok: true, provider: serviceProvider.getProviderName(), received: true }
-    } catch (error: any) {
-      await this.whatsapp.completeWebhookEvent(webhookEvent.id, {
+        orgId: result.results?.find((r: any) => r.orgId)?.orgId ?? orgId,
+      }))
+      .catch((error: any) => this.whatsapp.completeWebhookEvent(webhookEvent.id, {
         status: 'FAILED',
+        orgId,
         errorMessage: String(error?.message ?? 'parse_failed'),
+      }))
+      .finally(() => {
+        this.logger.log(JSON.stringify({
+          action: 'whatsapp.webhook.ack',
+          provider,
+          orgId,
+          traceId,
+          webhookEventId: webhookEvent.id,
+          latencyMs: Date.now() - startedAt,
+        }))
       })
-      return { ok: true, received: true }
-    }
+
+    return { ok: true, provider: serviceProvider.getProviderName(), received: true, traceId, webhookEventId: webhookEvent.id }
   }
+
   @Post('webhook/:provider')
+  @Public()
+  @Roles()
+  @HttpCode(200)
   async webhookLegacy(@Param('provider') provider: string, @Body() payload: any, @Headers() headers: Record<string, string>) {
     return this.webhook(provider, payload, headers)
+  }
+
+  private extractWebhookOrgId(payload: any, headers: Record<string, string>) {
+    const raw = headers?.['x-org-id'] ?? headers?.['x-nexo-org-id'] ?? payload?.orgId ?? payload?.tenantId
+    const orgId = String(raw ?? '').trim()
+    if (!orgId) throw new BadRequestException('orgId é obrigatório para webhook WhatsApp')
+    return orgId
   }
 
   @Get('health')

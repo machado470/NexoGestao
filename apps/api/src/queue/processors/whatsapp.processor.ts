@@ -15,6 +15,7 @@ import {
 import { createWhatsAppProvider } from '../../whatsapp/providers/provider.factory'
 import { QUEUE_CONNECTION, QUEUE_NAMES } from '../queue.constants'
 import { QueueService } from '../queue.service'
+import { WhatsAppObservabilityService } from '../../common/metrics/whatsapp-observability.service'
 
 @Injectable()
 export class WhatsAppProcessor implements OnModuleInit, OnModuleDestroy {
@@ -26,6 +27,7 @@ export class WhatsAppProcessor implements OnModuleInit, OnModuleDestroy {
     @Inject(QUEUE_CONNECTION) private readonly connection: IORedis,
     private readonly whatsApp: WhatsAppService,
     private readonly queueService: QueueService,
+    private readonly waMetrics: WhatsAppObservabilityService,
   ) {}
 
   onModuleInit() {
@@ -119,11 +121,13 @@ export class WhatsAppProcessor implements OnModuleInit, OnModuleDestroy {
         const nextAttempt = (job?.attemptsMade ?? 0) + 1
         const baseDelay = 1000
         const retryDelayMs = baseDelay * 2 ** Math.max(0, nextAttempt - 1)
+        this.waMetrics.incRetry()
         this.logger.warn(
           `whatsapp job retry jobId=${job?.id?.toString() ?? ''} attempt=${nextAttempt} delayMs=${retryDelayMs} requestId=${job?.data?.requestId ?? 'n/a'} userId=${job?.data?.userId ?? 'n/a'} orgId=${job?.data?.orgId ?? 'n/a'} error=${err.message}`,
         )
 
         if (job && job.attemptsMade >= (job.opts.attempts ?? 1)) {
+          this.waMetrics.incFailedJobs()
           await this.queueService.addJob(
             QUEUE_NAMES.WHATSAPP_DLQ,
             'whatsapp.send.dlq',

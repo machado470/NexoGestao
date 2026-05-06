@@ -18,6 +18,7 @@ import { RequestContextService } from '../common/context/request-context.service
 import { TenantOperationsService } from '../common/tenant-ops/tenant-ops.service'
 import { CommercialPolicyService, isCommercialBlocked } from '../common/commercial/commercial-policy.service'
 import { createWhatsAppProvider } from './providers/provider.factory'
+import { ParsedWebhookMessage } from './providers/whatsapp.provider'
 import { WhatsAppTemplateService } from './whatsapp-template.service'
 import { WhatsAppContextService } from './whatsapp-context.service'
 import { buildCommunicationFailureSignal } from '../governance/communication-failure.signal'
@@ -255,8 +256,9 @@ export class WhatsAppService {
     })
     this.logTransition('whatsapp.outbound', { conversationId: conversation.id, messageId: message.id, status: 'WAITING_CUSTOMER' })
 
-    await this.queueService.addJob(QUEUE_NAMES.WHATSAPP, 'dispatch-message', { messageId: message.id }, { jobId: `whatsapp:dispatch:${message.id}` })
+    await this.queueService.addJob(QUEUE_NAMES.WHATSAPP, 'dispatch-message', { messageId: message.id, orgId, requestId: this.requestContext.requestId, userId: this.requestContext.userId }, { jobId: `whatsapp:dispatch:${message.id}` })
 
+    this.waMetrics.incQueuedJobs()
     this.tenantOps.increment(orgId, 'whatsapp_queued')
     this.waMetrics.incOutbound()
     return { created: true, message }
@@ -273,21 +275,24 @@ export class WhatsAppService {
     }
 
     const updated = await this.prisma.whatsAppMessage.update({ where: { id: input.id }, data })
-    await this.timeline.log({
-      orgId,
-      action: input.status === 'FAILED' ? 'WHATSAPP_MESSAGE_FAILED' : input.status === 'DELIVERED' ? 'WHATSAPP_MESSAGE_DELIVERED' : 'WHATSAPP_MESSAGE_SENT',
-      customerId: updated.customerId ?? null,
-      metadata: {
+    const action = input.status === 'FAILED'
+      ? 'MESSAGE_FAILED'
+      : input.status === 'DELIVERED'
+        ? 'MESSAGE_DELIVERED'
+        : input.status === 'READ'
+          ? 'MESSAGE_READ'
+          : input.status === 'SENT'
+            ? 'MESSAGE_SENT'
+            : null
+
+    if (action) {
+      await this.logMessageTimelineEventOnce({
+        orgId,
         messageId: updated.id,
-        conversationId: updated.conversationId,
-        customerId: updated.customerId,
-        entityType: updated.entityType,
-        entityId: updated.entityId,
-        provider: updated.provider,
-        status: updated.status,
-        messageType: updated.messageType,
-      },
-    }).catch(() => null)
+        action,
+        errorMessage: input.errorMessage ?? updated.errorMessage ?? null,
+      })
+    }
     return updated
   }
 
@@ -315,7 +320,8 @@ export class WhatsAppService {
     }
 
     await this.prisma.whatsAppMessage.update({ where: { id: messageId }, data: { status: 'QUEUED', failedAt: null, errorMessage: null, errorCode: null } })
-    await this.queueService.addJob(QUEUE_NAMES.WHATSAPP, 'dispatch-message', { messageId }, { jobId: `whatsapp:dispatch:retry:${messageId}` })
+    await this.queueService.addJob(QUEUE_NAMES.WHATSAPP, 'dispatch-message', { messageId, orgId, requestId: this.requestContext.requestId, userId: this.requestContext.userId }, { jobId: `whatsapp:dispatch:retry:${messageId}` })
+    this.waMetrics.incQueuedJobs()
     await this.logMessageTimelineEventOnce({
       orgId,
       messageId,
@@ -325,84 +331,208 @@ export class WhatsAppService {
     return { ok: true, messageId }
   }
 
-  async processInboundWebhook(providerName: string, payload: unknown) {
+  async processInboundWebhook(providerName: string, payload: unknown, options: { orgId?: string | null; traceId?: string | null; webhookEventId?: string | null } = {}) {
+    const startedAt = Date.now()
     const provider = createWhatsAppProvider()
+    if (provider.getProviderName() !== providerName) {
+      throw new BadRequestException(`provider inválido: esperado ${provider.getProviderName()}, recebido ${providerName}`)
+    }
+
     const parsed = provider.parseWebhook(payload)
+    if (!Array.isArray(parsed)) throw new BadRequestException('payload de webhook inválido')
+    if (parsed.length === 0) throw new BadRequestException('payload de webhook sem mensagens processáveis')
 
     const results: any[] = []
     for (const item of parsed) {
-      if (item.eventType !== 'MESSAGE_RECEIVED' && item.providerMessageId) {
-        const status = item.eventType === 'MESSAGE_DELIVERED' ? 'DELIVERED' : item.eventType === 'MESSAGE_READ' ? 'READ' : item.eventType === 'MESSAGE_FAILED' ? 'FAILED' : null
-        if (status) {
-          const existing = await this.prisma.whatsAppMessage.findFirst({ where: { providerMessageId: item.providerMessageId } })
-          if (existing) {
-            await this.logMessageTimelineEventOnce({ orgId: existing.orgId, messageId: existing.id, action: item.eventType })
-            await this.updateMessageStatus(existing.orgId, { id: existing.id, status: status as WhatsAppMessageStatus, errorMessage: item.content ?? undefined })
-            results.push({ associated: true, updatedMessageId: existing.id, eventType: item.eventType })
-            continue
-          }
-        }
+      this.validateParsedWebhookMessage(item)
+      if (item.eventType === 'MESSAGE_RECEIVED') {
+        results.push(await this.processInboundMessage(providerName, item, options))
+      } else {
+        results.push(await this.processProviderMessageStatus(providerName, item, options))
       }
-      const phone = normalizePhone(item.fromPhone)
-      const customer = phone
-        ? await this.prisma.customer.findFirst({ where: { phone }, select: { id: true, orgId: true, phone: true } })
-        : null
-
-      const orgId = customer?.orgId ?? null
-      if (!orgId) {
-        results.push({ associated: false, reason: 'customer_not_found', phone })
-        continue
-      }
-
-      const conversation = await this.resolveOrCreateConversation(orgId, customer.id, customer.phone, {
-        contextType: 'CUSTOMER',
-        contextId: customer.id,
-      })
-
-      const duplicated = item.providerMessageId
-        ? await this.prisma.whatsAppMessage.findFirst({ where: { orgId, providerMessageId: item.providerMessageId } })
-        : null
-      if (duplicated) {
-        await this.logMessageTimelineEventOnce({ orgId, messageId: duplicated.id, action: item.eventType })
-        results.push({ associated: true, orgId, customerId: customer.id, messageId: duplicated.id, duplicated: true })
-        continue
-      }
-
-      const message = await this.prisma.whatsAppMessage.create({
-        data: {
-          orgId,
-          conversationId: conversation.id,
-          customerId: customer.id,
-          direction: 'INBOUND',
-          entityType: 'CUSTOMER',
-          entityId: customer.id,
-          messageType: 'MANUAL',
-          toPhone: conversation.phone,
-          fromPhone: phone,
-          renderedText: item.content ?? '',
-          content: item.content ?? '',
-          status: 'DELIVERED',
-          provider: providerName,
-          providerMessageId: item.providerMessageId,
-          metadata: (item.metadata ?? null) as Prisma.InputJsonValue,
-          deliveredAt: item.timestamp ?? new Date(),
-        },
-      })
-
-      await this.touchConversation(conversation.id, {
-        unreadCountIncrement: 1,
-        lastMessageAt: message.createdAt,
-        lastInboundAt: message.createdAt,
-        status: WhatsAppConversationStatus.WAITING_OPERATOR,
-      })
-      this.logTransition('whatsapp.inbound', { orgId, conversationId: conversation.id, messageId: message.id, status: 'WAITING_OPERATOR' })
-
-      await this.logMessageTimelineEventOnce({ orgId, messageId: message.id, action: 'MESSAGE_RECEIVED' })
-
-      results.push({ associated: true, orgId, customerId: customer.id, messageId: message.id })
     }
 
-    return { provider: providerName, processed: results.length, results }
+    const durationMs = Date.now() - startedAt
+    this.waMetrics.observeProcessingDuration(durationMs)
+    this.logger.log(JSON.stringify({
+      action: 'whatsapp.webhook.processed',
+      provider: providerName,
+      orgId: options.orgId ?? null,
+      traceId: options.traceId ?? null,
+      webhookEventId: options.webhookEventId ?? null,
+      processed: results.length,
+      durationMs,
+    }))
+
+    return { provider: providerName, processed: results.length, results, durationMs }
+  }
+
+  private validateParsedWebhookMessage(item: ParsedWebhookMessage) {
+    const validEvents = new Set(['MESSAGE_RECEIVED', 'MESSAGE_DELIVERED', 'MESSAGE_READ', 'MESSAGE_FAILED'])
+    if (!item || typeof item !== 'object') throw new BadRequestException('mensagem de webhook inválida')
+    if (!validEvents.has(item.eventType)) throw new BadRequestException(`tipo de evento WhatsApp inválido: ${(item as any).eventType}`)
+    if (item.eventType === 'MESSAGE_RECEIVED' && !normalizePhone(item.fromPhone)) {
+      throw new BadRequestException('mensagem recebida sem telefone de origem válido')
+    }
+    if (item.eventType !== 'MESSAGE_RECEIVED' && !item.providerMessageId) {
+      throw new BadRequestException('evento de status sem providerMessageId')
+    }
+  }
+
+  private async processProviderMessageStatus(providerName: string, item: ParsedWebhookMessage, options: { orgId?: string | null; traceId?: string | null; webhookEventId?: string | null }) {
+    const status = item.eventType === 'MESSAGE_DELIVERED'
+      ? 'DELIVERED'
+      : item.eventType === 'MESSAGE_READ'
+        ? 'READ'
+        : item.eventType === 'MESSAGE_FAILED'
+          ? 'FAILED'
+          : null
+
+    if (!status || !item.providerMessageId) {
+      return { associated: false, reason: 'status_not_supported', eventType: item.eventType }
+    }
+
+    const existing = await this.prisma.whatsAppMessage.findFirst({
+      where: {
+        providerMessageId: item.providerMessageId,
+        orgId: options.orgId ?? undefined,
+      },
+    })
+
+    if (!existing) {
+      this.waMetrics.incFailedWebhook()
+      this.logger.warn(JSON.stringify({
+        action: 'whatsapp.webhook.status_unmatched',
+        provider: providerName,
+        orgId: options.orgId ?? null,
+        traceId: options.traceId ?? null,
+        providerMessageId: item.providerMessageId,
+        eventType: item.eventType,
+      }))
+      return { associated: false, reason: 'message_not_found', providerMessageId: item.providerMessageId, eventType: item.eventType }
+    }
+
+    await this.updateMessageStatus(existing.orgId, {
+      id: existing.id,
+      status: status as WhatsAppMessageStatus,
+      errorMessage: item.content ?? undefined,
+    })
+
+    return { associated: true, orgId: existing.orgId, updatedMessageId: existing.id, eventType: item.eventType }
+  }
+
+  private async processInboundMessage(providerName: string, item: ParsedWebhookMessage, options: { orgId?: string | null; traceId?: string | null; webhookEventId?: string | null }) {
+    const orgId = options.orgId?.trim()
+    if (!orgId) throw new BadRequestException('orgId é obrigatório para webhook WhatsApp')
+
+    const phone = normalizePhone(item.fromPhone)
+    if (!phone) throw new BadRequestException('telefone de origem inválido')
+
+    const duplicated = item.providerMessageId
+      ? await this.prisma.whatsAppMessage.findFirst({ where: { orgId, providerMessageId: item.providerMessageId } })
+      : null
+    if (duplicated) {
+      await this.logMessageTimelineEventOnce({ orgId, messageId: duplicated.id, action: 'MESSAGE_RECEIVED' })
+      return { associated: true, orgId, customerId: duplicated.customerId ?? null, messageId: duplicated.id, duplicated: true }
+    }
+
+    const customer = await this.prisma.customer.findFirst({
+      where: { orgId, phone },
+      select: { id: true, orgId: true, phone: true },
+    })
+
+    const resolution = await this.resolveOperationalContext(orgId, customer?.id ?? null)
+    const conversation = await this.resolveOrCreateConversation(orgId, customer?.id ?? null, customer?.phone ?? phone, {
+      contextType: resolution.contextType,
+      contextId: resolution.contextId,
+    })
+
+    const message = await this.prisma.whatsAppMessage.create({
+      data: {
+        orgId,
+        conversationId: conversation.id,
+        customerId: customer?.id ?? null,
+        direction: 'INBOUND',
+        entityType: resolution.entityType,
+        entityId: resolution.entityId ?? conversation.id,
+        messageType: 'MANUAL',
+        toPhone: normalizePhone(item.toPhone) ?? conversation.phone,
+        fromPhone: phone,
+        renderedText: item.content ?? '',
+        content: item.content ?? '',
+        status: 'DELIVERED',
+        provider: providerName,
+        providerMessageId: item.providerMessageId,
+        metadata: {
+          ...(item.metadata ?? {}),
+          traceId: options.traceId ?? null,
+          webhookEventId: options.webhookEventId ?? null,
+          resolvedContext: resolution,
+        } as Prisma.InputJsonValue,
+        deliveredAt: item.timestamp ?? new Date(),
+      },
+    })
+
+    await this.touchConversation(conversation.id, {
+      unreadCountIncrement: 1,
+      lastMessageAt: message.createdAt,
+      lastInboundAt: message.createdAt,
+      status: WhatsAppConversationStatus.WAITING_OPERATOR,
+    })
+    this.logTransition('whatsapp.inbound', { orgId, provider: providerName, traceId: options.traceId ?? null, conversationId: conversation.id, messageId: message.id, status: 'WAITING_OPERATOR' })
+
+    await this.logMessageTimelineEventOnce({ orgId, messageId: message.id, action: 'MESSAGE_RECEIVED' })
+
+    this.tenantOps.increment(orgId, 'whatsapp_inbound')
+    this.waMetrics.incInbound()
+    return { associated: true, orgId, customerId: customer?.id ?? null, messageId: message.id, conversationId: conversation.id, context: resolution }
+  }
+
+  private async resolveOperationalContext(orgId: string, customerId: string | null) {
+    if (!customerId) {
+      return {
+        contextType: 'GENERAL' as WhatsAppContextType,
+        entityType: 'GENERAL' as WhatsAppEntityType,
+        contextId: null,
+        entityId: null,
+        customerId: null,
+        chargeId: null,
+        appointmentId: null,
+        serviceOrderId: null,
+      }
+    }
+
+    const [openCharge, nextAppointment, activeServiceOrder] = await Promise.all([
+      this.prisma.charge.findFirst({
+        where: { orgId, customerId, status: { in: ['OVERDUE', 'PENDING'] } },
+        orderBy: [{ status: 'asc' }, { dueDate: 'asc' }],
+        select: { id: true },
+      }),
+      this.prisma.appointment.findFirst({
+        where: { orgId, customerId, startsAt: { gte: new Date() }, status: { in: ['SCHEDULED', 'CONFIRMED'] } },
+        orderBy: { startsAt: 'asc' },
+        select: { id: true },
+      }),
+      this.prisma.serviceOrder.findFirst({
+        where: { orgId, customerId, status: { in: ['OPEN', 'ASSIGNED', 'IN_PROGRESS'] } },
+        orderBy: { updatedAt: 'desc' },
+        select: { id: true },
+      }),
+    ])
+
+    const contextType = openCharge ? 'CHARGE' : nextAppointment ? 'APPOINTMENT' : activeServiceOrder ? 'SERVICE_ORDER' : 'GENERAL'
+    const contextId = openCharge?.id ?? nextAppointment?.id ?? activeServiceOrder?.id ?? null
+
+    return {
+      contextType: contextType as WhatsAppContextType,
+      entityType: contextType as WhatsAppEntityType,
+      contextId,
+      entityId: contextId ?? customerId,
+      customerId,
+      chargeId: openCharge?.id ?? null,
+      appointmentId: nextAppointment?.id ?? null,
+      serviceOrderId: activeServiceOrder?.id ?? null,
+    }
   }
 
   private calculateInboxPriority(item: { status: WhatsAppConversationStatus; lastInboundAt: Date | null; lastOutboundAt: Date | null; updatedAt: Date }, signals: { hasPendingCharge: boolean; hasOverdueCharge: boolean; failedMessageCount: number }): WhatsAppConversationPriority {
@@ -555,9 +685,10 @@ export class WhatsAppService {
   }
 
 
-  async createWebhookEvent(input: { provider: string; eventType: string; payload: Prisma.InputJsonValue }) {
+  async createWebhookEvent(input: { provider: string; eventType: string; payload: Prisma.InputJsonValue; orgId?: string | null }) {
     return this.prisma.whatsAppWebhookEvent.create({
       data: {
+        orgId: input.orgId ?? null,
         provider: input.provider,
         eventType: input.eventType,
         payload: input.payload,
