@@ -1,0 +1,2 @@
+ALTER TABLE "WhatsAppWebhookEvent"
+  ADD COLUMN IF NOT EXISTS "retryAttempts" INTEGER NOT NULL DEFAULT 0;

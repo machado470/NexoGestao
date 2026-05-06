@@ -13,7 +13,7 @@ jest.mock('./providers/provider.factory', () => ({
 describe('WhatsApp webhook security', () => {
   it('rejeita webhook sem orgId multi-tenant', async () => {
     const controller = new WhatsAppController(
-      { createWebhookEvent: jest.fn(), processInboundWebhook: jest.fn(), completeWebhookEvent: jest.fn() } as any,
+      { createWebhookEvent: jest.fn(), enqueueInboundWebhook: jest.fn() } as any,
       {} as any,
       {} as any,
     )
@@ -22,7 +22,7 @@ describe('WhatsApp webhook security', () => {
   })
 
   it('rejeita assinatura inválida antes de persistir payload', async () => {
-    const service = { createWebhookEvent: jest.fn(), processInboundWebhook: jest.fn(), completeWebhookEvent: jest.fn() }
+    const service = { createWebhookEvent: jest.fn(), enqueueInboundWebhook: jest.fn() }
     const controller = new WhatsAppController(service as any, {} as any, {} as any)
 
     await expect(controller.webhook('mock', { orgId: 'org1', signatureOk: false }, { 'x-org-id': 'org1' })).rejects.toBeInstanceOf(BadRequestException)
@@ -31,9 +31,8 @@ describe('WhatsApp webhook security', () => {
 
   it('persiste payload bruto e retorna 200-friendly ack com trace id', async () => {
     const service = {
-      createWebhookEvent: jest.fn().mockResolvedValue({ id: 'wh1' }),
-      processInboundWebhook: jest.fn().mockResolvedValue({ results: [{ orgId: 'org1' }] }),
-      completeWebhookEvent: jest.fn().mockResolvedValue({}),
+      createWebhookEvent: jest.fn().mockResolvedValue({ id: 'wh1', createdAt: new Date('2026-05-06T00:00:00Z') }),
+      enqueueInboundWebhook: jest.fn().mockResolvedValue({ id: 'job1' }),
     }
     const controller = new WhatsAppController(service as any, {} as any, {} as any)
 
@@ -41,7 +40,8 @@ describe('WhatsApp webhook security', () => {
 
     expect(result).toEqual(expect.objectContaining({ ok: true, received: true, traceId: 'trace-1', webhookEventId: 'wh1' }))
     expect(service.createWebhookEvent).toHaveBeenCalledWith(expect.objectContaining({ orgId: 'org1', provider: 'mock', payload: expect.objectContaining({ phone: '+5511999999999' }) }))
-    expect(service.processInboundWebhook).toHaveBeenCalledWith('mock', expect.any(Object), expect.objectContaining({ orgId: 'org1', traceId: 'trace-1', webhookEventId: 'wh1' }))
+    expect(service.enqueueInboundWebhook).toHaveBeenCalledWith(expect.objectContaining({ webhookEventId: 'wh1', orgId: 'org1', provider: 'mock', traceId: 'trace-1' }))
+    expect((service as any).processInboundWebhook).toBeUndefined()
   })
 
   it('valida assinatura Meta sem lançar em assinatura com tamanho inválido', async () => {

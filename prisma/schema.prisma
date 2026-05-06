@@ -663,15 +663,16 @@ model WhatsAppMessage {
 }
 
 model WhatsAppWebhookEvent {
-  id          String                 @id @default(uuid())
-  orgId       String?
-  provider    String
-  eventType   String
-  payload     Json
-  processedAt DateTime?
-  status      WhatsAppWebhookStatus  @default(RECEIVED)
-  errorMessage String?
-  createdAt   DateTime               @default(now())
+  id            String                 @id @default(uuid())
+  orgId         String?
+  provider      String
+  eventType     String
+  payload       Json
+  processedAt   DateTime?
+  status        WhatsAppWebhookStatus  @default(RECEIVED)
+  errorMessage  String?
+  retryAttempts Int                    @default(0)
+  createdAt     DateTime               @default(now())
 
   org Organization? @relation(fields: [orgId], references: [id])
 
