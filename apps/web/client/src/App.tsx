@@ -50,6 +50,7 @@ const GovernancePage = lazy(() => import("./pages/GovernancePage"));
 const FinancesPage = lazy(() => import("./pages/FinancesPage"));
 const ExecutiveDashboard = lazy(() => import("./pages/ExecutiveDashboard"));
 const WhatsAppPage = lazy(() => import("./pages/WhatsAppPage"));
+const WhatsAppWebhookRecoveryPage = lazy(() => import("./pages/WhatsAppWebhookRecoveryPage"));
 const CalendarPage = lazy(() => import("./pages/CalendarPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const ProfilePage = lazy(() => import("./pages/ProfilePage"));
@@ -504,6 +505,10 @@ const WhatsAppRoute = lazyProtectedPage(WhatsAppPage, {
   requireCompletedOnboarding: true,
 });
 
+const WhatsAppWebhookRecoveryRoute = lazyProtectedPage(WhatsAppWebhookRecoveryPage, {
+  requireCompletedOnboarding: true,
+});
+
 const CalendarRoute = lazyProtectedPage(CalendarPage, {
   permissions: ["appointments:read"],
   requireCompletedOnboarding: true,
@@ -646,6 +651,7 @@ function Router() {
           />
         )}
       />
+      <Route path="/whatsapp/webhooks" component={WhatsAppWebhookRecoveryRoute} />
       <Route path="/whatsapp" component={WhatsAppRoute} />
       <Route
         path="/launches"
