@@ -22,6 +22,7 @@ import { createWhatsAppProvider } from './providers/provider.factory'
 import { ParsedWebhookMessage } from './providers/whatsapp.provider'
 import { WhatsAppTemplateService } from './whatsapp-template.service'
 import { WhatsAppContextService } from './whatsapp-context.service'
+import { WhatsAppIntelligenceService, OperationalContextSnapshot } from './whatsapp-intelligence.service'
 import { buildCommunicationFailureSignal } from '../governance/communication-failure.signal'
 import { normalizePhone } from './phone.util'
 import { randomUUID } from 'crypto'
@@ -47,6 +48,7 @@ export class WhatsAppService {
     private readonly commercial: CommercialPolicyService,
     private readonly templateService?: WhatsAppTemplateService,
     private readonly contextService?: WhatsAppContextService,
+    private readonly intelligenceService?: WhatsAppIntelligenceService,
   ) {}
 
   async listConversations(orgId: string, filters: any = {}) {
@@ -115,6 +117,21 @@ export class WhatsAppService {
       noResponseMinutes: item.lastInboundAt && (!item.lastOutboundAt || item.lastInboundAt > item.lastOutboundAt) ? Math.floor((Date.now() - item.lastInboundAt.getTime()) / 60000) : null,
       noResponseHours: item.lastInboundAt && (!item.lastOutboundAt || item.lastInboundAt > item.lastOutboundAt) ? Number(((Date.now() - item.lastInboundAt.getTime()) / 3600000).toFixed(1)) : null,
       failedMessageCount: failedMap.get(item.id) ?? 0,
+      intent: (item as any).intent ?? 'GENERAL_INTENT',
+      slaStatus: (item as any).slaStatus ?? 'OK',
+      waitingSince: (item as any).waitingSince ?? null,
+      responseDueAt: (item as any).responseDueAt ?? null,
+      suggestedActions: (item as any).suggestedActions ?? [],
+      intelligence: {
+        intent: (item as any).intent ?? 'GENERAL_INTENT',
+        priority: (item as any).priority ?? item.priority,
+        slaStatus: (item as any).slaStatus ?? 'OK',
+        suggestedActions: (item as any).suggestedActions ?? [],
+        explanation: (item as any).intelligenceExplanation ?? {
+          intentReason: (item as any).intentReason ?? null,
+          priorityReason: (item as any).priorityReason ?? null,
+        },
+      },
       nextAction: this.resolveNextAction({
         failedMessageCount: failedMap.get(item.id) ?? 0,
         hasPendingCharge: (pendingMap.get(item.customerId ?? '') ?? 0) > 0 || (overdueMap.get(item.customerId ?? '') ?? 0) > 0,
@@ -149,7 +166,35 @@ export class WhatsAppService {
     const conv = await this.getConversation(orgId, conversationId)
     if (!conv?.customerId) return null
     if (!this.contextService) return null
-    return this.contextService.getOperationalContext(orgId, conv.customerId)
+    const context = await this.contextService.getOperationalContext(orgId, conv.customerId)
+    return {
+      ...context,
+      intelligence: this.toConversationIntelligence(conv),
+    }
+  }
+
+  async getConversationIntelligence(orgId: string, conversationId: string) {
+    const conversation = await this.prisma.whatsAppConversation.findFirst({ where: { id: conversationId, orgId } })
+    if (!conversation) throw new NotFoundException('Conversa WhatsApp não encontrada')
+    return this.toConversationIntelligence(conversation)
+  }
+
+  private toConversationIntelligence(conversation: any) {
+    return {
+      intent: conversation.intent ?? 'GENERAL_INTENT',
+      intentReason: conversation.intentReason ?? null,
+      intentConfidence: conversation.intentConfidence ?? null,
+      priority: conversation.priority ?? 'MEDIUM',
+      priorityReason: conversation.priorityReason ?? null,
+      waitingSince: conversation.waitingSince ?? null,
+      lastInboundAt: conversation.lastInboundAt ?? null,
+      lastOutboundAt: conversation.lastOutboundAt ?? null,
+      slaStatus: conversation.slaStatus ?? 'OK',
+      responseDueAt: conversation.responseDueAt ?? null,
+      suggestedActions: conversation.suggestedActions ?? [],
+      explanation: conversation.intelligenceExplanation ?? null,
+      intelligenceVersion: conversation.intelligenceVersion ?? 1,
+    }
   }
 
   async sendManualMessage(orgId: string, userId: string | null, input: any) {
@@ -254,6 +299,9 @@ export class WhatsAppService {
     await this.touchConversation(conversation.id, {
       lastMessageAt: message.createdAt,
       lastOutboundAt: message.createdAt,
+      waitingSince: null,
+      responseDueAt: null,
+      slaStatus: 'OK',
       status: WhatsAppConversationStatus.WAITING_CUSTOMER,
     })
     this.logTransition('whatsapp.outbound', { conversationId: conversation.id, messageId: message.id, status: 'WAITING_CUSTOMER' })
@@ -479,15 +527,27 @@ export class WhatsAppService {
       unreadCountIncrement: 1,
       lastMessageAt: message.createdAt,
       lastInboundAt: message.createdAt,
+      waitingSince: message.createdAt,
       status: WhatsAppConversationStatus.WAITING_OPERATOR,
     })
     this.logTransition('whatsapp.inbound', { orgId, provider: providerName, traceId: options.traceId ?? null, conversationId: conversation.id, messageId: message.id, status: 'WAITING_OPERATOR' })
 
     await this.logMessageTimelineEventOnce({ orgId, messageId: message.id, action: 'MESSAGE_RECEIVED' })
 
+    const intelligence = await this.applyOperationalIntelligence({
+      orgId,
+      conversationId: conversation.id,
+      messageId: message.id,
+      content: item.content ?? '',
+      resolution,
+      lastInboundAt: message.createdAt,
+      lastOutboundAt: conversation.lastOutboundAt ?? null,
+      status: WhatsAppConversationStatus.WAITING_OPERATOR,
+    })
+
     this.tenantOps.increment(orgId, 'whatsapp_inbound')
     this.waMetrics.incInbound()
-    return { associated: true, orgId, customerId: customer?.id ?? null, messageId: message.id, conversationId: conversation.id, context: resolution }
+    return { associated: true, orgId, customerId: customer?.id ?? null, messageId: message.id, conversationId: conversation.id, context: resolution, intelligence }
   }
 
   private async resolveOperationalContext(orgId: string, customerId: string | null) {
@@ -508,17 +568,17 @@ export class WhatsAppService {
       this.prisma.charge.findFirst({
         where: { orgId, customerId, status: { in: ['OVERDUE', 'PENDING'] } },
         orderBy: [{ status: 'asc' }, { dueDate: 'asc' }],
-        select: { id: true },
+        select: { id: true, status: true, dueDate: true },
       }),
       this.prisma.appointment.findFirst({
         where: { orgId, customerId, startsAt: { gte: new Date() }, status: { in: ['SCHEDULED', 'CONFIRMED'] } },
         orderBy: { startsAt: 'asc' },
-        select: { id: true },
+        select: { id: true, startsAt: true },
       }),
       this.prisma.serviceOrder.findFirst({
         where: { orgId, customerId, status: { in: ['OPEN', 'ASSIGNED', 'IN_PROGRESS'] } },
         orderBy: { updatedAt: 'desc' },
-        select: { id: true },
+        select: { id: true, status: true },
       }),
     ])
 
@@ -532,8 +592,12 @@ export class WhatsAppService {
       entityId: contextId ?? customerId,
       customerId,
       chargeId: openCharge?.id ?? null,
+      chargeStatus: openCharge?.status ?? null,
+      chargeDueDate: openCharge?.dueDate ?? null,
       appointmentId: nextAppointment?.id ?? null,
+      appointmentStartsAt: nextAppointment?.startsAt ?? null,
       serviceOrderId: activeServiceOrder?.id ?? null,
+      serviceOrderStatus: activeServiceOrder?.status ?? null,
     }
   }
 
@@ -1023,7 +1087,7 @@ export class WhatsAppService {
 
   private async touchConversation(
     conversationId: string,
-    input: { unreadCountIncrement?: number; lastMessageAt?: Date; lastInboundAt?: Date; lastOutboundAt?: Date; status?: WhatsAppConversationStatus; lastEventTimestamp?: Date },
+    input: { unreadCountIncrement?: number; lastMessageAt?: Date; lastInboundAt?: Date; lastOutboundAt?: Date; waitingSince?: Date | null; responseDueAt?: Date | null; slaStatus?: 'OK' | 'WARNING' | 'BREACHED'; status?: WhatsAppConversationStatus; lastEventTimestamp?: Date },
   ) {
     await this.prisma.whatsAppConversation.updateMany({
       where: { id: conversationId, ...(input.lastEventTimestamp ? { updatedAt: { lt: input.lastEventTimestamp } } : {}) },
@@ -1032,9 +1096,211 @@ export class WhatsAppService {
         lastMessageAt: input.lastMessageAt,
         lastInboundAt: input.lastInboundAt,
         lastOutboundAt: input.lastOutboundAt,
+        waitingSince: input.waitingSince,
+        responseDueAt: input.responseDueAt,
+        slaStatus: input.slaStatus,
         status: input.status,
       },
     })
+  }
+
+
+  private async applyOperationalIntelligence(input: {
+    orgId: string
+    conversationId: string
+    messageId: string
+    content: string
+    resolution: OperationalContextSnapshot
+    lastInboundAt: Date
+    lastOutboundAt: Date | null
+    status: WhatsAppConversationStatus
+  }) {
+    const conversation = await this.prisma.whatsAppConversation.findFirst({
+      where: { id: input.conversationId, orgId: input.orgId },
+    })
+    if (!conversation) return null
+
+    const [failedMessageCount, repeatedInboundWithoutResponse] = await Promise.all([
+      this.prisma.whatsAppMessage.count({ where: { orgId: input.orgId, conversationId: input.conversationId, status: 'FAILED' } }),
+      this.prisma.whatsAppMessage.count({
+        where: {
+          orgId: input.orgId,
+          conversationId: input.conversationId,
+          direction: 'INBOUND',
+          createdAt: input.lastOutboundAt ? { gt: input.lastOutboundAt } : undefined,
+        },
+      }),
+    ])
+
+    const context: OperationalContextSnapshot = {
+      ...input.resolution,
+      failedMessageCount,
+      repeatedInboundWithoutResponse,
+    }
+    const engine = this.intelligenceService ?? new WhatsAppIntelligenceService()
+    const decision = engine.evaluate({
+      content: input.content,
+      status: input.status,
+      lastInboundAt: input.lastInboundAt,
+      lastOutboundAt: input.lastOutboundAt,
+      context,
+    })
+
+    await this.prisma.whatsAppConversation.updateMany({
+      where: { id: input.conversationId, orgId: input.orgId },
+      data: {
+        priority: decision.priority.priority,
+        priorityReason: decision.priority.reason,
+        intent: decision.intent.intent,
+        intentReason: decision.intent.reason,
+        intentConfidence: decision.intent.confidence,
+        waitingSince: decision.sla.waitingSince,
+        responseDueAt: decision.sla.responseDueAt,
+        slaStatus: decision.sla.slaStatus,
+        suggestedActions: decision.suggestedActions as unknown as Prisma.InputJsonValue,
+        intelligenceExplanation: decision.explanation as unknown as Prisma.InputJsonValue,
+        intelligenceVersion: decision.explanation.version,
+      },
+    })
+
+    await this.emitIntelligenceTimelineEvents({
+      orgId: input.orgId,
+      conversationId: input.conversationId,
+      messageId: input.messageId,
+      customerId: conversation.customerId ?? null,
+      context,
+      previous: conversation,
+      decision,
+    })
+
+    return decision
+  }
+
+  private async emitIntelligenceTimelineEvents(input: {
+    orgId: string
+    conversationId: string
+    messageId: string
+    customerId: string | null
+    context: OperationalContextSnapshot
+    previous: { intent?: string | null; priority?: string | null; slaStatus?: string | null }
+    decision: any
+  }) {
+    const base = {
+      conversationId: input.conversationId,
+      messageId: input.messageId,
+      intelligenceVersion: input.decision.explanation?.version ?? 1,
+    }
+
+    await this.logConversationTimelineEventOnce({
+      orgId: input.orgId,
+      action: 'WHATSAPP_INTENT_DETECTED',
+      conversationId: input.conversationId,
+      dedupeKey: `intent:${input.messageId}:${input.decision.intent.intent}`,
+      customerId: input.customerId,
+      context: input.context,
+      metadata: {
+        ...base,
+        intent: input.decision.intent.intent,
+        reason: input.decision.intent.reason,
+        confidence: input.decision.intent.confidence,
+        matchedTerms: input.decision.intent.matchedTerms,
+      },
+    })
+
+    if (input.previous.priority !== input.decision.priority.priority) {
+      await this.logConversationTimelineEventOnce({
+        orgId: input.orgId,
+        action: 'WHATSAPP_PRIORITY_UPDATED',
+        conversationId: input.conversationId,
+        dedupeKey: `priority:${input.conversationId}:${input.decision.priority.priority}:${input.messageId}`,
+        customerId: input.customerId,
+        context: input.context,
+        metadata: {
+          ...base,
+          previousPriority: input.previous.priority ?? null,
+          priority: input.decision.priority.priority,
+          score: input.decision.priority.score,
+          factors: input.decision.priority.factors,
+          reason: input.decision.priority.reason,
+        },
+      })
+    }
+
+    if (input.decision.sla.slaStatus === 'BREACHED') {
+      await this.logConversationTimelineEventOnce({
+        orgId: input.orgId,
+        action: 'WHATSAPP_SLA_BREACHED',
+        conversationId: input.conversationId,
+        dedupeKey: `sla:${input.conversationId}:${input.decision.sla.responseDueAt?.toISOString?.() ?? 'none'}`,
+        customerId: input.customerId,
+        context: input.context,
+        metadata: {
+          ...base,
+          slaStatus: input.decision.sla.slaStatus,
+          waitingSince: input.decision.sla.waitingSince?.toISOString?.() ?? null,
+          responseDueAt: input.decision.sla.responseDueAt?.toISOString?.() ?? null,
+          reason: input.decision.sla.reason,
+        },
+      })
+    }
+
+    for (const suggestion of input.decision.suggestedActions ?? []) {
+      await this.logConversationTimelineEventOnce({
+        orgId: input.orgId,
+        action: 'WHATSAPP_ACTION_SUGGESTED',
+        conversationId: input.conversationId,
+        dedupeKey: `suggestion:${input.conversationId}:${suggestion.action}:${suggestion.relatedEntity?.entityId ?? 'none'}`,
+        customerId: input.customerId,
+        context: input.context,
+        metadata: {
+          ...base,
+          action: suggestion.action,
+          label: suggestion.label,
+          reason: suggestion.reason,
+          confidence: suggestion.confidence,
+          priority: suggestion.priority,
+          relatedEntity: suggestion.relatedEntity,
+        },
+      })
+    }
+  }
+
+  private async logConversationTimelineEventOnce(input: {
+    orgId: string
+    action: string
+    conversationId: string
+    dedupeKey: string
+    customerId: string | null
+    context: OperationalContextSnapshot
+    metadata: Record<string, unknown>
+  }) {
+    const existing = await this.prisma.timelineEvent.findFirst({
+      where: {
+        orgId: input.orgId,
+        action: input.action,
+        metadata: {
+          path: ['dedupeKey'],
+          equals: input.dedupeKey,
+        },
+      },
+      select: { id: true },
+    })
+    if (existing?.id) return null
+
+    return this.timeline.log({
+      orgId: input.orgId,
+      action: input.action,
+      customerId: input.customerId,
+      chargeId: input.context.chargeId ?? null,
+      appointmentId: input.context.appointmentId ?? null,
+      serviceOrderId: input.context.serviceOrderId ?? null,
+      metadata: {
+        ...input.metadata,
+        dedupeKey: input.dedupeKey,
+        conversationId: input.conversationId,
+        customerId: input.customerId,
+      },
+    }).catch(() => null)
   }
 
   private getMessageTypeTimelineAction(messageType: WhatsAppMessageType | null | undefined): string | null {

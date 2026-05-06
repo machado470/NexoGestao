@@ -65,6 +65,11 @@ export class WhatsAppController {
     return this.whatsapp.getContext(orgId, id)
   }
 
+  @Get('conversations/:id/intelligence')
+  async getConversationIntelligence(@Org() orgId: string, @Param('id') id: string) {
+    return this.whatsapp.getConversationIntelligence(orgId, id)
+  }
+
   @Post('conversations/:id/messages')
   @UseInterceptors(IdempotencyInterceptor)
   @Throttle({ default: { limit: 5, ttl: 60000 } })
