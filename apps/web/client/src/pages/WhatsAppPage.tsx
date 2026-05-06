@@ -11,14 +11,17 @@ import { useLocation } from "wouter";
 import { toast } from "sonner";
 import {
   CheckCheck,
+  CheckCircle2,
   EllipsisVertical,
   Info,
   MessageCircleMore,
   Paperclip,
+  PlayCircle,
   Search,
   Send,
   Star,
   Volume2,
+  XCircle,
 } from "lucide-react";
 
 import { trpc } from "@/lib/trpc";
@@ -46,6 +49,25 @@ type ContextType = "CUSTOMER" | "CHARGE" | "APPOINTMENT" | "SERVICE_ORDER" | "PA
 type MessageDirection = "INBOUND" | "OUTBOUND";
 type MessageStatus = "QUEUED" | "SENT" | "DELIVERED" | "READ" | "FAILED";
 type OperationalMessageType = "GENERAL" | "APPOINTMENT_CONFIRMATION" | "APPOINTMENT_REMINDER" | "SERVICE_UPDATE" | "PAYMENT_LINK" | "PAYMENT_REMINDER" | "PAYMENT_CONFIRMATION" | "CUSTOMER_NOTIFICATION";
+
+type WhatsAppSuggestedAction = "SEND_PAYMENT_LINK" | "CONFIRM_APPOINTMENT" | "RESCHEDULE_APPOINTMENT" | "SEND_SERVICE_UPDATE" | "ESCALATE_TO_OPERATOR" | "MARK_RESOLVED" | "REPLY_WITH_TEMPLATE";
+type WhatsAppActionExecutionStatus = "PENDING_APPROVAL" | "APPROVED" | "EXECUTED" | "FAILED" | "CANCELLED";
+
+type WhatsAppActionExecution = {
+  id: string;
+  conversationId: string;
+  suggestedAction: WhatsAppSuggestedAction;
+  status: WhatsAppActionExecutionStatus;
+  approvalRequired?: boolean | null;
+  executionReason?: string | null;
+  failureReason?: string | null;
+  createdAt?: string | null;
+  approvedAt?: string | null;
+  executedAt?: string | null;
+  failedAt?: string | null;
+  cancelledAt?: string | null;
+  conversation?: { id?: string; customerId?: string | null; phone?: string | null; title?: string | null; priority?: string | null; intent?: string | null } | null;
+};
 type Customer = { id?: string | number; name?: string; phone?: string | null; [key: string]: any };
 
 type Conversation = {
@@ -305,11 +327,64 @@ function getConversationBadges(conversation: Conversation) {
 function buildSuggestedAction(conversation?: Conversation, context?: WhatsAppContext | null) {
   if (!conversation) return null;
   if (conversation.hasFailedDelivery) return { key: "retry", label: "Reenviar mensagem" };
-  if (conversation.hasPendingCharge && conversation.hasNoResponse) return { key: "charge", label: "Cobrar novamente" };
-  if (context?.nextAppointment?.id && String(context?.nextAppointment?.status ?? "").toUpperCase() !== "CONFIRMED") {
-    return { key: "appointment", label: "Confirmar agendamento" };
+  if (conversation.hasPendingCharge && conversation.hasNoResponse) {
+    return {
+      key: "charge",
+      label: context?.openCharge?.paymentLink ? "Enviar link de pagamento" : "Enviar lembrete de cobrança",
+      executableAction: (context?.openCharge?.paymentLink ? "SEND_PAYMENT_LINK" : "REPLY_WITH_TEMPLATE") as WhatsAppSuggestedAction,
+    };
   }
-  return null;
+  if (context?.nextAppointment?.id && String(context?.nextAppointment?.status ?? "").toUpperCase() !== "CONFIRMED") {
+    return { key: "appointment", label: "Confirmar agendamento", executableAction: "CONFIRM_APPOINTMENT" as WhatsAppSuggestedAction };
+  }
+  if (context?.activeServiceOrder?.id) {
+    return { key: "service", label: "Enviar atualização da O.S.", executableAction: "SEND_SERVICE_UPDATE" as WhatsAppSuggestedAction };
+  }
+  return { key: "resolve", label: "Marcar conversa como resolvida", executableAction: "MARK_RESOLVED" as WhatsAppSuggestedAction };
+}
+
+function actionLabel(action?: string | null) {
+  const labels: Record<string, string> = {
+    SEND_PAYMENT_LINK: "Enviar link de pagamento",
+    CONFIRM_APPOINTMENT: "Confirmar agendamento",
+    RESCHEDULE_APPOINTMENT: "Reagendar agendamento",
+    SEND_SERVICE_UPDATE: "Atualizar O.S.",
+    ESCALATE_TO_OPERATOR: "Escalar para operador",
+    MARK_RESOLVED: "Marcar como resolvida",
+    REPLY_WITH_TEMPLATE: "Responder com template",
+  };
+  return labels[String(action ?? "")] ?? String(action ?? "Ação");
+}
+
+function executionStatusLabel(status?: string | null) {
+  const labels: Record<string, string> = {
+    PENDING_APPROVAL: "Aguardando aprovação",
+    APPROVED: "Aprovada",
+    EXECUTED: "Executada",
+    FAILED: "Falhou",
+    CANCELLED: "Cancelada",
+  };
+  return labels[String(status ?? "")] ?? String(status ?? "--");
+}
+
+function buildActionPayload(action: WhatsAppSuggestedAction, context?: WhatsAppContext | null) {
+  const entity = resolveEntityFromContext(context);
+  return {
+    entityType: entity.entityType,
+    entityId: entity.entityId,
+    customerName: context?.customer?.name,
+    paymentLink: context?.openCharge?.paymentLink,
+    chargeAmount: context?.openCharge?.amount,
+    chargeDueDate: context?.openCharge?.dueDate,
+    appointmentDate: context?.nextAppointment?.scheduledAt,
+    appointmentTime: context?.nextAppointment?.scheduledAt,
+    serviceOrderNumber: context?.activeServiceOrder?.number,
+    templateKey: action === "REPLY_WITH_TEMPLATE"
+      ? context?.openCharge?.id
+        ? "payment_reminder"
+        : "manual_followup"
+      : undefined,
+  };
 }
 
 function timeAgoLabel(value?: string | null) {
@@ -823,6 +898,93 @@ function ExecutionChatColumn({
   );
 }
 
+
+function ActionExecutionPanel({
+  pendingApprovals,
+  history,
+  isLoading,
+  onApprove,
+  onExecute,
+  onCancel,
+  isMutating,
+}: {
+  pendingApprovals: WhatsAppActionExecution[];
+  history: WhatsAppActionExecution[];
+  isLoading: boolean;
+  onApprove: (execution: WhatsAppActionExecution) => void;
+  onExecute: (execution: WhatsAppActionExecution) => void;
+  onCancel: (execution: WhatsAppActionExecution) => void;
+  isMutating: boolean;
+}) {
+  const recentHistory = history.slice(0, 5);
+  return (
+    <section className="px-1 py-1">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Execução assistida</p>
+          <p className="mt-1 text-[11px] text-[var(--text-muted)]">Aprovação humana para ações sensíveis.</p>
+        </div>
+        <span className="rounded-full border border-amber-300/25 bg-amber-300/10 px-2 py-0.5 text-[10px] text-amber-100">
+          {pendingApprovals.length} pendente(s)
+        </span>
+      </div>
+
+      {isLoading ? (
+        <div className="mt-3 space-y-2">
+          <AppSkeleton className="h-16 rounded-xl" />
+          <AppSkeleton className="h-12 rounded-xl" />
+        </div>
+      ) : pendingApprovals.length > 0 ? (
+        <div className="mt-3 space-y-2">
+          {pendingApprovals.slice(0, 3).map((execution) => (
+            <div key={execution.id} className="rounded-xl border border-amber-300/20 bg-amber-400/10 p-2.5">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-medium text-amber-50">{actionLabel(execution.suggestedAction)}</p>
+                  <p className="mt-0.5 text-[10px] text-amber-100/80">{execution.conversation?.title ?? executionStatusLabel(execution.status)}</p>
+                </div>
+                <span className="shrink-0 rounded-full bg-black/20 px-2 py-0.5 text-[10px] text-amber-100">HITL</span>
+              </div>
+              {execution.executionReason ? <p className="mt-2 line-clamp-2 text-[11px] text-amber-100/90">{execution.executionReason}</p> : null}
+              <div className="mt-2 grid grid-cols-3 gap-1.5">
+                <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-[10px]" disabled={isMutating} onClick={() => onApprove(execution)}>
+                  <CheckCircle2 className="mr-1 size-3" /> Aprovar
+                </Button>
+                <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-[10px]" disabled={isMutating} onClick={() => onExecute(execution)}>
+                  <PlayCircle className="mr-1 size-3" /> Executar
+                </Button>
+                <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-[10px]" disabled={isMutating} onClick={() => onCancel(execution)}>
+                  <XCircle className="mr-1 size-3" /> Cancelar
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-3 rounded-xl border border-white/[0.06] bg-white/[0.015] p-2.5 text-[11px] text-[var(--text-muted)]">
+          Nenhuma aprovação pendente para esta conversa.
+        </div>
+      )}
+
+      {recentHistory.length > 0 ? (
+        <div className="mt-3 space-y-1.5">
+          <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Histórico recente</p>
+          {recentHistory.map((execution) => (
+            <div key={execution.id} className="rounded-lg border border-white/[0.05] bg-white/[0.012] px-2.5 py-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="truncate text-[11px] text-[var(--text-secondary)]">{actionLabel(execution.suggestedAction)}</p>
+                <span className="shrink-0 text-[10px] text-[var(--text-muted)]">{executionStatusLabel(execution.status)}</span>
+              </div>
+              <p className="mt-0.5 text-[10px] text-[var(--text-muted)]">{fmtDateTime(execution.executedAt ?? execution.approvedAt ?? execution.createdAt)}</p>
+              {execution.failureReason ? <p className="mt-1 line-clamp-2 text-[10px] text-rose-300">{execution.failureReason}</p> : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 function OperationalContextColumn({
   context,
   conversation,
@@ -832,6 +994,13 @@ function OperationalContextColumn({
   onSendCharge,
   onSendReminder,
   onMoreActions,
+  pendingApprovals,
+  executionHistory,
+  isExecutionLoading,
+  onApproveExecution,
+  onExecuteExecution,
+  onCancelExecution,
+  isExecutionMutating,
   highlightedChargeId,
   highlightedAppointmentId,
   highlightedServiceOrderId,
@@ -844,6 +1013,13 @@ function OperationalContextColumn({
   onSendCharge: () => void;
   onSendReminder: () => void;
   onMoreActions: () => void;
+  pendingApprovals: WhatsAppActionExecution[];
+  executionHistory: WhatsAppActionExecution[];
+  isExecutionLoading: boolean;
+  onApproveExecution: (execution: WhatsAppActionExecution) => void;
+  onExecuteExecution: (execution: WhatsAppActionExecution) => void;
+  onCancelExecution: (execution: WhatsAppActionExecution) => void;
+  isExecutionMutating: boolean;
   highlightedChargeId?: string | null;
   highlightedAppointmentId?: string | null;
   highlightedServiceOrderId?: string | null;
@@ -895,6 +1071,16 @@ function OperationalContextColumn({
               Ver cliente
             </Button>
           </section>
+
+          <ActionExecutionPanel
+            pendingApprovals={pendingApprovals}
+            history={executionHistory}
+            isLoading={isExecutionLoading}
+            onApprove={onApproveExecution}
+            onExecute={onExecuteExecution}
+            onCancel={onCancelExecution}
+            isMutating={isExecutionMutating}
+          />
 
           <section className="px-1 py-1">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Próximo agendamento</p>
@@ -1329,10 +1515,32 @@ export default function WhatsAppPage() {
     { conversationId: selectedConversationRecordId ?? "" },
     { enabled: Boolean(selectedConversationRecordId), retry: false }
   );
+  const pendingApprovalsQuery = trpc.nexo.whatsapp.listPendingApprovals.useQuery(
+    { limit: 25 },
+    { enabled: Boolean(selectedConversationRecordId), retry: false }
+  );
+  const executionHistoryQuery = trpc.nexo.whatsapp.listExecutionHistory.useQuery(
+    { conversationId: selectedConversationRecordId ?? undefined, limit: 25 },
+    { enabled: Boolean(selectedConversationRecordId), retry: false }
+  );
 
   const sendMessageMutation = trpc.nexo.whatsapp.sendMessage.useMutation();
   const sendTemplateMutation = trpc.nexo.whatsapp.sendTemplate.useMutation();
   const retryMessageMutation = trpc.nexo.whatsapp.retryMessage.useMutation();
+  const requestExecutionMutation = trpc.nexo.whatsapp.requestExecution.useMutation();
+  const approveExecutionMutation = trpc.nexo.whatsapp.approveExecution.useMutation();
+  const executeExecutionMutation = trpc.nexo.whatsapp.executeExecution.useMutation();
+  const cancelExecutionMutation = trpc.nexo.whatsapp.cancelExecution.useMutation();
+
+  const pendingApprovals = useMemo(
+    () => (Array.isArray(pendingApprovalsQuery.data) ? (pendingApprovalsQuery.data as WhatsAppActionExecution[]) : [])
+      .filter(item => !selectedConversationRecordId || item.conversationId === selectedConversationRecordId),
+    [pendingApprovalsQuery.data, selectedConversationRecordId]
+  );
+  const executionHistory = useMemo(
+    () => (Array.isArray(executionHistoryQuery.data) ? (executionHistoryQuery.data as WhatsAppActionExecution[]) : []),
+    [executionHistoryQuery.data]
+  );
 
   const messages = useMemo(
     () =>
@@ -1416,6 +1624,74 @@ export default function WhatsAppPage() {
     () => buildSuggestedAction(selectedConversation, context),
     [context, selectedConversation]
   );
+  const refreshExecutionState = useCallback(async () => {
+    await Promise.all([
+      pendingApprovalsQuery.refetch(),
+      executionHistoryQuery.refetch(),
+      messagesQuery.refetch(),
+      conversationsQuery.refetch(),
+      contextQuery.refetch(),
+      conversationDetailsQuery.refetch(),
+    ]);
+  }, [conversationDetailsQuery, contextQuery, conversationsQuery, executionHistoryQuery, messagesQuery, pendingApprovalsQuery]);
+
+  const handleApproveExecution = useCallback(async (execution: WhatsAppActionExecution) => {
+    try {
+      await approveExecutionMutation.mutateAsync({ id: execution.id, reason: "Aprovado no cockpit WhatsApp" });
+      await refreshExecutionState();
+      toast.success("Workflow aprovado.");
+    } catch (error: any) {
+      toast.error(error?.message ?? "Falha ao aprovar workflow.");
+    }
+  }, [approveExecutionMutation, refreshExecutionState]);
+
+  const handleExecuteExecution = useCallback(async (execution: WhatsAppActionExecution) => {
+    try {
+      const target = execution.status === "PENDING_APPROVAL"
+        ? await approveExecutionMutation.mutateAsync({ id: execution.id, reason: "Aprovado para execução imediata no cockpit WhatsApp" }) as WhatsAppActionExecution
+        : execution;
+      await executeExecutionMutation.mutateAsync({ id: target.id, reason: "Executado no cockpit WhatsApp" });
+      await refreshExecutionState();
+      toast.success("Workflow executado.");
+    } catch (error: any) {
+      toast.error(error?.message ?? "Falha ao executar workflow.");
+    }
+  }, [approveExecutionMutation, executeExecutionMutation, refreshExecutionState]);
+
+  const handleCancelExecution = useCallback(async (execution: WhatsAppActionExecution) => {
+    try {
+      await cancelExecutionMutation.mutateAsync({ id: execution.id, reason: "Cancelado no cockpit WhatsApp" });
+      await refreshExecutionState();
+      toast.success("Workflow cancelado.");
+    } catch (error: any) {
+      toast.error(error?.message ?? "Falha ao cancelar workflow.");
+    }
+  }, [cancelExecutionMutation, refreshExecutionState]);
+
+  const handleRequestSuggestedExecution = useCallback(async () => {
+    if (!selectedConversationRecordId || !suggestedAction?.executableAction) {
+      toast.message("A ação sugerida precisa de uma conversa ativa.");
+      return;
+    }
+    try {
+      const execution = await requestExecutionMutation.mutateAsync({
+        conversationId: selectedConversationRecordId,
+        suggestedAction: suggestedAction.executableAction,
+        executionReason: suggestedAction.label,
+        actionPayload: buildActionPayload(suggestedAction.executableAction, context),
+        idempotencyKey: `whatsapp-ui:${selectedConversationRecordId}:${suggestedAction.executableAction}:${context?.openCharge?.id ?? context?.nextAppointment?.id ?? context?.activeServiceOrder?.id ?? context?.customer?.id ?? "general"}`,
+      }) as WhatsAppActionExecution;
+      await refreshExecutionState();
+      if (execution.status === "PENDING_APPROVAL") {
+        toast.success("Workflow criado e aguardando aprovação.");
+        return;
+      }
+      toast.success("Workflow executado com segurança.");
+    } catch (error: any) {
+      toast.error(error?.message ?? "Falha ao criar workflow sugerido.");
+    }
+  }, [context, refreshExecutionState, requestExecutionMutation, selectedConversationRecordId, suggestedAction]);
+
   const governanceAlert = useMemo(() => {
     if (!selectedConversation) return null;
     if (!selectedConversation.governanceSignal?.communicationFailure && !selectedConversation.hasFailedDelivery) return null;
@@ -1683,8 +1959,7 @@ export default function WhatsAppPage() {
             governanceAlert={governanceAlert}
             onRunSuggestedAction={() => {
               if (suggestedAction?.key === "retry") { void handleRetryLastFailed(); return; }
-              if (suggestedAction?.key === "charge") { void handleSendCharge(); return; }
-              if (suggestedAction?.key === "appointment") { handleTemplateChip("Confirmação de agendamento"); }
+              void handleRequestSuggestedExecution();
             }}
           />
         </div>
@@ -1699,6 +1974,13 @@ export default function WhatsAppPage() {
             onSendCharge={handleSendCharge}
             onSendReminder={handleSendReminder}
             onMoreActions={handleMoreActions}
+            pendingApprovals={pendingApprovals}
+            executionHistory={executionHistory}
+            isExecutionLoading={pendingApprovalsQuery.isLoading || pendingApprovalsQuery.isFetching || executionHistoryQuery.isLoading || executionHistoryQuery.isFetching}
+            onApproveExecution={handleApproveExecution}
+            onExecuteExecution={handleExecuteExecution}
+            onCancelExecution={handleCancelExecution}
+            isExecutionMutating={approveExecutionMutation.isPending || executeExecutionMutation.isPending || cancelExecutionMutation.isPending || requestExecutionMutation.isPending}
             highlightedChargeId={queryChargeId}
             highlightedAppointmentId={queryAppointmentId}
             highlightedServiceOrderId={queryServiceOrderId}
