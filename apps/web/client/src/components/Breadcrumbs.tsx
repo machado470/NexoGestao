@@ -30,6 +30,10 @@ const routeBreadcrumbs: Record<string, Breadcrumb[]> = {
   "/finances": [{ label: "Financeiro" }],
 
   "/whatsapp": [{ label: "WhatsApp" }],
+  "/whatsapp/webhooks": [
+    { label: "WhatsApp", href: "/whatsapp" },
+    { label: "Webhooks" },
+  ],
 
   "/timeline": [{ label: "Timeline" }],
 
