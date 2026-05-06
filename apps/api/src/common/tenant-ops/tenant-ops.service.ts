@@ -10,6 +10,7 @@ type TenantMetricEvent =
   | 'automation_blocked'
   | 'automation_throttled'
   | 'whatsapp_queued'
+  | 'whatsapp_inbound'
   | 'whatsapp_blocked'
   | 'finance_charge_create'
   | 'finance_charge_pay'
