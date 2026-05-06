@@ -12,6 +12,7 @@ import { QuotasModule } from '../quotas/quotas.module'
 import { WhatsAppTemplateService } from './whatsapp-template.service'
 import { WhatsAppContextService } from './whatsapp-context.service'
 import { WhatsAppAutomationService } from './whatsapp-automation.service'
+import { WhatsAppIntelligenceService } from './whatsapp-intelligence.service'
 import { IdempotencyCacheService } from '../common/idempotency/idempotency-cache.service'
 import { IdempotencyInterceptor } from '../common/idempotency/idempotency.interceptor'
 import { HealthModule } from '../health/health.module'
@@ -26,12 +27,13 @@ const testControllers = process.env.NODE_ENV === 'production' ? [] : [WhatsAppTe
     WhatsAppTemplateService,
     WhatsAppContextService,
     WhatsAppAutomationService,
+    WhatsAppIntelligenceService,
     WhatsAppDispatcherJob,
     WhatsAppProcessor,
     WhatsAppDlqProcessor,
     IdempotencyCacheService,
     IdempotencyInterceptor,
   ],
-  exports: [WhatsAppService, WhatsAppTemplateService, WhatsAppContextService, WhatsAppAutomationService],
+  exports: [WhatsAppService, WhatsAppTemplateService, WhatsAppContextService, WhatsAppAutomationService, WhatsAppIntelligenceService],
 })
 export class WhatsAppModule {}

@@ -761,6 +761,10 @@ export const nexoProxyRouter = router({
       .input(z.object({ conversationId: z.string().min(1) }))
       .query(async ({ ctx, input }) => authedGet(ctx as CtxLike, `/whatsapp/conversations/${input.conversationId}/context`)),
 
+    getIntelligence: protectedProcedure
+      .input(z.object({ conversationId: z.string().min(1) }))
+      .query(async ({ ctx, input }) => authedGet(ctx as CtxLike, `/whatsapp/conversations/${input.conversationId}/intelligence`)),
+
     sendMessage: protectedProcedure
       .input(z.object({
         conversationId: z.string().min(1).optional(),

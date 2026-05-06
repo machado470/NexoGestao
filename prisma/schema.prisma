@@ -577,12 +577,22 @@ model WhatsAppConversation {
   title          String?
   status         WhatsAppConversationStatus  @default(OPEN)
   priority       WhatsAppConversationPriority @default(MEDIUM)
+  priorityReason String?
+  intent         WhatsAppInboundIntent        @default(GENERAL_INTENT)
+  intentReason   String?
+  intentConfidence Float?
   assignedUserId String?
   contextType    WhatsAppContextType         @default(GENERAL)
   contextId      String?
   lastMessageAt  DateTime?
   lastInboundAt  DateTime?
   lastOutboundAt DateTime?
+  waitingSince   DateTime?
+  responseDueAt  DateTime?
+  slaStatus      WhatsAppSlaStatus           @default(OK)
+  suggestedActions Json?
+  intelligenceExplanation Json?
+  intelligenceVersion Int                    @default(1)
   unreadCount    Int                         @default(0)
   createdAt      DateTime                    @default(now())
   updatedAt      DateTime                    @updatedAt
@@ -599,6 +609,8 @@ model WhatsAppConversation {
   @@index([orgId, customerId, lastMessageAt])
   @@index([orgId, priority, lastMessageAt])
   @@index([orgId, priority, unreadCount, lastMessageAt])
+  @@index([orgId, intent, lastInboundAt])
+  @@index([orgId, slaStatus, responseDueAt])
 }
 
 model WhatsAppTemplate {
@@ -896,6 +908,33 @@ enum WhatsAppConversationPriority {
   NORMAL
   HIGH
   CRITICAL
+}
+
+enum WhatsAppInboundIntent {
+  PAYMENT_INTENT
+  RESCHEDULE_INTENT
+  CANCELLATION_INTENT
+  COMPLAINT_INTENT
+  QUOTE_REQUEST_INTENT
+  SERVICE_STATUS_INTENT
+  GENERAL_INTENT
+}
+
+enum WhatsAppSlaStatus {
+  OK
+  WARNING
+  BREACHED
+}
+
+enum WhatsAppSuggestedAction {
+  SEND_PAYMENT_LINK
+  CONFIRM_APPOINTMENT
+  RESCHEDULE_APPOINTMENT
+  OPEN_SERVICE_ORDER
+  SEND_SERVICE_UPDATE
+  ESCALATE_TO_OPERATOR
+  MARK_RESOLVED
+  REPLY_WITH_TEMPLATE
 }
 
 enum WhatsAppContextType {
