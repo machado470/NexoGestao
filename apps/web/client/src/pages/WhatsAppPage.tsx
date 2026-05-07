@@ -11,6 +11,7 @@ import { useLocation } from "wouter";
 import { toast } from "sonner";
 import {
   CheckCheck,
+  ChevronDown,
   EllipsisVertical,
   Info,
   MessageCircleMore,
@@ -36,14 +37,16 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { AppPageLoadingState } from "@/components/internal-page-system";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import {
   WhatsAppActionExecutionPanel,
   type WhatsAppActionExecution,
@@ -76,6 +79,108 @@ type OperationalMessageType =
   | "PAYMENT_REMINDER"
   | "PAYMENT_CONFIRMATION"
   | "CUSTOMER_NOTIFICATION";
+
+const INTENT_OPTIONS: Array<{
+  value: ComposerIntent;
+  label: string;
+}> = [
+  { value: "PAYMENT", label: "Cobrança" },
+  { value: "APPOINTMENT", label: "Agendamento" },
+  { value: "SERVICE_UPDATE", label: "Atualização de serviço" },
+  { value: "GENERAL", label: "Geral" },
+];
+
+type ComposerIntent = "PAYMENT" | "APPOINTMENT" | "SERVICE_UPDATE" | "GENERAL";
+
+type ComposerActionGroupName =
+  | "Comunicação"
+  | "Operacional"
+  | "Execução assistida";
+
+type ComposerActionDescriptor = {
+  key: string;
+  label: string;
+  group: ComposerActionGroupName;
+  disabled?: boolean;
+  reason?: string;
+};
+
+export function buildWhatsAppComposerActionGroups({
+  hasSuggestedAction,
+}: {
+  hasSuggestedAction: boolean;
+}): Record<ComposerActionGroupName, ComposerActionDescriptor[]> {
+  return {
+    Comunicação: [
+      { key: "quick-template", label: "Template rápido", group: "Comunicação" },
+      {
+        key: "attach-file",
+        label: "Anexar arquivo",
+        group: "Comunicação",
+        disabled: true,
+        reason: "Em breve",
+      },
+      {
+        key: "send-image-document",
+        label: "Enviar imagem/documento",
+        group: "Comunicação",
+        disabled: true,
+        reason: "Em breve",
+      },
+      {
+        key: "audio-recording",
+        label: "Áudio / gravação",
+        group: "Comunicação",
+        disabled: true,
+        reason: "Em breve",
+      },
+    ],
+    Operacional: [
+      { key: "send-charge", label: "Enviar cobrança", group: "Operacional" },
+      {
+        key: "send-payment-link",
+        label: "Enviar link de pagamento",
+        group: "Operacional",
+      },
+      {
+        key: "confirm-appointment",
+        label: "Confirmar agendamento",
+        group: "Operacional",
+      },
+      {
+        key: "update-service",
+        label: "Atualizar serviço",
+        group: "Operacional",
+      },
+      {
+        key: "link-service-order",
+        label: "Vincular O.S.",
+        group: "Operacional",
+      },
+      {
+        key: "mark-resolved",
+        label: "Marcar conversa como resolvida",
+        group: "Operacional",
+      },
+    ],
+    "Execução assistida": [
+      {
+        key: "create-assisted-execution",
+        label: "Criar execução assistida",
+        group: "Execução assistida",
+        disabled: !hasSuggestedAction,
+        reason: hasSuggestedAction ? undefined : "Sem ação sugerida",
+      },
+      {
+        key: "suggested-follow-up",
+        label: "Follow-up / ação sugerida",
+        group: "Execução assistida",
+        disabled: !hasSuggestedAction,
+        reason: hasSuggestedAction ? undefined : "Sem ação sugerida",
+      },
+    ],
+  };
+}
 
 type Customer = {
   id?: string | number;
@@ -729,7 +834,9 @@ function ExecutionChatColumn({
   onOpenAppointment,
   onOpenServiceOrder,
   onFillTemplate,
-  canMarkAsPaid,
+  onSendCharge,
+  onRequestSuggestedExecution,
+  canSendPaymentLink,
   suggestedActionLabel,
   governanceAlert,
   onRunSuggestedAction,
@@ -742,10 +849,8 @@ function ExecutionChatColumn({
   sendMessage: () => void;
   content: string;
   setContent: (value: string) => void;
-  selectedIntent: "PAYMENT" | "APPOINTMENT" | "SERVICE_UPDATE" | "GENERAL";
-  setSelectedIntent: (
-    value: "PAYMENT" | "APPOINTMENT" | "SERVICE_UPDATE" | "GENERAL"
-  ) => void;
+  selectedIntent: ComposerIntent;
+  setSelectedIntent: (value: ComposerIntent) => void;
   onToggleFavorite: () => void;
   isFavorite: boolean;
   onInfo: () => void;
@@ -756,7 +861,9 @@ function ExecutionChatColumn({
   onOpenAppointment: () => void;
   onOpenServiceOrder: () => void;
   onFillTemplate: (template: string) => void;
-  canMarkAsPaid: boolean;
+  onSendCharge: () => void;
+  onRequestSuggestedExecution: () => void;
+  canSendPaymentLink: boolean;
   suggestedActionLabel?: string | null;
   governanceAlert?: string | null;
   onRunSuggestedAction: () => void;
@@ -911,97 +1018,6 @@ function ExecutionChatColumn({
 
       <footer className="shrink-0 mt-0 border-y border-white/[0.06] bg-white/[0.02]">
         <div className="flex items-center gap-2 border-t border-white/[0.06] px-3 py-2.5">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-9 shrink-0 px-3 text-[11px]"
-                disabled={!hasConversation}
-              >
-                Enviar mensagem
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="start" className="w-72 p-2">
-              <div className="space-y-1">
-                {QUICK_COMPOSER_TEMPLATES.map(template => (
-                  <Button
-                    key={template}
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    className="h-8 w-full justify-start px-2 text-[11px]"
-                    onClick={() => onFillTemplate(template)}
-                  >
-                    {template}
-                  </Button>
-                ))}
-              </div>
-            </PopoverContent>
-          </Popover>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-9 shrink-0 px-3 text-[11px]"
-                disabled={!hasConversation}
-              >
-                Mais ações
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56">
-              <DropdownMenuItem onClick={onOpenCustomer}>
-                Abrir cliente
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onOpenFinance}>
-                Abrir financeiro
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => onFillTemplate("Cobrança pendente")}
-              >
-                Enviar cobrança
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => onFillTemplate("Confirmação de agendamento")}
-              >
-                Confirmar agendamento
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onMoreActions}>
-                Atualizar status
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onOpenServiceOrder}>
-                Abrir O.S.
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <button
-            type="button"
-            className="rounded-lg p-2 enabled:hover:bg-white/10 disabled:opacity-45"
-            disabled={!hasConversation}
-          >
-            <MessageCircleMore className="size-4" />
-          </button>
-          <button
-            type="button"
-            className="rounded-lg p-2 enabled:hover:bg-white/10 disabled:opacity-45"
-            disabled={!hasConversation}
-          >
-            <Paperclip className="size-4" />
-          </button>
-          <select
-            value={selectedIntent}
-            onChange={event => setSelectedIntent(event.target.value as any)}
-            className="h-9 rounded-lg bg-white/[0.02] px-2 text-xs"
-            disabled={!hasConversation}
-          >
-            <option value="PAYMENT">Payment</option>
-            <option value="APPOINTMENT">Appointment</option>
-            <option value="SERVICE_UPDATE">Service update</option>
-            <option value="GENERAL">General</option>
-          </select>
           <input
             value={content}
             onChange={event => canCompose && setContent(event.target.value)}
@@ -1013,22 +1029,197 @@ function ExecutionChatColumn({
             disabled={!hasConversation || !canCompose}
             className="h-9 min-w-0 flex-1 rounded-lg bg-white/[0.02] px-3 text-sm outline-none placeholder:text-[var(--text-muted)]/70"
           />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-9 shrink-0 gap-1.5 px-3 text-[11px]"
+                disabled={!hasConversation}
+                aria-label="Mais ações da conversa"
+              >
+                Mais ações
+                <ChevronDown className="size-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-72">
+              <DropdownMenuLabel className="px-2 py-1.5 text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+                Comunicação
+              </DropdownMenuLabel>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <MessageCircleMore className="size-4" />
+                  Template rápido
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="w-64">
+                  {QUICK_COMPOSER_TEMPLATES.map(template => (
+                    <DropdownMenuItem
+                      key={template}
+                      onClick={() => onFillTemplate(template)}
+                    >
+                      {template}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  Intenção:{" "}
+                  {
+                    INTENT_OPTIONS.find(
+                      option => option.value === selectedIntent
+                    )?.label
+                  }
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="w-56">
+                  <DropdownMenuRadioGroup
+                    value={selectedIntent}
+                    onValueChange={value =>
+                      setSelectedIntent(value as ComposerIntent)
+                    }
+                  >
+                    {INTENT_OPTIONS.map(option => (
+                      <DropdownMenuRadioItem
+                        key={option.value}
+                        value={option.value}
+                      >
+                        {option.label}
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+              <DropdownMenuItem disabled>
+                <Paperclip className="size-4" />
+                <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                  <span>Anexar arquivo</span>
+                  <span className="text-[10px] text-[var(--text-muted)]">
+                    Em breve
+                  </span>
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled>
+                <Paperclip className="size-4" />
+                <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                  <span>Enviar imagem/documento</span>
+                  <span className="text-[10px] text-[var(--text-muted)]">
+                    Em breve
+                  </span>
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled>
+                <Volume2 className="size-4" />
+                <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                  <span>Áudio / gravação</span>
+                  <span className="text-[10px] text-[var(--text-muted)]">
+                    Em breve
+                  </span>
+                </span>
+              </DropdownMenuItem>
+
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="px-2 py-1.5 text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+                Operacional
+              </DropdownMenuLabel>
+              <DropdownMenuItem onClick={onSendCharge}>
+                Enviar cobrança
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={onSendCharge}
+                disabled={!canSendPaymentLink}
+              >
+                <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                  <span>Enviar link de pagamento</span>
+                  {!canSendPaymentLink ? (
+                    <span className="text-[10px] text-[var(--text-muted)]">
+                      Sem link
+                    </span>
+                  ) : null}
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onFillTemplate("Confirmação de agendamento")}
+              >
+                Confirmar agendamento
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onFillTemplate("Atualização de O.S.")}
+              >
+                Atualizar serviço
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onOpenServiceOrder}>
+                Vincular O.S.
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={onRunSuggestedAction}
+                disabled={
+                  suggestedActionLabel !== "Marcar conversa como resolvida"
+                }
+              >
+                <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                  <span>Marcar conversa como resolvida</span>
+                  {suggestedActionLabel !== "Marcar conversa como resolvida" ? (
+                    <span className="text-[10px] text-[var(--text-muted)]">
+                      Indisponível
+                    </span>
+                  ) : null}
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onOpenCustomer}>
+                Abrir cliente
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onOpenFinance}>
+                Abrir financeiro
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onOpenAppointment}>
+                Abrir agendamento
+              </DropdownMenuItem>
+
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="px-2 py-1.5 text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+                Execução assistida
+              </DropdownMenuLabel>
+              <DropdownMenuItem
+                onClick={onRequestSuggestedExecution}
+                disabled={!suggestedActionLabel}
+              >
+                <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                  <span>Criar execução assistida</span>
+                  {!suggestedActionLabel ? (
+                    <span className="text-[10px] text-[var(--text-muted)]">
+                      Sem ação sugerida
+                    </span>
+                  ) : null}
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={onRunSuggestedAction}
+                disabled={!suggestedActionLabel}
+              >
+                <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                  <span>
+                    {suggestedActionLabel ?? "Follow-up / ação sugerida"}
+                  </span>
+                  {!suggestedActionLabel ? (
+                    <span className="text-[10px] text-[var(--text-muted)]">
+                      Sem ação sugerida
+                    </span>
+                  ) : null}
+                </span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button
             type="button"
             size="sm"
             className="h-9 rounded-full bg-emerald-600/85 px-3 hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-45"
             onClick={sendMessage}
             disabled={!hasConversation || !canCompose}
+            aria-label="Enviar mensagem"
           >
             <Send className="size-3.5" />
           </Button>
-          <button
-            type="button"
-            className="shrink-0 rounded-lg p-2 enabled:hover:bg-white/10 disabled:opacity-45"
-            disabled={!hasConversation}
-          >
-            <Volume2 className="size-4" />
-          </button>
         </div>
       </footer>
       {error ? (
@@ -1391,9 +1582,11 @@ export default function WhatsAppPage() {
     "nexo.whatsapp.composer.v2",
     ""
   );
-  const [selectedIntent, setSelectedIntent] = useOperationalMemoryState<
-    "PAYMENT" | "APPOINTMENT" | "SERVICE_UPDATE" | "GENERAL"
-  >("nexo.whatsapp.intent.v1", "GENERAL");
+  const [selectedIntent, setSelectedIntent] =
+    useOperationalMemoryState<ComposerIntent>(
+      "nexo.whatsapp.intent.v1",
+      "GENERAL"
+    );
   const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
   const [isContextVisible, setIsContextVisible] = useState(true);
   const [composerError, setComposerError] = useState<string | null>(null);
@@ -2493,7 +2686,11 @@ export default function WhatsAppPage() {
               )
             }
             onFillTemplate={handleTemplateChip}
-            canMarkAsPaid={Boolean(context?.openCharge?.id)}
+            onSendCharge={() => void handleSendCharge()}
+            onRequestSuggestedExecution={() =>
+              void handleRequestSuggestedExecution()
+            }
+            canSendPaymentLink={Boolean(context?.openCharge?.paymentLink)}
             suggestedActionLabel={suggestedAction?.label ?? null}
             governanceAlert={governanceAlert}
             onRunSuggestedAction={() => {
