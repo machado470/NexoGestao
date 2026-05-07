@@ -92,7 +92,7 @@ export function ExecutionGlobalBar() {
     return "Engine ativa";
   }, [selectedMode, summary.blockedRecent]);
 
-  if (import.meta.env.DEV) {
+  if (import.meta.env.DEV && import.meta.env.VITE_BOOT_DIAGNOSTICS === "true") {
     // eslint-disable-next-line no-console
     console.log("[boot] execution bar render", {
       canRenderBar,

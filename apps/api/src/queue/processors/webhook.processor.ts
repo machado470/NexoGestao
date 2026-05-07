@@ -17,7 +17,12 @@ export class WebhookProcessor implements OnModuleInit, OnModuleDestroy {
     private readonly webhookService: WebhookService,
   ) {}
 
-  onModuleInit() {
+  async onModuleInit() {
+    if (!(await this.queueService.ensureEnabled())) {
+      this.logger.warn('Webhook worker não iniciado: Redis/fila em modo degradado')
+      return
+    }
+
     try {
       this.worker = new Worker(
         QUEUE_NAMES.WEBHOOKS,
@@ -60,6 +65,10 @@ export class WebhookProcessor implements OnModuleInit, OnModuleDestroy {
         },
         { connection: this.connection },
       )
+
+      this.worker.on('error', (error) => {
+        this.logger.error(`Webhook worker error: ${error.message}`)
+      })
 
       this.logger.log('Webhook worker iniciado')
     } catch (err) {

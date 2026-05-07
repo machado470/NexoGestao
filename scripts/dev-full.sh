@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 API_PORT="${API_PORT:-3000}"
-WEB_PORT="${PORT:-3010}"
+WEB_PORT="${WEB_PORT:-${PORT:-3010}}"
 NEXO_API_URL="${NEXO_API_URL:-http://localhost:${API_PORT}}"
 ALLOW_KILL="${NEXO_KILL_STALE_DEV_PROCESSES:-0}"
 RESET_MODE="${NEXO_DEV_RESET:-0}"
@@ -32,7 +32,7 @@ ensure_env_file() {
 }
 
 validate_required_env() {
-  local required=(DATABASE_URL REDIS_URL API_PORT PORT)
+  local required=(DATABASE_URL REDIS_URL API_PORT WEB_PORT NEXO_API_URL)
   local missing=()
 
   for key in "${required[@]}"; do
@@ -301,12 +301,12 @@ API_PID=$!
 kill -0 "$API_PID" >/dev/null 2>&1 || fail "API falhou no boot. Veja logs: $API_LOG_FILE"
 wait_tcp 127.0.0.1 "$API_PORT" 120 || fail "API não abriu porta $API_PORT. Veja logs: $API_LOG_FILE"
 log "[READY] API porta OK"
-wait_http "http://127.0.0.1:${API_PORT}/health" 120 || fail "API falhou no /health. Veja logs: $API_LOG_FILE"
-log "[READY] API /health OK"
+wait_http "http://127.0.0.1:${API_PORT}/v1/health" 120 || fail "API falhou no /v1/health. Veja logs: $API_LOG_FILE"
+log "[READY] API /v1/health OK"
 
 # 8) subir WEB
 log "[BOOT] iniciando WEB..."
-PORT="$WEB_PORT" NEXO_API_URL="$NEXO_API_URL" pnpm --filter ./apps/web run dev > "$WEB_LOG_FILE" 2>&1 &
+WEB_PORT="$WEB_PORT" PORT="$WEB_PORT" NEXO_API_URL="$NEXO_API_URL" pnpm --filter ./apps/web run dev > "$WEB_LOG_FILE" 2>&1 &
 WEB_PID=$!
 
 # 9) validar root web

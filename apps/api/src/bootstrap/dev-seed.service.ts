@@ -10,7 +10,10 @@ const PILOT_ADMIN_PASSWORD = 'Piloto@Admin123'
 
 function shouldRunDevSeed() {
   const nodeEnv = (process.env.NODE_ENV ?? '').toLowerCase().trim()
-  return !nodeEnv || nodeEnv === 'development'
+  const seedEnabled = (process.env.NEXO_DEV_SEED ?? '').trim() === '1'
+  const seedMode = (process.env.SEED_MODE ?? 'basic').trim().toLowerCase()
+
+  return seedEnabled && nodeEnv !== 'production' && ['basic', 'pilot'].includes(seedMode)
 }
 
 @Injectable()
@@ -20,7 +23,10 @@ export class DevSeedService implements OnModuleInit {
   constructor(private readonly prisma: PrismaService) {}
 
   async onModuleInit() {
-    if (!shouldRunDevSeed()) return
+    if (!shouldRunDevSeed()) {
+      this.logger.log('[BOOT][DevSeed] seed explícito desabilitado (NEXO_DEV_SEED=1 SEED_MODE=basic para habilitar).')
+      return
+    }
 
     try {
       await this.ensurePilotAdmin()
@@ -102,7 +108,7 @@ export class DevSeedService implements OnModuleInit {
     })
 
     this.logger.warn(
-      `[BOOT][DevSeed] Dados piloto verificados para ${PILOT_ADMIN_EMAIL} (${PILOT_ORG_SLUG}) em NODE_ENV!=production`,
+      `[BOOT][DevSeed] Seed básico verificado para ${PILOT_ADMIN_EMAIL} (${PILOT_ORG_SLUG}) em NODE_ENV!=production`,
     )
   }
 }

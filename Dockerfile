@@ -17,7 +17,7 @@ RUN npm install -g pnpm @nestjs/cli
 # manifests do workspace
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json apps/api/package.json
-
+COPY packages/common/package.json packages/common/package.json
 
 RUN pnpm install --frozen-lockfile
 

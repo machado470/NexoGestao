@@ -39,13 +39,13 @@ async function startServer() {
     serveStatic(app);
   }
 
-  const port = Number(process.env.PORT || "3010");
+  const port = Number(process.env.WEB_PORT || process.env.PORT || "3010");
 
   server.on("error", (error: NodeJS.ErrnoException) => {
     if (error.code === "EADDRINUSE") {
       console.error(
         `[web] Falha ao iniciar: porta ${port} já está em uso. ` +
-          `[web] Sugestão: tente PORT=${port + 1} ou finalize o processo atual.`
+          `[web] Sugestão: tente WEB_PORT=${port + 1} ou finalize o processo atual.`
       );
     }
     throw error;
@@ -55,7 +55,7 @@ async function startServer() {
     const address = server.address() as AddressInfo | null;
     const finalPort = address?.port ?? port;
     console.log(`[web] Server running on http://localhost:${finalPort}/`);
-    console.log(`[web] PORT=${finalPort}`);
+    console.log(`[web] WEB_PORT=${finalPort}`);
     const nexoApi = getNexoApiResolutionMetadata();
     console.log(
       `[web] NEXO_API_URL resolved=${nexoApi.resolved} configured=${nexoApi.configured ?? "default"} ` +

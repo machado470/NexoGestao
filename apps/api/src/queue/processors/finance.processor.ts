@@ -16,7 +16,12 @@ export class FinanceProcessor implements OnModuleInit, OnModuleDestroy {
     private readonly queueService: QueueService,
   ) {}
 
-  onModuleInit() {
+  async onModuleInit() {
+    if (!(await this.queueService.ensureEnabled())) {
+      this.logger.warn('Finance worker não iniciado: Redis/fila em modo degradado')
+      return
+    }
+
     try {
       this.worker = new Worker(
         QUEUE_NAMES.FINANCE,
@@ -47,6 +52,10 @@ export class FinanceProcessor implements OnModuleInit, OnModuleDestroy {
         },
         { connection: this.connection },
       )
+
+      this.worker.on('error', (error) => {
+        this.logger.error(`Finance worker error: ${error.message}`)
+      })
 
       this.logger.log('Finance worker iniciado')
     } catch (err) {

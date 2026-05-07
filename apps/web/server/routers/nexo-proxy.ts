@@ -388,7 +388,7 @@ export const nexoProxyRouter = router({
           throw new Error("Login não retornou token.");
         }
 
-        console.log("[auth.login] token:", token);
+        console.info("[auth.login] session established");
         setTokenCookie(ctx as CtxLike, token);
 
         return result;
@@ -476,19 +476,33 @@ export const nexoProxyRouter = router({
       )
       .mutation(async ({ input, ctx }) => {
         const rawToken = input.token.trim();
-        const result = await nexoFetch("/me", {
-          headers: {
-            Authorization: `Bearer ${rawToken}`,
-          },
-        });
-
         setTokenCookie(ctx as CtxLike, rawToken);
 
-        return {
-          success: true,
-          token: rawToken,
-          me: result,
-        };
+        try {
+          const result = await nexoFetch("/me", {
+            headers: {
+              Authorization: `Bearer ${rawToken}`,
+            },
+          });
+
+          return {
+            success: true,
+            validated: true,
+            token: rawToken,
+            me: result,
+          };
+        } catch (error) {
+          console.warn("[auth.establishSession] sessão persistida; validação /me indisponível", {
+            reason: error instanceof Error ? error.message : String(error),
+          });
+
+          return {
+            success: true,
+            validated: false,
+            token: rawToken,
+            me: null,
+          };
+        }
       }),
 
     verifyEmail: publicProcedure

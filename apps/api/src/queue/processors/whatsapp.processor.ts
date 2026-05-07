@@ -280,7 +280,12 @@ export class WhatsAppProcessor implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  onModuleInit() {
+  async onModuleInit() {
+    if (!(await this.queueService.ensureEnabled())) {
+      this.logger.warn('WhatsApp worker não iniciado: Redis/fila em modo degradado')
+      return
+    }
+
     try {
       this.worker = new Worker(
         QUEUE_NAMES.WHATSAPP,
@@ -291,6 +296,10 @@ export class WhatsAppProcessor implements OnModuleInit, OnModuleDestroy {
           limiter: { max: 10, duration: 1000 },
         },
       )
+
+      this.worker.on('error', (error) => {
+        this.logger.error(`WhatsApp worker error: ${error.message}`)
+      })
 
       this.worker.on('failed', async (job, err) =>
         this.handleFailedJob(job ?? undefined, err),

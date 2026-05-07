@@ -16,7 +16,12 @@ export class AutomationProcessor implements OnModuleInit, OnModuleDestroy {
     private readonly queueService: QueueService,
   ) {}
 
-  onModuleInit() {
+  async onModuleInit() {
+    if (!(await this.queueService.ensureEnabled())) {
+      this.logger.warn('Automation worker não iniciado: Redis/fila em modo degradado')
+      return
+    }
+
     try {
       this.worker = new Worker(
         QUEUE_NAMES.AUTOMATION,
@@ -40,6 +45,10 @@ export class AutomationProcessor implements OnModuleInit, OnModuleDestroy {
         },
         { connection: this.connection },
       )
+
+      this.worker.on('error', (error) => {
+        this.logger.error(`Automation worker error: ${error.message}`)
+      })
 
       this.logger.log('Automation worker iniciado')
     } catch (err) {
