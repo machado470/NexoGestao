@@ -12,15 +12,14 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
   private readonly schedulerMap = new Map<QueueName, JobScheduler>()
   private connectionInitPromise?: Promise<void>
   private hasLoggedAlreadyConnecting = false
+  private hasLoggedActive = false
   private redisEnabled = true
 
   constructor(
     @Inject(QUEUE_CONNECTION)
     private readonly connection: IORedis,
     private readonly prisma: PrismaService,
-  ) {
-    this.registerQueues()
-  }
+  ) {}
 
   async onModuleInit() {
     await this.ensureEnabled()
@@ -35,8 +34,12 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
 
     try {
       await this.ensureRedisReady()
+      this.registerQueuesOnce()
       this.redisEnabled = true
-      this.logger.log(`Queue ativa: ${Object.values(QUEUE_NAMES).join(', ')}`)
+      if (!this.hasLoggedActive) {
+        this.hasLoggedActive = true
+        this.logger.log(`Queue ativa: ${Object.values(QUEUE_NAMES).join(', ')}`)
+      }
       return true
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
@@ -144,7 +147,9 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     })
   }
 
-  private registerQueues() {
+  private registerQueuesOnce() {
+    if (this.queueMap.size > 0) return
+
     for (const queueName of Object.values(QUEUE_NAMES)) {
       const opts: QueueOptions = {
         connection: this.connection,
