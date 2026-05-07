@@ -1,5 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import type { Context } from "./context";
+import { isAdminRole } from "./roles";
 
 /**
  * Valida se o usuário tem acesso à organização especificada
@@ -27,7 +28,7 @@ export function ensureOrgAccess(ctx: Context, targetOrgId: string | number) {
  * Valida se o usuário é admin da organização
  */
 export function ensureAdminAccess(ctx: Context) {
-  if (ctx.user?.role?.toUpperCase() !== "ADMIN") {
+  if (!isAdminRole(ctx.user?.role)) {
     throw new TRPCError({
       code: "FORBIDDEN",
       message: "Acesso negado. Apenas administradores podem realizar esta ação.",

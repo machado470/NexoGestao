@@ -23,14 +23,27 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleInit() {
+    await this.ensureEnabled()
+  }
+
+  isEnabled() {
+    return this.redisEnabled && (this.connection.status === 'ready' || this.connection.status === 'connect')
+  }
+
+  async ensureEnabled() {
+    if (!this.redisEnabled) return false
+
     try {
       await this.ensureRedisReady()
+      this.redisEnabled = true
       this.logger.log(`Queue ativa: ${Object.values(QUEUE_NAMES).join(', ')}`)
+      return true
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
       this.redisEnabled = false
       this.logger.error(`Redis indisponível no bootstrap da fila: ${msg}`)
       this.logger.warn('Fila em modo degradado (sem Redis): jobs serão ignorados em ambiente local.')
+      return false
     }
   }
 
@@ -220,10 +233,12 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
   }
 
   async getQueueStatus() {
-    if (!this.redisEnabled) {
+    if (!this.isEnabled()) {
       return {
+        ok: false,
         redisEnabled: false,
-        reason: 'Redis indisponível no ambiente local',
+        reason: 'Redis indisponível no ambiente atual',
+        status: this.connection.status,
       }
     }
 

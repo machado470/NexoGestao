@@ -32,7 +32,7 @@ export function GlobalActionEngine() {
   const serviceOrders = useMemo(() => toArray<any>(serviceOrdersQuery.data ?? []), [serviceOrdersQuery.data]);
   const charges = useMemo(() => toArray<any>(chargesQuery.data ?? []), [chargesQuery.data]);
 
-  if (import.meta.env.DEV) {
+  if (import.meta.env.DEV && import.meta.env.VITE_BOOT_DIAGNOSTICS === "true") {
     // eslint-disable-next-line no-console
     console.log("[boot] global action engine render", {
       loading,

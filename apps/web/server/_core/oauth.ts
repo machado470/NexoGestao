@@ -273,7 +273,7 @@ async function establishSessionInApi(googleUser: {
     throw new Error("google_session_token_missing");
   }
 
-  console.log("[auth.google] token:", token);
+  console.info("[auth.google] session token received");
   return { token, payload };
 }
 

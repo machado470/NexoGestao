@@ -33,10 +33,15 @@ services:
       dockerfile: Dockerfile
     container_name: nexogestao_api
     env_file:
-      - .env.docker
+      - path: .env.docker
+        required: false
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/nexogestao?schema=public
       NODE_ENV: production
+      API_PORT: "3000"
+      WEB_PORT: "3010"
+      NEXO_API_URL: http://api:3000
+      JWT_SECRET: ${JWT_SECRET:-change-me-docker-local}
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       AUTO_MIGRATE: "1"

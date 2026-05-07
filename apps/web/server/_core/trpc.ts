@@ -3,6 +3,7 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import cookie from "cookie";
 import type { TrpcContext } from "./context";
+import { isAdminRole } from "./roles";
 
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
@@ -68,7 +69,7 @@ export const adminProcedure = t.procedure.use(
       throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
     }
 
-    if (ctx.user?.role !== "admin") {
+    if (!isAdminRole(ctx.user?.role)) {
       throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
     }
 

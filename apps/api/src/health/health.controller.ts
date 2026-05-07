@@ -1,4 +1,4 @@
-import { Controller, Get, Logger, Optional, Query } from '@nestjs/common'
+import { Controller, Get, Logger, Optional, Query, ServiceUnavailableException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { PrismaService } from '../prisma/prisma.service'
 import { MetricsService } from '../common/metrics/metrics.service'
@@ -115,7 +115,73 @@ export class HealthController {
   }
 
   @Get('readiness')
-  readiness() {
+  async readiness() {
+    const startedAt = Date.now()
+    const checks = await this.collectCriticalChecks()
+    const ok = checks.database.ok && checks.prismaClient.ok && checks.queue.ok
+
+    const body = {
+      status: ok ? 'ready' : 'not_ready',
+      timestamp: new Date().toISOString(),
+      latencyMs: Date.now() - startedAt,
+      checks,
+      notes: [
+        '[READY] /health/readiness valida dependências críticas de operação.',
+        '[OPTIONAL] Stripe/Google OAuth/Resend/WhatsApp/Sentry ausentes não impedem startup local.',
+      ],
+      integrations: this.optionalIntegrations(),
+    }
+
+    if (!ok) {
+      throw new ServiceUnavailableException(body)
+    }
+
+    return body
+  }
+
+  @Get('liveness')
+  liveness() {
+    return {
+      status: 'alive',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+    }
+  }
+
+  private async collectCriticalChecks() {
+    const databaseStartedAt = Date.now()
+    let database = { ok: false as boolean, latencyMs: 0 }
+    let prismaClient = { ok: false as boolean }
+
+    try {
+      await this.prisma.$queryRaw`SELECT 1`
+      database = { ok: true, latencyMs: Date.now() - databaseStartedAt }
+      prismaClient = { ok: true }
+    } catch {
+      database = { ok: false, latencyMs: Date.now() - databaseStartedAt }
+      prismaClient = { ok: false }
+    }
+
+    const queueStartedAt = Date.now()
+    const queueSummary = this.queueService
+      ? await this.queueService.getQueueStatus().catch((error: unknown) => ({
+          ok: false,
+          reason: error instanceof Error ? error.message : String(error),
+        }))
+      : { ok: false, reason: 'queue_service_not_bound' }
+
+    const queue = {
+      ok: (queueSummary as any)?.ok === false ? false : true,
+      provider: 'bullmq',
+      enabled: this.queueService?.isEnabled() ?? false,
+      latencyMs: Date.now() - queueStartedAt,
+      summary: queueSummary,
+    }
+
+    return { database, prismaClient, queue }
+  }
+
+  private optionalIntegrations() {
     const stripeConfigured =
       this.hasValue('STRIPE_SECRET_KEY')
       && this.hasValue('STRIPE_WEBHOOK_SECRET')
@@ -135,31 +201,18 @@ export class HealthController {
         : 'misconfigured'
 
     return {
-      status: 'ok',
-      timestamp: new Date().toISOString(),
-      critical: {
-        api: 'configured',
-        database: 'validated_via_/health',
-        queue: 'validated_via_/health',
-      },
-      notes: [
-        '[READY] /health/readiness reflete prontidão de boot sem bloquear por integrações opcionais.',
-        '[OPTIONAL] Stripe/Google OAuth/Resend/WhatsApp/Sentry ausentes não impedem startup local.',
-      ],
-      integrations: {
-        stripe: stripeConfigured ? 'configured' : 'missing',
-        googleAuth: googleAuthConfigured ? 'configured' : 'missing',
-        email: emailConfigured ? 'configured' : 'missing',
-        whatsapp: whatsappIntegrationStatus,
-      },
-      whatsapp: {
+      stripe: stripeConfigured ? 'configured' : 'missing',
+      googleAuth: googleAuthConfigured ? 'configured' : 'missing',
+      email: emailConfigured ? 'configured' : 'missing',
+      whatsapp: whatsappIntegrationStatus,
+      whatsappDetails: {
         providerRequested: whatsappReadiness.providerRequested,
         providerResolved: whatsappReadiness.providerResolved,
         isProviderKnown: whatsappReadiness.isProviderKnown,
         mode: whatsappReadiness.mode,
         credentialsReady: whatsappReadiness.credentialsReady,
         missingEnv: whatsappReadiness.missingEnv,
-        queueAvailable: Boolean(this.queueService),
+        queueAvailable: this.queueService?.isEnabled() ?? false,
       },
     }
   }

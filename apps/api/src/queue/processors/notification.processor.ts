@@ -16,7 +16,12 @@ export class NotificationProcessor implements OnModuleInit, OnModuleDestroy {
     private readonly queueService: QueueService,
   ) {}
 
-  onModuleInit() {
+  async onModuleInit() {
+    if (!(await this.queueService.ensureEnabled())) {
+      this.logger.warn('Notification worker não iniciado: Redis/fila em modo degradado')
+      return
+    }
+
     try {
       this.worker = new Worker(
         QUEUE_NAMES.NOTIFICATIONS,
@@ -44,6 +49,10 @@ export class NotificationProcessor implements OnModuleInit, OnModuleDestroy {
         },
         { connection: this.connection },
       )
+
+      this.worker.on('error', (error) => {
+        this.logger.error(`Notification worker error: ${error.message}`)
+      })
 
       this.logger.log('Notification worker iniciado')
     } catch (err) {

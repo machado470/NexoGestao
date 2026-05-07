@@ -1,4 +1,4 @@
-import './tracing'
+import { startTracing } from './tracing'
 import { NestFactory } from '@nestjs/core'
 import { ValidationPipe, Logger } from '@nestjs/common'
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger'
@@ -26,6 +26,11 @@ async function bootstrap() {
   const runningFromWindowsMount = /^\/mnt\/[a-z]\//i.test(cwd)
 
   try {
+    const tracingStarted = await startTracing()
+    if (tracingStarted) {
+      logger.log('[BOOT][OTEL] OpenTelemetry habilitado')
+    }
+
     logger.log(`[BOOT] Processo iniciado em cwd=${cwd}`)
     if (runningFromWindowsMount) {
       logger.warn(
@@ -92,7 +97,7 @@ async function bootstrap() {
     const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig)
     SwaggerModule.setup('api', app, swaggerDocument)
 
-    const portRaw = process.env.API_PORT || process.env.PORT || '3000'
+    const portRaw = process.env.API_PORT || '3000'
     const port = Number(portRaw) || 3000
 
     logger.log(`[BOOT] Iniciando listener HTTP em 0.0.0.0:${port}...`)
@@ -112,7 +117,7 @@ async function bootstrap() {
     logger.error(message)
     const errno = err as NodeJS.ErrnoException | undefined
     if (errno?.code === 'EADDRINUSE') {
-      const requestedPort = process.env.API_PORT || process.env.PORT || '3000'
+      const requestedPort = process.env.API_PORT || '3000'
       const suggestedPort = Number(requestedPort) + 1
       logger.error(
         `Conflito de porta detectado (EADDRINUSE) na API: ${requestedPort}. ` +

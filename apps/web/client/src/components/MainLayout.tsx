@@ -97,7 +97,7 @@ export function MainLayout({ children }: MainLayoutProps) {
 
   useAutomationRunner({ navigate, enabled: isAuthenticated });
 
-  if (import.meta.env.DEV) {
+  if (import.meta.env.DEV && import.meta.env.VITE_BOOT_DIAGNOSTICS === "true") {
     // eslint-disable-next-line no-console
     console.info("[LAYOUT] MainLayout mounted", {
       pathname: location,
@@ -109,7 +109,7 @@ export function MainLayout({ children }: MainLayoutProps) {
   }
 
   useEffect(() => {
-    if (!import.meta.env.DEV) return;
+    if (!import.meta.env.DEV || import.meta.env.VITE_BOOT_DIAGNOSTICS !== "true") return;
     // eslint-disable-next-line no-console
     console.log("[boot] MainLayout mounted");
     return () => {
