@@ -11,23 +11,25 @@ import { useLocation } from "wouter";
 import { toast } from "sonner";
 import {
   CheckCheck,
-  CheckCircle2,
   EllipsisVertical,
   Info,
   MessageCircleMore,
   Paperclip,
-  PlayCircle,
   Search,
   Send,
   Star,
   Volume2,
-  XCircle,
 } from "lucide-react";
 
 import { trpc } from "@/lib/trpc";
 import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
 import { cn } from "@/lib/utils";
-import { priorityRank, resolveInboxPriority, type GovernanceSignal, type InboxPriority } from "@/lib/whatsappInboxPriority";
+import {
+  priorityRank,
+  resolveInboxPriority,
+  type GovernanceSignal,
+  type InboxPriority,
+} from "@/lib/whatsappInboxPriority";
 import { Button } from "@/components/design-system";
 import { AppPageShell, AppSkeleton } from "@/components/app-system";
 import {
@@ -36,39 +38,51 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { AppPageLoadingState } from "@/components/internal-page-system";
 import {
-  AppPageLoadingState,
-} from "@/components/internal-page-system";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  WhatsAppActionExecutionPanel,
+  type WhatsAppActionExecution,
+  type WhatsAppSuggestedAction,
+} from "@/lib/whatsappActionExecution";
 
-type ConversationFilter = "critical_now" | "waiting_customer" | "today_commitments" | "resolved";
+type ConversationFilter =
+  | "critical_now"
+  | "waiting_customer"
+  | "today_commitments"
+  | "resolved";
 
 type WhatsAppConversationStatus = "OPEN" | "PENDING" | "RESOLVED" | "FAILED";
 type WhatsAppPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
-type ContextType = "CUSTOMER" | "CHARGE" | "APPOINTMENT" | "SERVICE_ORDER" | "PAYMENT" | "GENERAL";
+type ContextType =
+  | "CUSTOMER"
+  | "CHARGE"
+  | "APPOINTMENT"
+  | "SERVICE_ORDER"
+  | "PAYMENT"
+  | "GENERAL";
 type MessageDirection = "INBOUND" | "OUTBOUND";
 type MessageStatus = "QUEUED" | "SENT" | "DELIVERED" | "READ" | "FAILED";
-type OperationalMessageType = "GENERAL" | "APPOINTMENT_CONFIRMATION" | "APPOINTMENT_REMINDER" | "SERVICE_UPDATE" | "PAYMENT_LINK" | "PAYMENT_REMINDER" | "PAYMENT_CONFIRMATION" | "CUSTOMER_NOTIFICATION";
+type OperationalMessageType =
+  | "GENERAL"
+  | "APPOINTMENT_CONFIRMATION"
+  | "APPOINTMENT_REMINDER"
+  | "SERVICE_UPDATE"
+  | "PAYMENT_LINK"
+  | "PAYMENT_REMINDER"
+  | "PAYMENT_CONFIRMATION"
+  | "CUSTOMER_NOTIFICATION";
 
-type WhatsAppSuggestedAction = "SEND_PAYMENT_LINK" | "CONFIRM_APPOINTMENT" | "RESCHEDULE_APPOINTMENT" | "SEND_SERVICE_UPDATE" | "ESCALATE_TO_OPERATOR" | "MARK_RESOLVED" | "REPLY_WITH_TEMPLATE";
-type WhatsAppActionExecutionStatus = "PENDING_APPROVAL" | "APPROVED" | "EXECUTED" | "FAILED" | "CANCELLED";
-
-type WhatsAppActionExecution = {
-  id: string;
-  conversationId: string;
-  suggestedAction: WhatsAppSuggestedAction;
-  status: WhatsAppActionExecutionStatus;
-  approvalRequired?: boolean | null;
-  executionReason?: string | null;
-  failureReason?: string | null;
-  createdAt?: string | null;
-  approvedAt?: string | null;
-  executedAt?: string | null;
-  failedAt?: string | null;
-  cancelledAt?: string | null;
-  conversation?: { id?: string; customerId?: string | null; phone?: string | null; title?: string | null; priority?: string | null; intent?: string | null } | null;
+type Customer = {
+  id?: string | number;
+  name?: string;
+  phone?: string | null;
+  [key: string]: any;
 };
-type Customer = { id?: string | number; name?: string; phone?: string | null; [key: string]: any };
 
 type Conversation = {
   id: string;
@@ -143,7 +157,11 @@ type WhatsAppContext = {
   } | null;
 };
 
-const FILTERS: Array<{ value: ConversationFilter; label: string; count: string }> = [
+const FILTERS: Array<{
+  value: ConversationFilter;
+  label: string;
+  count: string;
+}> = [
   { value: "critical_now", label: "Critical now", count: "" },
   { value: "waiting_customer", label: "Waiting customer", count: "" },
   { value: "today_commitments", label: "Today commitments", count: "" },
@@ -158,7 +176,10 @@ const QUICK_COMPOSER_TEMPLATES = [
   "Mensagem livre",
 ] as const;
 
-const statusUi: Record<WhatsAppConversationStatus, { label: string; dot: string }> = {
+const statusUi: Record<
+  WhatsAppConversationStatus,
+  { label: string; dot: string }
+> = {
   OPEN: { label: "Aberta", dot: "bg-amber-400" },
   PENDING: { label: "Pendente", dot: "bg-[var(--accent-primary)]" },
   RESOLVED: { label: "Resolvida", dot: "bg-emerald-400" },
@@ -184,9 +205,12 @@ function normalizeCustomersPayload(payload: unknown): Customer[] {
   if (Array.isArray(raw?.result?.data)) return raw.result.data;
   if (Array.isArray(raw?.result?.data?.items)) return raw.result.data.items;
   if (Array.isArray(raw?.result?.data?.json)) return raw.result.data.json;
-  if (Array.isArray(raw?.result?.data?.json?.data)) return raw.result.data.json.data;
-  if (Array.isArray(raw?.result?.data?.json?.items)) return raw.result.data.json.items;
-  if (Array.isArray(raw?.result?.data?.json?.data?.items)) return raw.result.data.json.data.items;
+  if (Array.isArray(raw?.result?.data?.json?.data))
+    return raw.result.data.json.data;
+  if (Array.isArray(raw?.result?.data?.json?.items))
+    return raw.result.data.json.items;
+  if (Array.isArray(raw?.result?.data?.json?.data?.items))
+    return raw.result.data.json.data.items;
 
   return [];
 }
@@ -215,11 +239,16 @@ function fmtTime(value?: string | null) {
 
 function mapConversation(item: any): Conversation {
   const customerName = item?.customer?.name ?? item?.title ?? "Sem nome";
-  const hasPendingCharge = item?.contextType === "CHARGE" && ["OPEN", "PENDING"].includes(String(item?.status ?? "OPEN"));
+  const hasPendingCharge =
+    item?.contextType === "CHARGE" &&
+    ["OPEN", "PENDING"].includes(String(item?.status ?? "OPEN"));
   const hasUpcomingAppointment = item?.contextType === "APPOINTMENT";
   const hasActiveServiceOrder = item?.contextType === "SERVICE_ORDER";
-  const governanceSignal = (item?.metadata?.governanceSignal ?? null) as GovernanceSignal | null;
-  const hasFailedDelivery = item?.status === "FAILED" || Boolean(governanceSignal?.communicationFailure);
+  const governanceSignal = (item?.metadata?.governanceSignal ??
+    null) as GovernanceSignal | null;
+  const hasFailedDelivery =
+    item?.status === "FAILED" ||
+    Boolean(governanceSignal?.communicationFailure);
   const hasNoResponse = item?.unreadCount > 0 || hasPendingCharge;
   const operationalStatus = hasFailedDelivery
     ? "Falha"
@@ -242,7 +271,9 @@ function mapConversation(item: any): Conversation {
     name: String(customerName),
     phone: item?.phone ?? item?.customer?.phone ?? null,
     title: item?.title ?? null,
-    lastMessage: String(item?.lastMessagePreview ?? item?.title ?? "Sem mensagens"),
+    lastMessage: String(
+      item?.lastMessagePreview ?? item?.title ?? "Sem mensagens"
+    ),
     lastMessageAt: item?.lastMessageAt ?? null,
     status: (item?.status ?? "OPEN") as WhatsAppConversationStatus,
     contextType: (item?.contextType ?? "GENERAL") as ContextType,
@@ -262,10 +293,12 @@ function mapConversation(item: any): Conversation {
     isVirtual: false,
     customer: item?.customer
       ? {
-        id: item?.customer?.id ? String(item.customer.id) : undefined,
-        name: item?.customer?.name ? String(item.customer.name) : undefined,
-        phone: item?.customer?.phone ? String(item.customer.phone) : undefined,
-      }
+          id: item?.customer?.id ? String(item.customer.id) : undefined,
+          name: item?.customer?.name ? String(item.customer.name) : undefined,
+          phone: item?.customer?.phone
+            ? String(item.customer.phone)
+            : undefined,
+        }
       : null,
   };
 }
@@ -282,12 +315,20 @@ function mapMessage(item: any): ChatMessage {
   };
 }
 
-function resolveMessageTypeFromContext(context?: WhatsAppContext | null, intent?: "PAYMENT"|"APPOINTMENT"|"SERVICE_UPDATE"|"GENERAL"): OperationalMessageType {
-  if (intent === "PAYMENT") return context?.openCharge?.paymentLink ? "PAYMENT_LINK" : "PAYMENT_REMINDER";
+function resolveMessageTypeFromContext(
+  context?: WhatsAppContext | null,
+  intent?: "PAYMENT" | "APPOINTMENT" | "SERVICE_UPDATE" | "GENERAL"
+): OperationalMessageType {
+  if (intent === "PAYMENT")
+    return context?.openCharge?.paymentLink
+      ? "PAYMENT_LINK"
+      : "PAYMENT_REMINDER";
   if (intent === "APPOINTMENT") return "APPOINTMENT_CONFIRMATION";
   if (intent === "SERVICE_UPDATE") return "SERVICE_UPDATE";
-  if (context?.openCharge?.id && context?.openCharge?.paymentLink) return "PAYMENT_LINK";
-  if (context?.openCharge?.id && (context?.openCharge?.daysOverdue ?? 0) > 0) return "PAYMENT_REMINDER";
+  if (context?.openCharge?.id && context?.openCharge?.paymentLink)
+    return "PAYMENT_LINK";
+  if (context?.openCharge?.id && (context?.openCharge?.daysOverdue ?? 0) > 0)
+    return "PAYMENT_REMINDER";
   if (context?.openCharge?.id) return "CUSTOMER_NOTIFICATION";
   if (context?.nextAppointment?.id) return "APPOINTMENT_REMINDER";
   if (context?.activeServiceOrder?.id) return "SERVICE_UPDATE";
@@ -295,17 +336,24 @@ function resolveMessageTypeFromContext(context?: WhatsAppContext | null, intent?
 }
 
 function resolveEntityFromContext(context?: WhatsAppContext | null) {
-  if (context?.openCharge?.id) return { entityType: "CHARGE", entityId: context.openCharge.id };
-  if (context?.nextAppointment?.id) return { entityType: "APPOINTMENT", entityId: context.nextAppointment.id };
+  if (context?.openCharge?.id)
+    return { entityType: "CHARGE", entityId: context.openCharge.id };
+  if (context?.nextAppointment?.id)
+    return { entityType: "APPOINTMENT", entityId: context.nextAppointment.id };
   if (context?.activeServiceOrder?.id) {
-    return { entityType: "SERVICE_ORDER", entityId: context.activeServiceOrder.id };
+    return {
+      entityType: "SERVICE_ORDER",
+      entityId: context.activeServiceOrder.id,
+    };
   }
-  if (context?.customer?.id) return { entityType: "CUSTOMER", entityId: context.customer.id };
+  if (context?.customer?.id)
+    return { entityType: "CUSTOMER", entityId: context.customer.id };
   return { entityType: "GENERAL", entityId: undefined };
 }
 
 function getOperationalStatus(conversation: Conversation) {
-  if (conversation.conversationId) return conversation.operationalStatus ?? "Resolvido";
+  if (conversation.conversationId)
+    return conversation.operationalStatus ?? "Resolvido";
   return "Sem conversa ativa";
 }
 
@@ -315,7 +363,6 @@ function priorityScore(conversation: Conversation) {
   return rank * 100;
 }
 
-
 function getConversationBadges(conversation: Conversation) {
   const badges: string[] = [];
   if (conversation.hasFailedDelivery) badges.push("Falha");
@@ -324,50 +371,52 @@ function getConversationBadges(conversation: Conversation) {
   return badges;
 }
 
-function buildSuggestedAction(conversation?: Conversation, context?: WhatsAppContext | null) {
+function buildSuggestedAction(
+  conversation?: Conversation,
+  context?: WhatsAppContext | null
+) {
   if (!conversation) return null;
-  if (conversation.hasFailedDelivery) return { key: "retry", label: "Reenviar mensagem" };
+  if (conversation.hasFailedDelivery)
+    return { key: "retry", label: "Reenviar mensagem" };
   if (conversation.hasPendingCharge && conversation.hasNoResponse) {
     return {
       key: "charge",
-      label: context?.openCharge?.paymentLink ? "Enviar link de pagamento" : "Enviar lembrete de cobrança",
-      executableAction: (context?.openCharge?.paymentLink ? "SEND_PAYMENT_LINK" : "REPLY_WITH_TEMPLATE") as WhatsAppSuggestedAction,
+      label: context?.openCharge?.paymentLink
+        ? "Enviar link de pagamento"
+        : "Enviar lembrete de cobrança",
+      executableAction: (context?.openCharge?.paymentLink
+        ? "SEND_PAYMENT_LINK"
+        : "REPLY_WITH_TEMPLATE") as WhatsAppSuggestedAction,
     };
   }
-  if (context?.nextAppointment?.id && String(context?.nextAppointment?.status ?? "").toUpperCase() !== "CONFIRMED") {
-    return { key: "appointment", label: "Confirmar agendamento", executableAction: "CONFIRM_APPOINTMENT" as WhatsAppSuggestedAction };
+  if (
+    context?.nextAppointment?.id &&
+    String(context?.nextAppointment?.status ?? "").toUpperCase() !== "CONFIRMED"
+  ) {
+    return {
+      key: "appointment",
+      label: "Confirmar agendamento",
+      executableAction: "CONFIRM_APPOINTMENT" as WhatsAppSuggestedAction,
+    };
   }
   if (context?.activeServiceOrder?.id) {
-    return { key: "service", label: "Enviar atualização da O.S.", executableAction: "SEND_SERVICE_UPDATE" as WhatsAppSuggestedAction };
+    return {
+      key: "service",
+      label: "Enviar atualização da O.S.",
+      executableAction: "SEND_SERVICE_UPDATE" as WhatsAppSuggestedAction,
+    };
   }
-  return { key: "resolve", label: "Marcar conversa como resolvida", executableAction: "MARK_RESOLVED" as WhatsAppSuggestedAction };
-}
-
-function actionLabel(action?: string | null) {
-  const labels: Record<string, string> = {
-    SEND_PAYMENT_LINK: "Enviar link de pagamento",
-    CONFIRM_APPOINTMENT: "Confirmar agendamento",
-    RESCHEDULE_APPOINTMENT: "Reagendar agendamento",
-    SEND_SERVICE_UPDATE: "Atualizar O.S.",
-    ESCALATE_TO_OPERATOR: "Escalar para operador",
-    MARK_RESOLVED: "Marcar como resolvida",
-    REPLY_WITH_TEMPLATE: "Responder com template",
+  return {
+    key: "resolve",
+    label: "Marcar conversa como resolvida",
+    executableAction: "MARK_RESOLVED" as WhatsAppSuggestedAction,
   };
-  return labels[String(action ?? "")] ?? String(action ?? "Ação");
 }
 
-function executionStatusLabel(status?: string | null) {
-  const labels: Record<string, string> = {
-    PENDING_APPROVAL: "Aguardando aprovação",
-    APPROVED: "Aprovada",
-    EXECUTED: "Executada",
-    FAILED: "Falhou",
-    CANCELLED: "Cancelada",
-  };
-  return labels[String(status ?? "")] ?? String(status ?? "--");
-}
-
-function buildActionPayload(action: WhatsAppSuggestedAction, context?: WhatsAppContext | null) {
+function buildActionPayload(
+  action: WhatsAppSuggestedAction,
+  context?: WhatsAppContext | null
+) {
   const entity = resolveEntityFromContext(context);
   return {
     entityType: entity.entityType,
@@ -379,11 +428,12 @@ function buildActionPayload(action: WhatsAppSuggestedAction, context?: WhatsAppC
     appointmentDate: context?.nextAppointment?.scheduledAt,
     appointmentTime: context?.nextAppointment?.scheduledAt,
     serviceOrderNumber: context?.activeServiceOrder?.number,
-    templateKey: action === "REPLY_WITH_TEMPLATE"
-      ? context?.openCharge?.id
-        ? "payment_reminder"
-        : "manual_followup"
-      : undefined,
+    templateKey:
+      action === "REPLY_WITH_TEMPLATE"
+        ? context?.openCharge?.id
+          ? "payment_reminder"
+          : "manual_followup"
+        : undefined,
   };
 }
 
@@ -391,7 +441,10 @@ function timeAgoLabel(value?: string | null) {
   if (!value) return null;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
-  const minutes = Math.max(1, Math.floor((Date.now() - date.getTime()) / 60000));
+  const minutes = Math.max(
+    1,
+    Math.floor((Date.now() - date.getTime()) / 60000)
+  );
   if (minutes < 60) return `${minutes} min atrás`;
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h atrás`;
@@ -406,7 +459,9 @@ function buildTemplateText(template: string, context?: WhatsAppContext | null) {
   const chargeAmount = context?.openCharge?.amount
     ? `R$ ${(context.openCharge.amount / 100).toFixed(2).replace(".", ",")}`
     : "valor pendente";
-  const chargeDueDate = context?.openCharge?.dueDate ? fmtDateTime(context.openCharge.dueDate) : "sem vencimento";
+  const chargeDueDate = context?.openCharge?.dueDate
+    ? fmtDateTime(context.openCharge.dueDate)
+    : "sem vencimento";
 
   if (template === "Confirmação de agendamento") {
     return `Olá ${customerName}, confirmando seu agendamento em ${appointmentDate}.`;
@@ -475,16 +530,26 @@ const ConversationRow = memo(function ConversationRow({
               {conversation.name.slice(0, 1)}
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">{conversation.name}</p>
-              <p className="truncate text-[11px] text-[var(--text-muted)]">{conversation.phone ?? "Telefone não informado"}</p>
+              <p className="truncate text-sm font-semibold">
+                {conversation.name}
+              </p>
+              <p className="truncate text-[11px] text-[var(--text-muted)]">
+                {conversation.phone ?? "Telefone não informado"}
+              </p>
               {conversation.title ? (
-                <p className="truncate text-[11px] text-[var(--accent-primary)]/90">{conversation.title}</p>
+                <p className="truncate text-[11px] text-[var(--accent-primary)]/90">
+                  {conversation.title}
+                </p>
               ) : null}
             </div>
           </div>
-          <span className="text-[11px] text-[var(--text-muted)]">{fmtTime(conversation.lastMessageAt)}</span>
+          <span className="text-[11px] text-[var(--text-muted)]">
+            {fmtTime(conversation.lastMessageAt)}
+          </span>
         </div>
-        <p className="mt-1.5 line-clamp-1 text-xs text-[var(--text-secondary)]">{conversation.contextHint ?? conversation.lastMessage}</p>
+        <p className="mt-1.5 line-clamp-1 text-xs text-[var(--text-secondary)]">
+          {conversation.contextHint ?? conversation.lastMessage}
+        </p>
         <div className="mt-2 flex items-center justify-between text-[11px] text-[var(--text-muted)]">
           <span className="inline-flex items-center gap-1.5">
             <span className={cn("h-2 w-2 rounded-full", status.dot)} />
@@ -492,8 +557,13 @@ const ConversationRow = memo(function ConversationRow({
           </span>
           {badges.length ? (
             <div className="flex flex-wrap justify-end gap-1">
-              {badges.slice(0, 3).map((badge) => (
-                <span key={badge} className="rounded-full border border-white/15 bg-white/10 px-1.5 py-0.5 text-[10px] leading-none text-white/90">{badge}</span>
+              {badges.slice(0, 3).map(badge => (
+                <span
+                  key={badge}
+                  className="rounded-full border border-white/15 bg-white/10 px-1.5 py-0.5 text-[10px] leading-none text-white/90"
+                >
+                  {badge}
+                </span>
               ))}
             </div>
           ) : null}
@@ -552,8 +622,15 @@ function InboxQueueColumn({
     <aside className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-white/[0.015] p-2.5">
       <div className="shrink-0 space-y-2 pb-2.5">
         <div className="flex items-center justify-between">
-          <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Operational Queue</p>
-          <button type="button" className="rounded-lg bg-white/[0.02] px-2 py-1 text-[10px] text-[var(--text-muted)] hover:bg-white/[0.05]">Filtros</button>
+          <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
+            Operational Queue
+          </p>
+          <button
+            type="button"
+            className="rounded-lg bg-white/[0.02] px-2 py-1 text-[10px] text-[var(--text-muted)] hover:bg-white/[0.05]"
+          >
+            Filtros
+          </button>
         </div>
         <div className="flex items-center gap-2 rounded-lg bg-white/[0.02] px-2.5 py-1.5">
           <Search className="size-3.5 text-[var(--text-muted)]" />
@@ -611,7 +688,9 @@ function InboxQueueColumn({
           </div>
         ) : (
           <div style={{ height: totalHeight, position: "relative" }}>
-            <div style={{ transform: `translateY(${startIndex * ROW_HEIGHT}px)` }}>
+            <div
+              style={{ transform: `translateY(${startIndex * ROW_HEIGHT}px)` }}
+            >
               {visibleRows.map(conversation => (
                 <ConversationRow
                   key={conversation.id}
@@ -664,7 +743,9 @@ function ExecutionChatColumn({
   content: string;
   setContent: (value: string) => void;
   selectedIntent: "PAYMENT" | "APPOINTMENT" | "SERVICE_UPDATE" | "GENERAL";
-  setSelectedIntent: (value: "PAYMENT" | "APPOINTMENT" | "SERVICE_UPDATE" | "GENERAL") => void;
+  setSelectedIntent: (
+    value: "PAYMENT" | "APPOINTMENT" | "SERVICE_UPDATE" | "GENERAL"
+  ) => void;
   onToggleFavorite: () => void;
   isFavorite: boolean;
   onInfo: () => void;
@@ -697,10 +778,16 @@ function ExecutionChatColumn({
             {conversation?.name?.slice(0, 1) ?? "-"}
           </div>
           <div>
-            <p className="text-sm font-semibold">{conversation?.name ?? "Selecione uma conversa"}</p>
-            <p className="text-xs text-[var(--text-muted)]">{conversation?.phone ?? "Nenhuma conversa ativa"}</p>
+            <p className="text-sm font-semibold">
+              {conversation?.name ?? "Selecione uma conversa"}
+            </p>
+            <p className="text-xs text-[var(--text-muted)]">
+              {conversation?.phone ?? "Nenhuma conversa ativa"}
+            </p>
             {conversation?.conversationId ? (
-              <p className="text-[10px] text-[var(--text-muted)]">{conversation.title ?? getOperationalStatus(conversation)}</p>
+              <p className="text-[10px] text-[var(--text-muted)]">
+                {conversation.title ?? getOperationalStatus(conversation)}
+              </p>
             ) : null}
             {!conversation?.conversationId && conversation ? (
               <span className="mt-1 inline-flex rounded-full border border-amber-300/25 bg-amber-300/10 px-2 py-0.5 text-[10px] text-amber-100">
@@ -716,7 +803,12 @@ function ExecutionChatColumn({
             onClick={onToggleFavorite}
             disabled={!hasConversation}
           >
-            <Star className={cn("size-4.5", isFavorite ? "fill-yellow-400 text-yellow-300" : "")} />
+            <Star
+              className={cn(
+                "size-4.5",
+                isFavorite ? "fill-yellow-400 text-yellow-300" : ""
+              )}
+            />
           </button>
           <button
             type="button"
@@ -740,13 +832,26 @@ function ExecutionChatColumn({
       {suggestedActionLabel || governanceAlert ? (
         <div className="mx-4 mb-2 rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs">
           {suggestedActionLabel ? (
-            <button type="button" onClick={onRunSuggestedAction} className="font-medium text-amber-100 underline-offset-2 hover:underline">{suggestedActionLabel}</button>
+            <button
+              type="button"
+              onClick={onRunSuggestedAction}
+              className="font-medium text-amber-100 underline-offset-2 hover:underline"
+            >
+              {suggestedActionLabel}
+            </button>
           ) : null}
-          {governanceAlert ? <p className="mt-1 text-[11px] text-amber-200/90">{governanceAlert}</p> : null}
+          {governanceAlert ? (
+            <p className="mt-1 text-[11px] text-amber-200/90">
+              {governanceAlert}
+            </p>
+          ) : null}
         </div>
       ) : null}
 
-      <div ref={messagesRef} className="scrollbar-thin-nexo flex-1 min-h-0 overflow-y-auto bg-transparent px-5 pb-1 pt-4">
+      <div
+        ref={messagesRef}
+        className="scrollbar-thin-nexo flex-1 min-h-0 overflow-y-auto bg-transparent px-5 pb-1 pt-4"
+      >
         {!hasConversation ? (
           <div className="flex h-full items-center justify-center px-1 py-4 text-xs text-[var(--text-muted)]">
             Selecione um cliente ou conversa para continuar.
@@ -758,13 +863,21 @@ function ExecutionChatColumn({
             ))}
           </div>
         ) : messages.length === 0 ? (
-          <div className="px-1 py-4 text-xs text-[var(--text-muted)]">Sem mensagens nesta conversa.</div>
+          <div className="px-1 py-4 text-xs text-[var(--text-muted)]">
+            Sem mensagens nesta conversa.
+          </div>
         ) : (
           <div className="space-y-3.5">
             {messages.map(message => {
               const outgoing = message.direction === "OUTBOUND";
               return (
-                <div key={message.id} className={cn("flex", outgoing ? "justify-end" : "justify-start")}>
+                <div
+                  key={message.id}
+                  className={cn(
+                    "flex",
+                    outgoing ? "justify-end" : "justify-start"
+                  )}
+                >
                   <div
                     className={cn(
                       "rounded-2xl border px-4 py-3 text-sm leading-relaxed",
@@ -775,13 +888,18 @@ function ExecutionChatColumn({
                   >
                     <p>{message.content}</p>
                     <p className="mt-2 flex items-center justify-end gap-1 text-[10px] text-[var(--text-muted)]/85">
-                      {fmtTime(message.createdAt)} · Operação: {message.status}{message.messageType ? ` · ${message.messageType}` : ""}
-                      {outgoing && ["DELIVERED", "READ"].includes(message.status) ? (
+                      {fmtTime(message.createdAt)} · Operação: {message.status}
+                      {message.messageType ? ` · ${message.messageType}` : ""}
+                      {outgoing &&
+                      ["DELIVERED", "READ"].includes(message.status) ? (
                         <CheckCheck className="size-3" />
                       ) : null}
                     </p>
                     {message.status === "FAILED" ? (
-                      <p className="mt-1 text-[10px] text-rose-300">{message.errorMessage ?? "Falha de entrega. Use reenviar nas ações."}</p>
+                      <p className="mt-1 text-[10px] text-rose-300">
+                        {message.errorMessage ??
+                          "Falha de entrega. Use reenviar nas ações."}
+                      </p>
                     ) : null}
                   </div>
                 </div>
@@ -807,7 +925,7 @@ function ExecutionChatColumn({
             </PopoverTrigger>
             <PopoverContent align="start" className="w-72 p-2">
               <div className="space-y-1">
-                {QUICK_COMPOSER_TEMPLATES.map((template) => (
+                {QUICK_COMPOSER_TEMPLATES.map(template => (
                   <Button
                     key={template}
                     type="button"
@@ -835,12 +953,28 @@ function ExecutionChatColumn({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">
-              <DropdownMenuItem onClick={onOpenCustomer}>Abrir cliente</DropdownMenuItem>
-              <DropdownMenuItem onClick={onOpenFinance}>Abrir financeiro</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onFillTemplate("Cobrança pendente")}>Enviar cobrança</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onFillTemplate("Confirmação de agendamento")}>Confirmar agendamento</DropdownMenuItem>
-              <DropdownMenuItem onClick={onMoreActions}>Atualizar status</DropdownMenuItem>
-              <DropdownMenuItem onClick={onOpenServiceOrder}>Abrir O.S.</DropdownMenuItem>
+              <DropdownMenuItem onClick={onOpenCustomer}>
+                Abrir cliente
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onOpenFinance}>
+                Abrir financeiro
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onFillTemplate("Cobrança pendente")}
+              >
+                Enviar cobrança
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onFillTemplate("Confirmação de agendamento")}
+              >
+                Confirmar agendamento
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onMoreActions}>
+                Atualizar status
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onOpenServiceOrder}>
+                Abrir O.S.
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           <button
@@ -859,7 +993,7 @@ function ExecutionChatColumn({
           </button>
           <select
             value={selectedIntent}
-            onChange={(event) => setSelectedIntent(event.target.value as any)}
+            onChange={event => setSelectedIntent(event.target.value as any)}
             className="h-9 rounded-lg bg-white/[0.02] px-2 text-xs"
             disabled={!hasConversation}
           >
@@ -871,7 +1005,11 @@ function ExecutionChatColumn({
           <input
             value={content}
             onChange={event => canCompose && setContent(event.target.value)}
-            placeholder={hasConversation ? composePlaceholder : "Selecione uma conversa para responder..."}
+            placeholder={
+              hasConversation
+                ? composePlaceholder
+                : "Selecione uma conversa para responder..."
+            }
             disabled={!hasConversation || !canCompose}
             className="h-9 min-w-0 flex-1 rounded-lg bg-white/[0.02] px-3 text-sm outline-none placeholder:text-[var(--text-muted)]/70"
           />
@@ -893,93 +1031,8 @@ function ExecutionChatColumn({
           </button>
         </div>
       </footer>
-      {error ? <p className="px-3 pb-2 text-[11px] text-rose-300">{error}</p> : null}
-    </section>
-  );
-}
-
-
-function ActionExecutionPanel({
-  pendingApprovals,
-  history,
-  isLoading,
-  onApprove,
-  onExecute,
-  onCancel,
-  isMutating,
-}: {
-  pendingApprovals: WhatsAppActionExecution[];
-  history: WhatsAppActionExecution[];
-  isLoading: boolean;
-  onApprove: (execution: WhatsAppActionExecution) => void;
-  onExecute: (execution: WhatsAppActionExecution) => void;
-  onCancel: (execution: WhatsAppActionExecution) => void;
-  isMutating: boolean;
-}) {
-  const recentHistory = history.slice(0, 5);
-  return (
-    <section className="px-1 py-1">
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Execução assistida</p>
-          <p className="mt-1 text-[11px] text-[var(--text-muted)]">Aprovação humana para ações sensíveis.</p>
-        </div>
-        <span className="rounded-full border border-amber-300/25 bg-amber-300/10 px-2 py-0.5 text-[10px] text-amber-100">
-          {pendingApprovals.length} pendente(s)
-        </span>
-      </div>
-
-      {isLoading ? (
-        <div className="mt-3 space-y-2">
-          <AppSkeleton className="h-16 rounded-xl" />
-          <AppSkeleton className="h-12 rounded-xl" />
-        </div>
-      ) : pendingApprovals.length > 0 ? (
-        <div className="mt-3 space-y-2">
-          {pendingApprovals.slice(0, 3).map((execution) => (
-            <div key={execution.id} className="rounded-xl border border-amber-300/20 bg-amber-400/10 p-2.5">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="truncate text-xs font-medium text-amber-50">{actionLabel(execution.suggestedAction)}</p>
-                  <p className="mt-0.5 text-[10px] text-amber-100/80">{execution.conversation?.title ?? executionStatusLabel(execution.status)}</p>
-                </div>
-                <span className="shrink-0 rounded-full bg-black/20 px-2 py-0.5 text-[10px] text-amber-100">HITL</span>
-              </div>
-              {execution.executionReason ? <p className="mt-2 line-clamp-2 text-[11px] text-amber-100/90">{execution.executionReason}</p> : null}
-              <div className="mt-2 grid grid-cols-3 gap-1.5">
-                <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-[10px]" disabled={isMutating} onClick={() => onApprove(execution)}>
-                  <CheckCircle2 className="mr-1 size-3" /> Aprovar
-                </Button>
-                <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-[10px]" disabled={isMutating} onClick={() => onExecute(execution)}>
-                  <PlayCircle className="mr-1 size-3" /> Executar
-                </Button>
-                <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-[10px]" disabled={isMutating} onClick={() => onCancel(execution)}>
-                  <XCircle className="mr-1 size-3" /> Cancelar
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="mt-3 rounded-xl border border-white/[0.06] bg-white/[0.015] p-2.5 text-[11px] text-[var(--text-muted)]">
-          Nenhuma aprovação pendente para esta conversa.
-        </div>
-      )}
-
-      {recentHistory.length > 0 ? (
-        <div className="mt-3 space-y-1.5">
-          <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Histórico recente</p>
-          {recentHistory.map((execution) => (
-            <div key={execution.id} className="rounded-lg border border-white/[0.05] bg-white/[0.012] px-2.5 py-2">
-              <div className="flex items-center justify-between gap-2">
-                <p className="truncate text-[11px] text-[var(--text-secondary)]">{actionLabel(execution.suggestedAction)}</p>
-                <span className="shrink-0 text-[10px] text-[var(--text-muted)]">{executionStatusLabel(execution.status)}</span>
-              </div>
-              <p className="mt-0.5 text-[10px] text-[var(--text-muted)]">{fmtDateTime(execution.executedAt ?? execution.approvedAt ?? execution.createdAt)}</p>
-              {execution.failureReason ? <p className="mt-1 line-clamp-2 text-[10px] text-rose-300">{execution.failureReason}</p> : null}
-            </div>
-          ))}
-        </div>
+      {error ? (
+        <p className="px-3 pb-2 text-[11px] text-rose-300">{error}</p>
       ) : null}
     </section>
   );
@@ -1001,6 +1054,8 @@ function OperationalContextColumn({
   onExecuteExecution,
   onCancelExecution,
   isExecutionMutating,
+  isExecutionError,
+  onRetryExecution,
   highlightedChargeId,
   highlightedAppointmentId,
   highlightedServiceOrderId,
@@ -1020,17 +1075,23 @@ function OperationalContextColumn({
   onExecuteExecution: (execution: WhatsAppActionExecution) => void;
   onCancelExecution: (execution: WhatsAppActionExecution) => void;
   isExecutionMutating: boolean;
+  isExecutionError?: boolean;
+  onRetryExecution?: () => void;
   highlightedChargeId?: string | null;
   highlightedAppointmentId?: string | null;
   highlightedServiceOrderId?: string | null;
 }) {
   if (!conversation && !selectedCustomer) {
     return (
-      <aside className="scrollbar-thin-nexo h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden bg-white/[0.015] p-2.5" id="whatsapp-context-panel">
+      <aside
+        className="scrollbar-thin-nexo h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden bg-white/[0.015] p-2.5"
+        id="whatsapp-context-panel"
+      >
         <section className="rounded-xl border border-white/[0.06] bg-white/[0.01] px-3 py-3">
           <p className="text-xs font-semibold">Sem contexto ativo</p>
           <p className="mt-1 text-[11px] text-[var(--text-muted)]">
-            Selecione uma conversa para ver cliente, agendamento, O.S. e cobrança vinculados.
+            Selecione uma conversa para ver cliente, agendamento, O.S. e
+            cobrança vinculados.
           </p>
           <div className="mt-3 space-y-1.5 text-[11px] text-[var(--text-muted)]">
             <p>Cliente — aguardando conversa</p>
@@ -1048,7 +1109,10 @@ function OperationalContextColumn({
   const hasServiceOrder = Boolean(context?.activeServiceOrder?.id);
 
   return (
-    <aside className="scrollbar-thin-nexo h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden bg-white/[0.015] p-2.5" id="whatsapp-context-panel">
+    <aside
+      className="scrollbar-thin-nexo h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden bg-white/[0.015] p-2.5"
+      id="whatsapp-context-panel"
+    >
       {isLoading ? (
         <div className="space-y-3">
           {Array.from({ length: 5 }).map((_, idx) => (
@@ -1058,24 +1122,49 @@ function OperationalContextColumn({
       ) : (
         <div className="space-y-5 text-xs">
           <section className="px-1 py-1">
-            <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Cliente</p>
-            <p className="mt-1 font-semibold">{context?.customer?.name ?? selectedCustomer?.name ?? conversation?.name ?? "Sem nome"}</p>
-            <p className="text-[11px] text-[var(--text-muted)]">{context?.customer?.phone ?? selectedCustomer?.phone ?? conversation?.phone ?? "--"}</p>
+            <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+              Cliente
+            </p>
+            <p className="mt-1 font-semibold">
+              {context?.customer?.name ??
+                selectedCustomer?.name ??
+                conversation?.name ??
+                "Sem nome"}
+            </p>
+            <p className="text-[11px] text-[var(--text-muted)]">
+              {context?.customer?.phone ??
+                selectedCustomer?.phone ??
+                conversation?.phone ??
+                "--"}
+            </p>
             <Button
               type="button"
               size="sm"
               variant="outline"
               className="mt-3 h-7 text-[11px]"
-              onClick={() => onNavigate(context?.customer?.id ? `/customers?customerId=${context.customer.id}` : "/customers")}
+              onClick={() =>
+                onNavigate(
+                  context?.customer?.id
+                    ? `/customers?customerId=${context.customer.id}`
+                    : "/customers"
+                )
+              }
             >
               Ver cliente
             </Button>
           </section>
 
-          <ActionExecutionPanel
+          <WhatsAppActionExecutionPanel
             pendingApprovals={pendingApprovals}
             history={executionHistory}
             isLoading={isExecutionLoading}
+            isError={Boolean(isExecutionError)}
+            errorMessage={
+              isExecutionError
+                ? "Não foi possível carregar aprovações ou histórico desta conversa."
+                : undefined
+            }
+            onRetry={onRetryExecution}
             onApprove={onApproveExecution}
             onExecute={onExecuteExecution}
             onCancel={onCancelExecution}
@@ -1083,12 +1172,25 @@ function OperationalContextColumn({
           />
 
           <section className="px-1 py-1">
-            <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Próximo agendamento</p>
-            <p className="mt-1 font-medium">{context?.nextAppointment?.serviceName ?? NO_APPOINTMENT_TEXT}</p>
-            <p className="text-[11px] text-[var(--text-muted)]">{context?.nextAppointment?.scheduledAt ? fmtDateTime(context?.nextAppointment?.scheduledAt) : NO_APPOINTMENT_TEXT}</p>
-            <span className="mt-1 inline-flex whitespace-nowrap rounded-full border border-amber-400/30 bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-100">{context?.nextAppointment?.status ?? "--"}</span>
-            {highlightedAppointmentId && context?.nextAppointment?.id === highlightedAppointmentId ? (
-              <p className="mt-1 text-[10px] text-[var(--accent-primary)]">Sugestão: Confirmar agendamento.</p>
+            <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+              Próximo agendamento
+            </p>
+            <p className="mt-1 font-medium">
+              {context?.nextAppointment?.serviceName ?? NO_APPOINTMENT_TEXT}
+            </p>
+            <p className="text-[11px] text-[var(--text-muted)]">
+              {context?.nextAppointment?.scheduledAt
+                ? fmtDateTime(context?.nextAppointment?.scheduledAt)
+                : NO_APPOINTMENT_TEXT}
+            </p>
+            <span className="mt-1 inline-flex whitespace-nowrap rounded-full border border-amber-400/30 bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-100">
+              {context?.nextAppointment?.status ?? "--"}
+            </span>
+            {highlightedAppointmentId &&
+            context?.nextAppointment?.id === highlightedAppointmentId ? (
+              <p className="mt-1 text-[10px] text-[var(--accent-primary)]">
+                Sugestão: Confirmar agendamento.
+              </p>
             ) : null}
             <Button
               type="button"
@@ -1096,19 +1198,37 @@ function OperationalContextColumn({
               variant="outline"
               className="mt-3 h-7 text-[11px]"
               disabled={!hasAppointment}
-              onClick={() => context?.nextAppointment?.id && onNavigate(`/appointments?appointmentId=${context.nextAppointment.id}`)}
+              onClick={() =>
+                context?.nextAppointment?.id &&
+                onNavigate(
+                  `/appointments?appointmentId=${context.nextAppointment.id}`
+                )
+              }
             >
               Ver agendamento
             </Button>
           </section>
 
           <section className="px-1 py-1">
-            <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Ordem de serviço</p>
-            <p className="mt-1 font-medium">{context?.activeServiceOrder?.number ? `OS #${context.activeServiceOrder.number}` : NO_SERVICE_ORDER_TEXT}</p>
-            <p className="text-[11px] text-[var(--text-muted)]">Status: {context?.activeServiceOrder?.status ?? "--"}</p>
-            <p className="text-[11px] text-[var(--text-muted)]">Técnico: {context?.activeServiceOrder?.technician ?? "--"}</p>
-            {highlightedServiceOrderId && context?.activeServiceOrder?.id === highlightedServiceOrderId ? (
-              <p className="mt-1 text-[10px] text-[var(--accent-primary)]">Sugestão: Atualizar cliente sobre serviço.</p>
+            <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+              Ordem de serviço
+            </p>
+            <p className="mt-1 font-medium">
+              {context?.activeServiceOrder?.number
+                ? `OS #${context.activeServiceOrder.number}`
+                : NO_SERVICE_ORDER_TEXT}
+            </p>
+            <p className="text-[11px] text-[var(--text-muted)]">
+              Status: {context?.activeServiceOrder?.status ?? "--"}
+            </p>
+            <p className="text-[11px] text-[var(--text-muted)]">
+              Técnico: {context?.activeServiceOrder?.technician ?? "--"}
+            </p>
+            {highlightedServiceOrderId &&
+            context?.activeServiceOrder?.id === highlightedServiceOrderId ? (
+              <p className="mt-1 text-[10px] text-[var(--accent-primary)]">
+                Sugestão: Atualizar cliente sobre serviço.
+              </p>
             ) : null}
             <Button
               type="button"
@@ -1116,22 +1236,43 @@ function OperationalContextColumn({
               variant="outline"
               className="mt-3 h-7 text-[11px]"
               disabled={!hasServiceOrder}
-              onClick={() => context?.activeServiceOrder?.id && onNavigate(`/service-orders?serviceOrderId=${context.activeServiceOrder.id}`)}
+              onClick={() =>
+                context?.activeServiceOrder?.id &&
+                onNavigate(
+                  `/service-orders?serviceOrderId=${context.activeServiceOrder.id}`
+                )
+              }
             >
               Ver O.S.
             </Button>
           </section>
 
           <section className="px-1 py-1">
-            <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Cobrança</p>
-            <p className="mt-1 font-medium">{context?.openCharge?.id ? `Cobrança #${context.openCharge.id}` : NO_CHARGE_TEXT}</p>
-            <p className="text-[11px] text-[var(--text-muted)]">Vencimento: {fmtDateTime(context?.openCharge?.dueDate)}</p>
-            <p className="text-[11px]">
-              Valor: {context?.openCharge?.amount ? `R$ ${(context.openCharge.amount / 100).toFixed(2).replace(".", ",")}` : "--"}
+            <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+              Cobrança
             </p>
-            <span className="mt-1 inline-flex whitespace-nowrap rounded-full border border-rose-400/35 bg-rose-500/10 px-2 py-0.5 text-[10px] text-rose-100">{context?.openCharge?.status ?? "--"}</span>
-            {highlightedChargeId && context?.openCharge?.id === highlightedChargeId ? (
-              <p className="mt-1 text-[10px] text-[var(--accent-primary)]">Sugestão: Enviar cobrança.</p>
+            <p className="mt-1 font-medium">
+              {context?.openCharge?.id
+                ? `Cobrança #${context.openCharge.id}`
+                : NO_CHARGE_TEXT}
+            </p>
+            <p className="text-[11px] text-[var(--text-muted)]">
+              Vencimento: {fmtDateTime(context?.openCharge?.dueDate)}
+            </p>
+            <p className="text-[11px]">
+              Valor:{" "}
+              {context?.openCharge?.amount
+                ? `R$ ${(context.openCharge.amount / 100).toFixed(2).replace(".", ",")}`
+                : "--"}
+            </p>
+            <span className="mt-1 inline-flex whitespace-nowrap rounded-full border border-rose-400/35 bg-rose-500/10 px-2 py-0.5 text-[10px] text-rose-100">
+              {context?.openCharge?.status ?? "--"}
+            </span>
+            {highlightedChargeId &&
+            context?.openCharge?.id === highlightedChargeId ? (
+              <p className="mt-1 text-[10px] text-[var(--accent-primary)]">
+                Sugestão: Enviar cobrança.
+              </p>
             ) : null}
             <Button
               type="button"
@@ -1139,34 +1280,77 @@ function OperationalContextColumn({
               variant="outline"
               className="mt-3 h-7 text-[11px]"
               disabled={!hasCharge}
-              onClick={() => context?.openCharge?.id && onNavigate(`/finances?chargeId=${context.openCharge.id}`)}
+              onClick={() =>
+                context?.openCharge?.id &&
+                onNavigate(`/finances?chargeId=${context.openCharge.id}`)
+              }
             >
               Ver cobrança
             </Button>
           </section>
 
           <section className="px-1 py-1">
-            <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Última interação</p>
-            <p className="mt-1">{context?.lastInteraction?.direction ?? "--"}</p>
-            <p className="text-[11px] text-[var(--text-muted)]">{fmtDateTime(context?.lastInteraction?.createdAt)}</p>
-            <span className="mt-1 inline-flex whitespace-nowrap rounded-full border border-emerald-400/35 bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-100">{context?.lastInteraction?.status ?? "--"}</span>
+            <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+              Última interação
+            </p>
+            <p className="mt-1">
+              {context?.lastInteraction?.direction ?? "--"}
+            </p>
+            <p className="text-[11px] text-[var(--text-muted)]">
+              {fmtDateTime(context?.lastInteraction?.createdAt)}
+            </p>
+            <span className="mt-1 inline-flex whitespace-nowrap rounded-full border border-emerald-400/35 bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-100">
+              {context?.lastInteraction?.status ?? "--"}
+            </span>
           </section>
 
           <section className="px-1 py-1">
-            <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Action cockpit</p>
+            <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+              Action cockpit
+            </p>
             <div className="mt-2.5 grid grid-cols-1 gap-2">
-              <Button type="button" size="sm" variant="outline" className="h-8 w-full min-w-0 justify-start truncate px-2.5 text-[11px]" onClick={onSendCharge}>Enviar cobrança</Button>
               <Button
                 type="button"
                 size="sm"
                 variant="outline"
                 className="h-8 w-full min-w-0 justify-start truncate px-2.5 text-[11px]"
-                onClick={() => onNavigate(context?.openCharge?.id ? `/finances?chargeId=${context.openCharge.id}&action=register-payment` : "/finances")}
+                onClick={onSendCharge}
+              >
+                Enviar cobrança
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 w-full min-w-0 justify-start truncate px-2.5 text-[11px]"
+                onClick={() =>
+                  onNavigate(
+                    context?.openCharge?.id
+                      ? `/finances?chargeId=${context.openCharge.id}&action=register-payment`
+                      : "/finances"
+                  )
+                }
               >
                 Registrar pagamento
               </Button>
-              <Button type="button" size="sm" variant="outline" className="h-8 w-full min-w-0 justify-start truncate px-2.5 text-[11px]" onClick={onSendReminder}>Enviar lembrete</Button>
-              <Button type="button" size="sm" variant="outline" className="h-8 w-full min-w-0 justify-start truncate px-2.5 text-[11px]" onClick={onMoreActions}>Mais ações</Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 w-full min-w-0 justify-start truncate px-2.5 text-[11px]"
+                onClick={onSendReminder}
+              >
+                Enviar lembrete
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 w-full min-w-0 justify-start truncate px-2.5 text-[11px]"
+                onClick={onMoreActions}
+              >
+                Mais ações
+              </Button>
             </div>
           </section>
         </div>
@@ -1177,7 +1361,10 @@ function OperationalContextColumn({
 
 export default function WhatsAppPage() {
   const [location, setLocation] = useLocation();
-  const searchParams = useMemo(() => new URLSearchParams(location.split("?")[1] ?? ""), [location]);
+  const searchParams = useMemo(
+    () => new URLSearchParams(location.split("?")[1] ?? ""),
+    [location]
+  );
   const queryConversationId = searchParams.get("conversationId");
   const queryCustomerId = searchParams.get("customerId");
   const queryChargeId = searchParams.get("chargeId");
@@ -1185,21 +1372,34 @@ export default function WhatsAppPage() {
   const queryServiceOrderId = searchParams.get("serviceOrderId");
   const queryTemplate = searchParams.get("template");
 
-  const [selectedConversationId, setSelectedConversationId] = useOperationalMemoryState<string | null>(
-    "nexo.whatsapp.selected-conversation.v1",
-    queryConversationId ?? (queryCustomerId ? `customer:${queryCustomerId}` : null)
+  const [selectedConversationId, setSelectedConversationId] =
+    useOperationalMemoryState<string | null>(
+      "nexo.whatsapp.selected-conversation.v1",
+      queryConversationId ??
+        (queryCustomerId ? `customer:${queryCustomerId}` : null)
+    );
+  const [searchTerm, setSearchTerm] = useOperationalMemoryState(
+    "nexo.whatsapp.search.v2",
+    ""
   );
-  const [searchTerm, setSearchTerm] = useOperationalMemoryState("nexo.whatsapp.search.v2", "");
-  const [activeFilter, setActiveFilter] = useOperationalMemoryState<ConversationFilter>(
-    "nexo.whatsapp.filter.v3",
-    "critical_now"
+  const [activeFilter, setActiveFilter] =
+    useOperationalMemoryState<ConversationFilter>(
+      "nexo.whatsapp.filter.v3",
+      "critical_now"
+    );
+  const [content, setContent] = useOperationalMemoryState(
+    "nexo.whatsapp.composer.v2",
+    ""
   );
-  const [content, setContent] = useOperationalMemoryState("nexo.whatsapp.composer.v2", "");
-  const [selectedIntent, setSelectedIntent] = useOperationalMemoryState<"PAYMENT"|"APPOINTMENT"|"SERVICE_UPDATE"|"GENERAL">("nexo.whatsapp.intent.v1", "GENERAL");
+  const [selectedIntent, setSelectedIntent] = useOperationalMemoryState<
+    "PAYMENT" | "APPOINTMENT" | "SERVICE_UPDATE" | "GENERAL"
+  >("nexo.whatsapp.intent.v1", "GENERAL");
   const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
   const [isContextVisible, setIsContextVisible] = useState(true);
   const [composerError, setComposerError] = useState<string | null>(null);
-  const [localFavorites, setLocalFavorites] = useState<Record<string, boolean>>({});
+  const [localFavorites, setLocalFavorites] = useState<Record<string, boolean>>(
+    {}
+  );
   const didAutoSelectFromQueryRef = useRef(false);
   const hasManualSelectionRef = useRef(false);
   const shouldPromoteVirtualSelectionRef = useRef(false);
@@ -1218,22 +1418,38 @@ export default function WhatsAppPage() {
     return input;
   }, [activeFilter, debouncedSearch]);
 
-  const healthQuery = trpc.nexo.whatsapp.health.useQuery(undefined, { retry: false });
-  const conversationsQuery = trpc.nexo.whatsapp.listConversations.useQuery(filtersInput, {
+  const healthQuery = trpc.nexo.whatsapp.health.useQuery(undefined, {
     retry: false,
   });
+  const conversationsQuery = trpc.nexo.whatsapp.listConversations.useQuery(
+    filtersInput,
+    {
+      retry: false,
+    }
+  );
 
   const conversations = useMemo(
-    () => (Array.isArray(conversationsQuery.data) ? conversationsQuery.data.map(mapConversation) : []),
+    () =>
+      Array.isArray(conversationsQuery.data)
+        ? conversationsQuery.data.map(mapConversation)
+        : [],
     [conversationsQuery.data]
   );
   const customersQuery = trpc.nexo.customers.list.useQuery(
     { page: 1, limit: 300 },
     { retry: false, enabled: true }
   );
-  const appointmentsQuery = trpc.nexo.appointments.list.useQuery(undefined, { retry: false });
-  const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery({ page: 1, limit: 500 }, { retry: false });
-  const chargesQuery = trpc.finance.charges.list.useQuery({ page: 1, limit: 500 }, { retry: false });
+  const appointmentsQuery = trpc.nexo.appointments.list.useQuery(undefined, {
+    retry: false,
+  });
+  const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery(
+    { page: 1, limit: 500 },
+    { retry: false }
+  );
+  const chargesQuery = trpc.finance.charges.list.useQuery(
+    { page: 1, limit: 500 },
+    { retry: false }
+  );
   const customers = useMemo(
     () => normalizeCustomersPayload(customersQuery.data),
     [customersQuery.data]
@@ -1258,14 +1474,30 @@ export default function WhatsAppPage() {
   }, [chargesQuery.data]);
   const deepLinkCustomerId = useMemo(() => {
     if (queryCustomerId) return queryCustomerId;
-    const chargeCustomerId = charges.find((charge: any) => String(charge?.id ?? "") === String(queryChargeId ?? ""))?.customerId;
+    const chargeCustomerId = charges.find(
+      (charge: any) => String(charge?.id ?? "") === String(queryChargeId ?? "")
+    )?.customerId;
     if (chargeCustomerId) return String(chargeCustomerId);
-    const appointmentCustomerId = appointments.find((appointment: any) => String(appointment?.id ?? "") === String(queryAppointmentId ?? ""))?.customerId;
+    const appointmentCustomerId = appointments.find(
+      (appointment: any) =>
+        String(appointment?.id ?? "") === String(queryAppointmentId ?? "")
+    )?.customerId;
     if (appointmentCustomerId) return String(appointmentCustomerId);
-    const serviceOrderCustomerId = serviceOrders.find((serviceOrder: any) => String(serviceOrder?.id ?? "") === String(queryServiceOrderId ?? ""))?.customerId;
+    const serviceOrderCustomerId = serviceOrders.find(
+      (serviceOrder: any) =>
+        String(serviceOrder?.id ?? "") === String(queryServiceOrderId ?? "")
+    )?.customerId;
     if (serviceOrderCustomerId) return String(serviceOrderCustomerId);
     return null;
-  }, [appointments, charges, queryAppointmentId, queryChargeId, queryCustomerId, queryServiceOrderId, serviceOrders]);
+  }, [
+    appointments,
+    charges,
+    queryAppointmentId,
+    queryChargeId,
+    queryCustomerId,
+    queryServiceOrderId,
+    serviceOrders,
+  ]);
 
   const conversationCustomerIds = useMemo(
     () =>
@@ -1279,95 +1511,142 @@ export default function WhatsAppPage() {
   const customersWithoutConversation = useMemo(
     () =>
       customers
-        .filter((customer: any) => customer?.id && !conversationCustomerIds.has(String(customer.id)))
-        .map((customer: any): Conversation => ({
-          id: `customer:${String(customer.id)}`,
-          conversationId: null,
-          customerId: String(customer.id),
-          name: String(customer?.name ?? "Sem nome"),
-          phone: customer?.phone ? String(customer.phone) : null,
-          title: "Sem conversa ativa",
-          lastMessage: "Sem conversa ativa",
-          lastMessageAt: null,
-          status: "OPEN",
-          contextType: "GENERAL",
-          priority: "LOW",
-          unreadCount: 0,
-          contextId: String(customer.id),
-          operationalStatus: "Sem conversa ativa",
-          contextHint: "Sem conversa ativa",
-          hasPendingCharge: charges.some((charge: any) => String(charge?.customerId ?? "") === String(customer.id) && ["PENDING", "OVERDUE"].includes(String(charge?.status ?? ""))),
-          hasUpcomingAppointment: appointments.some((appointment: any) => String(appointment?.customerId ?? "") === String(customer.id) && String(appointment?.status ?? "").toUpperCase() !== "CANCELED"),
-          hasActiveServiceOrder: serviceOrders.some((serviceOrder: any) => String(serviceOrder?.customerId ?? "") === String(customer.id) && !["DONE", "CANCELED"].includes(String(serviceOrder?.status ?? "").toUpperCase())),
-          hasFailedDelivery: false,
-          isVirtual: true,
-          customer: {
-            id: String(customer.id),
+        .filter(
+          (customer: any) =>
+            customer?.id && !conversationCustomerIds.has(String(customer.id))
+        )
+        .map(
+          (customer: any): Conversation => ({
+            id: `customer:${String(customer.id)}`,
+            conversationId: null,
+            customerId: String(customer.id),
             name: String(customer?.name ?? "Sem nome"),
             phone: customer?.phone ? String(customer.phone) : null,
-          },
-        })),
+            title: "Sem conversa ativa",
+            lastMessage: "Sem conversa ativa",
+            lastMessageAt: null,
+            status: "OPEN",
+            contextType: "GENERAL",
+            priority: "LOW",
+            unreadCount: 0,
+            contextId: String(customer.id),
+            operationalStatus: "Sem conversa ativa",
+            contextHint: "Sem conversa ativa",
+            hasPendingCharge: charges.some(
+              (charge: any) =>
+                String(charge?.customerId ?? "") === String(customer.id) &&
+                ["PENDING", "OVERDUE"].includes(String(charge?.status ?? ""))
+            ),
+            hasUpcomingAppointment: appointments.some(
+              (appointment: any) =>
+                String(appointment?.customerId ?? "") === String(customer.id) &&
+                String(appointment?.status ?? "").toUpperCase() !== "CANCELED"
+            ),
+            hasActiveServiceOrder: serviceOrders.some(
+              (serviceOrder: any) =>
+                String(serviceOrder?.customerId ?? "") ===
+                  String(customer.id) &&
+                !["DONE", "CANCELED"].includes(
+                  String(serviceOrder?.status ?? "").toUpperCase()
+                )
+            ),
+            hasFailedDelivery: false,
+            isVirtual: true,
+            customer: {
+              id: String(customer.id),
+              name: String(customer?.name ?? "Sem nome"),
+              phone: customer?.phone ? String(customer.phone) : null,
+            },
+          })
+        ),
     [appointments, charges, conversationCustomerIds, customers, serviceOrders]
   );
-  const buildVirtualRowFromCustomer = useCallback((customer: any): Conversation => ({
-    id: `customer:${String(customer.id)}`,
-    conversationId: null,
-    customerId: String(customer.id),
-    name: String(customer?.name ?? "Sem nome"),
-    phone: customer?.phone ? String(customer.phone) : null,
-    title: "Sem conversa ativa",
-    lastMessage: "Sem conversa ativa",
-    lastMessageAt: null,
-    status: "OPEN",
-    contextType: "GENERAL",
-    priority: "LOW",
-    unreadCount: 0,
-    contextId: String(customer.id),
-    operationalStatus: "Sem conversa ativa",
-    contextHint: "Sem conversa ativa",
-    hasPendingCharge: charges.some((charge: any) => String(charge?.customerId ?? "") === String(customer.id) && ["PENDING", "OVERDUE"].includes(String(charge?.status ?? ""))),
-    hasUpcomingAppointment: appointments.some((appointment: any) => String(appointment?.customerId ?? "") === String(customer.id) && String(appointment?.status ?? "").toUpperCase() !== "CANCELED"),
-    hasActiveServiceOrder: serviceOrders.some((serviceOrder: any) => String(serviceOrder?.customerId ?? "") === String(customer.id) && !["DONE", "CANCELED"].includes(String(serviceOrder?.status ?? "").toUpperCase())),
-    hasFailedDelivery: false,
-    isVirtual: true,
-    customer: {
-      id: String(customer.id),
+  const buildVirtualRowFromCustomer = useCallback(
+    (customer: any): Conversation => ({
+      id: `customer:${String(customer.id)}`,
+      conversationId: null,
+      customerId: String(customer.id),
       name: String(customer?.name ?? "Sem nome"),
       phone: customer?.phone ? String(customer.phone) : null,
-    },
-  }), [appointments, charges, serviceOrders]);
+      title: "Sem conversa ativa",
+      lastMessage: "Sem conversa ativa",
+      lastMessageAt: null,
+      status: "OPEN",
+      contextType: "GENERAL",
+      priority: "LOW",
+      unreadCount: 0,
+      contextId: String(customer.id),
+      operationalStatus: "Sem conversa ativa",
+      contextHint: "Sem conversa ativa",
+      hasPendingCharge: charges.some(
+        (charge: any) =>
+          String(charge?.customerId ?? "") === String(customer.id) &&
+          ["PENDING", "OVERDUE"].includes(String(charge?.status ?? ""))
+      ),
+      hasUpcomingAppointment: appointments.some(
+        (appointment: any) =>
+          String(appointment?.customerId ?? "") === String(customer.id) &&
+          String(appointment?.status ?? "").toUpperCase() !== "CANCELED"
+      ),
+      hasActiveServiceOrder: serviceOrders.some(
+        (serviceOrder: any) =>
+          String(serviceOrder?.customerId ?? "") === String(customer.id) &&
+          !["DONE", "CANCELED"].includes(
+            String(serviceOrder?.status ?? "").toUpperCase()
+          )
+      ),
+      hasFailedDelivery: false,
+      isVirtual: true,
+      customer: {
+        id: String(customer.id),
+        name: String(customer?.name ?? "Sem nome"),
+        phone: customer?.phone ? String(customer.phone) : null,
+      },
+    }),
+    [appointments, charges, serviceOrders]
+  );
   const allInboxRows = useMemo(
     () => [...conversations, ...customersWithoutConversation],
     [conversations, customersWithoutConversation]
   );
   const filteredRows = useMemo(() => {
     const query = debouncedSearch.trim().toLowerCase();
-    return allInboxRows.filter(item => {
-      const searchable = [
-        item.customer?.name ?? item.name,
-        item.customer?.phone ?? item.phone ?? "",
-        item.title ?? "",
-        item.phone ?? "",
-        item.lastMessage,
-        item.contextHint ?? "",
-        item.operationalStatus ?? "",
-      ].join(" ").toLowerCase();
-      const matchesSearch = !query
-        || searchable.includes(query);
-      if (!matchesSearch) return false;
-      if (activeFilter === "critical_now") return item.priority === "CRITICAL" || item.status === "FAILED";
-      if (!item.conversationId) return Boolean(query);
-      if (activeFilter === "waiting_customer") return item.unreadCount > 0 || item.hasNoResponse;
-      if (activeFilter === "today_commitments") return item.contextType === "APPOINTMENT" || item.contextType === "SERVICE_ORDER" || item.hasPendingCharge;
-      if (activeFilter === "resolved") return item.status === "RESOLVED";
-      return true;
-    }).sort((a, b) => {
-      const scoreDiff = priorityScore(a) - priorityScore(b);
-      if (scoreDiff !== 0) return scoreDiff;
-      const aDate = new Date(a.lastMessageAt ?? 0).getTime();
-      const bDate = new Date(b.lastMessageAt ?? 0).getTime();
-      return bDate - aDate;
-    });
+    return allInboxRows
+      .filter(item => {
+        const searchable = [
+          item.customer?.name ?? item.name,
+          item.customer?.phone ?? item.phone ?? "",
+          item.title ?? "",
+          item.phone ?? "",
+          item.lastMessage,
+          item.contextHint ?? "",
+          item.operationalStatus ?? "",
+        ]
+          .join(" ")
+          .toLowerCase();
+        const matchesSearch = !query || searchable.includes(query);
+        if (!matchesSearch) return false;
+        if (activeFilter === "critical_now")
+          return item.priority === "CRITICAL" || item.status === "FAILED";
+        if (!item.conversationId) return Boolean(query);
+        if (activeFilter === "waiting_customer")
+          return item.unreadCount > 0 || item.hasNoResponse;
+        if (activeFilter === "today_commitments")
+          return (
+            item.contextType === "APPOINTMENT" ||
+            item.contextType === "SERVICE_ORDER" ||
+            item.hasPendingCharge
+          );
+        if (activeFilter === "resolved") return item.status === "RESOLVED";
+        return true;
+      })
+      .sort((a, b) => {
+        const scoreDiff = priorityScore(a) - priorityScore(b);
+        if (scoreDiff !== 0) return scoreDiff;
+        const aDate = new Date(a.lastMessageAt ?? 0).getTime();
+        const bDate = new Date(b.lastMessageAt ?? 0).getTime();
+        return bDate - aDate;
+      });
   }, [activeFilter, allInboxRows, debouncedSearch]);
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -1402,12 +1681,18 @@ export default function WhatsAppPage() {
   ]);
   const emptyStateMessage = useMemo(() => {
     if (customersQuery.error) return "Erro ao carregar clientes";
-    if (!customersQuery.isLoading && !customersQuery.isFetching && customers.length === 0) {
+    if (
+      !customersQuery.isLoading &&
+      !customersQuery.isFetching &&
+      customers.length === 0
+    ) {
       return "Nenhum cliente carregado";
     }
-    if (allInboxRows.length > 0 && filteredRows.length === 0) return "Nenhum resultado para esta busca";
+    if (allInboxRows.length > 0 && filteredRows.length === 0)
+      return "Nenhum resultado para esta busca";
     if (debouncedSearch.trim()) return "Nenhum resultado para esta busca";
-    if (activeFilter === "critical_now") return "Nenhuma conversa crítica agora.";
+    if (activeFilter === "critical_now")
+      return "Nenhuma conversa crítica agora.";
     return "Nenhum cliente encontrado.";
   }, [
     activeFilter,
@@ -1422,19 +1707,31 @@ export default function WhatsAppPage() {
 
   const selectedConversation = useMemo(
     () =>
-      filteredRows.find(item => item.id === selectedConversationId)
-      ?? allInboxRows.find(item => item.id === selectedConversationId),
+      filteredRows.find(item => item.id === selectedConversationId) ??
+      allInboxRows.find(item => item.id === selectedConversationId),
     [allInboxRows, filteredRows, selectedConversationId]
   );
-  const selectedConversationRecordId = selectedConversation?.conversationId ?? null;
+  const selectedConversationRecordId =
+    selectedConversation?.conversationId ?? null;
 
   useEffect(() => {
     if (hasManualSelectionRef.current) return;
-    const conversationsReady = !conversationsQuery.isLoading && !conversationsQuery.isFetching;
-    const customersReady = !customersQuery.isLoading && !customersQuery.isFetching;
-    if ((deepLinkCustomerId || queryConversationId) && !didAutoSelectFromQueryRef.current && conversationsReady && customersReady) {
+    const conversationsReady =
+      !conversationsQuery.isLoading && !conversationsQuery.isFetching;
+    const customersReady =
+      !customersQuery.isLoading && !customersQuery.isFetching;
+    if (
+      (deepLinkCustomerId || queryConversationId) &&
+      !didAutoSelectFromQueryRef.current &&
+      conversationsReady &&
+      customersReady
+    ) {
       if (queryConversationId) {
-        const byConversation = allInboxRows.find(item => item.conversationId === queryConversationId || item.id === queryConversationId);
+        const byConversation = allInboxRows.find(
+          item =>
+            item.conversationId === queryConversationId ||
+            item.id === queryConversationId
+        );
         if (byConversation) {
           setSelectedConversationId(byConversation.id);
           didAutoSelectFromQueryRef.current = true;
@@ -1442,17 +1739,30 @@ export default function WhatsAppPage() {
         }
       }
       if (deepLinkCustomerId) {
-        const existingConversation = allInboxRows.find(item => item.customerId === deepLinkCustomerId && Boolean(item.conversationId));
-        const virtualCustomer = allInboxRows.find(item => item.id === `customer:${deepLinkCustomerId}`)
-          ?? (() => {
-            const customer = customers.find((item: any) => String(item?.id ?? "") === String(deepLinkCustomerId));
+        const existingConversation = allInboxRows.find(
+          item =>
+            item.customerId === deepLinkCustomerId &&
+            Boolean(item.conversationId)
+        );
+        const virtualCustomer =
+          allInboxRows.find(
+            item => item.id === `customer:${deepLinkCustomerId}`
+          ) ??
+          (() => {
+            const customer = customers.find(
+              (item: any) =>
+                String(item?.id ?? "") === String(deepLinkCustomerId)
+            );
             return customer ? buildVirtualRowFromCustomer(customer) : null;
           })();
         if (!existingConversation && !virtualCustomer && import.meta.env.DEV) {
-          console.debug("[WhatsAppPage] customerId from URL not found in customers dataset", {
-            queryCustomerId: deepLinkCustomerId,
-            normalizedCustomersLength: customers.length,
-          });
+          console.debug(
+            "[WhatsAppPage] customerId from URL not found in customers dataset",
+            {
+              queryCustomerId: deepLinkCustomerId,
+              normalizedCustomersLength: customers.length,
+            }
+          );
         }
         const nextSelection = existingConversation ?? virtualCustomer;
         if (nextSelection?.id) {
@@ -1494,13 +1804,21 @@ export default function WhatsAppPage() {
     const customerId = selectedConversation?.customerId;
     if (!customerId) return;
     const existingConversation = conversations.find(
-      (item) => item.customerId === customerId && Boolean(item.conversationId)
+      item => item.customerId === customerId && Boolean(item.conversationId)
     );
-    if (existingConversation?.id && existingConversation.id !== selectedConversationId) {
+    if (
+      existingConversation?.id &&
+      existingConversation.id !== selectedConversationId
+    ) {
       shouldPromoteVirtualSelectionRef.current = false;
       setSelectedConversationId(existingConversation.id);
     }
-  }, [conversations, selectedConversation?.customerId, selectedConversationId, setSelectedConversationId]);
+  }, [
+    conversations,
+    selectedConversation?.customerId,
+    selectedConversationId,
+    setSelectedConversationId,
+  ]);
 
   const conversationDetailsQuery = trpc.nexo.whatsapp.getConversation.useQuery(
     { id: selectedConversationRecordId ?? "" },
@@ -1515,30 +1833,46 @@ export default function WhatsAppPage() {
     { conversationId: selectedConversationRecordId ?? "" },
     { enabled: Boolean(selectedConversationRecordId), retry: false }
   );
-  const pendingApprovalsQuery = trpc.nexo.whatsapp.listPendingApprovals.useQuery(
-    { limit: 25 },
-    { enabled: Boolean(selectedConversationRecordId), retry: false }
-  );
-  const executionHistoryQuery = trpc.nexo.whatsapp.listExecutionHistory.useQuery(
-    { conversationId: selectedConversationRecordId ?? undefined, limit: 25 },
-    { enabled: Boolean(selectedConversationRecordId), retry: false }
-  );
+  const pendingApprovalsQuery =
+    trpc.nexo.whatsapp.listPendingApprovals.useQuery(
+      { limit: 25 },
+      { enabled: Boolean(selectedConversationRecordId), retry: false }
+    );
+  const executionHistoryQuery =
+    trpc.nexo.whatsapp.listExecutionHistory.useQuery(
+      { conversationId: selectedConversationRecordId ?? undefined, limit: 25 },
+      { enabled: Boolean(selectedConversationRecordId), retry: false }
+    );
 
   const sendMessageMutation = trpc.nexo.whatsapp.sendMessage.useMutation();
   const sendTemplateMutation = trpc.nexo.whatsapp.sendTemplate.useMutation();
   const retryMessageMutation = trpc.nexo.whatsapp.retryMessage.useMutation();
-  const requestExecutionMutation = trpc.nexo.whatsapp.requestExecution.useMutation();
-  const approveExecutionMutation = trpc.nexo.whatsapp.approveExecution.useMutation();
-  const executeExecutionMutation = trpc.nexo.whatsapp.executeExecution.useMutation();
-  const cancelExecutionMutation = trpc.nexo.whatsapp.cancelExecution.useMutation();
+  const requestExecutionMutation =
+    trpc.nexo.whatsapp.requestExecution.useMutation();
+  const approveExecutionMutation =
+    trpc.nexo.whatsapp.approveExecution.useMutation();
+  const executeExecutionMutation =
+    trpc.nexo.whatsapp.executeExecution.useMutation();
+  const cancelExecutionMutation =
+    trpc.nexo.whatsapp.cancelExecution.useMutation();
 
   const pendingApprovals = useMemo(
-    () => (Array.isArray(pendingApprovalsQuery.data) ? (pendingApprovalsQuery.data as WhatsAppActionExecution[]) : [])
-      .filter(item => !selectedConversationRecordId || item.conversationId === selectedConversationRecordId),
+    () =>
+      (Array.isArray(pendingApprovalsQuery.data)
+        ? (pendingApprovalsQuery.data as WhatsAppActionExecution[])
+        : []
+      ).filter(
+        item =>
+          !selectedConversationRecordId ||
+          item.conversationId === selectedConversationRecordId
+      ),
     [pendingApprovalsQuery.data, selectedConversationRecordId]
   );
   const executionHistory = useMemo(
-    () => (Array.isArray(executionHistoryQuery.data) ? (executionHistoryQuery.data as WhatsAppActionExecution[]) : []),
+    () =>
+      Array.isArray(executionHistoryQuery.data)
+        ? (executionHistoryQuery.data as WhatsAppActionExecution[])
+        : [],
     [executionHistoryQuery.data]
   );
 
@@ -1549,63 +1883,111 @@ export default function WhatsAppPage() {
         : [],
     [messagesQuery.data, selectedConversationRecordId]
   );
-  const selectedCustomer = useMemo(
-    () => {
-      const activeCustomerId = selectedConversation?.customerId ?? deepLinkCustomerId ?? "";
-      return customers.find((customer: any) => String(customer?.id ?? "") === String(activeCustomerId)) ?? null;
-    },
-    [customers, deepLinkCustomerId, selectedConversation?.customerId]
-  );
+  const selectedCustomer = useMemo(() => {
+    const activeCustomerId =
+      selectedConversation?.customerId ?? deepLinkCustomerId ?? "";
+    return (
+      customers.find(
+        (customer: any) =>
+          String(customer?.id ?? "") === String(activeCustomerId)
+      ) ?? null
+    );
+  }, [customers, deepLinkCustomerId, selectedConversation?.customerId]);
   const selectedCustomerCharge = useMemo(
-    () => charges.find((charge: any) => String(charge?.customerId ?? "") === String(selectedCustomer?.id ?? "") && ["PENDING", "OVERDUE"].includes(String(charge?.status ?? "").toUpperCase()))
-      ?? charges.find((charge: any) => String(charge?.id ?? "") === String(queryChargeId ?? "")) ?? null,
+    () =>
+      charges.find(
+        (charge: any) =>
+          String(charge?.customerId ?? "") ===
+            String(selectedCustomer?.id ?? "") &&
+          ["PENDING", "OVERDUE"].includes(
+            String(charge?.status ?? "").toUpperCase()
+          )
+      ) ??
+      charges.find(
+        (charge: any) =>
+          String(charge?.id ?? "") === String(queryChargeId ?? "")
+      ) ??
+      null,
     [charges, queryChargeId, selectedCustomer?.id]
   );
   const selectedCustomerAppointment = useMemo(
-    () => appointments.find((appointment: any) => String(appointment?.id ?? "") === String(queryAppointmentId ?? ""))
-      ?? appointments.find((appointment: any) => String(appointment?.customerId ?? "") === String(selectedCustomer?.id ?? "") && String(appointment?.status ?? "").toUpperCase() !== "CANCELED")
-      ?? null,
+    () =>
+      appointments.find(
+        (appointment: any) =>
+          String(appointment?.id ?? "") === String(queryAppointmentId ?? "")
+      ) ??
+      appointments.find(
+        (appointment: any) =>
+          String(appointment?.customerId ?? "") ===
+            String(selectedCustomer?.id ?? "") &&
+          String(appointment?.status ?? "").toUpperCase() !== "CANCELED"
+      ) ??
+      null,
     [appointments, queryAppointmentId, selectedCustomer?.id]
   );
   const selectedCustomerServiceOrder = useMemo(
-    () => serviceOrders.find((serviceOrder: any) => String(serviceOrder?.id ?? "") === String(queryServiceOrderId ?? ""))
-      ?? serviceOrders.find((serviceOrder: any) => String(serviceOrder?.customerId ?? "") === String(selectedCustomer?.id ?? "") && !["DONE", "CANCELED"].includes(String(serviceOrder?.status ?? "").toUpperCase()))
-      ?? null,
+    () =>
+      serviceOrders.find(
+        (serviceOrder: any) =>
+          String(serviceOrder?.id ?? "") === String(queryServiceOrderId ?? "")
+      ) ??
+      serviceOrders.find(
+        (serviceOrder: any) =>
+          String(serviceOrder?.customerId ?? "") ===
+            String(selectedCustomer?.id ?? "") &&
+          !["DONE", "CANCELED"].includes(
+            String(serviceOrder?.status ?? "").toUpperCase()
+          )
+      ) ??
+      null,
     [queryServiceOrderId, selectedCustomer?.id, serviceOrders]
   );
   const context = useMemo(() => {
-    if (selectedConversationRecordId) return (contextQuery.data ?? null) as WhatsAppContext | null;
+    if (selectedConversationRecordId)
+      return (contextQuery.data ?? null) as WhatsAppContext | null;
     if (selectedCustomer) {
       return {
         customer: {
           id: String(selectedCustomer.id),
-          name: String(selectedCustomer.name ?? selectedConversation?.name ?? "Sem nome"),
-          phone: selectedCustomer.phone ? String(selectedCustomer.phone) : undefined,
+          name: String(
+            selectedCustomer.name ?? selectedConversation?.name ?? "Sem nome"
+          ),
+          phone: selectedCustomer.phone
+            ? String(selectedCustomer.phone)
+            : undefined,
         },
         nextAppointment: selectedCustomerAppointment
           ? {
-            id: String(selectedCustomerAppointment.id),
-            scheduledAt: selectedCustomerAppointment.startsAt ?? selectedCustomerAppointment.scheduledAt,
-            status: selectedCustomerAppointment.status,
-            serviceName: selectedCustomerAppointment.serviceName ?? null,
-          }
+              id: String(selectedCustomerAppointment.id),
+              scheduledAt:
+                selectedCustomerAppointment.startsAt ??
+                selectedCustomerAppointment.scheduledAt,
+              status: selectedCustomerAppointment.status,
+              serviceName: selectedCustomerAppointment.serviceName ?? null,
+            }
           : null,
         activeServiceOrder: selectedCustomerServiceOrder
           ? {
-            id: String(selectedCustomerServiceOrder.id),
-            number: selectedCustomerServiceOrder.number ? String(selectedCustomerServiceOrder.number) : null,
-            status: selectedCustomerServiceOrder.status,
-            technician: selectedCustomerServiceOrder.technicianName ?? null,
-          }
+              id: String(selectedCustomerServiceOrder.id),
+              number: selectedCustomerServiceOrder.number
+                ? String(selectedCustomerServiceOrder.number)
+                : null,
+              status: selectedCustomerServiceOrder.status,
+              technician: selectedCustomerServiceOrder.technicianName ?? null,
+            }
           : null,
         openCharge: selectedCustomerCharge
           ? {
-            id: String(selectedCustomerCharge.id),
-            amount: Number(selectedCustomerCharge.amountCents ?? selectedCustomerCharge.amount ?? 0),
-            dueDate: selectedCustomerCharge.dueDate,
-            status: selectedCustomerCharge.status,
-            paymentLink: selectedCustomerCharge.paymentLink ?? null,
-          }
+              id: String(selectedCustomerCharge.id),
+              amount: Number(
+                selectedCustomerCharge.amountCents ??
+                  selectedCustomerCharge.amount ??
+                  0
+              ),
+              dueDate: selectedCustomerCharge.dueDate,
+              status: selectedCustomerCharge.status,
+              paymentLink: selectedCustomerCharge.paymentLink ?? null,
+            }
           : null,
       } as WhatsAppContext;
     }
@@ -1633,40 +2015,88 @@ export default function WhatsAppPage() {
       contextQuery.refetch(),
       conversationDetailsQuery.refetch(),
     ]);
-  }, [conversationDetailsQuery, contextQuery, conversationsQuery, executionHistoryQuery, messagesQuery, pendingApprovalsQuery]);
+  }, [
+    conversationDetailsQuery,
+    contextQuery,
+    conversationsQuery,
+    executionHistoryQuery,
+    messagesQuery,
+    pendingApprovalsQuery,
+  ]);
 
-  const handleApproveExecution = useCallback(async (execution: WhatsAppActionExecution) => {
-    try {
-      await approveExecutionMutation.mutateAsync({ id: execution.id, reason: "Aprovado no cockpit WhatsApp" });
-      await refreshExecutionState();
-      toast.success("Workflow aprovado.");
-    } catch (error: any) {
-      toast.error(error?.message ?? "Falha ao aprovar workflow.");
-    }
-  }, [approveExecutionMutation, refreshExecutionState]);
+  const handleApproveExecution = useCallback(
+    async (execution: WhatsAppActionExecution) => {
+      try {
+        await approveExecutionMutation.mutateAsync({
+          id: execution.id,
+          reason: "Aprovado no cockpit WhatsApp",
+        });
+        await refreshExecutionState();
+        toast.success("Workflow aprovado.");
+      } catch (error: any) {
+        toast.error(error?.message ?? "Falha ao aprovar workflow.");
+      }
+    },
+    [approveExecutionMutation, refreshExecutionState]
+  );
 
-  const handleExecuteExecution = useCallback(async (execution: WhatsAppActionExecution) => {
-    try {
-      const target = execution.status === "PENDING_APPROVAL"
-        ? await approveExecutionMutation.mutateAsync({ id: execution.id, reason: "Aprovado para execução imediata no cockpit WhatsApp" }) as WhatsAppActionExecution
-        : execution;
-      await executeExecutionMutation.mutateAsync({ id: target.id, reason: "Executado no cockpit WhatsApp" });
-      await refreshExecutionState();
-      toast.success("Workflow executado.");
-    } catch (error: any) {
-      toast.error(error?.message ?? "Falha ao executar workflow.");
-    }
-  }, [approveExecutionMutation, executeExecutionMutation, refreshExecutionState]);
+  const handleExecuteExecution = useCallback(
+    async (execution: WhatsAppActionExecution) => {
+      if (
+        execution.status === "PENDING_APPROVAL" ||
+        execution.approvalRequired
+      ) {
+        toast.message(
+          "Aprove o workflow antes de executar. A execução automática de ações sensíveis está bloqueada."
+        );
+        return;
+      }
+      const confirmed = window.confirm(
+        "Confirmar execução deste workflow WhatsApp agora?"
+      );
+      if (!confirmed) return;
+      try {
+        await executeExecutionMutation.mutateAsync({
+          id: execution.id,
+          reason: "Executado no cockpit WhatsApp",
+        });
+        await refreshExecutionState();
+        toast.success("Workflow executado.");
+      } catch (error: any) {
+        toast.error(error?.message ?? "Falha ao executar workflow.");
+      }
+    },
+    [executeExecutionMutation, refreshExecutionState]
+  );
 
-  const handleCancelExecution = useCallback(async (execution: WhatsAppActionExecution) => {
-    try {
-      await cancelExecutionMutation.mutateAsync({ id: execution.id, reason: "Cancelado no cockpit WhatsApp" });
-      await refreshExecutionState();
-      toast.success("Workflow cancelado.");
-    } catch (error: any) {
-      toast.error(error?.message ?? "Falha ao cancelar workflow.");
-    }
-  }, [cancelExecutionMutation, refreshExecutionState]);
+  const handleCancelExecution = useCallback(
+    async (execution: WhatsAppActionExecution) => {
+      const reason = window.prompt(
+        "Informe o motivo do cancelamento do workflow WhatsApp:",
+        "Cancelado no cockpit WhatsApp"
+      );
+      const normalizedReason = reason?.trim();
+      if (!normalizedReason) {
+        toast.message("Informe um motivo para cancelar o workflow.");
+        return;
+      }
+      const confirmed = window.confirm(
+        "Confirmar cancelamento deste workflow WhatsApp?"
+      );
+      if (!confirmed) return;
+      try {
+        await cancelExecutionMutation.mutateAsync({
+          id: execution.id,
+          reason: normalizedReason,
+        });
+        await refreshExecutionState();
+        toast.success("Workflow cancelado.");
+      } catch (error: any) {
+        toast.error(error?.message ?? "Falha ao cancelar workflow.");
+      }
+    },
+    [cancelExecutionMutation, refreshExecutionState]
+  );
 
   const handleRequestSuggestedExecution = useCallback(async () => {
     if (!selectedConversationRecordId || !suggestedAction?.executableAction) {
@@ -1674,13 +2104,16 @@ export default function WhatsAppPage() {
       return;
     }
     try {
-      const execution = await requestExecutionMutation.mutateAsync({
+      const execution = (await requestExecutionMutation.mutateAsync({
         conversationId: selectedConversationRecordId,
         suggestedAction: suggestedAction.executableAction,
         executionReason: suggestedAction.label,
-        actionPayload: buildActionPayload(suggestedAction.executableAction, context),
+        actionPayload: buildActionPayload(
+          suggestedAction.executableAction,
+          context
+        ),
         idempotencyKey: `whatsapp-ui:${selectedConversationRecordId}:${suggestedAction.executableAction}:${context?.openCharge?.id ?? context?.nextAppointment?.id ?? context?.activeServiceOrder?.id ?? context?.customer?.id ?? "general"}`,
-      }) as WhatsAppActionExecution;
+      })) as WhatsAppActionExecution;
       await refreshExecutionState();
       if (execution.status === "PENDING_APPROVAL") {
         toast.success("Workflow criado e aguardando aprovação.");
@@ -1690,24 +2123,53 @@ export default function WhatsAppPage() {
     } catch (error: any) {
       toast.error(error?.message ?? "Falha ao criar workflow sugerido.");
     }
-  }, [context, refreshExecutionState, requestExecutionMutation, selectedConversationRecordId, suggestedAction]);
+  }, [
+    context,
+    refreshExecutionState,
+    requestExecutionMutation,
+    selectedConversationRecordId,
+    suggestedAction,
+  ]);
 
   const governanceAlert = useMemo(() => {
     if (!selectedConversation) return null;
-    if (!selectedConversation.governanceSignal?.communicationFailure && !selectedConversation.hasFailedDelivery) return null;
-    const parts = ["Sinal de governança: falha de comunicação"]; 
-    if ((selectedConversation.failedMessageCount ?? 0) > 1) parts.push(`${selectedConversation.failedMessageCount} falhas acumuladas`);
+    if (
+      !selectedConversation.governanceSignal?.communicationFailure &&
+      !selectedConversation.hasFailedDelivery
+    )
+      return null;
+    const parts = ["Sinal de governança: falha de comunicação"];
+    if ((selectedConversation.failedMessageCount ?? 0) > 1)
+      parts.push(
+        `${selectedConversation.failedMessageCount} falhas acumuladas`
+      );
     const failedAgo = timeAgoLabel(selectedConversation.lastFailedAt);
     if (failedAgo) parts.push(`última falha ${failedAgo}`);
     return parts.join(" • ");
   }, [selectedConversation]);
 
   const destinationPhone = useMemo(
-    () => String(context?.customer?.phone ?? selectedConversation?.phone ?? selectedCustomer?.phone ?? "").trim(),
-    [context?.customer?.phone, selectedConversation?.phone, selectedCustomer?.phone]
+    () =>
+      String(
+        context?.customer?.phone ??
+          selectedConversation?.phone ??
+          selectedCustomer?.phone ??
+          ""
+      ).trim(),
+    [
+      context?.customer?.phone,
+      selectedConversation?.phone,
+      selectedCustomer?.phone,
+    ]
   );
-  const hasOperationalContext = Boolean(context?.openCharge?.id || context?.nextAppointment?.id || context?.activeServiceOrder?.id || context?.customer?.id);
-  const canComposeForSelected = Boolean(selectedConversationId) && Boolean(destinationPhone);
+  const hasOperationalContext = Boolean(
+    context?.openCharge?.id ||
+    context?.nextAppointment?.id ||
+    context?.activeServiceOrder?.id ||
+    context?.customer?.id
+  );
+  const canComposeForSelected =
+    Boolean(selectedConversationId) && Boolean(destinationPhone);
   const composePlaceholder = selectedConversation
     ? selectedConversationRecordId
       ? "Responder conversa..."
@@ -1726,9 +2188,12 @@ export default function WhatsAppPage() {
       setComposerError("Selecione uma conversa antes de enviar.");
       return;
     }
-    const customerId = context?.customer?.id ?? selectedConversation?.customerId ?? undefined;
+    const customerId =
+      context?.customer?.id ?? selectedConversation?.customerId ?? undefined;
     if (!selectedConversationRecordId && !customerId) {
-      setComposerError("Não foi possível identificar o cliente para iniciar a conversa.");
+      setComposerError(
+        "Não foi possível identificar o cliente para iniciar a conversa."
+      );
       return;
     }
     if (!destinationPhone) {
@@ -1737,7 +2202,9 @@ export default function WhatsAppPage() {
     }
     const finalContent = content.trim();
     if (!hasOperationalContext && selectedIntent !== "GENERAL") {
-      setComposerError("Selecione contexto operacional válido ou use intenção Geral.");
+      setComposerError(
+        "Selecione contexto operacional válido ou use intenção Geral."
+      );
       return;
     }
     if (!finalContent) {
@@ -1749,7 +2216,9 @@ export default function WhatsAppPage() {
     try {
       const entity = resolveEntityFromContext(context);
       if (entity.entityType === "GENERAL" && selectedIntent !== "GENERAL") {
-        setComposerError("Sem entityType/entityId: use intenção Geral ou vincule contexto.");
+        setComposerError(
+          "Sem entityType/entityId: use intenção Geral ou vincule contexto."
+        );
         return;
       }
       await sendMessageMutation.mutateAsync({
@@ -1767,12 +2236,18 @@ export default function WhatsAppPage() {
       const refreshedRows = Array.isArray(refreshedConversations.data)
         ? refreshedConversations.data.map(mapConversation)
         : [];
-      const resolvedConversation = refreshedRows.find(item => String(item.customerId ?? "") === String(customerId ?? ""));
+      const resolvedConversation = refreshedRows.find(
+        item => String(item.customerId ?? "") === String(customerId ?? "")
+      );
       if (resolvedConversation?.id) {
         setSelectedConversationId(resolvedConversation.id);
       }
       // TODO(timeline): validar evento MESSAGE_SENT/PAYMENT_LINK_SENT quando endpoint de timeline expuser rastreamento dedicado.
-      await Promise.all([messagesQuery.refetch(), contextQuery.refetch(), conversationDetailsQuery.refetch()]);
+      await Promise.all([
+        messagesQuery.refetch(),
+        contextQuery.refetch(),
+        conversationDetailsQuery.refetch(),
+      ]);
     } catch (error: any) {
       console.error(error);
       setComposerError(error?.message ?? "Falha ao enviar mensagem.");
@@ -1801,9 +2276,12 @@ export default function WhatsAppPage() {
 
   const handleSendTemplate = async (templateKey: string) => {
     if (!selectedConversationId) return;
-    const customerId = context?.customer?.id ?? selectedConversation?.customerId ?? undefined;
+    const customerId =
+      context?.customer?.id ?? selectedConversation?.customerId ?? undefined;
     if (!selectedConversationRecordId && !customerId) {
-      toast.error("Não foi possível identificar o cliente para iniciar a conversa.");
+      toast.error(
+        "Não foi possível identificar o cliente para iniciar a conversa."
+      );
       return;
     }
     if (!destinationPhone) {
@@ -1813,7 +2291,9 @@ export default function WhatsAppPage() {
     try {
       const entity = resolveEntityFromContext(context);
       if (entity.entityType === "GENERAL" && selectedIntent !== "GENERAL") {
-        setComposerError("Sem entityType/entityId: use intenção Geral ou vincule contexto.");
+        setComposerError(
+          "Sem entityType/entityId: use intenção Geral ou vincule contexto."
+        );
         return;
       }
       await sendTemplateMutation.mutateAsync({
@@ -1838,11 +2318,17 @@ export default function WhatsAppPage() {
       const refreshedRows = Array.isArray(refreshedConversations.data)
         ? refreshedConversations.data.map(mapConversation)
         : [];
-      const resolvedConversation = refreshedRows.find(item => String(item.customerId ?? "") === String(customerId ?? ""));
+      const resolvedConversation = refreshedRows.find(
+        item => String(item.customerId ?? "") === String(customerId ?? "")
+      );
       if (resolvedConversation?.id) {
         setSelectedConversationId(resolvedConversation.id);
       }
-      await Promise.all([messagesQuery.refetch(), contextQuery.refetch(), conversationDetailsQuery.refetch()]);
+      await Promise.all([
+        messagesQuery.refetch(),
+        contextQuery.refetch(),
+        conversationDetailsQuery.refetch(),
+      ]);
       toast.success("Template enviado.");
     } catch (error: any) {
       toast.error(error?.message ?? "Falha ao enviar template.");
@@ -1850,14 +2336,20 @@ export default function WhatsAppPage() {
   };
 
   const handleRetryLastFailed = async () => {
-    const failed = [...messages].reverse().find((item) => item.status === "FAILED");
+    const failed = [...messages]
+      .reverse()
+      .find(item => item.status === "FAILED");
     if (!failed?.id) {
       toast.message("Nenhuma mensagem com falha para reenviar.");
       return;
     }
     try {
       await retryMessageMutation.mutateAsync({ id: failed.id });
-      await Promise.all([messagesQuery.refetch(), conversationsQuery.refetch(), contextQuery.refetch()]);
+      await Promise.all([
+        messagesQuery.refetch(),
+        conversationsQuery.refetch(),
+        contextQuery.refetch(),
+      ]);
       toast.success("Reenvio solicitado com sucesso.");
     } catch (error: any) {
       toast.error(error?.message ?? "Não foi possível reenviar a mensagem.");
@@ -1873,11 +2365,16 @@ export default function WhatsAppPage() {
       toast.message("Nenhuma cobrança aberta para este cliente.");
       return;
     }
-    await handleSendTemplate(context.openCharge.paymentLink ? "payment_link" : "payment_reminder");
+    await handleSendTemplate(
+      context.openCharge.paymentLink ? "payment_link" : "payment_reminder"
+    );
   };
 
   const handleSendReminder = async () => {
-    if (context?.openCharge?.id && (context?.openCharge?.daysOverdue ?? 0) > 0) {
+    if (
+      context?.openCharge?.id &&
+      (context?.openCharge?.daysOverdue ?? 0) > 0
+    ) {
       await handleSendTemplate("payment_reminder");
       return;
     }
@@ -1892,7 +2389,11 @@ export default function WhatsAppPage() {
     await handleSendTemplate("manual_followup");
   };
 
-  if (conversationsQuery.isLoading && customersQuery.isLoading && allInboxRows.length === 0) {
+  if (
+    conversationsQuery.isLoading &&
+    customersQuery.isLoading &&
+    allInboxRows.length === 0
+  ) {
     return (
       <AppPageShell>
         <AppPageLoadingState
@@ -1916,11 +2417,20 @@ export default function WhatsAppPage() {
             search={searchTerm}
             onSearch={setSearchTerm}
             isLoading={
-              (conversationsQuery.isLoading || conversationsQuery.isFetching || customersQuery.isLoading || customersQuery.isFetching)
-              && filteredRows.length === 0
+              (conversationsQuery.isLoading ||
+                conversationsQuery.isFetching ||
+                customersQuery.isLoading ||
+                customersQuery.isFetching) &&
+              filteredRows.length === 0
             }
-            hasError={Boolean(conversationsQuery.error) || Boolean(customersQuery.error)}
-            errorMessage={customersQuery.error ? "Erro ao carregar clientes" : "Não foi possível carregar conversas"}
+            hasError={
+              Boolean(conversationsQuery.error) || Boolean(customersQuery.error)
+            }
+            errorMessage={
+              customersQuery.error
+                ? "Erro ao carregar clientes"
+                : "Não foi possível carregar conversas"
+            }
             emptyStateMessage={emptyStateMessage}
           />
         </div>
@@ -1939,32 +2449,69 @@ export default function WhatsAppPage() {
             setSelectedIntent={setSelectedIntent}
             onToggleFavorite={() => {
               if (!selectedConversationId) return;
-              setLocalFavorites(prev => ({ ...prev, [selectedConversationId]: !prev[selectedConversationId] }));
+              setLocalFavorites(prev => ({
+                ...prev,
+                [selectedConversationId]: !prev[selectedConversationId],
+              }));
               // TODO: conectar favorite quando Conversation tiver campo isFavorite
             }}
             isFavorite={Boolean(localFavorites[selectedConversationId ?? ""])}
             onInfo={() => {
               setIsContextVisible(true);
-              document.getElementById("whatsapp-context-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+              document
+                .getElementById("whatsapp-context-panel")
+                ?.scrollIntoView({ behavior: "smooth", block: "start" });
             }}
             onMoreActions={handleMoreActions}
             error={composerError}
-            onOpenCustomer={() => setLocation(context?.customer?.id ? `/customers?customerId=${context.customer.id}` : "/customers")}
-            onOpenFinance={() => setLocation(context?.openCharge?.id ? `/finances?chargeId=${context.openCharge.id}` : "/finances")}
-            onOpenAppointment={() => setLocation(context?.nextAppointment?.id ? `/appointments?appointmentId=${context.nextAppointment.id}` : "/appointments")}
-            onOpenServiceOrder={() => setLocation(context?.activeServiceOrder?.id ? `/service-orders?serviceOrderId=${context.activeServiceOrder.id}` : "/service-orders")}
+            onOpenCustomer={() =>
+              setLocation(
+                context?.customer?.id
+                  ? `/customers?customerId=${context.customer.id}`
+                  : "/customers"
+              )
+            }
+            onOpenFinance={() =>
+              setLocation(
+                context?.openCharge?.id
+                  ? `/finances?chargeId=${context.openCharge.id}`
+                  : "/finances"
+              )
+            }
+            onOpenAppointment={() =>
+              setLocation(
+                context?.nextAppointment?.id
+                  ? `/appointments?appointmentId=${context.nextAppointment.id}`
+                  : "/appointments"
+              )
+            }
+            onOpenServiceOrder={() =>
+              setLocation(
+                context?.activeServiceOrder?.id
+                  ? `/service-orders?serviceOrderId=${context.activeServiceOrder.id}`
+                  : "/service-orders"
+              )
+            }
             onFillTemplate={handleTemplateChip}
             canMarkAsPaid={Boolean(context?.openCharge?.id)}
             suggestedActionLabel={suggestedAction?.label ?? null}
             governanceAlert={governanceAlert}
             onRunSuggestedAction={() => {
-              if (suggestedAction?.key === "retry") { void handleRetryLastFailed(); return; }
+              if (suggestedAction?.key === "retry") {
+                void handleRetryLastFailed();
+                return;
+              }
               void handleRequestSuggestedExecution();
             }}
           />
         </div>
 
-        <div className={cn("h-full min-h-0 min-w-0 overflow-hidden", isContextVisible ? "xl:block" : "hidden")}> 
+        <div
+          className={cn(
+            "h-full min-h-0 min-w-0 overflow-hidden",
+            isContextVisible ? "xl:block" : "hidden"
+          )}
+        >
           <OperationalContextColumn
             conversation={selectedConversation}
             context={context}
@@ -1976,11 +2523,30 @@ export default function WhatsAppPage() {
             onMoreActions={handleMoreActions}
             pendingApprovals={pendingApprovals}
             executionHistory={executionHistory}
-            isExecutionLoading={pendingApprovalsQuery.isLoading || pendingApprovalsQuery.isFetching || executionHistoryQuery.isLoading || executionHistoryQuery.isFetching}
+            isExecutionLoading={
+              pendingApprovalsQuery.isLoading ||
+              pendingApprovalsQuery.isFetching ||
+              executionHistoryQuery.isLoading ||
+              executionHistoryQuery.isFetching
+            }
             onApproveExecution={handleApproveExecution}
             onExecuteExecution={handleExecuteExecution}
             onCancelExecution={handleCancelExecution}
-            isExecutionMutating={approveExecutionMutation.isPending || executeExecutionMutation.isPending || cancelExecutionMutation.isPending || requestExecutionMutation.isPending}
+            isExecutionMutating={
+              approveExecutionMutation.isPending ||
+              executeExecutionMutation.isPending ||
+              cancelExecutionMutation.isPending ||
+              requestExecutionMutation.isPending
+            }
+            isExecutionError={Boolean(
+              pendingApprovalsQuery.error || executionHistoryQuery.error
+            )}
+            onRetryExecution={() =>
+              void Promise.all([
+                pendingApprovalsQuery.refetch(),
+                executionHistoryQuery.refetch(),
+              ])
+            }
             highlightedChargeId={queryChargeId}
             highlightedAppointmentId={queryAppointmentId}
             highlightedServiceOrderId={queryServiceOrderId}

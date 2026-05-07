@@ -1,7 +1,14 @@
 import { useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
-import { Clock3, MessageSquareWarning, MoreHorizontal, ShieldAlert, TrendingDown } from "lucide-react";
+import {
+  Clock3,
+  MessageSquareWarning,
+  MoreHorizontal,
+  ShieldAlert,
+  TrendingDown,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { trpc } from "@/lib/trpc";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,8 +28,20 @@ import {
   AppStatusBadge,
 } from "@/components/internal-page-system";
 import { normalizeOperationalState } from "@/lib/operations";
+import {
+  buildWhatsAppExecutionPath,
+  formatWhatsAppExecutionDate,
+  whatsappActionLabel,
+  type WhatsAppActionExecution,
+} from "@/lib/whatsappActionExecution";
 
-type DashboardState = "healthy" | "alert" | "critical" | "empty" | "error" | "loading";
+type DashboardState =
+  | "healthy"
+  | "alert"
+  | "critical"
+  | "empty"
+  | "error"
+  | "loading";
 type Severity = "critical" | "high" | "medium";
 
 const severityWeight: Record<Severity, number> = {
@@ -139,7 +158,10 @@ const operationalQueue = [
   },
 ] as const;
 
-function resolveOperationalState(alertCount: number, criticalCount: number): DashboardState {
+function resolveOperationalState(
+  alertCount: number,
+  criticalCount: number
+): DashboardState {
   if (criticalCount > 1) return "critical";
   if (alertCount > 0) return "alert";
   return "healthy";
@@ -149,6 +171,34 @@ export default function ExecutiveDashboard() {
   useRenderWatchdog("ExecutiveDashboard");
   const [location, navigate] = useLocation();
   const { runAction } = useRunAction();
+  const pendingWhatsAppApprovalsQuery =
+    trpc.nexo.whatsapp.listPendingApprovals.useQuery(
+      { limit: 10 },
+      { retry: false }
+    );
+
+  const pendingWhatsAppApprovals = useMemo(() => {
+    const data = Array.isArray(pendingWhatsAppApprovalsQuery.data)
+      ? (pendingWhatsAppApprovalsQuery.data as WhatsAppActionExecution[])
+      : [];
+    return [...data].sort((a, b) => {
+      const priorityWeight = (value?: string | null) => {
+        const normalized = String(value ?? "").toUpperCase();
+        if (normalized === "CRITICAL") return 4;
+        if (normalized === "HIGH") return 3;
+        if (normalized === "MEDIUM") return 2;
+        return 1;
+      };
+      const priorityDelta =
+        priorityWeight(b.conversation?.priority) -
+        priorityWeight(a.conversation?.priority);
+      if (priorityDelta !== 0) return priorityDelta;
+      return (
+        new Date(String(b.createdAt ?? 0)).getTime() -
+        new Date(String(a.createdAt ?? 0)).getTime()
+      );
+    });
+  }, [pendingWhatsAppApprovalsQuery.data]);
 
   const forcedState = useMemo(() => {
     if (typeof window === "undefined") return null;
@@ -167,12 +217,20 @@ export default function ExecutiveDashboard() {
   }, [location]);
 
   const immediateAttention = useMemo(
-    () => [...immediateAttentionItems].sort((a, b) => severityWeight[b.severity] - severityWeight[a.severity]).slice(0, 3),
+    () =>
+      [...immediateAttentionItems]
+        .sort((a, b) => severityWeight[b.severity] - severityWeight[a.severity])
+        .slice(0, 3),
     []
   );
 
-  const criticalCount = immediateAttention.filter(item => item.severity === "critical").length;
-  const computedState = resolveOperationalState(immediateAttention.length, criticalCount);
+  const criticalCount = immediateAttention.filter(
+    item => item.severity === "critical"
+  ).length;
+  const computedState = resolveOperationalState(
+    immediateAttention.length,
+    criticalCount
+  );
   const dashboardState: DashboardState = forcedState ?? computedState;
 
   const operationStateLabel =
@@ -184,12 +242,15 @@ export default function ExecutiveDashboard() {
           ? "Carregando operação"
           : normalizeOperationalState(dashboardState);
 
-  const operationalPeriodLabel = "Hoje · 22 de abril de 2026 · Turno 08:00–18:00";
+  const operationalPeriodLabel =
+    "Hoje · 22 de abril de 2026 · Turno 08:00–18:00";
 
   const nextBestAction = {
     action: "Cobrar João Silva — R$ 4.280 vencido há 5 dias",
-    reason: "Maior valor em atraso e sem contato recente, com risco de contaminar o fechamento do dia.",
-    impact: "Libera caixa imediato, reduz risco operacional financeiro e destrava repasses do turno.",
+    reason:
+      "Maior valor em atraso e sem contato recente, com risco de contaminar o fechamento do dia.",
+    impact:
+      "Libera caixa imediato, reduz risco operacional financeiro e destrava repasses do turno.",
     ctaLabel: "Enviar cobrança",
     ctaPath: "/finances?view=charges&status=overdue",
   };
@@ -207,18 +268,32 @@ export default function ExecutiveDashboard() {
         secondaryActions={
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button size="icon" variant="outline" aria-label="Ações secundárias do dashboard">
+              <Button
+                size="icon"
+                variant="outline"
+                aria-label="Ações secundárias do dashboard"
+              >
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52">
-              <DropdownMenuItem onClick={() => navigate("/governance")}>Ver governança</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate("/timeline")}>Abrir timeline</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate("/governance")}>
+                Ver governança
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate("/timeline")}>
+                Abrir timeline
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         }
         primaryAction={
-          <Button onClick={() => void runAction(async () => navigate("/dashboard/operations?filter=critical"))}>
+          <Button
+            onClick={() =>
+              void runAction(async () =>
+                navigate("/dashboard/operations?filter=critical")
+              )
+            }
+          >
             Abrir fila prioritária
           </Button>
         }
@@ -249,7 +324,9 @@ export default function ExecutiveDashboard() {
         />
       ) : null}
 
-      {dashboardState !== "loading" && dashboardState !== "error" && dashboardState !== "empty" ? (
+      {dashboardState !== "loading" &&
+      dashboardState !== "error" &&
+      dashboardState !== "empty" ? (
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
           <AppSectionBlock
             title="Atenção imediata"
@@ -263,12 +340,26 @@ export default function ExecutiveDashboard() {
                   className="flex min-h-[188px] flex-col rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3.5"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm font-semibold text-[var(--text-primary)]">{item.title}</p>
-                    <AppStatusBadge label={item.severity === "critical" ? "Urgente" : "Atenção"} />
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">
+                      {item.title}
+                    </p>
+                    <AppStatusBadge
+                      label={
+                        item.severity === "critical" ? "Urgente" : "Atenção"
+                      }
+                    />
                   </div>
-                  <p className="mt-2 text-xs text-[var(--text-secondary)]">{item.context}</p>
-                  <p className="mt-2 text-xs text-[var(--text-secondary)]">Impacto: {item.impact}</p>
-                  <Button className="mt-auto" size="sm" onClick={() => navigate(item.primaryPath)}>
+                  <p className="mt-2 text-xs text-[var(--text-secondary)]">
+                    {item.context}
+                  </p>
+                  <p className="mt-2 text-xs text-[var(--text-secondary)]">
+                    Impacto: {item.impact}
+                  </p>
+                  <Button
+                    className="mt-auto"
+                    size="sm"
+                    onClick={() => navigate(item.primaryPath)}
+                  >
                     {item.primaryCtaLabel}
                   </Button>
                 </article>
@@ -282,10 +373,20 @@ export default function ExecutiveDashboard() {
             className="xl:col-span-12"
           >
             <article className="rounded-lg border border-[var(--dashboard-danger)]/35 bg-[color-mix(in_srgb,var(--dashboard-danger)_8%,var(--surface-subtle))] p-4">
-              <p className="text-sm font-semibold text-[var(--text-primary)]">{nextBestAction.action}</p>
-              <p className="mt-1.5 text-xs text-[var(--text-secondary)]">Motivo: {nextBestAction.reason}</p>
-              <p className="mt-1.5 text-xs text-[var(--text-secondary)]">Impacto esperado: {nextBestAction.impact}</p>
-              <Button className="mt-3" size="sm" onClick={() => navigate(nextBestAction.ctaPath)}>
+              <p className="text-sm font-semibold text-[var(--text-primary)]">
+                {nextBestAction.action}
+              </p>
+              <p className="mt-1.5 text-xs text-[var(--text-secondary)]">
+                Motivo: {nextBestAction.reason}
+              </p>
+              <p className="mt-1.5 text-xs text-[var(--text-secondary)]">
+                Impacto esperado: {nextBestAction.impact}
+              </p>
+              <Button
+                className="mt-3"
+                size="sm"
+                onClick={() => navigate(nextBestAction.ctaPath)}
+              >
                 {nextBestAction.ctaLabel}
               </Button>
             </article>
@@ -301,25 +402,59 @@ export default function ExecutiveDashboard() {
                 label="Receita do período"
                 value="R$ 187,4k"
                 helper="↓ 4,2% vs. semana passada · inadimplência em alta."
-                delta={<Button size="sm" variant="ghost" onClick={() => navigate("/finances?view=revenue")}>Ver receita</Button>}
+                delta={
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => navigate("/finances?view=revenue")}
+                  >
+                    Ver receita
+                  </Button>
+                }
               />
               <AppStatCard
                 label="Ordens abertas"
                 value="18"
                 helper="2 atrasadas · SLA no limite do turno."
-                delta={<Button size="sm" variant="ghost" onClick={() => navigate("/service-orders?status=open")}>Abrir O.S.</Button>}
+                delta={
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => navigate("/service-orders?status=open")}
+                  >
+                    Abrir O.S.
+                  </Button>
+                }
               />
               <AppStatCard
                 label="Cobranças pendentes"
                 value="21"
                 helper="6 vencidas · gargalo principal do fluxo."
-                delta={<Button size="sm" variant="ghost" onClick={() => navigate("/finances?view=charges&status=overdue")}>Cobranças</Button>}
+                delta={
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() =>
+                      navigate("/finances?view=charges&status=overdue")
+                    }
+                  >
+                    Cobranças
+                  </Button>
+                }
               />
               <AppStatCard
                 label="Ticket médio"
                 value="R$ 892"
                 helper="↑ 3,1% vs. último ciclo · manter margem."
-                delta={<Button size="sm" variant="ghost" onClick={() => navigate("/finances?view=performance")}>Ver ticket</Button>}
+                delta={
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => navigate("/finances?view=performance")}
+                  >
+                    Ver ticket
+                  </Button>
+                }
               />
             </div>
           </AppSectionBlock>
@@ -335,18 +470,122 @@ export default function ExecutiveDashboard() {
                   key={step.stage}
                   className="flex min-h-[178px] flex-col rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3.5"
                 >
-                  <p className="text-xs font-semibold uppercase tracking-[0.06em] text-[var(--text-muted)]">{step.stage}</p>
-                  <p className="mt-2 text-3xl font-semibold leading-none text-[var(--text-primary)]">{step.volume}</p>
-                  <p className="mt-3 text-xs leading-5 text-[var(--text-secondary)]">{step.microcontext}</p>
-                  <Button size="sm" className="mt-auto" variant="outline" onClick={() => navigate(step.path)}>
+                  <p className="text-xs font-semibold uppercase tracking-[0.06em] text-[var(--text-muted)]">
+                    {step.stage}
+                  </p>
+                  <p className="mt-2 text-3xl font-semibold leading-none text-[var(--text-primary)]">
+                    {step.volume}
+                  </p>
+                  <p className="mt-3 text-xs leading-5 text-[var(--text-secondary)]">
+                    {step.microcontext}
+                  </p>
+                  <Button
+                    size="sm"
+                    className="mt-auto"
+                    variant="outline"
+                    onClick={() => navigate(step.path)}
+                  >
                     {step.action}
                   </Button>
                 </article>
               ))}
             </div>
             <p className="mt-3 text-xs text-[var(--text-secondary)]">
-              Gargalo principal: Cobrança → Pagamento. Ação sugerida: acelerar carteira vencida antes do fechamento.
+              Gargalo principal: Cobrança → Pagamento. Ação sugerida: acelerar
+              carteira vencida antes do fechamento.
             </p>
+          </AppSectionBlock>
+
+          <AppSectionBlock
+            title="Aprovações WhatsApp"
+            subtitle="Workflows sensíveis aguardando decisão humana antes da execução."
+            className="xl:col-span-12"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3.5">
+              <div>
+                <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                  Pendências de execução assistida
+                </p>
+                <p className="mt-1 text-3xl font-semibold leading-none text-[var(--text-primary)]">
+                  {pendingWhatsAppApprovals.length}
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                  {pendingWhatsAppApprovals.length > 0
+                    ? "Abra o cockpit com contexto para aprovar, executar após aprovação ou cancelar com motivo."
+                    : "Nenhuma ação WhatsApp aguardando aprovação agora."}
+                </p>
+              </div>
+              <Button variant="outline" onClick={() => navigate("/whatsapp")}>
+                Abrir WhatsApp
+              </Button>
+            </div>
+
+            {pendingWhatsAppApprovalsQuery.isLoading ? (
+              <p className="mt-3 text-xs text-[var(--text-muted)]">
+                Carregando aprovações pendentes...
+              </p>
+            ) : pendingWhatsAppApprovalsQuery.error ? (
+              <div className="mt-3 rounded-lg border border-rose-300/25 bg-rose-300/10 p-3 text-xs text-rose-200">
+                Não foi possível carregar aprovações WhatsApp no dashboard.
+                <Button
+                  className="ml-2 h-7 px-2 text-[10px]"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void pendingWhatsAppApprovalsQuery.refetch()}
+                >
+                  Tentar novamente
+                </Button>
+              </div>
+            ) : pendingWhatsAppApprovals.length > 0 ? (
+              <div className="mt-3 grid gap-2 lg:grid-cols-3">
+                {pendingWhatsAppApprovals.slice(0, 3).map(execution => (
+                  <article
+                    key={execution.id}
+                    className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/70 p-3"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
+                          {whatsappActionLabel(execution.suggestedAction)}
+                        </p>
+                        <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                          {execution.conversation?.title ?? "Conversa WhatsApp"}
+                        </p>
+                      </div>
+                      <AppStatusBadge
+                        label={
+                          execution.conversation?.priority === "CRITICAL"
+                            ? "Urgente"
+                            : "Pendente"
+                        }
+                      />
+                    </div>
+                    <p className="mt-2 line-clamp-2 text-xs text-[var(--text-secondary)]">
+                      {execution.executionReason ?? "Sem motivo informado."}
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--text-muted)]">
+                      Criada em{" "}
+                      {formatWhatsAppExecutionDate(execution.createdAt)}
+                    </p>
+                    <Button
+                      className="mt-3"
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        navigate(buildWhatsAppExecutionPath(execution))
+                      }
+                    >
+                      Abrir com contexto
+                    </Button>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <AppPageEmptyState
+                title="Sem aprovações WhatsApp pendentes"
+                description="Quando uma ação sensível precisar de decisão humana, ela aparecerá aqui com atalho para o cockpit."
+              />
+            )}
           </AppSectionBlock>
 
           <AppSectionBlock
@@ -356,17 +595,30 @@ export default function ExecutiveDashboard() {
           >
             <div className="space-y-2.5">
               {operationalQueue.map(item => (
-                <article key={`${item.type}-${item.entity}`} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3.5">
+                <article
+                  key={`${item.type}-${item.entity}`}
+                  className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3.5"
+                >
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
-                      <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">{item.type}</p>
-                      <p className="text-sm font-semibold text-[var(--text-primary)]">{item.entity}</p>
+                      <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                        {item.type}
+                      </p>
+                      <p className="text-sm font-semibold text-[var(--text-primary)]">
+                        {item.entity}
+                      </p>
                     </div>
                     <AppStatusBadge label={item.status} />
                   </div>
                   <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-xs text-[var(--text-secondary)]">Prazo: {item.deadline}</p>
-                    <Button size="sm" variant="outline" onClick={() => navigate(item.path)}>
+                    <p className="text-xs text-[var(--text-secondary)]">
+                      Prazo: {item.deadline}
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => navigate(item.path)}
+                    >
                       {item.actionLabel}
                     </Button>
                   </div>
@@ -383,19 +635,31 @@ export default function ExecutiveDashboard() {
             <div className="space-y-2.5">
               <div className="flex items-start gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
                 <Clock3 className="mt-0.5 h-4 w-4 text-[var(--dashboard-warning)]" />
-                <p className="text-xs text-[var(--text-secondary)]">Atraso médio em O.S. subiu para 38min e já compromete a janela da manhã.</p>
+                <p className="text-xs text-[var(--text-secondary)]">
+                  Atraso médio em O.S. subiu para 38min e já compromete a janela
+                  da manhã.
+                </p>
               </div>
               <div className="flex items-start gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
                 <TrendingDown className="mt-0.5 h-4 w-4 text-[var(--dashboard-danger)]" />
-                <p className="text-xs text-[var(--text-secondary)]">Cobrança está travando conversão para pagamento no ponto final do fluxo.</p>
+                <p className="text-xs text-[var(--text-secondary)]">
+                  Cobrança está travando conversão para pagamento no ponto final
+                  do fluxo.
+                </p>
               </div>
               <div className="flex items-start gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
                 <MessageSquareWarning className="mt-0.5 h-4 w-4 text-[var(--dashboard-danger)]" />
-                <p className="text-xs text-[var(--text-secondary)]">Mensagens falhadas cresceram e elevam risco de no-show em agendamentos críticos.</p>
+                <p className="text-xs text-[var(--text-secondary)]">
+                  Mensagens falhadas cresceram e elevam risco de no-show em
+                  agendamentos críticos.
+                </p>
               </div>
               <div className="flex items-start gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
                 <ShieldAlert className="mt-0.5 h-4 w-4 text-[var(--dashboard-info)]" />
-                <p className="text-xs text-[var(--text-secondary)]">Risco operacional permanece concentrado em agenda e financeiro neste turno.</p>
+                <p className="text-xs text-[var(--text-secondary)]">
+                  Risco operacional permanece concentrado em agenda e financeiro
+                  neste turno.
+                </p>
               </div>
             </div>
           </AppSectionBlock>
