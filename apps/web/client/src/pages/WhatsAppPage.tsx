@@ -38,8 +38,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
@@ -70,27 +68,34 @@ type ContextType =
   | "GENERAL";
 type MessageDirection = "INBOUND" | "OUTBOUND";
 type MessageStatus = "QUEUED" | "SENT" | "DELIVERED" | "READ" | "FAILED";
-type OperationalMessageType =
-  | "GENERAL"
+export type OperationalMessageType =
   | "APPOINTMENT_CONFIRMATION"
   | "APPOINTMENT_REMINDER"
   | "SERVICE_UPDATE"
   | "PAYMENT_LINK"
   | "PAYMENT_REMINDER"
   | "PAYMENT_CONFIRMATION"
-  | "CUSTOMER_NOTIFICATION";
+  | "CUSTOMER_NOTIFICATION"
+  | "MANUAL"
+  | "REMIND_24H"
+  | "RECEIPT"
+  | "EXECUTION_CONFIRMATION";
 
-const INTENT_OPTIONS: Array<{
-  value: ComposerIntent;
-  label: string;
-}> = [
-  { value: "PAYMENT", label: "Cobrança" },
-  { value: "APPOINTMENT", label: "Agendamento" },
-  { value: "SERVICE_UPDATE", label: "Atualização de serviço" },
-  { value: "GENERAL", label: "Geral" },
-];
+const DEFAULT_MANUAL_MESSAGE_TYPE: OperationalMessageType = "MANUAL";
 
-type ComposerIntent = "PAYMENT" | "APPOINTMENT" | "SERVICE_UPDATE" | "GENERAL";
+const VALID_OPERATIONAL_MESSAGE_TYPES = new Set<OperationalMessageType>([
+  "APPOINTMENT_CONFIRMATION",
+  "APPOINTMENT_REMINDER",
+  "SERVICE_UPDATE",
+  "PAYMENT_LINK",
+  "PAYMENT_REMINDER",
+  "PAYMENT_CONFIRMATION",
+  "CUSTOMER_NOTIFICATION",
+  "MANUAL",
+  "REMIND_24H",
+  "RECEIPT",
+  "EXECUTION_CONFIRMATION",
+]);
 
 type ComposerActionGroupName =
   | "Comunicação"
@@ -227,7 +232,7 @@ type ChatMessage = {
   errorMessage?: string | null;
 };
 
-type WhatsAppContext = {
+export type WhatsAppContext = {
   customer?: { id?: string; name?: string; phone?: string } | null;
   nextAppointment?: {
     id?: string;
@@ -420,24 +425,63 @@ function mapMessage(item: any): ChatMessage {
   };
 }
 
-function resolveMessageTypeFromContext(
-  context?: WhatsAppContext | null,
-  intent?: "PAYMENT" | "APPOINTMENT" | "SERVICE_UPDATE" | "GENERAL"
+export function getDefaultMessageType(): OperationalMessageType {
+  return DEFAULT_MANUAL_MESSAGE_TYPE;
+}
+
+function normalizeMessageType(
+  messageType?: string | null
+): OperationalMessageType | null {
+  if (!messageType || messageType === "GENERAL") return null;
+  return VALID_OPERATIONAL_MESSAGE_TYPES.has(
+    messageType as OperationalMessageType
+  )
+    ? (messageType as OperationalMessageType)
+    : null;
+}
+
+export function resolveMessageType({
+  explicitMessageType,
+  context,
+}: {
+  explicitMessageType?: string | null;
+  context?: WhatsAppContext | null;
+} = {}): OperationalMessageType {
+  const normalizedExplicit = normalizeMessageType(explicitMessageType);
+  if (normalizedExplicit) return normalizedExplicit;
+
+  return getDefaultMessageType();
+}
+
+export function buildWhatsAppSendPayload<
+  TPayload extends { messageType?: string | null },
+>(
+  payload: TPayload,
+  options: { context?: WhatsAppContext | null } = {}
+): Omit<TPayload, "messageType"> & { messageType: OperationalMessageType } {
+  return {
+    ...payload,
+    messageType: resolveMessageType({
+      explicitMessageType: payload.messageType,
+      context: options.context,
+    }),
+  };
+}
+
+function resolveMessageTypeFromTemplate(
+  templateKey: string,
+  context?: WhatsAppContext | null
 ): OperationalMessageType {
-  if (intent === "PAYMENT")
-    return context?.openCharge?.paymentLink
-      ? "PAYMENT_LINK"
-      : "PAYMENT_REMINDER";
-  if (intent === "APPOINTMENT") return "APPOINTMENT_CONFIRMATION";
-  if (intent === "SERVICE_UPDATE") return "SERVICE_UPDATE";
-  if (context?.openCharge?.id && context?.openCharge?.paymentLink)
-    return "PAYMENT_LINK";
-  if (context?.openCharge?.id && (context?.openCharge?.daysOverdue ?? 0) > 0)
+  const normalizedTemplateKey = templateKey.toLowerCase();
+  if (normalizedTemplateKey.includes("payment_link")) return "PAYMENT_LINK";
+  if (normalizedTemplateKey.includes("payment_reminder"))
     return "PAYMENT_REMINDER";
-  if (context?.openCharge?.id) return "CUSTOMER_NOTIFICATION";
-  if (context?.nextAppointment?.id) return "APPOINTMENT_REMINDER";
-  if (context?.activeServiceOrder?.id) return "SERVICE_UPDATE";
-  return "GENERAL";
+  if (normalizedTemplateKey.includes("appointment_confirmation"))
+    return "APPOINTMENT_CONFIRMATION";
+  if (normalizedTemplateKey.includes("appointment_reminder"))
+    return "APPOINTMENT_REMINDER";
+  if (normalizedTemplateKey.includes("service_update")) return "SERVICE_UPDATE";
+  return resolveMessageType({ context });
 }
 
 function resolveEntityFromContext(context?: WhatsAppContext | null) {
@@ -822,8 +866,6 @@ function ExecutionChatColumn({
   sendMessage,
   content,
   setContent,
-  selectedIntent,
-  setSelectedIntent,
   onToggleFavorite,
   isFavorite,
   onInfo,
@@ -849,8 +891,6 @@ function ExecutionChatColumn({
   sendMessage: () => void;
   content: string;
   setContent: (value: string) => void;
-  selectedIntent: ComposerIntent;
-  setSelectedIntent: (value: ComposerIntent) => void;
   onToggleFavorite: () => void;
   isFavorite: boolean;
   onInfo: () => void;
@@ -860,7 +900,10 @@ function ExecutionChatColumn({
   onOpenFinance: () => void;
   onOpenAppointment: () => void;
   onOpenServiceOrder: () => void;
-  onFillTemplate: (template: string) => void;
+  onFillTemplate: (
+    template: string,
+    messageType?: OperationalMessageType
+  ) => void;
   onSendCharge: () => void;
   onRequestSuggestedExecution: () => void;
   canSendPaymentLink: boolean;
@@ -1021,6 +1064,11 @@ function ExecutionChatColumn({
           <input
             value={content}
             onChange={event => canCompose && setContent(event.target.value)}
+            onKeyDown={event => {
+              if (event.key !== "Enter" || event.shiftKey) return;
+              event.preventDefault();
+              if (hasConversation && canCompose) sendMessage();
+            }}
             placeholder={
               hasConversation
                 ? composePlaceholder
@@ -1061,33 +1109,6 @@ function ExecutionChatColumn({
                       {template}
                     </DropdownMenuItem>
                   ))}
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger>
-                  Intenção:{" "}
-                  {
-                    INTENT_OPTIONS.find(
-                      option => option.value === selectedIntent
-                    )?.label
-                  }
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent className="w-56">
-                  <DropdownMenuRadioGroup
-                    value={selectedIntent}
-                    onValueChange={value =>
-                      setSelectedIntent(value as ComposerIntent)
-                    }
-                  >
-                    {INTENT_OPTIONS.map(option => (
-                      <DropdownMenuRadioItem
-                        key={option.value}
-                        value={option.value}
-                      >
-                        {option.label}
-                      </DropdownMenuRadioItem>
-                    ))}
-                  </DropdownMenuRadioGroup>
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
               <DropdownMenuItem disabled>
@@ -1139,12 +1160,19 @@ function ExecutionChatColumn({
                 </span>
               </DropdownMenuItem>
               <DropdownMenuItem
-                onClick={() => onFillTemplate("Confirmação de agendamento")}
+                onClick={() =>
+                  onFillTemplate(
+                    "Confirmação de agendamento",
+                    "APPOINTMENT_CONFIRMATION"
+                  )
+                }
               >
                 Confirmar agendamento
               </DropdownMenuItem>
               <DropdownMenuItem
-                onClick={() => onFillTemplate("Atualização de O.S.")}
+                onClick={() =>
+                  onFillTemplate("Atualização de O.S.", "SERVICE_UPDATE")
+                }
               >
                 Atualizar serviço
               </DropdownMenuItem>
@@ -1582,11 +1610,8 @@ export default function WhatsAppPage() {
     "nexo.whatsapp.composer.v2",
     ""
   );
-  const [selectedIntent, setSelectedIntent] =
-    useOperationalMemoryState<ComposerIntent>(
-      "nexo.whatsapp.intent.v1",
-      "GENERAL"
-    );
+  const [composerMessageTypeOverride, setComposerMessageTypeOverride] =
+    useState<OperationalMessageType | null>(null);
   const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
   const [isContextVisible, setIsContextVisible] = useState(true);
   const [composerError, setComposerError] = useState<string | null>(null);
@@ -1987,6 +2012,7 @@ export default function WhatsAppPage() {
   useEffect(() => {
     if (!selectedConversationId) {
       setContent("");
+      setComposerMessageTypeOverride(null);
       setComposerError(null);
     }
   }, [selectedConversationId, setContent]);
@@ -2355,12 +2381,6 @@ export default function WhatsAppPage() {
       selectedCustomer?.phone,
     ]
   );
-  const hasOperationalContext = Boolean(
-    context?.openCharge?.id ||
-    context?.nextAppointment?.id ||
-    context?.activeServiceOrder?.id ||
-    context?.customer?.id
-  );
   const canComposeForSelected =
     Boolean(selectedConversationId) && Boolean(destinationPhone);
   const composePlaceholder = selectedConversation
@@ -2373,6 +2393,7 @@ export default function WhatsAppPage() {
     hasManualSelectionRef.current = true;
     setSelectedConversationId(conversationId);
     setContent("");
+    setComposerMessageTypeOverride(null);
     setComposerError(null);
   };
 
@@ -2394,12 +2415,6 @@ export default function WhatsAppPage() {
       return;
     }
     const finalContent = content.trim();
-    if (!hasOperationalContext && selectedIntent !== "GENERAL") {
-      setComposerError(
-        "Selecione contexto operacional válido ou use intenção Geral."
-      );
-      return;
-    }
     if (!finalContent) {
       setComposerError("Digite uma mensagem antes de enviar.");
       return;
@@ -2408,22 +2423,22 @@ export default function WhatsAppPage() {
 
     try {
       const entity = resolveEntityFromContext(context);
-      if (entity.entityType === "GENERAL" && selectedIntent !== "GENERAL") {
-        setComposerError(
-          "Sem entityType/entityId: use intenção Geral ou vincule contexto."
-        );
-        return;
-      }
-      await sendMessageMutation.mutateAsync({
-        conversationId: selectedConversationRecordId ?? undefined,
-        customerId,
-        toPhone: destinationPhone,
-        content: finalContent,
-        entityType: entity.entityType,
-        entityId: entity.entityId ?? customerId ?? undefined,
-        messageType: resolveMessageTypeFromContext(context, selectedIntent),
-      });
+      await sendMessageMutation.mutateAsync(
+        buildWhatsAppSendPayload(
+          {
+            conversationId: selectedConversationRecordId ?? undefined,
+            customerId,
+            toPhone: destinationPhone,
+            content: finalContent,
+            entityType: entity.entityType,
+            entityId: entity.entityId ?? customerId ?? undefined,
+            messageType: composerMessageTypeOverride,
+          },
+          { context }
+        )
+      );
       setContent("");
+      setComposerMessageTypeOverride(null);
       shouldPromoteVirtualSelectionRef.current = !selectedConversationRecordId;
       const refreshedConversations = await conversationsQuery.refetch();
       const refreshedRows = Array.isArray(refreshedConversations.data)
@@ -2455,19 +2470,33 @@ export default function WhatsAppPage() {
       APPOINTMENT_REMINDER: "Lembrete de agendamento",
       SERVICE_UPDATE: "Atualização de O.S.",
       PAYMENT_LINK: "Link de pagamento",
+      PAYMENT_REMINDER: "Lembrete de cobrança",
       PAYMENT_CONFIRMATION: "Confirmação de pagamento",
       CUSTOMER_NOTIFICATION: "Mensagem livre",
+      MANUAL: "Mensagem livre",
     };
     const resolved = templateMap[String(queryTemplate).toUpperCase()];
-    if (resolved) setContent(buildTemplateText(resolved, context));
+    if (resolved) {
+      setContent(buildTemplateText(resolved, context));
+      setComposerMessageTypeOverride(
+        resolveMessageTypeFromTemplate(String(queryTemplate), context)
+      );
+    }
   }, [queryTemplate, selectedConversationId, content, context, setContent]);
 
-  const handleTemplateChip = (template: string) => {
+  const handleTemplateChip = (
+    template: string,
+    messageType?: OperationalMessageType
+  ) => {
     if (!selectedConversationId) return;
     setContent(buildTemplateText(template, context));
+    setComposerMessageTypeOverride(messageType ?? null);
   };
 
-  const handleSendTemplate = async (templateKey: string) => {
+  const handleSendTemplate = async (
+    templateKey: string,
+    messageType = resolveMessageTypeFromTemplate(templateKey, context)
+  ) => {
     if (!selectedConversationId) return;
     const customerId =
       context?.customer?.id ?? selectedConversation?.customerId ?? undefined;
@@ -2483,12 +2512,6 @@ export default function WhatsAppPage() {
     }
     try {
       const entity = resolveEntityFromContext(context);
-      if (entity.entityType === "GENERAL" && selectedIntent !== "GENERAL") {
-        setComposerError(
-          "Sem entityType/entityId: use intenção Geral ou vincule contexto."
-        );
-        return;
-      }
       await sendTemplateMutation.mutateAsync({
         templateKey,
         conversationId: selectedConversationRecordId ?? undefined,
@@ -2496,6 +2519,7 @@ export default function WhatsAppPage() {
         toPhone: destinationPhone,
         entityType: entity.entityType,
         entityId: entity.entityId ?? customerId ?? undefined,
+        messageType,
         context: {
           customerName: context?.customer?.name,
           appointmentDate: context?.nextAppointment?.scheduledAt,
@@ -2559,7 +2583,8 @@ export default function WhatsAppPage() {
       return;
     }
     await handleSendTemplate(
-      context.openCharge.paymentLink ? "payment_link" : "payment_reminder"
+      context.openCharge.paymentLink ? "payment_link" : "payment_reminder",
+      context.openCharge.paymentLink ? "PAYMENT_LINK" : "PAYMENT_REMINDER"
     );
   };
 
@@ -2568,18 +2593,18 @@ export default function WhatsAppPage() {
       context?.openCharge?.id &&
       (context?.openCharge?.daysOverdue ?? 0) > 0
     ) {
-      await handleSendTemplate("payment_reminder");
+      await handleSendTemplate("payment_reminder", "PAYMENT_REMINDER");
       return;
     }
     if (context?.nextAppointment?.id) {
-      await handleSendTemplate("appointment_reminder");
+      await handleSendTemplate("appointment_reminder", "APPOINTMENT_REMINDER");
       return;
     }
     if (context?.activeServiceOrder?.id) {
-      await handleSendTemplate("service_update");
+      await handleSendTemplate("service_update", "SERVICE_UPDATE");
       return;
     }
-    await handleSendTemplate("manual_followup");
+    await handleSendTemplate("manual_followup", getDefaultMessageType());
   };
 
   if (
@@ -2638,8 +2663,6 @@ export default function WhatsAppPage() {
             sendMessage={handleManualSend}
             content={content}
             setContent={value => setContent(value)}
-            selectedIntent={selectedIntent}
-            setSelectedIntent={setSelectedIntent}
             onToggleFavorite={() => {
               if (!selectedConversationId) return;
               setLocalFavorites(prev => ({
