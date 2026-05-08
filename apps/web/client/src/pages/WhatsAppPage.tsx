@@ -1,6 +1,7 @@
 import {
   memo,
   type CSSProperties,
+  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
@@ -10,9 +11,17 @@ import {
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import {
+  Bell,
+  Bot,
+  CalendarCheck,
   CheckCheck,
+  CheckCircle2,
   ChevronDown,
+  CircleDollarSign,
+  ClipboardList,
+  CreditCard,
   EllipsisVertical,
+  FileText,
   Info,
   MessageCircleMore,
   Paperclip,
@@ -99,73 +108,152 @@ const VALID_OPERATIONAL_MESSAGE_TYPES = new Set<OperationalMessageType>([
 
 type ComposerActionGroupName =
   | "Comunicação"
-  | "Operacional"
+  | "Financeiro"
+  | "Agenda"
+  | "Ordem de serviço"
   | "Execução assistida";
+
+type ComposerActionGroupId =
+  | "communication"
+  | "finance"
+  | "agenda"
+  | "serviceOrder"
+  | "execution";
 
 type ComposerActionDescriptor = {
   key: string;
   label: string;
   group: ComposerActionGroupName;
+  groupId: ComposerActionGroupId;
+  description?: string;
   disabled?: boolean;
   reason?: string;
 };
 
+type WhatsAppComposerAction = ComposerActionDescriptor & {
+  icon: ReactNode;
+  onSelect?: () => void;
+};
+
+const COMPOSER_ACTION_GROUPS: Array<{
+  id: ComposerActionGroupId;
+  label: ComposerActionGroupName;
+}> = [
+  { id: "communication", label: "Comunicação" },
+  { id: "finance", label: "Financeiro" },
+  { id: "agenda", label: "Agenda" },
+  { id: "serviceOrder", label: "Ordem de serviço" },
+  { id: "execution", label: "Execução assistida" },
+];
+
 export function buildWhatsAppComposerActionGroups({
   hasSuggestedAction,
+  hasOpenCharge = true,
+  canSendPaymentLink = true,
+  hasUpcomingAppointment = true,
+  hasActiveServiceOrder = true,
+  canResolveConversation = hasSuggestedAction,
 }: {
   hasSuggestedAction: boolean;
+  hasOpenCharge?: boolean;
+  canSendPaymentLink?: boolean;
+  hasUpcomingAppointment?: boolean;
+  hasActiveServiceOrder?: boolean;
+  canResolveConversation?: boolean;
 }): Record<ComposerActionGroupName, ComposerActionDescriptor[]> {
   return {
     Comunicação: [
-      { key: "quick-template", label: "Template rápido", group: "Comunicação" },
+      {
+        key: "quick-template",
+        label: "Template rápido",
+        group: "Comunicação",
+        groupId: "communication",
+        description: "Preencher uma resposta padronizada.",
+      },
       {
         key: "attach-file",
         label: "Anexar arquivo",
         group: "Comunicação",
+        groupId: "communication",
+        description: "Enviar mídia ou documento nesta conversa.",
         disabled: true,
         reason: "Em breve",
       },
       {
-        key: "send-image-document",
-        label: "Enviar imagem/documento",
+        key: "audio-message",
+        label: "Áudio / mensagem de voz",
         group: "Comunicação",
-        disabled: true,
-        reason: "Em breve",
-      },
-      {
-        key: "audio-recording",
-        label: "Áudio / gravação",
-        group: "Comunicação",
+        groupId: "communication",
+        description: "Gravar ou enviar áudio pelo WhatsApp.",
         disabled: true,
         reason: "Em breve",
       },
     ],
-    Operacional: [
-      { key: "send-charge", label: "Enviar cobrança", group: "Operacional" },
+    Financeiro: [
+      {
+        key: "send-charge",
+        label: "Enviar cobrança",
+        group: "Financeiro",
+        groupId: "finance",
+        description: "Enviar a cobrança aberta do cliente.",
+        disabled: !hasOpenCharge,
+        reason: hasOpenCharge ? undefined : "Sem cobrança",
+      },
       {
         key: "send-payment-link",
         label: "Enviar link de pagamento",
-        group: "Operacional",
+        group: "Financeiro",
+        groupId: "finance",
+        description: "Compartilhar o checkout já disponível.",
+        disabled: !canSendPaymentLink,
+        reason: canSendPaymentLink ? undefined : "Sem link",
       },
+      {
+        key: "payment-reminder",
+        label: "Lembrete de pagamento",
+        group: "Financeiro",
+        groupId: "finance",
+        description: "Preparar lembrete com dados da cobrança.",
+        disabled: !hasOpenCharge,
+        reason: hasOpenCharge ? undefined : "Sem cobrança",
+      },
+    ],
+    Agenda: [
       {
         key: "confirm-appointment",
         label: "Confirmar agendamento",
-        group: "Operacional",
+        group: "Agenda",
+        groupId: "agenda",
+        description: "Preencher confirmação com data e horário.",
+        disabled: !hasUpcomingAppointment,
+        reason: hasUpcomingAppointment ? undefined : "Sem agenda",
       },
+      {
+        key: "appointment-reminder",
+        label: "Lembrete de agendamento",
+        group: "Agenda",
+        groupId: "agenda",
+        description: "Preparar lembrete do próximo atendimento.",
+        disabled: !hasUpcomingAppointment,
+        reason: hasUpcomingAppointment ? undefined : "Sem agenda",
+      },
+    ],
+    "Ordem de serviço": [
       {
         key: "update-service",
         label: "Atualizar serviço",
-        group: "Operacional",
+        group: "Ordem de serviço",
+        groupId: "serviceOrder",
+        description: "Preencher status da O.S. ativa.",
+        disabled: !hasActiveServiceOrder,
+        reason: hasActiveServiceOrder ? undefined : "Sem O.S.",
       },
       {
         key: "link-service-order",
         label: "Vincular O.S.",
-        group: "Operacional",
-      },
-      {
-        key: "mark-resolved",
-        label: "Marcar conversa como resolvida",
-        group: "Operacional",
+        group: "Ordem de serviço",
+        groupId: "serviceOrder",
+        description: "Abrir a O.S. ativa ou localizar cadastro.",
       },
     ],
     "Execução assistida": [
@@ -173,15 +261,19 @@ export function buildWhatsAppComposerActionGroups({
         key: "create-assisted-execution",
         label: "Criar execução assistida",
         group: "Execução assistida",
+        groupId: "execution",
+        description: "Revisar e aprovar a ação sugerida.",
         disabled: !hasSuggestedAction,
         reason: hasSuggestedAction ? undefined : "Sem ação sugerida",
       },
       {
-        key: "suggested-follow-up",
-        label: "Follow-up / ação sugerida",
+        key: "mark-resolved",
+        label: "Marcar conversa como resolvida",
         group: "Execução assistida",
-        disabled: !hasSuggestedAction,
-        reason: hasSuggestedAction ? undefined : "Sem ação sugerida",
+        groupId: "execution",
+        description: "Executar quando o agente sugerir resolução.",
+        disabled: !canResolveConversation,
+        reason: canResolveConversation ? undefined : "Indisponível",
       },
     ],
   };
@@ -871,14 +963,16 @@ function ExecutionChatColumn({
   onInfo,
   onMoreActions,
   error,
-  onOpenCustomer,
-  onOpenFinance,
-  onOpenAppointment,
   onOpenServiceOrder,
   onFillTemplate,
   onSendCharge,
+  onSendPaymentReminder,
   onRequestSuggestedExecution,
+  hasOpenCharge,
   canSendPaymentLink,
+  hasUpcomingAppointment,
+  hasActiveServiceOrder,
+  canResolveConversation,
   suggestedActionLabel,
   governanceAlert,
   onRunSuggestedAction,
@@ -896,17 +990,19 @@ function ExecutionChatColumn({
   onInfo: () => void;
   onMoreActions: () => void;
   error?: string | null;
-  onOpenCustomer: () => void;
-  onOpenFinance: () => void;
-  onOpenAppointment: () => void;
   onOpenServiceOrder: () => void;
   onFillTemplate: (
     template: string,
     messageType?: OperationalMessageType
   ) => void;
   onSendCharge: () => void;
+  onSendPaymentReminder: () => void;
   onRequestSuggestedExecution: () => void;
+  hasOpenCharge: boolean;
   canSendPaymentLink: boolean;
+  hasUpcomingAppointment: boolean;
+  hasActiveServiceOrder: boolean;
+  canResolveConversation: boolean;
   suggestedActionLabel?: string | null;
   governanceAlert?: string | null;
   onRunSuggestedAction: () => void;
@@ -919,6 +1015,70 @@ function ExecutionChatColumn({
     if (!node) return;
     node.scrollTop = node.scrollHeight;
   }, [conversation?.id, messages.length]);
+
+  const actionGroups = COMPOSER_ACTION_GROUPS;
+  const composerActionsByGroup = useMemo(() => {
+    const descriptors = buildWhatsAppComposerActionGroups({
+      hasSuggestedAction: Boolean(suggestedActionLabel),
+      hasOpenCharge,
+      canSendPaymentLink,
+      hasUpcomingAppointment,
+      hasActiveServiceOrder,
+      canResolveConversation,
+    });
+    const iconByKey: Record<string, ReactNode> = {
+      "quick-template": <MessageCircleMore className="size-4" />,
+      "attach-file": <Paperclip className="size-4" />,
+      "audio-message": <Volume2 className="size-4" />,
+      "send-charge": <CircleDollarSign className="size-4" />,
+      "send-payment-link": <CreditCard className="size-4" />,
+      "payment-reminder": <Bell className="size-4" />,
+      "confirm-appointment": <CalendarCheck className="size-4" />,
+      "appointment-reminder": <Bell className="size-4" />,
+      "update-service": <ClipboardList className="size-4" />,
+      "link-service-order": <FileText className="size-4" />,
+      "create-assisted-execution": <Bot className="size-4" />,
+      "mark-resolved": <CheckCircle2 className="size-4" />,
+    };
+    const handlerByKey: Record<string, () => void> = {
+      "send-charge": onSendCharge,
+      "send-payment-link": onSendCharge,
+      "payment-reminder": onSendPaymentReminder,
+      "confirm-appointment": () =>
+        onFillTemplate("Confirmação de agendamento", "APPOINTMENT_CONFIRMATION"),
+      "appointment-reminder": () =>
+        onFillTemplate("Lembrete de agendamento", "APPOINTMENT_REMINDER"),
+      "update-service": () =>
+        onFillTemplate("Atualização de O.S.", "SERVICE_UPDATE"),
+      "link-service-order": onOpenServiceOrder,
+      "create-assisted-execution": onRequestSuggestedExecution,
+      "mark-resolved": onRunSuggestedAction,
+    };
+
+    return Object.fromEntries(
+      Object.entries(descriptors).map(([group, actions]) => [
+        group,
+        actions.map(action => ({
+          ...action,
+          icon: iconByKey[action.key] ?? <FileText className="size-4" />,
+          onSelect: handlerByKey[action.key],
+        })),
+      ])
+    ) as Record<ComposerActionGroupName, WhatsAppComposerAction[]>;
+  }, [
+    canResolveConversation,
+    canSendPaymentLink,
+    hasActiveServiceOrder,
+    hasOpenCharge,
+    hasUpcomingAppointment,
+    onFillTemplate,
+    onOpenServiceOrder,
+    onRequestSuggestedExecution,
+    onRunSuggestedAction,
+    onSendCharge,
+    onSendPaymentReminder,
+    suggestedActionLabel,
+  ]);
 
   return (
     <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-white/[0.015]">
@@ -1091,151 +1251,89 @@ function ExecutionChatColumn({
                 <ChevronDown className="size-3.5" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-72">
-              <DropdownMenuLabel className="px-2 py-1.5 text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-                Comunicação
-              </DropdownMenuLabel>
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger>
-                  <MessageCircleMore className="size-4" />
-                  Template rápido
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent className="w-64">
-                  {QUICK_COMPOSER_TEMPLATES.map(template => (
-                    <DropdownMenuItem
-                      key={template}
-                      onClick={() => onFillTemplate(template)}
-                    >
-                      {template}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-              <DropdownMenuItem disabled>
-                <Paperclip className="size-4" />
-                <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
-                  <span>Anexar arquivo</span>
-                  <span className="text-[10px] text-[var(--text-muted)]">
-                    Em breve
-                  </span>
-                </span>
-              </DropdownMenuItem>
-              <DropdownMenuItem disabled>
-                <Paperclip className="size-4" />
-                <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
-                  <span>Enviar imagem/documento</span>
-                  <span className="text-[10px] text-[var(--text-muted)]">
-                    Em breve
-                  </span>
-                </span>
-              </DropdownMenuItem>
-              <DropdownMenuItem disabled>
-                <Volume2 className="size-4" />
-                <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
-                  <span>Áudio / gravação</span>
-                  <span className="text-[10px] text-[var(--text-muted)]">
-                    Em breve
-                  </span>
-                </span>
-              </DropdownMenuItem>
+            <DropdownMenuContent
+              align="end"
+              sideOffset={8}
+              className="max-h-[min(78vh,34rem)] w-[min(22rem,calc(100vw-2rem))] overflow-y-auto p-2"
+            >
+              {actionGroups.map(group => {
+                const actions = composerActionsByGroup[group.label] ?? [];
+                if (actions.length === 0) return null;
 
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel className="px-2 py-1.5 text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-                Operacional
-              </DropdownMenuLabel>
-              <DropdownMenuItem onClick={onSendCharge}>
-                Enviar cobrança
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={onSendCharge}
-                disabled={!canSendPaymentLink}
-              >
-                <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
-                  <span>Enviar link de pagamento</span>
-                  {!canSendPaymentLink ? (
-                    <span className="text-[10px] text-[var(--text-muted)]">
-                      Sem link
-                    </span>
-                  ) : null}
-                </span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() =>
-                  onFillTemplate(
-                    "Confirmação de agendamento",
-                    "APPOINTMENT_CONFIRMATION"
-                  )
-                }
-              >
-                Confirmar agendamento
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() =>
-                  onFillTemplate("Atualização de O.S.", "SERVICE_UPDATE")
-                }
-              >
-                Atualizar serviço
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onOpenServiceOrder}>
-                Vincular O.S.
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={onRunSuggestedAction}
-                disabled={
-                  suggestedActionLabel !== "Marcar conversa como resolvida"
-                }
-              >
-                <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
-                  <span>Marcar conversa como resolvida</span>
-                  {suggestedActionLabel !== "Marcar conversa como resolvida" ? (
-                    <span className="text-[10px] text-[var(--text-muted)]">
-                      Indisponível
-                    </span>
-                  ) : null}
-                </span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onOpenCustomer}>
-                Abrir cliente
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onOpenFinance}>
-                Abrir financeiro
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onOpenAppointment}>
-                Abrir agendamento
-              </DropdownMenuItem>
+                return (
+                  <div key={group.id} className="py-1 first:pt-0 last:pb-0">
+                    <DropdownMenuLabel className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                      {group.label}
+                    </DropdownMenuLabel>
+                    <div className="space-y-0.5">
+                      {actions.map(action => {
+                        const contentNode = (
+                          <span className="flex min-w-0 flex-1 items-start gap-2.5">
+                            <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg border border-white/[0.06] bg-white/[0.03] text-[var(--text-secondary)]">
+                              {action.icon}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="flex min-w-0 items-center justify-between gap-2">
+                                <span className="truncate text-sm font-medium text-[var(--text-primary)]">
+                                  {action.label}
+                                </span>
+                                {action.disabled && action.reason ? (
+                                  <span className="shrink-0 rounded-full border border-white/[0.06] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-muted)]">
+                                    {action.reason}
+                                  </span>
+                                ) : null}
+                              </span>
+                              {action.description ? (
+                                <span className="mt-0.5 block text-[11px] leading-snug text-[var(--text-muted)]">
+                                  {action.description}
+                                </span>
+                              ) : null}
+                            </span>
+                          </span>
+                        );
 
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel className="px-2 py-1.5 text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-                Execução assistida
-              </DropdownMenuLabel>
-              <DropdownMenuItem
-                onClick={onRequestSuggestedExecution}
-                disabled={!suggestedActionLabel}
-              >
-                <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
-                  <span>Criar execução assistida</span>
-                  {!suggestedActionLabel ? (
-                    <span className="text-[10px] text-[var(--text-muted)]">
-                      Sem ação sugerida
-                    </span>
-                  ) : null}
-                </span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={onRunSuggestedAction}
-                disabled={!suggestedActionLabel}
-              >
-                <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
-                  <span>
-                    {suggestedActionLabel ?? "Follow-up / ação sugerida"}
-                  </span>
-                  {!suggestedActionLabel ? (
-                    <span className="text-[10px] text-[var(--text-muted)]">
-                      Sem ação sugerida
-                    </span>
-                  ) : null}
-                </span>
-              </DropdownMenuItem>
+                        if (action.key === "quick-template") {
+                          return (
+                            <DropdownMenuSub key={action.key}>
+                              <DropdownMenuSubTrigger className="items-start gap-0 rounded-lg px-2 py-2">
+                                {contentNode}
+                              </DropdownMenuSubTrigger>
+                              <DropdownMenuSubContent
+                                alignOffset={-4}
+                                className="max-h-[min(70vh,24rem)] w-64 overflow-y-auto"
+                              >
+                                {QUICK_COMPOSER_TEMPLATES.map(template => (
+                                  <DropdownMenuItem
+                                    key={template}
+                                    onClick={() => onFillTemplate(template)}
+                                  >
+                                    <FileText className="size-4" />
+                                    {template}
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuSubContent>
+                            </DropdownMenuSub>
+                          );
+                        }
+
+                        return (
+                          <DropdownMenuItem
+                            key={action.key}
+                            disabled={action.disabled}
+                            onClick={action.disabled ? undefined : action.onSelect}
+                            className="items-start rounded-lg px-2 py-2"
+                          >
+                            {contentNode}
+                          </DropdownMenuItem>
+                        );
+                      })}
+                    </div>
+                    {group.id !== "execution" ? (
+                      <DropdownMenuSeparator className="my-1" />
+                    ) : null}
+                  </div>
+                );
+              })}
             </DropdownMenuContent>
           </DropdownMenu>
           <Button
@@ -2680,27 +2778,6 @@ export default function WhatsAppPage() {
             }}
             onMoreActions={handleMoreActions}
             error={composerError}
-            onOpenCustomer={() =>
-              setLocation(
-                context?.customer?.id
-                  ? `/customers?customerId=${context.customer.id}`
-                  : "/customers"
-              )
-            }
-            onOpenFinance={() =>
-              setLocation(
-                context?.openCharge?.id
-                  ? `/finances?chargeId=${context.openCharge.id}`
-                  : "/finances"
-              )
-            }
-            onOpenAppointment={() =>
-              setLocation(
-                context?.nextAppointment?.id
-                  ? `/appointments?appointmentId=${context.nextAppointment.id}`
-                  : "/appointments"
-              )
-            }
             onOpenServiceOrder={() =>
               setLocation(
                 context?.activeServiceOrder?.id
@@ -2710,10 +2787,19 @@ export default function WhatsAppPage() {
             }
             onFillTemplate={handleTemplateChip}
             onSendCharge={() => void handleSendCharge()}
+            onSendPaymentReminder={() =>
+              void handleSendTemplate("payment_reminder", "PAYMENT_REMINDER")
+            }
             onRequestSuggestedExecution={() =>
               void handleRequestSuggestedExecution()
             }
+            hasOpenCharge={Boolean(context?.openCharge?.id)}
             canSendPaymentLink={Boolean(context?.openCharge?.paymentLink)}
+            hasUpcomingAppointment={Boolean(context?.nextAppointment?.id)}
+            hasActiveServiceOrder={Boolean(context?.activeServiceOrder?.id)}
+            canResolveConversation={
+              suggestedAction?.label === "Marcar conversa como resolvida"
+            }
             suggestedActionLabel={suggestedAction?.label ?? null}
             governanceAlert={governanceAlert}
             onRunSuggestedAction={() => {
