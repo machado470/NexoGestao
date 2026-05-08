@@ -8,61 +8,79 @@ import {
 } from "./WhatsAppPage";
 
 describe("WhatsApp composer action groups", () => {
-  it("moves communication controls into Mais ações descriptors", () => {
+  it("renders Mais ações as compact operational sections", () => {
     const groups = buildWhatsAppComposerActionGroups({
       hasSuggestedAction: true,
+      canResolveConversation: true,
     });
 
+    expect(Object.keys(groups)).toEqual([
+      "Comunicação",
+      "Financeiro",
+      "Agenda",
+      "Ordem de serviço",
+      "Execução assistida",
+    ]);
     expect(groups.Comunicação.map(action => action.label)).toEqual([
       "Template rápido",
       "Anexar arquivo",
-      "Enviar imagem/documento",
-      "Áudio / gravação",
+      "Áudio / mensagem de voz",
     ]);
-    expect(
-      groups.Comunicação.filter(action => action.disabled).map(
-        action => action.reason
-      )
-    ).toEqual(["Em breve", "Em breve", "Em breve"]);
-  });
-
-  it("keeps supported operational and assisted execution actions discoverable", () => {
-    const groups = buildWhatsAppComposerActionGroups({
-      hasSuggestedAction: true,
-    });
-
-    expect(groups.Operacional.map(action => action.label)).toEqual([
+    expect(groups.Financeiro.map(action => action.label)).toEqual([
       "Enviar cobrança",
       "Enviar link de pagamento",
+      "Lembrete de pagamento",
+    ]);
+    expect(groups.Agenda.map(action => action.label)).toEqual([
       "Confirmar agendamento",
+      "Lembrete de agendamento",
+    ]);
+    expect(groups["Ordem de serviço"].map(action => action.label)).toEqual([
       "Atualizar serviço",
       "Vincular O.S.",
-      "Marcar conversa como resolvida",
     ]);
     expect(groups["Execução assistida"].map(action => action.label)).toEqual([
       "Criar execução assistida",
-      "Follow-up / ação sugerida",
+      "Marcar conversa como resolvida",
     ]);
-    expect(groups["Execução assistida"].every(action => !action.disabled)).toBe(
-      true
-    );
   });
 
-  it("disables assisted execution entries when no suggested action exists", () => {
+  it("keeps unavailable actions disabled with user-facing reasons", () => {
     const groups = buildWhatsAppComposerActionGroups({
       hasSuggestedAction: false,
+      hasOpenCharge: false,
+      canSendPaymentLink: false,
+      hasUpcomingAppointment: false,
+      hasActiveServiceOrder: false,
+      canResolveConversation: false,
     });
 
+    expect(
+      groups.Comunicação.filter(action => action.disabled).map(action => [
+        action.label,
+        action.reason,
+      ])
+    ).toEqual([
+      ["Anexar arquivo", "Em breve"],
+      ["Áudio / mensagem de voz", "Em breve"],
+    ]);
+    expect(groups.Financeiro.every(action => action.disabled)).toBe(true);
+    expect(groups.Agenda.every(action => action.disabled)).toBe(true);
+    expect(groups["Ordem de serviço"][0]).toMatchObject({
+      label: "Atualizar serviço",
+      disabled: true,
+      reason: "Sem O.S.",
+    });
+    expect(groups["Ordem de serviço"][1]).toMatchObject({
+      label: "Vincular O.S.",
+    });
+    expect(groups["Ordem de serviço"][1].disabled).toBeUndefined();
     expect(groups["Execução assistida"].every(action => action.disabled)).toBe(
       true
     );
-    expect(groups["Execução assistida"].map(action => action.reason)).toEqual([
-      "Sem ação sugerida",
-      "Sem ação sugerida",
-    ]);
   });
 
-  it("does not bring back the old visible General intent selector", () => {
+  it("does not bring back isolated composer controls or General labels", () => {
     const groups = buildWhatsAppComposerActionGroups({
       hasSuggestedAction: true,
     });
@@ -73,6 +91,8 @@ describe("WhatsApp composer action groups", () => {
     expect(labels).not.toContain("Geral");
     expect(labels).not.toContain("General");
     expect(labels).not.toContain("Intenção");
+    expect(labels).not.toContain("Enviar imagem/documento");
+    expect(labels).not.toContain("Gravação isolada");
   });
 });
 
@@ -86,6 +106,9 @@ describe("WhatsApp composer messageType resolution", () => {
     expect(
       resolveMessageType({ explicitMessageType: "APPOINTMENT_CONFIRMATION" })
     ).toBe("APPOINTMENT_CONFIRMATION");
+    expect(
+      resolveMessageType({ explicitMessageType: "APPOINTMENT_REMINDER" })
+    ).toBe("APPOINTMENT_REMINDER");
     expect(resolveMessageType({ explicitMessageType: "SERVICE_UPDATE" })).toBe(
       "SERVICE_UPDATE"
     );
@@ -126,5 +149,23 @@ describe("WhatsApp composer messageType resolution", () => {
       content: "Confirmado",
       messageType: "APPOINTMENT_CONFIRMATION",
     });
+    expect(
+      buildWhatsAppSendPayload({
+        content: "Serviço atualizado",
+        messageType: "SERVICE_UPDATE",
+      })
+    ).toMatchObject({ messageType: "SERVICE_UPDATE" });
+    expect(
+      buildWhatsAppSendPayload({
+        content: "Link",
+        messageType: "PAYMENT_LINK",
+      })
+    ).toMatchObject({ messageType: "PAYMENT_LINK" });
+    expect(
+      buildWhatsAppSendPayload({
+        content: "Lembrete",
+        messageType: "PAYMENT_REMINDER",
+      })
+    ).toMatchObject({ messageType: "PAYMENT_REMINDER" });
   });
 });
