@@ -146,22 +146,154 @@ const COMPOSER_ACTION_GROUPS: Array<{
   { id: "execution", label: "Execução assistida" },
 ];
 
+type WhatsAppComposerActionPalette = {
+  recommendedActions: ComposerActionDescriptor[];
+  groupedActions: Record<ComposerActionGroupName, ComposerActionDescriptor[]>;
+};
+
+type WhatsAppComposerActionContext = {
+  hasSuggestedAction: boolean;
+  hasPendingAssistedExecution?: boolean;
+  hasOpenCharge?: boolean;
+  hasPendingCharge?: boolean;
+  canSendPaymentLink?: boolean;
+  chargeStatus?: string | null;
+  chargeDaysOverdue?: number | null;
+  hasUpcomingAppointment?: boolean;
+  appointmentStatus?: string | null;
+  hasActiveServiceOrder?: boolean;
+  serviceOrderStatus?: string | null;
+  canResolveConversation?: boolean;
+};
+
+function normalizeContextStatus(value?: string | null) {
+  return String(value ?? "")
+    .trim()
+    .toUpperCase();
+}
+
+function cloneRecommendedAction(
+  action: ComposerActionDescriptor,
+  description: string,
+  label = action.label
+): ComposerActionDescriptor {
+  return {
+    ...action,
+    label,
+    description,
+  };
+}
+
+export function getRecommendedWhatsAppComposerActions(
+  context: Required<
+    Pick<
+      WhatsAppComposerActionContext,
+      | "hasSuggestedAction"
+      | "hasPendingAssistedExecution"
+      | "hasOpenCharge"
+      | "hasPendingCharge"
+      | "canSendPaymentLink"
+      | "hasUpcomingAppointment"
+      | "hasActiveServiceOrder"
+      | "canResolveConversation"
+    >
+  > &
+    Pick<
+      WhatsAppComposerActionContext,
+      | "chargeStatus"
+      | "chargeDaysOverdue"
+      | "appointmentStatus"
+      | "serviceOrderStatus"
+    >,
+  groupedActions: Record<ComposerActionGroupName, ComposerActionDescriptor[]>
+): ComposerActionDescriptor[] {
+  const actionByKey = new Map(
+    Object.values(groupedActions)
+      .flat()
+      .map(action => [action.key, action])
+  );
+  const chargeStatus = normalizeContextStatus(context.chargeStatus);
+  const appointmentStatus = normalizeContextStatus(context.appointmentStatus);
+  const serviceOrderStatus = normalizeContextStatus(context.serviceOrderStatus);
+  const hasOverdueCharge =
+    (context.chargeDaysOverdue ?? 0) > 0 ||
+    ["OVERDUE", "VENCIDA", "ATRASADA"].includes(chargeStatus);
+  const hasChargeToCollect =
+    context.hasOpenCharge &&
+    (context.hasPendingCharge ||
+      hasOverdueCharge ||
+      ["PENDING", "OPEN", "ABERTA", "PENDENTE"].includes(chargeStatus));
+  const hasAppointmentToConfirm =
+    context.hasUpcomingAppointment &&
+    !["CONFIRMED", "CONFIRMADO", "CANCELLED", "CANCELED", "CANCELADO"].includes(
+      appointmentStatus
+    );
+  const hasServiceOrderNeedingUpdate =
+    context.hasActiveServiceOrder &&
+    ![
+      "DONE",
+      "COMPLETED",
+      "CONCLUIDA",
+      "CONCLUÍDA",
+      "CANCELLED",
+      "CANCELED",
+    ].includes(serviceOrderStatus);
+
+  const recommended: ComposerActionDescriptor[] = [];
+  const add = (key: string, description: string, label?: string) => {
+    const action = actionByKey.get(key);
+    if (!action || action.disabled) return;
+    recommended.push(cloneRecommendedAction(action, description, label));
+  };
+
+  if (context.hasPendingAssistedExecution) {
+    add(
+      "create-assisted-execution",
+      "Há uma execução pendente para revisar antes de continuar.",
+      "Revisar execução assistida"
+    );
+  }
+
+  if (hasOverdueCharge) {
+    add("send-charge", "Cobrança vencida neste atendimento.");
+    add("send-payment-link", "Link disponível para resolver a cobrança agora.");
+  } else if (hasChargeToCollect) {
+    add("send-charge", "Cobrança pendente vinculada ao cliente.");
+    add("send-payment-link", "Link disponível para resolver a cobrança agora.");
+  }
+
+  if (hasAppointmentToConfirm) {
+    add(
+      "confirm-appointment",
+      "Agendamento pendente no contexto desta conversa."
+    );
+  }
+
+  if (hasServiceOrderNeedingUpdate) {
+    add("update-service", "O.S. ativa ou atrasada vinculada ao cliente.");
+  }
+
+  return recommended;
+}
+
 export function buildWhatsAppComposerActionGroups({
   hasSuggestedAction,
+  hasPendingAssistedExecution = false,
   hasOpenCharge = true,
+  hasPendingCharge = hasOpenCharge,
   canSendPaymentLink = true,
+  chargeStatus = null,
+  chargeDaysOverdue = null,
   hasUpcomingAppointment = true,
+  appointmentStatus = null,
   hasActiveServiceOrder = true,
+  serviceOrderStatus = null,
   canResolveConversation = hasSuggestedAction,
-}: {
-  hasSuggestedAction: boolean;
-  hasOpenCharge?: boolean;
-  canSendPaymentLink?: boolean;
-  hasUpcomingAppointment?: boolean;
-  hasActiveServiceOrder?: boolean;
-  canResolveConversation?: boolean;
-}): Record<ComposerActionGroupName, ComposerActionDescriptor[]> {
-  return {
+}: WhatsAppComposerActionContext): WhatsAppComposerActionPalette {
+  const groupedActions: Record<
+    ComposerActionGroupName,
+    ComposerActionDescriptor[]
+  > = {
     Comunicação: [
       {
         key: "quick-template",
@@ -205,8 +337,12 @@ export function buildWhatsAppComposerActionGroups({
         group: "Financeiro",
         groupId: "finance",
         description: "Compartilhar o checkout já disponível.",
-        disabled: !canSendPaymentLink,
-        reason: canSendPaymentLink ? undefined : "Sem link",
+        disabled: !hasOpenCharge || !canSendPaymentLink,
+        reason: !hasOpenCharge
+          ? "Sem cobrança"
+          : canSendPaymentLink
+            ? undefined
+            : "Sem link",
       },
       {
         key: "payment-reminder",
@@ -254,28 +390,58 @@ export function buildWhatsAppComposerActionGroups({
         group: "Ordem de serviço",
         groupId: "serviceOrder",
         description: "Abrir a O.S. ativa ou localizar cadastro.",
+        disabled: !hasActiveServiceOrder,
+        reason: hasActiveServiceOrder ? undefined : "Sem O.S.",
       },
     ],
     "Execução assistida": [
       {
         key: "create-assisted-execution",
-        label: "Criar execução assistida",
+        label: hasPendingAssistedExecution
+          ? "Revisar execução assistida"
+          : "Criar execução assistida",
         group: "Execução assistida",
         groupId: "execution",
-        description: "Revisar e aprovar a ação sugerida.",
-        disabled: !hasSuggestedAction,
-        reason: hasSuggestedAction ? undefined : "Sem ação sugerida",
+        description: hasPendingAssistedExecution
+          ? "Abrir workflow pendente desta conversa."
+          : "Revisar e aprovar a ação sugerida.",
+        disabled: !hasSuggestedAction && !hasPendingAssistedExecution,
+        reason:
+          hasSuggestedAction || hasPendingAssistedExecution
+            ? undefined
+            : "Sem ação sugerida",
       },
       {
         key: "mark-resolved",
         label: "Marcar conversa como resolvida",
         group: "Execução assistida",
         groupId: "execution",
-        description: "Executar quando o agente sugerir resolução.",
+        description: "Encerrar esta conversa via execução assistida.",
         disabled: !canResolveConversation,
-        reason: canResolveConversation ? undefined : "Indisponível",
+        reason: canResolveConversation ? undefined : "Conversa resolvida",
       },
     ],
+  };
+
+  return {
+    recommendedActions: getRecommendedWhatsAppComposerActions(
+      {
+        hasSuggestedAction,
+        hasPendingAssistedExecution,
+        hasOpenCharge,
+        hasPendingCharge,
+        canSendPaymentLink,
+        chargeStatus,
+        chargeDaysOverdue,
+        hasUpcomingAppointment,
+        appointmentStatus,
+        hasActiveServiceOrder,
+        serviceOrderStatus,
+        canResolveConversation,
+      },
+      groupedActions
+    ),
+    groupedActions,
   };
 }
 
@@ -968,11 +1134,19 @@ function ExecutionChatColumn({
   onSendCharge,
   onSendPaymentReminder,
   onRequestSuggestedExecution,
+  onResolveConversation,
+  onReviewAssistedExecution,
   hasOpenCharge,
+  hasPendingCharge,
   canSendPaymentLink,
+  chargeStatus,
+  chargeDaysOverdue,
   hasUpcomingAppointment,
+  appointmentStatus,
   hasActiveServiceOrder,
+  serviceOrderStatus,
   canResolveConversation,
+  hasPendingAssistedExecution,
   suggestedActionLabel,
   governanceAlert,
   onRunSuggestedAction,
@@ -998,11 +1172,19 @@ function ExecutionChatColumn({
   onSendCharge: () => void;
   onSendPaymentReminder: () => void;
   onRequestSuggestedExecution: () => void;
+  onResolveConversation: () => void;
+  onReviewAssistedExecution: () => void;
   hasOpenCharge: boolean;
+  hasPendingCharge: boolean;
   canSendPaymentLink: boolean;
+  chargeStatus?: string | null;
+  chargeDaysOverdue?: number | null;
   hasUpcomingAppointment: boolean;
+  appointmentStatus?: string | null;
   hasActiveServiceOrder: boolean;
+  serviceOrderStatus?: string | null;
   canResolveConversation: boolean;
+  hasPendingAssistedExecution: boolean;
   suggestedActionLabel?: string | null;
   governanceAlert?: string | null;
   onRunSuggestedAction: () => void;
@@ -1017,15 +1199,22 @@ function ExecutionChatColumn({
   }, [conversation?.id, messages.length]);
 
   const actionGroups = COMPOSER_ACTION_GROUPS;
-  const composerActionsByGroup = useMemo(() => {
-    const descriptors = buildWhatsAppComposerActionGroups({
-      hasSuggestedAction: Boolean(suggestedActionLabel),
-      hasOpenCharge,
-      canSendPaymentLink,
-      hasUpcomingAppointment,
-      hasActiveServiceOrder,
-      canResolveConversation,
-    });
+  const composerActionPalette = useMemo(() => {
+    const { recommendedActions, groupedActions } =
+      buildWhatsAppComposerActionGroups({
+        hasSuggestedAction: Boolean(suggestedActionLabel),
+        hasPendingAssistedExecution,
+        hasOpenCharge,
+        hasPendingCharge,
+        canSendPaymentLink,
+        chargeStatus,
+        chargeDaysOverdue,
+        hasUpcomingAppointment,
+        appointmentStatus,
+        hasActiveServiceOrder,
+        serviceOrderStatus,
+        canResolveConversation,
+      });
     const iconByKey: Record<string, ReactNode> = {
       "quick-template": <MessageCircleMore className="size-4" />,
       "attach-file": <Paperclip className="size-4" />,
@@ -1045,40 +1234,124 @@ function ExecutionChatColumn({
       "send-payment-link": onSendCharge,
       "payment-reminder": onSendPaymentReminder,
       "confirm-appointment": () =>
-        onFillTemplate("Confirmação de agendamento", "APPOINTMENT_CONFIRMATION"),
+        onFillTemplate(
+          "Confirmação de agendamento",
+          "APPOINTMENT_CONFIRMATION"
+        ),
       "appointment-reminder": () =>
         onFillTemplate("Lembrete de agendamento", "APPOINTMENT_REMINDER"),
       "update-service": () =>
         onFillTemplate("Atualização de O.S.", "SERVICE_UPDATE"),
       "link-service-order": onOpenServiceOrder,
-      "create-assisted-execution": onRequestSuggestedExecution,
-      "mark-resolved": onRunSuggestedAction,
+      "create-assisted-execution": hasPendingAssistedExecution
+        ? onReviewAssistedExecution
+        : onRequestSuggestedExecution,
+      "mark-resolved": onResolveConversation,
     };
+    const withRuntime = (
+      actions: ComposerActionDescriptor[]
+    ): WhatsAppComposerAction[] =>
+      actions.map(action => ({
+        ...action,
+        icon: iconByKey[action.key] ?? <FileText className="size-4" />,
+        onSelect: handlerByKey[action.key],
+      }));
 
-    return Object.fromEntries(
-      Object.entries(descriptors).map(([group, actions]) => [
-        group,
-        actions.map(action => ({
-          ...action,
-          icon: iconByKey[action.key] ?? <FileText className="size-4" />,
-          onSelect: handlerByKey[action.key],
-        })),
-      ])
-    ) as Record<ComposerActionGroupName, WhatsAppComposerAction[]>;
+    return {
+      recommendedActions: withRuntime(recommendedActions),
+      groupedActions: Object.fromEntries(
+        Object.entries(groupedActions).map(([group, actions]) => [
+          group,
+          withRuntime(actions),
+        ])
+      ) as Record<ComposerActionGroupName, WhatsAppComposerAction[]>,
+    };
   }, [
+    appointmentStatus,
     canResolveConversation,
     canSendPaymentLink,
+    chargeDaysOverdue,
+    chargeStatus,
     hasActiveServiceOrder,
     hasOpenCharge,
+    hasPendingAssistedExecution,
+    hasPendingCharge,
     hasUpcomingAppointment,
     onFillTemplate,
     onOpenServiceOrder,
     onRequestSuggestedExecution,
-    onRunSuggestedAction,
+    onResolveConversation,
+    onReviewAssistedExecution,
     onSendCharge,
     onSendPaymentReminder,
+    serviceOrderStatus,
     suggestedActionLabel,
   ]);
+
+  const renderComposerAction = (
+    action: WhatsAppComposerAction,
+    key = action.key
+  ) => {
+    const contentNode = (
+      <span className="flex min-w-0 flex-1 items-start gap-2.5">
+        <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg border border-white/[0.06] bg-white/[0.03] text-[var(--text-secondary)]">
+          {action.icon}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex min-w-0 items-center justify-between gap-2">
+            <span className="truncate text-sm font-medium text-[var(--text-primary)]">
+              {action.label}
+            </span>
+            {action.disabled && action.reason ? (
+              <span className="shrink-0 rounded-full border border-white/[0.06] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-muted)]">
+                {action.reason}
+              </span>
+            ) : null}
+          </span>
+          {action.description ? (
+            <span className="mt-0.5 block text-[11px] leading-snug text-[var(--text-muted)]">
+              {action.description}
+            </span>
+          ) : null}
+        </span>
+      </span>
+    );
+
+    if (action.key === "quick-template") {
+      return (
+        <DropdownMenuSub key={key}>
+          <DropdownMenuSubTrigger className="items-start gap-0 rounded-lg px-2 py-2">
+            {contentNode}
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent
+            alignOffset={-4}
+            className="max-h-[min(70vh,24rem)] w-64 overflow-y-auto"
+          >
+            {QUICK_COMPOSER_TEMPLATES.map(template => (
+              <DropdownMenuItem
+                key={template}
+                onClick={() => onFillTemplate(template)}
+              >
+                <FileText className="size-4" />
+                {template}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+      );
+    }
+
+    return (
+      <DropdownMenuItem
+        key={key}
+        disabled={action.disabled}
+        onClick={action.disabled ? undefined : action.onSelect}
+        className="items-start rounded-lg px-2 py-2"
+      >
+        {contentNode}
+      </DropdownMenuItem>
+    );
+  };
 
   return (
     <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-white/[0.015]">
@@ -1256,8 +1529,22 @@ function ExecutionChatColumn({
               sideOffset={8}
               className="max-h-[min(78vh,34rem)] w-[min(22rem,calc(100vw-2rem))] overflow-y-auto p-2"
             >
+              {composerActionPalette.recommendedActions.length ? (
+                <div className="pb-1">
+                  <DropdownMenuLabel className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-200">
+                    Recomendadas agora
+                  </DropdownMenuLabel>
+                  <div className="space-y-0.5">
+                    {composerActionPalette.recommendedActions.map(action =>
+                      renderComposerAction(action, `recommended-${action.key}`)
+                    )}
+                  </div>
+                  <DropdownMenuSeparator className="my-1" />
+                </div>
+              ) : null}
               {actionGroups.map(group => {
-                const actions = composerActionsByGroup[group.label] ?? [];
+                const actions =
+                  composerActionPalette.groupedActions[group.label] ?? [];
                 if (actions.length === 0) return null;
 
                 return (
@@ -1266,67 +1553,7 @@ function ExecutionChatColumn({
                       {group.label}
                     </DropdownMenuLabel>
                     <div className="space-y-0.5">
-                      {actions.map(action => {
-                        const contentNode = (
-                          <span className="flex min-w-0 flex-1 items-start gap-2.5">
-                            <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg border border-white/[0.06] bg-white/[0.03] text-[var(--text-secondary)]">
-                              {action.icon}
-                            </span>
-                            <span className="min-w-0 flex-1">
-                              <span className="flex min-w-0 items-center justify-between gap-2">
-                                <span className="truncate text-sm font-medium text-[var(--text-primary)]">
-                                  {action.label}
-                                </span>
-                                {action.disabled && action.reason ? (
-                                  <span className="shrink-0 rounded-full border border-white/[0.06] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-muted)]">
-                                    {action.reason}
-                                  </span>
-                                ) : null}
-                              </span>
-                              {action.description ? (
-                                <span className="mt-0.5 block text-[11px] leading-snug text-[var(--text-muted)]">
-                                  {action.description}
-                                </span>
-                              ) : null}
-                            </span>
-                          </span>
-                        );
-
-                        if (action.key === "quick-template") {
-                          return (
-                            <DropdownMenuSub key={action.key}>
-                              <DropdownMenuSubTrigger className="items-start gap-0 rounded-lg px-2 py-2">
-                                {contentNode}
-                              </DropdownMenuSubTrigger>
-                              <DropdownMenuSubContent
-                                alignOffset={-4}
-                                className="max-h-[min(70vh,24rem)] w-64 overflow-y-auto"
-                              >
-                                {QUICK_COMPOSER_TEMPLATES.map(template => (
-                                  <DropdownMenuItem
-                                    key={template}
-                                    onClick={() => onFillTemplate(template)}
-                                  >
-                                    <FileText className="size-4" />
-                                    {template}
-                                  </DropdownMenuItem>
-                                ))}
-                              </DropdownMenuSubContent>
-                            </DropdownMenuSub>
-                          );
-                        }
-
-                        return (
-                          <DropdownMenuItem
-                            key={action.key}
-                            disabled={action.disabled}
-                            onClick={action.disabled ? undefined : action.onSelect}
-                            className="items-start rounded-lg px-2 py-2"
-                          >
-                            {contentNode}
-                          </DropdownMenuItem>
-                        );
-                      })}
+                      {actions.map(action => renderComposerAction(action))}
                     </div>
                     {group.id !== "execution" ? (
                       <DropdownMenuSeparator className="my-1" />
@@ -2448,6 +2675,42 @@ export default function WhatsAppPage() {
     suggestedAction,
   ]);
 
+  const handleResolveConversationExecution = useCallback(async () => {
+    if (!selectedConversationRecordId) {
+      toast.message("Selecione uma conversa ativa para resolver.");
+      return;
+    }
+    try {
+      const execution = (await requestExecutionMutation.mutateAsync({
+        conversationId: selectedConversationRecordId,
+        suggestedAction: "MARK_RESOLVED",
+        executionReason: "Marcar conversa como resolvida",
+        actionPayload: buildActionPayload("MARK_RESOLVED", context),
+        idempotencyKey: `whatsapp-ui:${selectedConversationRecordId}:MARK_RESOLVED:${context?.customer?.id ?? "conversation"}`,
+      })) as WhatsAppActionExecution;
+      await refreshExecutionState();
+      if (execution.status === "PENDING_APPROVAL") {
+        toast.success("Workflow de resolução criado e aguardando aprovação.");
+        return;
+      }
+      toast.success("Conversa marcada para resolução com segurança.");
+    } catch (error: any) {
+      toast.error(error?.message ?? "Falha ao criar workflow de resolução.");
+    }
+  }, [
+    context,
+    refreshExecutionState,
+    requestExecutionMutation,
+    selectedConversationRecordId,
+  ]);
+
+  const handleReviewAssistedExecution = useCallback(() => {
+    setIsContextVisible(true);
+    document
+      .getElementById("whatsapp-context-panel")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
   const governanceAlert = useMemo(() => {
     if (!selectedConversation) return null;
     if (
@@ -2793,13 +3056,26 @@ export default function WhatsAppPage() {
             onRequestSuggestedExecution={() =>
               void handleRequestSuggestedExecution()
             }
-            hasOpenCharge={Boolean(context?.openCharge?.id)}
-            canSendPaymentLink={Boolean(context?.openCharge?.paymentLink)}
-            hasUpcomingAppointment={Boolean(context?.nextAppointment?.id)}
-            hasActiveServiceOrder={Boolean(context?.activeServiceOrder?.id)}
-            canResolveConversation={
-              suggestedAction?.label === "Marcar conversa como resolvida"
+            onResolveConversation={() =>
+              void handleResolveConversationExecution()
             }
+            onReviewAssistedExecution={handleReviewAssistedExecution}
+            hasOpenCharge={Boolean(context?.openCharge?.id)}
+            hasPendingCharge={Boolean(
+              context?.openCharge?.id || selectedConversation?.hasPendingCharge
+            )}
+            canSendPaymentLink={Boolean(context?.openCharge?.paymentLink)}
+            chargeStatus={context?.openCharge?.status ?? null}
+            chargeDaysOverdue={context?.openCharge?.daysOverdue ?? null}
+            hasUpcomingAppointment={Boolean(context?.nextAppointment?.id)}
+            appointmentStatus={context?.nextAppointment?.status ?? null}
+            hasActiveServiceOrder={Boolean(context?.activeServiceOrder?.id)}
+            serviceOrderStatus={context?.activeServiceOrder?.status ?? null}
+            canResolveConversation={
+              Boolean(selectedConversationRecordId) &&
+              selectedConversation?.status !== "RESOLVED"
+            }
+            hasPendingAssistedExecution={pendingApprovals.length > 0}
             suggestedActionLabel={suggestedAction?.label ?? null}
             governanceAlert={governanceAlert}
             onRunSuggestedAction={() => {
