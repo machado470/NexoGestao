@@ -554,7 +554,7 @@ const statusUi: Record<
   FAILED: { label: "Falha", dot: "bg-rose-400" },
 };
 
-const ROW_HEIGHT = 106;
+const ROW_HEIGHT = 124;
 const NO_APPOINTMENT_TEXT = "Sem agendamento futuro";
 const NO_SERVICE_ORDER_TEXT = "Nenhuma O.S. ativa";
 const NO_CHARGE_TEXT = "Nenhuma cobrança pendente";
@@ -913,34 +913,34 @@ const ConversationRow = memo(function ConversationRow({
   const badges = getConversationBadges(conversation);
 
   return (
-    <div style={style} className="px-0.5 py-1">
+    <div style={style} className="px-1 py-2">
       <button
         type="button"
         onClick={() => onSelect(conversation.id)}
         className={cn(
-          "w-full rounded-xl px-3 py-2.5 text-left transition",
+          "w-full rounded-2xl px-4 py-3 text-left text-app-primary transition duration-150",
           selectedId === conversation.id
-            ? "bg-[var(--accent-soft)]/28"
-            : "bg-white/[0.015] hover:bg-white/[0.045]"
+            ? "bg-[var(--accent-soft)]/45"
+            : "bg-app-card/45 hover:bg-app-card/80"
         )}
       >
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
             <div
               className={cn(
-                "flex size-8 shrink-0 items-center justify-center rounded-full border text-xs font-semibold",
+                "flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
                 selectedId === conversation.id
-                  ? "border-[var(--accent-primary)]/55 bg-[var(--accent-soft)]/70 text-[var(--accent-primary)]"
-                  : "border-white/[0.12] bg-white/[0.04] text-[var(--text-secondary)]"
+                  ? "bg-[var(--accent-soft)]/80 text-[var(--accent-primary)]"
+                  : "bg-app-surface text-app-muted"
               )}
             >
               {conversation.name.slice(0, 1)}
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">
+              <p className="truncate text-sm font-semibold text-app-primary">
                 {conversation.name}
               </p>
-              <p className="truncate text-[11px] text-[var(--text-muted)]">
+              <p className="truncate text-[11px] text-app-muted">
                 {conversation.phone ?? "Telefone não informado"}
               </p>
               {conversation.title ? (
@@ -950,14 +950,14 @@ const ConversationRow = memo(function ConversationRow({
               ) : null}
             </div>
           </div>
-          <span className="text-[11px] text-[var(--text-muted)]">
+          <span className="shrink-0 text-[11px] text-app-muted">
             {fmtTime(conversation.lastMessageAt)}
           </span>
         </div>
-        <p className="mt-1.5 line-clamp-1 text-xs text-[var(--text-secondary)]">
+        <p className="mt-2 line-clamp-1 text-xs text-[var(--text-secondary)]">
           {conversation.contextHint ?? conversation.lastMessage}
         </p>
-        <div className="mt-2 flex items-center justify-between text-[11px] text-[var(--text-muted)]">
+        <div className="mt-3 flex items-center justify-between gap-3 text-[11px] text-app-muted">
           <span className="inline-flex items-center gap-1.5">
             <span className={cn("h-2 w-2 rounded-full", status.dot)} />
             {operational}
@@ -967,7 +967,7 @@ const ConversationRow = memo(function ConversationRow({
               {badges.slice(0, 3).map(badge => (
                 <span
                   key={badge}
-                  className="rounded-full border border-white/15 bg-white/10 px-1.5 py-0.5 text-[10px] leading-none text-white/90"
+                  className="rounded-full bg-app-surface px-2 py-0.5 text-[10px] leading-none text-[var(--text-secondary)]"
                 >
                   {badge}
                 </span>
@@ -975,7 +975,7 @@ const ConversationRow = memo(function ConversationRow({
             </div>
           ) : null}
           {conversation.unreadCount ? (
-            <span className="rounded-full border border-amber-400/35 bg-amber-500/20 px-1.5 py-0.5 text-[10px] leading-none text-amber-100">
+            <span className="rounded-full bg-[color-mix(in_srgb,var(--warning)_18%,var(--app-surface))] px-2 py-0.5 text-[10px] font-medium leading-none text-[var(--warning)]">
               {conversation.unreadCount}
             </span>
           ) : null}
@@ -1026,26 +1026,26 @@ function InboxQueueColumn({
   const visibleRows = rows.slice(startIndex, startIndex + visibleCount);
 
   return (
-    <aside className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-white/[0.015] p-2.5">
-      <div className="shrink-0 space-y-2 pb-2.5">
+    <aside className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-[var(--radius-panel)] bg-app-panel p-4 text-app-primary">
+      <div className="shrink-0 space-y-3 pb-3">
         <div className="flex items-center justify-between">
           <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
             Operational Queue
           </p>
           <button
             type="button"
-            className="rounded-lg bg-white/[0.02] px-2 py-1 text-[10px] text-[var(--text-muted)] hover:bg-white/[0.05]"
+            className="rounded-lg bg-app-surface px-2 py-1 text-[10px] text-app-muted transition hover:bg-app-card"
           >
             Filtros
           </button>
         </div>
-        <div className="flex items-center gap-2 rounded-lg bg-white/[0.02] px-2.5 py-1.5">
+        <div className="flex items-center gap-2 rounded-xl bg-app-surface px-3 py-2">
           <Search className="size-3.5 text-[var(--text-muted)]" />
           <input
             value={search}
             onChange={e => onSearch(e.target.value)}
             placeholder="Buscar conversa..."
-            className="h-7 w-full bg-transparent text-xs outline-none"
+            className="h-8 w-full bg-transparent text-xs text-app-primary outline-none placeholder:text-app-muted/75"
           />
         </div>
         <div className="flex flex-wrap gap-1.5">
@@ -1056,8 +1056,8 @@ function InboxQueueColumn({
               className={cn(
                 "h-7.5 rounded-full px-2.5 text-[11px]",
                 filter === item.value
-                  ? "bg-[var(--accent-soft)]/45 text-[var(--accent-primary)]"
-                  : "bg-white/[0.02] text-[var(--text-muted)]"
+                  ? "bg-[var(--accent-soft)]/55 text-[var(--accent-primary)]"
+                  : "bg-app-surface text-app-muted hover:bg-app-card"
               )}
               onClick={() => onFilter(item.value)}
             >
@@ -1068,7 +1068,7 @@ function InboxQueueColumn({
       </div>
       <div
         ref={viewportRef}
-        className="scrollbar-thin-nexo mt-2 flex-1 min-h-0 overflow-y-auto pr-1"
+        className="scrollbar-thin-nexo mt-3 min-h-0 flex-1 overflow-y-auto pr-1"
         onScroll={e => setScrollTop(e.currentTarget.scrollTop)}
       >
         {isLoading ? (
@@ -1078,8 +1078,8 @@ function InboxQueueColumn({
             ))}
           </div>
         ) : rows.length === 0 ? (
-          <div className="rounded-lg border border-white/[0.06] bg-white/[0.01] px-2.5 py-3">
-            <div className="mb-2 h-px w-full bg-white/[0.06]" />
+          <div className="rounded-xl bg-app-surface px-4 py-4">
+            <div className="mb-3 h-px w-full bg-app-border" />
             <p className="text-xs text-[var(--text-secondary)]">
               {hasError
                 ? (errorMessage ?? "Não foi possível carregar conversas")
@@ -1294,7 +1294,7 @@ function ExecutionChatColumn({
   ) => {
     const contentNode = (
       <span className="flex min-w-0 flex-1 items-start gap-2.5">
-        <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg border border-white/[0.06] bg-white/[0.03] text-[var(--text-secondary)]">
+        <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-app-surface text-[var(--text-secondary)]">
           {action.icon}
         </span>
         <span className="min-w-0 flex-1">
@@ -1303,7 +1303,7 @@ function ExecutionChatColumn({
               {action.label}
             </span>
             {action.disabled && action.reason ? (
-              <span className="shrink-0 rounded-full border border-white/[0.06] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-muted)]">
+              <span className="shrink-0 rounded-full bg-app-surface px-2 py-0.5 text-[10px] font-medium text-app-muted">
                 {action.reason}
               </span>
             ) : null}
@@ -1324,8 +1324,9 @@ function ExecutionChatColumn({
             {contentNode}
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent
+            sideOffset={10}
             alignOffset={-4}
-            className="max-h-[min(70vh,24rem)] w-64 overflow-y-auto"
+            className="z-[70] max-h-[min(70vh,24rem)] w-64 overflow-y-auto border border-app-border bg-app-card text-app-primary"
           >
             {QUICK_COMPOSER_TEMPLATES.map(template => (
               <DropdownMenuItem
@@ -1354,8 +1355,8 @@ function ExecutionChatColumn({
   };
 
   return (
-    <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-white/[0.015]">
-      <header className="shrink-0 flex items-center justify-between px-4 py-2.5">
+    <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-[var(--radius-panel)] bg-app-panel text-app-primary">
+      <header className="flex shrink-0 items-center justify-between px-5 py-4">
         <div className="flex items-center gap-3">
           <div className="flex size-10 items-center justify-center rounded-full border border-[var(--accent-primary)]/25 bg-[var(--accent-soft)]/60 text-sm font-semibold text-[var(--accent-primary)]">
             {conversation?.name?.slice(0, 1) ?? "-"}
@@ -1373,7 +1374,7 @@ function ExecutionChatColumn({
               </p>
             ) : null}
             {!conversation?.conversationId && conversation ? (
-              <span className="mt-1 inline-flex rounded-full border border-amber-300/25 bg-amber-300/10 px-2 py-0.5 text-[10px] text-amber-100">
+              <span className="mt-1 inline-flex rounded-full bg-[color-mix(in_srgb,var(--warning)_14%,var(--app-surface))] px-2 py-0.5 text-[10px] text-[var(--warning)]">
                 Sem conversa ativa
               </span>
             ) : null}
@@ -1382,7 +1383,7 @@ function ExecutionChatColumn({
         <div className="flex items-center gap-1.5 text-[var(--text-muted)]">
           <button
             type="button"
-            className="rounded-lg p-1.5 enabled:hover:bg-white/10 disabled:opacity-45"
+            className="rounded-lg p-1.5 transition enabled:hover:bg-app-surface disabled:opacity-45"
             onClick={onToggleFavorite}
             disabled={!hasConversation}
           >
@@ -1395,7 +1396,7 @@ function ExecutionChatColumn({
           </button>
           <button
             type="button"
-            className="rounded-lg p-1.5 enabled:hover:bg-white/10 disabled:opacity-45"
+            className="rounded-lg p-1.5 transition enabled:hover:bg-app-surface disabled:opacity-45"
             onClick={onInfo}
             disabled={!hasConversation}
           >
@@ -1403,7 +1404,7 @@ function ExecutionChatColumn({
           </button>
           <button
             type="button"
-            className="rounded-lg p-1.5 enabled:hover:bg-white/10 disabled:opacity-45"
+            className="rounded-lg p-1.5 transition enabled:hover:bg-app-surface disabled:opacity-45"
             onClick={onMoreActions}
             disabled={!hasConversation}
           >
@@ -1413,18 +1414,18 @@ function ExecutionChatColumn({
       </header>
 
       {suggestedActionLabel || governanceAlert ? (
-        <div className="mx-4 mb-2 rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs">
+        <div className="mx-5 mb-3 rounded-xl bg-[color-mix(in_srgb,var(--warning)_12%,var(--app-surface))] px-4 py-3 text-xs">
           {suggestedActionLabel ? (
             <button
               type="button"
               onClick={onRunSuggestedAction}
-              className="font-medium text-amber-100 underline-offset-2 hover:underline"
+              className="font-medium text-[var(--warning)] underline-offset-2 hover:underline"
             >
               {suggestedActionLabel}
             </button>
           ) : null}
           {governanceAlert ? (
-            <p className="mt-1 text-[11px] text-amber-200/90">
+            <p className="mt-1 text-[11px] text-[var(--text-secondary)]">
               {governanceAlert}
             </p>
           ) : null}
@@ -1433,7 +1434,7 @@ function ExecutionChatColumn({
 
       <div
         ref={messagesRef}
-        className="scrollbar-thin-nexo flex-1 min-h-0 overflow-y-auto bg-transparent px-5 pb-1 pt-4"
+        className="scrollbar-thin-nexo min-h-0 flex-1 overflow-y-auto bg-transparent px-6 pb-2 pt-5"
       >
         {!hasConversation ? (
           <div className="flex h-full items-center justify-center px-1 py-4 text-xs text-[var(--text-muted)]">
@@ -1463,10 +1464,10 @@ function ExecutionChatColumn({
                 >
                   <div
                     className={cn(
-                      "rounded-2xl border px-4 py-3 text-sm leading-relaxed",
+                      "rounded-2xl px-4 py-3 text-sm leading-relaxed",
                       outgoing
-                        ? "max-w-[66%] border-emerald-400/20 bg-emerald-900/55"
-                        : "max-w-[68%] border-white/[0.08] bg-white/[0.03]"
+                        ? "max-w-[66%] bg-[color-mix(in_srgb,var(--success)_16%,var(--app-card))] text-app-primary"
+                        : "max-w-[68%] bg-app-card text-app-primary"
                     )}
                   >
                     <p>{message.content}</p>
@@ -1479,7 +1480,7 @@ function ExecutionChatColumn({
                       ) : null}
                     </p>
                     {message.status === "FAILED" ? (
-                      <p className="mt-1 text-[10px] text-rose-300">
+                      <p className="mt-1 text-[10px] text-[var(--danger)]">
                         {message.errorMessage ??
                           "Falha de entrega. Use reenviar nas ações."}
                       </p>
@@ -1492,8 +1493,8 @@ function ExecutionChatColumn({
         )}
       </div>
 
-      <footer className="shrink-0 mt-0 border-y border-white/[0.06] bg-white/[0.02]">
-        <div className="flex items-center gap-2 border-t border-white/[0.06] px-3 py-2.5">
+      <footer className="mt-0 shrink-0 bg-app-panel px-4 pb-4 pt-2">
+        <div className="flex items-center gap-2 rounded-2xl bg-app-surface p-2">
           <input
             value={content}
             onChange={event => canCompose && setContent(event.target.value)}
@@ -1508,9 +1509,9 @@ function ExecutionChatColumn({
                 : "Selecione uma conversa para responder..."
             }
             disabled={!hasConversation || !canCompose}
-            className="h-9 min-w-0 flex-1 rounded-lg bg-white/[0.02] px-3 text-sm outline-none placeholder:text-[var(--text-muted)]/70"
+            className="h-10 min-w-0 flex-1 rounded-xl bg-app-card px-3 text-sm text-app-primary outline-none placeholder:text-app-muted/70"
           />
-          <DropdownMenu>
+          <DropdownMenu dir="rtl">
             <DropdownMenuTrigger asChild>
               <Button
                 type="button"
@@ -1527,11 +1528,11 @@ function ExecutionChatColumn({
             <DropdownMenuContent
               align="end"
               sideOffset={8}
-              className="max-h-[min(78vh,34rem)] w-[min(22rem,calc(100vw-2rem))] overflow-y-auto p-2"
+              className="z-[60] max-h-[min(78vh,34rem)] w-[min(22rem,calc(100vw-2rem))] overflow-visible p-2 [direction:ltr]"
             >
               {composerActionPalette.recommendedActions.length ? (
                 <div className="pb-1">
-                  <DropdownMenuLabel className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-200">
+                  <DropdownMenuLabel className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--warning)]">
                     Recomendadas agora
                   </DropdownMenuLabel>
                   <div className="space-y-0.5">
@@ -1566,7 +1567,7 @@ function ExecutionChatColumn({
           <Button
             type="button"
             size="sm"
-            className="h-9 rounded-full bg-emerald-600/85 px-3 hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-45"
+            className="h-10 rounded-full bg-[var(--accent-primary)] px-3 text-[var(--primary-foreground)] hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-45"
             onClick={sendMessage}
             disabled={!hasConversation || !canCompose}
             aria-label="Enviar mensagem"
@@ -1576,7 +1577,7 @@ function ExecutionChatColumn({
         </div>
       </footer>
       {error ? (
-        <p className="px-3 pb-2 text-[11px] text-rose-300">{error}</p>
+        <p className="px-3 pb-2 text-[11px] text-[var(--danger)]">{error}</p>
       ) : null}
     </section>
   );
@@ -1628,10 +1629,10 @@ function OperationalContextColumn({
   if (!conversation && !selectedCustomer) {
     return (
       <aside
-        className="scrollbar-thin-nexo h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden bg-white/[0.015] p-2.5"
+        className="scrollbar-thin-nexo h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden rounded-[var(--radius-panel)] bg-app-panel p-4 text-app-primary"
         id="whatsapp-context-panel"
       >
-        <section className="rounded-xl border border-white/[0.06] bg-white/[0.01] px-3 py-3">
+        <section className="rounded-2xl bg-app-surface px-4 py-4">
           <p className="text-xs font-semibold">Sem contexto ativo</p>
           <p className="mt-1 text-[11px] text-[var(--text-muted)]">
             Selecione uma conversa para ver cliente, agendamento, O.S. e
@@ -1654,7 +1655,7 @@ function OperationalContextColumn({
 
   return (
     <aside
-      className="scrollbar-thin-nexo h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden bg-white/[0.015] p-2.5"
+      className="scrollbar-thin-nexo h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden rounded-[var(--radius-panel)] bg-app-panel p-4 text-app-primary"
       id="whatsapp-context-panel"
     >
       {isLoading ? (
@@ -1664,7 +1665,7 @@ function OperationalContextColumn({
           ))}
         </div>
       ) : (
-        <div className="space-y-5 text-xs">
+        <div className="space-y-6 text-xs">
           <section className="px-1 py-1">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
               Cliente
@@ -1727,7 +1728,7 @@ function OperationalContextColumn({
                 ? fmtDateTime(context?.nextAppointment?.scheduledAt)
                 : NO_APPOINTMENT_TEXT}
             </p>
-            <span className="mt-1 inline-flex whitespace-nowrap rounded-full border border-amber-400/30 bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-100">
+            <span className="mt-2 inline-flex whitespace-nowrap rounded-full bg-[color-mix(in_srgb,var(--warning)_14%,var(--app-surface))] px-2 py-0.5 text-[10px] text-[var(--warning)]">
               {context?.nextAppointment?.status ?? "--"}
             </span>
             {highlightedAppointmentId &&
@@ -1809,7 +1810,7 @@ function OperationalContextColumn({
                 ? `R$ ${(context.openCharge.amount / 100).toFixed(2).replace(".", ",")}`
                 : "--"}
             </p>
-            <span className="mt-1 inline-flex whitespace-nowrap rounded-full border border-rose-400/35 bg-rose-500/10 px-2 py-0.5 text-[10px] text-rose-100">
+            <span className="mt-2 inline-flex whitespace-nowrap rounded-full bg-[color-mix(in_srgb,var(--danger)_12%,var(--app-surface))] px-2 py-0.5 text-[10px] text-[var(--danger)]">
               {context?.openCharge?.status ?? "--"}
             </span>
             {highlightedChargeId &&
@@ -1843,7 +1844,7 @@ function OperationalContextColumn({
             <p className="text-[11px] text-[var(--text-muted)]">
               {fmtDateTime(context?.lastInteraction?.createdAt)}
             </p>
-            <span className="mt-1 inline-flex whitespace-nowrap rounded-full border border-emerald-400/35 bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-100">
+            <span className="mt-2 inline-flex whitespace-nowrap rounded-full bg-[color-mix(in_srgb,var(--success)_12%,var(--app-surface))] px-2 py-0.5 text-[10px] text-[var(--success)]">
               {context?.lastInteraction?.status ?? "--"}
             </span>
           </section>
@@ -2984,8 +2985,8 @@ export default function WhatsAppPage() {
   }
 
   return (
-    <AppPageShell className="h-[calc(100vh-5rem)] min-h-0 overflow-hidden bg-[#0B111C] px-3 pb-0 pt-3">
-      <div className="grid h-full min-h-0 grid-cols-1 gap-4 overflow-hidden bg-transparent xl:grid-cols-[minmax(260px,300px)_minmax(0,1fr)_minmax(280px,320px)]">
+    <AppPageShell className="h-[calc(100vh-5rem)] min-h-0 overflow-hidden bg-app-surface px-4 pb-0 pt-4 text-app-primary">
+      <div className="grid h-full min-h-0 grid-cols-1 gap-4 overflow-visible bg-transparent xl:grid-cols-[minmax(280px,320px)_minmax(0,1fr)_minmax(292px,332px)]">
         <div className="h-full min-h-0 min-w-0 overflow-hidden">
           <InboxQueueColumn
             rows={filteredRows}

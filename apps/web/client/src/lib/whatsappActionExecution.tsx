@@ -129,21 +129,21 @@ export function WhatsAppExecutionStatusBadge({
   const normalized = String(status ?? "");
   const className =
     normalized === "PENDING_APPROVAL"
-      ? "border-amber-300/35 bg-amber-300/10 text-amber-200"
+      ? "bg-[color-mix(in_srgb,var(--warning)_14%,var(--app-surface))] text-[var(--warning)]"
       : normalized === "APPROVED"
-        ? "border-sky-300/35 bg-sky-300/10 text-sky-200"
+        ? "bg-[color-mix(in_srgb,var(--info)_12%,var(--app-surface))] text-[var(--info)]"
         : normalized === "EXECUTED"
-          ? "border-emerald-300/35 bg-emerald-300/10 text-emerald-200"
+          ? "bg-[color-mix(in_srgb,var(--success)_12%,var(--app-surface))] text-[var(--success)]"
           : normalized === "FAILED"
-            ? "border-rose-300/35 bg-rose-300/10 text-rose-200"
+            ? "bg-[color-mix(in_srgb,var(--danger)_12%,var(--app-surface))] text-[var(--danger)]"
             : normalized === "CANCELLED"
-              ? "border-[var(--border-subtle)] bg-[var(--surface-subtle)] text-[var(--text-muted)]"
-              : "border-[var(--border-subtle)] bg-[var(--surface-subtle)] text-[var(--text-secondary)]";
+              ? "bg-app-surface text-app-muted"
+              : "bg-app-surface text-[var(--text-secondary)]";
 
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[10px] font-medium",
+        "inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-medium",
         className
       )}
     >
@@ -169,7 +169,7 @@ export function WhatsAppPendingApprovalCard({
     execution.status === "PENDING_APPROVAL" ||
     execution.approvalRequired === true;
   return (
-    <article className="rounded-xl border border-amber-300/25 bg-amber-300/10 p-2.5">
+    <article className="rounded-2xl bg-[color-mix(in_srgb,var(--warning)_10%,var(--app-surface))] p-3">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate text-xs font-semibold text-[var(--text-primary)]">
@@ -185,7 +185,7 @@ export function WhatsAppPendingApprovalCard({
       <p className="mt-2 line-clamp-2 text-[11px] text-[var(--text-secondary)]">
         {execution.executionReason ?? "Sem motivo informado."}
       </p>
-      <p className="mt-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-2 py-1 text-[10px] text-[var(--text-muted)]">
+      <p className="mt-2 rounded-lg bg-app-card px-2 py-1 text-[10px] text-app-muted">
         {compactWhatsAppPayloadSummary(execution.actionPayload)}
       </p>
       <div className="mt-2 grid grid-cols-3 gap-1.5">
@@ -241,7 +241,7 @@ export function WhatsAppExecutionHistoryItem({
     execution.approvedAt ??
     execution.createdAt;
   return (
-    <article className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-2.5 py-2">
+    <article className="rounded-xl bg-app-surface px-3 py-2">
       <div className="flex items-center justify-between gap-2">
         <p className="truncate text-[11px] font-medium text-[var(--text-secondary)]">
           {whatsappActionLabel(execution.suggestedAction)}
@@ -255,7 +255,7 @@ export function WhatsAppExecutionHistoryItem({
         {compactWhatsAppPayloadSummary(execution.actionPayload)}
       </p>
       {execution.failureReason ? (
-        <p className="mt-1 line-clamp-2 text-[10px] text-rose-300">
+        <p className="mt-1 line-clamp-2 text-[10px] text-[var(--danger)]">
           {execution.failureReason}
         </p>
       ) : null}
@@ -298,7 +298,7 @@ export function WhatsAppActionExecutionPanel({
             Aprovação humana para ações sensíveis, sem autoexecução.
           </p>
         </div>
-        <span className="rounded-full border border-amber-300/25 bg-amber-300/10 px-2 py-0.5 text-[10px] text-amber-200">
+        <span className="rounded-full bg-[color-mix(in_srgb,var(--warning)_14%,var(--app-surface))] px-2 py-0.5 text-[10px] text-[var(--warning)]">
           {pendingApprovals.length} pendente(s)
         </span>
       </div>
@@ -309,7 +309,7 @@ export function WhatsAppActionExecutionPanel({
           <AppSkeleton className="h-14 rounded-xl" />
         </div>
       ) : isError ? (
-        <div className="rounded-xl border border-rose-300/25 bg-rose-300/10 p-2.5 text-[11px] text-rose-200">
+        <div className="rounded-xl bg-[color-mix(in_srgb,var(--danger)_10%,var(--app-surface))] p-3 text-[11px] text-[var(--danger)]">
           <p className="font-medium">Falha ao carregar execuções assistidas.</p>
           <p className="mt-1">
             {errorMessage ??
@@ -354,7 +354,7 @@ export function WhatsAppActionExecutionPanel({
                 ))}
               </div>
             ) : (
-              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-2.5 text-[11px] text-[var(--text-muted)]">
+              <div className="rounded-xl bg-app-surface p-3 text-[11px] text-app-muted">
                 Nenhuma aprovação pendente para esta conversa.
               </div>
             )}
@@ -374,7 +374,7 @@ export function WhatsAppActionExecutionPanel({
                 ))}
               </div>
             ) : (
-              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-2.5 text-[11px] text-[var(--text-muted)]">
+              <div className="rounded-xl bg-app-surface p-3 text-[11px] text-app-muted">
                 Nenhuma execução recente registrada para esta conversa.
               </div>
             )}

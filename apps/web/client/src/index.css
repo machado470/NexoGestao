@@ -56,7 +56,15 @@
   --color-nexo-green: #10b981;
   --color-nexo-purple: #a78bfa;
   --color-nexo-gray: #e5e7eb;
+
+  --color-app-panel: var(--app-panel);
+  --color-app-surface: var(--app-surface);
+  --color-app-card: var(--app-card);
+  --color-app-border: var(--app-border);
+  --color-app-primary: var(--app-text);
+  --color-app-muted: var(--app-muted);
 }
+
 
 @layer base {
   body[data-visual-context="landing"] {
