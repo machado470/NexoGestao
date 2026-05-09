@@ -1293,13 +1293,13 @@ function ExecutionChatColumn({
     key = action.key
   ) => {
     const contentNode = (
-      <span className="flex min-w-0 flex-1 items-start gap-2.5">
-        <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-app-surface text-[var(--text-secondary)]">
+      <span className="flex min-w-0 flex-1 items-start gap-3">
+        <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-app-surface text-[var(--text-secondary)]">
           {action.icon}
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex min-w-0 items-center justify-between gap-2">
-            <span className="truncate text-sm font-medium text-[var(--text-primary)]">
+            <span className="truncate text-sm font-medium leading-5 text-[var(--text-primary)]">
               {action.label}
             </span>
             {action.disabled && action.reason ? (
@@ -1309,7 +1309,7 @@ function ExecutionChatColumn({
             ) : null}
           </span>
           {action.description ? (
-            <span className="mt-0.5 block text-[11px] leading-snug text-[var(--text-muted)]">
+            <span className="mt-1 block text-[11px] leading-relaxed text-[var(--text-muted)]">
               {action.description}
             </span>
           ) : null}
@@ -1320,21 +1320,24 @@ function ExecutionChatColumn({
     if (action.key === "quick-template") {
       return (
         <DropdownMenuSub key={key}>
-          <DropdownMenuSubTrigger className="items-start gap-0 rounded-lg px-2 py-2">
+          <DropdownMenuSubTrigger className="items-start gap-0 rounded-lg px-2.5 py-2.5">
             {contentNode}
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent
-            sideOffset={10}
-            alignOffset={-4}
-            className="z-[70] max-h-[min(70vh,24rem)] w-64 overflow-y-auto border border-app-border bg-app-card text-app-primary"
+            sideOffset={2}
+            alignOffset={-6}
+            className="nexo-cascade-surface nexo-cascade-submenu z-[70] max-h-[min(70vh,24rem)] w-72 overflow-y-auto p-2 text-app-primary [direction:ltr]"
           >
             {QUICK_COMPOSER_TEMPLATES.map(template => (
               <DropdownMenuItem
                 key={template}
                 onClick={() => onFillTemplate(template)}
+                className="gap-2.5 rounded-lg px-2.5 py-2.5 text-[13px] leading-snug"
               >
-                <FileText className="size-4" />
-                {template}
+                <FileText className="size-4 text-[var(--text-muted)]" />
+                <span className="min-w-0 flex-1 whitespace-normal">
+                  {template}
+                </span>
               </DropdownMenuItem>
             ))}
           </DropdownMenuSubContent>
@@ -1347,7 +1350,7 @@ function ExecutionChatColumn({
         key={key}
         disabled={action.disabled}
         onClick={action.disabled ? undefined : action.onSelect}
-        className="items-start rounded-lg px-2 py-2"
+        className="items-start rounded-lg px-2.5 py-2.5"
       >
         {contentNode}
       </DropdownMenuItem>
@@ -1528,7 +1531,7 @@ function ExecutionChatColumn({
             <DropdownMenuContent
               align="end"
               sideOffset={8}
-              className="z-[60] max-h-[min(78vh,34rem)] w-[min(22rem,calc(100vw-2rem))] overflow-visible p-2 [direction:ltr]"
+              className="nexo-cascade-surface z-[60] max-h-[min(78vh,34rem)] w-[min(22rem,calc(100vw-2rem))] overflow-visible p-2 [direction:ltr]"
             >
               {composerActionPalette.recommendedActions.length ? (
                 <div className="pb-1">
