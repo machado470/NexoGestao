@@ -1344,20 +1344,15 @@ function ExecutionChatColumn({
     const isUnavailable = action.availability === "unavailable";
     const statusLabel = action.reason ?? (isPrimary ? action.group : undefined);
     const contentNode = (
-      <span
-        className={cn(
-          "flex min-w-0 flex-1 items-start gap-2.5",
-          isDisabled ? "opacity-70" : "opacity-100"
-        )}
-      >
+      <span className="flex min-w-0 flex-1 items-start gap-2.5">
         <span
           className={cn(
             "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg transition-colors",
             isPrimary
               ? "bg-[var(--accent-soft)] text-[var(--accent-primary)]"
               : isDisabled
-                ? "bg-app-surface/55 text-[var(--text-muted)]/70"
-                : "bg-app-surface text-[var(--text-secondary)]"
+                ? "bg-[var(--wa-action-disabled-icon-bg)] text-[var(--wa-action-disabled-icon)]"
+                : "bg-[var(--wa-action-icon-bg)] text-[var(--text-secondary)]"
           )}
         >
           {action.icon}
@@ -1368,7 +1363,7 @@ function ExecutionChatColumn({
               className={cn(
                 "min-w-0 truncate text-[13px] leading-5",
                 isDisabled
-                  ? "font-medium text-[var(--text-muted)]"
+                  ? "font-medium text-[var(--wa-action-disabled-text)]"
                   : "font-semibold text-[var(--text-primary)]"
               )}
             >
@@ -1377,12 +1372,12 @@ function ExecutionChatColumn({
             {statusLabel ? (
               <span
                 className={cn(
-                  "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium leading-4",
+                  "shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium leading-4",
                   isUpcoming
-                    ? "bg-[color-mix(in_srgb,var(--warning)_14%,transparent)] text-[var(--warning)]"
+                    ? "border-[color-mix(in_srgb,var(--warning)_24%,transparent)] bg-[color-mix(in_srgb,var(--warning)_12%,var(--app-card))] text-[color-mix(in_srgb,var(--warning)_84%,var(--text-primary))]"
                     : isUnavailable
-                      ? "bg-app-surface/60 text-app-muted"
-                      : "bg-app-surface text-[var(--text-secondary)]"
+                      ? "border-[var(--wa-action-badge-border)] bg-[var(--wa-action-badge-bg)] text-[var(--wa-action-badge-muted-text)]"
+                      : "border-[var(--wa-action-badge-border)] bg-[var(--wa-action-badge-bg)] text-[var(--wa-action-badge-text)]"
                 )}
               >
                 {statusLabel}
@@ -1394,8 +1389,8 @@ function ExecutionChatColumn({
               className={cn(
                 "mt-0.5 block line-clamp-2 text-[11px] leading-4",
                 isDisabled
-                  ? "text-[var(--text-muted)]/70"
-                  : "text-[var(--text-muted)]"
+                  ? "text-[var(--wa-action-disabled-description)]"
+                  : "text-[var(--wa-action-description)]"
               )}
             >
               {action.description}
@@ -1414,7 +1409,7 @@ function ExecutionChatColumn({
           <DropdownMenuSubContent
             sideOffset={2}
             alignOffset={-6}
-            className="nexo-cascade-surface nexo-cascade-submenu scrollbar-menu-nexo z-[70] max-h-[min(70vh,24rem)] w-72 overflow-y-auto p-2 text-app-primary [direction:ltr]"
+            className="nexo-cascade-surface nexo-cascade-submenu whatsapp-action-menu scrollbar-menu-nexo z-[70] max-h-[min(70vh,24rem)] w-72 overflow-y-auto p-2 text-app-primary [direction:ltr]"
           >
             {QUICK_COMPOSER_TEMPLATES.map(template => (
               <DropdownMenuItem
@@ -1471,12 +1466,12 @@ function ExecutionChatColumn({
       >
         <DropdownMenuLabel
           className={cn(
-            "px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.18em]",
+            "px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em]",
             tone === "primary"
-              ? "text-[var(--warning)]"
+              ? "text-[var(--wa-action-section-primary)]"
               : tone === "secondary"
-                ? "text-[var(--text-muted)]"
-                : "text-[var(--text-muted)]/70"
+                ? "text-[var(--wa-action-section-label)]"
+                : "text-[var(--wa-action-section-muted)]"
           )}
         >
           {title}
@@ -1664,7 +1659,7 @@ function ExecutionChatColumn({
             <DropdownMenuContent
               align="end"
               sideOffset={8}
-              className="nexo-cascade-surface z-[60] max-h-[min(560px,calc(100vh-12rem),var(--radix-dropdown-menu-content-available-height))] w-[min(22rem,calc(100vw-2rem))] overflow-visible p-0 [direction:ltr]"
+              className="nexo-cascade-surface whatsapp-action-menu z-[60] max-h-[min(560px,calc(100vh-12rem),var(--radix-dropdown-menu-content-available-height))] w-[min(22rem,calc(100vw-2rem))] overflow-visible p-0 [direction:ltr]"
             >
               <div className="scrollbar-menu-nexo max-h-[min(560px,calc(100vh-12rem),var(--radix-dropdown-menu-content-available-height))] min-h-0 overflow-y-auto overscroll-contain p-2">
                 {renderActionSection({
@@ -1675,7 +1670,7 @@ function ExecutionChatColumn({
                   actions: composerActionPalette.primaryActions,
                 })}
                 {composerActionPalette.secondaryActions.length ? (
-                  <DropdownMenuSeparator className="mx-2 my-1.5 opacity-60" />
+                  <DropdownMenuSeparator className="mx-2 my-1.5 bg-[var(--wa-action-separator)] opacity-100" />
                 ) : null}
                 {renderActionSection({
                   title: "Outras ações",
@@ -1683,7 +1678,7 @@ function ExecutionChatColumn({
                   actions: composerActionPalette.secondaryActions,
                 })}
                 {composerActionPalette.unavailableActions.length ? (
-                  <DropdownMenuSeparator className="mx-2 my-1.5 opacity-40" />
+                  <DropdownMenuSeparator className="mx-2 my-1.5 bg-[var(--wa-action-separator)] opacity-100" />
                 ) : null}
                 {renderActionSection({
                   title: "Indisponíveis neste contexto",
@@ -1691,7 +1686,7 @@ function ExecutionChatColumn({
                   actions: composerActionPalette.unavailableActions,
                 })}
                 {composerActionPalette.upcomingActions.length ? (
-                  <DropdownMenuSeparator className="mx-2 my-1.5 opacity-40" />
+                  <DropdownMenuSeparator className="mx-2 my-1.5 bg-[var(--wa-action-separator)] opacity-100" />
                 ) : null}
                 {renderActionSection({
                   title: "Em breve",

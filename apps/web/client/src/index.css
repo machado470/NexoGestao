@@ -2838,19 +2838,19 @@ html {
     --sidebar-collapsed-width: 88px;
     --app-bg: #f2f6fb;
     --app-shell: #eef3f9;
-    --app-surface: #f7fafe;
+    --app-surface: #f5f8fc;
     --app-panel: #fbfdff;
     --app-card: #ffffff;
-    --app-border: rgba(70, 102, 136, 0.2);
+    --app-border: rgba(70, 102, 136, 0.24);
     --app-text: #12243f;
-    --app-muted: #5f7796;
+    --app-muted: #526b8c;
     --app-sidebar: #e9f0f8;
     --app-sidebar-surface: #e9f0f8;
     --app-topbar: #f5f8fc;
-    --app-overlay-bg: #ffffff;
-    --app-overlay-surface: #ffffff;
-    --app-overlay-border: rgba(70, 102, 136, 0.24);
-    --app-overlay-shadow: 0 18px 44px rgba(17, 40, 68, 0.14);
+    --app-overlay-bg: #fbfdff;
+    --app-overlay-surface: #f5f8fc;
+    --app-overlay-border: rgba(70, 102, 136, 0.3);
+    --app-overlay-shadow: 0 20px 48px rgba(17, 40, 68, 0.16);
     --app-overlay-text: #12243f;
   }
 
@@ -2891,7 +2891,7 @@ html {
     --nexo-border-soft: var(--app-border);
     --nexo-border-strong: color-mix(in srgb, var(--app-border) 92%, #dce7f3);
     --text-primary: var(--app-text);
-    --text-secondary: color-mix(in srgb, var(--app-text) 80%, #5d7492);
+    --text-secondary: color-mix(in srgb, var(--app-text) 84%, #5d7492);
     --text-muted: var(--app-muted);
     --bg-sidebar: var(--app-sidebar);
     --bg-header: var(--app-topbar);
@@ -3122,7 +3122,96 @@ html {
       var(--app-surface, var(--app-overlay-surface))
     );
     color: var(--app-text, var(--app-overlay-text));
-    box-shadow: 0 14px 32px rgba(17, 40, 68, 0.12);
+    box-shadow: 0 16px 38px rgba(17, 40, 68, 0.15);
+  }
+
+  .whatsapp-action-menu {
+    --wa-action-description: #526b8c;
+    --wa-action-disabled-text: #627996;
+    --wa-action-disabled-description: #6f839d;
+    --wa-action-disabled-icon: #6a809d;
+    --wa-action-disabled-icon-bg: color-mix(
+      in srgb,
+      var(--app-surface) 86%,
+      #ffffff
+    );
+    --wa-action-icon-bg: color-mix(in srgb, var(--app-surface) 88%, #ffffff);
+    --wa-action-section-primary: color-mix(
+      in srgb,
+      var(--warning) 82%,
+      #5a3719
+    );
+    --wa-action-section-label: #516885;
+    --wa-action-section-muted: #647894;
+    --wa-action-badge-bg: color-mix(in srgb, var(--app-surface) 78%, #ffffff);
+    --wa-action-badge-border: color-mix(
+      in srgb,
+      var(--app-border) 74%,
+      transparent
+    );
+    --wa-action-badge-text: #405774;
+    --wa-action-badge-muted-text: #667a95;
+    --wa-action-separator: color-mix(
+      in srgb,
+      var(--app-border) 82%,
+      transparent
+    );
+  }
+
+  .dark .whatsapp-action-menu,
+  [data-theme="dark"] .whatsapp-action-menu,
+  .app-root.dark .whatsapp-action-menu,
+  .app-root[data-theme="dark"] .whatsapp-action-menu {
+    --wa-action-description: var(--text-muted);
+    --wa-action-disabled-text: color-mix(
+      in srgb,
+      var(--text-muted) 86%,
+      var(--text-primary)
+    );
+    --wa-action-disabled-description: color-mix(
+      in srgb,
+      var(--text-muted) 78%,
+      transparent
+    );
+    --wa-action-disabled-icon: color-mix(
+      in srgb,
+      var(--text-muted) 78%,
+      transparent
+    );
+    --wa-action-disabled-icon-bg: color-mix(
+      in srgb,
+      var(--app-surface) 72%,
+      transparent
+    );
+    --wa-action-icon-bg: var(--app-surface);
+    --wa-action-section-primary: var(--warning);
+    --wa-action-section-label: var(--text-muted);
+    --wa-action-section-muted: color-mix(
+      in srgb,
+      var(--text-muted) 72%,
+      transparent
+    );
+    --wa-action-badge-bg: color-mix(
+      in srgb,
+      var(--app-surface) 70%,
+      transparent
+    );
+    --wa-action-badge-border: color-mix(
+      in srgb,
+      var(--app-border) 70%,
+      transparent
+    );
+    --wa-action-badge-text: var(--text-secondary);
+    --wa-action-badge-muted-text: color-mix(
+      in srgb,
+      var(--text-muted) 84%,
+      var(--text-primary)
+    );
+    --wa-action-separator: color-mix(
+      in srgb,
+      var(--app-border) 76%,
+      transparent
+    );
   }
 
   .dark .nexo-cascade-surface,
