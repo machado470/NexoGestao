@@ -65,7 +65,6 @@
   --color-app-muted: var(--app-muted);
 }
 
-
 @layer base {
   body[data-visual-context="landing"] {
     background: #f8f9fb;
@@ -246,6 +245,31 @@
 
 .scrollbar-thin-nexo::-webkit-scrollbar-thumb:hover {
   background: rgba(249, 115, 22, 0.7);
+}
+
+.scrollbar-menu-nexo {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text-muted) 34%, transparent)
+    transparent;
+  scrollbar-gutter: stable;
+}
+
+.scrollbar-menu-nexo::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.scrollbar-menu-nexo::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-menu-nexo::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text-muted) 28%, transparent);
+  border-radius: 999px;
+}
+
+.scrollbar-menu-nexo::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--accent-primary) 48%, transparent);
 }
 
 :root {
@@ -1680,7 +1704,10 @@ html {
     gap: 0.625rem;
     padding: 0 0.75rem;
     color: var(--text-secondary);
-    transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+    transition:
+      background-color 0.18s ease,
+      color 0.18s ease,
+      border-color 0.18s ease;
   }
 
   .nexo-sidebar-item:hover {
