@@ -1531,40 +1531,42 @@ function ExecutionChatColumn({
             <DropdownMenuContent
               align="end"
               sideOffset={8}
-              className="nexo-cascade-surface z-[60] max-h-[min(78vh,34rem)] w-[min(22rem,calc(100vw-2rem))] overflow-visible p-2 [direction:ltr]"
+              className="nexo-cascade-surface z-[60] max-h-[min(560px,calc(100vh-12rem),var(--radix-dropdown-menu-content-available-height))] w-[min(22rem,calc(100vw-2rem))] overflow-visible p-0 [direction:ltr]"
             >
-              {composerActionPalette.recommendedActions.length ? (
-                <div className="pb-1">
-                  <DropdownMenuLabel className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--warning)]">
-                    Recomendadas agora
-                  </DropdownMenuLabel>
-                  <div className="space-y-0.5">
-                    {composerActionPalette.recommendedActions.map(action =>
-                      renderComposerAction(action, `recommended-${action.key}`)
-                    )}
-                  </div>
-                  <DropdownMenuSeparator className="my-1" />
-                </div>
-              ) : null}
-              {actionGroups.map(group => {
-                const actions =
-                  composerActionPalette.groupedActions[group.label] ?? [];
-                if (actions.length === 0) return null;
-
-                return (
-                  <div key={group.id} className="py-1 first:pt-0 last:pb-0">
-                    <DropdownMenuLabel className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                      {group.label}
+              <div className="scrollbar-thin-nexo max-h-[min(560px,calc(100vh-12rem),var(--radix-dropdown-menu-content-available-height))] min-h-0 overflow-y-auto overscroll-contain p-2">
+                {composerActionPalette.recommendedActions.length ? (
+                  <div className="pb-1">
+                    <DropdownMenuLabel className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--warning)]">
+                      Recomendadas agora
                     </DropdownMenuLabel>
                     <div className="space-y-0.5">
-                      {actions.map(action => renderComposerAction(action))}
+                      {composerActionPalette.recommendedActions.map(action =>
+                        renderComposerAction(action, `recommended-${action.key}`)
+                      )}
                     </div>
-                    {group.id !== "execution" ? (
-                      <DropdownMenuSeparator className="my-1" />
-                    ) : null}
+                    <DropdownMenuSeparator className="my-1" />
                   </div>
-                );
-              })}
+                ) : null}
+                {actionGroups.map(group => {
+                  const actions =
+                    composerActionPalette.groupedActions[group.label] ?? [];
+                  if (actions.length === 0) return null;
+
+                  return (
+                    <div key={group.id} className="py-1 first:pt-0 last:pb-0">
+                      <DropdownMenuLabel className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                        {group.label}
+                      </DropdownMenuLabel>
+                      <div className="space-y-0.5">
+                        {actions.map(action => renderComposerAction(action))}
+                      </div>
+                      {group.id !== "execution" ? (
+                        <DropdownMenuSeparator className="my-1" />
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
             </DropdownMenuContent>
           </DropdownMenu>
           <Button
