@@ -222,14 +222,16 @@ function DropdownMenuSubContent({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.SubContent>) {
   return (
-    <DropdownMenuPrimitive.SubContent
-      data-slot="dropdown-menu-sub-content"
-      className={cn(
-        "nexo-floating-panel border-[var(--app-overlay-border)] bg-[var(--app-overlay-bg)] text-[var(--app-overlay-text)] shadow-[var(--app-overlay-shadow)] nexo-motion-panel z-50 min-w-[8rem] origin-(--radix-dropdown-menu-content-transform-origin) overflow-hidden rounded-[var(--radius-surface)] border p-1.5",
-        className
-      )}
-      {...props}
-    />
+    <DropdownMenuPrimitive.Portal>
+      <DropdownMenuPrimitive.SubContent
+        data-slot="dropdown-menu-sub-content"
+        className={cn(
+          "nexo-floating-panel border-[var(--app-overlay-border)] bg-[var(--app-overlay-bg)] text-[var(--app-overlay-text)] shadow-[var(--app-overlay-shadow)] nexo-motion-panel z-50 min-w-[8rem] origin-(--radix-dropdown-menu-content-transform-origin) overflow-hidden rounded-[var(--radius-surface)] border p-1.5",
+          className
+        )}
+        {...props}
+      />
+    </DropdownMenuPrimitive.Portal>
   );
 }
 
