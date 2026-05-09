@@ -129,21 +129,21 @@ export function WhatsAppExecutionStatusBadge({
   const normalized = String(status ?? "");
   const className =
     normalized === "PENDING_APPROVAL"
-      ? "bg-[color-mix(in_srgb,var(--warning)_14%,var(--app-surface))] text-[var(--warning)]"
+      ? "border-[color-mix(in_srgb,var(--warning)_24%,transparent)] bg-[color-mix(in_srgb,var(--warning)_13%,var(--app-card))] text-[color-mix(in_srgb,var(--warning)_88%,var(--text-primary))]"
       : normalized === "APPROVED"
-        ? "bg-[color-mix(in_srgb,var(--info)_12%,var(--app-surface))] text-[var(--info)]"
+        ? "border-[color-mix(in_srgb,var(--info)_22%,transparent)] bg-[color-mix(in_srgb,var(--info)_11%,var(--app-card))] text-[color-mix(in_srgb,var(--info)_86%,var(--text-primary))]"
         : normalized === "EXECUTED"
-          ? "bg-[color-mix(in_srgb,var(--success)_12%,var(--app-surface))] text-[var(--success)]"
+          ? "border-[color-mix(in_srgb,var(--success)_22%,transparent)] bg-[color-mix(in_srgb,var(--success)_11%,var(--app-card))] text-[color-mix(in_srgb,var(--success)_84%,var(--text-primary))]"
           : normalized === "FAILED"
-            ? "bg-[color-mix(in_srgb,var(--danger)_12%,var(--app-surface))] text-[var(--danger)]"
+            ? "border-[color-mix(in_srgb,var(--danger)_24%,transparent)] bg-[color-mix(in_srgb,var(--danger)_11%,var(--app-card))] text-[color-mix(in_srgb,var(--danger)_88%,var(--text-primary))]"
             : normalized === "CANCELLED"
-              ? "bg-app-surface text-app-muted"
-              : "bg-app-surface text-[var(--text-secondary)]";
+              ? "border-[color-mix(in_srgb,var(--app-border)_70%,transparent)] bg-[color-mix(in_srgb,var(--app-surface)_86%,transparent)] text-[var(--text-secondary)]"
+              : "border-[color-mix(in_srgb,var(--app-border)_70%,transparent)] bg-[color-mix(in_srgb,var(--app-surface)_86%,transparent)] text-[var(--text-secondary)]";
 
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-medium",
+        "inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[10px] font-medium",
         className
       )}
     >
@@ -169,7 +169,7 @@ export function WhatsAppPendingApprovalCard({
     execution.status === "PENDING_APPROVAL" ||
     execution.approvalRequired === true;
   return (
-    <article className="rounded-2xl bg-[color-mix(in_srgb,var(--warning)_10%,var(--app-surface))] p-3">
+    <article className="rounded-2xl border border-[color-mix(in_srgb,var(--warning)_18%,transparent)] bg-[color-mix(in_srgb,var(--warning)_8%,var(--app-card))] p-3">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate text-xs font-semibold text-[var(--text-primary)]">
@@ -182,10 +182,10 @@ export function WhatsAppPendingApprovalCard({
         </div>
         <WhatsAppExecutionStatusBadge status={execution.status} />
       </div>
-      <p className="mt-2 line-clamp-2 text-[11px] text-[var(--text-secondary)]">
+      <p className="mt-2 line-clamp-2 text-[11px] leading-4 text-[var(--text-secondary)]">
         {execution.executionReason ?? "Sem motivo informado."}
       </p>
-      <p className="mt-2 rounded-lg bg-app-card px-2 py-1 text-[10px] text-app-muted">
+      <p className="mt-2 rounded-lg bg-[color-mix(in_srgb,var(--app-card)_88%,var(--app-surface))] px-2 py-1 text-[10px] text-[var(--text-secondary)]">
         {compactWhatsAppPayloadSummary(execution.actionPayload)}
       </p>
       <div className="mt-2 grid grid-cols-3 gap-1.5">
@@ -193,7 +193,7 @@ export function WhatsAppPendingApprovalCard({
           type="button"
           size="sm"
           variant="outline"
-          className="h-7 px-2 text-[10px]"
+          className="h-7 border-[color-mix(in_srgb,var(--app-border)_78%,transparent)] bg-[color-mix(in_srgb,var(--app-card)_86%,transparent)] px-2 text-[10px] font-semibold text-[var(--text-primary)] hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)] disabled:text-[var(--text-muted)] disabled:opacity-100 disabled:saturate-100"
           disabled={disabled}
           onClick={() => onApprove(execution)}
         >
@@ -203,7 +203,7 @@ export function WhatsAppPendingApprovalCard({
           type="button"
           size="sm"
           variant="outline"
-          className="h-7 px-2 text-[10px]"
+          className="h-7 border-[color-mix(in_srgb,var(--app-border)_78%,transparent)] bg-[color-mix(in_srgb,var(--app-card)_86%,transparent)] px-2 text-[10px] font-semibold text-[var(--text-primary)] hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)] disabled:text-[var(--text-muted)] disabled:opacity-100 disabled:saturate-100"
           disabled={disabled || requiresApproval}
           title={
             requiresApproval
@@ -218,7 +218,7 @@ export function WhatsAppPendingApprovalCard({
           type="button"
           size="sm"
           variant="outline"
-          className="h-7 px-2 text-[10px]"
+          className="h-7 border-[color-mix(in_srgb,var(--app-border)_78%,transparent)] bg-[color-mix(in_srgb,var(--app-card)_86%,transparent)] px-2 text-[10px] font-semibold text-[var(--text-primary)] hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)] disabled:text-[var(--text-muted)] disabled:opacity-100 disabled:saturate-100"
           disabled={disabled}
           onClick={() => onCancel(execution)}
         >
@@ -241,17 +241,17 @@ export function WhatsAppExecutionHistoryItem({
     execution.approvedAt ??
     execution.createdAt;
   return (
-    <article className="rounded-xl bg-app-surface px-3 py-2">
+    <article className="rounded-xl bg-[color-mix(in_srgb,var(--app-surface)_78%,transparent)] px-3 py-2">
       <div className="flex items-center justify-between gap-2">
-        <p className="truncate text-[11px] font-medium text-[var(--text-secondary)]">
+        <p className="truncate text-[11px] font-semibold text-[var(--text-primary)]">
           {whatsappActionLabel(execution.suggestedAction)}
         </p>
         <WhatsAppExecutionStatusBadge status={execution.status} />
       </div>
-      <p className="mt-0.5 text-[10px] text-[var(--text-muted)]">
+      <p className="mt-0.5 text-[10px] text-[var(--text-secondary)]">
         {formatWhatsAppExecutionDate(timestamp)}
       </p>
-      <p className="mt-1 line-clamp-1 text-[10px] text-[var(--text-muted)]">
+      <p className="mt-1 line-clamp-1 text-[10px] text-[var(--text-secondary)]">
         {compactWhatsAppPayloadSummary(execution.actionPayload)}
       </p>
       {execution.failureReason ? (
@@ -288,17 +288,17 @@ export function WhatsAppActionExecutionPanel({
 }) {
   const recentHistory = history.slice(0, 5);
   return (
-    <section className="space-y-3 px-1 py-1">
+    <section className="space-y-3 rounded-2xl bg-[color-mix(in_srgb,var(--app-surface)_64%,transparent)] px-3 py-3">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
             Execução assistida
           </p>
-          <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+          <p className="mt-1 text-[11px] leading-4 text-[var(--text-secondary)]">
             Aprovação humana para ações sensíveis, sem autoexecução.
           </p>
         </div>
-        <span className="rounded-full bg-[color-mix(in_srgb,var(--warning)_14%,var(--app-surface))] px-2 py-0.5 text-[10px] text-[var(--warning)]">
+        <span className="rounded-full border border-[color-mix(in_srgb,var(--warning)_22%,transparent)] bg-[color-mix(in_srgb,var(--warning)_12%,var(--app-card))] px-2 py-0.5 text-[10px] font-medium text-[color-mix(in_srgb,var(--warning)_88%,var(--text-primary))]">
           {pendingApprovals.length} pendente(s)
         </span>
       </div>
@@ -320,7 +320,7 @@ export function WhatsAppActionExecutionPanel({
               type="button"
               size="sm"
               variant="outline"
-              className="mt-2 h-7 px-2 text-[10px]"
+              className="mt-2 h-7 border-[color-mix(in_srgb,var(--app-border)_78%,transparent)] bg-[color-mix(in_srgb,var(--app-card)_86%,transparent)] px-2 text-[10px] font-semibold text-[var(--text-primary)] hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)]"
               onClick={onRetry}
             >
               Tentar novamente
@@ -331,11 +331,11 @@ export function WhatsAppActionExecutionPanel({
         <>
           <div>
             <div className="mb-2 flex items-center justify-between gap-2">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
                 Aguardando aprovação
               </p>
               {isMutating ? (
-                <span className="text-[10px] text-[var(--text-muted)]">
+                <span className="text-[10px] text-[var(--text-secondary)]">
                   Processando...
                 </span>
               ) : null}
@@ -354,14 +354,14 @@ export function WhatsAppActionExecutionPanel({
                 ))}
               </div>
             ) : (
-              <div className="rounded-xl bg-app-surface p-3 text-[11px] text-app-muted">
+              <div className="rounded-xl bg-[color-mix(in_srgb,var(--app-surface)_78%,transparent)] p-3 text-[11px] text-[var(--text-secondary)]">
                 Nenhuma aprovação pendente para esta conversa.
               </div>
             )}
           </div>
 
           <div>
-            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
               Histórico recente
             </p>
             {recentHistory.length > 0 ? (
@@ -374,7 +374,7 @@ export function WhatsAppActionExecutionPanel({
                 ))}
               </div>
             ) : (
-              <div className="rounded-xl bg-app-surface p-3 text-[11px] text-app-muted">
+              <div className="rounded-xl bg-[color-mix(in_srgb,var(--app-surface)_78%,transparent)] p-3 text-[11px] text-[var(--text-secondary)]">
                 Nenhuma execução recente registrada para esta conversa.
               </div>
             )}

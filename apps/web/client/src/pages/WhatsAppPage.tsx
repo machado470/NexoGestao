@@ -1349,10 +1349,10 @@ function ExecutionChatColumn({
           className={cn(
             "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg transition-colors",
             isPrimary
-              ? "bg-[var(--accent-soft)] text-[var(--accent-primary)]"
+              ? "bg-[var(--accent-soft)] text-[var(--wa-menu-icon-active)]"
               : isDisabled
                 ? "bg-[var(--wa-action-disabled-icon-bg)] text-[var(--wa-action-disabled-icon)]"
-                : "bg-[var(--wa-action-icon-bg)] text-[var(--text-secondary)]"
+                : "bg-[var(--wa-action-icon-bg)] text-[var(--wa-menu-icon)]"
           )}
         >
           {action.icon}
@@ -1364,7 +1364,7 @@ function ExecutionChatColumn({
                 "min-w-0 truncate text-[13px] leading-5",
                 isDisabled
                   ? "font-medium text-[var(--wa-action-disabled-text)]"
-                  : "font-semibold text-[var(--text-primary)]"
+                  : "font-semibold text-[var(--wa-menu-fg-primary)]"
               )}
             >
               {action.label}
@@ -1372,7 +1372,7 @@ function ExecutionChatColumn({
             {statusLabel ? (
               <span
                 className={cn(
-                  "shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium leading-4",
+                  "shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium leading-4 tracking-[-0.01em]",
                   isUpcoming
                     ? "border-[color-mix(in_srgb,var(--warning)_24%,transparent)] bg-[color-mix(in_srgb,var(--warning)_12%,var(--app-card))] text-[color-mix(in_srgb,var(--warning)_84%,var(--text-primary))]"
                     : isUnavailable
@@ -1403,7 +1403,7 @@ function ExecutionChatColumn({
     if (action.key === "quick-template") {
       return (
         <DropdownMenuSub key={key}>
-          <DropdownMenuSubTrigger className="items-start gap-0 rounded-lg px-2.5 py-2 outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--accent-primary)] data-[state=open]:bg-app-surface">
+          <DropdownMenuSubTrigger className="cursor-pointer items-start gap-0 rounded-lg px-2.5 py-2 outline-none data-[state=open]:bg-[var(--wa-menu-item-active)] focus:bg-[var(--wa-menu-item-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--accent-primary)] hover:bg-[var(--wa-menu-item-hover)] [&>svg]:mt-1 [&>svg]:text-[var(--wa-menu-icon)]">
             {contentNode}
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent
@@ -1415,9 +1415,9 @@ function ExecutionChatColumn({
               <DropdownMenuItem
                 key={template}
                 onClick={() => onFillTemplate(template)}
-                className="gap-2.5 rounded-lg px-2.5 py-2.5 text-[13px] leading-snug outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--accent-primary)]"
+                className="cursor-pointer gap-2.5 rounded-lg px-2.5 py-2.5 text-[13px] font-medium leading-snug text-[var(--wa-menu-fg-primary)] outline-none data-[highlighted]:bg-[var(--wa-menu-item-hover)] data-[highlighted]:text-[var(--wa-menu-fg-primary)] focus:bg-[var(--wa-menu-item-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--accent-primary)]"
               >
-                <FileText className="size-4 text-[var(--text-muted)]" />
+                <FileText className="size-4 text-[var(--wa-menu-icon)]" />
                 <span className="min-w-0 flex-1 whitespace-normal">
                   {template}
                 </span>
@@ -1435,7 +1435,7 @@ function ExecutionChatColumn({
         aria-disabled={isDisabled}
         onClick={isDisabled ? undefined : action.onSelect}
         className={cn(
-          "items-start rounded-lg px-2.5 py-2 outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--accent-primary)]",
+          "items-start rounded-lg px-2.5 py-2 outline-none data-[highlighted]:bg-[var(--wa-menu-item-hover)] focus:bg-[var(--wa-menu-item-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--accent-primary)]",
           isDisabled
             ? "cursor-default data-[disabled]:pointer-events-none data-[disabled]:opacity-100"
             : "cursor-pointer"
@@ -1648,7 +1648,7 @@ function ExecutionChatColumn({
                 type="button"
                 size="sm"
                 variant="outline"
-                className="h-9 shrink-0 gap-1.5 px-3 text-[11px]"
+                className="whatsapp-action-menu h-9 shrink-0 gap-1.5 border-[var(--wa-menu-badge-border)] bg-[var(--wa-menu-badge-bg)] px-3 text-[11px] font-semibold text-[var(--wa-menu-fg-primary)] hover:border-[color-mix(in_srgb,var(--accent-primary)_28%,var(--app-border))] hover:bg-[var(--wa-menu-item-hover)] hover:text-[var(--wa-menu-fg-primary)] disabled:opacity-100 disabled:saturate-100 disabled:text-[var(--wa-menu-fg-disabled)] [&_svg]:text-[var(--wa-menu-icon)]"
                 disabled={!hasConversation}
                 aria-label="Mais ações da conversa"
               >
@@ -1981,8 +1981,8 @@ function OperationalContextColumn({
             </span>
           </section>
 
-          <section className="px-1 py-1">
-            <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+          <section className="rounded-2xl bg-[color-mix(in_srgb,var(--app-surface)_72%,transparent)] px-3 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
               Action cockpit
             </p>
             <div className="mt-2.5 grid grid-cols-1 gap-2">
@@ -1990,7 +1990,7 @@ function OperationalContextColumn({
                 type="button"
                 size="sm"
                 variant="outline"
-                className="h-8 w-full min-w-0 justify-start truncate px-2.5 text-[11px]"
+                className="h-8 w-full min-w-0 justify-start truncate border-[color-mix(in_srgb,var(--app-border)_78%,transparent)] bg-[color-mix(in_srgb,var(--app-card)_86%,transparent)] px-2.5 text-[11px] font-semibold text-[var(--text-primary)] hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)]"
                 onClick={onSendCharge}
               >
                 Enviar cobrança
@@ -1999,7 +1999,7 @@ function OperationalContextColumn({
                 type="button"
                 size="sm"
                 variant="outline"
-                className="h-8 w-full min-w-0 justify-start truncate px-2.5 text-[11px]"
+                className="h-8 w-full min-w-0 justify-start truncate border-[color-mix(in_srgb,var(--app-border)_78%,transparent)] bg-[color-mix(in_srgb,var(--app-card)_86%,transparent)] px-2.5 text-[11px] font-semibold text-[var(--text-primary)] hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)]"
                 onClick={() =>
                   onNavigate(
                     context?.openCharge?.id
@@ -2014,7 +2014,7 @@ function OperationalContextColumn({
                 type="button"
                 size="sm"
                 variant="outline"
-                className="h-8 w-full min-w-0 justify-start truncate px-2.5 text-[11px]"
+                className="h-8 w-full min-w-0 justify-start truncate border-[color-mix(in_srgb,var(--app-border)_78%,transparent)] bg-[color-mix(in_srgb,var(--app-card)_86%,transparent)] px-2.5 text-[11px] font-semibold text-[var(--text-primary)] hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)]"
                 onClick={onSendReminder}
               >
                 Enviar lembrete
@@ -2023,7 +2023,7 @@ function OperationalContextColumn({
                 type="button"
                 size="sm"
                 variant="outline"
-                className="h-8 w-full min-w-0 justify-start truncate px-2.5 text-[11px]"
+                className="h-8 w-full min-w-0 justify-start truncate border-[color-mix(in_srgb,var(--app-border)_78%,transparent)] bg-[color-mix(in_srgb,var(--app-card)_86%,transparent)] px-2.5 text-[11px] font-semibold text-[var(--text-primary)] hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)]"
                 onClick={onMoreActions}
               >
                 Mais ações

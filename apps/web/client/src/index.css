@@ -3126,10 +3126,38 @@ html {
   }
 
   .whatsapp-action-menu {
-    --wa-action-description: #526b8c;
-    --wa-action-disabled-text: #627996;
-    --wa-action-disabled-description: #6f839d;
-    --wa-action-disabled-icon: #6a809d;
+    --wa-menu-fg-primary: #20344d;
+    --wa-menu-fg-secondary: #4d6684;
+    --wa-menu-fg-tertiary: #647a95;
+    --wa-menu-fg-disabled: #73859a;
+    --wa-menu-icon: #516987;
+    --wa-menu-icon-active: color-mix(
+      in srgb,
+      var(--accent-primary) 86%,
+      #213a58
+    );
+    --wa-menu-badge-text: #526783;
+    --wa-menu-badge-bg: color-mix(in srgb, var(--app-surface) 84%, #ffffff);
+    --wa-menu-badge-border: color-mix(
+      in srgb,
+      var(--app-border) 68%,
+      transparent
+    );
+    --wa-menu-section-label: #516885;
+    --wa-menu-item-hover: color-mix(
+      in srgb,
+      var(--accent-soft) 44%,
+      var(--app-surface)
+    );
+    --wa-menu-item-active: color-mix(
+      in srgb,
+      var(--accent-soft) 62%,
+      var(--app-surface)
+    );
+    --wa-action-description: var(--wa-menu-fg-secondary);
+    --wa-action-disabled-text: var(--wa-menu-fg-disabled);
+    --wa-action-disabled-description: var(--wa-menu-fg-tertiary);
+    --wa-action-disabled-icon: var(--wa-menu-fg-disabled);
     --wa-action-disabled-icon-bg: color-mix(
       in srgb,
       var(--app-surface) 86%,
@@ -3141,16 +3169,12 @@ html {
       var(--warning) 82%,
       #5a3719
     );
-    --wa-action-section-label: #516885;
-    --wa-action-section-muted: #647894;
-    --wa-action-badge-bg: color-mix(in srgb, var(--app-surface) 78%, #ffffff);
-    --wa-action-badge-border: color-mix(
-      in srgb,
-      var(--app-border) 74%,
-      transparent
-    );
-    --wa-action-badge-text: #405774;
-    --wa-action-badge-muted-text: #667a95;
+    --wa-action-section-label: var(--wa-menu-section-label);
+    --wa-action-section-muted: var(--wa-menu-fg-tertiary);
+    --wa-action-badge-bg: var(--wa-menu-badge-bg);
+    --wa-action-badge-border: var(--wa-menu-badge-border);
+    --wa-action-badge-text: var(--wa-menu-badge-text);
+    --wa-action-badge-muted-text: var(--wa-menu-fg-tertiary);
     --wa-action-separator: color-mix(
       in srgb,
       var(--app-border) 82%,
@@ -3158,11 +3182,43 @@ html {
     );
   }
 
+  .nexo-cascade-submenu.whatsapp-action-menu {
+    background: color-mix(
+      in srgb,
+      var(--app-card, var(--app-overlay-bg)) 90%,
+      var(--app-surface, var(--app-overlay-surface))
+    );
+  }
+
   .dark .whatsapp-action-menu,
   [data-theme="dark"] .whatsapp-action-menu,
   .app-root.dark .whatsapp-action-menu,
   .app-root[data-theme="dark"] .whatsapp-action-menu {
-    --wa-action-description: var(--text-muted);
+    --wa-menu-fg-primary: var(--text-primary);
+    --wa-menu-fg-secondary: var(--text-secondary);
+    --wa-menu-fg-tertiary: var(--text-muted);
+    --wa-menu-fg-disabled: color-mix(
+      in srgb,
+      var(--text-muted) 86%,
+      var(--text-primary)
+    );
+    --wa-menu-icon: var(--text-muted);
+    --wa-menu-icon-active: var(--accent-primary);
+    --wa-menu-badge-text: var(--text-secondary);
+    --wa-menu-badge-bg: color-mix(
+      in srgb,
+      var(--app-surface) 70%,
+      transparent
+    );
+    --wa-menu-badge-border: color-mix(
+      in srgb,
+      var(--app-border) 70%,
+      transparent
+    );
+    --wa-menu-section-label: var(--text-muted);
+    --wa-menu-item-hover: var(--accent-soft);
+    --wa-menu-item-active: var(--accent-soft);
+    --wa-action-description: var(--wa-menu-fg-tertiary);
     --wa-action-disabled-text: color-mix(
       in srgb,
       var(--text-muted) 86%,
@@ -3185,23 +3241,15 @@ html {
     );
     --wa-action-icon-bg: var(--app-surface);
     --wa-action-section-primary: var(--warning);
-    --wa-action-section-label: var(--text-muted);
+    --wa-action-section-label: var(--wa-menu-section-label);
     --wa-action-section-muted: color-mix(
       in srgb,
       var(--text-muted) 72%,
       transparent
     );
-    --wa-action-badge-bg: color-mix(
-      in srgb,
-      var(--app-surface) 70%,
-      transparent
-    );
-    --wa-action-badge-border: color-mix(
-      in srgb,
-      var(--app-border) 70%,
-      transparent
-    );
-    --wa-action-badge-text: var(--text-secondary);
+    --wa-action-badge-bg: var(--wa-menu-badge-bg);
+    --wa-action-badge-border: var(--wa-menu-badge-border);
+    --wa-action-badge-text: var(--wa-menu-badge-text);
     --wa-action-badge-muted-text: color-mix(
       in srgb,
       var(--text-muted) 84%,
