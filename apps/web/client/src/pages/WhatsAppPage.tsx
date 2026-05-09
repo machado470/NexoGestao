@@ -120,6 +120,12 @@ type ComposerActionGroupId =
   | "serviceOrder"
   | "execution";
 
+type ComposerActionAvailability =
+  | "primary"
+  | "secondary"
+  | "unavailable"
+  | "upcoming";
+
 type ComposerActionDescriptor = {
   key: string;
   label: string;
@@ -128,6 +134,7 @@ type ComposerActionDescriptor = {
   description?: string;
   disabled?: boolean;
   reason?: string;
+  availability?: ComposerActionAvailability;
 };
 
 type WhatsAppComposerAction = ComposerActionDescriptor & {
@@ -135,18 +142,11 @@ type WhatsAppComposerAction = ComposerActionDescriptor & {
   onSelect?: () => void;
 };
 
-const COMPOSER_ACTION_GROUPS: Array<{
-  id: ComposerActionGroupId;
-  label: ComposerActionGroupName;
-}> = [
-  { id: "communication", label: "Comunicação" },
-  { id: "finance", label: "Financeiro" },
-  { id: "agenda", label: "Agenda" },
-  { id: "serviceOrder", label: "Ordem de serviço" },
-  { id: "execution", label: "Execução assistida" },
-];
-
 type WhatsAppComposerActionPalette = {
+  primaryActions: ComposerActionDescriptor[];
+  secondaryActions: ComposerActionDescriptor[];
+  unavailableActions: ComposerActionDescriptor[];
+  upcomingActions: ComposerActionDescriptor[];
   recommendedActions: ComposerActionDescriptor[];
   groupedActions: Record<ComposerActionGroupName, ComposerActionDescriptor[]>;
 };
@@ -181,6 +181,7 @@ function cloneRecommendedAction(
     ...action,
     label,
     description,
+    availability: "primary",
   };
 }
 
@@ -310,6 +311,7 @@ export function buildWhatsAppComposerActionGroups({
         description: "Enviar mídia ou documento nesta conversa.",
         disabled: true,
         reason: "Em breve",
+        availability: "upcoming",
       },
       {
         key: "audio-message",
@@ -319,6 +321,7 @@ export function buildWhatsAppComposerActionGroups({
         description: "Gravar ou enviar áudio pelo WhatsApp.",
         disabled: true,
         reason: "Em breve",
+        availability: "upcoming",
       },
     ],
     Financeiro: [
@@ -423,24 +426,58 @@ export function buildWhatsAppComposerActionGroups({
     ],
   };
 
+  const recommendedActions = getRecommendedWhatsAppComposerActions(
+    {
+      hasSuggestedAction,
+      hasPendingAssistedExecution,
+      hasOpenCharge,
+      hasPendingCharge,
+      canSendPaymentLink,
+      chargeStatus,
+      chargeDaysOverdue,
+      hasUpcomingAppointment,
+      appointmentStatus,
+      hasActiveServiceOrder,
+      serviceOrderStatus,
+      canResolveConversation,
+    },
+    groupedActions
+  );
+  const recommendedKeys = new Set(recommendedActions.map(action => action.key));
+  const allActions = Object.values(groupedActions).flat();
+  const fallbackPrimaryAction = allActions.find(
+    action =>
+      action.key === "quick-template" && !recommendedKeys.has(action.key)
+  );
+  const primaryActions = recommendedActions.length
+    ? recommendedActions
+    : fallbackPrimaryAction
+      ? [
+          {
+            ...fallbackPrimaryAction,
+            availability: "primary" as const,
+            description:
+              "Começar com uma resposta padronizada ou mensagem livre.",
+          },
+        ]
+      : [];
+  const primaryKeys = new Set(primaryActions.map(action => action.key));
+  const contextualActions = allActions.filter(
+    action => !primaryKeys.has(action.key)
+  );
+
   return {
-    recommendedActions: getRecommendedWhatsAppComposerActions(
-      {
-        hasSuggestedAction,
-        hasPendingAssistedExecution,
-        hasOpenCharge,
-        hasPendingCharge,
-        canSendPaymentLink,
-        chargeStatus,
-        chargeDaysOverdue,
-        hasUpcomingAppointment,
-        appointmentStatus,
-        hasActiveServiceOrder,
-        serviceOrderStatus,
-        canResolveConversation,
-      },
-      groupedActions
-    ),
+    primaryActions,
+    secondaryActions: contextualActions
+      .filter(action => !action.disabled)
+      .map(action => ({ ...action, availability: "secondary" as const })),
+    unavailableActions: contextualActions
+      .filter(action => action.disabled && action.availability !== "upcoming")
+      .map(action => ({ ...action, availability: "unavailable" as const })),
+    upcomingActions: contextualActions
+      .filter(action => action.availability === "upcoming")
+      .map(action => ({ ...action, availability: "upcoming" as const })),
+    recommendedActions,
     groupedActions,
   };
 }
@@ -1198,23 +1235,28 @@ function ExecutionChatColumn({
     node.scrollTop = node.scrollHeight;
   }, [conversation?.id, messages.length]);
 
-  const actionGroups = COMPOSER_ACTION_GROUPS;
   const composerActionPalette = useMemo(() => {
-    const { recommendedActions, groupedActions } =
-      buildWhatsAppComposerActionGroups({
-        hasSuggestedAction: Boolean(suggestedActionLabel),
-        hasPendingAssistedExecution,
-        hasOpenCharge,
-        hasPendingCharge,
-        canSendPaymentLink,
-        chargeStatus,
-        chargeDaysOverdue,
-        hasUpcomingAppointment,
-        appointmentStatus,
-        hasActiveServiceOrder,
-        serviceOrderStatus,
-        canResolveConversation,
-      });
+    const {
+      primaryActions,
+      secondaryActions,
+      unavailableActions,
+      upcomingActions,
+      recommendedActions,
+      groupedActions,
+    } = buildWhatsAppComposerActionGroups({
+      hasSuggestedAction: Boolean(suggestedActionLabel),
+      hasPendingAssistedExecution,
+      hasOpenCharge,
+      hasPendingCharge,
+      canSendPaymentLink,
+      chargeStatus,
+      chargeDaysOverdue,
+      hasUpcomingAppointment,
+      appointmentStatus,
+      hasActiveServiceOrder,
+      serviceOrderStatus,
+      canResolveConversation,
+    });
     const iconByKey: Record<string, ReactNode> = {
       "quick-template": <MessageCircleMore className="size-4" />,
       "attach-file": <Paperclip className="size-4" />,
@@ -1258,6 +1300,10 @@ function ExecutionChatColumn({
       }));
 
     return {
+      primaryActions: withRuntime(primaryActions),
+      secondaryActions: withRuntime(secondaryActions),
+      unavailableActions: withRuntime(unavailableActions),
+      upcomingActions: withRuntime(upcomingActions),
       recommendedActions: withRuntime(recommendedActions),
       groupedActions: Object.fromEntries(
         Object.entries(groupedActions).map(([group, actions]) => [
@@ -1292,24 +1338,66 @@ function ExecutionChatColumn({
     action: WhatsAppComposerAction,
     key = action.key
   ) => {
+    const isDisabled = Boolean(action.disabled);
+    const isPrimary = action.availability === "primary";
+    const isUpcoming = action.availability === "upcoming";
+    const isUnavailable = action.availability === "unavailable";
+    const statusLabel = action.reason ?? (isPrimary ? action.group : undefined);
     const contentNode = (
-      <span className="flex min-w-0 flex-1 items-start gap-3">
-        <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-app-surface text-[var(--text-secondary)]">
+      <span
+        className={cn(
+          "flex min-w-0 flex-1 items-start gap-2.5",
+          isDisabled ? "opacity-70" : "opacity-100"
+        )}
+      >
+        <span
+          className={cn(
+            "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg transition-colors",
+            isPrimary
+              ? "bg-[var(--accent-soft)] text-[var(--accent-primary)]"
+              : isDisabled
+                ? "bg-app-surface/55 text-[var(--text-muted)]/70"
+                : "bg-app-surface text-[var(--text-secondary)]"
+          )}
+        >
           {action.icon}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="flex min-w-0 items-center justify-between gap-2">
-            <span className="truncate text-sm font-medium leading-5 text-[var(--text-primary)]">
+          <span className="flex min-w-0 items-start justify-between gap-2">
+            <span
+              className={cn(
+                "min-w-0 truncate text-[13px] leading-5",
+                isDisabled
+                  ? "font-medium text-[var(--text-muted)]"
+                  : "font-semibold text-[var(--text-primary)]"
+              )}
+            >
               {action.label}
             </span>
-            {action.disabled && action.reason ? (
-              <span className="shrink-0 rounded-full bg-app-surface px-2 py-0.5 text-[10px] font-medium text-app-muted">
-                {action.reason}
+            {statusLabel ? (
+              <span
+                className={cn(
+                  "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium leading-4",
+                  isUpcoming
+                    ? "bg-[color-mix(in_srgb,var(--warning)_14%,transparent)] text-[var(--warning)]"
+                    : isUnavailable
+                      ? "bg-app-surface/60 text-app-muted"
+                      : "bg-app-surface text-[var(--text-secondary)]"
+                )}
+              >
+                {statusLabel}
               </span>
             ) : null}
           </span>
           {action.description ? (
-            <span className="mt-1 block text-[11px] leading-relaxed text-[var(--text-muted)]">
+            <span
+              className={cn(
+                "mt-0.5 block line-clamp-2 text-[11px] leading-4",
+                isDisabled
+                  ? "text-[var(--text-muted)]/70"
+                  : "text-[var(--text-muted)]"
+              )}
+            >
               {action.description}
             </span>
           ) : null}
@@ -1320,19 +1408,19 @@ function ExecutionChatColumn({
     if (action.key === "quick-template") {
       return (
         <DropdownMenuSub key={key}>
-          <DropdownMenuSubTrigger className="items-start gap-0 rounded-lg px-2.5 py-2.5">
+          <DropdownMenuSubTrigger className="items-start gap-0 rounded-lg px-2.5 py-2 outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--accent-primary)] data-[state=open]:bg-app-surface">
             {contentNode}
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent
             sideOffset={2}
             alignOffset={-6}
-            className="nexo-cascade-surface nexo-cascade-submenu z-[70] max-h-[min(70vh,24rem)] w-72 overflow-y-auto p-2 text-app-primary [direction:ltr]"
+            className="nexo-cascade-surface nexo-cascade-submenu scrollbar-menu-nexo z-[70] max-h-[min(70vh,24rem)] w-72 overflow-y-auto p-2 text-app-primary [direction:ltr]"
           >
             {QUICK_COMPOSER_TEMPLATES.map(template => (
               <DropdownMenuItem
                 key={template}
                 onClick={() => onFillTemplate(template)}
-                className="gap-2.5 rounded-lg px-2.5 py-2.5 text-[13px] leading-snug"
+                className="gap-2.5 rounded-lg px-2.5 py-2.5 text-[13px] leading-snug outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--accent-primary)]"
               >
                 <FileText className="size-4 text-[var(--text-muted)]" />
                 <span className="min-w-0 flex-1 whitespace-normal">
@@ -1348,12 +1436,57 @@ function ExecutionChatColumn({
     return (
       <DropdownMenuItem
         key={key}
-        disabled={action.disabled}
-        onClick={action.disabled ? undefined : action.onSelect}
-        className="items-start rounded-lg px-2.5 py-2.5"
+        disabled={isDisabled}
+        aria-disabled={isDisabled}
+        onClick={isDisabled ? undefined : action.onSelect}
+        className={cn(
+          "items-start rounded-lg px-2.5 py-2 outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--accent-primary)]",
+          isDisabled
+            ? "cursor-default data-[disabled]:pointer-events-none data-[disabled]:opacity-100"
+            : "cursor-pointer"
+        )}
       >
         {contentNode}
       </DropdownMenuItem>
+    );
+  };
+
+  const renderActionSection = ({
+    title,
+    tone,
+    actions,
+  }: {
+    title: string;
+    tone: "primary" | "secondary" | "muted" | "upcoming";
+    actions: WhatsAppComposerAction[];
+  }) => {
+    if (!actions.length) return null;
+
+    return (
+      <div
+        className={cn(
+          "space-y-1.5 py-1.5 first:pt-0 last:pb-0",
+          tone === "primary" ? "pt-0" : "mt-1.5"
+        )}
+      >
+        <DropdownMenuLabel
+          className={cn(
+            "px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.18em]",
+            tone === "primary"
+              ? "text-[var(--warning)]"
+              : tone === "secondary"
+                ? "text-[var(--text-muted)]"
+                : "text-[var(--text-muted)]/70"
+          )}
+        >
+          {title}
+        </DropdownMenuLabel>
+        <div className="space-y-0.5">
+          {actions.map(action =>
+            renderComposerAction(action, `${tone}-${action.key}`)
+          )}
+        </div>
+      </div>
     );
   };
 
@@ -1533,38 +1666,37 @@ function ExecutionChatColumn({
               sideOffset={8}
               className="nexo-cascade-surface z-[60] max-h-[min(560px,calc(100vh-12rem),var(--radix-dropdown-menu-content-available-height))] w-[min(22rem,calc(100vw-2rem))] overflow-visible p-0 [direction:ltr]"
             >
-              <div className="scrollbar-thin-nexo max-h-[min(560px,calc(100vh-12rem),var(--radix-dropdown-menu-content-available-height))] min-h-0 overflow-y-auto overscroll-contain p-2">
-                {composerActionPalette.recommendedActions.length ? (
-                  <div className="pb-1">
-                    <DropdownMenuLabel className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--warning)]">
-                      Recomendadas agora
-                    </DropdownMenuLabel>
-                    <div className="space-y-0.5">
-                      {composerActionPalette.recommendedActions.map(action =>
-                        renderComposerAction(action, `recommended-${action.key}`)
-                      )}
-                    </div>
-                    <DropdownMenuSeparator className="my-1" />
-                  </div>
+              <div className="scrollbar-menu-nexo max-h-[min(560px,calc(100vh-12rem),var(--radix-dropdown-menu-content-available-height))] min-h-0 overflow-y-auto overscroll-contain p-2">
+                {renderActionSection({
+                  title: composerActionPalette.recommendedActions.length
+                    ? "Recomendadas agora"
+                    : "Ações principais",
+                  tone: "primary",
+                  actions: composerActionPalette.primaryActions,
+                })}
+                {composerActionPalette.secondaryActions.length ? (
+                  <DropdownMenuSeparator className="mx-2 my-1.5 opacity-60" />
                 ) : null}
-                {actionGroups.map(group => {
-                  const actions =
-                    composerActionPalette.groupedActions[group.label] ?? [];
-                  if (actions.length === 0) return null;
-
-                  return (
-                    <div key={group.id} className="py-1 first:pt-0 last:pb-0">
-                      <DropdownMenuLabel className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                        {group.label}
-                      </DropdownMenuLabel>
-                      <div className="space-y-0.5">
-                        {actions.map(action => renderComposerAction(action))}
-                      </div>
-                      {group.id !== "execution" ? (
-                        <DropdownMenuSeparator className="my-1" />
-                      ) : null}
-                    </div>
-                  );
+                {renderActionSection({
+                  title: "Outras ações",
+                  tone: "secondary",
+                  actions: composerActionPalette.secondaryActions,
+                })}
+                {composerActionPalette.unavailableActions.length ? (
+                  <DropdownMenuSeparator className="mx-2 my-1.5 opacity-40" />
+                ) : null}
+                {renderActionSection({
+                  title: "Indisponíveis neste contexto",
+                  tone: "muted",
+                  actions: composerActionPalette.unavailableActions,
+                })}
+                {composerActionPalette.upcomingActions.length ? (
+                  <DropdownMenuSeparator className="mx-2 my-1.5 opacity-40" />
+                ) : null}
+                {renderActionSection({
+                  title: "Em breve",
+                  tone: "upcoming",
+                  actions: composerActionPalette.upcomingActions,
                 })}
               </div>
             </DropdownMenuContent>

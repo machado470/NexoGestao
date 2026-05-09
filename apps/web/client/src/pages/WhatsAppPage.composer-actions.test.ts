@@ -85,6 +85,70 @@ describe("WhatsApp composer action groups", () => {
     ).toBe(true);
   });
 
+  it("classifies composer actions by current context", () => {
+    const palette = buildWhatsAppComposerActionGroups({
+      hasSuggestedAction: false,
+      hasOpenCharge: false,
+      canSendPaymentLink: false,
+      hasUpcomingAppointment: false,
+      hasActiveServiceOrder: false,
+      canResolveConversation: false,
+    });
+
+    expect(palette.primaryActions.map(action => action.label)).toEqual([
+      "Template rápido",
+    ]);
+    expect(palette.secondaryActions).toEqual([]);
+    expect(palette.unavailableActions.map(action => action.reason)).toEqual([
+      "Sem cobrança",
+      "Sem cobrança",
+      "Sem cobrança",
+      "Sem agenda",
+      "Sem agenda",
+      "Sem O.S.",
+      "Sem O.S.",
+      "Sem ação sugerida",
+      "Conversa resolvida",
+    ]);
+    expect(palette.upcomingActions.map(action => action.label)).toEqual([
+      "Anexar arquivo",
+      "Áudio / mensagem de voz",
+    ]);
+    expect(palette.upcomingActions.every(action => action.disabled)).toBe(true);
+  });
+
+  it("moves only relevant actions into primary for active operational context", () => {
+    const palette = buildWhatsAppComposerActionGroups({
+      hasSuggestedAction: true,
+      hasPendingAssistedExecution: true,
+      hasOpenCharge: true,
+      hasPendingCharge: true,
+      canSendPaymentLink: true,
+      chargeStatus: "OVERDUE",
+      hasUpcomingAppointment: true,
+      appointmentStatus: "PENDING",
+      hasActiveServiceOrder: true,
+      serviceOrderStatus: "IN_PROGRESS",
+      canResolveConversation: true,
+    });
+
+    expect(palette.primaryActions.map(action => action.key)).toEqual([
+      "create-assisted-execution",
+      "send-charge",
+      "send-payment-link",
+      "confirm-appointment",
+      "update-service",
+    ]);
+    expect(palette.secondaryActions.map(action => action.key)).toEqual([
+      "quick-template",
+      "payment-reminder",
+      "appointment-reminder",
+      "link-service-order",
+      "mark-resolved",
+    ]);
+    expect(palette.unavailableActions).toEqual([]);
+  });
+
   it("shows Recomendadas agora actions when strong context exists", () => {
     const { recommendedActions } = buildWhatsAppComposerActionGroups({
       hasSuggestedAction: true,
