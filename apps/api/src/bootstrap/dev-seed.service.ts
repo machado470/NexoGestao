@@ -4,9 +4,14 @@ import { PrismaService } from '../prisma/prisma.service'
 
 const PILOT_ORG_SLUG = 'pilot-servicos-viva'
 const PILOT_ORG_NAME = 'Serviços Viva - Ambiente Piloto'
-const PILOT_ADMIN_EMAIL = 'admin.piloto@nexogestao.local'
+const PILOT_ADMIN_EMAIL_FALLBACK = 'admin.piloto@nexogestao.local'
 const PILOT_ADMIN_NAME = 'Paula Almeida'
-const PILOT_ADMIN_PASSWORD = 'Piloto@Admin123'
+const PILOT_ADMIN_PASSWORD_FALLBACK = 'Admin123!'
+
+function env(name: string, fallback: string) {
+  const value = process.env[name]?.trim()
+  return value && value.length > 0 ? value : fallback
+}
 
 function shouldRunDevSeed() {
   const nodeEnv = (process.env.NODE_ENV ?? '').toLowerCase().trim()
@@ -40,7 +45,9 @@ export class DevSeedService implements OnModuleInit {
   }
 
   private async ensurePilotAdmin() {
-    const passwordHash = await bcrypt.hash(PILOT_ADMIN_PASSWORD, 10)
+    const pilotAdminEmail = env('PILOT_ADMIN_EMAIL', PILOT_ADMIN_EMAIL_FALLBACK).toLowerCase()
+    const pilotAdminPassword = env('PILOT_ADMIN_PASSWORD', PILOT_ADMIN_PASSWORD_FALLBACK)
+    const passwordHash = await bcrypt.hash(pilotAdminPassword, 10)
 
     await this.prisma.$transaction(async (tx) => {
       const org = await tx.organization.upsert({
@@ -61,7 +68,7 @@ export class DevSeedService implements OnModuleInit {
       })
 
       const existingUser = await tx.user.findUnique({
-        where: { email: PILOT_ADMIN_EMAIL },
+        where: { email: pilotAdminEmail },
         select: { id: true },
       })
 
@@ -78,7 +85,7 @@ export class DevSeedService implements OnModuleInit {
           })
         : await tx.user.create({
             data: {
-              email: PILOT_ADMIN_EMAIL,
+              email: pilotAdminEmail,
               password: passwordHash,
               role: 'ADMIN',
               active: true,
@@ -92,13 +99,13 @@ export class DevSeedService implements OnModuleInit {
         update: {
           orgId: org.id,
           name: PILOT_ADMIN_NAME,
-          email: PILOT_ADMIN_EMAIL,
+          email: pilotAdminEmail,
           role: 'ADMIN',
           active: true,
         },
         create: {
           name: PILOT_ADMIN_NAME,
-          email: PILOT_ADMIN_EMAIL,
+          email: pilotAdminEmail,
           role: 'ADMIN',
           active: true,
           orgId: org.id,
@@ -108,7 +115,7 @@ export class DevSeedService implements OnModuleInit {
     })
 
     this.logger.warn(
-      `[BOOT][DevSeed] Seed básico verificado para ${PILOT_ADMIN_EMAIL} (${PILOT_ORG_SLUG}) em NODE_ENV!=production`,
+      `[BOOT][DevSeed] Seed básico verificado para ${pilotAdminEmail} (${PILOT_ORG_SLUG}) em NODE_ENV!=production`,
     )
   }
 }
