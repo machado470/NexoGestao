@@ -6,6 +6,7 @@ const NEXO_TOKEN_COOKIE = "nexo_token";
 
 export type TrpcUser = {
   token: string;
+  validated: true;
   id?: string;
   organizationId?: string;
   role?: string;
@@ -169,7 +170,7 @@ function unwrapMePayload(payload: unknown): Record<string, unknown> | null {
   return level3 ?? level2 ?? level1;
 }
 
-function normalizeMePayload(payload: unknown): Omit<TrpcUser, "token"> | null {
+function normalizeMePayload(payload: unknown): Omit<TrpcUser, "token" | "validated"> | null {
   const root = unwrapMePayload(payload);
   if (!root) {
     return null;
@@ -298,6 +299,7 @@ export async function fetchNexoMe(req: any) {
       return {
         token,
         ...normalized,
+        validated: true,
       } satisfies TrpcUser;
     } catch (error) {
       if (error instanceof NexoBootstrapError) {
@@ -312,7 +314,7 @@ export async function fetchNexoMe(req: any) {
         logWithSuppression(
           "connection",
           "warn",
-          "[trpc/context] fetchNexoMe upstream unavailable; using degraded fallback",
+          "[trpc/context] fetchNexoMe upstream unavailable; refusing token-only auth context",
           {
             url: `${NEXO_API_URL}/me`,
             error:
@@ -384,17 +386,15 @@ export async function createContext(
     return {
       req: opts.req,
       res: opts.res,
-      user: me ?? { token },
+      user: me,
     };
   } catch (error) {
-    if (error instanceof NexoBootstrapError && error.kind === "malformed") {
-      throw error;
-    }
-
     logWithSuppression(
-      "context_fallback",
-      "warn",
-      "[trpc/context] createContext degraded to token-only auth context",
+      "context_validation_failed",
+      error instanceof NexoBootstrapError && error.kind === "unavailable"
+        ? "warn"
+        : "error",
+      "[trpc/context] createContext refused token-only auth context",
       {
         reason:
           error instanceof NexoBootstrapError ? error.kind : "unexpected_error",
@@ -404,7 +404,7 @@ export async function createContext(
     return {
       req: opts.req,
       res: opts.res,
-      user: { token },
+      user: null,
     };
   }
 }

@@ -27,17 +27,20 @@ type AuthUser = {
 } | null;
 
 export type AuthBootstrapState =
-  | "initializing"
+  | "validating"
   | "unauthenticated"
   | "authenticated"
+  | "degraded"
   | "error";
 
 export function resolveAuthBootstrapState(params: {
   isInitializing: boolean;
   bootstrapError: unknown | null;
   user: AuthUser;
+  isUnavailable?: boolean;
 }): AuthBootstrapState {
-  if (params.isInitializing) return "initializing";
+  if (params.isInitializing) return "validating";
+  if (params.isUnavailable) return "degraded";
   if (params.bootstrapError) return "error";
   if (params.user) return "authenticated";
   return "unauthenticated";
@@ -559,6 +562,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isInitializing,
     bootstrapError: meBootstrapError,
     user: userSafe,
+    isUnavailable: meBootstrapUnavailable,
   });
 
   useEffect(() => {
@@ -572,7 +576,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       {
         pathname,
         fetchStatus: meQuery.fetchStatus,
-        fallbackAuthState: userSafe ? "authenticated" : "unauthenticated",
+        fallbackAuthState: "degraded",
       }
     );
   }, [meBootstrapUnavailable, meQuery.fetchStatus, pathname, userSafe]);

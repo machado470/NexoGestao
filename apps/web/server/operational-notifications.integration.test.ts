@@ -17,6 +17,7 @@ function createCtx(orgId: string) {
       organizationId: orgId,
       role: "admin",
       token: "test-token",
+      validated: true,
     },
   } as any;
 }
