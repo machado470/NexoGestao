@@ -24,6 +24,9 @@ import {
 
 const prisma = new PrismaClient()
 
+const PILOT_ADMIN_EMAIL_FALLBACK = 'admin.piloto@nexogestao.local'
+const PILOT_ADMIN_PASSWORD_FALLBACK = 'Admin123!'
+
 type PilotUser = {
   key: 'admin' | 'operator' | 'finance'
   name: string
@@ -977,8 +980,8 @@ export async function seedPilot() {
     {
       key: 'admin',
       name: 'Paula Almeida',
-      email: env('PILOT_ADMIN_EMAIL', 'admin.piloto@nexogestao.local'),
-      password: env('PILOT_ADMIN_PASSWORD', 'Piloto@Admin123'),
+      email: env('PILOT_ADMIN_EMAIL', PILOT_ADMIN_EMAIL_FALLBACK),
+      password: env('PILOT_ADMIN_PASSWORD', PILOT_ADMIN_PASSWORD_FALLBACK),
       role: UserRole.ADMIN,
       personRole: 'ADMIN',
     },
