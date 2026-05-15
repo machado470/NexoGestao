@@ -6,7 +6,7 @@ import { extractPathname, isPublicOrAuthPath } from "@/lib/routeAccess";
 import { pushAuditEvent, setAuditField } from "@/lib/renderAudit";
 
 export type AppBootstrapState =
-  | "initializing"
+  | "validating"
   | "unauthenticated"
   | "authenticated"
   | "error";
@@ -76,7 +76,7 @@ export function AppBootstrapGuard({
     };
   }, []);
 
-  if (state === "initializing" && !isPublicBootstrapPath) {
+  if (state === "validating" && !isPublicBootstrapPath) {
     return (
       <>
         {children}
@@ -103,7 +103,7 @@ export function AppBootstrapGuard({
     );
   }
 
-  if (state !== "initializing" && state !== "error" && state !== "authenticated" && state !== "unauthenticated") {
+  if (state !== "validating" && state !== "error" && state !== "authenticated" && state !== "unauthenticated") {
     setAuditField("errorType", "bootstrap");
     return (
       <div className="nexo-app-shell flex min-h-screen items-center justify-center px-6">

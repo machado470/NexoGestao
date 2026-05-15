@@ -8,14 +8,14 @@ import { isPublicOrAuthPath } from "@/lib/routeAccess";
 describe("AppBootstrapGuard", () => {
   it("mantém estados de bootstrap explícitos", () => {
     const states: AppBootstrapState[] = [
-      "initializing",
+      "validating",
       "unauthenticated",
       "authenticated",
       "error",
     ];
 
     expect(states).toEqual([
-      "initializing",
+      "validating",
       "unauthenticated",
       "authenticated",
       "error",
@@ -29,7 +29,7 @@ describe("AppBootstrapGuard", () => {
       expect(isPublicOrAuthPath(pathname)).toBe(true);
       expect(
         resolveAppBootstrapGuardBranch({
-          state: "initializing",
+          state: "validating",
           isPublicBootstrapPath: true,
         })
       ).toBe("pass_through");

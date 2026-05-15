@@ -36,7 +36,7 @@ describe("App routing/auth guard helpers", () => {
   });
 
   it("define branch explícito para RootRoute sem render vazio", () => {
-    expect(resolveRootRouteBranch("initializing")).toBe("initializing_landing");
+    expect(resolveRootRouteBranch("validating")).toBe("initializing_landing");
     expect(resolveRootRouteBranch("error")).toBe("bootstrap_error_landing");
     expect(resolveRootRouteBranch("unauthenticated")).toBe("unauthenticated_landing");
     expect(resolveRootRouteBranch("authenticated")).toBe("authenticated_redirect");
@@ -53,7 +53,7 @@ describe("App routing/auth guard helpers", () => {
 
     expect(
       resolveAppBootstrapGuardBranch({
-        state: "initializing",
+        state: "validating",
         isPublicBootstrapPath: true,
       })
     ).toBe("pass_through");

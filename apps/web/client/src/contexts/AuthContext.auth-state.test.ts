@@ -27,7 +27,7 @@ describe("AuthContext auth bootstrap state", () => {
   }>([
     {
       input: { isInitializing: true, bootstrapError: null, user: null },
-      expected: "initializing",
+      expected: "validating",
     },
     {
       input: { isInitializing: false, bootstrapError: null, user: null },
@@ -40,6 +40,15 @@ describe("AuthContext auth bootstrap state", () => {
         user: { id: "user-1", normalizedRole: null },
       },
       expected: "authenticated",
+    },
+    {
+      input: {
+        isInitializing: false,
+        bootstrapError: null,
+        isUnavailable: true,
+        user: null,
+      },
+      expected: "degraded",
     },
     {
       input: {

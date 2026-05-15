@@ -357,3 +357,103 @@ describe('WhatsAppService inbound/outbound', () => {
   })
 
 })
+
+describe('WhatsAppService queued dispatch claim', () => {
+  function makeService(prisma: any) {
+    return new WhatsAppService(
+      prisma,
+      { addJob: jest.fn() } as any,
+      { incOutbound: jest.fn(), incInbound: jest.fn(), incFailed: jest.fn(), incFailedWebhook: jest.fn(), incQueuedJobs: jest.fn(), observeProcessingDuration: jest.fn() } as any,
+      { log: jest.fn().mockResolvedValue({}) } as any,
+      { orgId: 'test-org', userId: 'test-user', requestId: 'test-request' } as any,
+      { increment: jest.fn() } as any,
+      { enforceMeter: jest.fn().mockResolvedValue({ allowed: true }) } as any,
+    )
+  }
+
+  it('duas chamadas simultâneas de claim não retornam o mesmo id quando o banco aplica SKIP LOCKED', async () => {
+    const prisma: any = {
+      $queryRaw: jest.fn()
+        .mockResolvedValueOnce([{ id: 'm1', status: 'SENDING', lockedBy: 'worker-a' }])
+        .mockResolvedValueOnce([{ id: 'm2', status: 'SENDING', lockedBy: 'worker-b' }]),
+    }
+    const svc = makeService(prisma)
+
+    const [first, second] = await Promise.all([
+      svc.claimQueued({ workerId: 'worker-a', limit: 1 }),
+      svc.claimQueued({ workerId: 'worker-b', limit: 1 }),
+    ])
+
+    expect(first.map((item: any) => item.id)).toEqual(['m1'])
+    expect(second.map((item: any) => item.id)).toEqual(['m2'])
+    expect(new Set([...first, ...second].map((item: any) => item.id)).size).toBe(2)
+  })
+
+  it('usa claim atômico com FOR UPDATE SKIP LOCKED e ignora locks recentes', async () => {
+    const prisma: any = { $queryRaw: jest.fn().mockResolvedValue([]) }
+    const svc = makeService(prisma)
+
+    await svc.claimQueued({ workerId: 'worker-a', limit: 25 })
+
+    const sql = String(prisma.$queryRaw.mock.calls[0][0]?.strings?.join(' ') ?? '')
+    expect(sql).toContain('FOR UPDATE SKIP LOCKED')
+    expect(sql).toContain('status = \'QUEUED\'::"WhatsAppMessageStatus"')
+    expect(sql).toContain('"lockedAt" IS NULL')
+    expect(sql).toContain('"lockedAt" < NOW()')
+    expect(sql).toContain('status = \'SENDING\'::"WhatsAppMessageStatus"')
+    expect(sql).toContain('UPDATE "WhatsAppMessage" AS m')
+    expect(sql).toContain('"lockedBy" =')
+  })
+
+  it('mensagem enviada vai para SENT e libera o lock', async () => {
+    const prisma: any = {
+      whatsAppMessage: {
+        update: jest.fn().mockResolvedValue({ id: 'm1', orgId: 'org1', status: 'SENT', messageType: 'MANUAL', errorMessage: null }),
+        findFirst: jest.fn().mockResolvedValue({ id: 'm1', orgId: 'org1', messageType: 'MANUAL' }),
+      },
+      timelineEvent: { findFirst: jest.fn().mockResolvedValue({ id: 'existing' }) },
+    }
+    const svc = makeService(prisma)
+
+    await svc.markSent({ id: 'm1', provider: 'meta_cloud', providerMessageId: 'wamid.1' })
+
+    expect(prisma.whatsAppMessage.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'm1' },
+      data: expect.objectContaining({ status: 'SENT', lockedAt: null, lockedBy: null }),
+    }))
+  })
+
+  it('falha fatal vai para FAILED e libera o lock', async () => {
+    const prisma: any = {
+      whatsAppMessage: {
+        update: jest.fn().mockResolvedValue({ id: 'm1', orgId: 'org1', status: 'FAILED', messageType: 'MANUAL', errorMessage: 'boom' }),
+        findFirst: jest.fn().mockResolvedValue({ id: 'm1', orgId: 'org1', messageType: 'MANUAL' }),
+      },
+      timelineEvent: { findFirst: jest.fn().mockResolvedValue({ id: 'existing' }) },
+    }
+    const svc = makeService(prisma)
+
+    await svc.markFailedTerminal({ id: 'm1', provider: 'meta_cloud', errorCode: 'FATAL', errorMessage: 'boom' })
+
+    expect(prisma.whatsAppMessage.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'm1' },
+      data: expect.objectContaining({ status: 'FAILED', lockedAt: null, lockedBy: null }),
+    }))
+  })
+
+  it('falha transitória volta para QUEUED e libera o lock para retry futuro', async () => {
+    const prisma: any = {
+      whatsAppMessage: {
+        update: jest.fn().mockResolvedValue({ id: 'm1', status: 'QUEUED' }),
+      },
+    }
+    const svc = makeService(prisma)
+
+    await svc.markFailedAndRequeue({ id: 'm1', provider: 'meta_cloud', errorCode: 'TEMP', errorMessage: 'try again' })
+
+    expect(prisma.whatsAppMessage.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'm1' },
+      data: expect.objectContaining({ status: 'QUEUED', lockedAt: null, lockedBy: null }),
+    }))
+  })
+})

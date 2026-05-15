@@ -492,14 +492,17 @@ export const nexoProxyRouter = router({
             me: result,
           };
         } catch (error) {
-          console.warn("[auth.establishSession] sessão persistida; validação /me indisponível", {
+          console.warn("[auth.establishSession] sessão não validada por /me", {
             reason: error instanceof Error ? error.message : String(error),
           });
 
+          const cookieOptions = getSessionCookieOptions(ctx.req);
+          ctx.res.clearCookie("nexo_token", cookieOptions);
+
           return {
-            success: true,
+            success: false,
             validated: false,
-            token: rawToken,
+            validationStatus: "failed" as const,
             me: null,
           };
         }

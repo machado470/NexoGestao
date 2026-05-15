@@ -272,7 +272,7 @@ function ProtectedRoute({
   const requiresOnboarding = getRequiresOnboarding(payload);
 
   useEffect(() => {
-    if (authState === "initializing") return;
+    if (authState === "validating") return;
 
     if (!isAuthenticated) {
       if (location.startsWith("/login")) return;
@@ -304,7 +304,7 @@ function ProtectedRoute({
     requiresOnboarding,
   ]);
 
-  if (authState === "initializing") {
+  if (authState === "validating") {
     return <FullScreenLoader />;
   }
 
@@ -346,7 +346,7 @@ function AuthRoute({ component: Component }: { component: ComponentType }) {
   const redirectParam = readSafeRedirectFromPath(location);
 
   useEffect(() => {
-    if (authState !== "initializing" && isAuthenticated) {
+    if (authState !== "validating" && isAuthenticated) {
       const nextRoute = redirectParam || redirectTo || "/executive-dashboard";
       if (location === nextRoute) return;
       // eslint-disable-next-line no-console
@@ -357,7 +357,7 @@ function AuthRoute({ component: Component }: { component: ComponentType }) {
     }
   }, [authState, isAuthenticated, location, navigate, redirectParam, redirectTo]);
 
-  if (authState === "initializing") return <Component />;
+  if (authState === "validating") return <Component />;
 
   if (isAuthenticated) {
     return (
@@ -741,7 +741,7 @@ export type RootRouteBranch =
   | "unknown_state_fallback";
 
 export function resolveRootRouteBranch(authState: unknown): RootRouteBranch {
-  if (authState === "initializing") return "initializing_landing";
+  if (authState === "validating") return "initializing_landing";
   if (authState === "error") return "bootstrap_error_landing";
   if (authState === "unauthenticated") return "unauthenticated_landing";
   if (authState === "authenticated") return "authenticated_redirect";
@@ -775,7 +775,7 @@ function RootRoute() {
       route: location,
       authState,
       branch:
-        authState === "initializing"
+        authState === "validating"
           ? "loading"
           : authState === "error"
             ? "error"
@@ -927,7 +927,7 @@ function App() {
     return () => window.cancelAnimationFrame(raf);
   }, []);
 
-  const [bootstrapState, setBootstrapState] = useState<AppBootstrapState>("initializing");
+  const [bootstrapState, setBootstrapState] = useState<AppBootstrapState>("validating");
   const [bootstrapReason, setBootstrapReason] = useState<string | undefined>(undefined);
   const bootProbeStage = useMemo<BootProbeStage>(() => {
     if (typeof window === "undefined") return "full";
@@ -1081,7 +1081,7 @@ function AuthBootstrapStatus({
       // eslint-disable-next-line no-console
       console.info("[BOOTSTRAP] state", { authState });
     }
-    if (authState === "initializing") return;
+    if (authState === "validating") return;
     if (authState === "error") {
       if (isPublicRoute) {
         setBootPhase("AUTH_UNAUTHENTICATED");

@@ -46,14 +46,14 @@ const requireUser = t.middleware(async (opts) => {
   const { ctx, next } = opts;
   const token = readTokenFromCtx(ctx);
 
-  if (!token) {
+  if (!token || ctx.user?.validated !== true) {
     throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
   }
 
   return next({
     ctx: {
       ...ctx,
-      user: ctx.user ?? { token },
+      user: ctx.user,
     },
   });
 });
@@ -65,7 +65,7 @@ export const adminProcedure = t.procedure.use(
     const { ctx, next } = opts;
     const token = readTokenFromCtx(ctx);
 
-    if (!token) {
+    if (!token || ctx.user?.validated !== true) {
       throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
     }
 
