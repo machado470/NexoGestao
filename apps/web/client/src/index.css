@@ -2919,6 +2919,24 @@ html {
     box-shadow: 14px 0 28px rgba(44, 74, 108, 0.08);
   }
 
+  .app-root .nexo-sidebar-item {
+    color: var(--text-secondary);
+  }
+
+  .app-root .nexo-sidebar-item:hover {
+    border-color: color-mix(in srgb, var(--accent-primary) 18%, var(--app-border));
+    background: color-mix(in srgb, var(--accent-primary) 7%, var(--app-sidebar));
+    color: var(--text-primary);
+  }
+
+  .app-root .nexo-sidebar-item-active {
+    border-color: color-mix(in srgb, var(--accent-primary) 28%, var(--app-border));
+    background: color-mix(in srgb, var(--accent-primary) 10%, var(--app-sidebar));
+    color: color-mix(in srgb, var(--accent-primary) 72%, var(--text-primary));
+    box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent-primary) 66%, transparent);
+    --tw-ring-color: color-mix(in srgb, var(--accent-primary) 16%, transparent);
+  }
+
   .app-root .nexo-topbar {
     background: color-mix(in srgb, var(--app-topbar) 94%, #ffffff);
     border-bottom: 1px solid var(--app-border);
@@ -2968,6 +2986,62 @@ html {
 
   .app-root [data-scrollbar="nexo"]::-webkit-scrollbar-thumb:hover {
     background: rgba(89, 120, 154, 0.78);
+  }
+
+  .app-root .nexo-modal-content,
+  .app-root .nexo-modal-header,
+  .app-root .nexo-modal-footer {
+    border-color: var(--app-overlay-border);
+    background: var(--app-overlay-surface);
+    color: var(--app-overlay-text);
+  }
+
+  .app-root .nexo-modal-body {
+    background: var(--app-overlay-surface);
+    color: var(--app-overlay-text);
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--text-muted) 32%, transparent)
+      transparent;
+  }
+
+  .app-root .nexo-modal-body::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .app-root .nexo-modal-body::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .app-root .nexo-modal-body::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--text-muted) 28%, transparent);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    border-radius: 999px;
+  }
+
+  .app-root .nexo-modal-body::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, var(--accent-primary) 34%, transparent);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
+  .app-root .toaster [data-sonner-toast] {
+    border-color: var(--app-border);
+    background: var(--app-card);
+    color: var(--app-text);
+    box-shadow: var(--shadow-medium);
+  }
+
+  .app-root .toaster [data-sonner-toast][data-type="success"] {
+    border-color: color-mix(in srgb, var(--success) 34%, var(--app-border));
+    background: color-mix(in srgb, var(--success) 10%, var(--app-card));
+    color: color-mix(in srgb, var(--success) 76%, var(--app-text));
+  }
+
+  .app-root .toaster [data-sonner-toast][data-type="error"] {
+    border-color: color-mix(in srgb, var(--danger) 38%, var(--app-border));
+    background: color-mix(in srgb, var(--danger) 10%, var(--app-card));
+    color: color-mix(in srgb, var(--danger) 82%, var(--app-text));
   }
 
   .app-root.dark .nexo-app-shell,

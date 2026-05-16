@@ -59,9 +59,22 @@ type ServiceOrderDetails = {
   outcomeSummary?: string | null;
   updatedAt?: string | null;
   customer?: { name?: string | null } | null;
+  customerName?: string | null;
+  clientName?: string | null;
+  client?: { name?: string | null } | null;
   assignedTo?: { name?: string | null } | null;
   financialSummary?: { hasCharge?: boolean | null } | null;
 };
+
+function getServiceOrderCustomerName(serviceOrder: ServiceOrderDetails | null) {
+  return (
+    serviceOrder?.customer?.name ??
+    serviceOrder?.customerName ??
+    serviceOrder?.clientName ??
+    serviceOrder?.client?.name ??
+    "Cliente não identificado"
+  );
+}
 
 function normalizeServiceOrderPayload(payload: unknown): ServiceOrderDetails | null {
   const raw = (payload as { data?: unknown } | null | undefined)?.data ?? payload;
@@ -135,9 +148,9 @@ function getStatusBadgeClass(status?: string) {
     case "DONE":
       return "bg-emerald-500/15 text-emerald-200";
     case "CANCELED":
-      return "bg-white/10 text-white/80";
+      return "bg-white/10 text-[var(--text-primary)]/80";
     default:
-      return "bg-white/10 text-white/80";
+      return "bg-white/10 text-[var(--text-primary)]/80";
   }
 }
 
@@ -173,10 +186,10 @@ function SectionTitle({
         <Icon className="h-4 w-4" />
       </div>
       <div>
-        <h3 className="text-sm font-semibold text-white">
+        <h3 className="text-sm font-semibold text-[var(--text-primary)]">
           {title}
         </h3>
-        <p className="text-xs text-white/60">{subtitle}</p>
+        <p className="text-xs text-[var(--text-primary)]/60">{subtitle}</p>
       </div>
     </div>
   );
@@ -460,27 +473,27 @@ export default function EditServiceOrderModal({
         onInteractOutside={(event) => {
           if (updateServiceOrder.isPending) event.preventDefault();
         }}
-        className="w-full max-w-[820px] max-h-[90vh] flex flex-col overflow-hidden border border-white/10 bg-[#0B1220] p-0 shadow-xl shadow-black/25"
+        className="w-full max-w-[820px] max-h-[90vh] flex flex-col overflow-hidden border border-[var(--app-overlay-border)] bg-[var(--app-overlay-surface)] p-0 shadow-[var(--app-overlay-shadow)]"
       >
-        <DialogHeader className="shrink-0 border-b border-white/10 px-6 py-5">
+        <DialogHeader className="shrink-0 border-b border-[var(--border-subtle)] px-6 py-5">
           <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <DialogTitle className="text-lg font-semibold text-white">
+              <DialogTitle className="text-lg font-semibold text-[var(--text-primary)]">
                 O.S. #{serviceOrderId ?? "—"}
               </DialogTitle>
               <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getStatusBadgeClass(formData.status)}`}>
                 {getStatusLabel(formData.status)}
               </span>
             </div>
-            <DialogDescription className="text-sm text-white/70">
-              {(serviceOrder?.customer?.name ?? "Cliente não identificado")} · {formData.amount.trim() ? formatCurrencyFromInput(formData.amount) : "Sem valor"}
+            <DialogDescription className="text-sm text-[var(--text-muted)]">
+              {getServiceOrderCustomerName(serviceOrder)} · {formData.amount.trim() ? formatCurrencyFromInput(formData.amount) : "Sem valor"}
             </DialogDescription>
           </div>
         </DialogHeader>
         {getServiceOrder.isLoading ? (
           <div className="flex min-h-[220px] flex-col items-center justify-center gap-3 px-6 py-5">
             <Loader2 className="h-6 w-6 animate-spin text-orange-500" />
-            <p className="text-sm text-white/70">
+            <p className="text-sm text-[var(--text-muted)]">
               Carregando dados da ordem de serviço...
             </p>
             {loadingTimedOut ? (
@@ -490,7 +503,7 @@ export default function EditServiceOrderModal({
             ) : null}
           </div>
         ) : getServiceOrder.error ? (
-          <div className="m-6 space-y-3 rounded-xl border border-red-500/30 bg-red-500/10 p-5 text-sm text-red-200">
+          <div className="m-6 space-y-3 rounded-xl border border-[color-mix(in_srgb,var(--danger)_38%,transparent)] bg-[color-mix(in_srgb,var(--danger)_10%,var(--app-overlay-surface))] p-5 text-sm text-[var(--danger)]">
             <p>Não foi possível carregar os dados da ordem de serviço.</p>
             <Button type="button" variant="outline" onClick={() => void getServiceOrder.refetch()}>
               Tentar novamente
@@ -503,7 +516,7 @@ export default function EditServiceOrderModal({
               <Button
                 onClick={() => void submitUpdate()}
                 disabled={updateServiceOrder.isPending || getServiceOrder.isLoading || !isDirty}
-                className="w-full bg-orange-500 text-white hover:bg-orange-600"
+                className="w-full bg-[var(--accent-primary)] text-[var(--primary-foreground)] hover:bg-[var(--accent-primary-hover)]"
                 type="button"
               >
                 {updateServiceOrder.isPending ? (
@@ -517,7 +530,7 @@ export default function EditServiceOrderModal({
               </Button>
             ) : null}
 
-            <section className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+            <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-5">
               <SectionTitle
                 icon={ClipboardList}
                 title="Contexto atual"
@@ -526,16 +539,16 @@ export default function EditServiceOrderModal({
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <p className="text-[11px] uppercase tracking-wide text-white/60">
+                  <p className="text-[11px] uppercase tracking-wide text-[var(--text-primary)]/60">
                     Cliente
                   </p>
-                  <p className="mt-1 text-sm font-medium text-white">
-                    {serviceOrder?.customer?.name || "Cliente não identificado"}
+                  <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
+                    {getServiceOrderCustomerName(serviceOrder)}
                   </p>
                 </div>
 
                 <div>
-                  <p className="text-[11px] uppercase tracking-wide text-white/60">
+                  <p className="text-[11px] uppercase tracking-wide text-[var(--text-primary)]/60">
                     Status atual
                   </p>
                   <div className="mt-1">
@@ -550,19 +563,19 @@ export default function EditServiceOrderModal({
                 </div>
 
                 <div>
-                  <p className="text-[11px] uppercase tracking-wide text-white/60">
+                  <p className="text-[11px] uppercase tracking-wide text-[var(--text-primary)]/60">
                     Responsável atual
                   </p>
-                  <p className="mt-1 text-sm font-medium text-white">
+                  <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
                     {serviceOrder?.assignedTo?.name || "Ainda não atribuído"}
                   </p>
                 </div>
 
                 <div>
-                  <p className="text-[11px] uppercase tracking-wide text-white/60">
+                  <p className="text-[11px] uppercase tracking-wide text-[var(--text-primary)]/60">
                     Cobrança
                   </p>
-                  <p className="mt-1 text-sm font-medium text-white">
+                  <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
                     {serviceOrder?.financialSummary?.hasCharge
                       ? "Já vinculada"
                       : "Ainda sem cobrança"}
@@ -570,26 +583,26 @@ export default function EditServiceOrderModal({
                 </div>
 
                 <div>
-                  <p className="text-[11px] uppercase tracking-wide text-white/60">
+                  <p className="text-[11px] uppercase tracking-wide text-[var(--text-primary)]/60">
                     Motivo de cancelamento
                   </p>
-                  <p className="mt-1 text-sm font-medium text-white">
+                  <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
                     {serviceOrder?.cancellationReason || "—"}
                   </p>
                 </div>
 
                 <div>
-                  <p className="text-[11px] uppercase tracking-wide text-white/60">
+                  <p className="text-[11px] uppercase tracking-wide text-[var(--text-primary)]/60">
                     Resumo final
                   </p>
-                  <p className="mt-1 text-sm font-medium text-white">
+                  <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
                     {serviceOrder?.outcomeSummary || "—"}
                   </p>
                 </div>
               </div>
             </section>
 
-            <section className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+            <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-5">
               <SectionTitle
                 icon={ClipboardList}
                 title="Dados operacionais"
@@ -598,11 +611,11 @@ export default function EditServiceOrderModal({
 
               <div className="space-y-4">
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-white">
+                  <label className="mb-2 block text-sm font-medium text-[var(--text-primary)]">
                     Título *
                   </label>
                   <input
-                    className="w-full rounded-lg border border-white/10 bg-white/[0.04] p-2.5 text-white placeholder:text-white/40 focus:border-orange-500/40 focus:outline-none focus:ring-1 focus:ring-orange-500/40 hover:border-white/20"
+                    className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-2.5 text-[var(--text-primary)] placeholder:text-[var(--text-primary)]/40 focus:border-orange-500/40 focus:outline-none focus:ring-1 focus:ring-orange-500/40 hover:border-[var(--accent-primary)]/40"
                     value={formData.title}
                     onChange={(e) =>
                       setFormData((state) => ({ ...state, title: e.target.value }))
@@ -612,11 +625,11 @@ export default function EditServiceOrderModal({
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-white">
+                  <label className="mb-2 block text-sm font-medium text-[var(--text-primary)]">
                     Descrição
                   </label>
                   <textarea
-                    className="w-full rounded-lg border border-white/10 bg-white/[0.04] p-2.5 text-white placeholder:text-white/40 focus:border-orange-500/40 focus:outline-none focus:ring-1 focus:ring-orange-500/40 hover:border-white/20"
+                    className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-2.5 text-[var(--text-primary)] placeholder:text-[var(--text-primary)]/40 focus:border-orange-500/40 focus:outline-none focus:ring-1 focus:ring-orange-500/40 hover:border-[var(--accent-primary)]/40"
                     rows={4}
                     value={formData.description}
                     onChange={(e) =>
@@ -631,12 +644,12 @@ export default function EditServiceOrderModal({
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="mb-2 flex items-center gap-2 text-sm font-medium text-white">
+                    <label className="mb-2 flex items-center gap-2 text-sm font-medium text-[var(--text-primary)]">
                       <Flag className="h-4 w-4 text-gray-500" />
                       Prioridade
                     </label>
                     <select
-                      className="w-full rounded-lg border border-white/10 bg-white/[0.04] p-2.5 text-white placeholder:text-white/40 focus:border-orange-500/40 focus:outline-none focus:ring-1 focus:ring-orange-500/40 hover:border-white/20"
+                      className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-2.5 text-[var(--text-primary)] placeholder:text-[var(--text-primary)]/40 focus:border-orange-500/40 focus:outline-none focus:ring-1 focus:ring-orange-500/40 hover:border-[var(--accent-primary)]/40"
                       value={formData.priority}
                       onChange={(e) =>
                         setFormData((state) => ({
@@ -652,19 +665,19 @@ export default function EditServiceOrderModal({
                       <option value="4">Alta</option>
                       <option value="5">Urgente</option>
                     </select>
-                    <p className="mt-1 text-xs text-white/60">
+                    <p className="mt-1 text-xs text-[var(--text-primary)]/60">
                       Prioridade atual: {getPriorityLabel(formData.priority)}
                     </p>
                   </div>
 
                   <div>
-                    <label className="mb-2 flex items-center gap-2 text-sm font-medium text-white">
+                    <label className="mb-2 flex items-center gap-2 text-sm font-medium text-[var(--text-primary)]">
                       <CalendarDays className="h-4 w-4 text-gray-500" />
                       Agendada para
                     </label>
                     <input
                       type="datetime-local"
-                      className="w-full rounded-lg border border-white/10 bg-white/[0.04] p-2.5 text-white placeholder:text-white/40 focus:border-orange-500/40 focus:outline-none focus:ring-1 focus:ring-orange-500/40 hover:border-white/20"
+                      className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-2.5 text-[var(--text-primary)] placeholder:text-[var(--text-primary)]/40 focus:border-orange-500/40 focus:outline-none focus:ring-1 focus:ring-orange-500/40 hover:border-[var(--accent-primary)]/40"
                       value={formData.scheduledFor}
                       onChange={(e) =>
                         setFormData((state) => ({
@@ -678,7 +691,7 @@ export default function EditServiceOrderModal({
                 </div>
 
                 <div>
-                  <label className="mb-2 flex items-center gap-2 text-sm font-medium text-white">
+                  <label className="mb-2 flex items-center gap-2 text-sm font-medium text-[var(--text-primary)]">
                     <User className="h-4 w-4 text-gray-500" />
                     Responsável
                   </label>
@@ -702,7 +715,7 @@ export default function EditServiceOrderModal({
                         return nextState;
                       });
                     }}
-                    className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2.5 text-white focus:border-orange-500/40 focus:outline-none focus:ring-1 focus:ring-orange-500/40 hover:border-white/20 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2.5 text-[var(--text-primary)] focus:border-orange-500/40 focus:outline-none focus:ring-1 focus:ring-orange-500/40 hover:border-[var(--accent-primary)]/40 disabled:cursor-not-allowed disabled:opacity-60"
                     disabled={updateServiceOrder.isPending || isPersistedClosed}
                   >
                     <option value="">Remover responsável</option>
@@ -712,7 +725,7 @@ export default function EditServiceOrderModal({
                       </option>
                     ))}
                   </select>
-                  <p className="mt-1 text-xs text-white/60">
+                  <p className="mt-1 text-xs text-[var(--text-primary)]/60">
                     Responsável final: {selectedPersonName}
                   </p>
                 </div>
@@ -724,7 +737,7 @@ export default function EditServiceOrderModal({
                 ) : null}
 
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-white">
+                  <label className="mb-2 block text-sm font-medium text-[var(--text-primary)]">
                     Status
                   </label>
                   <select
@@ -739,7 +752,7 @@ export default function EditServiceOrderModal({
                           e.target.value === "DONE" ? state.outcomeSummary : "",
                       }))
                     }
-                    className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2.5 text-white focus:border-orange-500/40 focus:outline-none focus:ring-1 focus:ring-orange-500/40 hover:border-white/20 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2.5 text-[var(--text-primary)] focus:border-orange-500/40 focus:outline-none focus:ring-1 focus:ring-orange-500/40 hover:border-[var(--accent-primary)]/40 disabled:cursor-not-allowed disabled:opacity-60"
                     disabled={
                       updateServiceOrder.isPending || isPersistedDone || isPersistedCanceled
                     }
@@ -754,7 +767,7 @@ export default function EditServiceOrderModal({
                       </option>
                     ))}
                   </select>
-                  <p className="mt-2 text-xs text-white/60">
+                  <p className="mt-2 text-xs text-[var(--text-primary)]/60">
                     {transitionHint}
                   </p>
                 </div>
@@ -762,7 +775,7 @@ export default function EditServiceOrderModal({
             </section>
 
             {shouldShowCancellationReason ? (
-              <section className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+              <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-5">
                 <SectionTitle
                   icon={Ban}
                   title="Motivo do cancelamento"
@@ -770,7 +783,7 @@ export default function EditServiceOrderModal({
                 />
 
                 <textarea
-                  className="w-full rounded-lg border border-white/10 bg-white/[0.04] p-2.5 text-white placeholder:text-white/40 focus:border-orange-500/40 focus:outline-none focus:ring-1 focus:ring-orange-500/40 hover:border-white/20"
+                  className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-2.5 text-[var(--text-primary)] placeholder:text-[var(--text-primary)]/40 focus:border-orange-500/40 focus:outline-none focus:ring-1 focus:ring-orange-500/40 hover:border-[var(--accent-primary)]/40"
                   rows={4}
                   value={formData.cancellationReason}
                   onChange={(e) =>
@@ -782,14 +795,14 @@ export default function EditServiceOrderModal({
                   disabled={updateServiceOrder.isPending || isPersistedCanceled}
                   placeholder="Ex: Cliente adiou sem nova data, acesso ao local indisponível, escopo cancelado..."
                 />
-                <p className="mt-1 text-xs text-white/60">
+                <p className="mt-1 text-xs text-[var(--text-primary)]/60">
                   Esse motivo fica registrado para auditoria e rastreabilidade.
                 </p>
               </section>
             ) : null}
 
             {shouldShowOutcomeSummary ? (
-              <section className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+              <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-5">
                 <SectionTitle
                   icon={FileText}
                   title="Resumo final da execução"
@@ -797,7 +810,7 @@ export default function EditServiceOrderModal({
                 />
 
                 <textarea
-                  className="w-full rounded-lg border border-white/10 bg-white/[0.04] p-2.5 text-white placeholder:text-white/40 focus:border-orange-500/40 focus:outline-none focus:ring-1 focus:ring-orange-500/40 hover:border-white/20"
+                  className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-2.5 text-[var(--text-primary)] placeholder:text-[var(--text-primary)]/40 focus:border-orange-500/40 focus:outline-none focus:ring-1 focus:ring-orange-500/40 hover:border-[var(--accent-primary)]/40"
                   rows={5}
                   value={formData.outcomeSummary}
                   onChange={(e) =>
@@ -809,13 +822,13 @@ export default function EditServiceOrderModal({
                   disabled={updateServiceOrder.isPending || isPersistedDone}
                   placeholder="Ex: Serviço concluído com sucesso, limpeza finalizada, itens revisados, cliente orientado sobre próximos passos..."
                 />
-                <p className="mt-1 text-xs text-white/60">
+                <p className="mt-1 text-xs text-[var(--text-primary)]/60">
                   Esse resumo ajuda a fechar a operação com contexto real.
                 </p>
               </section>
             ) : null}
 
-            <details className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+            <details className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-5">
               <summary className="cursor-pointer list-none">
                 <SectionTitle
                   icon={Wallet}
@@ -825,72 +838,72 @@ export default function EditServiceOrderModal({
               </summary>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-white">
+                  <label className="mb-2 block text-sm font-medium text-[var(--text-primary)]">
                     Valor (R$)
                   </label>
-                  <input inputMode="decimal" className="w-full rounded-lg border border-white/10 bg-white/[0.04] p-2.5 text-white placeholder:text-white/40 focus:border-orange-500/40 focus:outline-none focus:ring-1 focus:ring-orange-500/40 hover:border-white/20" value={formData.amount} onChange={(e) => setFormData((state) => ({ ...state, amount: e.target.value }))} disabled={updateServiceOrder.isPending || isPersistedClosed} />
-                  <p className="mt-1 text-xs text-white/60">Valor atual: {formatCurrencyFromInput(formData.amount)}</p>
+                  <input inputMode="decimal" className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-2.5 text-[var(--text-primary)] placeholder:text-[var(--text-primary)]/40 focus:border-orange-500/40 focus:outline-none focus:ring-1 focus:ring-orange-500/40 hover:border-[var(--accent-primary)]/40" value={formData.amount} onChange={(e) => setFormData((state) => ({ ...state, amount: e.target.value }))} disabled={updateServiceOrder.isPending || isPersistedClosed} />
+                  <p className="mt-1 text-xs text-[var(--text-primary)]/60">Valor atual: {formatCurrencyFromInput(formData.amount)}</p>
                 </div>
                 <div>
-                  <label className="mb-2 flex items-center gap-2 text-sm font-medium text-white">
+                  <label className="mb-2 flex items-center gap-2 text-sm font-medium text-[var(--text-primary)]">
                     <CalendarDays className="h-4 w-4 text-gray-500" />
                     Vencimento
                   </label>
-                  <input type="datetime-local" className="w-full rounded-lg border border-white/10 bg-white/[0.04] p-2.5 text-white placeholder:text-white/40 focus:border-orange-500/40 focus:outline-none focus:ring-1 focus:ring-orange-500/40 hover:border-white/20" value={formData.dueDate} onChange={(e) => setFormData((state) => ({ ...state, dueDate: e.target.value }))} disabled={updateServiceOrder.isPending || isPersistedClosed} />
+                  <input type="datetime-local" className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-2.5 text-[var(--text-primary)] placeholder:text-[var(--text-primary)]/40 focus:border-orange-500/40 focus:outline-none focus:ring-1 focus:ring-orange-500/40 hover:border-[var(--accent-primary)]/40" value={formData.dueDate} onChange={(e) => setFormData((state) => ({ ...state, dueDate: e.target.value }))} disabled={updateServiceOrder.isPending || isPersistedClosed} />
                 </div>
               </div>
             </details>
 
-            <section className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+            <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-5">
               <div className="mb-3 flex items-center gap-2">
                 <AlertCircle className="h-4 w-4 text-orange-500" />
-                <h3 className="text-sm font-semibold text-white">
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">
                   Resumo antes de salvar
                 </h3>
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <p className="text-[11px] uppercase tracking-wide text-white/60">
+                  <p className="text-[11px] uppercase tracking-wide text-[var(--text-primary)]/60">
                     Status final
                   </p>
-                  <p className="mt-1 text-sm font-medium text-white">
+                  <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
                     {getStatusLabel(formData.status)}
                   </p>
                 </div>
 
                 <div>
-                  <p className="text-[11px] uppercase tracking-wide text-white/60">
+                  <p className="text-[11px] uppercase tracking-wide text-[var(--text-primary)]/60">
                     Responsável final
                   </p>
-                  <p className="mt-1 text-sm font-medium text-white">
+                  <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
                     {selectedPersonName}
                   </p>
                 </div>
 
                 <div>
-                  <p className="text-[11px] uppercase tracking-wide text-white/60">
+                  <p className="text-[11px] uppercase tracking-wide text-[var(--text-primary)]/60">
                     Prioridade
                   </p>
-                  <p className="mt-1 text-sm font-medium text-white">
+                  <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
                     {getPriorityLabel(formData.priority)}
                   </p>
                 </div>
 
                 <div>
-                  <p className="text-[11px] uppercase tracking-wide text-white/60">
+                  <p className="text-[11px] uppercase tracking-wide text-[var(--text-primary)]/60">
                     Agendamento previsto
                   </p>
-                  <p className="mt-1 text-sm font-medium text-white">
+                  <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
                     {formatDateTimePreview(formData.scheduledFor)}
                   </p>
                 </div>
 
                 <div>
-                  <p className="text-[11px] uppercase tracking-wide text-white/60">
+                  <p className="text-[11px] uppercase tracking-wide text-[var(--text-primary)]/60">
                     Base financeira
                   </p>
-                  <p className="mt-1 text-sm font-medium text-white">
+                  <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
                     {formData.amount.trim()
                       ? formatCurrencyFromInput(formData.amount)
                       : "Ainda sem valor"}
@@ -898,10 +911,10 @@ export default function EditServiceOrderModal({
                 </div>
 
                 <div>
-                  <p className="text-[11px] uppercase tracking-wide text-white/60">
+                  <p className="text-[11px] uppercase tracking-wide text-[var(--text-primary)]/60">
                     Fechamento operacional
                   </p>
-                  <p className="mt-1 text-sm font-medium text-white">
+                  <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
                     {formData.status === "CANCELED"
                       ? formData.cancellationReason.trim() || "Motivo pendente"
                       : formData.status === "DONE"
@@ -914,10 +927,10 @@ export default function EditServiceOrderModal({
           </div>
         </div>
         )}
-        <DialogFooter className="shrink-0 gap-3 border-t border-white/10 bg-[#0B1220] px-6 py-4 sm:justify-between">
-          <div className="mr-auto flex flex-wrap gap-6 text-sm text-white/70">
-            <span>Status: <strong className="text-white">{getStatusLabel(formData.status)}</strong></span>
-            <span>Valor: <strong className="text-white">{formData.amount.trim() ? formatCurrencyFromInput(formData.amount) : "—"}</strong></span>
+        <DialogFooter className="shrink-0 gap-3 border-t border-[var(--border-subtle)] bg-[var(--app-overlay-surface)] px-6 py-4 sm:justify-between">
+          <div className="mr-auto flex flex-wrap gap-6 text-sm text-[var(--text-muted)]">
+            <span>Status: <strong className="text-[var(--text-primary)]">{getStatusLabel(formData.status)}</strong></span>
+            <span>Valor: <strong className="text-[var(--text-primary)]">{formData.amount.trim() ? formatCurrencyFromInput(formData.amount) : "—"}</strong></span>
           </div>
           <Button
             onClick={() => {
@@ -948,7 +961,7 @@ export default function EditServiceOrderModal({
           <Button
             onClick={() => void submitUpdate()}
             disabled={updateServiceOrder.isPending || getServiceOrder.isLoading || !isDirty}
-            className="bg-orange-500 text-white hover:bg-orange-600"
+            className="bg-orange-500 text-[var(--text-primary)] hover:bg-orange-600"
             type="button"
           >
             {updateServiceOrder.isPending ? (

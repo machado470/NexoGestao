@@ -112,10 +112,10 @@ function SectionTitle({
         <Icon className="h-4 w-4" />
       </div>
       <div>
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+        <h3 className="text-sm font-semibold text-[var(--text-primary)]">
           {title}
         </h3>
-        <p className="text-xs text-gray-500 dark:text-gray-400">{subtitle}</p>
+        <p className="text-xs text-[var(--text-muted)]">{subtitle}</p>
       </div>
     </div>
   );
@@ -231,12 +231,12 @@ export function EditChargeModal({
         showCloseButton={false}
         className="max-h-[90vh] max-w-2xl overflow-hidden border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-0 shadow-sm dark:bg-[var(--surface-base)]"
       >
-        <DialogHeader className="border-b border-gray-200 px-6 py-6 dark:border-zinc-800">
-          <DialogTitle className="flex items-center gap-2 text-xl text-gray-900 dark:text-white">
+        <DialogHeader className="border-b border-[var(--border-subtle)] px-6 py-6">
+          <DialogTitle className="flex items-center gap-2 text-xl text-[var(--text-primary)]">
             <Pencil className="h-5 w-5 text-orange-500" />
             Editar Cobrança
           </DialogTitle>
-          <DialogDescription className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <DialogDescription className="mt-1 text-sm text-[var(--text-muted)]">
             Ajuste valor, vencimento, cancelamento manual e observações da cobrança.
           </DialogDescription>
         </DialogHeader>
@@ -247,7 +247,7 @@ export function EditChargeModal({
         ) : (
           <div className="max-h-[70vh] overflow-y-auto p-6">
           <div className="space-y-6">
-            <section className="rounded-xl border border-gray-200 p-4 dark:border-zinc-800">
+            <section className="rounded-xl border border-[var(--border-subtle)] p-4">
               <SectionTitle
                 icon={Receipt}
                 title="Contexto da cobrança"
@@ -256,16 +256,16 @@ export function EditChargeModal({
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
                     Cliente
                   </p>
-                  <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
+                  <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
                     {charge?.customer?.name || "Cliente não identificado"}
                   </p>
                 </div>
 
                 <div>
-                  <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
                     Status atual
                   </p>
                   <div className="mt-1">
@@ -280,19 +280,19 @@ export function EditChargeModal({
                 </div>
 
                 <div>
-                  <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
                     O.S. vinculada
                   </p>
-                  <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
+                  <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
                     {charge?.serviceOrder?.title || "Cobrança manual"}
                   </p>
                 </div>
 
                 <div>
-                  <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
                     Pago em
                   </p>
-                  <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
+                  <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
                     {charge?.paidAt
                       ? new Date(charge.paidAt).toLocaleDateString("pt-BR")
                       : "Ainda não pago"}
@@ -301,7 +301,7 @@ export function EditChargeModal({
               </div>
             </section>
 
-            <section className="rounded-xl border border-gray-200 p-4 dark:border-zinc-800">
+            <section className="rounded-xl border border-[var(--border-subtle)] p-4">
               <SectionTitle
                 icon={Wallet}
                 title="Dados editáveis"
@@ -311,7 +311,7 @@ export function EditChargeModal({
               <div className="space-y-4">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-white">
+                    <label className="mb-2 block text-sm font-medium text-[var(--text-primary)]">
                       Valor (R$) *
                     </label>
                     <input
@@ -321,17 +321,17 @@ export function EditChargeModal({
                       onChange={(e) =>
                         setFormData({ ...formData, amount: e.target.value })
                       }
-                      className="w-full rounded-lg border border-gray-300 bg-[var(--surface-elevated)] px-3 py-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                      className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2.5 text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/35 disabled:cursor-not-allowed disabled:opacity-100 disabled:text-[var(--text-muted)]"
                       placeholder="100,00"
                       disabled={disableEditing || updateCharge.isPending}
                     />
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    <p className="mt-1 text-xs text-[var(--text-muted)]">
                       Valor atual: {formatCurrencyFromInput(formData.amount)}
                     </p>
                   </div>
 
                   <div>
-                    <label className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-white">
+                    <label className="mb-2 flex items-center gap-2 text-sm font-medium text-[var(--text-primary)]">
                       <CalendarDays className="h-4 w-4 text-gray-500" />
                       Data de vencimento *
                     </label>
@@ -341,14 +341,14 @@ export function EditChargeModal({
                       onChange={(e) =>
                         setFormData({ ...formData, dueDate: e.target.value })
                       }
-                      className="w-full rounded-lg border border-gray-300 bg-[var(--surface-elevated)] px-3 py-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                      className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2.5 text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/35 disabled:cursor-not-allowed disabled:opacity-100 disabled:text-[var(--text-muted)]"
                       disabled={disableEditing || updateCharge.isPending}
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-white">
+                  <label className="mb-2 block text-sm font-medium text-[var(--text-primary)]">
                     Status
                   </label>
                   <select
@@ -356,19 +356,19 @@ export function EditChargeModal({
                     onChange={(e) =>
                       setFormData({ ...formData, status: e.target.value })
                     }
-                    className="w-full rounded-lg border border-gray-300 bg-[var(--surface-elevated)] px-3 py-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                    className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2.5 text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/35 disabled:cursor-not-allowed disabled:opacity-100 disabled:text-[var(--text-muted)]"
                     disabled={disableEditing || updateCharge.isPending}
                   >
                     <option value="PENDING">Manter ativa</option>
                     <option value="CANCELED">Cancelar cobrança</option>
                   </select>
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">
                     O backend só permite cancelamento manual. Cobranças pagas seguem o fluxo de pagamento.
                   </p>
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-white">
+                  <label className="mb-2 block text-sm font-medium text-[var(--text-primary)]">
                     Notas
                   </label>
                   <textarea
@@ -376,7 +376,7 @@ export function EditChargeModal({
                     onChange={(e) =>
                       setFormData({ ...formData, notes: e.target.value })
                     }
-                    className="w-full rounded-lg border border-gray-300 bg-[var(--surface-elevated)] px-3 py-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                    className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2.5 text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/35 disabled:cursor-not-allowed disabled:opacity-100 disabled:text-[var(--text-muted)]"
                     placeholder="Adicione notas sobre a cobrança"
                     rows={4}
                     disabled={updateCharge.isPending}
@@ -400,7 +400,7 @@ export function EditChargeModal({
             )}
 
             {isCanceled && (
-              <section className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300">
+              <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4 text-sm text-[var(--text-secondary)]">
                 <div className="flex items-start gap-2">
                   <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                   <div>
@@ -413,47 +413,47 @@ export function EditChargeModal({
               </section>
             )}
 
-            <section className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4 dark:border-zinc-800 dark:bg-[var(--surface-base)]">
+            <section className="rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--surface-base)] p-4">
               <div className="mb-3 flex items-center gap-2">
                 <AlertCircle className="h-4 w-4 text-orange-500" />
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">
                   Resumo antes de salvar
                 </h3>
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
                     Valor
                   </p>
-                  <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
+                  <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
                     {formatCurrencyFromInput(formData.amount)}
                   </p>
                 </div>
 
                 <div>
-                  <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
                     Vencimento
                   </p>
-                  <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
+                  <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
                     {formatDueDatePreview(formData.dueDate)}
                   </p>
                 </div>
 
                 <div>
-                  <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
                     Ação de status
                   </p>
-                  <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
+                  <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
                     {formData.status === "CANCELED" ? "Cancelar cobrança" : "Manter ativa"}
                   </p>
                 </div>
 
                 <div>
-                  <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
                     Observações
                   </p>
-                  <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">
+                  <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
                     {formData.notes.trim() || "Sem observações"}
                   </p>
                 </div>
@@ -462,11 +462,11 @@ export function EditChargeModal({
           </div>
         </div>
         )}
-        <DialogFooter className="flex gap-2 border-t border-gray-200 p-6 sm:justify-start dark:border-zinc-800">
+        <DialogFooter className="flex gap-2 border-t border-[var(--border-subtle)] p-6 sm:justify-start">
           <Button
             onClick={() => void submitUpdate()}
             disabled={updateCharge.isPending || getCharge.isLoading}
-            className="flex-1 bg-orange-500 text-white hover:bg-orange-600"
+            className="flex-1 bg-[var(--accent-primary)] text-[var(--primary-foreground)] hover:bg-[var(--accent-primary-hover)]"
             type="button"
           >
             {updateCharge.isPending ? (

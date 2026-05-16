@@ -40,38 +40,38 @@ export default function DetailModal({
 }: DetailModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={(open) => (!open ? onClose() : undefined)}>
-      <DialogContent className="max-w-2xl overflow-hidden border border-slate-200/50 bg-white/95 p-0 backdrop-blur-sm shadow-2xl dark:border-slate-700/50 dark:bg-slate-900/95">
+      <DialogContent className="max-w-2xl overflow-hidden border border-[var(--app-overlay-border)] bg-[var(--app-overlay-surface)] p-0 text-[var(--app-overlay-text)] shadow-[var(--app-overlay-shadow)]">
         <DialogHeader
-          className={`border-b border-slate-200/50 bg-gradient-to-r ${colorMap[color]} px-8 py-6 dark:border-slate-700/50`}
+          className={`border-b border-[var(--border-subtle)] bg-gradient-to-r ${colorMap[color]} px-8 py-6`}
         >
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-4">
               <div className="text-4xl">{icon}</div>
               <div>
-                <DialogTitle className="text-2xl font-bold text-slate-900 dark:text-white">
+                <DialogTitle className="text-2xl font-bold text-[var(--text-primary)]">
                   {title}
                 </DialogTitle>
-                <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                <p className="mt-1 text-sm text-[var(--text-muted)]">
                   {description}
                 </p>
               </div>
             </div>
             <button onClick={onClose} className="rounded-lg p-2 transition-colors hover:bg-white/20">
-              <X className="h-6 w-6 text-slate-600 dark:text-slate-400" />
+              <X className="h-6 w-6 text-[var(--text-muted)]" />
             </button>
           </div>
         </DialogHeader>
 
         <div className="px-8 py-6">
           <div className="mb-8">
-            <h3 className="mb-4 text-lg font-semibold text-slate-900 dark:text-white">Detalhes</h3>
+            <h3 className="mb-4 text-lg font-semibold text-[var(--text-primary)]">Detalhes</h3>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {details.map((detail, index) => (
-                <div key={index} className="rounded-lg bg-[var(--surface-base)]/50 p-4 dark:bg-slate-800/50">
-                  <p className="text-xs font-semibold uppercase text-slate-600 dark:text-slate-400">
+                <div key={index} className="rounded-lg bg-[var(--surface-base)]/70 p-4">
+                  <p className="text-xs font-semibold uppercase text-[var(--text-muted)]">
                     {detail.label}
                   </p>
-                  <p className="mt-1 text-sm font-medium text-slate-900 dark:text-white">
+                  <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
                     {detail.value}
                   </p>
                 </div>
@@ -80,12 +80,12 @@ export default function DetailModal({
           </div>
 
           <div>
-            <h3 className="mb-4 text-lg font-semibold text-slate-900 dark:text-white">Tecnologias</h3>
+            <h3 className="mb-4 text-lg font-semibold text-[var(--text-primary)]">Tecnologias</h3>
             <div className="flex flex-wrap gap-2">
               {technologies.map((tech, index) => (
                 <span
                   key={index}
-                  className="inline-block rounded-full bg-orange-100 px-4 py-2 text-sm font-medium text-orange-700 dark:bg-orange-500/20 dark:text-orange-200"
+                  className="inline-block rounded-full bg-orange-100 px-4 py-2 text-sm font-medium text-[var(--accent-primary)]"
                 >
                   {tech}
                 </span>
@@ -94,7 +94,7 @@ export default function DetailModal({
           </div>
         </div>
 
-        <DialogFooter className="border-t border-slate-200/50 bg-[var(--surface-base)]/50 px-8 py-4 dark:border-slate-700/50 dark:bg-slate-800/50">
+        <DialogFooter className="border-t border-[var(--border-subtle)] bg-[var(--surface-base)]/70 px-8 py-4">
           <button
             onClick={onClose}
             className="rounded-lg bg-primary px-6 py-2 font-medium text-primary-foreground transition-colors hover:bg-primary/90"
