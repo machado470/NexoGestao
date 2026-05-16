@@ -238,7 +238,11 @@ export default function ServiceOrdersPage() {
         description: safeText(order?.description, "Sem descrição detalhada"),
         customerId,
         customerName: safeText(
-          order?.customer?.name ?? customerById.get(customerId)?.name,
+          order?.customer?.name ??
+            order?.customerName ??
+            order?.clientName ??
+            order?.client?.name ??
+            customerById.get(customerId)?.name,
           "Cliente não identificado"
         ),
         status,

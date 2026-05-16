@@ -544,7 +544,7 @@ export default function AppointmentsPage() {
         title={editing ? "Editar agendamento" : "Novo agendamento"}
         description="Operação real conectada ao backend"
         closeBlocked={createMutation.isPending || updateMutation.isPending}
-        contentClassName="bg-[#0B1220]"
+        contentClassName="bg-[var(--app-overlay-surface)]"
         footer={(
           <>
             <p className="mr-auto text-xs text-[var(--text-muted)]">Resumo: {form.customerId ? (customerById.get(form.customerId) ?? "Cliente") : "Selecione cliente"} · {form.date || "Data"} {form.time || "Hora"}</p>

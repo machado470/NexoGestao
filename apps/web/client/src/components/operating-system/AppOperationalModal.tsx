@@ -61,13 +61,13 @@ export function AppOperationalModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="flex h-[92vh] w-[min(96vw,1280px)] max-w-none flex-col gap-0 overflow-hidden border-[var(--border-subtle)] bg-[var(--surface-base)] p-0 shadow-2xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:slide-in-from-bottom-1 data-[state=closed]:slide-out-to-bottom-1 data-[state=open]:zoom-in-[0.995] data-[state=closed]:zoom-out-[0.995]"
+        className="flex h-[92vh] w-[min(96vw,1280px)] max-w-none flex-col gap-0 overflow-hidden border-[var(--app-overlay-border)] bg-[var(--app-overlay-surface)] p-0 text-[var(--app-overlay-text)] shadow-[var(--app-overlay-shadow)] duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:slide-in-from-bottom-1 data-[state=closed]:slide-out-to-bottom-1 data-[state=open]:zoom-in-[0.995] data-[state=closed]:zoom-out-[0.995]"
         onOpenAutoFocus={event => {
           event.preventDefault();
         }}
       >
         <DialogTitle className="sr-only">{title}</DialogTitle>
-        <header className="sticky top-0 z-20 border-b border-[var(--border-subtle)] bg-[var(--surface-base)]/95 px-6 py-4 backdrop-blur">
+        <header className="sticky top-0 z-20 shrink-0 border-b border-[var(--border-subtle)] bg-[var(--app-overlay-surface)]/95 px-6 py-4 backdrop-blur">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <h2 className="truncate text-lg font-semibold text-[var(--text-primary)]">
@@ -121,7 +121,7 @@ export function AppOperationalModal({
           ) : null}
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+        <div className="nexo-modal-body min-h-0 flex-1 overflow-y-auto px-6 py-5">
           {contentLoading ? (
             <div className="space-y-4">
               <div className="h-3 w-56 animate-pulse rounded bg-[var(--surface-subtle)]" />
@@ -135,7 +135,7 @@ export function AppOperationalModal({
           )}
         </div>
 
-        <footer className="sticky bottom-0 z-20 border-t border-[var(--border-subtle)] bg-[var(--surface-base)]/95 px-6 py-4 backdrop-blur">
+        <footer className="sticky bottom-0 z-20 shrink-0 border-t border-[var(--border-subtle)] bg-[var(--app-overlay-surface)]/95 px-6 py-4 backdrop-blur">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap gap-2">
               {primaryAction ? (

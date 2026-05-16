@@ -77,7 +77,7 @@ export function BaseModal({
           initialFocusRef.current.focus();
         }}
         className={cn(
-          "flex max-h-[90vh] min-h-[220px] flex-col overflow-hidden rounded-2xl border-[var(--border-subtle)]/90 p-0 shadow-[var(--app-overlay-shadow)]",
+          "flex max-h-[90vh] min-h-[220px] flex-col overflow-hidden rounded-2xl border-[var(--app-overlay-border)] bg-[var(--app-overlay-surface)] p-0 text-[var(--app-overlay-text)] shadow-[var(--app-overlay-shadow)]",
           modalSizeMap[size],
           contentClassName
         )}

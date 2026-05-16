@@ -6,7 +6,7 @@ import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[var(--radius-control)] text-sm font-semibold nexo-state-transition disabled:pointer-events-none disabled:opacity-45 disabled:saturate-70 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none active:scale-[var(--motion-press-scale)]",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[var(--radius-control)] text-sm font-semibold nexo-state-transition disabled:pointer-events-none disabled:border-[color-mix(in_srgb,var(--border-subtle)_80%,transparent)] disabled:bg-[color-mix(in_srgb,var(--surface-elevated)_72%,var(--app-card))] disabled:text-[color-mix(in_srgb,var(--text-muted)_86%,var(--text-primary))] disabled:opacity-100 disabled:saturate-75 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none active:scale-[var(--motion-press-scale)]",
   {
     variants: {
       variant: {
@@ -19,11 +19,11 @@ const buttonVariants = cva(
         destructive:
           "bg-destructive text-destructive-foreground hover:bg-[color-mix(in_srgb,var(--destructive)_86%,black)]",
         neutral:
-          "border border-white/20 bg-transparent text-white hover:border-white/35 hover:bg-white/10",
+          "border border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--text-primary)] hover:border-[var(--accent-primary)]/35 hover:bg-[var(--accent-soft)]",
         outline:
-          "border border-white/20 bg-transparent text-white hover:border-white/35 hover:bg-white/10",
+          "border border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--text-primary)] hover:border-[var(--accent-primary)]/35 hover:bg-[var(--accent-soft)]",
         secondary:
-          "border border-white/20 bg-transparent text-white hover:border-white/35 hover:bg-white/10",
+          "border border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--text-primary)] hover:border-[var(--accent-primary)]/35 hover:bg-[var(--accent-soft)]",
         ghost:
           "text-[var(--text-secondary)] hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)]",
         link: "text-primary underline-offset-4 hover:underline",

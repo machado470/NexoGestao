@@ -178,6 +178,15 @@ async function nexoFetch(path: string, options: RequestInit = {}) {
       ? `${normalizedMessage} [${errorCode}]`
       : normalizedMessage;
 
+    console.error("[nexo-proxy] upstream request failed", {
+      path,
+      method: options.method || "GET",
+      status: response.status,
+      statusText: response.statusText,
+      message: contextualMessage,
+      body,
+    });
+
     if (response.status === 401) {
       throw new TRPCError({ code: "UNAUTHORIZED", message: contextualMessage });
     }
