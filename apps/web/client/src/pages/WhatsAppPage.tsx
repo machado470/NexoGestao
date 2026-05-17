@@ -41,11 +41,7 @@ import {
   type InboxPriority,
 } from "@/lib/whatsappInboxPriority";
 import { Button } from "@/components/design-system";
-import {
-  AppPageShell,
-  AppSkeleton,
-  AppStatCard,
-} from "@/components/app-system";
+import { AppPageShell, AppSkeleton } from "@/components/app-system";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -60,9 +56,7 @@ import {
 import {
   AppOperationalHeader,
   AppPageLoadingState,
-  AppStatusBadge,
 } from "@/components/internal-page-system";
-import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import {
   WhatsAppActionExecutionPanel,
   type WhatsAppActionExecution,
@@ -1006,10 +1000,14 @@ const ConversationRow = memo(function ConversationRow({
         type="button"
         onClick={() => onSelect(conversation.id)}
         className={cn(
-          "w-full rounded-2xl px-4 py-3 text-left text-app-primary transition duration-150",
+          "relative w-full rounded-2xl border px-4 py-3 text-left text-app-primary transition duration-150",
+          "before:absolute before:inset-y-3 before:left-2 before:w-1 before:rounded-full",
           selectedId === conversation.id
-            ? "bg-[var(--accent-soft)]/45"
-            : "bg-app-card/45 hover:bg-app-card/80"
+            ? "border-[var(--accent-primary)]/25 bg-[var(--accent-soft)]/45 before:bg-[var(--accent-primary)]"
+            : conversation.priority === "CRITICAL" ||
+                conversation.priority === "HIGH"
+              ? "border-[color-mix(in_srgb,var(--warning)_24%,var(--app-border))] bg-app-card/55 before:bg-[var(--warning)] hover:bg-app-card/80"
+              : "border-transparent bg-app-card/45 before:bg-transparent hover:bg-app-card/80"
         )}
       >
         <div className="flex items-start justify-between gap-2">
@@ -1045,7 +1043,7 @@ const ConversationRow = memo(function ConversationRow({
         <p className="mt-2 line-clamp-1 text-xs text-[var(--text-secondary)]">
           {conversation.lastMessage}
         </p>
-        <div className="mt-2 grid grid-cols-2 gap-1.5 text-[10px] text-app-muted">
+        <div className="mt-2 grid grid-cols-2 gap-1.5 pl-1 text-[10px] text-app-muted">
           <span className="rounded-full bg-app-surface px-2 py-0.5">
             Contexto: {getContextTypeLabel(conversation.contextType)}
           </span>
@@ -1129,17 +1127,22 @@ function InboxQueueColumn({
   const visibleRows = rows.slice(startIndex, startIndex + visibleCount);
 
   return (
-    <aside className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-[var(--radius-panel)] bg-app-panel p-4 text-app-primary">
-      <div className="shrink-0 space-y-3 pb-3">
+    <aside className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-[var(--radius-panel)] border border-[var(--app-border)]/60 bg-app-panel p-3 text-app-primary">
+      <div className="shrink-0 space-y-2.5 pb-2">
         <div className="flex items-center justify-between">
-          <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
-            Inbox inteligente
-          </p>
+          <div>
+            <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
+              Inbox
+            </p>
+            <p className="text-[10px] text-[var(--text-muted)]">
+              prioridade, contexto e última mensagem
+            </p>
+          </div>
           <button
             type="button"
             className="rounded-lg bg-app-surface px-2 py-1 text-[10px] text-app-muted transition hover:bg-app-card"
           >
-            Filtros
+            {rows.length} itens
           </button>
         </div>
         <div className="flex items-center gap-2 rounded-xl bg-app-surface px-3 py-2">
@@ -1171,7 +1174,7 @@ function InboxQueueColumn({
       </div>
       <div
         ref={viewportRef}
-        className="scrollbar-thin-nexo mt-3 min-h-0 flex-1 overflow-y-auto pr-1"
+        className="scrollbar-thin-nexo mt-2 min-h-0 flex-1 overflow-y-auto pr-1"
         onScroll={e => setScrollTop(e.currentTarget.scrollTop)}
       >
         {isLoading ? (
@@ -1552,8 +1555,8 @@ function ExecutionChatColumn({
   };
 
   return (
-    <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-[var(--radius-panel)] bg-app-panel text-app-primary">
-      <header className="flex shrink-0 items-center justify-between px-5 py-4">
+    <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-[var(--radius-panel)] border border-[var(--accent-primary)]/10 bg-app-panel text-app-primary">
+      <header className="flex shrink-0 items-center justify-between border-b border-[var(--app-border)]/55 px-5 py-3">
         <div className="flex items-center gap-3">
           <div className="flex size-10 items-center justify-center rounded-full border border-[var(--accent-primary)]/25 bg-[var(--accent-soft)]/60 text-sm font-semibold text-[var(--accent-primary)]">
             {conversation?.name?.slice(0, 1) ?? "-"}
@@ -1623,7 +1626,7 @@ function ExecutionChatColumn({
       </header>
 
       {suggestedActionLabel || governanceAlert ? (
-        <div className="mx-5 mb-3 rounded-xl bg-[color-mix(in_srgb,var(--warning)_12%,var(--app-surface))] px-4 py-3 text-xs">
+        <div className="mx-5 mt-3 rounded-xl border border-[color-mix(in_srgb,var(--warning)_18%,transparent)] bg-[color-mix(in_srgb,var(--warning)_10%,var(--app-surface))] px-3 py-2 text-xs">
           {suggestedActionLabel ? (
             <button
               type="button"
@@ -1643,7 +1646,7 @@ function ExecutionChatColumn({
 
       <div
         ref={messagesRef}
-        className="scrollbar-thin-nexo min-h-0 flex-1 overflow-y-auto bg-transparent px-6 pb-2 pt-5"
+        className="scrollbar-thin-nexo min-h-0 flex-1 overflow-y-auto bg-transparent px-6 pb-2 pt-4"
       >
         {!hasConversation ? (
           <div className="flex h-full items-center justify-center px-1 py-4 text-xs text-[var(--text-muted)]">
@@ -1660,7 +1663,7 @@ function ExecutionChatColumn({
             Sem mensagens nesta conversa.
           </div>
         ) : (
-          <div className="space-y-3.5">
+          <div className="space-y-3">
             {messages.map(message => {
               const outgoing = message.direction === "OUTBOUND";
               return (
@@ -1673,7 +1676,7 @@ function ExecutionChatColumn({
                 >
                   <div
                     className={cn(
-                      "rounded-2xl px-4 py-3 text-sm leading-relaxed",
+                      "rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
                       outgoing
                         ? "max-w-[66%] bg-[color-mix(in_srgb,var(--success)_16%,var(--app-card))] text-app-primary"
                         : "max-w-[68%] bg-app-card text-app-primary"
@@ -1702,7 +1705,7 @@ function ExecutionChatColumn({
         )}
       </div>
 
-      <footer className="mt-0 shrink-0 bg-app-panel px-4 pb-4 pt-2">
+      <footer className="mt-0 shrink-0 border-t border-[var(--app-border)]/55 bg-app-panel px-4 pb-3 pt-2">
         {hasConversation && !canCompose ? (
           <div className="mb-2 rounded-xl bg-[color-mix(in_srgb,var(--danger)_10%,var(--app-surface))] px-3 py-2 text-[11px] font-medium text-[var(--danger)]">
             Envio bloqueado: cliente sem telefone cadastrado.
@@ -1848,7 +1851,7 @@ function OperationalContextColumn({
   if (!conversation && !selectedCustomer) {
     return (
       <aside
-        className="scrollbar-thin-nexo h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden rounded-[var(--radius-panel)] bg-app-panel p-4 text-app-primary"
+        className="scrollbar-thin-nexo h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden rounded-[var(--radius-panel)] border border-[var(--app-border)]/60 bg-app-panel p-3 text-app-primary"
         id="whatsapp-context-panel"
       >
         <section className="rounded-2xl bg-app-surface px-4 py-4">
@@ -1874,7 +1877,7 @@ function OperationalContextColumn({
 
   return (
     <aside
-      className="scrollbar-thin-nexo h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden rounded-[var(--radius-panel)] bg-app-panel p-4 text-app-primary"
+      className="scrollbar-thin-nexo h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden rounded-[var(--radius-panel)] border border-[var(--app-border)]/60 bg-app-panel p-3 text-app-primary"
       id="whatsapp-context-panel"
     >
       {isLoading ? (
@@ -1884,8 +1887,8 @@ function OperationalContextColumn({
           ))}
         </div>
       ) : (
-        <div className="space-y-6 text-xs">
-          <section className="px-1 py-1">
+        <div className="space-y-3 text-xs">
+          <section className="rounded-2xl bg-[color-mix(in_srgb,var(--app-surface)_62%,transparent)] px-3 py-3">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
               Cliente
             </p>
@@ -1935,7 +1938,7 @@ function OperationalContextColumn({
             isMutating={isExecutionMutating}
           />
 
-          <section className="px-1 py-1">
+          <section className="rounded-2xl bg-[color-mix(in_srgb,var(--app-surface)_54%,transparent)] px-3 py-3">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
               Próximo agendamento
             </p>
@@ -1973,7 +1976,7 @@ function OperationalContextColumn({
             </Button>
           </section>
 
-          <section className="px-1 py-1">
+          <section className="rounded-2xl bg-[color-mix(in_srgb,var(--app-surface)_54%,transparent)] px-3 py-3">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
               Ordem de serviço
             </p>
@@ -2011,9 +2014,9 @@ function OperationalContextColumn({
             </Button>
           </section>
 
-          <section className="px-1 py-1">
+          <section className="rounded-2xl bg-[color-mix(in_srgb,var(--app-surface)_54%,transparent)] px-3 py-3">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-              Cobrança
+              Financeiro
             </p>
             <p className="mt-1 font-medium">
               {context?.openCharge?.id
@@ -2053,9 +2056,9 @@ function OperationalContextColumn({
             </Button>
           </section>
 
-          <section className="px-1 py-1">
+          <section className="rounded-2xl bg-[color-mix(in_srgb,var(--app-surface)_44%,transparent)] px-3 py-3">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-              Última interação
+              Timeline resumida
             </p>
             <p className="mt-1">
               {context?.lastInteraction?.direction ?? "--"}
@@ -2070,7 +2073,7 @@ function OperationalContextColumn({
 
           <section className="rounded-2xl bg-[color-mix(in_srgb,var(--app-surface)_72%,transparent)] px-3 py-3">
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
-              Painel de execução
+              Ações rápidas
             </p>
             <div className="mt-2.5 grid grid-cols-1 gap-2">
               <Button
@@ -3307,108 +3310,80 @@ export default function WhatsAppPage() {
   }
 
   return (
-    <AppPageShell className="h-[calc(100vh-5rem)] min-h-0 overflow-hidden bg-app-surface px-4 pb-0 pt-4 text-app-primary">
+    <AppPageShell className="h-[calc(100vh-5rem)] min-h-0 overflow-hidden bg-app-surface px-4 pb-0 pt-3 text-app-primary">
       <AppOperationalHeader
         title="WhatsApp operacional"
-        description={`Centro de execução da comunicação · ${conversations.length} conversa(s), ${communicationMetrics.waitingReplies} aguardando resposta e ${communicationMetrics.failedMessages} falha(s).`}
+        description="Inbox → conversa → contexto operacional."
         density="compact"
         contextChips={
           <>
             <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1 text-xs text-[var(--text-secondary)]">
-              Estado: {communicationMetrics.stateLabel}
-            </span>
-            <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1 text-xs text-[var(--text-secondary)]">
-              Inbox: {allInboxRows.length}
+              Conexão: {communicationMetrics.stateLabel}
             </span>
             {context?.openCharge?.daysOverdue ||
             String(context?.openCharge?.status ?? "").toUpperCase() ===
               "OVERDUE" ? (
               <span className="rounded-full border border-[var(--danger)]/30 bg-[color-mix(in_srgb,var(--danger)_10%,var(--surface-elevated))] px-3 py-1 text-xs text-[var(--danger)]">
-                Cobrança vencida em conversa
+                Cobrança vencida
               </span>
             ) : null}
           </>
         }
-      >
-        <p className="text-sm text-[var(--text-secondary)]">
-          Toda conversa precisa estar ligada a cobrança, agenda, O.S., cliente
-          ou exceção geral. A ação principal vem antes da navegação.
-        </p>
-      </AppOperationalHeader>
-
-      <OperationalTopCard
-        className="shrink-0"
-        contextLabel="Próxima melhor ação de comunicação"
-        title={
-          nextBestConversation
-            ? `${getPrimaryCommunicationAction(nextBestConversation)} · ${nextBestConversation.name}`
-            : "Nenhuma ação crítica de comunicação agora"
-        }
-        description={
-          nextBestConversation
-            ? `${getContextTypeLabel(nextBestConversation.contextType)} · ${getOperationalStatus(nextBestConversation)} · ${nextBestConversation.phone ? "telefone disponível" : "envio bloqueado sem telefone"}`
-            : "O backend não retornou conversa, cobrança, agendamento ou O.S. exigindo contato imediato."
-        }
-        chips={
-          nextBestConversation ? (
-            <>
-              <AppStatusBadge
-                label={getPriorityLabel(nextBestConversation.priority)}
-              />
-              <span className="rounded-full border border-[var(--border-subtle)] px-2.5 py-1 text-xs text-[var(--text-muted)]">
-                {getContextTypeLabel(nextBestConversation.contextType)}
-              </span>
-            </>
-          ) : null
-        }
-        primaryAction={
-          nextBestConversation ? (
-            <Button
-              onClick={handleNextBestAction}
-              disabled={
-                !nextBestConversation.phone &&
-                nextBestConversation.id === selectedConversationId
-              }
-            >
-              {nextBestConversation.id === selectedConversationId
-                ? getPrimaryCommunicationAction(nextBestConversation)
-                : "Abrir prioridade"}
-            </Button>
-          ) : null
-        }
-        secondaryActions={
-          nextBestConversation && !nextBestConversation.phone ? (
-            <span className="text-xs font-medium text-[var(--danger)]">
-              Cliente sem telefone: envio bloqueado.
-            </span>
-          ) : null
-        }
       />
 
-      <div className="grid shrink-0 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
-        <AppStatCard
-          label="Aguardando resposta"
-          value={String(communicationMetrics.waitingReplies)}
-          helper="Conversas abertas que ainda pedem resposta operacional."
-        />
-        <AppStatCard
-          label="Mensagens falhadas"
-          value={String(communicationMetrics.failedMessages)}
-          helper="Falhas aparecem no inbox e na conversa para reenvio."
-        />
-        <AppStatCard
-          label="Cobranças em conversa"
-          value={String(communicationMetrics.chargesInConversation)}
-          helper="Cobranças pendentes/vencidas têm prioridade de contato."
-        />
-        <AppStatCard
-          label="Agenda/O.S. com contexto"
-          value={String(communicationMetrics.activeContexts)}
-          helper="Agendamentos e O.S. vinculados à comunicação ativa."
-        />
-      </div>
+      <section className="shrink-0 rounded-[var(--radius-panel)] border border-[var(--app-border)]/60 bg-app-panel/70 px-3 py-2 text-app-primary">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+              Próxima ação
+            </p>
+            <p className="truncate text-sm font-semibold text-app-primary">
+              {nextBestConversation
+                ? `${getPrimaryCommunicationAction(nextBestConversation)} · ${nextBestConversation.name}`
+                : "Nenhuma conversa crítica exigindo resposta imediata"}
+            </p>
+            <p className="truncate text-[11px] text-[var(--text-muted)]">
+              {nextBestConversation
+                ? `${getContextTypeLabel(nextBestConversation.contextType)} · ${getOperationalStatus(nextBestConversation)} · ${nextBestConversation.phone ? "telefone disponível" : "envio bloqueado sem telefone"}`
+                : "A fila permanece disponível sem transformar o WhatsApp em dashboard."}
+            </p>
+          </div>
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+            <span className="rounded-full bg-app-surface px-2.5 py-1 text-[11px] text-[var(--text-secondary)]">
+              {communicationMetrics.waitingReplies} aguardando
+            </span>
+            <span className="rounded-full bg-app-surface px-2.5 py-1 text-[11px] text-[var(--text-secondary)]">
+              {communicationMetrics.failedMessages} falha(s)
+            </span>
+            <span className="rounded-full bg-app-surface px-2.5 py-1 text-[11px] text-[var(--text-secondary)]">
+              {communicationMetrics.activeContexts} contexto(s)
+            </span>
+            {nextBestConversation ? (
+              <Button
+                type="button"
+                size="sm"
+                className="h-8 px-3 text-[11px]"
+                onClick={handleNextBestAction}
+                disabled={
+                  !nextBestConversation.phone &&
+                  nextBestConversation.id === selectedConversationId
+                }
+              >
+                {nextBestConversation.id === selectedConversationId
+                  ? getPrimaryCommunicationAction(nextBestConversation)
+                  : "Abrir prioridade"}
+              </Button>
+            ) : null}
+          </div>
+        </div>
+        {nextBestConversation && !nextBestConversation.phone ? (
+          <p className="mt-1 text-[11px] font-medium text-[var(--danger)]">
+            Cliente sem telefone: envio bloqueado até corrigir cadastro.
+          </p>
+        ) : null}
+      </section>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-visible bg-transparent xl:grid-cols-[minmax(280px,320px)_minmax(0,1fr)_minmax(292px,332px)]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden bg-transparent xl:grid-cols-[minmax(286px,318px)_minmax(480px,1fr)_minmax(286px,318px)]">
         <div className="h-full min-h-0 min-w-0 overflow-hidden">
           <InboxQueueColumn
             rows={filteredRows}
