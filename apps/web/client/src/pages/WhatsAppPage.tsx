@@ -591,7 +591,7 @@ const statusUi: Record<
   FAILED: { label: "Falha", dot: "bg-rose-400" },
 };
 
-const ROW_HEIGHT = 148;
+const ROW_HEIGHT = 92;
 const NO_APPOINTMENT_TEXT = "Sem agendamento futuro";
 const NO_SERVICE_ORDER_TEXT = "Nenhuma O.S. ativa";
 const NO_CHARGE_TEXT = "Nenhuma cobrança pendente";
@@ -810,8 +810,9 @@ function priorityScore(conversation: Conversation) {
 function getConversationBadges(conversation: Conversation) {
   const badges: string[] = [];
   if (conversation.hasFailedDelivery) badges.push("Falha");
+  if (conversation.priority === "CRITICAL") badges.push("Crítica");
+  if (conversation.priority === "HIGH") badges.push("Alta");
   if (conversation.hasNoResponse) badges.push("Sem resposta");
-  if (conversation.hasPendingCharge) badges.push("Cobrança pendente");
   return badges;
 }
 
@@ -821,6 +822,13 @@ function getContextTypeLabel(contextType?: ContextType | null) {
   if (contextType === "SERVICE_ORDER") return "O.S.";
   if (contextType === "PAYMENT") return "Pagamento";
   if (contextType === "CUSTOMER") return "Cliente";
+  return "Geral";
+}
+
+function getInboxContextLabel(contextType?: ContextType | null) {
+  if (contextType === "CHARGE" || contextType === "PAYMENT") return "Cobrança";
+  if (contextType === "APPOINTMENT") return "Agendamento";
+  if (contextType === "SERVICE_ORDER") return "O.S.";
   return "Geral";
 }
 
@@ -973,95 +981,78 @@ const ConversationRow = memo(function ConversationRow({
   style: CSSProperties;
 }) {
   const status = statusUi[conversation.status] ?? statusUi.OPEN;
-  const operational = getOperationalStatus(conversation);
-  const badges = getConversationBadges(conversation);
+  const isSelected = selectedId === conversation.id;
+  const primaryBadge = getInboxContextLabel(conversation.contextType);
+  const statusBadge = getConversationBadges(conversation)[0];
+  const lastMessage =
+    conversation.lastMessage?.trim() ||
+    conversation.contextHint ||
+    "Sem mensagem recente";
 
   return (
-    <div style={style} className="px-1 py-2">
+    <div style={style} className="px-1 py-1">
       <button
         type="button"
         onClick={() => onSelect(conversation.id)}
         className={cn(
-          "relative w-full rounded-2xl border px-4 py-3 text-left text-app-primary transition duration-150",
-          "before:absolute before:inset-y-3 before:left-2 before:w-1 before:rounded-full",
-          selectedId === conversation.id
-            ? "border-[var(--accent-primary)]/25 bg-[var(--accent-soft)]/45 before:bg-[var(--accent-primary)]"
-            : conversation.priority === "CRITICAL" ||
-                conversation.priority === "HIGH"
-              ? "border-[color-mix(in_srgb,var(--warning)_24%,var(--app-border))] bg-app-card/55 before:bg-[var(--warning)] hover:bg-app-card/80"
-              : "border-transparent bg-app-card/45 before:bg-transparent hover:bg-app-card/80"
+          "relative grid h-full w-full grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center gap-2.5 rounded-xl px-3 py-2 text-left text-app-primary transition duration-150",
+          "before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-full",
+          isSelected
+            ? "bg-[var(--accent-soft)]/40 before:bg-[var(--accent-primary)]"
+            : conversation.priority === "CRITICAL" || conversation.priority === "HIGH"
+              ? "bg-[color-mix(in_srgb,var(--warning)_8%,var(--app-card))] before:bg-[var(--warning)]/75 hover:bg-app-card/80"
+              : "bg-app-card/35 before:bg-transparent hover:bg-app-card/75"
         )}
       >
-        <div className="flex items-start justify-between gap-2">
+        <div
+          className={cn(
+            "flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold uppercase",
+            isSelected
+              ? "bg-[var(--accent-primary)] text-white"
+              : "bg-app-surface text-app-muted"
+          )}
+        >
+          {conversation.name.slice(0, 1)}
+        </div>
+
+        <div className="min-w-0 space-y-1">
           <div className="flex min-w-0 items-center gap-2">
-            <div
-              className={cn(
-                "flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
-                selectedId === conversation.id
-                  ? "bg-[var(--accent-soft)]/80 text-[var(--accent-primary)]"
-                  : "bg-app-surface text-app-muted"
-              )}
-            >
-              {conversation.name.slice(0, 1)}
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-app-primary">
-                {conversation.name}
-              </p>
-              <p className="truncate text-[11px] text-app-muted">
-                {conversation.phone ?? "Telefone não informado"}
-              </p>
-              {conversation.title ? (
-                <p className="truncate text-[11px] text-[var(--accent-primary)]/90">
-                  {conversation.title}
-                </p>
-              ) : null}
-            </div>
+            <p className="min-w-0 flex-1 truncate text-sm font-semibold leading-5 text-app-primary">
+              {conversation.name}
+            </p>
+            {conversation.phone ? (
+              <span className="hidden max-w-[7rem] shrink truncate text-[10px] text-app-muted sm:inline">
+                {conversation.phone}
+              </span>
+            ) : null}
           </div>
-          <span className="shrink-0 text-[11px] text-app-muted">
+          <p className="truncate text-xs leading-4 text-[var(--text-secondary)]">
+            {lastMessage}
+          </p>
+          <div className="flex min-w-0 items-center gap-1.5 overflow-hidden text-[10px] leading-none">
+            <span className="shrink-0 rounded-full bg-app-surface px-2 py-1 font-medium text-[var(--text-secondary)]">
+              {primaryBadge}
+            </span>
+            {statusBadge ? (
+              <span className="inline-flex min-w-0 items-center gap-1 rounded-full bg-app-surface/80 px-2 py-1 text-app-muted">
+                <span className={cn("size-1.5 shrink-0 rounded-full", status.dot)} />
+                <span className="truncate">{statusBadge}</span>
+              </span>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="flex h-full shrink-0 flex-col items-end justify-between gap-1 text-right">
+          <span className="whitespace-nowrap text-[10px] text-app-muted">
             {fmtTime(conversation.lastMessageAt)}
           </span>
-        </div>
-        <p className="mt-2 line-clamp-1 text-xs text-[var(--text-secondary)]">
-          {conversation.lastMessage}
-        </p>
-        <div className="mt-2 grid grid-cols-2 gap-1.5 pl-1 text-[10px] text-app-muted">
-          <span className="rounded-full bg-app-surface px-2 py-0.5">
-            Contexto: {getContextTypeLabel(conversation.contextType)}
-          </span>
-          <span className="rounded-full bg-app-surface px-2 py-0.5">
-            Prioridade: {getPriorityLabel(conversation.priority)}
-          </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-app-surface px-2 py-0.5">
-            <span className={cn("h-2 w-2 rounded-full", status.dot)} />
-            {operational}
-          </span>
-          <span className="truncate rounded-full bg-app-surface px-2 py-0.5">
-            Ação: {getPrimaryCommunicationAction(conversation)}
-          </span>
-        </div>
-        <div className="mt-2 flex items-center justify-between gap-3 text-[11px] text-app-muted">
-          {badges.length ? (
-            <div className="flex flex-wrap gap-1">
-              {badges.slice(0, 3).map(badge => (
-                <span
-                  key={badge}
-                  className="rounded-full bg-app-surface px-2 py-0.5 text-[10px] leading-none text-[var(--text-secondary)]"
-                >
-                  {badge}
-                </span>
-              ))}
-            </div>
-          ) : (
-            <span className="text-[10px] text-[var(--text-muted)]">
-              {conversation.contextHint ?? "Conversa geral"}
-            </span>
-          )}
           {conversation.unreadCount ? (
-            <span className="rounded-full bg-[color-mix(in_srgb,var(--warning)_18%,var(--app-surface))] px-2 py-0.5 text-[10px] font-medium leading-none text-[var(--warning)]">
+            <span className="min-w-5 rounded-full bg-[color-mix(in_srgb,var(--warning)_18%,var(--app-surface))] px-1.5 py-0.5 text-center text-[10px] font-medium leading-none text-[var(--warning)]">
               {conversation.unreadCount}
             </span>
-          ) : null}
+          ) : (
+            <span className={cn("size-2 rounded-full", status.dot)} />
+          )}
         </div>
       </button>
     </div>
@@ -1109,40 +1100,37 @@ function InboxQueueColumn({
   const visibleRows = rows.slice(startIndex, startIndex + visibleCount);
 
   return (
-    <aside className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-[var(--radius-panel)] border border-[var(--app-border)]/60 bg-app-panel p-3 text-app-primary">
-      <div className="shrink-0 space-y-2.5 pb-2">
-        <div className="flex items-center justify-between">
-          <div>
+    <aside className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-[var(--radius-panel)] border border-[var(--app-border)]/60 bg-app-panel p-2.5 text-app-primary">
+      <div className="shrink-0 space-y-2 pb-2">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
             <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
               Inbox
             </p>
-            <p className="text-[10px] text-[var(--text-muted)]">
-              prioridade, contexto e última mensagem
+            <p className="truncate text-[10px] text-[var(--text-muted)]">
+              Conversas por prioridade
             </p>
           </div>
-          <button
-            type="button"
-            className="rounded-lg bg-app-surface px-2 py-1 text-[10px] text-app-muted transition hover:bg-app-card"
-          >
+          <span className="shrink-0 rounded-lg bg-app-surface px-2 py-1 text-[10px] text-app-muted">
             {rows.length} itens
-          </button>
+          </span>
         </div>
-        <div className="flex items-center gap-2 rounded-xl bg-app-surface px-3 py-2">
-          <Search className="size-3.5 text-[var(--text-muted)]" />
+        <div className="flex h-9 items-center gap-2 rounded-xl bg-app-surface px-3">
+          <Search className="size-3.5 shrink-0 text-[var(--text-muted)]" />
           <input
             value={search}
             onChange={e => onSearch(e.target.value)}
             placeholder="Buscar conversa..."
-            className="h-8 w-full bg-transparent text-xs text-app-primary outline-none placeholder:text-app-muted/75"
+            className="h-full min-w-0 flex-1 bg-transparent text-xs text-app-primary outline-none placeholder:text-app-muted/75"
           />
         </div>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="scrollbar-thin-nexo flex gap-1.5 overflow-x-auto whitespace-nowrap pb-1">
           {FILTERS.map(item => (
             <button
               key={item.value}
               type="button"
               className={cn(
-                "h-7.5 rounded-full px-2.5 text-[11px]",
+                "h-7 shrink-0 rounded-full px-2.5 text-[11px] transition",
                 filter === item.value
                   ? "bg-[var(--accent-soft)]/55 text-[var(--accent-primary)]"
                   : "bg-app-surface text-app-muted hover:bg-app-card"
@@ -1156,13 +1144,13 @@ function InboxQueueColumn({
       </div>
       <div
         ref={viewportRef}
-        className="scrollbar-thin-nexo mt-2 min-h-0 flex-1 overflow-y-auto pr-1"
+        className="scrollbar-thin-nexo mt-1 min-h-0 flex-1 overflow-y-auto pr-1"
         onScroll={e => setScrollTop(e.currentTarget.scrollTop)}
       >
         {isLoading ? (
           <div className="space-y-2">
             {Array.from({ length: 5 }).map((_, idx) => (
-              <AppSkeleton key={idx} className="h-24 rounded-xl" />
+              <AppSkeleton key={idx} className="h-20 rounded-xl" />
             ))}
           </div>
         ) : rows.length === 0 ? (
@@ -3210,7 +3198,7 @@ export default function WhatsAppPage() {
 
   return (
     <AppPageShell className="h-[calc(100vh-5rem)] min-h-0 overflow-hidden bg-app-surface px-4 pb-0 pt-3 text-app-primary">
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden bg-transparent xl:grid-cols-[minmax(286px,318px)_minmax(480px,1fr)_minmax(286px,318px)]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden bg-transparent xl:grid-cols-[minmax(320px,360px)_minmax(0,1fr)_minmax(300px,340px)]">
         <div className="h-full min-h-0 min-w-0 overflow-hidden">
           <InboxQueueColumn
             rows={filteredRows}
