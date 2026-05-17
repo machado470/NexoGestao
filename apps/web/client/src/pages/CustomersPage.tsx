@@ -1,4 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  CalendarClock,
+  CheckCircle2,
+  CreditCard,
+  MessageCircle,
+  Phone,
+  ShieldAlert,
+  Wrench,
+} from "lucide-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -13,7 +24,7 @@ import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
 import { Button } from "@/components/design-system";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
-import { AppRowActionsDropdown } from "@/components/app-system";
+import { AppRowActionsDropdown, AppStatCard } from "@/components/app-system";
 import {
   AppFiltersBar,
   AppOperationalHeader,
@@ -24,6 +35,7 @@ import {
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
+import { cn } from "@/lib/utils";
 
 type Customer = Record<string, any>;
 type Appointment = Record<string, any>;
@@ -45,6 +57,43 @@ type CustomerFilter =
   | "no_recent_contact"
   | "risk";
 
+type CustomerProfile = {
+  customer: Customer;
+  customerId: string;
+  appointments: Appointment[];
+  serviceOrders: ServiceOrder[];
+  charges: Charge[];
+  overdue: number;
+  pending: number;
+  pendingCents: number;
+  lastInteractionAt: Date | null;
+  daysWithoutContact: number;
+  hasOpenServiceOrder: boolean;
+  status: "Em risco" | "Com pendência" | "Saudável";
+  riskSignal: string;
+  nextActionLabel: string;
+  nextActionPath: string;
+  lastService?: ServiceOrder;
+  nextAppointment?: Appointment;
+  contact: string;
+  pendingChargeId: string | null;
+};
+
+type AttentionItem = {
+  key: string;
+  title: string;
+  context: string;
+  status: string;
+  actionLabel: string;
+  actionPath: string;
+  customer?: Customer;
+  chargeId?: string | null;
+};
+
+const pageSize = 8;
+const openServiceOrderStatuses = ["OPEN", "ASSIGNED", "IN_PROGRESS"];
+const pendingChargeStatuses = ["OVERDUE", "PENDING"];
+
 function formatCurrency(cents?: number) {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
@@ -63,6 +112,15 @@ function formatDateTime(value: unknown, fallback = "Não informado") {
   return date ? date.toLocaleString("pt-BR") : fallback;
 }
 
+function daysBetween(date: Date | null) {
+  if (!date) return 999;
+  const now = new Date();
+  return Math.max(
+    0,
+    Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24))
+  );
+}
+
 function customerStatus(input: {
   overdue: number;
   pending: number;
@@ -74,8 +132,9 @@ function customerStatus(input: {
     input.pending > 0 ||
     input.hasOpenServiceOrder ||
     input.daysWithoutContact >= 15
-  )
+  ) {
     return "Com pendência";
+  }
   return "Saudável";
 }
 
@@ -92,8 +151,215 @@ function normalizeWorkspace(input: unknown): Workspace {
   };
 }
 
+function getCustomerContact(customer: Customer) {
+  const phone = String(customer.phone ?? "").trim();
+  const email = String(customer.email ?? "").trim();
+  if (phone && email) return `${phone} · ${email}`;
+  return phone || email || "Sem contato cadastrado";
+}
+
+function isChargePending(charge: Charge) {
+  return pendingChargeStatuses.includes(
+    String(charge.status ?? "").toUpperCase()
+  );
+}
+
+function isServiceOrderOpen(order: ServiceOrder) {
+  return openServiceOrderStatuses.includes(
+    String(order.status ?? "").toUpperCase()
+  );
+}
+
+function resolveRiskSignal(
+  profile: Pick<
+    CustomerProfile,
+    "overdue" | "pending" | "hasOpenServiceOrder" | "daysWithoutContact"
+  >
+) {
+  if (profile.overdue > 0) return `${profile.overdue} cobrança(s) vencida(s)`;
+  if (profile.daysWithoutContact >= 30)
+    return `Sem contato há ${profile.daysWithoutContact} dias`;
+  if (profile.hasOpenServiceOrder) return "O.S. aberta exige acompanhamento";
+  if (profile.pending > 0) return `${profile.pending} cobrança(s) pendente(s)`;
+  if (profile.daysWithoutContact >= 15)
+    return `Follow-up pendente há ${profile.daysWithoutContact} dias`;
+  return "Sem bloqueio operacional detectado";
+}
+
+function buildCustomerProfiles(input: {
+  customers: Customer[];
+  appointments: Appointment[];
+  serviceOrders: ServiceOrder[];
+  charges: Charge[];
+}) {
+  const map = new Map<
+    string,
+    Omit<
+      CustomerProfile,
+      | "daysWithoutContact"
+      | "status"
+      | "riskSignal"
+      | "nextActionLabel"
+      | "nextActionPath"
+      | "lastService"
+      | "nextAppointment"
+      | "contact"
+      | "pendingChargeId"
+      | "hasOpenServiceOrder"
+    >
+  >();
+
+  for (const customer of input.customers) {
+    const customerId = String(customer.id ?? "");
+    if (!customerId) continue;
+    map.set(customerId, {
+      customer,
+      customerId,
+      appointments: [],
+      serviceOrders: [],
+      charges: [],
+      overdue: 0,
+      pending: 0,
+      pendingCents: 0,
+      lastInteractionAt: toDate(customer.updatedAt ?? customer.createdAt),
+    });
+  }
+
+  const updateInteraction = (
+    current: { lastInteractionAt: Date | null },
+    value: unknown
+  ) => {
+    const touchDate = toDate(value);
+    if (
+      touchDate &&
+      (!current.lastInteractionAt || touchDate > current.lastInteractionAt)
+    ) {
+      current.lastInteractionAt = touchDate;
+    }
+  };
+
+  for (const item of input.appointments) {
+    const current = map.get(String(item.customerId ?? ""));
+    if (!current) continue;
+    current.appointments.push(item);
+    updateInteraction(
+      current,
+      item.updatedAt ?? item.startsAt ?? item.createdAt
+    );
+  }
+
+  for (const item of input.serviceOrders) {
+    const current = map.get(String(item.customerId ?? ""));
+    if (!current) continue;
+    current.serviceOrders.push(item);
+    updateInteraction(
+      current,
+      item.updatedAt ?? item.createdAt ?? item.scheduledFor
+    );
+  }
+
+  for (const item of input.charges) {
+    const current = map.get(String(item.customerId ?? ""));
+    if (!current) continue;
+    current.charges.push(item);
+    const status = String(item.status ?? "").toUpperCase();
+    const cents = Number(item.amountCents ?? item.amount ?? 0);
+    if (status === "OVERDUE") {
+      current.overdue += 1;
+      current.pendingCents += cents;
+    }
+    if (status === "PENDING") {
+      current.pending += 1;
+      current.pendingCents += cents;
+    }
+    updateInteraction(
+      current,
+      item.updatedAt ?? item.createdAt ?? item.dueDate
+    );
+  }
+
+  return Array.from(map.values()).map(profile => {
+    const appointments = [...profile.appointments].sort(
+      (a, b) =>
+        new Date(String(a.startsAt ?? a.createdAt ?? 0)).getTime() -
+        new Date(String(b.startsAt ?? b.createdAt ?? 0)).getTime()
+    );
+    const serviceOrders = [...profile.serviceOrders].sort(
+      (a, b) =>
+        new Date(String(b.updatedAt ?? b.createdAt ?? 0)).getTime() -
+        new Date(String(a.updatedAt ?? a.createdAt ?? 0)).getTime()
+    );
+    const charges = [...profile.charges].sort(
+      (a, b) =>
+        new Date(String(a.dueDate ?? a.createdAt ?? 0)).getTime() -
+        new Date(String(b.dueDate ?? b.createdAt ?? 0)).getTime()
+    );
+    const hasOpenServiceOrder = serviceOrders.some(isServiceOrderOpen);
+    const daysWithoutContact = daysBetween(profile.lastInteractionAt);
+    const status = customerStatus({
+      overdue: profile.overdue,
+      pending: profile.pending,
+      hasOpenServiceOrder,
+      daysWithoutContact,
+    });
+    const nextAppointment = appointments.find(item => {
+      const startsAt = toDate(item.startsAt);
+      return startsAt && startsAt.getTime() >= Date.now();
+    });
+    const pendingChargeId =
+      String(charges.find(isChargePending)?.id ?? "").trim() || null;
+    const nextActionLabel =
+      profile.overdue > 0
+        ? "Cobrar agora"
+        : hasOpenServiceOrder
+          ? "Acompanhar O.S."
+          : nextAppointment
+            ? "Confirmar agenda"
+            : daysWithoutContact >= 15
+              ? "Retomar contato"
+              : "Criar próxima ação";
+    const nextActionPath =
+      profile.overdue > 0
+        ? `/finances?customerId=${profile.customerId}`
+        : hasOpenServiceOrder
+          ? `/service-orders?customerId=${profile.customerId}`
+          : nextAppointment
+            ? `/appointments?customerId=${profile.customerId}`
+            : `/whatsapp?customerId=${profile.customerId}`;
+
+    return {
+      ...profile,
+      appointments,
+      serviceOrders,
+      charges,
+      daysWithoutContact,
+      hasOpenServiceOrder,
+      status,
+      riskSignal: resolveRiskSignal({
+        overdue: profile.overdue,
+        pending: profile.pending,
+        hasOpenServiceOrder,
+        daysWithoutContact,
+      }),
+      nextActionLabel,
+      nextActionPath,
+      lastService: serviceOrders[0],
+      nextAppointment,
+      contact: getCustomerContact(profile.customer),
+      pendingChargeId,
+    } satisfies CustomerProfile;
+  });
+}
+
+function ActionCue({ children }: { children: string }) {
+  return (
+    <span className="inline-flex rounded-md border border-[var(--border-subtle)] px-2 py-1 text-[11px] font-medium text-[var(--text-secondary)]">
+      {children}
+    </span>
+  );
+}
+
 export default function CustomersPage() {
-  const pageSize = 8;
   const [location, navigate] = useLocation();
   const [searchTerm, setSearchTerm] = useOperationalMemoryState(
     "nexo.customers.search.v2",
@@ -150,6 +416,21 @@ export default function CustomersPage() {
     [chargesQuery.data]
   );
 
+  const profiles = useMemo(
+    () =>
+      buildCustomerProfiles({
+        customers,
+        appointments,
+        serviceOrders,
+        charges,
+      }),
+    [appointments, charges, customers, serviceOrders]
+  );
+  const profileById = useMemo(
+    () => new Map(profiles.map(profile => [profile.customerId, profile])),
+    [profiles]
+  );
+
   const workspaceQuery = trpc.nexo.customers.workspace.useQuery(
     { id: activeCustomerId ?? "" },
     { enabled: Boolean(activeCustomerId), retry: false }
@@ -160,165 +441,137 @@ export default function CustomersPage() {
     [workspaceQuery.data]
   );
 
-  const byCustomer = useMemo(() => {
-    const map = new Map<
-      string,
-      {
-        appointments: Appointment[];
-        serviceOrders: ServiceOrder[];
-        charges: Charge[];
-        overdue: number;
-        pending: number;
-        pendingCents: number;
-        lastInteractionAt: Date | null;
-      }
-    >();
-
-    for (const customer of customers) {
-      map.set(String(customer.id), {
-        appointments: [],
-        serviceOrders: [],
-        charges: [],
-        overdue: 0,
-        pending: 0,
-        pendingCents: 0,
-        lastInteractionAt: toDate(customer.updatedAt ?? customer.createdAt),
-      });
-    }
-
-    for (const item of appointments) {
-      const customerId = String(item.customerId ?? "");
-      if (!customerId || !map.has(customerId)) continue;
-      const current = map.get(customerId)!;
-      current.appointments.push(item);
-      const touchDate = toDate(
-        item.updatedAt ?? item.startsAt ?? item.createdAt
-      );
-      if (
-        touchDate &&
-        (!current.lastInteractionAt || touchDate > current.lastInteractionAt)
-      ) {
-        current.lastInteractionAt = touchDate;
-      }
-    }
-
-    for (const item of serviceOrders) {
-      const customerId = String(item.customerId ?? "");
-      if (!customerId || !map.has(customerId)) continue;
-      const current = map.get(customerId)!;
-      current.serviceOrders.push(item);
-      const touchDate = toDate(
-        item.updatedAt ?? item.createdAt ?? item.scheduledFor
-      );
-      if (
-        touchDate &&
-        (!current.lastInteractionAt || touchDate > current.lastInteractionAt)
-      ) {
-        current.lastInteractionAt = touchDate;
-      }
-    }
-
-    for (const item of charges) {
-      const customerId = String(item.customerId ?? "");
-      if (!customerId || !map.has(customerId)) continue;
-      const current = map.get(customerId)!;
-      current.charges.push(item);
-      const status = String(item.status ?? "").toUpperCase();
-      const cents = Number(item.amountCents ?? 0);
-      if (status === "OVERDUE") {
-        current.overdue += 1;
-        current.pendingCents += cents;
-      }
-      if (status === "PENDING") {
-        current.pending += 1;
-        current.pendingCents += cents;
-      }
-      const touchDate = toDate(
-        item.updatedAt ?? item.createdAt ?? item.dueDate
-      );
-      if (
-        touchDate &&
-        (!current.lastInteractionAt || touchDate > current.lastInteractionAt)
-      ) {
-        current.lastInteractionAt = touchDate;
-      }
-    }
-
-    for (const value of map.values()) {
-      value.appointments.sort(
-        (a, b) =>
-          new Date(String(a.startsAt ?? a.createdAt ?? 0)).getTime() -
-          new Date(String(b.startsAt ?? b.createdAt ?? 0)).getTime()
-      );
-      value.serviceOrders.sort(
-        (a, b) =>
-          new Date(String(b.updatedAt ?? b.createdAt ?? 0)).getTime() -
-          new Date(String(a.updatedAt ?? a.createdAt ?? 0)).getTime()
-      );
-    }
-
-    return map;
-  }, [appointments, charges, customers, serviceOrders]);
-
-  const displayedCustomers = useMemo(() => {
-    const now = new Date();
+  const filteredProfiles = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
 
-    return customers.filter(customer => {
-      const customerId = String(customer.id ?? "");
-      const aggregate = byCustomer.get(customerId);
-      if (!aggregate) return false;
-
-      const lastInteraction = aggregate.lastInteractionAt;
-      const daysWithoutContact = lastInteraction
-        ? Math.floor(
-            (now.getTime() - lastInteraction.getTime()) / (1000 * 60 * 60 * 24)
-          )
-        : 999;
-      const hasOpenServiceOrder = aggregate.serviceOrders.some(order => {
-        const status = String(order.status ?? "").toUpperCase();
-        return ["OPEN", "ASSIGNED", "IN_PROGRESS"].includes(status);
-      });
-      const status = customerStatus({
-        overdue: aggregate.overdue,
-        pending: aggregate.pending,
-        hasOpenServiceOrder,
-        daysWithoutContact,
-      });
-
+    return profiles.filter(profile => {
       if (
         activeFilter === "pending" &&
-        !(aggregate.pending > 0 || aggregate.overdue > 0)
-      )
+        !(profile.pending > 0 || profile.overdue > 0)
+      ) {
         return false;
-      if (activeFilter === "open_os" && !hasOpenServiceOrder) return false;
-      if (activeFilter === "no_recent_contact" && daysWithoutContact < 15)
+      }
+      if (activeFilter === "open_os" && !profile.hasOpenServiceOrder) {
         return false;
-      if (activeFilter === "risk" && status !== "Em risco") return false;
+      }
+      if (
+        activeFilter === "no_recent_contact" &&
+        profile.daysWithoutContact < 15
+      ) {
+        return false;
+      }
+      if (activeFilter === "risk" && profile.status !== "Em risco") {
+        return false;
+      }
 
       if (!query) return true;
-      return [customer.name, customer.phone, customer.email]
+      return [
+        profile.customer.name,
+        profile.customer.phone,
+        profile.customer.email,
+      ]
         .map(value => String(value ?? "").toLowerCase())
         .join(" ")
         .includes(query);
     });
-  }, [activeFilter, byCustomer, customers, searchTerm]);
+  }, [activeFilter, profiles, searchTerm]);
 
   const isLoading = customersQuery.isLoading && customers.length === 0;
   const hasBlockingError =
     Boolean(customersQuery.error) && customers.length === 0;
-  const paginatedCustomers = useMemo(() => {
+  const paginatedProfiles = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
-    return displayedCustomers.slice(start, start + pageSize);
-  }, [currentPage, displayedCustomers, pageSize]);
+    return filteredProfiles.slice(start, start + pageSize);
+  }, [currentPage, filteredProfiles]);
+
+  const attentionItems = useMemo<AttentionItem[]>(() => {
+    const items: AttentionItem[] = [];
+    for (const profile of profiles) {
+      if (profile.overdue > 0) {
+        items.push({
+          key: `${profile.customerId}-overdue`,
+          title: String(profile.customer.name ?? "Cliente sem nome"),
+          context: `${formatCurrency(profile.pendingCents)} em cobrança vencida ou pendente.`,
+          status: "Urgente",
+          actionLabel: "Cobrar",
+          actionPath: `/finances?customerId=${profile.customerId}`,
+          customer: profile.customer,
+          chargeId: profile.pendingChargeId,
+        });
+        continue;
+      }
+      if (profile.hasOpenServiceOrder) {
+        items.push({
+          key: `${profile.customerId}-open-os`,
+          title: String(profile.customer.name ?? "Cliente sem nome"),
+          context: profile.lastService
+            ? `O.S. ${String(profile.lastService.title ?? profile.lastService.id ?? "aberta")} em ${String(profile.lastService.status ?? "andamento")}.`
+            : "O.S. aberta exige acompanhamento.",
+          status: "Atenção",
+          actionLabel: "Ver O.S.",
+          actionPath: `/service-orders?customerId=${profile.customerId}`,
+        });
+        continue;
+      }
+      if (profile.daysWithoutContact >= 15) {
+        items.push({
+          key: `${profile.customerId}-silent`,
+          title: String(profile.customer.name ?? "Cliente sem nome"),
+          context: `Sem interação registrada há ${profile.daysWithoutContact} dias.`,
+          status: profile.daysWithoutContact >= 30 ? "Em risco" : "Monitorar",
+          actionLabel: "Retomar contato",
+          actionPath: `/whatsapp?customerId=${profile.customerId}`,
+          customer: profile.customer,
+        });
+      }
+    }
+    return items.slice(0, 4);
+  }, [profiles]);
+
+  const selectedProfile = activeCustomerId
+    ? (profileById.get(String(activeCustomerId)) ?? null)
+    : null;
+  const selectedCustomer = selectedProfile?.customer ?? null;
+
+  const workspaceCharges = (workspace.charges ?? selectedProfile?.charges ?? [])
+    .slice()
+    .sort(
+      (a, b) =>
+        new Date(String(a.dueDate ?? a.createdAt ?? 0)).getTime() -
+        new Date(String(b.dueDate ?? b.createdAt ?? 0)).getTime()
+    );
+  const workspaceServiceOrders =
+    workspace.serviceOrders ?? selectedProfile?.serviceOrders ?? [];
+  const workspaceAppointments =
+    workspace.appointments ?? selectedProfile?.appointments ?? [];
+  const workspacePendingCents = workspaceCharges.reduce((total, charge) => {
+    if (!isChargePending(charge)) return total;
+    return total + Number(charge.amountCents ?? charge.amount ?? 0);
+  }, 0);
 
   function openCustomerWhatsApp(customer: Customer, chargeId?: string | null) {
     const customerId = String(customer?.id ?? "");
-    if (!customerId) return toast.error("Cliente sem identificador para abrir WhatsApp.");
+    if (!customerId) {
+      return toast.error("Cliente sem identificador para abrir WhatsApp.");
+    }
     if (!String(customer?.phone ?? "").trim()) {
       return toast.error("Cliente sem telefone/WhatsApp cadastrado.");
     }
-    navigate(`/whatsapp?customerId=${customerId}${chargeId ? `&chargeId=${chargeId}` : ""}`);
+    navigate(
+      `/whatsapp?customerId=${customerId}${chargeId ? `&chargeId=${chargeId}` : ""}`
+    );
+  }
+
+  function runAttentionAction(item: AttentionItem) {
+    if (item.actionLabel.includes("Cobrar") && item.customer) {
+      openCustomerWhatsApp(item.customer, item.chargeId);
+      return;
+    }
+    if (item.actionLabel.includes("contato") && item.customer) {
+      openCustomerWhatsApp(item.customer, item.chargeId);
+      return;
+    }
+    navigate(item.actionPath);
   }
 
   useEffect(() => {
@@ -326,11 +579,14 @@ export default function CustomersPage() {
   }, [activeFilter, searchTerm]);
 
   useEffect(() => {
-    const totalPages = Math.max(1, Math.ceil(displayedCustomers.length / pageSize));
+    const totalPages = Math.max(
+      1,
+      Math.ceil(filteredProfiles.length / pageSize)
+    );
     if (currentPage > totalPages) {
       setCurrentPage(1);
     }
-  }, [currentPage, displayedCustomers.length, pageSize]);
+  }, [currentPage, filteredProfiles.length]);
 
   usePageDiagnostics({
     page: "customers",
@@ -348,70 +604,232 @@ export default function CustomersPage() {
       setActiveCustomerId(queryCustomerId);
       return;
     }
-    if (!activeCustomerId && displayedCustomers.length > 0) {
-      setActiveCustomerId(String(displayedCustomers[0].id));
+    if (!activeCustomerId && filteredProfiles.length > 0) {
+      setActiveCustomerId(filteredProfiles[0].customerId);
     }
-  }, [activeCustomerId, displayedCustomers, location, setActiveCustomerId]);
-
-  const selectedCustomer = useMemo(
-    () =>
-      customers.find(item => String(item.id) === String(activeCustomerId)) ??
-      null,
-    [activeCustomerId, customers]
-  );
+  }, [activeCustomerId, filteredProfiles, location, setActiveCustomerId]);
 
   return (
     <PageWrapper title="Clientes" showOperationalHeader={false}>
       <div className="flex flex-col gap-4">
         <AppOperationalHeader
           title="Clientes"
-          description="Central de relacionamento, execução e histórico operacional por cliente."
+          description="Centro de contexto operacional, financeiro e comunicação de cada relacionamento ativo."
           density="compact"
           primaryAction={
             <Button onClick={() => setCreateOpen(true)}>Novo cliente</Button>
           }
+          contextChips={
+            <>
+              <span className="rounded-md border border-[var(--border-subtle)] px-2 py-1 text-xs text-[var(--text-muted)]">
+                {customers.length} clientes na carteira
+              </span>
+              <span className="rounded-md border border-[var(--border-subtle)] px-2 py-1 text-xs text-[var(--text-muted)]">
+                {
+                  profiles.filter(profile => profile.status === "Em risco")
+                    .length
+                }{" "}
+                em risco
+              </span>
+              <span className="rounded-md border border-[var(--border-subtle)] px-2 py-1 text-xs text-[var(--text-muted)]">
+                {profiles.filter(profile => profile.hasOpenServiceOrder).length}{" "}
+                com O.S. aberta
+              </span>
+            </>
+          }
         >
-          <div className="grid gap-2 md:grid-cols-[1fr_auto]">
+          <div className="grid gap-2 text-xs text-[var(--text-secondary)] md:grid-cols-3">
+            <span className="flex items-center gap-2">
+              <CheckCircle2 className="h-3.5 w-3.5 text-[var(--dashboard-success)]" />
+              Cada cliente mostra contexto e próxima ação.
+            </span>
+            <span className="flex items-center gap-2">
+              <ShieldAlert className="h-3.5 w-3.5 text-[var(--dashboard-warning)]" />
+              Prioridade combina financeiro, O.S. e contato.
+            </span>
+            <span className="flex items-center gap-2">
+              <ArrowRight className="h-3.5 w-3.5 text-[var(--dashboard-info)]" />
+              Ações reais vêm antes da navegação.
+            </span>
+          </div>
+        </AppOperationalHeader>
+
+        <OperationalTopCard
+          contextLabel="Próxima decisão da carteira"
+          title={
+            attentionItems[0]
+              ? attentionItems[0].title
+              : "Carteira sem bloqueio imediato"
+          }
+          description={
+            attentionItems[0]
+              ? attentionItems[0].context
+              : "Os dados retornados não apontam dívida vencida, O.S. aberta ou silêncio prolongado."
+          }
+          chips={
+            <>
+              <ActionCue>Financeiro</ActionCue>
+              <ActionCue>Execução</ActionCue>
+              <ActionCue>Comunicação</ActionCue>
+            </>
+          }
+          primaryAction={
+            attentionItems[0] ? (
+              <Button
+                size="sm"
+                onClick={() => runAttentionAction(attentionItems[0])}
+              >
+                {attentionItems[0].actionLabel}
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setCreateOpen(true)}
+              >
+                Novo cliente
+              </Button>
+            )
+          }
+        />
+
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <AppStatCard
+            label="Saldo em atenção"
+            value={formatCurrency(
+              profiles.reduce(
+                (total, profile) => total + profile.pendingCents,
+                0
+              )
+            )}
+            helper="Soma segura das cobranças pendentes/vencidas retornadas."
+            delta={
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setActiveFilter("pending")}
+              >
+                Filtrar pendências
+              </Button>
+            }
+          />
+          <AppStatCard
+            label="Risco de relacionamento"
+            value={
+              profiles.filter(profile => profile.status === "Em risco").length
+            }
+            helper="Clientes com dívida vencida ou longo período sem contato."
+            delta={
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setActiveFilter("risk")}
+              >
+                Ver risco
+              </Button>
+            }
+          />
+          <AppStatCard
+            label="Execução aberta"
+            value={
+              profiles.filter(profile => profile.hasOpenServiceOrder).length
+            }
+            helper="Clientes com O.S. aberta que ainda pede acompanhamento."
+            delta={
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setActiveFilter("open_os")}
+              >
+                Ver O.S.
+              </Button>
+            }
+          />
+        </div>
+
+        <AppSectionBlock
+          title="Atenção imediata"
+          subtitle="Clientes que podem travar caixa, execução ou resposta no turno."
+          compact
+        >
+          {isLoading ? (
+            <AppPageLoadingState description="Carregando sinais dos clientes..." />
+          ) : attentionItems.length === 0 ? (
+            <AppPageEmptyState
+              title="Nenhum cliente em atenção imediata"
+              description="A carteira não retornou dívida, O.S. aberta ou longo silêncio nos dados disponíveis."
+            />
+          ) : (
+            <div className="grid gap-2 lg:grid-cols-2">
+              {attentionItems.map(item => (
+                <article
+                  key={item.key}
+                  className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3.5"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <AppStatusBadge label={item.status} />
+                        <p className="text-sm font-semibold text-[var(--text-primary)]">
+                          {item.title}
+                        </p>
+                      </div>
+                      <p className="mt-2 text-xs leading-5 text-[var(--text-secondary)]">
+                        {item.context}
+                      </p>
+                    </div>
+                    <Button size="sm" onClick={() => runAttentionAction(item)}>
+                      {item.actionLabel}
+                    </Button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </AppSectionBlock>
+
+        <AppFiltersBar className="shrink-0 gap-3 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-3">
+          <div className="min-w-[220px] flex-1">
             <input
               value={searchTerm}
               onChange={event => setSearchTerm(event.target.value)}
               placeholder="Buscar por nome, telefone ou e-mail"
-              className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm text-[var(--text-primary)]"
+              className="h-9 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)]"
             />
-            <div className="flex h-9 items-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 text-xs text-[var(--text-secondary)]">
-              {customers.length} clientes reais
-            </div>
           </div>
-        </AppOperationalHeader>
-
-        <AppFiltersBar className="shrink-0 gap-2 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-3">
-          {[
-            { key: "all", label: "Todos" },
-            { key: "pending", label: "Com pendência" },
-            { key: "open_os", label: "Com O.S. aberta" },
-            { key: "no_recent_contact", label: "Sem contato recente" },
-            { key: "risk", label: "Em risco" },
-          ].map(item => (
-            <button
-              key={item.key}
-              type="button"
-              className={`h-8 rounded-md px-3 text-xs font-medium transition-colors ${
-                activeFilter === item.key
-                  ? "bg-[var(--accent-soft)] text-[var(--accent-primary)]"
-                  : "bg-[var(--surface-subtle)] text-[var(--text-secondary)]"
-              }`}
-              onClick={() => setActiveFilter(item.key as CustomerFilter)}
-            >
-              {item.label}
-            </button>
-          ))}
+          <div className="flex flex-wrap items-center gap-2">
+            {[
+              { key: "all", label: "Todos" },
+              { key: "pending", label: "Com pendência" },
+              { key: "open_os", label: "Com O.S. aberta" },
+              { key: "no_recent_contact", label: "Sem contato recente" },
+              { key: "risk", label: "Em risco" },
+            ].map(item => (
+              <button
+                key={item.key}
+                type="button"
+                className={cn(
+                  "h-8 rounded-md border px-3 text-xs font-medium transition-colors",
+                  activeFilter === item.key
+                    ? "border-[var(--accent-primary)] bg-[var(--accent-soft)] text-[var(--accent-primary)]"
+                    : "border-[var(--border-subtle)] bg-[var(--surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                )}
+                onClick={() => setActiveFilter(item.key as CustomerFilter)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+          <span className="rounded-md border border-[var(--border-subtle)] px-2 py-1 text-xs text-[var(--text-muted)]">
+            {filteredProfiles.length} resultado(s)
+          </span>
         </AppFiltersBar>
 
-        <div className="flex flex-col gap-3">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
           <AppSectionBlock
             title="Carteira operacional"
-            subtitle="Visão densa com ações por cliente."
-            className="flex flex-col"
+            subtitle="Lista priorizada por contexto, pendência e próxima ação possível."
+            className="xl:col-span-7"
           >
             {isLoading ? (
               <AppPageLoadingState description="Carregando clientes..." />
@@ -427,7 +845,7 @@ export default function CustomersPage() {
               <div className="space-y-3">
                 <AppPageEmptyState
                   title="Nenhum cliente cadastrado"
-                  description="Cadastre o primeiro cliente para iniciar o relacionamento operacional."
+                  description="Cadastre o primeiro cliente para iniciar a memória operacional de relacionamento."
                 />
                 <div className="flex justify-center">
                   <Button onClick={() => setCreateOpen(true)}>
@@ -435,176 +853,156 @@ export default function CustomersPage() {
                   </Button>
                 </div>
               </div>
-            ) : displayedCustomers.length === 0 ? (
+            ) : filteredProfiles.length === 0 ? (
               <AppPageEmptyState
                 title="Busca sem resultado"
-                description="Nenhum cliente corresponde aos filtros e termo pesquisado."
+                description="Nenhum cliente corresponde aos filtros ativos e termo pesquisado."
               />
             ) : (
-              <div className="space-y-2">
-                <div className="grid grid-cols-1 gap-2 lg:grid-cols-2 2xl:grid-cols-3">
-                  {paginatedCustomers.map(customer => {
-                    const customerId = String(customer.id ?? "");
-                    const aggregate = byCustomer.get(customerId);
-                    if (!aggregate) return null;
-
-                    const now = new Date();
-                    const lastInteraction = aggregate.lastInteractionAt;
-                    const daysWithoutContact = lastInteraction
-                      ? Math.floor(
-                          (now.getTime() - lastInteraction.getTime()) /
-                            (1000 * 60 * 60 * 24)
-                        )
-                      : 999;
-                    const hasOpenServiceOrder = aggregate.serviceOrders.some(
-                      order => {
-                        const status = String(order.status ?? "").toUpperCase();
-                        return ["OPEN", "ASSIGNED", "IN_PROGRESS"].includes(
-                          status
-                        );
+              <div className="space-y-2.5">
+                {paginatedProfiles.map(profile => (
+                  <article
+                    key={profile.customerId}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setActiveCustomerId(profile.customerId)}
+                    onKeyDown={event => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        setActiveCustomerId(profile.customerId);
                       }
-                    );
-                    const status = customerStatus({
-                      overdue: aggregate.overdue,
-                      pending: aggregate.pending,
-                      hasOpenServiceOrder,
-                      daysWithoutContact,
-                    });
-
-                    const lastService = aggregate.serviceOrders[0];
-                    const nextAppointment = aggregate.appointments.find(item => {
-                      const startsAt = toDate(item.startsAt);
-                      return startsAt && startsAt.getTime() >= Date.now();
-                    });
-                    const contact =
-                      String(customer.phone ?? "").trim() ||
-                      String(customer.email ?? "").trim() ||
-                      "Sem contato";
-
-                    return (
-                      <article
-                        key={customerId}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => setActiveCustomerId(customerId)}
-                        onKeyDown={event => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault();
-                            setActiveCustomerId(customerId);
-                          }
-                        }}
-                        className={`rounded-lg border p-3 transition-colors ${
-                          customerId === activeCustomerId
-                            ? "border-[var(--accent-primary)] bg-[var(--accent-soft)]/35"
-                            : "border-[var(--border-subtle)] bg-[var(--surface-base)] hover:bg-[var(--surface-subtle)]/60"
-                        }`}
-                      >
-                        <div className="flex min-w-0 items-start gap-2">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex min-w-0 items-center gap-2">
-                              <p className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--text-primary)]">
-                                {String(customer.name ?? "Sem nome")}
-                              </p>
-                              <span className="shrink-0 whitespace-nowrap">
-                                <AppStatusBadge label={status} />
-                              </span>
-                            </div>
-
-                            <p className="mt-0.5 truncate text-[11px] text-[var(--text-secondary)]">
-                              {contact}
-                            </p>
-
-                            <p className="mt-2 truncate text-xs text-[var(--text-secondary)]">
-                              Último serviço:{" "}
-                              <span className="text-[var(--text-primary)]">
-                                {lastService
-                                  ? `${String(lastService.title ?? "O.S.")} · ${String(lastService.status ?? "-")}`
-                                  : "Nenhum serviço registrado"}
-                              </span>
-                            </p>
-                            <p className="mt-1 truncate text-xs text-[var(--text-secondary)]">
-                              Próximo agendamento:{" "}
-                              <span className="text-[var(--text-primary)]">
-                                {nextAppointment
-                                  ? formatDateTime(nextAppointment.startsAt)
-                                  : "Sem agendamento futuro"}
-                              </span>
-                            </p>
-                            {aggregate.pendingCents > 0 ? (
-                              <p className="mt-1 truncate text-xs font-medium text-rose-500">
-                                Saldo pendente:{" "}
-                                {formatCurrency(aggregate.pendingCents)}
-                              </p>
-                            ) : null}
-                          </div>
-
-                          <div
-                            className="shrink-0"
-                            onClick={event => event.stopPropagation()}
-                          >
-                            <AppRowActionsDropdown
-                              triggerLabel="Mais ações"
-                              contentClassName="min-w-[210px]"
-                              items={[
-                                {
-                                  label:
-                                    pendingEditCustomerId === customerId
-                                      ? "Editando..."
-                                      : "Editar",
-                                  tone: "primary",
-                                  onSelect: () => {
-                                    setPendingEditCustomerId(customerId);
-                                    setEditingCustomerId(customerId);
-                                    toast.success("Editor de cliente aberto.");
-                                  },
-                                  disabled: pendingEditCustomerId === customerId,
-                                },
-                                {
-                                  type: "separator",
-                                  label: "Navegação",
-                                },
-                                {
-                                  label: "Abrir cliente",
-                                  onSelect: () => setActiveCustomerId(customerId),
-                                },
-                                {
-                                  label: "Agendar",
-                                  onSelect: () =>
-                                    navigate(
-                                      `/appointments?customerId=${customerId}`
-                                    ),
-                                },
-                                {
-                                  label: "Abrir O.S.",
-                                  onSelect: () =>
-                                    navigate(
-                                      `/service-orders?customerId=${customerId}`
-                                    ),
-                                },
-                                {
-                                  label: "Enviar WhatsApp",
-                                  onSelect: () =>
-                                    openCustomerWhatsApp(
-                                      customer,
-                                      String(aggregate.charges.find(charge => ["OVERDUE", "PENDING"].includes(String(charge?.status ?? "").toUpperCase()))?.id ?? "") || null
-                                    ),
-                                },
-                                {
-                                  label: "Abrir cobrança",
-                                  onSelect: () =>
-                                    navigate(`/finances?customerId=${customerId}`),
-                                }
-                              ]}
-                            />
-                          </div>
+                    }}
+                    className={cn(
+                      "rounded-lg border p-3.5 transition-colors",
+                      profile.customerId === activeCustomerId
+                        ? "border-[var(--accent-primary)] bg-[var(--accent-soft)]/35"
+                        : "border-[var(--border-subtle)] bg-[var(--surface-base)] hover:bg-[var(--surface-subtle)]/60"
+                    )}
+                  >
+                    <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                          <p className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--text-primary)]">
+                            {String(profile.customer.name ?? "Sem nome")}
+                          </p>
+                          <AppStatusBadge label={profile.status} />
                         </div>
-                      </article>
-                    );
-                  })}
-                </div>
+                        <p className="mt-1 truncate text-xs text-[var(--text-secondary)]">
+                          {profile.contact}
+                        </p>
+                        <div className="mt-3 grid gap-2 text-xs text-[var(--text-secondary)] md:grid-cols-2">
+                          <span>
+                            Saldo pendente:{" "}
+                            {formatCurrency(profile.pendingCents)}
+                          </span>
+                          <span>
+                            Última O.S.:{" "}
+                            {profile.lastService
+                              ? `${String(profile.lastService.title ?? "O.S.")} · ${String(profile.lastService.status ?? "-")}`
+                              : "Sem O.S. registrada"}
+                          </span>
+                          <span>
+                            Próximo agendamento:{" "}
+                            {profile.nextAppointment
+                              ? formatDateTime(profile.nextAppointment.startsAt)
+                              : "Sem agenda futura"}
+                          </span>
+                          <span>Sinal: {profile.riskSignal}</span>
+                        </div>
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <ActionCue>{profile.nextActionLabel}</ActionCue>
+                          {profile.pendingCents === 0 ? (
+                            <ActionCue>
+                              Financeiro sem pendência retornada
+                            </ActionCue>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      <div
+                        className="flex shrink-0 flex-wrap items-center gap-2"
+                        onClick={event => event.stopPropagation()}
+                      >
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            if (profile.nextActionLabel.includes("Cobrar")) {
+                              openCustomerWhatsApp(
+                                profile.customer,
+                                profile.pendingChargeId
+                              );
+                              return;
+                            }
+                            navigate(profile.nextActionPath);
+                          }}
+                        >
+                          {profile.nextActionLabel}
+                        </Button>
+                        <AppRowActionsDropdown
+                          triggerLabel="Mais ações"
+                          contentClassName="min-w-[220px]"
+                          items={[
+                            {
+                              label: "Abrir cliente",
+                              tone: "primary",
+                              onSelect: () =>
+                                setActiveCustomerId(profile.customerId),
+                            },
+                            {
+                              label: "Agendar",
+                              onSelect: () =>
+                                navigate(
+                                  `/appointments?customerId=${profile.customerId}`
+                                ),
+                            },
+                            {
+                              label: "Nova O.S.",
+                              onSelect: () =>
+                                navigate(
+                                  `/service-orders?customerId=${profile.customerId}`
+                                ),
+                            },
+                            {
+                              label: "Cobrar",
+                              onSelect: () =>
+                                navigate(
+                                  `/finances?customerId=${profile.customerId}`
+                                ),
+                            },
+                            {
+                              label: "WhatsApp",
+                              onSelect: () =>
+                                openCustomerWhatsApp(
+                                  profile.customer,
+                                  profile.pendingChargeId
+                                ),
+                            },
+                            {
+                              type: "separator",
+                              label: "Cadastro",
+                            },
+                            {
+                              label:
+                                pendingEditCustomerId === profile.customerId
+                                  ? "Editando..."
+                                  : "Editar dados",
+                              onSelect: () => {
+                                setPendingEditCustomerId(profile.customerId);
+                                setEditingCustomerId(profile.customerId);
+                                toast.success("Editor de cliente aberto.");
+                              },
+                              disabled:
+                                pendingEditCustomerId === profile.customerId,
+                            },
+                          ]}
+                        />
+                      </div>
+                    </div>
+                  </article>
+                ))}
                 <AppPagination
                   currentPage={currentPage}
-                  totalItems={displayedCustomers.length}
+                  totalItems={filteredProfiles.length}
                   pageSize={pageSize}
                   onPageChange={setCurrentPage}
                 />
@@ -614,13 +1012,13 @@ export default function CustomersPage() {
 
           <AppSectionBlock
             title="Detalhe do cliente"
-            subtitle="Resumo, status e histórico operacional conectado ao backend."
-            className="flex flex-col"
+            subtitle="Resumo, ações principais, financeiro, O.S., agenda, comunicação e histórico disponível."
+            className="xl:col-span-5"
           >
-            {!activeCustomerId || !selectedCustomer ? (
+            {!activeCustomerId || !selectedCustomer || !selectedProfile ? (
               <AppPageEmptyState
                 title="Selecione um cliente"
-                description="Escolha um cliente na lista para abrir os detalhes operacionais."
+                description="Escolha um cliente na carteira para abrir o centro contextual."
               />
             ) : workspaceQuery.isLoading ? (
               <AppPageLoadingState description="Carregando detalhe do cliente..." />
@@ -632,21 +1030,27 @@ export default function CustomersPage() {
               />
             ) : (
               <div className="space-y-3">
-                <article className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/35 p-3">
-                  <p className="text-sm font-semibold text-[var(--text-primary)]">
-                    {String(selectedCustomer.name ?? "Cliente")}
+                <article className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/35 p-3.5">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-[var(--text-primary)]">
+                        {String(selectedCustomer.name ?? "Cliente")}
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                        {selectedProfile.contact}
+                      </p>
+                    </div>
+                    <AppStatusBadge label={selectedProfile.status} />
+                  </div>
+                  <p className="mt-3 text-xs leading-5 text-[var(--text-secondary)]">
+                    {selectedProfile.riskSignal}. Próxima ação sugerida:{" "}
+                    {selectedProfile.nextActionLabel}.
                   </p>
-                  <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                    {String(selectedCustomer.phone ?? "Sem telefone")} ·{" "}
-                    {String(selectedCustomer.email ?? "Sem e-mail")}
-                  </p>
-                  <p className="mt-1 text-xs text-[var(--text-muted)]">
-                    Status:{" "}
-                    {String(selectedCustomer.active ? "Ativo" : "Inativo")}
-                  </p>
-                  <p className="mt-2 text-xs text-[var(--text-secondary)]">
+                  <p className="mt-2 text-xs text-[var(--text-muted)]">
                     Observações:{" "}
-                    {String(selectedCustomer.notes ?? "Sem observações")}
+                    {String(
+                      selectedCustomer.notes ?? "Sem observações registradas"
+                    )}
                   </p>
                 </article>
 
@@ -655,19 +1059,21 @@ export default function CustomersPage() {
                     size="sm"
                     variant="outline"
                     onClick={() =>
-                      navigate(`/appointments?customerId=${activeCustomerId}`)
+                      navigate(`/service-orders?customerId=${activeCustomerId}`)
                     }
                   >
-                    Agendar
+                    <Wrench className="mr-1.5 h-3.5 w-3.5" />
+                    Nova O.S.
                   </Button>
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() =>
-                      navigate(`/service-orders?customerId=${activeCustomerId}`)
+                      navigate(`/appointments?customerId=${activeCustomerId}`)
                     }
                   >
-                    Abrir O.S.
+                    <CalendarClock className="mr-1.5 h-3.5 w-3.5" />
+                    Agendar
                   </Button>
                   <Button
                     size="sm"
@@ -676,7 +1082,8 @@ export default function CustomersPage() {
                       navigate(`/finances?customerId=${activeCustomerId}`)
                     }
                   >
-                    Abrir cobrança
+                    <CreditCard className="mr-1.5 h-3.5 w-3.5" />
+                    Cobrar
                   </Button>
                   <Button
                     size="sm"
@@ -684,21 +1091,116 @@ export default function CustomersPage() {
                     onClick={() =>
                       openCustomerWhatsApp(
                         selectedCustomer,
-                        String((workspace.charges ?? []).find(charge => ["OVERDUE", "PENDING"].includes(String(charge?.status ?? "").toUpperCase()))?.id ?? "") || null
+                        String(
+                          workspaceCharges.find(isChargePending)?.id ?? ""
+                        ) || null
                       )
                     }
                   >
-                    Enviar WhatsApp
+                    <MessageCircle className="mr-1.5 h-3.5 w-3.5" />
+                    WhatsApp
                   </Button>
+                </div>
+
+                <div className="grid gap-2 md:grid-cols-2">
+                  <article className="rounded-xl border border-[var(--border-subtle)] p-3">
+                    <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                      <CreditCard className="h-3.5 w-3.5" /> Financeiro
+                    </p>
+                    <p className="mt-2 text-lg font-semibold text-[var(--text-primary)]">
+                      {formatCurrency(
+                        workspacePendingCents || selectedProfile.pendingCents
+                      )}
+                    </p>
+                    <p className="text-xs text-[var(--text-muted)]">
+                      {workspaceCharges.length} cobrança(s) relacionadas.
+                    </p>
+                  </article>
+                  <article className="rounded-xl border border-[var(--border-subtle)] p-3">
+                    <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                      <Phone className="h-3.5 w-3.5" /> Comunicação
+                    </p>
+                    <p className="mt-2 text-xs leading-5 text-[var(--text-primary)]">
+                      {String(selectedCustomer.phone ?? "Sem telefone")}
+                    </p>
+                    <p className="text-xs text-[var(--text-muted)]">
+                      WhatsApp abre com contexto do cliente quando há telefone.
+                    </p>
+                  </article>
                 </div>
 
                 <article className="rounded-xl border border-[var(--border-subtle)] p-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-                    Timeline recente
+                    O.S. relacionadas
+                  </p>
+                  <div className="mt-2 space-y-1.5">
+                    {workspaceServiceOrders.slice(0, 3).map((order, index) => (
+                      <div
+                        key={`${String(order.id ?? "order")}-${index}`}
+                        className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/30 p-2"
+                      >
+                        <p className="text-xs font-medium text-[var(--text-primary)]">
+                          {String(order.title ?? order.description ?? "O.S.")}
+                        </p>
+                        <p className="text-[11px] text-[var(--text-muted)]">
+                          {String(order.status ?? "Status não informado")} ·{" "}
+                          {formatDateTime(order.updatedAt ?? order.createdAt)}
+                        </p>
+                      </div>
+                    ))}
+                    {workspaceServiceOrders.length === 0 ? (
+                      <p className="text-xs text-[var(--text-muted)]">
+                        Nenhuma O.S. relacionada retornada.
+                      </p>
+                    ) : null}
+                  </div>
+                </article>
+
+                <article className="rounded-xl border border-[var(--border-subtle)] p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                    Agendamentos relacionados
+                  </p>
+                  <div className="mt-2 space-y-1.5">
+                    {workspaceAppointments
+                      .slice(0, 3)
+                      .map((appointment, index) => (
+                        <div
+                          key={`${String(appointment.id ?? "appointment")}-${index}`}
+                          className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/30 p-2"
+                        >
+                          <p className="text-xs font-medium text-[var(--text-primary)]">
+                            {String(
+                              appointment.title ??
+                                appointment.description ??
+                                "Agendamento"
+                            )}
+                          </p>
+                          <p className="text-[11px] text-[var(--text-muted)]">
+                            {formatDateTime(
+                              appointment.startsAt ?? appointment.createdAt
+                            )}{" "}
+                            ·{" "}
+                            {String(
+                              appointment.status ?? "Status não informado"
+                            )}
+                          </p>
+                        </div>
+                      ))}
+                    {workspaceAppointments.length === 0 ? (
+                      <p className="text-xs text-[var(--text-muted)]">
+                        Nenhum agendamento relacionado retornado.
+                      </p>
+                    ) : null}
+                  </div>
+                </article>
+
+                <article className="rounded-xl border border-[var(--border-subtle)] p-3">
+                  <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                    <AlertTriangle className="h-3.5 w-3.5" /> Timeline recente
                   </p>
                   <ul className="mt-2 space-y-1.5 text-xs text-[var(--text-secondary)]">
                     {(workspace.timeline ?? [])
-                      .slice(0, 6)
+                      .slice(0, 5)
                       .map((event, index) => (
                         <li
                           key={`${String(event.id ?? "event")}-${index}`}
@@ -717,27 +1219,8 @@ export default function CustomersPage() {
                         </li>
                       ))}
                     {(workspace.timeline ?? []).length === 0 ? (
-                      <li>Sem eventos para este cliente.</li>
+                      <li>Sem timeline retornada para este cliente.</li>
                     ) : null}
-                  </ul>
-                </article>
-
-                <article className="rounded-xl border border-[var(--border-subtle)] p-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-                    Blocos conectados
-                  </p>
-                  <ul className="mt-2 space-y-1 text-xs text-[var(--text-secondary)]">
-                    <li>
-                      Agendamentos: {(workspace.appointments ?? []).length}
-                    </li>
-                    <li>
-                      Ordens de serviço:{" "}
-                      {(workspace.serviceOrders ?? []).length}
-                    </li>
-                    <li>
-                      Financeiro (cobranças): {(workspace.charges ?? []).length}
-                    </li>
-                    <li>WhatsApp: disponível via navegação contextual.</li>
                   </ul>
                 </article>
               </div>
