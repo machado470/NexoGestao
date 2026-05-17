@@ -3504,3 +3504,127 @@ html {
     right: 0;
   }
 }
+
+/* Surface harmony patch: operational light surfaces without dark widgets inside light modals. */
+@layer base {
+  .app-root {
+    --surface-operational-light: #eef3fa;
+    --surface-operational-raised-light: #f6f9fd;
+    --surface-operational-muted-light: #e8eff8;
+    --surface-input-light: #f8fbff;
+    --surface-input: var(--surface-input-light);
+    --surface-elevated: var(--surface-operational-raised-light);
+    --text-muted: #526985;
+    --muted-foreground: var(--text-muted);
+    --popover: color-mix(in srgb, var(--surface-operational-raised-light) 92%, #ffffff);
+    --popover-foreground: var(--text-primary);
+    --app-overlay-bg: rgba(15, 23, 42, 0.32);
+    --app-overlay-surface: #f6f9fd;
+    --app-overlay-header: color-mix(in srgb, var(--surface-operational-raised-light) 82%, #ffffff);
+    --app-overlay-body: var(--surface-operational-light);
+    --app-overlay-footer: color-mix(in srgb, var(--surface-operational-muted-light) 86%, #ffffff);
+    --app-overlay-border: color-mix(in srgb, var(--border-subtle) 88%, #ffffff);
+    --modal-card-shadow-light: 0 12px 28px rgba(28, 52, 84, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  }
+
+  .app-root.dark,
+  .app-root[data-theme="dark"] {
+    --surface-operational-light: #111d2e;
+    --surface-operational-raised-light: #152036;
+    --surface-operational-muted-light: #0f172b;
+    --surface-input-light: #1c2432;
+    --surface-input: var(--surface-input-light);
+    --surface-elevated: #152036;
+    --popover: #152036;
+    --popover-foreground: #f0f4ff;
+    --app-overlay-bg: #111d2e;
+    --app-overlay-surface: #152036;
+    --app-overlay-header: #172238;
+    --app-overlay-body: #152036;
+    --app-overlay-footer: #121d31;
+    --app-overlay-border: rgba(139, 156, 192, 0.26);
+  }
+}
+
+@layer components {
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-modal-content {
+    background: var(--app-overlay-surface);
+    border-color: var(--app-overlay-border);
+    box-shadow: var(--app-overlay-shadow);
+  }
+
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-modal-header {
+    background: linear-gradient(180deg, var(--app-overlay-header), color-mix(in srgb, var(--app-overlay-header) 70%, var(--app-overlay-body)));
+    border-bottom-color: var(--app-overlay-border);
+  }
+
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-modal-body {
+    background: var(--app-overlay-body);
+    color: var(--text-secondary);
+  }
+
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-modal-footer {
+    background: linear-gradient(180deg, color-mix(in srgb, var(--app-overlay-footer) 86%, transparent), var(--app-overlay-footer));
+    border-top-color: color-mix(in srgb, var(--app-overlay-border) 92%, #b9c8dc);
+    box-shadow: 0 -10px 22px rgba(28, 52, 84, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  }
+
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-modal-body :where(.nexo-card-base, .nexo-card-kpi, .nexo-card-operational, .nexo-card-informative, .nexo-surface, .nexo-surface-primary, .nexo-surface-operational),
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-modal-body :where(section, article, details, div)[class*="bg-[var(--surface-base)]"],
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-modal-body :where(section, article, details, div)[class*="bg-[var(--surface-elevated)]"] {
+    background: linear-gradient(180deg, var(--surface-operational-raised-light), var(--surface-operational-light));
+    border-color: color-mix(in srgb, var(--border-subtle) 82%, #ffffff);
+    box-shadow: var(--modal-card-shadow-light);
+  }
+
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-modal-body :where(.nexo-card-kpi, .nexo-card-operational, .nexo-surface-operational) {
+    background: linear-gradient(170deg, var(--surface-operational-raised-light), color-mix(in srgb, var(--surface-operational-light) 84%, var(--accent-soft)));
+  }
+
+  .app-root:not(.dark):not([data-theme="dark"]) :where(input:not([type="checkbox"]):not([type="radio"]), textarea, [data-slot="select-trigger"]) {
+    background: var(--surface-input);
+    border-color: color-mix(in srgb, var(--border-subtle) 90%, #ffffff);
+    color: var(--text-primary);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.62), 0 1px 2px rgba(28, 52, 84, 0.04);
+  }
+
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-modal-body :where(input:not([type="checkbox"]):not([type="radio"]), textarea, [data-slot="select-trigger"]) {
+    background: color-mix(in srgb, var(--surface-input-light) 88%, var(--surface-operational-light));
+  }
+
+  .app-root:not(.dark):not([data-theme="dark"]) :where(input:not([type="checkbox"]):not([type="radio"]), textarea)::placeholder,
+  .app-root:not(.dark):not([data-theme="dark"]) [data-placeholder],
+  .app-root:not(.dark):not([data-theme="dark"]) [data-slot="select-trigger"][data-placeholder] {
+    color: var(--text-muted);
+    opacity: 1;
+  }
+
+  .app-root:not(.dark):not([data-theme="dark"]) :where(.nexo-section-description, .nexo-page-header-description, .nexo-zone-title, .text-\[var\(--text-muted\)\]) {
+    color: var(--text-muted);
+  }
+
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-floating-panel,
+  .app-root:not(.dark):not([data-theme="dark"]) [data-slot="dropdown-menu-content"],
+  .app-root:not(.dark):not([data-theme="dark"]) [data-slot="dropdown-menu-sub-content"],
+  .app-root:not(.dark):not([data-theme="dark"]) [data-slot="popover-content"],
+  .app-root:not(.dark):not([data-theme="dark"]) [data-slot="select-content"] {
+    background: linear-gradient(180deg, var(--popover), var(--surface-operational-light));
+    color: var(--popover-foreground);
+    border-color: var(--app-overlay-border);
+    box-shadow: 0 18px 42px rgba(28, 52, 84, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(16px);
+  }
+
+  .app-root:not(.dark):not([data-theme="dark"]) :where([data-slot="dropdown-menu-item"], [data-slot="dropdown-menu-checkbox-item"], [data-slot="dropdown-menu-radio-item"], [data-slot="dropdown-menu-sub-trigger"], [data-slot="select-item"], [data-slot="command-item"]) {
+    color: var(--text-secondary);
+  }
+
+  .app-root:not(.dark):not([data-theme="dark"]) :where([data-slot="dropdown-menu-item"], [data-slot="dropdown-menu-checkbox-item"], [data-slot="dropdown-menu-radio-item"], [data-slot="dropdown-menu-sub-trigger"], [data-slot="select-item"], [data-slot="command-item"]):is(:hover, :focus, [data-highlighted], [data-selected="true"]) {
+    background: var(--accent-soft);
+    color: var(--text-primary);
+  }
+
+  .app-root:not(.dark):not([data-theme="dark"]) :where([data-slot="dropdown-menu-label"], [data-slot="command-group"] [cmdk-group-heading]) {
+    color: var(--text-muted);
+  }
+}
