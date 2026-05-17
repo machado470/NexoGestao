@@ -594,7 +594,17 @@ export const nexoProxyRouter = router({
       }
 
       const { id: _id, ...payload } = input ?? {};
-      return authedPatch(ctx as CtxLike, `/appointments/${id}`, payload);
+      const updatePayload = { ...payload };
+
+      if (!updatePayload.expectedUpdatedAt) {
+        const current = await authedGet(ctx as CtxLike, `/appointments/${id}`) as { updatedAt?: string | null };
+        if (!current?.updatedAt) {
+          throw new Error("Não foi possível obter a versão atual do agendamento.");
+        }
+        updatePayload.expectedUpdatedAt = current.updatedAt;
+      }
+
+      return authedPatch(ctx as CtxLike, `/appointments/${id}`, updatePayload);
     }),
   }),
 
