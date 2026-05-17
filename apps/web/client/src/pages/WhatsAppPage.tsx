@@ -61,6 +61,7 @@ import {
 } from "@/lib/whatsappActionExecution";
 
 type ConversationFilter =
+  | "all"
   | "critical_now"
   | "waiting_customer"
   | "today_commitments"
@@ -567,6 +568,7 @@ const FILTERS: Array<{
   label: string;
   count: string;
 }> = [
+  { value: "all", label: "Geral", count: "" },
   { value: "critical_now", label: "Críticas", count: "" },
   { value: "waiting_customer", label: "Aguardando", count: "" },
   { value: "today_commitments", label: "Com contexto", count: "" },
@@ -2138,11 +2140,7 @@ export default function WhatsAppPage() {
     "nexo.whatsapp.search.v2",
     ""
   );
-  const [activeFilter, setActiveFilter] =
-    useOperationalMemoryState<ConversationFilter>(
-      "nexo.whatsapp.filter.v3",
-      "critical_now"
-    );
+  const [activeFilter, setActiveFilter] = useState<ConversationFilter>("all");
   const [content, setContent] = useOperationalMemoryState(
     "nexo.whatsapp.composer.v2",
     ""
@@ -2164,14 +2162,7 @@ export default function WhatsAppPage() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  const filtersInput = useMemo(() => {
-    const input: Record<string, unknown> = {};
-    if (activeFilter === "waiting_customer") input.onlyUnread = true;
-    if (activeFilter === "critical_now") input.onlyFailed = true;
-    if (activeFilter === "today_commitments") input.onlyPending = true;
-    if (activeFilter === "resolved") input.status = "RESOLVED";
-    return input;
-  }, [activeFilter, debouncedSearch]);
+  const filtersInput = useMemo<Record<string, unknown>>(() => ({}), []);
 
   const healthQuery = trpc.nexo.whatsapp.health.useQuery(undefined, {
     retry: false,
@@ -2381,9 +2372,9 @@ export default function WhatsAppPage() {
           .toLowerCase();
         const matchesSearch = !query || searchable.includes(query);
         if (!matchesSearch) return false;
+        if (activeFilter === "all") return true;
         if (activeFilter === "critical_now")
           return item.priority === "CRITICAL" || item.status === "FAILED";
-        if (!item.conversationId) return Boolean(query);
         if (activeFilter === "waiting_customer")
           return item.unreadCount > 0 || item.hasNoResponse;
         if (activeFilter === "today_commitments")
