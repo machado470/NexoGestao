@@ -13,7 +13,7 @@ import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import { Button } from "@/components/design-system";
-import { AppRowActionsDropdown } from "@/components/app-system";
+import { AppRowActionsDropdown, AppStatCard } from "@/components/app-system";
 import {
   AppFiltersBar,
   AppOperationalHeader,
@@ -26,6 +26,7 @@ import {
 } from "@/components/internal-page-system";
 import CreateServiceOrderModal from "@/components/CreateServiceOrderModal";
 import EditServiceOrderModal from "@/components/EditServiceOrderModal";
+import { cn } from "@/lib/utils";
 
 type ServiceOrdersFilter =
   | "all"
@@ -77,6 +78,58 @@ function getStatusTone(status: string, isOverdue: boolean) {
   if (["OPEN", "ASSIGNED"].includes(status)) return "Pendente";
   if (status === "CANCELED") return "Bloqueado";
   return "Pendente";
+}
+
+function getChargeStatusLabel(charge: any, hasCharge: boolean) {
+  if (!hasCharge) return "Sem cobrança";
+  const status = String(charge?.status ?? "").toUpperCase();
+  if (status === "PAID") return "Cobrança paga";
+  if (status === "OVERDUE") return "Cobrança vencida";
+  if (status === "PENDING") return "Cobrança pendente";
+  return "Cobrança vinculada";
+}
+
+function getPrimaryAction(item: {
+  status: string;
+  isOverdue: boolean;
+  hasCharge: boolean;
+  assignedToPersonId: string;
+}) {
+  if (item.status === "DONE" && !item.hasCharge) {
+    return { label: "Gerar cobrança", type: "charge" as const, reason: "Concluída sem cobrança" };
+  }
+  if (item.isOverdue) {
+    return item.status === "IN_PROGRESS"
+      ? { label: "Concluir ou replanejar", type: "complete" as const, reason: "Prazo vencido" }
+      : { label: "Iniciar agora", type: "start" as const, reason: "Atrasada sem execução" };
+  }
+  if (!item.assignedToPersonId && item.status !== "DONE" && item.status !== "CANCELED") {
+    return { label: "Definir responsável", type: "edit" as const, reason: "Sem responsável" };
+  }
+  if (["OPEN", "ASSIGNED"].includes(item.status)) {
+    return { label: "Iniciar", type: "start" as const, reason: "Pronta para execução" };
+  }
+  if (item.status === "IN_PROGRESS") {
+    return { label: "Concluir", type: "complete" as const, reason: "Execução em andamento" };
+  }
+  if (item.status === "DONE") {
+    return { label: "Abrir detalhe", type: "select" as const, reason: "Execução concluída" };
+  }
+  return { label: "Revisar O.S.", type: "select" as const, reason: "Dados incompletos" };
+}
+
+function getRiskLabel(item: {
+  status: string;
+  isOverdue: boolean;
+  hasCharge: boolean;
+  assignedToPersonId: string;
+  dueDate: Date | null;
+}) {
+  if (item.status === "DONE" && !item.hasCharge) return "Alerta: concluída sem cobrança";
+  if (item.isOverdue) return "Atrasada";
+  if (!item.assignedToPersonId && item.status !== "DONE" && item.status !== "CANCELED") return "Sem responsável";
+  if (item.status === "IN_PROGRESS" && !item.dueDate) return "Em risco: sem prazo";
+  return "Sem bloqueio crítico";
 }
 
 function safeText(value: unknown, fallback = "—") {
@@ -230,7 +283,7 @@ export default function ServiceOrdersPage() {
         order?.assignedToPersonId ?? order?.assignedTo?.id ?? ""
       );
 
-      return {
+      const enriched = {
         raw: order,
         id,
         code: safeText(order?.number ?? order?.code ?? order?.id),
@@ -251,6 +304,7 @@ export default function ServiceOrdersPage() {
         dueDateLabel: formatDate(order?.dueDate ?? order?.scheduledFor, "Sem prazo"),
         amountCents: Number(order?.amountCents ?? linkedCharge?.amountCents ?? 0) || 0,
         hasCharge,
+        financialStatusLabel: getChargeStatusLabel(linkedCharge, hasCharge),
         linkedCharge,
         isOverdue,
         appointmentId,
@@ -262,6 +316,12 @@ export default function ServiceOrdersPage() {
         ),
         startedAt: order?.startedAt ?? order?.executionStartedAt ?? null,
         finishedAt: order?.endedAt ?? order?.finishedAt ?? null,
+      };
+
+      return {
+        ...enriched,
+        riskLabel: getRiskLabel(enriched),
+        nextAction: getPrimaryAction(enriched),
       };
     });
   }, [appointmentById, chargeByServiceOrderId, customerById, peopleById, serviceOrders]);
@@ -277,7 +337,7 @@ export default function ServiceOrdersPage() {
         return false;
       if (activeFilter === "overdue" && !item.isOverdue) return false;
       if (activeFilter === "done" && item.status !== "DONE") return false;
-      if (activeFilter === "without_charge" && item.hasCharge) return false;
+      if (activeFilter === "without_charge" && (item.status !== "DONE" || item.hasCharge)) return false;
 
       if (normalizedTerm) {
         const hay = `${item.code} ${item.customerName} ${item.title} ${item.description}`.toLowerCase();
@@ -341,9 +401,74 @@ export default function ServiceOrdersPage() {
     const progress = enrichedOrders.filter(item => item.status === "IN_PROGRESS").length;
     const overdue = enrichedOrders.filter(item => item.isOverdue).length;
     const done = enrichedOrders.filter(item => item.status === "DONE").length;
+    const doneWithoutCharge = enrichedOrders.filter(
+      item => item.status === "DONE" && !item.hasCharge
+    ).length;
     const noCharge = enrichedOrders.filter(item => !item.hasCharge).length;
-    return { all: enrichedOrders.length, open, progress, overdue, done, noCharge };
+    const unassigned = enrichedOrders.filter(
+      item => !item.assignedToPersonId && item.status !== "DONE" && item.status !== "CANCELED"
+    ).length;
+    return { all: enrichedOrders.length, open, progress, overdue, done, doneWithoutCharge, noCharge, unassigned };
   }, [enrichedOrders]);
+
+  const immediateAttention = useMemo(() => {
+    const ranked = enrichedOrders
+      .filter(
+        item =>
+          item.isOverdue ||
+          (!item.assignedToPersonId && item.status !== "DONE" && item.status !== "CANCELED") ||
+          (item.status === "DONE" && !item.hasCharge) ||
+          (item.status === "IN_PROGRESS" && !item.dueDate)
+      )
+      .sort((a, b) => {
+        const score = (item: typeof a) => {
+          if (item.status === "DONE" && !item.hasCharge) return 4;
+          if (item.isOverdue) return 3;
+          if (!item.assignedToPersonId) return 2;
+          return 1;
+        };
+        return score(b) - score(a);
+      });
+    return ranked.slice(0, 4);
+  }, [enrichedOrders]);
+
+  const nextExecution = useMemo(() => {
+    return immediateAttention[0] ??
+      enrichedOrders.find(item => item.status === "IN_PROGRESS") ??
+      enrichedOrders.find(item => ["OPEN", "ASSIGNED"].includes(item.status)) ??
+      enrichedOrders.find(item => item.status === "DONE" && !item.hasCharge) ??
+      null;
+  }, [enrichedOrders, immediateAttention]);
+
+  const operationalKpis = useMemo(
+    () => [
+      {
+        label: "Abertas",
+        value: counts.open,
+        helper: "O.S. aguardando início ou dono da execução.",
+        filter: "open" as ServiceOrdersFilter,
+      },
+      {
+        label: "Em andamento",
+        value: counts.progress,
+        helper: "Serviços ativos que precisam avançar no turno.",
+        filter: "in_progress" as ServiceOrdersFilter,
+      },
+      {
+        label: "Atrasadas",
+        value: counts.overdue,
+        helper: counts.overdue > 0 ? "Prioridade visual máxima na carteira." : "Nenhum prazo vencido retornado.",
+        filter: "overdue" as ServiceOrdersFilter,
+      },
+      {
+        label: "Concluídas / sem cobrança",
+        value: `${counts.done} / ${counts.doneWithoutCharge}`,
+        helper: counts.doneWithoutCharge > 0 ? "Alerta forte: execução virou caixa pendente." : "Concluídas retornadas estão cobertas.",
+        filter: "without_charge" as ServiceOrdersFilter,
+      },
+    ],
+    [counts]
+  );
 
   const anyActionPending = updateMutation.isPending || generateChargeMutation.isPending;
   const isPendingAction = (orderId: string, type: "start" | "complete" | "charge") =>
@@ -411,6 +536,26 @@ export default function ServiceOrdersPage() {
     }
   }
 
+  function runPrimaryAction(item: NonNullable<typeof selectedOrder>) {
+    if (item.nextAction.type === "start") {
+      void handleStart(item.id);
+      return;
+    }
+    if (item.nextAction.type === "complete") {
+      void handleComplete(item.id);
+      return;
+    }
+    if (item.nextAction.type === "charge") {
+      void handleGenerateCharge(item.id);
+      return;
+    }
+    if (item.nextAction.type === "edit") {
+      setEditingId(item.id);
+      return;
+    }
+    setSelectedOrderId(item.id);
+  }
+
   async function handleGenerateCharge(orderId: string) {
     if (!capabilities.generateCharge) {
       setActionFeedback("Ação indisponível: endpoint de cobrança não disponível.");
@@ -450,12 +595,25 @@ export default function ServiceOrdersPage() {
       <div className="flex flex-col gap-4">
           <AppOperationalHeader
             title="Ordens de Serviço"
-            description="Execução, status e cobrança dos serviços."
+            description="Centro de execução: priorize atrasos, responsáveis, conclusão e cobrança antes de navegar."
             density="compact"
             primaryAction={
               <Button type="button" onClick={() => setOpenCreate(true)}>
                 Nova O.S.
               </Button>
+            }
+            contextChips={
+              <>
+                <span className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-2 py-1 text-xs text-[var(--text-secondary)]">
+                  {counts.all} O.S. retornadas
+                </span>
+                <span className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-2 py-1 text-xs text-[var(--text-secondary)]">
+                  {counts.overdue} atrasada(s)
+                </span>
+                <span className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-2 py-1 text-xs text-[var(--text-secondary)]">
+                  {counts.doneWithoutCharge} concluída(s) sem cobrança
+                </span>
+              </>
             }
           >
             <div className="grid gap-2 md:grid-cols-[1fr_auto]">
@@ -466,10 +624,46 @@ export default function ServiceOrdersPage() {
                 className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm text-[var(--text-primary)]"
               />
               <div className="flex h-9 items-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 text-xs text-[var(--text-secondary)]">
-                {filteredOrders.length} / {counts.all} O.S. reais
+                {filteredOrders.length} / {counts.all} O.S. na carteira
               </div>
             </div>
           </AppOperationalHeader>
+
+          <OperationalTopCard
+            title={nextExecution ? `Próxima execução: #${nextExecution.code}` : "Próxima execução"}
+            description={
+              nextExecution
+                ? `${nextExecution.customerName} · ${nextExecution.nextAction.reason} · ${nextExecution.dueDateLabel}`
+                : "Nenhuma O.S. retornada pelo backend para priorização operacional."
+            }
+            primaryAction={
+              nextExecution ? (
+                <Button size="sm" onClick={() => runPrimaryAction(nextExecution)}>
+                  {nextExecution.nextAction.label}
+                </Button>
+              ) : (
+                <Button size="sm" variant="outline" onClick={() => setOpenCreate(true)}>
+                  Criar O.S.
+                </Button>
+              )
+            }
+          />
+
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {operationalKpis.map(kpi => (
+              <AppStatCard
+                key={kpi.label}
+                label={kpi.label}
+                value={kpi.value}
+                helper={kpi.helper}
+                delta={
+                  <Button size="sm" variant="ghost" onClick={() => setActiveFilter(kpi.filter)}>
+                    Ver carteira
+                  </Button>
+                }
+              />
+            ))}
+          </div>
 
           <AppFiltersBar className="shrink-0 gap-2 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-3">
             {[
@@ -478,16 +672,17 @@ export default function ServiceOrdersPage() {
               { key: "in_progress", label: `Em andamento (${counts.progress})` },
               { key: "overdue", label: `Atrasadas (${counts.overdue})` },
               { key: "done", label: `Concluídas (${counts.done})` },
-              { key: "without_charge", label: `Sem cobrança (${counts.noCharge})` },
+              { key: "without_charge", label: `Concluídas sem cobrança (${counts.doneWithoutCharge})` },
             ].map(filter => (
               <button
                 key={filter.key}
                 type="button"
-                className={`h-8 rounded-md px-3 text-xs font-medium transition-colors ${
+                className={cn(
+                  "h-8 rounded-md border px-3 text-xs font-medium transition-colors",
                   activeFilter === filter.key
-                    ? "bg-[var(--accent-soft)] text-[var(--accent-primary)]"
-                    : "bg-[var(--surface-subtle)] text-[var(--text-secondary)] hover:bg-[var(--surface-subtle)]/80 hover:text-[var(--text-primary)]"
-                }`}
+                    ? "border-[var(--accent-primary)] bg-[var(--accent-soft)] text-[var(--accent-primary)]"
+                    : "border-[var(--border-subtle)] bg-[var(--surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                )}
                 onClick={() => setActiveFilter(filter.key as ServiceOrdersFilter)}
               >
                 {filter.label}
@@ -495,7 +690,56 @@ export default function ServiceOrdersPage() {
             ))}
           </AppFiltersBar>
 
-          <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+            <AppSectionBlock
+              title="Atenção imediata"
+              subtitle="Atraso, ausência de responsável, conclusão sem cobrança e risco de parada aparecem antes da lista."
+              className="xl:col-span-5"
+            >
+              {isLoading ? (
+                <AppPageLoadingState description="Carregando alertas de O.S..." />
+              ) : immediateAttention.length === 0 ? (
+                <AppPageEmptyState
+                  title="Sem alerta imediato"
+                  description="Os dados retornados não indicam O.S. atrasada, sem responsável, concluída sem cobrança ou parada sem prazo."
+                />
+              ) : (
+                <div className="space-y-2">
+                  {immediateAttention.map(item => (
+                    <article
+                      key={`attention-${item.id}`}
+                      className={cn(
+                        "rounded-lg border p-3",
+                        item.status === "DONE" && !item.hasCharge
+                          ? "border-[var(--dashboard-danger)] bg-[color-mix(in_srgb,var(--dashboard-danger)_8%,var(--surface-subtle))]"
+                          : item.isOverdue
+                            ? "border-[var(--status-danger)] bg-[color-mix(in_srgb,var(--status-danger)_8%,var(--surface-subtle))]"
+                            : "border-[var(--border-subtle)] bg-[var(--surface-subtle)]"
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
+                            #{item.code} · {item.customerName}
+                          </p>
+                          <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                            {item.riskLabel}
+                          </p>
+                          <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+                            {item.title} · {item.responsibleName} · {item.dueDateLabel}
+                          </p>
+                        </div>
+                        <Button size="sm" onClick={() => runPrimaryAction(item)}>
+                          {item.nextAction.label}
+                        </Button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </AppSectionBlock>
+
+          <div className="flex flex-col gap-4 xl:col-span-7">
             <AppSectionBlock
               title="Carteira de O.S."
               subtitle="Lista compacta para execução operacional"
@@ -542,11 +786,13 @@ export default function ServiceOrdersPage() {
                             setSelectedOrderId(item.id);
                           }
                         }}
-                        className={`rounded-lg border p-3 text-left transition-colors ${
+                        className={cn(
+                          "rounded-lg border p-3 text-left transition-colors",
                           selectedOrder?.id === item.id
-                            ? "border-orange-500 bg-white/[0.03]"
-                            : "border-[var(--border-subtle)] bg-[var(--surface-base)] hover:bg-[var(--surface-subtle)]/70"
-                        }`}
+                            ? "border-[var(--accent-primary)] bg-[var(--accent-soft)]"
+                            : "border-[var(--border-subtle)] bg-[var(--surface-base)] hover:bg-[var(--surface-subtle)]/70",
+                          item.isOverdue ? "border-[var(--status-danger)]" : null
+                        )}
                       >
                         <div className="flex min-w-0 items-start gap-2">
                           <div className="min-w-0 flex-1">
@@ -573,14 +819,38 @@ export default function ServiceOrdersPage() {
                               <span className="truncate">Valor: {formatCurrency(item.amountCents)}</span>
                               <span className="truncate">Execução: {item.statusLabel}</span>
                               <span
-                                className={`truncate ${
-                                  item.hasCharge
-                                    ? "text-[var(--text-muted)]"
-                                    : "text-amber-400/90"
-                                }`}
+                                className={cn(
+                                  "truncate",
+                                  item.status === "DONE" && !item.hasCharge
+                                    ? "text-[var(--status-danger)]"
+                                    : "text-[var(--text-muted)]"
+                                )}
                               >
-                                {item.hasCharge ? "Com cobrança" : "Sem cobrança"}
+                                {item.financialStatusLabel}
                               </span>
+                            </div>
+
+                            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border-subtle)] pt-2">
+                              <div className="min-w-0 text-[11px] text-[var(--text-muted)]">
+                                <span className="block truncate">Responsável: {item.responsibleName}</span>
+                                <span className={cn(
+                                  "block truncate",
+                                  item.riskLabel === "Sem bloqueio crítico"
+                                    ? "text-[var(--text-muted)]"
+                                    : "text-[var(--status-danger)]"
+                                )}>
+                                  Pendência: {item.riskLabel}
+                                </span>
+                              </div>
+                              <Button
+                                size="sm"
+                                onClick={event => {
+                                  event.stopPropagation();
+                                  runPrimaryAction(item);
+                                }}
+                              >
+                                {item.nextAction.label}
+                              </Button>
                             </div>
                           </div>
 
@@ -835,6 +1105,7 @@ export default function ServiceOrdersPage() {
             </AppSectionBlock>
           </div>
         </div>
+      </div>
 
         <CreateServiceOrderModal
           open={openCreate}
