@@ -10,13 +10,19 @@ import {
   AppDataTable,
   AppPageEmptyState,
   AppPageErrorState,
-  AppPageHeader,
+  AppOperationalHeader,
+  AppOperationalBar,
   AppPageLoadingState,
   AppPagination,
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
-import { AppPageShell, AppRowActionsDropdown, AppStatCard } from "@/components/app-system";
+import {
+  AppInfoCard,
+  AppPageShell,
+  AppRowActionsDropdown,
+  AppStatCard,
+} from "@/components/app-system";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
 import { safeDate } from "@/lib/operational/kpi";
 import { trpc } from "@/lib/trpc";
@@ -48,7 +54,9 @@ function formatDate(value: unknown) {
 }
 
 function normalizeStatus(value: unknown) {
-  return String(value ?? "").trim().toUpperCase();
+  return String(value ?? "")
+    .trim()
+    .toUpperCase();
 }
 
 function computeDaysOverdue(value: unknown) {
@@ -58,7 +66,9 @@ function computeDaysOverdue(value: unknown) {
   start.setHours(0, 0, 0, 0);
   const due = new Date(dueDate);
   due.setHours(0, 0, 0, 0);
-  const diff = Math.floor((start.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
+  const diff = Math.floor(
+    (start.getTime() - due.getTime()) / (1000 * 60 * 60 * 24)
+  );
   return Math.max(diff, 0);
 }
 
@@ -89,6 +99,81 @@ function statusMatchesFilter(status: string, filter: StatusFilter) {
   return true;
 }
 
+function safeText(value: unknown, fallback = "—") {
+  const text = String(value ?? "").trim();
+  return text.length > 0 ? text : fallback;
+}
+
+function getChargePrimaryAction(charge: ChargeRecord) {
+  const status = normalizeStatus(charge?.status);
+  if (status === "OVERDUE") {
+    return {
+      label: "Cobrar agora",
+      reason: "Cobrança vencida precisa de ação",
+      kind: "collect" as const,
+    };
+  }
+  if (status === "PENDING") {
+    return {
+      label: "Enviar link",
+      reason: "Pendência ativa antes de virar atraso",
+      kind: "collect" as const,
+    };
+  }
+  if (status === "PAID") {
+    return {
+      label: "Ver recebimento",
+      reason: "Pagamento já confirmado",
+      kind: "detail" as const,
+    };
+  }
+  return {
+    label: "Revisar",
+    reason: "Status exige conferência",
+    kind: "detail" as const,
+  };
+}
+
+function getChargeRisk(charge: ChargeRecord) {
+  const status = normalizeStatus(charge?.status);
+  if (status === "OVERDUE")
+    return `Risco alto · ${Number(charge?.overdueDays ?? 0)} dia(s) em atraso`;
+  if (status === "PENDING" && !safeDate(charge?.dueDate))
+    return "Pendência: sem vencimento confiável";
+  if (status === "PENDING")
+    return "Risco monitorado · cobrar antes do vencimento";
+  if (status === "PAID") return "Sem risco financeiro imediato";
+  if (status === "CANCELED") return "Cancelada · sem ação de cobrança";
+  return "Revisar dados da cobrança";
+}
+
+function hasRegisteredPayment(charge: ChargeRecord) {
+  if (normalizeStatus(charge?.status) !== "PAID") return true;
+  return Array.isArray(charge?.payments) && charge.payments.length > 0;
+}
+
+function getCommunicationState(charge: ChargeRecord) {
+  const communicationFields = [
+    charge?.whatsappSentAt,
+    charge?.lastWhatsappSentAt,
+    charge?.reminderSentAt,
+    charge?.lastReminderAt,
+    charge?.paymentLinkSentAt,
+    charge?.messageSentAt,
+  ];
+
+  if (communicationFields.some(Boolean)) return "sent" as const;
+  if (
+    "whatsappSentAt" in charge ||
+    "lastWhatsappSentAt" in charge ||
+    "reminderSentAt" in charge ||
+    "lastReminderAt" in charge
+  ) {
+    return "not_sent" as const;
+  }
+  return "unknown" as const;
+}
+
 export default function FinancesPage() {
   const [location, navigate] = useLocation();
   const [openCreate, setOpenCreate] = useState(false);
@@ -99,8 +184,12 @@ export default function FinancesPage() {
   const _operationalSeverityContract: OperationalSeverity = "healthy";
   void _operationalSeverityContract;
   const [selectedChargeId, setSelectedChargeId] = useState<string | null>(null);
-  const [openPayModalFor, setOpenPayModalFor] = useState<ChargeRecord | null>(null);
-  const [openEditModalFor, setOpenEditModalFor] = useState<ChargeRecord | null>(null);
+  const [openPayModalFor, setOpenPayModalFor] = useState<ChargeRecord | null>(
+    null
+  );
+  const [openEditModalFor, setOpenEditModalFor] = useState<ChargeRecord | null>(
+    null
+  );
   const [payMethod, setPayMethod] = useState<PaymentMethod>("PIX");
   const [payAmount, setPayAmount] = useState("");
   const [payDate, setPayDate] = useState("");
@@ -119,39 +208,66 @@ export default function FinancesPage() {
     };
   }, [location]);
 
-  const chargesQuery = trpc.finance.charges.list.useQuery({ page: 1, limit: 500 }, { retry: false });
-  const customersQuery = trpc.nexo.customers.list.useQuery({ page: 1, limit: 500 }, { retry: false });
-  const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery({ page: 1, limit: 500 }, { retry: false });
+  const chargesQuery = trpc.finance.charges.list.useQuery(
+    { page: 1, limit: 500 },
+    { retry: false }
+  );
+  const customersQuery = trpc.nexo.customers.list.useQuery(
+    { page: 1, limit: 500 },
+    { retry: false }
+  );
+  const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery(
+    { page: 1, limit: 500 },
+    { retry: false }
+  );
 
   const markPaidMutation = trpc.finance.charges.pay.useMutation();
   const cancelMutation = trpc.finance.charges.delete.useMutation();
   const editMutation = trpc.finance.charges.update.useMutation();
 
-  const charges = useMemo(() => normalizeArrayPayload<ChargeRecord>(chargesQuery.data), [chargesQuery.data]);
-  const customers = useMemo(() => normalizeArrayPayload<any>(customersQuery.data), [customersQuery.data]);
-  const serviceOrders = useMemo(() => normalizeArrayPayload<any>(serviceOrdersQuery.data), [serviceOrdersQuery.data]);
+  const charges = useMemo(
+    () => normalizeArrayPayload<ChargeRecord>(chargesQuery.data),
+    [chargesQuery.data]
+  );
+  const customers = useMemo(
+    () => normalizeArrayPayload<any>(customersQuery.data),
+    [customersQuery.data]
+  );
+  const serviceOrders = useMemo(
+    () => normalizeArrayPayload<any>(serviceOrdersQuery.data),
+    [serviceOrdersQuery.data]
+  );
 
   const customerById = useMemo(
-    () => new Map(customers.map((item) => [String(item?.id ?? ""), item])),
+    () => new Map(customers.map(item => [String(item?.id ?? ""), item])),
     [customers]
   );
 
   const serviceOrderById = useMemo(
-    () => new Map(serviceOrders.map((item) => [String(item?.id ?? ""), item])),
+    () => new Map(serviceOrders.map(item => [String(item?.id ?? ""), item])),
     [serviceOrders]
   );
 
-  const allQueriesLoading = chargesQuery.isLoading || customersQuery.isLoading || serviceOrdersQuery.isLoading;
+  const allQueriesLoading =
+    chargesQuery.isLoading ||
+    customersQuery.isLoading ||
+    serviceOrdersQuery.isLoading;
   const allQueriesErrored = Boolean(chargesQuery.error && charges.length === 0);
 
   const enrichedCharges = useMemo<ChargeRecord[]>(() => {
     return charges.map((charge: ChargeRecord) => {
-      const customerId = String(charge?.customerId ?? charge?.customer?.id ?? "");
-      const serviceOrderId = String(charge?.serviceOrderId ?? charge?.serviceOrder?.id ?? "");
+      const customerId = String(
+        charge?.customerId ?? charge?.customer?.id ?? ""
+      );
+      const serviceOrderId = String(
+        charge?.serviceOrderId ?? charge?.serviceOrder?.id ?? ""
+      );
       const status = normalizeStatus(charge?.status);
       const customer = charge?.customer ?? customerById.get(customerId) ?? null;
-      const serviceOrder = charge?.serviceOrder ?? serviceOrderById.get(serviceOrderId) ?? null;
-      const overdueDays = status === "OVERDUE" ? computeDaysOverdue(charge?.dueDate) : 0;
+      const serviceOrder =
+        charge?.serviceOrder ?? serviceOrderById.get(serviceOrderId) ?? null;
+      const overdueDays =
+        status === "OVERDUE" ? computeDaysOverdue(charge?.dueDate) : 0;
 
       return {
         ...charge,
@@ -160,26 +276,46 @@ export default function FinancesPage() {
         serviceOrderId,
         customer,
         serviceOrder,
-        customerName: String(customer?.name ?? charge?.customerName ?? "Cliente não identificado"),
-        serviceOrderLabel: String(serviceOrder?.number ?? serviceOrder?.id ?? serviceOrderId ?? "Sem O.S."),
+        customerName: String(
+          customer?.name ?? charge?.customerName ?? "Cliente não identificado"
+        ),
+        serviceOrderLabel: String(
+          serviceOrder?.number ??
+            serviceOrder?.id ??
+            serviceOrderId ??
+            "Sem O.S."
+        ),
         overdueDays,
       } as ChargeRecord;
     });
   }, [charges, customerById, serviceOrderById]);
 
   const scopedCharges = useMemo(() => {
-    return enrichedCharges.filter((charge) => {
-      if (queryParams.customerId && charge.customerId !== queryParams.customerId) return false;
-      if (queryParams.serviceOrderId && charge.serviceOrderId !== queryParams.serviceOrderId) return false;
+    return enrichedCharges.filter(charge => {
+      if (
+        queryParams.customerId &&
+        charge.customerId !== queryParams.customerId
+      )
+        return false;
+      if (
+        queryParams.serviceOrderId &&
+        charge.serviceOrderId !== queryParams.serviceOrderId
+      )
+        return false;
       return true;
     });
   }, [enrichedCharges, queryParams.customerId, queryParams.serviceOrderId]);
 
   const filteredCharges = useMemo(() => {
-    return scopedCharges.filter((charge) => {
+    return scopedCharges.filter(charge => {
       if (!statusMatchesFilter(charge.status, statusFilter)) return false;
-      const source = `${charge.customerName} ${charge.serviceOrderLabel} ${charge.status} ${charge.id ?? ""}`.toLowerCase();
-      if (searchTerm.trim() && !source.includes(searchTerm.toLowerCase().trim())) return false;
+      const source =
+        `${charge.customerName} ${charge.serviceOrderLabel} ${charge.status} ${charge.id ?? ""}`.toLowerCase();
+      if (
+        searchTerm.trim() &&
+        !source.includes(searchTerm.toLowerCase().trim())
+      )
+        return false;
       return true;
     });
   }, [scopedCharges, searchTerm, statusFilter]);
@@ -190,29 +326,39 @@ export default function FinancesPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, queryParams.customerId, queryParams.serviceOrderId]);
+  }, [
+    searchTerm,
+    statusFilter,
+    queryParams.customerId,
+    queryParams.serviceOrderId,
+  ]);
 
   useEffect(() => {
-    const totalPages = Math.max(1, Math.ceil(filteredCharges.length / pageSize));
+    const totalPages = Math.max(
+      1,
+      Math.ceil(filteredCharges.length / pageSize)
+    );
     if (currentPage > totalPages) setCurrentPage(1);
   }, [currentPage, filteredCharges.length, pageSize]);
 
-  const hasFiltersContext = Boolean(queryParams.customerId || queryParams.serviceOrderId);
+  const hasFiltersContext = Boolean(
+    queryParams.customerId || queryParams.serviceOrderId
+  );
 
   const health = useMemo(() => {
     const received = enrichedCharges
-      .filter((item) => item.status === "PAID")
+      .filter(item => item.status === "PAID")
       .reduce((acc, item) => acc + Number(item?.amountCents ?? 0), 0);
     const receivable = enrichedCharges
-      .filter((item) => item.status === "PENDING")
+      .filter(item => item.status === "PENDING")
       .reduce((acc, item) => acc + Number(item?.amountCents ?? 0), 0);
     const overdue = enrichedCharges
-      .filter((item) => item.status === "OVERDUE")
+      .filter(item => item.status === "OVERDUE")
       .reduce((acc, item) => acc + Number(item?.amountCents ?? 0), 0);
     const now = Date.now();
-    const nextThirtyDays = now + (1000 * 60 * 60 * 24 * 30);
+    const nextThirtyDays = now + 1000 * 60 * 60 * 24 * 30;
     const projected = enrichedCharges
-      .filter((item) => {
+      .filter(item => {
         if (!["PENDING", "OVERDUE"].includes(item.status)) return false;
         const due = safeDate(item?.dueDate)?.getTime();
         if (!due) return false;
@@ -224,21 +370,26 @@ export default function FinancesPage() {
   }, [enrichedCharges]);
 
   const nextBestAction = useMemo(() => {
-    const pendingOrOverdue = enrichedCharges.filter((item) => ["PENDING", "OVERDUE"].includes(item.status));
+    const pendingOrOverdue = enrichedCharges.filter(item =>
+      ["PENDING", "OVERDUE"].includes(item.status)
+    );
     if (pendingOrOverdue.length === 0) return null;
 
-    const overdue = pendingOrOverdue.filter((item) => item.status === "OVERDUE");
+    const overdue = pendingOrOverdue.filter(item => item.status === "OVERDUE");
     if (overdue.length > 0) {
       return [...overdue].sort((a, b) => {
-        if (b.overdueDays !== a.overdueDays) return b.overdueDays - a.overdueDays;
+        if (b.overdueDays !== a.overdueDays)
+          return b.overdueDays - a.overdueDays;
         return Number(b?.amountCents ?? 0) - Number(a?.amountCents ?? 0);
       })[0];
     }
 
-    const pending = pendingOrOverdue.filter((item) => item.status === "PENDING");
+    const pending = pendingOrOverdue.filter(item => item.status === "PENDING");
     if (pending.length === 0) return null;
 
-    const byAmount = [...pending].sort((a, b) => Number(b?.amountCents ?? 0) - Number(a?.amountCents ?? 0))[0];
+    const byAmount = [...pending].sort(
+      (a, b) => Number(b?.amountCents ?? 0) - Number(a?.amountCents ?? 0)
+    )[0];
     if (Number(byAmount?.amountCents ?? 0) > 0) return byAmount;
 
     return [...pending].sort((a, b) => {
@@ -261,27 +412,53 @@ export default function FinancesPage() {
 
   const selectedCharge = useMemo(() => {
     if (!selectedChargeId) return null;
-    return enrichedCharges.find((item) => String(item?.id ?? "") === selectedChargeId) ?? null;
+    return (
+      enrichedCharges.find(
+        item => String(item?.id ?? "") === selectedChargeId
+      ) ?? null
+    );
   }, [enrichedCharges, selectedChargeId]);
+
+  const selectedChargeDetailsQuery = trpc.finance.charges.getById.useQuery(
+    { id: String(selectedChargeId ?? "") },
+    { enabled: Boolean(selectedChargeId), retry: false }
+  );
+
+  const selectedFinancialRecord = useMemo(() => {
+    const detailed = selectedChargeDetailsQuery.data as
+      | ChargeRecord
+      | undefined;
+    return { ...(selectedCharge ?? {}), ...(detailed ?? {}) } as ChargeRecord;
+  }, [selectedCharge, selectedChargeDetailsQuery.data]);
 
   const timelineByCustomerQuery = trpc.nexo.timeline.listByCustomer.useQuery(
     { customerId: String(selectedCharge?.customerId ?? ""), limit: 20 },
     { enabled: Boolean(selectedCharge?.customerId), retry: false }
   );
 
-  const timelineByServiceOrderQuery = trpc.nexo.timeline.listByServiceOrder.useQuery(
-    { serviceOrderId: String(selectedCharge?.serviceOrderId ?? ""), limit: 20 },
-    { enabled: Boolean(selectedCharge?.serviceOrderId), retry: false }
-  );
+  const timelineByServiceOrderQuery =
+    trpc.nexo.timeline.listByServiceOrder.useQuery(
+      {
+        serviceOrderId: String(selectedCharge?.serviceOrderId ?? ""),
+        limit: 20,
+      },
+      { enabled: Boolean(selectedCharge?.serviceOrderId), retry: false }
+    );
 
   const timelineItems = useMemo(() => {
-    const customerTimeline = normalizeArrayPayload<any>(timelineByCustomerQuery.data);
-    const serviceOrderTimeline = normalizeArrayPayload<any>(timelineByServiceOrderQuery.data);
+    const customerTimeline = normalizeArrayPayload<any>(
+      timelineByCustomerQuery.data
+    );
+    const serviceOrderTimeline = normalizeArrayPayload<any>(
+      timelineByServiceOrderQuery.data
+    );
     const combined = [...customerTimeline, ...serviceOrderTimeline];
     const unique = new Map<string, any>();
 
     for (const item of combined) {
-      const key = String(item?.id ?? `${item?.createdAt ?? ""}-${item?.title ?? ""}`);
+      const key = String(
+        item?.id ?? `${item?.createdAt ?? ""}-${item?.title ?? ""}`
+      );
       if (!unique.has(key)) unique.set(key, item);
     }
 
@@ -294,14 +471,169 @@ export default function FinancesPage() {
       .slice(0, 10);
   }, [timelineByCustomerQuery.data, timelineByServiceOrderQuery.data]);
 
-  const hasSearchNoResults = Boolean(searchTerm.trim()) && filteredCharges.length === 0;
+  const hasSearchNoResults =
+    Boolean(searchTerm.trim()) && filteredCharges.length === 0;
   const paymentsListAvailable = false;
+
+  const completedOrdersWithoutCharge = useMemo(() => {
+    const chargedOrderIds = new Set(
+      enrichedCharges
+        .map(charge => String(charge?.serviceOrderId ?? ""))
+        .filter(Boolean)
+    );
+
+    return serviceOrders.filter(order => {
+      const status = normalizeStatus(order?.status);
+      const orderId = String(order?.id ?? "");
+      return status === "DONE" && orderId && !chargedOrderIds.has(orderId);
+    });
+  }, [enrichedCharges, serviceOrders]);
+
+  const cashHealth = useMemo(() => {
+    const paidCount = enrichedCharges.filter(
+      item => item.status === "PAID"
+    ).length;
+    const pendingCount = enrichedCharges.filter(
+      item => item.status === "PENDING"
+    ).length;
+    const overdueCount = enrichedCharges.filter(
+      item => item.status === "OVERDUE"
+    ).length;
+    const pendingAmount = health.receivable;
+    const riskAmount = health.overdue;
+    const collectionBottleneck = (() => {
+      if (overdueCount > 0)
+        return `${overdueCount} cobrança(s) vencida(s) travando recebimento`;
+      if (completedOrdersWithoutCharge.length > 0)
+        return `${completedOrdersWithoutCharge.length} O.S. concluída(s) sem cobrança`;
+      if (pendingCount > paidCount)
+        return "Mais pendências abertas do que recebimentos confirmados";
+      return "Fluxo cobrança → pagamento sem gargalo crítico";
+    })();
+
+    return {
+      paidCount,
+      pendingCount,
+      overdueCount,
+      pendingAmount,
+      riskAmount,
+      collectionBottleneck,
+    };
+  }, [
+    completedOrdersWithoutCharge.length,
+    enrichedCharges,
+    health.overdue,
+    health.receivable,
+  ]);
+
+  const immediateAttentionItems = useMemo(() => {
+    const overdueCharges = enrichedCharges.filter(
+      item => item.status === "OVERDUE"
+    );
+    const pendingWithoutWhatsApp = enrichedCharges.filter(item => {
+      if (!["PENDING", "OVERDUE"].includes(item.status)) return false;
+      return getCommunicationState(item) === "not_sent";
+    });
+    const paidWithoutRegisteredPayment = enrichedCharges.filter(
+      item => !hasRegisteredPayment(item)
+    );
+    const communicationUnknownCount = enrichedCharges.filter(item => {
+      if (!["PENDING", "OVERDUE"].includes(item.status)) return false;
+      return getCommunicationState(item) === "unknown";
+    }).length;
+
+    return [
+      {
+        key: "overdue",
+        title: "Cobrança vencida",
+        value: String(overdueCharges.length),
+        consequence:
+          overdueCharges.length > 0
+            ? "Priorize cobrança por WhatsApp ou registre pagamento."
+            : "Sem atraso financeiro no momento.",
+        actionLabel:
+          overdueCharges.length > 0 ? "Priorizar atraso" : "Ver carteira",
+        onAction: () =>
+          setStatusFilter(overdueCharges.length > 0 ? "overdue" : "all"),
+      },
+      {
+        key: "whatsapp",
+        title: "Cobrança sem WhatsApp enviado",
+        value:
+          pendingWithoutWhatsApp.length > 0
+            ? String(pendingWithoutWhatsApp.length)
+            : "fallback",
+        consequence:
+          pendingWithoutWhatsApp.length > 0
+            ? "Há pendência sem comunicação registrada nos campos retornados."
+            : communicationUnknownCount > 0
+              ? "Backend não retornou telemetria de envio; use WhatsApp contextual para cobrar."
+              : "Nenhuma pendência sem envio registrada.",
+        actionLabel: "Abrir pendências",
+        onAction: () => setStatusFilter("pending"),
+      },
+      {
+        key: "os-without-charge",
+        title: "O.S. concluída sem cobrança",
+        value: String(completedOrdersWithoutCharge.length),
+        consequence:
+          completedOrdersWithoutCharge.length > 0
+            ? "Receita operacional ainda não virou cobrança."
+            : "Nenhuma O.S. concluída sem cobrança encontrada nos dados carregados.",
+        actionLabel:
+          completedOrdersWithoutCharge.length > 0
+            ? "Ver O.S."
+            : "Ver cobranças",
+        onAction: () => {
+          if (completedOrdersWithoutCharge.length > 0)
+            navigate("/service-orders");
+          else setStatusFilter("all");
+        },
+      },
+      {
+        key: "payment-register",
+        title: "Pagamento não registrado",
+        value:
+          paidWithoutRegisteredPayment.length > 0
+            ? String(paidWithoutRegisteredPayment.length)
+            : "fallback",
+        consequence:
+          paidWithoutRegisteredPayment.length > 0
+            ? "Cobrança paga sem lista de pagamentos vinculada no detalhe."
+            : "Endpoint de lista geral de pagamentos não está exposto; detalhe busca pagamentos apenas por cobrança.",
+        actionLabel: "Conferir detalhe",
+        onAction: () =>
+          selectedChargeId
+            ? undefined
+            : setSelectedChargeId(String(enrichedCharges[0]?.id ?? "")),
+      },
+      {
+        key: "communication-failure",
+        title: "Falha de cobrança/comunicação",
+        value: "fallback",
+        consequence:
+          "A página não recebeu campo de falha de envio; sem inventar incidentes.",
+        actionLabel: "Usar WhatsApp contextual",
+        onAction: () =>
+          selectedCharge
+            ? goToWhatsApp(selectedCharge)
+            : setStatusFilter("overdue"),
+      },
+    ];
+  }, [
+    completedOrdersWithoutCharge,
+    enrichedCharges,
+    navigate,
+    selectedCharge,
+    selectedChargeId,
+  ]);
 
   async function refreshAll() {
     await Promise.all([
       chargesQuery.refetch(),
       customersQuery.refetch(),
       serviceOrdersQuery.refetch(),
+      selectedChargeDetailsQuery.refetch(),
       timelineByCustomerQuery.refetch(),
       timelineByServiceOrderQuery.refetch(),
     ]);
@@ -309,7 +641,12 @@ export default function FinancesPage() {
 
   async function openMarkAsPaid(charge: ChargeRecord) {
     setPayMethod("PIX");
-    setPayAmount(String((Number(charge?.amountCents ?? 0) / 100).toFixed(2)).replace(".", ","));
+    setPayAmount(
+      String((Number(charge?.amountCents ?? 0) / 100).toFixed(2)).replace(
+        ".",
+        ","
+      )
+    );
     setPayDate(new Date().toISOString().slice(0, 10));
     setPayNotes("");
     setOpenPayModalFor(charge);
@@ -319,7 +656,9 @@ export default function FinancesPage() {
     if (!openPayModalFor?.id) return;
     const normalized = payAmount.replace(/\./g, "").replace(",", ".");
     const amountNumber = Number(normalized);
-    const amountCents = Number.isFinite(amountNumber) ? Math.round(amountNumber * 100) : 0;
+    const amountCents = Number.isFinite(amountNumber)
+      ? Math.round(amountNumber * 100)
+      : 0;
     if (amountCents <= 0) {
       toast.error("Valor inválido para registrar pagamento.");
       return;
@@ -340,7 +679,12 @@ export default function FinancesPage() {
   }
 
   function openEditCharge(charge: ChargeRecord) {
-    setEditAmount(String((Number(charge?.amountCents ?? 0) / 100).toFixed(2)).replace(".", ","));
+    setEditAmount(
+      String((Number(charge?.amountCents ?? 0) / 100).toFixed(2)).replace(
+        ".",
+        ","
+      )
+    );
     const due = safeDate(charge?.dueDate);
     setEditDueDate(due ? due.toISOString().slice(0, 10) : "");
     setEditNotes(String(charge?.notes ?? ""));
@@ -351,7 +695,9 @@ export default function FinancesPage() {
     if (!openEditModalFor?.id) return;
     const normalized = editAmount.replace(/\./g, "").replace(",", ".");
     const amountNumber = Number(normalized);
-    const amountCents = Number.isFinite(amountNumber) ? Math.round(amountNumber * 100) : 0;
+    const amountCents = Number.isFinite(amountNumber)
+      ? Math.round(amountNumber * 100)
+      : 0;
 
     if (amountCents <= 0 || !editDueDate) {
       toast.error("Preencha valor e vencimento para editar a cobrança.");
@@ -398,7 +744,9 @@ export default function FinancesPage() {
       toast.error("Cliente inválido para abrir WhatsApp.");
       return;
     }
-    navigate(`/service-orders?customerId=${charge.customerId ?? ""}&serviceOrderId=${charge.serviceOrderId}`);
+    navigate(
+      `/service-orders?customerId=${charge.customerId ?? ""}&serviceOrderId=${charge.serviceOrderId}`
+    );
   }
 
   function goToWhatsApp(charge: ChargeRecord) {
@@ -407,11 +755,15 @@ export default function FinancesPage() {
       return;
     }
     if (String(charge.status ?? "").toUpperCase() === "PAID") {
-      toast.info("Cobrança já paga. Use WhatsApp apenas para comunicação pós-pagamento.");
+      toast.info(
+        "Cobrança já paga. Use WhatsApp apenas para comunicação pós-pagamento."
+      );
       navigate(`/whatsapp?customerId=${charge.customerId}`);
       return;
     }
-    navigate(`/whatsapp?customerId=${charge.customerId}&chargeId=${charge.id ?? ""}`);
+    navigate(
+      `/whatsapp?customerId=${charge.customerId}&chargeId=${charge.id ?? ""}`
+    );
   }
 
   return (
@@ -420,18 +772,91 @@ export default function FinancesPage() {
       subtitle="cobrança, recebimento e risco financeiro operacional"
     >
       <AppPageShell className="space-y-4">
-        <AppPageHeader
+        <AppOperationalHeader
           title="Financeiro"
-          description={`cobrança, recebimento e risco financeiro operacional · ${enrichedCharges.length} cobrança(s) carregada(s)`}
+          description={`Centro operacional de cobrança e receita · ${enrichedCharges.length} cobrança(s), ${cashHealth.overdueCount} vencida(s) e ${completedOrdersWithoutCharge.length} O.S. concluída(s) sem cobrança.`}
           secondaryActions={
             <Button variant="ghost" size="sm" onClick={() => void refreshAll()}>
               Atualizar
             </Button>
           }
-          cta={
-            <Button onClick={() => setOpenCreate(true)}>
-              Nova cobrança
-            </Button>
+          primaryAction={
+            <Button onClick={() => setOpenCreate(true)}>Nova cobrança</Button>
+          }
+          contextChips={
+            <>
+              <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1 text-xs text-[var(--text-secondary)]">
+                Carteira: {enrichedCharges.length}
+              </span>
+              <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1 text-xs text-[var(--text-secondary)]">
+                Atrasos: {cashHealth.overdueCount}
+              </span>
+              <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1 text-xs text-[var(--text-secondary)]">
+                Pendências: {cashHealth.pendingCount}
+              </span>
+              {hasFiltersContext ? (
+                <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1 text-xs text-[var(--text-secondary)]">
+                  Contexto via operação
+                </span>
+              ) : null}
+            </>
+          }
+        >
+          <p className="text-sm text-[var(--text-secondary)]">
+            Ação real primeiro: cobrar, enviar link ou registrar pagamento antes
+            de navegar para cliente/O.S.
+          </p>
+        </AppOperationalHeader>
+
+        <OperationalTopCard
+          contextLabel="Próxima decisão financeira"
+          title={
+            nextBestAction
+              ? `Cobrar ${nextBestAction.customerName}`
+              : "Caixa sem cobrança crítica agora"
+          }
+          description={
+            nextBestAction
+              ? `${formatCurrency(Number(nextBestAction?.amountCents ?? 0))} · ${nextBestAction.status === "OVERDUE" ? `${nextBestAction.overdueDays} dia(s) em atraso` : "pendência ativa"} · Origem/O.S.: ${nextBestAction.serviceOrderLabel}`
+              : "Nenhuma cobrança pendente ou vencida foi retornada pelo backend para ação imediata."
+          }
+          chips={
+            nextBestAction ? (
+              <>
+                <AppStatusBadge
+                  label={chargeStatusLabel(nextBestAction.status)}
+                />
+                <span className="rounded-full border border-[var(--border-subtle)] px-2.5 py-1 text-xs text-[var(--text-muted)]">
+                  {getChargeRisk(nextBestAction)}
+                </span>
+              </>
+            ) : null
+          }
+          primaryAction={
+            nextBestAction ? (
+              <Button
+                onClick={() => {
+                  setSelectedChargeId(String(nextBestAction?.id ?? ""));
+                  goToWhatsApp(nextBestAction);
+                }}
+              >
+                Cobrar agora
+              </Button>
+            ) : (
+              <Button variant="outline" onClick={() => setStatusFilter("all")}>
+                Ver carteira
+              </Button>
+            )
+          }
+          secondaryActions={
+            nextBestAction ? (
+              <Button
+                variant="outline"
+                onClick={() => void openMarkAsPaid(nextBestAction)}
+              >
+                Marcar como pago
+              </Button>
+            ) : null
           }
         />
 
@@ -439,96 +864,183 @@ export default function FinancesPage() {
           <AppStatCard
             label="Recebido"
             value={formatCurrency(health.received)}
-            helper="Entradas já confirmadas no caixa."
+            helper={`Consequência: ${cashHealth.paidCount} cobrança(s) confirmada(s) no caixa.`}
           />
           <AppStatCard
             label="A receber"
             value={formatCurrency(health.receivable)}
-            helper="Cobranças pendentes dentro do fluxo."
+            helper={`Consequência: ${cashHealth.pendingCount} cobrança(s) ainda pedem acompanhamento.`}
           />
           <AppStatCard
             label="Vencido"
             value={formatCurrency(health.overdue)}
-            helper="Valores já em atraso."
+            helper={
+              cashHealth.overdueCount > 0
+                ? "Consequência: cobrar antes de navegar."
+                : "Consequência: manter rotina preventiva."
+            }
           />
           <AppStatCard
             label="Previsto"
             value={formatCurrency(health.projected)}
-            helper="Pendências previstas para até 30 dias."
+            helper="Consequência: visão dos próximos 30 dias com dados de vencimento."
           />
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" onClick={() => setStatusFilter("paid")}>Ver pagas</Button>
-          <Button size="sm" variant="outline" onClick={() => setStatusFilter("pending")}>Pendências de cobrança</Button>
-          <Button size="sm" variant="outline" onClick={() => setStatusFilter("overdue")}>Priorizar atraso</Button>
-        </div>
-
-        <AppSectionBlock title="Próxima melhor ação" subtitle="Prioridade operacional baseada em dados reais.">
-          {nextBestAction ? (
-            <div className="flex flex-col gap-3 rounded-xl border border-[var(--border-subtle)] p-4 md:flex-row md:items-center md:justify-between">
-              <div className="space-y-1">
-                <p className="text-sm font-semibold text-[var(--text-primary)]">{nextBestAction.customerName}</p>
-                <p className="text-sm text-[var(--text-secondary)]">
-                  {formatCurrency(Number(nextBestAction?.amountCents ?? 0))}
-                  {nextBestAction.status === "OVERDUE" ? ` · ${nextBestAction.overdueDays} dia(s) em atraso` : " · pendência ativa"}
-                </p>
-                <p className="text-xs text-[var(--text-muted)]">Origem/O.S.: {nextBestAction.serviceOrderLabel}</p>
-              </div>
-              <Button
-               
-                onClick={() => {
-                  setSelectedChargeId(String(nextBestAction?.id ?? ""));
-                  goToWhatsApp(nextBestAction);
-                }}
-              >
-                Acionar WhatsApp
-              </Button>
-            </div>
-          ) : (
-            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 text-sm text-emerald-200">
-              Estado saudável: nenhuma cobrança pendente ou vencida requer ação imediata.
-            </div>
-          )}
+        <AppSectionBlock
+          title="Saúde do caixa"
+          subtitle="Leitura operacional do dinheiro e do gargalo cobrança → pagamento."
+        >
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <AppInfoCard>
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                Dinheiro recebido
+              </p>
+              <p className="mt-2 text-xl font-semibold text-[var(--text-primary)]">
+                {formatCurrency(health.received)}
+              </p>
+              <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                Já entrou no caixa conforme cobranças pagas.
+              </p>
+            </AppInfoCard>
+            <AppInfoCard>
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                Dinheiro pendente
+              </p>
+              <p className="mt-2 text-xl font-semibold text-[var(--text-primary)]">
+                {formatCurrency(cashHealth.pendingAmount)}
+              </p>
+              <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                Precisa de acompanhamento antes do vencimento.
+              </p>
+            </AppInfoCard>
+            <AppInfoCard>
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                Dinheiro em risco
+              </p>
+              <p className="mt-2 text-xl font-semibold text-[var(--text-primary)]">
+                {formatCurrency(cashHealth.riskAmount)}
+              </p>
+              <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                Toda cobrança vencida sugere cobrança imediata.
+              </p>
+            </AppInfoCard>
+            <AppInfoCard>
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                Gargalo principal
+              </p>
+              <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
+                {cashHealth.collectionBottleneck}
+              </p>
+              <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                Use a ação principal da linha antes de abrir detalhes.
+              </p>
+            </AppInfoCard>
+          </div>
         </AppSectionBlock>
 
-        <AppSectionBlock title="Filtros operacionais" subtitle="Todas, pendentes, vencidas, pagas e canceladas.">
-          <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" variant={statusFilter === "all" ? "default" : "outline"} onClick={() => setStatusFilter("all")}>Todas</Button>
-            <Button size="sm" variant={statusFilter === "pending" ? "default" : "outline"} onClick={() => setStatusFilter("pending")}>Pendentes</Button>
-            <Button size="sm" variant={statusFilter === "overdue" ? "default" : "outline"} onClick={() => setStatusFilter("overdue")}>Vencidas</Button>
-            <Button size="sm" variant={statusFilter === "paid" ? "default" : "outline"} onClick={() => setStatusFilter("paid")}>Pagas</Button>
-            <Button size="sm" variant={statusFilter === "canceled" ? "default" : "outline"} onClick={() => setStatusFilter("canceled")}>Canceladas</Button>
-            <input
-              className="h-9 min-w-[220px] rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm"
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="Buscar cliente, O.S., status ou ID"
-            />
+        <AppSectionBlock
+          title="Atenção imediata"
+          subtitle="Pendências que afetam cobrança, comunicação e registro de pagamento."
+        >
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            {immediateAttentionItems.map(item => (
+              <article
+                key={item.key}
+                className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-sm font-semibold text-[var(--text-primary)]">
+                    {item.title}
+                  </p>
+                  <span className="rounded-full border border-[var(--border-subtle)] px-2 py-0.5 text-xs text-[var(--text-muted)]">
+                    {item.value}
+                  </span>
+                </div>
+                <p className="mt-2 min-h-12 text-xs leading-5 text-[var(--text-secondary)]">
+                  {item.consequence}
+                </p>
+                <Button
+                  className="mt-3 w-full"
+                  size="sm"
+                  variant="outline"
+                  onClick={item.onAction}
+                >
+                  {item.actionLabel}
+                </Button>
+              </article>
+            ))}
           </div>
+        </AppSectionBlock>
+
+        <AppSectionBlock
+          title="Carteira operacional"
+          subtitle="Cobranças reais com risco, origem e ação primária antes da navegação."
+        >
+          <AppOperationalBar
+            tabs={[
+              { value: "all", label: "Todas" },
+              { value: "pending", label: "Pendentes" },
+              { value: "overdue", label: "Vencidas" },
+              { value: "paid", label: "Pagas" },
+              { value: "canceled", label: "Canceladas" },
+            ]}
+            activeTab={statusFilter}
+            onTabChange={setStatusFilter}
+            searchValue={searchTerm}
+            onSearchChange={setSearchTerm}
+            searchPlaceholder="Buscar cliente, O.S., status ou ID"
+            quickFilters={
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setStatusFilter("overdue")}
+                >
+                  Priorizar atraso
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setStatusFilter("pending")}
+                >
+                  Cobrar pendências
+                </Button>
+              </>
+            }
+            variant="embedded"
+          />
+
           {hasFiltersContext ? (
             <p className="text-xs text-[var(--text-muted)]">
               Contexto ativo via URL:{" "}
-              {queryParams.customerId ? `customerId=${queryParams.customerId} ` : ""}
-              {queryParams.serviceOrderId ? `serviceOrderId=${queryParams.serviceOrderId}` : ""}
+              {queryParams.customerId
+                ? `customerId=${queryParams.customerId} `
+                : ""}
+              {queryParams.serviceOrderId
+                ? `serviceOrderId=${queryParams.serviceOrderId}`
+                : ""}
             </p>
           ) : null}
-        </AppSectionBlock>
 
-        <AppSectionBlock title="Lista operacional" subtitle="Cobranças reais para cobrança, recebimento e risco.">
           {allQueriesLoading && enrichedCharges.length === 0 ? (
             <AppPageLoadingState description="Carregando cobranças, clientes e O.S...." />
           ) : null}
 
           {allQueriesErrored ? (
             <AppPageErrorState
-              description={chargesQuery.error?.message ?? "Falha ao carregar dados financeiros."}
+              description={
+                chargesQuery.error?.message ??
+                "Falha ao carregar dados financeiros."
+              }
               actionLabel="Tentar novamente"
               onAction={() => void refreshAll()}
             />
           ) : null}
 
-          {!allQueriesLoading && !allQueriesErrored && filteredCharges.length === 0 ? (
+          {!allQueriesLoading &&
+          !allQueriesErrored &&
+          filteredCharges.length === 0 ? (
             hasSearchNoResults ? (
               <AppPageEmptyState
                 title="Busca sem resultado"
@@ -542,81 +1054,145 @@ export default function FinancesPage() {
             )
           ) : null}
 
-          {!allQueriesLoading && !allQueriesErrored && filteredCharges.length > 0 ? (
+          {!allQueriesLoading &&
+          !allQueriesErrored &&
+          filteredCharges.length > 0 ? (
             <>
               <AppDataTable>
-                <table className="w-full min-w-[980px] text-sm">
-                <thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]">
-                  <tr>
-                    <th className="p-2.5 text-left">Cliente</th>
-                    <th className="text-left">Valor</th>
-                    <th className="text-left">Status</th>
-                    <th className="text-left">Vencimento</th>
-                    <th className="text-left">Dias em atraso</th>
-                    <th className="text-left">Origem/O.S.</th>
-                    <th className="text-left">Forma pagto</th>
-                    <th className="p-2.5 text-left">Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginatedCharges.map((row) => (
-                    <tr
-                      key={String(row?.id ?? "")}
-                      className="cursor-pointer border-t border-[var(--border-subtle)]"
-                      onClick={() => setSelectedChargeId(String(row?.id ?? ""))}
-                    >
-                      <td className="p-2.5">{row.customerName}</td>
-                      <td>{formatCurrency(Number(row?.amountCents ?? 0))}</td>
-                      <td>
-                        <AppStatusBadge label={chargeStatusLabel(row.status)} />
-                      </td>
-                      <td>{formatDate(row?.dueDate)}</td>
-                      <td>{row.status === "OVERDUE" ? `${row.overdueDays} dia(s)` : "—"}</td>
-                      <td>{row.serviceOrderLabel}</td>
-                      <td>{latestPaymentMethod(row)}</td>
-                      <td className="p-2.5" onClick={(event) => event.stopPropagation()}>
-                        <AppRowActionsDropdown
-                          items={[
-                            {
-                              label: "Marcar como pago",
-                              onSelect: () => void openMarkAsPaid(row),
-                              disabled: row.status === "PAID" || row.status === "CANCELED",
-                              tone: "primary",
-                            },
-                            {
-                              label: "Editar cobrança",
-                              onSelect: () => openEditCharge(row),
-                              disabled: row.status === "PAID" || row.status === "CANCELED",
-                              tone: "primary",
-                            },
-                            {
-                              label: "Cancelar cobrança",
-                              onSelect: () => void handleCancelCharge(row),
-                              disabled: row.status === "PAID" || row.status === "CANCELED",
-                              tone: "primary",
-                            },
-                            { type: "separator" },
-                            {
-                              label: normalizeStatus(row?.status) === "PAID" ? "WhatsApp pós-pagamento" : "Cobrar via WhatsApp",
-                              onSelect: () => goToWhatsApp(row),
-                              disabled: !row.customerId,
-                            },
-                            {
-                              label: "Abrir cliente",
-                              onSelect: () => goToCustomer(row),
-                              disabled: !row.customerId,
-                            },
-                            {
-                              label: "Abrir O.S.",
-                              onSelect: () => goToServiceOrder(row),
-                              disabled: !row.serviceOrderId,
-                            },
-                          ]}
-                        />
-                      </td>
+                <table className="w-full min-w-[1120px] text-sm">
+                  <thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]">
+                    <tr>
+                      <th className="p-2.5 text-left">Cliente</th>
+                      <th className="text-left">Valor</th>
+                      <th className="text-left">Status</th>
+                      <th className="text-left">Vencimento</th>
+                      <th className="text-left">Atraso</th>
+                      <th className="text-left">Origem/O.S.</th>
+                      <th className="text-left">Risco/pendência</th>
+                      <th className="text-left">Ação primária</th>
+                      <th className="p-2.5 text-left">Menu</th>
                     </tr>
-                  ))}
-                </tbody>
+                  </thead>
+                  <tbody>
+                    {paginatedCharges.map(row => {
+                      const primaryAction = getChargePrimaryAction(row);
+                      return (
+                        <tr
+                          key={String(row?.id ?? "")}
+                          className="cursor-pointer border-t border-[var(--border-subtle)] hover:bg-[var(--surface-subtle)]/60"
+                          onClick={() =>
+                            setSelectedChargeId(String(row?.id ?? ""))
+                          }
+                        >
+                          <td className="p-2.5">
+                            <div>
+                              <p className="font-medium text-[var(--text-primary)]">
+                                {row.customerName}
+                              </p>
+                              <p className="text-xs text-[var(--text-muted)]">
+                                {safeText(
+                                  row?.customer?.phone,
+                                  "Telefone não retornado"
+                                )}
+                              </p>
+                            </div>
+                          </td>
+                          <td>
+                            {formatCurrency(Number(row?.amountCents ?? 0))}
+                          </td>
+                          <td>
+                            <AppStatusBadge
+                              label={chargeStatusLabel(row.status)}
+                            />
+                          </td>
+                          <td>{formatDate(row?.dueDate)}</td>
+                          <td>
+                            {row.status === "OVERDUE"
+                              ? `${row.overdueDays} dia(s)`
+                              : "—"}
+                          </td>
+                          <td>{safeText(row.serviceOrderLabel, "Sem O.S.")}</td>
+                          <td>
+                            <p className="max-w-[220px] text-xs leading-5 text-[var(--text-secondary)]">
+                              {getChargeRisk(row)}
+                            </p>
+                          </td>
+                          <td onClick={event => event.stopPropagation()}>
+                            <Button
+                              size="sm"
+                              variant={
+                                primaryAction.kind === "collect"
+                                  ? "default"
+                                  : "outline"
+                              }
+                              onClick={() => {
+                                setSelectedChargeId(String(row?.id ?? ""));
+                                if (primaryAction.kind === "collect")
+                                  goToWhatsApp(row);
+                              }}
+                              disabled={row.status === "CANCELED"}
+                            >
+                              {primaryAction.label}
+                            </Button>
+                            <p className="mt-1 max-w-[180px] text-[11px] text-[var(--text-muted)]">
+                              {primaryAction.reason}
+                            </p>
+                          </td>
+                          <td
+                            className="p-2.5"
+                            onClick={event => event.stopPropagation()}
+                          >
+                            <AppRowActionsDropdown
+                              items={[
+                                {
+                                  label: "Marcar como pago",
+                                  onSelect: () => void openMarkAsPaid(row),
+                                  disabled:
+                                    row.status === "PAID" ||
+                                    row.status === "CANCELED",
+                                  tone: "primary",
+                                },
+                                {
+                                  label:
+                                    normalizeStatus(row?.status) === "PAID"
+                                      ? "WhatsApp pós-pagamento"
+                                      : "Cobrar via WhatsApp",
+                                  onSelect: () => goToWhatsApp(row),
+                                  disabled: !row.customerId,
+                                  tone: "primary",
+                                },
+                                {
+                                  label: "Editar cobrança",
+                                  onSelect: () => openEditCharge(row),
+                                  disabled:
+                                    row.status === "PAID" ||
+                                    row.status === "CANCELED",
+                                },
+                                {
+                                  label: "Cancelar cobrança",
+                                  onSelect: () => void handleCancelCharge(row),
+                                  disabled:
+                                    row.status === "PAID" ||
+                                    row.status === "CANCELED",
+                                },
+                                { type: "separator", label: "Navegação" },
+                                {
+                                  label: "Abrir cliente",
+                                  onSelect: () => goToCustomer(row),
+                                  disabled: !row.customerId,
+                                },
+                                {
+                                  label: "Abrir O.S.",
+                                  onSelect: () => goToServiceOrder(row),
+                                  disabled: !row.serviceOrderId,
+                                },
+                              ]}
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
                 </table>
               </AppDataTable>
               <AppPagination
@@ -629,87 +1205,198 @@ export default function FinancesPage() {
           ) : null}
         </AppSectionBlock>
 
-        <AppSectionBlock title="Detalhe financeiro" subtitle="Cliente, cobrança, histórico e ações de execução.">
+        <AppSectionBlock
+          title="Detalhe financeiro"
+          subtitle="Resumo, cliente, origem operacional, histórico e comunicação quando disponíveis."
+        >
           {selectedCharge ? (
             <div className="space-y-4">
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <div className="rounded-xl border border-[var(--border-subtle)] p-3">
-                  <p className="text-xs text-[var(--text-muted)]">Cliente</p>
-                  <p className="text-sm font-semibold">{selectedCharge.customerName}</p>
+                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3">
+                  <p className="text-xs text-[var(--text-muted)]">
+                    Cliente vinculado
+                  </p>
+                  <p className="text-sm font-semibold text-[var(--text-primary)]">
+                    {selectedFinancialRecord.customerName}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">
+                    {safeText(
+                      selectedFinancialRecord?.customer?.phone,
+                      "Telefone não retornado"
+                    )}
+                  </p>
                 </div>
-                <div className="rounded-xl border border-[var(--border-subtle)] p-3">
-                  <p className="text-xs text-[var(--text-muted)]">Valor</p>
-                  <p className="text-sm font-semibold">{formatCurrency(Number(selectedCharge?.amountCents ?? 0))}</p>
+                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3">
+                  <p className="text-xs text-[var(--text-muted)]">
+                    Valor da cobrança
+                  </p>
+                  <p className="text-sm font-semibold text-[var(--text-primary)]">
+                    {formatCurrency(
+                      Number(selectedFinancialRecord?.amountCents ?? 0)
+                    )}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">
+                    Método recebido:{" "}
+                    {latestPaymentMethod(selectedFinancialRecord)}
+                  </p>
                 </div>
-                <div className="rounded-xl border border-[var(--border-subtle)] p-3">
-                  <p className="text-xs text-[var(--text-muted)]">Status / vencimento</p>
-                  <p className="text-sm font-semibold">{chargeStatusLabel(selectedCharge.status)} · {formatDate(selectedCharge?.dueDate)}</p>
+                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3">
+                  <p className="text-xs text-[var(--text-muted)]">
+                    Status / vencimento
+                  </p>
+                  <p className="text-sm font-semibold text-[var(--text-primary)]">
+                    {chargeStatusLabel(selectedFinancialRecord.status)} ·{" "}
+                    {formatDate(selectedFinancialRecord?.dueDate)}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">
+                    {getChargeRisk(selectedFinancialRecord)}
+                  </p>
                 </div>
-                <div className="rounded-xl border border-[var(--border-subtle)] p-3">
-                  <p className="text-xs text-[var(--text-muted)]">Dias em atraso</p>
-                  <p className="text-sm font-semibold">{selectedCharge.status === "OVERDUE" ? `${selectedCharge.overdueDays} dia(s)` : "0"}</p>
+                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3">
+                  <p className="text-xs text-[var(--text-muted)]">
+                    Origem operacional
+                  </p>
+                  <p className="text-sm font-semibold text-[var(--text-primary)]">
+                    {safeText(
+                      selectedFinancialRecord.serviceOrderLabel,
+                      "Sem O.S. vinculada"
+                    )}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">
+                    ID: {safeText(selectedFinancialRecord?.id)}
+                  </p>
                 </div>
-              </div>
-
-              <div className="rounded-xl border border-[var(--border-subtle)] p-3">
-                <p className="text-xs text-[var(--text-muted)]">O.S. vinculada</p>
-                <p className="text-sm text-[var(--text-secondary)]">{selectedCharge.serviceOrderLabel || "Sem O.S. vinculada"}</p>
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <Button onClick={() => void openMarkAsPaid(selectedCharge)} disabled={selectedCharge.status === "PAID" || selectedCharge.status === "CANCELED" || markPaidMutation.isPending}>
-                  {markPaidMutation.isPending ? "Salvando..." : "Marcar como pago"}
+                <Button
+                  onClick={() => goToWhatsApp(selectedFinancialRecord)}
+                  disabled={selectedFinancialRecord.status === "CANCELED"}
+                >
+                  {selectedFinancialRecord.status === "OVERDUE"
+                    ? "Cobrar agora"
+                    : "Enviar link"}
                 </Button>
-                <Button variant="outline" onClick={() => openEditCharge(selectedCharge)} disabled={selectedCharge.status === "PAID" || selectedCharge.status === "CANCELED" || editMutation.isPending}>
+                <Button
+                  variant="outline"
+                  onClick={() => void openMarkAsPaid(selectedFinancialRecord)}
+                  disabled={
+                    selectedFinancialRecord.status === "PAID" ||
+                    selectedFinancialRecord.status === "CANCELED" ||
+                    markPaidMutation.isPending
+                  }
+                >
+                  {markPaidMutation.isPending
+                    ? "Salvando..."
+                    : "Marcar como pago"}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => openEditCharge(selectedFinancialRecord)}
+                  disabled={
+                    selectedFinancialRecord.status === "PAID" ||
+                    selectedFinancialRecord.status === "CANCELED" ||
+                    editMutation.isPending
+                  }
+                >
                   {editMutation.isPending ? "Salvando..." : "Editar cobrança"}
                 </Button>
-                <Button variant="outline" onClick={() => void handleCancelCharge(selectedCharge)} disabled={selectedCharge.status === "PAID" || selectedCharge.status === "CANCELED" || cancelMutation.isPending}>
-                  {cancelMutation.isPending ? "Salvando..." : "Cancelar cobrança"}
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    void handleCancelCharge(selectedFinancialRecord)
+                  }
+                  disabled={
+                    selectedFinancialRecord.status === "PAID" ||
+                    selectedFinancialRecord.status === "CANCELED" ||
+                    cancelMutation.isPending
+                  }
+                >
+                  {cancelMutation.isPending ? "Salvando..." : "Cancelar"}
                 </Button>
-                <Button variant="outline" onClick={() => goToWhatsApp(selectedCharge)}>
-                  Enviar WhatsApp contextual
-                </Button>
-                <Button variant="outline" onClick={() => goToCustomer(selectedCharge)}>
+                <Button
+                  variant="ghost"
+                  onClick={() => goToCustomer(selectedFinancialRecord)}
+                >
                   Abrir cliente
                 </Button>
-                <Button variant="outline" onClick={() => goToServiceOrder(selectedCharge)}>
+                <Button
+                  variant="ghost"
+                  onClick={() => goToServiceOrder(selectedFinancialRecord)}
+                >
                   Abrir O.S.
                 </Button>
               </div>
 
-              <div className="grid gap-3 lg:grid-cols-2">
-                <div className="rounded-xl border border-[var(--border-subtle)] p-3">
-                  <p className="text-xs font-semibold uppercase text-[var(--text-muted)]">Histórico / timeline</p>
-                  {timelineByCustomerQuery.isLoading || timelineByServiceOrderQuery.isLoading ? (
-                    <p className="mt-2 text-sm text-[var(--text-secondary)]">Carregando histórico...</p>
+              <div className="grid gap-3 lg:grid-cols-3">
+                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3 lg:col-span-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                    Histórico / timeline
+                  </p>
+                  {timelineByCustomerQuery.isLoading ||
+                  timelineByServiceOrderQuery.isLoading ? (
+                    <p className="mt-2 text-sm text-[var(--text-secondary)]">
+                      Carregando histórico...
+                    </p>
                   ) : timelineItems.length === 0 ? (
-                    <p className="mt-2 text-sm text-[var(--text-secondary)]">Histórico indisponível neste ambiente.</p>
+                    <p className="mt-2 text-sm text-[var(--text-secondary)]">
+                      Histórico indisponível neste ambiente para cliente/O.S.
+                      selecionados.
+                    </p>
                   ) : (
                     <ul className="mt-2 space-y-2 text-sm text-[var(--text-secondary)]">
-                      {timelineItems.map((item) => (
-                        <li key={String(item?.id ?? `${item?.createdAt ?? ""}-${item?.title ?? ""}`)} className="rounded-lg border border-[var(--border-subtle)] p-2.5">
-                          <p className="font-medium text-[var(--text-primary)]">{String(item?.title ?? item?.description ?? "Evento")}</p>
-                          <p className="text-xs text-[var(--text-muted)]">{formatDate(item?.createdAt)}</p>
+                      {timelineItems.map(item => (
+                        <li
+                          key={String(
+                            item?.id ??
+                              `${item?.createdAt ?? ""}-${item?.title ?? ""}`
+                          )}
+                          className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)]/40 p-2.5"
+                        >
+                          <p className="font-medium text-[var(--text-primary)]">
+                            {String(
+                              item?.title ?? item?.description ?? "Evento"
+                            )}
+                          </p>
+                          <p className="text-xs text-[var(--text-muted)]">
+                            {formatDate(item?.createdAt)}
+                          </p>
                         </li>
                       ))}
                     </ul>
                   )}
                 </div>
-                <div className="rounded-xl border border-[var(--border-subtle)] p-3">
-                  <p className="text-xs font-semibold uppercase text-[var(--text-muted)]">Mensagens / cobranças enviadas</p>
-                  <p className="mt-2 text-sm text-[var(--text-secondary)]">
-                    {paymentsListAvailable
-                      ? "Integração de mensagens/pagamentos conectada."
-                      : "ação indisponível neste ambiente: endpoint de listagem de pagamentos/mensagens não exposto no BFF."}
+                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                    Comunicação / WhatsApp
                   </p>
-                  <Button className="mt-3" variant="outline" onClick={() => goToWhatsApp(selectedCharge)}>
+                  <p className="mt-2 text-sm text-[var(--text-secondary)]">
+                    {getCommunicationState(selectedFinancialRecord) === "sent"
+                      ? "Envio de cobrança identificado nos campos retornados."
+                      : getCommunicationState(selectedFinancialRecord) ===
+                          "not_sent"
+                        ? "Sem envio registrado nos campos retornados."
+                        : "Backend não retornou telemetria de envio; ação disponível via WhatsApp contextual."}
+                  </p>
+                  <p className="mt-2 text-xs text-[var(--text-muted)]">
+                    {paymentsListAvailable
+                      ? "Listagem de pagamentos/mensagens conectada."
+                      : "Fallback: endpoint de lista geral de pagamentos/mensagens não exposto no BFF."}
+                  </p>
+                  <Button
+                    className="mt-3 w-full"
+                    variant="outline"
+                    onClick={() => goToWhatsApp(selectedFinancialRecord)}
+                  >
                     Ir para WhatsApp com contexto
                   </Button>
                 </div>
               </div>
             </div>
           ) : (
-            <p className="text-sm text-[var(--text-secondary)]">Selecione uma cobrança para abrir o painel detalhado.</p>
+            <p className="text-sm text-[var(--text-secondary)]">
+              Selecione uma cobrança para abrir o painel detalhado.
+            </p>
           )}
         </AppSectionBlock>
 
@@ -724,7 +1411,7 @@ export default function FinancesPage() {
 
         <QuickActionModal
           open={Boolean(openPayModalFor)}
-          onOpenChange={(open) => {
+          onOpenChange={open => {
             if (!open) setOpenPayModalFor(null);
           }}
           title="Marcar como pago"
@@ -734,14 +1421,28 @@ export default function FinancesPage() {
           footer={
             <div className="flex w-full items-center justify-between gap-3">
               <p className="text-xs text-[var(--text-muted)]">
-                Resumo: {openPayModalFor ? formatCurrency(Number(openPayModalFor?.amountCents ?? 0)) : "—"}
+                Resumo:{" "}
+                {openPayModalFor
+                  ? formatCurrency(Number(openPayModalFor?.amountCents ?? 0))
+                  : "—"}
               </p>
               <div className="flex items-center gap-2">
-                <Button type="button" variant="outline" onClick={() => setOpenPayModalFor(null)} disabled={markPaidMutation.isPending}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setOpenPayModalFor(null)}
+                  disabled={markPaidMutation.isPending}
+                >
                   Cancelar
                 </Button>
-                <Button type="button" onClick={() => void submitMarkAsPaid()} disabled={markPaidMutation.isPending}>
-                  {markPaidMutation.isPending ? "Salvando..." : "Confirmar pagamento"}
+                <Button
+                  type="button"
+                  onClick={() => void submitMarkAsPaid()}
+                  disabled={markPaidMutation.isPending}
+                >
+                  {markPaidMutation.isPending
+                    ? "Salvando..."
+                    : "Confirmar pagamento"}
                 </Button>
               </div>
             </div>
@@ -753,7 +1454,7 @@ export default function FinancesPage() {
               <input
                 className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3"
                 value={payAmount}
-                onChange={(event) => setPayAmount(event.target.value)}
+                onChange={event => setPayAmount(event.target.value)}
               />
             </label>
             <label className="space-y-1 text-sm">
@@ -761,39 +1462,52 @@ export default function FinancesPage() {
               <select
                 className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3"
                 value={payMethod}
-                onChange={(event) => setPayMethod(event.target.value as PaymentMethod)}
+                onChange={event =>
+                  setPayMethod(event.target.value as PaymentMethod)
+                }
               >
-                {PAYMENT_METHOD_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
+                {PAYMENT_METHOD_OPTIONS.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
                 ))}
               </select>
             </label>
             <label className="space-y-1 text-sm">
-              <span className="text-xs text-[var(--text-muted)]">Data de pagamento</span>
+              <span className="text-xs text-[var(--text-muted)]">
+                Data de pagamento
+              </span>
               <input
                 className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3"
                 value={payDate}
-                onChange={(event) => setPayDate(event.target.value)}
+                onChange={event => setPayDate(event.target.value)}
                 type="date"
               />
-              <span className="text-[11px] text-[var(--text-muted)]">Campo informativo (backend atual não persiste data manual).</span>
+              <span className="text-[11px] text-[var(--text-muted)]">
+                Campo informativo (backend atual não persiste data manual).
+              </span>
             </label>
             <label className="space-y-1 text-sm">
-              <span className="text-xs text-[var(--text-muted)]">Observação</span>
+              <span className="text-xs text-[var(--text-muted)]">
+                Observação
+              </span>
               <textarea
                 className="min-h-[80px] w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2"
                 value={payNotes}
-                onChange={(event) => setPayNotes(event.target.value)}
+                onChange={event => setPayNotes(event.target.value)}
                 placeholder="Observação operacional"
               />
-              <span className="text-[11px] text-[var(--text-muted)]">Campo informativo (endpoint pay não recebe observação neste ambiente).</span>
+              <span className="text-[11px] text-[var(--text-muted)]">
+                Campo informativo (endpoint pay não recebe observação neste
+                ambiente).
+              </span>
             </label>
           </div>
         </QuickActionModal>
 
         <QuickActionModal
           open={Boolean(openEditModalFor)}
-          onOpenChange={(open) => {
+          onOpenChange={open => {
             if (!open) setOpenEditModalFor(null);
           }}
           title="Editar cobrança"
@@ -802,12 +1516,23 @@ export default function FinancesPage() {
           closeBlocked={editMutation.isPending}
           footer={
             <div className="flex w-full items-center justify-between gap-3">
-              <p className="text-xs text-[var(--text-muted)]">Resumo atualizado no backend em tempo real.</p>
+              <p className="text-xs text-[var(--text-muted)]">
+                Resumo atualizado no backend em tempo real.
+              </p>
               <div className="flex items-center gap-2">
-                <Button type="button" variant="outline" onClick={() => setOpenEditModalFor(null)} disabled={editMutation.isPending}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setOpenEditModalFor(null)}
+                  disabled={editMutation.isPending}
+                >
                   Cancelar
                 </Button>
-                <Button type="button" onClick={() => void submitEditCharge()} disabled={editMutation.isPending}>
+                <Button
+                  type="button"
+                  onClick={() => void submitEditCharge()}
+                  disabled={editMutation.isPending}
+                >
                   {editMutation.isPending ? "Salvando..." : "Salvar edição"}
                 </Button>
               </div>
@@ -820,24 +1545,28 @@ export default function FinancesPage() {
               <input
                 className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3"
                 value={editAmount}
-                onChange={(event) => setEditAmount(event.target.value)}
+                onChange={event => setEditAmount(event.target.value)}
               />
             </label>
             <label className="space-y-1 text-sm">
-              <span className="text-xs text-[var(--text-muted)]">Vencimento</span>
+              <span className="text-xs text-[var(--text-muted)]">
+                Vencimento
+              </span>
               <input
                 className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3"
                 value={editDueDate}
-                onChange={(event) => setEditDueDate(event.target.value)}
+                onChange={event => setEditDueDate(event.target.value)}
                 type="date"
               />
             </label>
             <label className="space-y-1 text-sm sm:col-span-2">
-              <span className="text-xs text-[var(--text-muted)]">Observações</span>
+              <span className="text-xs text-[var(--text-muted)]">
+                Observações
+              </span>
               <textarea
                 className="min-h-[110px] w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2"
                 value={editNotes}
-                onChange={(event) => setEditNotes(event.target.value)}
+                onChange={event => setEditNotes(event.target.value)}
               />
             </label>
           </div>
