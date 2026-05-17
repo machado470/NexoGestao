@@ -64,14 +64,14 @@ export function SearchCommand({ results, onSearch, isLoading = false }: SearchCo
       <Button
         variant="outline"
         size="sm"
-        className="w-full justify-between text-gray-500"
+        className="w-full justify-between border-[var(--border-subtle)] bg-[var(--surface-input)] text-[var(--text-muted)] hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)]"
         onClick={() => setIsOpen(true)}
       >
         <div className="flex items-center gap-2">
           <Search className="w-4 h-4" />
           <span className="text-xs">Buscar...</span>
         </div>
-        <kbd className="text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">⌘K</kbd>
+        <kbd className="rounded bg-[var(--surface-operational-light,var(--surface-base))] px-2 py-1 text-xs text-[var(--text-secondary)]">⌘K</kbd>
       </Button>
     );
   }
@@ -80,16 +80,16 @@ export function SearchCommand({ results, onSearch, isLoading = false }: SearchCo
     <>
       {/* Overlay */}
       <div
-        className="fixed inset-0 bg-black/50 z-40"
+        className="fixed inset-0 z-40 bg-[var(--app-overlay-bg)] backdrop-blur-[2px]"
         onClick={() => setIsOpen(false)}
       />
 
       {/* Search Dialog */}
       <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-lg">
-        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+        <div className="nexo-floating-panel rounded-[var(--radius-surface)] border border-[var(--app-overlay-border)] bg-[var(--popover)] text-[var(--popover-foreground)] shadow-[var(--app-overlay-shadow)]">
           {/* Search Input */}
-          <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
-            <Search className="w-5 h-5 text-gray-400" />
+          <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] bg-[var(--app-overlay-header)] p-4">
+            <Search className="h-5 w-5 text-[var(--text-muted)]" />
             <Input
               autoFocus
               placeholder="Buscar clientes, agendamentos, ordens..."
@@ -100,22 +100,22 @@ export function SearchCommand({ results, onSearch, isLoading = false }: SearchCo
                 setSelectedIndex(0);
               }}
               onKeyDown={handleKeyDown}
-              className="border-0 focus:ring-0 text-lg"
+              className="border-0 bg-transparent text-lg shadow-none focus-visible:ring-0"
             />
             <button
               onClick={() => setIsOpen(false)}
-              className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
+              className="rounded p-1 text-[var(--text-muted)] hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)]"
             >
-              <X className="w-5 h-5 text-gray-400" />
+              <X className="h-5 w-5 text-[var(--text-muted)]" />
             </button>
           </div>
 
           {/* Results */}
           <div className="max-h-96 overflow-y-auto">
             {isLoading ? (
-              <div className="p-8 text-center text-gray-500">Buscando...</div>
+              <div className="p-8 text-center text-[var(--text-muted)]">Buscando...</div>
             ) : results.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">
+              <div className="p-8 text-center text-[var(--text-muted)]">
                 {query ? 'Nenhum resultado encontrado' : 'Digite para buscar'}
               </div>
             ) : (
@@ -125,7 +125,7 @@ export function SearchCommand({ results, onSearch, isLoading = false }: SearchCo
                   new Set(results.map((r) => r.category))
                 ).map((category) => (
                   <div key={category}>
-                    <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase">
+                    <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                       {category}
                     </div>
                     {results
@@ -138,13 +138,13 @@ export function SearchCommand({ results, onSearch, isLoading = false }: SearchCo
                             onClick={() => handleSelect(result)}
                             className={`w-full text-left px-3 py-2 rounded transition-colors ${
                               selectedIndex === globalIdx
-                                ? 'bg-orange-100 dark:bg-orange-900/30'
-                                : 'hover:bg-gray-100 dark:hover:bg-gray-800'
+                                ? 'bg-[var(--accent-soft)] text-[var(--text-primary)]'
+                                : 'text-[var(--text-secondary)] hover:bg-[var(--surface-operational-light,var(--surface-base))] hover:text-[var(--text-primary)]'
                             }`}
                           >
                             <div className="font-medium text-sm">{result.title}</div>
                             {result.description && (
-                              <div className="text-xs text-gray-500">{result.description}</div>
+                              <div className="text-xs text-[var(--text-muted)]">{result.description}</div>
                             )}
                           </button>
                         );
@@ -156,13 +156,13 @@ export function SearchCommand({ results, onSearch, isLoading = false }: SearchCo
           </div>
 
           {/* Footer */}
-          <div className="p-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between text-xs text-gray-500">
+          <div className="flex items-center justify-between border-t border-[var(--border-subtle)] bg-[var(--app-overlay-footer)] p-3 text-xs text-[var(--text-muted)]">
             <div className="flex gap-2">
-              <kbd className="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">↑↓</kbd>
+              <kbd className="rounded bg-[var(--surface-operational-light,var(--surface-base))] px-2 py-1 text-[var(--text-secondary)]">↑↓</kbd>
               <span>Navegar</span>
-              <kbd className="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">Enter</kbd>
+              <kbd className="rounded bg-[var(--surface-operational-light,var(--surface-base))] px-2 py-1 text-[var(--text-secondary)]">Enter</kbd>
               <span>Selecionar</span>
-              <kbd className="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">Esc</kbd>
+              <kbd className="rounded bg-[var(--surface-operational-light,var(--surface-base))] px-2 py-1 text-[var(--text-secondary)]">Esc</kbd>
               <span>Fechar</span>
             </div>
           </div>
