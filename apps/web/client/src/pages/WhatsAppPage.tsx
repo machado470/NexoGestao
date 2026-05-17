@@ -41,7 +41,11 @@ import {
   type InboxPriority,
 } from "@/lib/whatsappInboxPriority";
 import { Button } from "@/components/design-system";
-import { AppPageShell, AppSkeleton } from "@/components/app-system";
+import {
+  AppPageShell,
+  AppSkeleton,
+  AppStatCard,
+} from "@/components/app-system";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -53,7 +57,12 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { AppPageLoadingState } from "@/components/internal-page-system";
+import {
+  AppOperationalHeader,
+  AppPageLoadingState,
+  AppStatusBadge,
+} from "@/components/internal-page-system";
+import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import {
   WhatsAppActionExecutionPanel,
   type WhatsAppActionExecution,
@@ -567,10 +576,10 @@ const FILTERS: Array<{
   label: string;
   count: string;
 }> = [
-  { value: "critical_now", label: "Critical now", count: "" },
-  { value: "waiting_customer", label: "Waiting customer", count: "" },
-  { value: "today_commitments", label: "Today commitments", count: "" },
-  { value: "resolved", label: "Resolved", count: "" },
+  { value: "critical_now", label: "Críticas", count: "" },
+  { value: "waiting_customer", label: "Aguardando", count: "" },
+  { value: "today_commitments", label: "Com contexto", count: "" },
+  { value: "resolved", label: "Resolvidas", count: "" },
 ];
 
 const QUICK_COMPOSER_TEMPLATES = [
@@ -591,7 +600,7 @@ const statusUi: Record<
   FAILED: { label: "Falha", dot: "bg-rose-400" },
 };
 
-const ROW_HEIGHT = 124;
+const ROW_HEIGHT = 148;
 const NO_APPOINTMENT_TEXT = "Sem agendamento futuro";
 const NO_SERVICE_ORDER_TEXT = "Nenhuma O.S. ativa";
 const NO_CHARGE_TEXT = "Nenhuma cobrança pendente";
@@ -815,6 +824,48 @@ function getConversationBadges(conversation: Conversation) {
   return badges;
 }
 
+function getContextTypeLabel(contextType?: ContextType | null) {
+  if (contextType === "CHARGE") return "Cobrança";
+  if (contextType === "APPOINTMENT") return "Agendamento";
+  if (contextType === "SERVICE_ORDER") return "O.S.";
+  if (contextType === "PAYMENT") return "Pagamento";
+  if (contextType === "CUSTOMER") return "Cliente";
+  return "Geral";
+}
+
+function getPriorityLabel(priority?: WhatsAppPriority | null) {
+  if (priority === "CRITICAL") return "Crítica";
+  if (priority === "HIGH") return "Alta";
+  if (priority === "MEDIUM") return "Média";
+  return "Baixa";
+}
+
+function getPrimaryCommunicationAction(conversation?: Conversation | null) {
+  if (!conversation) return "Selecionar conversa";
+  if (!conversation.phone) return "Bloqueado: sem telefone";
+  if (conversation.hasFailedDelivery) return "Reenviar falha";
+  if (conversation.hasPendingCharge) return "Enviar cobrança";
+  if (conversation.hasUpcomingAppointment) return "Confirmar agenda";
+  if (conversation.hasActiveServiceOrder) return "Atualizar O.S.";
+  if (conversation.status !== "RESOLVED") return "Resolver conversa";
+  return "Acompanhar histórico";
+}
+
+function getCommunicationStateLabel({
+  conversations,
+  failedMessages,
+  waitingReplies,
+}: {
+  conversations: Conversation[];
+  failedMessages: number;
+  waitingReplies: number;
+}) {
+  if (failedMessages > 0) return "Atenção: falhas de envio";
+  if (waitingReplies > 0) return "Operação aguardando resposta";
+  if (conversations.length === 0) return "Sem conversas ativas";
+  return "Comunicação sob controle";
+}
+
 function buildSuggestedAction(
   conversation?: Conversation,
   context?: WhatsAppContext | null
@@ -992,15 +1043,26 @@ const ConversationRow = memo(function ConversationRow({
           </span>
         </div>
         <p className="mt-2 line-clamp-1 text-xs text-[var(--text-secondary)]">
-          {conversation.contextHint ?? conversation.lastMessage}
+          {conversation.lastMessage}
         </p>
-        <div className="mt-3 flex items-center justify-between gap-3 text-[11px] text-app-muted">
-          <span className="inline-flex items-center gap-1.5">
+        <div className="mt-2 grid grid-cols-2 gap-1.5 text-[10px] text-app-muted">
+          <span className="rounded-full bg-app-surface px-2 py-0.5">
+            Contexto: {getContextTypeLabel(conversation.contextType)}
+          </span>
+          <span className="rounded-full bg-app-surface px-2 py-0.5">
+            Prioridade: {getPriorityLabel(conversation.priority)}
+          </span>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-app-surface px-2 py-0.5">
             <span className={cn("h-2 w-2 rounded-full", status.dot)} />
             {operational}
           </span>
+          <span className="truncate rounded-full bg-app-surface px-2 py-0.5">
+            Ação: {getPrimaryCommunicationAction(conversation)}
+          </span>
+        </div>
+        <div className="mt-2 flex items-center justify-between gap-3 text-[11px] text-app-muted">
           {badges.length ? (
-            <div className="flex flex-wrap justify-end gap-1">
+            <div className="flex flex-wrap gap-1">
               {badges.slice(0, 3).map(badge => (
                 <span
                   key={badge}
@@ -1010,7 +1072,11 @@ const ConversationRow = memo(function ConversationRow({
                 </span>
               ))}
             </div>
-          ) : null}
+          ) : (
+            <span className="text-[10px] text-[var(--text-muted)]">
+              {conversation.contextHint ?? "Conversa geral"}
+            </span>
+          )}
           {conversation.unreadCount ? (
             <span className="rounded-full bg-[color-mix(in_srgb,var(--warning)_18%,var(--app-surface))] px-2 py-0.5 text-[10px] font-medium leading-none text-[var(--warning)]">
               {conversation.unreadCount}
@@ -1067,7 +1133,7 @@ function InboxQueueColumn({
       <div className="shrink-0 space-y-3 pb-3">
         <div className="flex items-center justify-between">
           <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
-            Operational Queue
+            Inbox inteligente
           </p>
           <button
             type="button"
@@ -1499,9 +1565,21 @@ function ExecutionChatColumn({
             <p className="text-xs text-[var(--text-muted)]">
               {conversation?.phone ?? "Nenhuma conversa ativa"}
             </p>
+            {conversation ? (
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                <span className="rounded-full bg-app-surface px-2 py-0.5 text-[10px] text-[var(--text-secondary)]">
+                  Contexto: {getContextTypeLabel(conversation.contextType)}
+                </span>
+                <span className="rounded-full bg-app-surface px-2 py-0.5 text-[10px] text-[var(--text-secondary)]">
+                  Status: {getOperationalStatus(conversation)}
+                </span>
+              </div>
+            ) : null}
             {conversation?.conversationId ? (
-              <p className="text-[10px] text-[var(--text-muted)]">
-                {conversation.title ?? getOperationalStatus(conversation)}
+              <p className="mt-1 text-[10px] text-[var(--text-muted)]">
+                {conversation.title ??
+                  conversation.contextHint ??
+                  "Conversa geral"}
               </p>
             ) : null}
             {!conversation?.conversationId && conversation ? (
@@ -1625,6 +1703,11 @@ function ExecutionChatColumn({
       </div>
 
       <footer className="mt-0 shrink-0 bg-app-panel px-4 pb-4 pt-2">
+        {hasConversation && !canCompose ? (
+          <div className="mb-2 rounded-xl bg-[color-mix(in_srgb,var(--danger)_10%,var(--app-surface))] px-3 py-2 text-[11px] font-medium text-[var(--danger)]">
+            Envio bloqueado: cliente sem telefone cadastrado.
+          </div>
+        ) : null}
         <div className="flex items-center gap-2 rounded-2xl bg-app-surface p-2">
           <input
             value={content}
@@ -1723,6 +1806,8 @@ function OperationalContextColumn({
   onNavigate,
   onSendCharge,
   onSendReminder,
+  onResolveConversation,
+  canResolveConversation,
   onMoreActions,
   pendingApprovals,
   executionHistory,
@@ -1744,6 +1829,8 @@ function OperationalContextColumn({
   onNavigate: (path: string) => void;
   onSendCharge: () => void;
   onSendReminder: () => void;
+  onResolveConversation: () => void;
+  canResolveConversation: boolean;
   onMoreActions: () => void;
   pendingApprovals: WhatsAppActionExecution[];
   executionHistory: WhatsAppActionExecution[];
@@ -1983,7 +2070,7 @@ function OperationalContextColumn({
 
           <section className="rounded-2xl bg-[color-mix(in_srgb,var(--app-surface)_72%,transparent)] px-3 py-3">
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
-              Action cockpit
+              Painel de execução
             </p>
             <div className="mt-2.5 grid grid-cols-1 gap-2">
               <Button
@@ -2017,7 +2104,26 @@ function OperationalContextColumn({
                 className="h-8 w-full min-w-0 justify-start truncate border-[color-mix(in_srgb,var(--app-border)_78%,transparent)] bg-[color-mix(in_srgb,var(--app-card)_86%,transparent)] px-2.5 text-[11px] font-semibold text-[var(--text-primary)] hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)]"
                 onClick={onSendReminder}
               >
-                Enviar lembrete
+                Confirmar agenda / enviar lembrete
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 w-full min-w-0 justify-start truncate border-[color-mix(in_srgb,var(--app-border)_78%,transparent)] bg-[color-mix(in_srgb,var(--app-card)_86%,transparent)] px-2.5 text-[11px] font-semibold text-[var(--text-primary)] hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)]"
+                onClick={onSendReminder}
+              >
+                Atualizar O.S.
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 w-full min-w-0 justify-start truncate border-[color-mix(in_srgb,var(--app-border)_78%,transparent)] bg-[color-mix(in_srgb,var(--app-card)_86%,transparent)] px-2.5 text-[11px] font-semibold text-[var(--text-primary)] hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)] disabled:opacity-45"
+                disabled={!canResolveConversation}
+                onClick={onResolveConversation}
+              >
+                Resolver conversa
               </Button>
               <Button
                 type="button"
@@ -2683,6 +2789,66 @@ export default function WhatsAppPage() {
     () => buildSuggestedAction(selectedConversation, context),
     [context, selectedConversation]
   );
+
+  const communicationMetrics = useMemo(() => {
+    const waitingReplies = conversations.filter(
+      item =>
+        item.status !== "RESOLVED" &&
+        (item.hasNoResponse ||
+          item.unreadCount > 0 ||
+          item.status === "PENDING")
+    ).length;
+    const failedMessages = conversations.reduce(
+      (total, item) =>
+        total + (item.failedMessageCount ?? (item.hasFailedDelivery ? 1 : 0)),
+      0
+    );
+    const chargesInConversation = allInboxRows.filter(
+      item => item.hasPendingCharge
+    ).length;
+    const activeContexts = allInboxRows.filter(
+      item => item.hasUpcomingAppointment || item.hasActiveServiceOrder
+    ).length;
+
+    return {
+      waitingReplies,
+      failedMessages,
+      chargesInConversation,
+      activeContexts,
+      stateLabel: getCommunicationStateLabel({
+        conversations,
+        failedMessages,
+        waitingReplies,
+      }),
+    };
+  }, [allInboxRows, conversations]);
+
+  const nextBestConversation = useMemo(() => {
+    return (
+      [...allInboxRows]
+        .filter(
+          item =>
+            item.conversationId ||
+            item.hasPendingCharge ||
+            item.hasUpcomingAppointment ||
+            item.hasActiveServiceOrder
+        )
+        .sort((a, b) => {
+          const chargeDiff =
+            Number(b.hasPendingCharge) - Number(a.hasPendingCharge);
+          if (chargeDiff !== 0) return chargeDiff;
+          const failureDiff =
+            Number(b.hasFailedDelivery) - Number(a.hasFailedDelivery);
+          if (failureDiff !== 0) return failureDiff;
+          const scoreDiff = priorityScore(a) - priorityScore(b);
+          if (scoreDiff !== 0) return scoreDiff;
+          return (
+            new Date(b.lastMessageAt ?? 0).getTime() -
+            new Date(a.lastMessageAt ?? 0).getTime()
+          );
+        })[0] ?? null
+    );
+  }, [allInboxRows]);
   const refreshExecutionState = useCallback(async () => {
     await Promise.all([
       pendingApprovalsQuery.refetch(),
@@ -3101,6 +3267,30 @@ export default function WhatsAppPage() {
     await handleSendTemplate("manual_followup", getDefaultMessageType());
   };
 
+  const handleNextBestAction = () => {
+    if (!nextBestConversation?.id) return;
+    if (nextBestConversation.id !== selectedConversationId) {
+      handleSelectConversation(nextBestConversation.id);
+      return;
+    }
+    if (nextBestConversation.hasFailedDelivery) {
+      void handleRetryLastFailed();
+      return;
+    }
+    if (nextBestConversation.hasPendingCharge) {
+      void handleSendCharge();
+      return;
+    }
+    if (
+      nextBestConversation.hasUpcomingAppointment ||
+      nextBestConversation.hasActiveServiceOrder
+    ) {
+      void handleSendReminder();
+      return;
+    }
+    void handleResolveConversationExecution();
+  };
+
   if (
     conversationsQuery.isLoading &&
     customersQuery.isLoading &&
@@ -3118,7 +3308,107 @@ export default function WhatsAppPage() {
 
   return (
     <AppPageShell className="h-[calc(100vh-5rem)] min-h-0 overflow-hidden bg-app-surface px-4 pb-0 pt-4 text-app-primary">
-      <div className="grid h-full min-h-0 grid-cols-1 gap-4 overflow-visible bg-transparent xl:grid-cols-[minmax(280px,320px)_minmax(0,1fr)_minmax(292px,332px)]">
+      <AppOperationalHeader
+        title="WhatsApp operacional"
+        description={`Centro de execução da comunicação · ${conversations.length} conversa(s), ${communicationMetrics.waitingReplies} aguardando resposta e ${communicationMetrics.failedMessages} falha(s).`}
+        density="compact"
+        contextChips={
+          <>
+            <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1 text-xs text-[var(--text-secondary)]">
+              Estado: {communicationMetrics.stateLabel}
+            </span>
+            <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1 text-xs text-[var(--text-secondary)]">
+              Inbox: {allInboxRows.length}
+            </span>
+            {context?.openCharge?.daysOverdue ||
+            String(context?.openCharge?.status ?? "").toUpperCase() ===
+              "OVERDUE" ? (
+              <span className="rounded-full border border-[var(--danger)]/30 bg-[color-mix(in_srgb,var(--danger)_10%,var(--surface-elevated))] px-3 py-1 text-xs text-[var(--danger)]">
+                Cobrança vencida em conversa
+              </span>
+            ) : null}
+          </>
+        }
+      >
+        <p className="text-sm text-[var(--text-secondary)]">
+          Toda conversa precisa estar ligada a cobrança, agenda, O.S., cliente
+          ou exceção geral. A ação principal vem antes da navegação.
+        </p>
+      </AppOperationalHeader>
+
+      <OperationalTopCard
+        className="shrink-0"
+        contextLabel="Próxima melhor ação de comunicação"
+        title={
+          nextBestConversation
+            ? `${getPrimaryCommunicationAction(nextBestConversation)} · ${nextBestConversation.name}`
+            : "Nenhuma ação crítica de comunicação agora"
+        }
+        description={
+          nextBestConversation
+            ? `${getContextTypeLabel(nextBestConversation.contextType)} · ${getOperationalStatus(nextBestConversation)} · ${nextBestConversation.phone ? "telefone disponível" : "envio bloqueado sem telefone"}`
+            : "O backend não retornou conversa, cobrança, agendamento ou O.S. exigindo contato imediato."
+        }
+        chips={
+          nextBestConversation ? (
+            <>
+              <AppStatusBadge
+                label={getPriorityLabel(nextBestConversation.priority)}
+              />
+              <span className="rounded-full border border-[var(--border-subtle)] px-2.5 py-1 text-xs text-[var(--text-muted)]">
+                {getContextTypeLabel(nextBestConversation.contextType)}
+              </span>
+            </>
+          ) : null
+        }
+        primaryAction={
+          nextBestConversation ? (
+            <Button
+              onClick={handleNextBestAction}
+              disabled={
+                !nextBestConversation.phone &&
+                nextBestConversation.id === selectedConversationId
+              }
+            >
+              {nextBestConversation.id === selectedConversationId
+                ? getPrimaryCommunicationAction(nextBestConversation)
+                : "Abrir prioridade"}
+            </Button>
+          ) : null
+        }
+        secondaryActions={
+          nextBestConversation && !nextBestConversation.phone ? (
+            <span className="text-xs font-medium text-[var(--danger)]">
+              Cliente sem telefone: envio bloqueado.
+            </span>
+          ) : null
+        }
+      />
+
+      <div className="grid shrink-0 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+        <AppStatCard
+          label="Aguardando resposta"
+          value={String(communicationMetrics.waitingReplies)}
+          helper="Conversas abertas que ainda pedem resposta operacional."
+        />
+        <AppStatCard
+          label="Mensagens falhadas"
+          value={String(communicationMetrics.failedMessages)}
+          helper="Falhas aparecem no inbox e na conversa para reenvio."
+        />
+        <AppStatCard
+          label="Cobranças em conversa"
+          value={String(communicationMetrics.chargesInConversation)}
+          helper="Cobranças pendentes/vencidas têm prioridade de contato."
+        />
+        <AppStatCard
+          label="Agenda/O.S. com contexto"
+          value={String(communicationMetrics.activeContexts)}
+          helper="Agendamentos e O.S. vinculados à comunicação ativa."
+        />
+      </div>
+
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-visible bg-transparent xl:grid-cols-[minmax(280px,320px)_minmax(0,1fr)_minmax(292px,332px)]">
         <div className="h-full min-h-0 min-w-0 overflow-hidden">
           <InboxQueueColumn
             rows={filteredRows}
@@ -3235,6 +3525,13 @@ export default function WhatsAppPage() {
             onNavigate={setLocation}
             onSendCharge={handleSendCharge}
             onSendReminder={handleSendReminder}
+            onResolveConversation={() =>
+              void handleResolveConversationExecution()
+            }
+            canResolveConversation={
+              Boolean(selectedConversationRecordId) &&
+              selectedConversation?.status !== "RESOLVED"
+            }
             onMoreActions={handleMoreActions}
             pendingApprovals={pendingApprovals}
             executionHistory={executionHistory}
