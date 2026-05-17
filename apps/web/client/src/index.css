@@ -87,8 +87,13 @@
     --info: #0ea5e9;
 
     --background-base: var(--bg-page);
-    --surface-base: #e6edf6;
-    --surface-elevated: #f4f7fc;
+    --surface-card-light: #ffffff;
+    --surface-elevated-light: #f8fbff;
+    --surface-overlay-light: #f3f7fd;
+    --surface-input-light: #ffffff;
+    --surface-base: #f1f5fb;
+    --surface-elevated: var(--surface-elevated-light);
+    --surface-input: var(--surface-input-light);
     --sidebar-bg: #e8eef7;
     --card-bg: var(--bg-card);
     --border-subtle: #cfd9e8;
@@ -101,7 +106,16 @@
     --success: #2f8f66;
     --warning: #b97828;
     --danger: #c54b4b;
-    --surface-contrast: #f0f4fa;
+    --surface-contrast: #eef4fb;
+    --app-overlay-bg: rgba(15, 23, 42, 0.32);
+    --app-overlay-surface: var(--surface-overlay-light);
+    --app-overlay-header: color-mix(in srgb, var(--surface-card-light) 82%, var(--surface-overlay-light));
+    --app-overlay-body: var(--surface-overlay-light);
+    --app-overlay-footer: color-mix(in srgb, var(--surface-card-light) 74%, var(--surface-overlay-light));
+    --app-overlay-border: rgba(92, 111, 136, 0.22);
+    --app-overlay-shadow: 0 26px 70px rgba(27, 39, 59, 0.18), 0 2px 8px rgba(27, 39, 59, 0.08);
+    --app-overlay-text: var(--text-primary);
+    --modal-card-shadow-light: 0 10px 26px rgba(27, 39, 59, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.78);
 
     --background: var(--background-base);
     --foreground: var(--text-primary);
@@ -118,7 +132,7 @@
     --destructive: var(--danger);
     --destructive-foreground: #fff3f2;
     --border: var(--border-subtle);
-    --input: var(--surface-base);
+    --input: var(--surface-input);
     --ring: color-mix(in srgb, var(--accent) 35%, transparent);
     --sidebar: var(--sidebar-bg);
     --sidebar-foreground: var(--text-primary);
@@ -162,8 +176,13 @@
     --info: #38bdf8;
 
     --background-base: #11151d;
+    --surface-card-light: #1a2230;
+    --surface-elevated-light: #1c2432;
+    --surface-overlay-light: #152036;
+    --surface-input-light: #1c2432;
     --surface-base: #181e2a;
     --surface-elevated: #1c2432;
+    --surface-input: var(--surface-elevated);
     --sidebar-bg: #141b26;
     --card-bg: #1a2230;
     --border-subtle: #2c3748;
@@ -177,6 +196,15 @@
     --warning: #df9b4a;
     --danger: #de6b6b;
     --surface-contrast: #1a3a52;
+    --app-overlay-bg: #111d2e;
+    --app-overlay-surface: #152036;
+    --app-overlay-header: #172238;
+    --app-overlay-body: #152036;
+    --app-overlay-footer: #121d31;
+    --app-overlay-border: rgba(139, 156, 192, 0.26);
+    --app-overlay-shadow: 0 24px 60px rgba(2, 6, 23, 0.55);
+    --app-overlay-text: #f0f4ff;
+    --modal-card-shadow-light: 0 14px 30px rgba(2, 6, 23, 0.34);
 
     --nexo-app-bg: #05080f;
     --nexo-page-surface: #03060d;
@@ -226,7 +254,7 @@
 
 .scrollbar-thin-nexo {
   scrollbar-width: thin;
-  scrollbar-color: rgba(249, 115, 22, 0.55) transparent;
+  scrollbar-color: color-mix(in srgb, var(--text-muted) 34%, transparent) transparent;
 }
 
 .scrollbar-thin-nexo::-webkit-scrollbar {
@@ -239,12 +267,12 @@
 }
 
 .scrollbar-thin-nexo::-webkit-scrollbar-thumb {
-  background: rgba(249, 115, 22, 0.45);
+  background: color-mix(in srgb, var(--text-muted) 30%, transparent);
   border-radius: 999px;
 }
 
 .scrollbar-thin-nexo::-webkit-scrollbar-thumb:hover {
-  background: rgba(249, 115, 22, 0.7);
+  background: color-mix(in srgb, var(--accent-primary) 40%, var(--text-muted) 24%);
 }
 
 .scrollbar-menu-nexo {
@@ -313,8 +341,16 @@
 
   --popover: #ffffff;
   --popover-foreground: #0f172a;
-  --app-overlay-bg: #ffffff;
-  --app-overlay-surface: #ffffff;
+  --surface-card-light: #ffffff;
+  --surface-elevated-light: #f8fbff;
+  --surface-overlay-light: #f3f7fd;
+  --surface-input-light: #ffffff;
+  --surface-input: var(--surface-input-light);
+  --app-overlay-bg: rgba(15, 23, 42, 0.32);
+  --app-overlay-surface: var(--surface-overlay-light);
+  --app-overlay-header: color-mix(in srgb, var(--surface-card-light) 82%, var(--surface-overlay-light));
+  --app-overlay-body: var(--surface-overlay-light);
+  --app-overlay-footer: color-mix(in srgb, var(--surface-card-light) 74%, var(--surface-overlay-light));
   --app-overlay-border: rgba(70, 102, 136, 0.24);
   --app-overlay-shadow: 0 18px 44px rgba(17, 40, 68, 0.14);
   --app-overlay-text: #12243f;
@@ -332,7 +368,7 @@
   --destructive-foreground: #ffffff;
 
   --border: #e5e7eb;
-  --input: #f3f4f6;
+  --input: var(--surface-input);
   --ring: #f97316;
 
   --sidebar: #ffffff;
@@ -397,8 +433,12 @@
 
   --popover: #111318;
   --popover-foreground: #f4f4f5;
+  --surface-input: #1c2432;
   --app-overlay-bg: #111d2e;
   --app-overlay-surface: #152036;
+  --app-overlay-header: #172238;
+  --app-overlay-body: #152036;
+  --app-overlay-footer: #121d31;
   --app-overlay-border: rgba(139, 156, 192, 0.26);
   --app-overlay-shadow: 0 24px 60px rgba(2, 6, 23, 0.55);
   --app-overlay-text: #f0f4ff;
@@ -488,7 +528,7 @@
     font-family: var(--nexo-body-font);
     background: #f8f9fb;
     scrollbar-width: thin;
-    scrollbar-color: rgba(249, 115, 22, 0.6) transparent;
+    scrollbar-color: color-mix(in srgb, var(--text-muted) 34%, transparent) transparent;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -521,8 +561,8 @@
 }
 
 :where(html, body, [data-scrollbar="nexo"])::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
+  width: 9px;
+  height: 9px;
 }
 
 :where(html, body, [data-scrollbar="nexo"])::-webkit-scrollbar-track {
@@ -531,32 +571,32 @@
 }
 
 :where(html, body, [data-scrollbar="nexo"])::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #fb923c, #f97316);
-  border: 3px solid transparent;
+  background: color-mix(in srgb, var(--text-muted) 36%, var(--accent-primary) 12%);
+  border: 2px solid transparent;
   background-clip: padding-box;
   border-radius: 999px;
   min-height: 28px;
 }
 
 :where(html, body, [data-scrollbar="nexo"])::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #fdba74, #fb923c);
-  border: 3px solid transparent;
+  background: color-mix(in srgb, var(--text-muted) 32%, var(--accent-primary) 28%);
+  border: 2px solid transparent;
   background-clip: padding-box;
 }
 
 .app-root.dark :where([data-scrollbar="nexo"]) {
-  scrollbar-color: rgba(251, 146, 60, 0.62) transparent;
+  scrollbar-color: color-mix(in srgb, var(--text-muted) 36%, transparent) transparent;
 }
 
 [data-scrollbar="nexo"] {
   scrollbar-width: thin;
-  scrollbar-color: rgba(249, 115, 22, 0.58) transparent;
+  scrollbar-color: color-mix(in srgb, var(--text-muted) 34%, transparent) transparent;
   background-color: transparent;
   scrollbar-gutter: stable;
 }
 
 .app-root.dark [data-scrollbar="nexo"] {
-  scrollbar-color: rgba(251, 146, 60, 0.58) transparent;
+  scrollbar-color: color-mix(in srgb, var(--text-muted) 36%, transparent) transparent;
 }
 
 @layer components {
@@ -828,6 +868,25 @@
     background: color-mix(in srgb, var(--nexo-card-muted) 76%, transparent);
     border-color: color-mix(in srgb, var(--nexo-border-soft) 85%, transparent);
     box-shadow: 0 10px 22px rgba(2, 6, 23, 0.16);
+  }
+
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-surface,
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-surface-primary,
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-card-kpi,
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-card-operational,
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-card-informative {
+    border-color: color-mix(in srgb, var(--border-subtle) 88%, #ffffff);
+    background: linear-gradient(180deg, var(--surface-card-light), var(--surface-elevated-light));
+    box-shadow: var(--modal-card-shadow-light);
+  }
+
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-modal-body .nexo-card-kpi,
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-modal-body .nexo-card-operational,
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-modal-body .nexo-card-informative,
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-modal-body section[class*="bg-[var(--surface-base)]"],
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-modal-body details[class*="bg-[var(--surface-base)]"] {
+    background: linear-gradient(180deg, var(--surface-card-light), var(--surface-elevated-light));
+    box-shadow: var(--modal-card-shadow-light);
   }
 
   .nexo-card-alert {
@@ -1303,21 +1362,21 @@ html {
   }
 
   ::-webkit-scrollbar-thumb {
-    background: #f97316;
+    background: color-mix(in srgb, var(--text-muted) 36%, var(--accent-primary) 12%);
     border-radius: 999px;
     transition: background 0.3s ease;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: #ea580c;
+    background: color-mix(in srgb, var(--text-muted) 32%, var(--accent-primary) 28%);
   }
 
   .dark ::-webkit-scrollbar-thumb {
-    background: rgba(251, 146, 60, 0.7);
+    background: color-mix(in srgb, var(--text-muted) 34%, var(--accent-primary) 18%);
   }
 
   .dark ::-webkit-scrollbar-thumb:hover {
-    background: rgba(251, 146, 60, 0.95);
+    background: color-mix(in srgb, var(--text-muted) 28%, var(--accent-primary) 34%);
   }
 }
 
@@ -1333,19 +1392,24 @@ html {
 }
 
 * {
-  scrollbar-color: #f97316 transparent;
+  scrollbar-color: color-mix(in srgb, var(--text-muted) 34%, transparent) transparent;
   scrollbar-width: thin;
 }
 
 .dark * {
-  scrollbar-color: rgba(251, 146, 60, 0.75) transparent;
+  scrollbar-color: color-mix(in srgb, var(--text-muted) 36%, transparent) transparent;
 }
 
 @layer base {
   :root {
     --background-base: #f4f6fa;
-    --surface-base: #eef2f8;
-    --surface-elevated: #f8fafd;
+    --surface-card-light: #ffffff;
+    --surface-elevated-light: #f8fbff;
+    --surface-overlay-light: #f3f7fd;
+    --surface-input-light: #ffffff;
+    --surface-base: #f1f5fb;
+    --surface-elevated: var(--surface-elevated-light);
+    --surface-input: var(--surface-input-light);
     --sidebar-bg: #edf1f7;
     --card-bg: #fbfcfe;
     --border-subtle: #d9e0eb;
@@ -1374,7 +1438,7 @@ html {
     --destructive: var(--danger);
     --destructive-foreground: #fff3f2;
     --border: var(--border-subtle);
-    --input: var(--surface-base);
+    --input: var(--surface-input);
     --ring: color-mix(in srgb, var(--accent) 34%, transparent);
     --sidebar: var(--sidebar-bg);
     --sidebar-foreground: var(--text-primary);
@@ -1416,8 +1480,13 @@ html {
 
   .dark {
     --background-base: #11151d;
+    --surface-card-light: #1a2230;
+    --surface-elevated-light: #1c2432;
+    --surface-overlay-light: #152036;
+    --surface-input-light: #1c2432;
     --surface-base: #181e2a;
     --surface-elevated: #1c2432;
+    --surface-input: var(--surface-elevated);
     --sidebar-bg: #141b26;
     --card-bg: #1a2230;
     --border-subtle: #2c3748;
@@ -1531,6 +1600,25 @@ html {
     border-color: var(--border-subtle);
     background: var(--card-bg);
     box-shadow: var(--nexo-shadow-elev-1);
+  }
+
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-surface,
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-surface-primary,
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-card-kpi,
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-card-operational,
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-card-informative {
+    border-color: color-mix(in srgb, var(--border-subtle) 88%, #ffffff);
+    background: linear-gradient(180deg, var(--surface-card-light), var(--surface-elevated-light));
+    box-shadow: var(--modal-card-shadow-light);
+  }
+
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-modal-body .nexo-card-kpi,
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-modal-body .nexo-card-operational,
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-modal-body .nexo-card-informative,
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-modal-body section[class*="bg-[var(--surface-base)]"],
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-modal-body details[class*="bg-[var(--surface-base)]"] {
+    background: linear-gradient(180deg, var(--surface-card-light), var(--surface-elevated-light));
+    box-shadow: var(--modal-card-shadow-light);
   }
 
   .nexo-card-alert {
@@ -2140,6 +2228,25 @@ html {
       opacity: 1;
       transform: translateY(0);
     }
+  }
+
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-surface,
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-surface-primary,
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-card-kpi,
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-card-operational,
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-card-informative {
+    border-color: color-mix(in srgb, var(--border-subtle) 88%, #ffffff);
+    background: linear-gradient(180deg, var(--surface-card-light), var(--surface-elevated-light));
+    box-shadow: var(--modal-card-shadow-light);
+  }
+
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-modal-body .nexo-card-kpi,
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-modal-body .nexo-card-operational,
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-modal-body .nexo-card-informative,
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-modal-body section[class*="bg-[var(--surface-base)]"],
+  .app-root:not(.dark):not([data-theme="dark"]) .nexo-modal-body details[class*="bg-[var(--surface-base)]"] {
+    background: linear-gradient(180deg, var(--surface-card-light), var(--surface-elevated-light));
+    box-shadow: var(--modal-card-shadow-light);
   }
 
   .nexo-card-alert {
@@ -3068,7 +3175,7 @@ html {
 
   .app-root.dark [data-scrollbar="nexo"],
   .app-root[data-theme="dark"] [data-scrollbar="nexo"] {
-    scrollbar-color: rgba(251, 146, 60, 0.58) transparent;
+    scrollbar-color: color-mix(in srgb, var(--text-muted) 36%, transparent) transparent;
   }
 }
 

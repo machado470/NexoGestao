@@ -269,6 +269,7 @@ export default function AppointmentsPage() {
           endsAt: endsAt.toISOString(),
           status: form.status,
           notes: form.notes.trim() || undefined,
+          expectedUpdatedAt: editing.updatedAt ?? undefined,
         });
         setSuccessMessage("Agendamento atualizado com sucesso.");
       } else {
@@ -296,7 +297,12 @@ export default function AppointmentsPage() {
   const updateStatus = async (appointmentId: string, status: AppointmentStatus) => {
     try {
       setSuccessMessage(null);
-      await updateMutation.mutateAsync({ id: appointmentId, status });
+      const appointment = appointments.find(item => String(item.id) === appointmentId);
+      await updateMutation.mutateAsync({
+        id: appointmentId,
+        status,
+        expectedUpdatedAt: appointment?.updatedAt ?? undefined,
+      });
       await utils.nexo.appointments.list.invalidate();
       setSuccessMessage(status === "CONFIRMED" ? "Agendamento confirmado." : "Agendamento cancelado.");
     } catch (error: any) {

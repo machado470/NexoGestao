@@ -35,6 +35,7 @@ type Appointment = {
   status: "SCHEDULED" | "CONFIRMED" | "DONE" | "CANCELED" | "NO_SHOW";
   title?: string | null;
   notes?: string | null;
+  updatedAt?: string | null;
 };
 
 const STATUS_COLOR: Record<Appointment["status"], string> = {
@@ -227,7 +228,12 @@ export default function CalendarPage() {
   };
 
   const handleConfirm = async (appointmentId: string) => {
-    await updateAppointment.mutateAsync({ id: appointmentId, status: "CONFIRMED" });
+    const appointment = appointments.find(item => item.id === appointmentId);
+    await updateAppointment.mutateAsync({
+      id: appointmentId,
+      status: "CONFIRMED",
+      expectedUpdatedAt: appointment?.updatedAt ?? undefined,
+    });
     refetchAll();
   };
 

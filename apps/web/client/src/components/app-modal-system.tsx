@@ -113,7 +113,7 @@ export function ModalHeader({
   return (
     <DialogHeader
       className={cn(
-        "border-b border-[var(--border-subtle)] px-6 py-5",
+        "border-b border-[var(--border-subtle)] bg-[var(--app-overlay-header)] px-6 py-5",
         fixed ? "shrink-0" : ""
       )}
     >
@@ -131,8 +131,9 @@ export function ModalBody({
 }) {
   return (
     <div
+      data-scrollbar="nexo"
       className={cn(
-        "nexo-modal-body min-h-0 flex-1 overflow-y-auto px-6 py-5",
+        "nexo-modal-body min-h-0 flex-1 overflow-y-auto bg-[var(--app-overlay-body)] px-6 py-5",
         className
       )}
     >
@@ -151,7 +152,7 @@ export function ModalFooter({
   return (
     <DialogFooter
       className={cn(
-        "border-t border-[var(--border-subtle)] px-6 py-4",
+        "border-t border-[var(--border-subtle)] bg-[var(--app-overlay-footer)] px-6 py-4",
         fixed ? "shrink-0" : ""
       )}
     >
