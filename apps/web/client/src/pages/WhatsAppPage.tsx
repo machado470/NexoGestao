@@ -53,10 +53,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  AppOperationalHeader,
-  AppPageLoadingState,
-} from "@/components/internal-page-system";
+import { AppPageLoadingState } from "@/components/internal-page-system";
 import {
   WhatsAppActionExecutionPanel,
   type WhatsAppActionExecution,
@@ -843,21 +840,6 @@ function getPrimaryCommunicationAction(conversation?: Conversation | null) {
   if (conversation.hasActiveServiceOrder) return "Atualizar O.S.";
   if (conversation.status !== "RESOLVED") return "Resolver conversa";
   return "Acompanhar histórico";
-}
-
-function getCommunicationStateLabel({
-  conversations,
-  failedMessages,
-  waitingReplies,
-}: {
-  conversations: Conversation[];
-  failedMessages: number;
-  waitingReplies: number;
-}) {
-  if (failedMessages > 0) return "Atenção: falhas de envio";
-  if (waitingReplies > 0) return "Operação aguardando resposta";
-  if (conversations.length === 0) return "Sem conversas ativas";
-  return "Comunicação sob controle";
 }
 
 function buildSuggestedAction(
@@ -2793,65 +2775,6 @@ export default function WhatsAppPage() {
     [context, selectedConversation]
   );
 
-  const communicationMetrics = useMemo(() => {
-    const waitingReplies = conversations.filter(
-      item =>
-        item.status !== "RESOLVED" &&
-        (item.hasNoResponse ||
-          item.unreadCount > 0 ||
-          item.status === "PENDING")
-    ).length;
-    const failedMessages = conversations.reduce(
-      (total, item) =>
-        total + (item.failedMessageCount ?? (item.hasFailedDelivery ? 1 : 0)),
-      0
-    );
-    const chargesInConversation = allInboxRows.filter(
-      item => item.hasPendingCharge
-    ).length;
-    const activeContexts = allInboxRows.filter(
-      item => item.hasUpcomingAppointment || item.hasActiveServiceOrder
-    ).length;
-
-    return {
-      waitingReplies,
-      failedMessages,
-      chargesInConversation,
-      activeContexts,
-      stateLabel: getCommunicationStateLabel({
-        conversations,
-        failedMessages,
-        waitingReplies,
-      }),
-    };
-  }, [allInboxRows, conversations]);
-
-  const nextBestConversation = useMemo(() => {
-    return (
-      [...allInboxRows]
-        .filter(
-          item =>
-            item.conversationId ||
-            item.hasPendingCharge ||
-            item.hasUpcomingAppointment ||
-            item.hasActiveServiceOrder
-        )
-        .sort((a, b) => {
-          const chargeDiff =
-            Number(b.hasPendingCharge) - Number(a.hasPendingCharge);
-          if (chargeDiff !== 0) return chargeDiff;
-          const failureDiff =
-            Number(b.hasFailedDelivery) - Number(a.hasFailedDelivery);
-          if (failureDiff !== 0) return failureDiff;
-          const scoreDiff = priorityScore(a) - priorityScore(b);
-          if (scoreDiff !== 0) return scoreDiff;
-          return (
-            new Date(b.lastMessageAt ?? 0).getTime() -
-            new Date(a.lastMessageAt ?? 0).getTime()
-          );
-        })[0] ?? null
-    );
-  }, [allInboxRows]);
   const refreshExecutionState = useCallback(async () => {
     await Promise.all([
       pendingApprovalsQuery.refetch(),
@@ -3270,30 +3193,6 @@ export default function WhatsAppPage() {
     await handleSendTemplate("manual_followup", getDefaultMessageType());
   };
 
-  const handleNextBestAction = () => {
-    if (!nextBestConversation?.id) return;
-    if (nextBestConversation.id !== selectedConversationId) {
-      handleSelectConversation(nextBestConversation.id);
-      return;
-    }
-    if (nextBestConversation.hasFailedDelivery) {
-      void handleRetryLastFailed();
-      return;
-    }
-    if (nextBestConversation.hasPendingCharge) {
-      void handleSendCharge();
-      return;
-    }
-    if (
-      nextBestConversation.hasUpcomingAppointment ||
-      nextBestConversation.hasActiveServiceOrder
-    ) {
-      void handleSendReminder();
-      return;
-    }
-    void handleResolveConversationExecution();
-  };
-
   if (
     conversationsQuery.isLoading &&
     customersQuery.isLoading &&
@@ -3311,78 +3210,6 @@ export default function WhatsAppPage() {
 
   return (
     <AppPageShell className="h-[calc(100vh-5rem)] min-h-0 overflow-hidden bg-app-surface px-4 pb-0 pt-3 text-app-primary">
-      <AppOperationalHeader
-        title="WhatsApp operacional"
-        description="Inbox → conversa → contexto operacional."
-        density="compact"
-        contextChips={
-          <>
-            <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1 text-xs text-[var(--text-secondary)]">
-              Conexão: {communicationMetrics.stateLabel}
-            </span>
-            {context?.openCharge?.daysOverdue ||
-            String(context?.openCharge?.status ?? "").toUpperCase() ===
-              "OVERDUE" ? (
-              <span className="rounded-full border border-[var(--danger)]/30 bg-[color-mix(in_srgb,var(--danger)_10%,var(--surface-elevated))] px-3 py-1 text-xs text-[var(--danger)]">
-                Cobrança vencida
-              </span>
-            ) : null}
-          </>
-        }
-      />
-
-      <section className="shrink-0 rounded-[var(--radius-panel)] border border-[var(--app-border)]/60 bg-app-panel/70 px-3 py-2 text-app-primary">
-        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-              Próxima ação
-            </p>
-            <p className="truncate text-sm font-semibold text-app-primary">
-              {nextBestConversation
-                ? `${getPrimaryCommunicationAction(nextBestConversation)} · ${nextBestConversation.name}`
-                : "Nenhuma conversa crítica exigindo resposta imediata"}
-            </p>
-            <p className="truncate text-[11px] text-[var(--text-muted)]">
-              {nextBestConversation
-                ? `${getContextTypeLabel(nextBestConversation.contextType)} · ${getOperationalStatus(nextBestConversation)} · ${nextBestConversation.phone ? "telefone disponível" : "envio bloqueado sem telefone"}`
-                : "A fila permanece disponível sem transformar o WhatsApp em dashboard."}
-            </p>
-          </div>
-          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-            <span className="rounded-full bg-app-surface px-2.5 py-1 text-[11px] text-[var(--text-secondary)]">
-              {communicationMetrics.waitingReplies} aguardando
-            </span>
-            <span className="rounded-full bg-app-surface px-2.5 py-1 text-[11px] text-[var(--text-secondary)]">
-              {communicationMetrics.failedMessages} falha(s)
-            </span>
-            <span className="rounded-full bg-app-surface px-2.5 py-1 text-[11px] text-[var(--text-secondary)]">
-              {communicationMetrics.activeContexts} contexto(s)
-            </span>
-            {nextBestConversation ? (
-              <Button
-                type="button"
-                size="sm"
-                className="h-8 px-3 text-[11px]"
-                onClick={handleNextBestAction}
-                disabled={
-                  !nextBestConversation.phone &&
-                  nextBestConversation.id === selectedConversationId
-                }
-              >
-                {nextBestConversation.id === selectedConversationId
-                  ? getPrimaryCommunicationAction(nextBestConversation)
-                  : "Abrir prioridade"}
-              </Button>
-            ) : null}
-          </div>
-        </div>
-        {nextBestConversation && !nextBestConversation.phone ? (
-          <p className="mt-1 text-[11px] font-medium text-[var(--danger)]">
-            Cliente sem telefone: envio bloqueado até corrigir cadastro.
-          </p>
-        ) : null}
-      </section>
-
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden bg-transparent xl:grid-cols-[minmax(286px,318px)_minmax(480px,1fr)_minmax(286px,318px)]">
         <div className="h-full min-h-0 min-w-0 overflow-hidden">
           <InboxQueueColumn
