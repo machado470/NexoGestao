@@ -256,7 +256,7 @@ export function CreateAppointmentModal({
             {formData.assignedToPersonId ? (
               <button
                 type="button"
-                className="text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
+                className="text-xs text-[var(--modal-section-muted)] transition-colors hover:text-[var(--modal-section-text)]"
                 onClick={() =>
                   setFormData({ ...formData, assignedToPersonId: "" })
                 }
@@ -317,7 +317,7 @@ export function CreateAppointmentModal({
             rows={3}
           />
         </AppField>
-        <p className="text-xs text-[var(--text-muted)]">
+        <p className="text-xs text-[var(--modal-section-muted)]">
           Dica operacional: a página sinaliza conflitos e próximos horários após criar.
         </p>
       </AppForm>

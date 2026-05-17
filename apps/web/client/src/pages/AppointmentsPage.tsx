@@ -333,7 +333,7 @@ export default function AppointmentsPage() {
           description="Controle do tempo, confirmação e preparação da execução"
           density="compact"
           primaryAction={
-            <Button className="bg-orange-500 text-white hover:bg-orange-400" onClick={() => { setEditing(null); setOpenModal(true); }}>
+            <Button className="bg-[var(--accent-primary)] text-[var(--primary-foreground)] hover:bg-[var(--accent-primary-hover)]" onClick={() => { setEditing(null); setOpenModal(true); }}>
               Novo agendamento
             </Button>
           }
@@ -345,13 +345,13 @@ export default function AppointmentsPage() {
               placeholder="Buscar cliente, observação ou serviço"
               className="h-9"
             />
-            <div className="flex h-9 items-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 text-xs text-[var(--text-secondary)]">
+            <div className="flex h-9 items-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 text-xs text-[var(--modal-section-muted)]">
               {mapped.length} agendamento(s)
             </div>
           </div>
         </AppOperationalHeader>
 
-        <AppFiltersBar className="shrink-0 gap-2 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-3">
+        <AppFiltersBar className="shrink-0 gap-2 nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] px-3 py-3">
           {FILTERS.map((filter) => (
             <button
               key={filter.key}
@@ -360,7 +360,7 @@ export default function AppointmentsPage() {
               className={`h-8 rounded-md px-3 text-xs font-medium transition-colors ${
                 selectedFilter === filter.key
                   ? "bg-[var(--accent-soft)] text-[var(--accent-primary)]"
-                  : "bg-[var(--surface-subtle)] text-[var(--text-secondary)]"
+                  : "bg-[var(--surface-subtle)] text-[var(--modal-section-muted)]"
               }`}
             >
               {filter.label}
@@ -423,13 +423,13 @@ export default function AppointmentsPage() {
                     className={`rounded-lg border p-3 transition-colors ${
                       isSelected
                         ? "border-orange-500 bg-[var(--accent-soft)]/30"
-                        : "border-[var(--border-subtle)] bg-[var(--surface-base)] hover:bg-[var(--surface-subtle)]/60"
+                        : "border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] hover:bg-[var(--surface-subtle)]/60"
                     }`}
                   >
                     <div className="flex min-w-0 items-start gap-2">
                       <div className="min-w-0 flex-1">
                         <div className="flex min-w-0 items-center gap-2">
-                          <p className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--text-primary)]">
+                          <p className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--modal-section-text)]">
                             {row.customerName}
                           </p>
                           <span className="shrink-0 whitespace-nowrap">
@@ -437,19 +437,19 @@ export default function AppointmentsPage() {
                           </span>
                         </div>
 
-                        <p className="mt-0.5 truncate text-[11px] text-[var(--text-secondary)]">
+                        <p className="mt-0.5 truncate text-[11px] text-[var(--modal-section-muted)]">
                           {formatDateTime(row.item.startsAt)}
                         </p>
-                        <p className="mt-2 truncate text-xs text-[var(--text-secondary)]">
+                        <p className="mt-2 truncate text-xs text-[var(--modal-section-muted)]">
                           {row.item.title || row.item.notes || "Sem observação"}
                         </p>
-                        <p className="mt-1 truncate text-xs text-[var(--text-secondary)]">
-                          Responsável: <span className="text-[var(--text-primary)]">{row.ownerName}</span>
+                        <p className="mt-1 truncate text-xs text-[var(--modal-section-muted)]">
+                          Responsável: <span className="text-[var(--modal-section-text)]">{row.ownerName}</span>
                         </p>
-                        <p className="mt-1 truncate text-xs text-[var(--text-secondary)]">
-                          Duração: <span className="text-[var(--text-primary)]">{durationLabel(row.item.startsAt, row.item.endsAt)}</span>
+                        <p className="mt-1 truncate text-xs text-[var(--modal-section-muted)]">
+                          Duração: <span className="text-[var(--modal-section-text)]">{durationLabel(row.item.startsAt, row.item.endsAt)}</span>
                         </p>
-                        <p className="mt-1 truncate text-xs text-[var(--text-secondary)]">
+                        <p className="mt-1 truncate text-xs text-[var(--modal-section-muted)]">
                           {orderId ? `O.S. #${orderId}` : "Sem O.S."}
                         </p>
                       </div>
@@ -497,19 +497,19 @@ export default function AppointmentsPage() {
           ) : (
             <div className="space-y-3">
               <article className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/35 p-3">
-                <p className="text-sm font-semibold text-[var(--text-primary)]">
+                <p className="text-sm font-semibold text-[var(--modal-section-text)]">
                   {selected.customerName}
                 </p>
-                <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                <p className="mt-1 text-xs text-[var(--modal-section-muted)]">
                   {formatDateTime(selected.item.startsAt)} · {mapStatus(selected.item.status).label}
                 </p>
-                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                <p className="mt-1 text-xs text-[var(--modal-section-muted)]">
                   Responsável: {selected.ownerName} · Duração: {durationLabel(selected.item.startsAt, selected.item.endsAt)}
                 </p>
-                <p className="mt-2 text-xs text-[var(--text-secondary)]">
+                <p className="mt-2 text-xs text-[var(--modal-section-muted)]">
                   Observações: {selected.item.notes || "—"}
                 </p>
-                <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                <p className="mt-1 text-xs text-[var(--modal-section-muted)]">
                   O.S. vinculada: {selected.order?.id ? `#${selected.order.id}` : "sem O.S."}
                 </p>
               </article>
@@ -524,19 +524,19 @@ export default function AppointmentsPage() {
               </div>
 
               <div className="pt-1">
-                <p className="mb-2 text-xs uppercase text-[var(--text-muted)]">Timeline / histórico</p>
+                <p className="mb-2 text-xs uppercase text-[var(--modal-section-muted)]">Timeline / histórico</p>
                 {queryParams.customerId ? (
                   <AppTimeline>
                     {timeline.slice(0, 5).map((event: any) => (
                       <AppTimelineItem key={String(event?.id ?? `${event?.createdAt}-${event?.action}`)}>
-                        <p className="text-xs text-[var(--text-primary)]">{String(event?.action ?? "Evento")}</p>
-                        <p className="text-xs text-[var(--text-muted)]">{String(event?.description ?? event?.summary ?? "Sem descrição")}</p>
+                        <p className="text-xs text-[var(--modal-section-text)]">{String(event?.action ?? "Evento")}</p>
+                        <p className="text-xs text-[var(--modal-section-muted)]">{String(event?.description ?? event?.summary ?? "Sem descrição")}</p>
                       </AppTimelineItem>
                     ))}
-                    {!timeline.length ? <p className="text-xs text-[var(--text-muted)]">Sem histórico para este cliente.</p> : null}
+                    {!timeline.length ? <p className="text-xs text-[var(--modal-section-muted)]">Sem histórico para este cliente.</p> : null}
                   </AppTimeline>
                 ) : (
-                  <p className="text-xs text-[var(--text-muted)]">Histórico disponível ao abrir com customerId na URL.</p>
+                  <p className="text-xs text-[var(--modal-section-muted)]">Histórico disponível ao abrir com customerId na URL.</p>
                 )}
               </div>
             </div>
@@ -550,12 +550,12 @@ export default function AppointmentsPage() {
         title={editing ? "Editar agendamento" : "Novo agendamento"}
         description="Operação real conectada ao backend"
         closeBlocked={createMutation.isPending || updateMutation.isPending}
-        contentClassName="bg-[var(--app-overlay-surface)]"
+        contentClassName="bg-[var(--modal-bg)]"
         footer={(
           <>
-            <p className="mr-auto text-xs text-[var(--text-muted)]">Resumo: {form.customerId ? (customerById.get(form.customerId) ?? "Cliente") : "Selecione cliente"} · {form.date || "Data"} {form.time || "Hora"}</p>
+            <p className="mr-auto text-xs text-[var(--modal-section-muted)]">Resumo: {form.customerId ? (customerById.get(form.customerId) ?? "Cliente") : "Selecione cliente"} · {form.date || "Data"} {form.time || "Hora"}</p>
             <Button type="button" variant="outline" onClick={() => { setOpenModal(false); setEditing(null); }} disabled={createMutation.isPending || updateMutation.isPending}>Cancelar</Button>
-            <Button type="submit" form="appointment-form" className="bg-orange-500 text-white hover:bg-orange-400" disabled={createMutation.isPending || updateMutation.isPending}>{createMutation.isPending || updateMutation.isPending ? "Salvando..." : "Salvar"}</Button>
+            <Button type="submit" form="appointment-form" className="bg-[var(--accent-primary)] text-[var(--primary-foreground)] hover:bg-[var(--accent-primary-hover)]" disabled={createMutation.isPending || updateMutation.isPending}>{createMutation.isPending || updateMutation.isPending ? "Salvando..." : "Salvar"}</Button>
           </>
         )}
       >

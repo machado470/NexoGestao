@@ -287,7 +287,7 @@ export function CreateChargeModal({
       description="Use quando precisar registrar uma cobrança fora da ordem de serviço."
       footer={
         <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-[var(--text-muted)]">
+          <p className="text-xs text-[var(--modal-section-muted)]">
             Essa cobrança ficará disponível no acompanhamento financeiro imediatamente.
           </p>
           <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row">
@@ -315,7 +315,7 @@ export function CreateChargeModal({
     >
       <div className="space-y-5">
         <section className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Modo da cobrança</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--modal-section-muted)]">Modo da cobrança</p>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             {(Object.keys(chargeModeLabels) as ChargeMode[]).map((mode) => (
               <button
@@ -323,10 +323,10 @@ export function CreateChargeModal({
                 type="button"
                 disabled={createCharge.isPending}
                 onClick={() => setFormData((state) => ({ ...state, mode }))}
-                className="rounded-[0.82rem] border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2 text-left text-sm text-[var(--text-primary)] transition hover:border-[var(--accent-primary)]/50 disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-[0.82rem] nexo-field border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-2 text-left text-sm text-[var(--modal-section-text)] transition hover:border-[var(--accent-primary)]/50 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <p className="font-medium">{chargeModeLabels[mode]}</p>
-                <p className="text-xs text-[var(--text-muted)]">
+                <p className="text-xs text-[var(--modal-section-muted)]">
                   {mode === "MANUAL" && "Fluxo direto para cobrança fora da rotina."}
                   {mode === "RECURRING" && "Mantém padrão mensal com vencimento previsível."}
                   {mode === "SERVICE" && "Vincule ao contexto de execução do serviço."}
@@ -336,11 +336,11 @@ export function CreateChargeModal({
           </div>
         </section>
 
-        <section className="space-y-4 rounded-[0.95rem] border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4">
-          <p className="text-sm font-semibold text-[var(--text-primary)]">Dados essenciais</p>
+        <section className="space-y-4 rounded-[0.95rem] nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] p-4">
+          <p className="text-sm font-semibold text-[var(--modal-section-text)]">Dados essenciais</p>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-[var(--text-secondary)]">Cliente *</label>
+            <label className="text-sm font-medium text-[var(--modal-section-muted)]">Cliente *</label>
             <Select
               value={formData.customerId}
               onValueChange={(customerId) => setFormData((state) => ({ ...state, customerId }))}
@@ -358,13 +358,13 @@ export function CreateChargeModal({
               </SelectContent>
             </Select>
             {!formData.customerId ? (
-              <p className="text-xs text-[var(--text-muted)]">Selecione o cliente para liberar o envio da cobrança.</p>
+              <p className="text-xs text-[var(--modal-section-muted)]">Selecione o cliente para liberar o envio da cobrança.</p>
             ) : null}
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-[var(--text-secondary)]">Valor *</label>
+              <label className="text-sm font-medium text-[var(--modal-section-muted)]">Valor *</label>
               <Input
                 inputMode="decimal"
                 placeholder="100,00"
@@ -372,30 +372,30 @@ export function CreateChargeModal({
                 onChange={(e) => setFormData((state) => ({ ...state, amount: e.target.value }))}
                 disabled={createCharge.isPending}
               />
-              <p className="text-xs text-[var(--text-muted)]">Valor atual: {formatCurrencyFromInput(formData.amount)}</p>
+              <p className="text-xs text-[var(--modal-section-muted)]">Valor atual: {formatCurrencyFromInput(formData.amount)}</p>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-[var(--text-secondary)]">Vencimento *</label>
+              <label className="text-sm font-medium text-[var(--modal-section-muted)]">Vencimento *</label>
               <Input
                 type="date"
                 value={formData.dueDate}
                 onChange={(e) => setFormData((state) => ({ ...state, dueDate: e.target.value }))}
                 disabled={createCharge.isPending}
               />
-              <p className="text-xs text-[var(--text-muted)]">Prévia: {formatDueDatePreview(formData.dueDate)}</p>
+              <p className="text-xs text-[var(--modal-section-muted)]">Prévia: {formatDueDatePreview(formData.dueDate)}</p>
             </div>
           </div>
         </section>
 
         <section className="space-y-4">
           <div className="space-y-2">
-            <p className="text-sm font-semibold text-[var(--text-primary)]">Contexto opcional</p>
-            <p className="text-xs text-[var(--text-muted)]">Use apenas se ajudar no acompanhamento e na comunicação.</p>
+            <p className="text-sm font-semibold text-[var(--modal-section-text)]">Contexto opcional</p>
+            <p className="text-xs text-[var(--modal-section-muted)]">Use apenas se ajudar no acompanhamento e na comunicação.</p>
           </div>
 
           {formData.mode === "SERVICE" ? (
             <div className="space-y-2">
-              <label className="text-sm font-medium text-[var(--text-secondary)]">Referência do serviço</label>
+              <label className="text-sm font-medium text-[var(--modal-section-muted)]">Referência do serviço</label>
               <Input
                 placeholder="Ex.: OS #1042 · Troca de compressor"
                 value={formData.serviceReference}
@@ -406,7 +406,7 @@ export function CreateChargeModal({
           ) : null}
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-[var(--text-secondary)]">Observações</label>
+            <label className="text-sm font-medium text-[var(--modal-section-muted)]">Observações</label>
             <Textarea
               rows={3}
               placeholder="Ex.: combinado com cliente para envio até 18h"
@@ -418,8 +418,8 @@ export function CreateChargeModal({
           </div>
         </section>
 
-        <section className="space-y-2 rounded-[0.95rem] border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4">
-          <p className="text-sm font-semibold text-[var(--text-primary)]">Após criar</p>
+        <section className="space-y-2 rounded-[0.95rem] nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] p-4">
+          <p className="text-sm font-semibold text-[var(--modal-section-text)]">Após criar</p>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             {(Object.keys(postActionLabels) as PostCreateAction[]).map((action) => (
               <button
@@ -427,11 +427,11 @@ export function CreateChargeModal({
                 type="button"
                 onClick={() => setFormData((state) => ({ ...state, postAction: action }))}
                 disabled={createCharge.isPending}
-                className="rounded-[0.82rem] border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2 text-left text-sm text-[var(--text-primary)] transition hover:border-[var(--accent-primary)]/50"
+                className="rounded-[0.82rem] nexo-field border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-2 text-left text-sm text-[var(--modal-section-text)] transition hover:border-[var(--accent-primary)]/50"
               >
                 <span className="font-medium">{postActionLabels[action]}</span>
                 {action === "CREATE_AND_CHARGE" ? (
-                  <span className="mt-1 inline-flex items-center gap-1 text-xs text-[var(--text-muted)]">
+                  <span className="mt-1 inline-flex items-center gap-1 text-xs text-[var(--modal-section-muted)]">
                     <MessageCircle className="h-3.5 w-3.5" />
                     Sugere envio imediato
                   </span>
@@ -441,14 +441,14 @@ export function CreateChargeModal({
           </div>
         </section>
 
-        <section className="rounded-[0.95rem] border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4">
-          <p className="text-sm font-semibold text-[var(--text-primary)]">Resumo ao vivo</p>
+        <section className="rounded-[0.95rem] nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] p-4">
+          <p className="text-sm font-semibold text-[var(--modal-section-text)]">Resumo ao vivo</p>
           <div className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-            <p><span className="text-[var(--text-muted)]">Cliente:</span> {selectedCustomerName}</p>
-            <p><span className="text-[var(--text-muted)]">Valor:</span> {formatCurrencyFromInput(formData.amount)}</p>
-            <p><span className="text-[var(--text-muted)]">Vencimento:</span> {formatDueDatePreview(formData.dueDate)}</p>
-            <p><span className="text-[var(--text-muted)]">Tipo:</span> {chargeModeLabels[formData.mode]}</p>
-            <p className="sm:col-span-2"><span className="text-[var(--text-muted)]">Observações:</span> {summarizedNotes}</p>
+            <p><span className="text-[var(--modal-section-muted)]">Cliente:</span> {selectedCustomerName}</p>
+            <p><span className="text-[var(--modal-section-muted)]">Valor:</span> {formatCurrencyFromInput(formData.amount)}</p>
+            <p><span className="text-[var(--modal-section-muted)]">Vencimento:</span> {formatDueDatePreview(formData.dueDate)}</p>
+            <p><span className="text-[var(--modal-section-muted)]">Tipo:</span> {chargeModeLabels[formData.mode]}</p>
+            <p className="sm:col-span-2"><span className="text-[var(--modal-section-muted)]">Observações:</span> {summarizedNotes}</p>
           </div>
         </section>
       </div>

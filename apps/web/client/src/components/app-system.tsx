@@ -253,14 +253,14 @@ export function AppFormSection({
   children: ReactNode;
 }) {
   return (
-    <section className={cn("space-y-3", className)}>
+    <section className={cn("nexo-form-section space-y-3 rounded-xl border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] p-4", className)}>
       {title ? (
-        <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+        <h3 className="text-sm font-semibold text-[var(--modal-section-text)]">
           {title}
         </h3>
       ) : null}
       {subtitle ? (
-        <p className="text-xs text-[var(--text-muted)]">{subtitle}</p>
+        <p className="nexo-helper-text text-xs text-[var(--modal-section-muted)]">{subtitle}</p>
       ) : null}
       {children}
     </section>

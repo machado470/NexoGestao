@@ -310,13 +310,13 @@ export default function CreateCustomerModal({
           </>
         ) : (
           <>
-            <div className="mr-auto flex flex-wrap gap-6 text-sm text-[var(--text-muted)]">
+            <div className="mr-auto flex flex-wrap gap-6 text-sm text-[var(--modal-section-muted)]">
               <span>
-                Status: <strong className="text-[var(--text-primary)]">Cadastro inicial</strong>
+                Status: <strong className="text-[var(--modal-section-text)]">Cadastro inicial</strong>
               </span>
               <span>
                 Próximo passo:{" "}
-                <strong className="text-[var(--text-primary)]">
+                <strong className="text-[var(--modal-section-text)]">
                   {nextStep === "only_register" ? "Somente registro" : "Operacional"}
                 </strong>
               </span>
@@ -352,14 +352,14 @@ export default function CreateCustomerModal({
       <div className="space-y-5 pb-1">
         {createdCustomer ? (
           <section className="space-y-3 rounded-xl border border-[color-mix(in_srgb,var(--success)_26%,var(--border))] bg-[color-mix(in_srgb,var(--success)_8%,var(--surface-base))] p-4">
-            <p className="text-sm font-semibold text-[var(--text-primary)]">
+            <p className="text-sm font-semibold text-[var(--modal-section-text)]">
               Cliente criado com sucesso
             </p>
-            <p className="text-sm text-[var(--text-secondary)]">
+            <p className="text-sm text-[var(--modal-section-muted)]">
               <strong>{createdCustomer.name}</strong> já está pronto para seguir
               no fluxo operacional.
             </p>
-            <p className="text-xs text-[var(--text-muted)]">
+            <p className="text-xs text-[var(--modal-section-muted)]">
               Próximo passo recomendado: abrir o workspace ou iniciar uma O.S.
             </p>
           </section>
@@ -367,73 +367,73 @@ export default function CreateCustomerModal({
 
         {!createdCustomer ? (
           <>
-            <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4">
-              <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Contexto</p>
-              <p className="text-sm text-[var(--text-primary)]">Cliente em cadastro · próximo passo {nextStep === "only_register" ? "apenas registrar" : "operacional"}</p>
+            <section className="rounded-xl nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] p-4">
+              <p className="text-xs uppercase tracking-wide text-[var(--modal-section-muted)]">Contexto</p>
+              <p className="text-sm text-[var(--modal-section-text)]">Cliente em cadastro · próximo passo {nextStep === "only_register" ? "apenas registrar" : "operacional"}</p>
             </section>
 
             <Accordion type="multiple" defaultValue={["main"]} className="space-y-3">
-              <AccordionItem value="main" className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] px-4">
-                <AccordionTrigger className="py-3 text-sm font-semibold text-[var(--text-primary)]">
+              <AccordionItem value="main" className="rounded-xl nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] px-4">
+                <AccordionTrigger className="py-3 text-sm font-semibold text-[var(--modal-section-text)]">
                   Dados principais
-                  <span className="ml-2 text-xs font-normal text-[var(--text-muted)]">
+                  <span className="ml-2 text-xs font-normal text-[var(--modal-section-muted)]">
                     {name.trim() || "Sem nome"} · {phone.trim() || "Sem telefone"}
                   </span>
                 </AccordionTrigger>
                 <AccordionContent className="space-y-4 pb-4">
                   <div className="space-y-2">
                     <Label htmlFor="customer-name">Nome *</Label>
-                    <Input id="customer-name" className="border-[var(--border-subtle)] bg-[var(--surface-elevated)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] hover:border-[var(--accent-primary)]/40 focus-visible:border-orange-500/40 focus-visible:ring-[3px] focus-visible:ring-orange-500/30" value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Cliente Demo" />
+                    <Input id="customer-name" className="border-[var(--field-border)] bg-[var(--field-bg)] text-[var(--modal-section-text)] placeholder:text-[var(--modal-section-muted)] hover:border-[var(--accent-primary)]/40 focus-visible:border-orange-500/40 focus-visible:ring-[3px] focus-visible:ring-orange-500/30" value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Cliente Demo" />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="customer-phone">Telefone / WhatsApp *</Label>
-                    <Input id="customer-phone" className="border-[var(--border-subtle)] bg-[var(--surface-elevated)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] hover:border-[var(--accent-primary)]/40 focus-visible:border-orange-500/40 focus-visible:ring-[3px] focus-visible:ring-orange-500/30" value={phone} onChange={e => setPhone(e.target.value)} placeholder="Ex: +5547999999999" />
-                    <p className="text-xs text-[var(--text-muted)]">Pode mandar com +55 ou só números. O backend normaliza.</p>
+                    <Input id="customer-phone" className="border-[var(--field-border)] bg-[var(--field-bg)] text-[var(--modal-section-text)] placeholder:text-[var(--modal-section-muted)] hover:border-[var(--accent-primary)]/40 focus-visible:border-orange-500/40 focus-visible:ring-[3px] focus-visible:ring-orange-500/30" value={phone} onChange={e => setPhone(e.target.value)} placeholder="Ex: +5547999999999" />
+                    <p className="text-xs text-[var(--modal-section-muted)]">Pode mandar com +55 ou só números. O backend normaliza.</p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="customer-email">Email</Label>
-                    <Input id="customer-email" className="border-[var(--border-subtle)] bg-[var(--surface-elevated)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] hover:border-[var(--accent-primary)]/40 focus-visible:border-orange-500/40 focus-visible:ring-[3px] focus-visible:ring-orange-500/30" value={email} onChange={e => setEmail(e.target.value)} placeholder="cliente@demo.com" type="email" />
+                    <Input id="customer-email" className="border-[var(--field-border)] bg-[var(--field-bg)] text-[var(--modal-section-text)] placeholder:text-[var(--modal-section-muted)] hover:border-[var(--accent-primary)]/40 focus-visible:border-orange-500/40 focus-visible:ring-[3px] focus-visible:ring-orange-500/30" value={email} onChange={e => setEmail(e.target.value)} placeholder="cliente@demo.com" type="email" />
                   </div>
                 </AccordionContent>
               </AccordionItem>
 
-              <AccordionItem value="financial" className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] px-4">
-                <AccordionTrigger className="py-3 text-sm font-semibold text-[var(--text-primary)]">
+              <AccordionItem value="financial" className="rounded-xl nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] px-4">
+                <AccordionTrigger className="py-3 text-sm font-semibold text-[var(--modal-section-text)]">
                   Financeiro
-                  <span className="ml-2 text-xs font-normal text-[var(--text-muted)]">
+                  <span className="ml-2 text-xs font-normal text-[var(--modal-section-muted)]">
                     {cpfCnpj.trim() || "Sem CPF/CNPJ"}
                   </span>
                 </AccordionTrigger>
                 <AccordionContent className="space-y-4 pb-4">
                   <div className="space-y-2">
                     <Label htmlFor="customer-cpf-cnpj">CPF/CNPJ</Label>
-                    <Input id="customer-cpf-cnpj" className="border-[var(--border-subtle)] bg-[var(--surface-elevated)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] hover:border-[var(--accent-primary)]/40 focus-visible:border-orange-500/40 focus-visible:ring-[3px] focus-visible:ring-orange-500/30" value={cpfCnpj} onChange={e => setCpfCnpj(e.target.value)} placeholder="Ex.: 123.456.789-00 ou 12.345.678/0001-99" />
+                    <Input id="customer-cpf-cnpj" className="border-[var(--field-border)] bg-[var(--field-bg)] text-[var(--modal-section-text)] placeholder:text-[var(--modal-section-muted)] hover:border-[var(--accent-primary)]/40 focus-visible:border-orange-500/40 focus-visible:ring-[3px] focus-visible:ring-orange-500/30" value={cpfCnpj} onChange={e => setCpfCnpj(e.target.value)} placeholder="Ex.: 123.456.789-00 ou 12.345.678/0001-99" />
                   </div>
                 </AccordionContent>
               </AccordionItem>
 
-              <AccordionItem value="advanced" className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] px-4">
-                <AccordionTrigger className="py-3 text-sm font-semibold text-[var(--text-primary)]">
+              <AccordionItem value="advanced" className="rounded-xl nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] px-4">
+                <AccordionTrigger className="py-3 text-sm font-semibold text-[var(--modal-section-text)]">
                   Avançado
-                  <span className="ml-2 text-xs font-normal text-[var(--text-muted)]">
+                  <span className="ml-2 text-xs font-normal text-[var(--modal-section-muted)]">
                     {address.trim() || notes.trim() ? "Com observações" : "Sem detalhes"}
                   </span>
                 </AccordionTrigger>
                 <AccordionContent className="space-y-4 pb-4">
                   <div className="space-y-2">
                     <Label htmlFor="customer-address">Endereço</Label>
-                    <Textarea id="customer-address" className="rounded-lg border-[var(--border-subtle)] bg-[var(--surface-elevated)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] hover:border-[var(--accent-primary)]/40 focus-visible:border-orange-500/40 focus-visible:ring-[3px] focus-visible:ring-orange-500/30" value={address} onChange={e => setAddress(e.target.value)} placeholder="Ex.: Rua X, 123, Bairro, Cidade" rows={2} />
+                    <Textarea id="customer-address" className="rounded-lg border-[var(--field-border)] bg-[var(--field-bg)] text-[var(--modal-section-text)] placeholder:text-[var(--modal-section-muted)] hover:border-[var(--accent-primary)]/40 focus-visible:border-orange-500/40 focus-visible:ring-[3px] focus-visible:ring-orange-500/30" value={address} onChange={e => setAddress(e.target.value)} placeholder="Ex.: Rua X, 123, Bairro, Cidade" rows={2} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="customer-notes">Observações</Label>
-                    <Textarea id="customer-notes" className="rounded-lg border-[var(--border-subtle)] bg-[var(--surface-elevated)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] hover:border-[var(--accent-primary)]/40 focus-visible:border-orange-500/40 focus-visible:ring-[3px] focus-visible:ring-orange-500/30" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Informações úteis sobre o cliente" rows={3} />
+                    <Textarea id="customer-notes" className="rounded-lg border-[var(--field-border)] bg-[var(--field-bg)] text-[var(--modal-section-text)] placeholder:text-[var(--modal-section-muted)] hover:border-[var(--accent-primary)]/40 focus-visible:border-orange-500/40 focus-visible:ring-[3px] focus-visible:ring-orange-500/30" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Informações úteis sobre o cliente" rows={3} />
                   </div>
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
 
             <div className="space-y-2">
-              <p className="text-sm font-medium text-[var(--text-primary)]">
+              <p className="text-sm font-medium text-[var(--modal-section-text)]">
                 Próximo passo
               </p>
               <div className="grid gap-2 sm:grid-cols-2">
@@ -466,31 +466,31 @@ export default function CreateCustomerModal({
                     className={`min-h-[88px] rounded-xl border p-4 text-left transition-colors ${
                       nextStep === option.id
                         ? "border-orange-500/40 bg-orange-500/10"
-                        : "border-[var(--border-subtle)] bg-[var(--surface-base)] hover:border-[var(--accent-primary)]/40"
+                        : "border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] hover:border-[var(--accent-primary)]/40"
                     }`}
                   >
-                    <p className="text-sm font-medium text-[var(--text-primary)]">
+                    <p className="text-sm font-medium text-[var(--modal-section-text)]">
                       {option.label}
                     </p>
-                    <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                    <p className="mt-1 text-xs text-[var(--modal-section-muted)]">
                       {option.hint}
                     </p>
                   </button>
                 ))}
               </div>
               {nextStep === "schedule" ? (
-                <p className="text-xs text-[var(--text-muted)]">
+                <p className="text-xs text-[var(--modal-section-muted)]">
                   Após criar, vamos preparar o fluxo para abrir agenda.
                 </p>
               ) : null}
               {nextStep === "message" ? (
-                <p className="text-xs text-[var(--text-muted)]">
+                <p className="text-xs text-[var(--modal-section-muted)]">
                   Após criar, o contato pode seguir direto para o WhatsApp
                   contextual.
                 </p>
               ) : null}
               {nextStep === "billing" ? (
-                <p className="text-xs text-[var(--text-muted)]">
+                <p className="text-xs text-[var(--modal-section-muted)]">
                   Após criar, já será possível iniciar a cobrança deste cliente.
                 </p>
               ) : null}

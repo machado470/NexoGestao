@@ -53,7 +53,7 @@ function Textarea({
     <textarea
       data-slot="textarea"
       className={cn(
-        "placeholder:text-[var(--text-muted)] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive flex field-sizing-content min-h-16 w-full rounded-[0.82rem] border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 py-2 text-base text-[var(--text-primary)] shadow-xs transition-[color,box-shadow,border-color,background-color] outline-none focus-visible:border-[var(--accent-primary)] focus-visible:ring-[3px] focus-visible:ring-[color-mix(in_srgb,var(--accent-primary)_24%,transparent)] disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+        "placeholder:text-[var(--field-placeholder)] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive flex field-sizing-content min-h-16 w-full rounded-[0.82rem] border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-2 text-base text-[var(--field-text)] shadow-xs transition-[color,box-shadow,border-color,background-color] outline-none focus-visible:border-[var(--accent-primary)] focus-visible:ring-[3px] focus-visible:ring-[color-mix(in_srgb,var(--accent-primary)_24%,transparent)] disabled:cursor-not-allowed disabled:bg-[var(--field-disabled-bg)] disabled:text-[var(--field-disabled-text)] disabled:opacity-100 md:text-sm",
         className
       )}
       onCompositionStart={handleCompositionStart}

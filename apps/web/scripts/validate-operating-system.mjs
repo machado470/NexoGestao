@@ -16,6 +16,47 @@ const pages = [
 
 const errors = [];
 
+const modalContrastForbiddenPatterns = [
+  /(?:^|\s)bg-slate-9\S*/,
+  /(?:^|\s)bg-zinc-9\S*/,
+  /(?:^|\s)bg-neutral-9\S*/,
+  /(?:^|\s)bg-black\S*/,
+  /(?:^|\s)bg-white\/\S*/,
+  /(?:^|\s)bg-\[#0B1220\]/,
+  /(?:^|\s)bg-\[#071224\]/,
+  /(?:^|\s)bg-\[#0D1B34\]/,
+  /(?:^|\s)text-white(?:\/\S*)?(?=\s|"|'|`|$)/,
+  /(?:^|\s)border-white(?:\/\S*)?(?=\s|"|'|`|$)/,
+];
+const modalContrastScopeFiles = [
+  "client/src/components/app-modal-system.tsx",
+  "client/src/components/ModalFlowShell.tsx",
+  "client/src/components/CreateCustomerModal.tsx",
+  "client/src/components/EditCustomerModal.tsx",
+  "client/src/components/CreateAppointmentModal.tsx",
+  "client/src/components/CreateServiceOrderModal.tsx",
+  "client/src/components/EditServiceOrderModal.tsx",
+  "client/src/components/CreateChargeModal.tsx",
+  "client/src/components/EditChargeModal.tsx",
+  "client/src/components/CreateExpenseModal.tsx",
+  "client/src/components/ui/dialog.tsx",
+  "client/src/components/ui/input.tsx",
+  "client/src/components/ui/textarea.tsx",
+  "client/src/components/ui/select.tsx",
+  "client/src/components/ui/dropdown-menu.tsx",
+  "client/src/components/ui/popover.tsx",
+  "client/src/pages/AppointmentsPage.tsx",
+  "client/src/pages/CalendarPage.tsx",
+];
+
+function stripDarkScopedClassTokens(line) {
+  return line
+    .split(/\s+/)
+    .filter((token) => !token.includes("dark:"))
+    .join(" ");
+}
+
+
 const forbiddenClasses = [
   "bg-zinc-900",
   "bg-slate-900",
@@ -152,6 +193,21 @@ for (const file of designSystemScope) {
       );
     }
   }
+}
+
+for (const file of modalContrastScopeFiles) {
+  const source = readFileSync(join(root, file), "utf8");
+  source.split(/\r?\n/).forEach((line, index) => {
+    const lightModeLine = stripDarkScopedClassTokens(line);
+    for (const pattern of modalContrastForbiddenPatterns) {
+      const match = lightModeLine.match(pattern);
+      if (match) {
+        errors.push(
+          `${file}:${index + 1}: contrato light de modais/forms violado (${match[0].trim()}). Use tokens semânticos --modal/--field/--summary ou classes nexo-*; exceções só com dark:.`
+        );
+      }
+    }
+  });
 }
 
 if (errors.length > 0) {

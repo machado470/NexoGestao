@@ -333,9 +333,9 @@ export default function CreateServiceOrderModal({
           ) : null}
           {!createdServiceOrder ? (
             <>
-              <div className="mr-auto flex flex-wrap gap-6 text-sm text-[var(--text-muted)]">
-                <span>Status: <strong className="text-[var(--text-primary)]">Aberta</strong></span>
-                <span>Valor: <strong className="text-[var(--text-primary)]">{hasAmount ? summaryAmount : "—"}</strong></span>
+              <div className="mr-auto flex flex-wrap gap-6 text-sm text-[var(--modal-section-muted)]">
+                <span>Status: <strong className="text-[var(--modal-section-text)]">Aberta</strong></span>
+                <span>Valor: <strong className="text-[var(--modal-section-text)]">{hasAmount ? summaryAmount : "—"}</strong></span>
               </div>
               <Button
                 type="button"
@@ -378,15 +378,15 @@ export default function CreateServiceOrderModal({
 
       {!createdServiceOrder ? (
         <AppForm id="create-service-order-form" className="space-y-5">
-          <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4">
+          <section className="rounded-xl nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] p-4">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
-                <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Identificador</p>
-                <p className="text-sm font-semibold text-[var(--text-primary)]">Nova O.S.</p>
+                <p className="text-xs uppercase tracking-wide text-[var(--modal-section-muted)]">Identificador</p>
+                <p className="text-sm font-semibold text-[var(--modal-section-text)]">Nova O.S.</p>
               </div>
               <div className="text-right">
-                <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Cliente</p>
-                <p className="text-sm font-medium text-[var(--text-primary)]">{selectedCustomerName}</p>
+                <p className="text-xs uppercase tracking-wide text-[var(--modal-section-muted)]">Cliente</p>
+                <p className="text-sm font-medium text-[var(--modal-section-text)]">{selectedCustomerName}</p>
               </div>
             </div>
           </section>
@@ -398,10 +398,10 @@ export default function CreateServiceOrderModal({
           ) : null}
 
           <Accordion type="multiple" defaultValue={["main", "financial"]} className="space-y-3">
-            <AccordionItem value="main" className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] px-4">
-              <AccordionTrigger className="py-3 text-sm font-semibold text-[var(--text-primary)]">
+            <AccordionItem value="main" className="rounded-xl nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] px-4">
+              <AccordionTrigger className="py-3 text-sm font-semibold text-[var(--modal-section-text)]">
                 Dados principais
-                <span className="ml-2 text-xs font-normal text-[var(--text-muted)]">
+                <span className="ml-2 text-xs font-normal text-[var(--modal-section-muted)]">
                   {formData.title.trim() || "Sem título"}
                 </span>
               </AccordionTrigger>
@@ -436,7 +436,7 @@ export default function CreateServiceOrderModal({
                     {formData.assignedToPersonId ? (
                       <button
                         type="button"
-                        className="text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
+                        className="text-xs text-[var(--modal-section-muted)] transition-colors hover:text-[var(--modal-section-text)]"
                         onClick={() =>
                           setFormData((state) => ({ ...state, assignedToPersonId: "" }))
                         }
@@ -472,10 +472,10 @@ export default function CreateServiceOrderModal({
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="financial" className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] px-4">
-              <AccordionTrigger className="py-3 text-sm font-semibold text-[var(--text-primary)]">
+            <AccordionItem value="financial" className="rounded-xl nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] px-4">
+              <AccordionTrigger className="py-3 text-sm font-semibold text-[var(--modal-section-text)]">
                 Financeiro
-                <span className="ml-2 text-xs font-normal text-[var(--text-muted)]">
+                <span className="ml-2 text-xs font-normal text-[var(--modal-section-muted)]">
                   {hasAmount ? summaryAmount : "Sem valor"}
                 </span>
               </AccordionTrigger>
@@ -512,10 +512,10 @@ export default function CreateServiceOrderModal({
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="advanced" className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] px-4">
-              <AccordionTrigger className="py-3 text-sm font-semibold text-[var(--text-primary)]">
+            <AccordionItem value="advanced" className="rounded-xl nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] px-4">
+              <AccordionTrigger className="py-3 text-sm font-semibold text-[var(--modal-section-text)]">
                 Avançado
-                <span className="ml-2 text-xs font-normal text-[var(--text-muted)]">
+                <span className="ml-2 text-xs font-normal text-[var(--modal-section-muted)]">
                   {formData.dueDate.trim() ? "Com vencimento" : "Sem vencimento"}
                 </span>
               </AccordionTrigger>
@@ -533,7 +533,7 @@ export default function CreateServiceOrderModal({
           </Accordion>
 
           {hasAmount ? (
-            <p className="text-xs text-[var(--text-muted)]">
+            <p className="text-xs text-[var(--modal-section-muted)]">
               Se o vencimento ficar vazio, o backend pode definir um padrão automático.
             </p>
           ) : null}
