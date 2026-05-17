@@ -40,7 +40,7 @@ function DropdownMenuContent({
         data-slot="dropdown-menu-content"
         sideOffset={sideOffset}
         className={cn(
-          "nexo-floating-panel border-[var(--app-overlay-border)] bg-[var(--popover)] text-[var(--popover-foreground)] shadow-[var(--app-overlay-shadow)] nexo-motion-panel z-50 max-h-(--radix-dropdown-menu-content-available-height) min-w-[8rem] origin-(--radix-dropdown-menu-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-[var(--radius-surface)] border p-1.5",
+          "nexo-floating-panel border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] text-[var(--modal-section-text)] shadow-[var(--app-overlay-shadow)] nexo-motion-panel z-50 max-h-(--radix-dropdown-menu-content-available-height) min-w-[8rem] origin-(--radix-dropdown-menu-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-[var(--radius-surface)] border p-1.5",
           className
         )}
         {...props}
@@ -72,7 +72,7 @@ function DropdownMenuItem({
       data-inset={inset}
       data-variant={variant}
       className={cn(
-        "text-[var(--text-secondary)] focus:bg-[var(--accent-soft)] focus:text-[var(--text-primary)] data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-[color-mix(in_srgb,var(--destructive)_18%,transparent)] data-[variant=destructive]:focus:text-destructive [&_svg:not([class*='text-'])]:text-[var(--text-muted)] relative flex cursor-default items-center gap-2 rounded-[calc(var(--radius-control)-2px)] px-2.5 py-2 text-sm outline-hidden select-none nexo-state-transition data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[inset]:pl-8 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "text-[var(--modal-section-muted)] focus:bg-[var(--accent-soft)] focus:text-[var(--text-primary)] data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-[color-mix(in_srgb,var(--destructive)_18%,transparent)] data-[variant=destructive]:focus:text-destructive [&_svg:not([class*='text-'])]:text-[var(--text-muted)] relative flex cursor-default items-center gap-2 rounded-[calc(var(--radius-control)-2px)] px-2.5 py-2 text-sm outline-hidden select-none nexo-state-transition data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[inset]:pl-8 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className
       )}
       {...props}
@@ -232,7 +232,7 @@ function DropdownMenuSubContent({
       <DropdownMenuPrimitive.SubContent
         data-slot="dropdown-menu-sub-content"
         className={cn(
-          "nexo-floating-panel border-[var(--app-overlay-border)] bg-[var(--popover)] text-[var(--popover-foreground)] shadow-[var(--app-overlay-shadow)] nexo-motion-panel z-50 min-w-[8rem] origin-(--radix-dropdown-menu-content-transform-origin) overflow-hidden rounded-[var(--radius-surface)] border p-1.5",
+          "nexo-floating-panel border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] text-[var(--modal-section-text)] shadow-[var(--app-overlay-shadow)] nexo-motion-panel z-50 min-w-[8rem] origin-(--radix-dropdown-menu-content-transform-origin) overflow-hidden rounded-[var(--radius-surface)] border p-1.5",
           className
         )}
         {...props}

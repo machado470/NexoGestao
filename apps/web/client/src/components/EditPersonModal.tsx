@@ -286,7 +286,7 @@ export default function EditPersonModal({
               <Button
                 type="submit"
                 disabled={updatePerson.isPending || !hasChanges}
-                className="inline-flex items-center gap-2 bg-orange-500 text-white hover:bg-orange-600"
+                className="inline-flex items-center gap-2 bg-[var(--accent-primary)] text-[var(--primary-foreground)] hover:bg-[var(--accent-primary-hover)]"
               >
                 {updatePerson.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />

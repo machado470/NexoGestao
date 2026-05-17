@@ -259,8 +259,8 @@ export default function CalendarPage() {
         {nextBestAction ? (
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <p className="text-sm font-semibold text-[var(--text-primary)]">Próxima melhor ação: {nextBestAction.title}</p>
-              <p className="text-xs text-[var(--text-secondary)]">{nextBestAction.description}</p>
+              <p className="text-sm font-semibold text-[var(--modal-section-text)]">Próxima melhor ação: {nextBestAction.title}</p>
+              <p className="text-xs text-[var(--modal-section-muted)]">{nextBestAction.description}</p>
             </div>
             {nextBestAction.intent === "confirm" ? (
               <Button size="sm" onClick={() => void handleConfirm(nextBestAction.appointmentId)}>
@@ -273,35 +273,35 @@ export default function CalendarPage() {
             )}
           </div>
         ) : (
-          <p className="text-sm text-[var(--text-secondary)]">Sem ação crítica imediata. Calendário saudável para o recorte selecionado.</p>
+          <p className="text-sm text-[var(--modal-section-muted)]">Sem ação crítica imediata. Calendário saudável para o recorte selecionado.</p>
         )}
       </AppOperationalHeader>
 
       <AppToolbar className="mt-4">
         <div className="flex flex-wrap items-center gap-2">
-          <select className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm" value={viewMode} onChange={event => setViewMode(event.target.value as ViewMode)}>
+          <select className="h-9 rounded-md nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] px-3 text-sm" value={viewMode} onChange={event => setViewMode(event.target.value as ViewMode)}>
             <option value="timeGridDay">Dia</option>
             <option value="timeGridWeek">Semana</option>
             <option value="dayGridMonth">Mês</option>
           </select>
-          <select className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm" value={teamFilter} onChange={event => setTeamFilter(event.target.value)}>
+          <select className="h-9 rounded-md nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] px-3 text-sm" value={teamFilter} onChange={event => setTeamFilter(event.target.value)}>
             <option value="all">Equipe: todas</option>
             {people.map((person: any) => <option key={String(person.id)} value={String(person.id)}>{String(person.name ?? "Colaborador")}</option>)}
           </select>
-          <select className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm" value={serviceFilter} onChange={event => setServiceFilter(event.target.value)}>
+          <select className="h-9 rounded-md nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] px-3 text-sm" value={serviceFilter} onChange={event => setServiceFilter(event.target.value)}>
             <option value="all">Serviço: todos</option>
             <option value="instalação">Instalação</option>
             <option value="manutenção">Manutenção</option>
             <option value="vistoria">Vistoria</option>
           </select>
-          <select className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm" value={statusFilter} onChange={event => setStatusFilter(event.target.value)}>
+          <select className="h-9 rounded-md nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] px-3 text-sm" value={statusFilter} onChange={event => setStatusFilter(event.target.value)}>
             <option value="all">Status: todos</option>
             <option value="SCHEDULED">Agendado</option>
             <option value="CONFIRMED">Confirmado</option>
             <option value="DONE">Concluído</option>
             <option value="CANCELED">Cancelado</option>
           </select>
-          <select className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm" value={customerFilter} onChange={event => setCustomerFilter(event.target.value)}>
+          <select className="h-9 rounded-md nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] px-3 text-sm" value={customerFilter} onChange={event => setCustomerFilter(event.target.value)}>
             <option value="all">Cliente: todos</option>
             {customers.map(customer => <option key={customer.id} value={customer.id}>{customer.name}</option>)}
           </select>
@@ -321,17 +321,17 @@ export default function CalendarPage() {
                 {immediateAttention.length > 0 ? (
                   <div className="grid gap-3 md:grid-cols-2">
                     {immediateAttention.map(({ item, tone, label }) => (
-                      <div key={item.id} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3">
+                      <div key={item.id} className="rounded-lg nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] p-3">
                         <div className="flex items-center justify-between gap-2">
-                          <p className="text-sm font-semibold text-[var(--text-primary)]">{item.customer?.name ?? "Cliente"}</p>
+                          <p className="text-sm font-semibold text-[var(--modal-section-text)]">{item.customer?.name ?? "Cliente"}</p>
                           <AppStatusBadge label={label} />
                         </div>
-                        <p className="mt-1 text-xs text-[var(--text-secondary)]">{item.title ?? "Serviço não informado"} · {new Date(item.startsAt).toLocaleString("pt-BR")}</p>
+                        <p className="mt-1 text-xs text-[var(--modal-section-muted)]">{item.title ?? "Serviço não informado"} · {new Date(item.startsAt).toLocaleString("pt-BR")}</p>
                         <div className="mt-2 flex flex-wrap gap-2">
                           <Button size="sm" variant="outline" onClick={() => void handleConfirm(item.id)}>Confirmar</Button>
                           <Button size="sm" variant="outline" onClick={() => navigate(`/appointments?id=${item.id}&action=reschedule&source=calendar`)}>Remarcar</Button>
                         </div>
-                        <div className="mt-2 flex items-center gap-1 text-xs text-[var(--text-muted)]">
+                        <div className="mt-2 flex items-center gap-1 text-xs text-[var(--modal-section-muted)]">
                           {tone === "critical" ? <AlertTriangle className="h-3.5 w-3.5 text-red-500" /> : <Clock3 className="h-3.5 w-3.5 text-amber-500" />}
                           <span>{tone === "critical" ? "Conflito visível para a equipe." : "Atraso detectado no horário planejado."}</span>
                         </div>
@@ -345,16 +345,16 @@ export default function CalendarPage() {
 
               <AppSectionBlock title="2) KPIs leves" subtitle="Pulso rápido da distribuição de carga.">
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3"><p className="text-xs text-[var(--text-muted)]">Conflitos detectados</p><p className="text-lg font-semibold text-[var(--text-primary)]">{executiveRead.conflicts}</p></div>
-                  <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3"><p className="text-xs text-[var(--text-muted)]">Sobrecarga próxima (1h)</p><p className="text-lg font-semibold text-[var(--text-primary)]">{executiveRead.overload}</p></div>
-                  <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3"><p className="text-xs text-[var(--text-muted)]">Confirmados</p><p className="text-lg font-semibold text-[var(--text-primary)]">{executiveRead.confirmed}</p></div>
-                  <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3"><p className="text-xs text-[var(--text-muted)]">Capacidade de encaixe</p><p className="text-lg font-semibold text-[var(--text-primary)]">{executiveRead.possibleFits}</p></div>
+                  <div className="rounded-lg nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] p-3"><p className="text-xs text-[var(--modal-section-muted)]">Conflitos detectados</p><p className="text-lg font-semibold text-[var(--modal-section-text)]">{executiveRead.conflicts}</p></div>
+                  <div className="rounded-lg nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] p-3"><p className="text-xs text-[var(--modal-section-muted)]">Sobrecarga próxima (1h)</p><p className="text-lg font-semibold text-[var(--modal-section-text)]">{executiveRead.overload}</p></div>
+                  <div className="rounded-lg nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] p-3"><p className="text-xs text-[var(--modal-section-muted)]">Confirmados</p><p className="text-lg font-semibold text-[var(--modal-section-text)]">{executiveRead.confirmed}</p></div>
+                  <div className="rounded-lg nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] p-3"><p className="text-xs text-[var(--modal-section-muted)]">Capacidade de encaixe</p><p className="text-lg font-semibold text-[var(--modal-section-text)]">{executiveRead.possibleFits}</p></div>
                 </div>
               </AppSectionBlock>
 
               <div className="grid gap-4 xl:grid-cols-12">
                 <AppSectionBlock title="3) Calendário visual" subtitle="Grade de leitura com evento legível: cliente, horário, serviço e status." className="xl:col-span-8">
-                  <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-2">
+                  <div className="rounded-lg nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] p-2">
                     <FullCalendar
                       plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
                       initialView={viewMode}
@@ -380,10 +380,10 @@ export default function CalendarPage() {
                 <AppSectionBlock title="4) Ação sem troca de tela" subtitle="Contexto mínimo para decidir e acionar rápido." className="xl:col-span-4">
                   {selected ? (
                     <div className="space-y-3">
-                      <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3">
-                        <p className="text-sm font-semibold text-[var(--text-primary)]">{selected.customer?.name ?? "Cliente não identificado"}</p>
-                        <p className="text-xs text-[var(--text-muted)]">{selected.title ?? "Serviço não informado"}</p>
-                        <p className="mt-2 text-xs text-[var(--text-secondary)]">{new Date(selected.startsAt).toLocaleString("pt-BR")}</p>
+                      <div className="rounded-lg nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] p-3">
+                        <p className="text-sm font-semibold text-[var(--modal-section-text)]">{selected.customer?.name ?? "Cliente não identificado"}</p>
+                        <p className="text-xs text-[var(--modal-section-muted)]">{selected.title ?? "Serviço não informado"}</p>
+                        <p className="mt-2 text-xs text-[var(--modal-section-muted)]">{new Date(selected.startsAt).toLocaleString("pt-BR")}</p>
                         <div className="mt-2 flex flex-wrap gap-2">
                           <AppStatusBadge label={STATUS_LABEL[selected.status]} />
                           <AppPriorityBadge label={new Date(selected.startsAt).getTime() - Date.now() < 45 * 60 * 1000 ? "Alta" : "Média"} />
@@ -406,13 +406,13 @@ export default function CalendarPage() {
                       </div>
                       <AppTimeline>
                         <AppTimelineItem>
-                          <p className="text-sm text-[var(--text-primary)]">Status atual: {normalizeEventStatus(selected.status)}</p>
+                          <p className="text-sm text-[var(--modal-section-text)]">Status atual: {normalizeEventStatus(selected.status)}</p>
                         </AppTimelineItem>
                         <AppTimelineItem>
-                          <p className="text-sm text-[var(--text-primary)]">Conexão direta com Agendamentos para execução detalhada.</p>
+                          <p className="text-sm text-[var(--modal-section-text)]">Conexão direta com Agendamentos para execução detalhada.</p>
                         </AppTimelineItem>
                         <AppTimelineItem>
-                          <p className="text-sm text-[var(--text-primary)]">Calendário mantém leitura de distribuição e não substitui a fila operacional.</p>
+                          <p className="text-sm text-[var(--modal-section-text)]">Calendário mantém leitura de distribuição e não substitui a fila operacional.</p>
                         </AppTimelineItem>
                       </AppTimeline>
                     </div>

@@ -115,6 +115,23 @@
     --app-overlay-border: rgba(92, 111, 136, 0.22);
     --app-overlay-shadow: 0 26px 70px rgba(27, 39, 59, 0.18), 0 2px 8px rgba(27, 39, 59, 0.08);
     --app-overlay-text: var(--text-primary);
+    --modal-bg: #f8fafc;
+    --modal-header-bg: #ffffff;
+    --modal-body-bg: #f1f5f9;
+    --modal-footer-bg: #ffffff;
+    --modal-section-bg: #ffffff;
+    --modal-section-border: #cbd5e1;
+    --modal-section-text: #0f172a;
+    --modal-section-muted: #475569;
+    --field-bg: #ffffff;
+    --field-border: #cbd5e1;
+    --field-text: #0f172a;
+    --field-placeholder: #64748b;
+    --field-disabled-bg: #f1f5f9;
+    --field-disabled-text: #94a3b8;
+    --summary-bg: #f8fafc;
+    --summary-text: #0f172a;
+    --summary-muted: #475569;
     --modal-card-shadow-light: 0 10px 26px rgba(27, 39, 59, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.78);
 
     --background: var(--background-base);
@@ -204,6 +221,23 @@
     --app-overlay-border: rgba(139, 156, 192, 0.26);
     --app-overlay-shadow: 0 24px 60px rgba(2, 6, 23, 0.55);
     --app-overlay-text: #f0f4ff;
+    --modal-bg: #111d2e;
+    --modal-header-bg: #172238;
+    --modal-body-bg: #152036;
+    --modal-footer-bg: #121d31;
+    --modal-section-bg: #1c2432;
+    --modal-section-border: rgba(139, 156, 192, 0.26);
+    --modal-section-text: #f0f4ff;
+    --modal-section-muted: #b8c2d4;
+    --field-bg: #1c2432;
+    --field-border: #2c3748;
+    --field-text: #f0f4ff;
+    --field-placeholder: #8a98b0;
+    --field-disabled-bg: #181e2a;
+    --field-disabled-text: #6b7fa8;
+    --summary-bg: #172238;
+    --summary-text: #f0f4ff;
+    --summary-muted: #b8c2d4;
     --modal-card-shadow-light: 0 14px 30px rgba(2, 6, 23, 0.34);
 
     --nexo-app-bg: #05080f;
@@ -241,7 +275,74 @@
   .app-root .nexo-page-header-description {
     max-width: 72ch;
   }
+
+  .app-root .nexo-modal-content {
+    background: var(--modal-bg);
+    color: var(--modal-section-text);
+  }
+
+  .app-root .nexo-modal-header {
+    background: var(--modal-header-bg);
+    border-color: var(--modal-section-border);
+  }
+
+  .app-root .nexo-modal-body {
+    background: var(--modal-body-bg);
+    color: var(--modal-section-text);
+  }
+
+  .app-root .nexo-modal-footer {
+    background: var(--modal-footer-bg);
+    border-color: var(--modal-section-border);
+    color: var(--summary-muted);
+  }
+
+  .app-root .nexo-modal-section,
+  .app-root .nexo-form-section {
+    border: 1px solid var(--modal-section-border);
+    background: var(--modal-section-bg);
+    color: var(--modal-section-text);
+    box-shadow: var(--modal-card-shadow-light);
+  }
+
+  .app-root .nexo-modal-summary {
+    border: 1px solid var(--modal-section-border);
+    background: var(--summary-bg);
+    color: var(--summary-text);
+  }
+
+  .app-root .nexo-field {
+    border-color: var(--field-border);
+    background: var(--field-bg);
+    color: var(--field-text);
+  }
+
+  .app-root .nexo-field::placeholder {
+    color: var(--field-placeholder);
+    opacity: 1;
+  }
+
+  .app-root .nexo-field:disabled,
+  .app-root .nexo-field[aria-disabled="true"],
+  .app-root .nexo-field[data-disabled] {
+    border-color: var(--field-border);
+    background: var(--field-disabled-bg);
+    color: var(--field-disabled-text);
+    opacity: 1;
+  }
+
+  .app-root .nexo-helper-text,
+  .app-root .nexo-muted-text {
+    color: var(--modal-section-muted);
+  }
+
+  .app-root .nexo-floating-panel {
+    border-color: var(--modal-section-border);
+    background: var(--modal-section-bg);
+    color: var(--modal-section-text);
+  }
 }
+
 
 .scrollbar-none {
   scrollbar-width: none;
@@ -354,6 +455,23 @@
   --app-overlay-border: rgba(70, 102, 136, 0.24);
   --app-overlay-shadow: 0 18px 44px rgba(17, 40, 68, 0.14);
   --app-overlay-text: #12243f;
+  --modal-bg: #f8fafc;
+  --modal-header-bg: #ffffff;
+  --modal-body-bg: #f1f5f9;
+  --modal-footer-bg: #ffffff;
+  --modal-section-bg: #ffffff;
+  --modal-section-border: #cbd5e1;
+  --modal-section-text: #0f172a;
+  --modal-section-muted: #475569;
+  --field-bg: #ffffff;
+  --field-border: #cbd5e1;
+  --field-text: #0f172a;
+  --field-placeholder: #64748b;
+  --field-disabled-bg: #f1f5f9;
+  --field-disabled-text: #94a3b8;
+  --summary-bg: #f8fafc;
+  --summary-text: #0f172a;
+  --summary-muted: #475569;
 
   --secondary: #f3f4f6;
   --secondary-foreground: #1f2937;
@@ -442,6 +560,23 @@
   --app-overlay-border: rgba(139, 156, 192, 0.26);
   --app-overlay-shadow: 0 24px 60px rgba(2, 6, 23, 0.55);
   --app-overlay-text: #f0f4ff;
+  --modal-bg: #111d2e;
+  --modal-header-bg: #172238;
+  --modal-body-bg: #152036;
+  --modal-footer-bg: #121d31;
+  --modal-section-bg: #1c2432;
+  --modal-section-border: rgba(139, 156, 192, 0.26);
+  --modal-section-text: #f0f4ff;
+  --modal-section-muted: #b8c2d4;
+  --field-bg: #1c2432;
+  --field-border: #2c3748;
+  --field-text: #f0f4ff;
+  --field-placeholder: #8a98b0;
+  --field-disabled-bg: #181e2a;
+  --field-disabled-text: #6b7fa8;
+  --summary-bg: #172238;
+  --summary-text: #f0f4ff;
+  --summary-muted: #b8c2d4;
 
   --secondary: #141821;
   --secondary-foreground: #e4e4e7;

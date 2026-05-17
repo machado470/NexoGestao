@@ -203,7 +203,7 @@ export default function CreateExpenseModal({ open, onClose, onCreated }: Props) 
       description="Registre uma despesa com modo rápido e ajuste fino só quando precisar."
       footer={
         <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-[var(--text-muted)]">
+          <p className="text-xs text-[var(--modal-section-muted)]">
             {formData.recurrence === "MONTHLY"
               ? "Entrará automaticamente nos próximos meses enquanto estiver ativa."
               : "Lançamento único para o ciclo atual."}
@@ -230,10 +230,10 @@ export default function CreateExpenseModal({ open, onClose, onCreated }: Props) 
       }
     >
       <form id="create-expense-form" onSubmit={handleSubmit} className="space-y-5">
-        <section className="space-y-3 rounded-[0.95rem] border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4">
+        <section className="space-y-3 rounded-[0.95rem] nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] p-4">
           <div className="space-y-1">
-            <p className="text-sm font-semibold text-[var(--text-primary)]">Modo rápido</p>
-            <p className="text-xs text-[var(--text-muted)]">Descreva de forma livre para acelerar o preenchimento.</p>
+            <p className="text-sm font-semibold text-[var(--modal-section-text)]">Modo rápido</p>
+            <p className="text-xs text-[var(--modal-section-muted)]">Descreva de forma livre para acelerar o preenchimento.</p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
             <Input
@@ -247,12 +247,12 @@ export default function CreateExpenseModal({ open, onClose, onCreated }: Props) 
               Aplicar sugestão
             </Button>
           </div>
-          <p className="text-xs text-[var(--text-muted)]">Exemplos: mercado 450 · aluguel 3000 · combustível 280.</p>
+          <p className="text-xs text-[var(--modal-section-muted)]">Exemplos: mercado 450 · aluguel 3000 · combustível 280.</p>
         </section>
 
         <section className="space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-[var(--text-primary)]">Essenciais</p>
+            <p className="text-sm font-semibold text-[var(--modal-section-text)]">Essenciais</p>
             <Button
               type="button"
               variant="ghost"
@@ -265,7 +265,7 @@ export default function CreateExpenseModal({ open, onClose, onCreated }: Props) 
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-2 sm:col-span-2">
-              <label className="text-sm font-medium text-[var(--text-secondary)]">Título *</label>
+              <label className="text-sm font-medium text-[var(--modal-section-muted)]">Título *</label>
               <Input
                 value={formData.title}
                 onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
@@ -274,7 +274,7 @@ export default function CreateExpenseModal({ open, onClose, onCreated }: Props) 
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-[var(--text-secondary)]">Valor *</label>
+              <label className="text-sm font-medium text-[var(--modal-section-muted)]">Valor *</label>
               <Input
                 inputMode="decimal"
                 value={formData.amount}
@@ -284,7 +284,7 @@ export default function CreateExpenseModal({ open, onClose, onCreated }: Props) 
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-[var(--text-secondary)]">Data *</label>
+              <label className="text-sm font-medium text-[var(--modal-section-muted)]">Data *</label>
               <Input
                 type="date"
                 value={formData.occurredAt}
@@ -296,18 +296,18 @@ export default function CreateExpenseModal({ open, onClose, onCreated }: Props) 
         </section>
 
         {formData.showDetails ? (
-          <section className="space-y-4 rounded-[0.95rem] border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4">
-            <p className="text-sm font-semibold text-[var(--text-primary)]">Classificação e contexto</p>
+          <section className="space-y-4 rounded-[0.95rem] nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] p-4">
+            <p className="text-sm font-semibold text-[var(--modal-section-text)]">Classificação e contexto</p>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-[var(--text-secondary)]">Categoria</label>
+              <label className="text-sm font-medium text-[var(--modal-section-muted)]">Categoria</label>
               <div className="mb-2 flex flex-wrap gap-2">
                 {quickCategoryChips.map((chip) => (
                   <button
                     key={chip.value}
                     type="button"
                     onClick={() => setFormData((prev) => ({ ...prev, category: chip.value }))}
-                    className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1 text-xs text-[var(--text-primary)] transition hover:border-[var(--accent-primary)]/50"
+                    className="rounded-full nexo-field border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-1 text-xs text-[var(--modal-section-text)] transition hover:border-[var(--accent-primary)]/50"
                   >
                     {chip.label}
                   </button>
@@ -333,7 +333,7 @@ export default function CreateExpenseModal({ open, onClose, onCreated }: Props) 
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-[var(--text-secondary)]">Tipo</label>
+                <label className="text-sm font-medium text-[var(--modal-section-muted)]">Tipo</label>
                 <Select
                   value={formData.type}
                   onValueChange={(value) => setFormData((prev) => ({ ...prev, type: value as ExpenseType }))}
@@ -352,7 +352,7 @@ export default function CreateExpenseModal({ open, onClose, onCreated }: Props) 
                 </Select>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-[var(--text-secondary)]">Recorrência</label>
+                <label className="text-sm font-medium text-[var(--modal-section-muted)]">Recorrência</label>
                 <Select
                   value={formData.recurrence}
                   onValueChange={(value) =>
@@ -376,7 +376,7 @@ export default function CreateExpenseModal({ open, onClose, onCreated }: Props) 
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-[var(--text-secondary)]">Descrição</label>
+                <label className="text-sm font-medium text-[var(--modal-section-muted)]">Descrição</label>
                 <Input
                   value={formData.description}
                   onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
@@ -385,7 +385,7 @@ export default function CreateExpenseModal({ open, onClose, onCreated }: Props) 
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-[var(--text-secondary)]">Observações</label>
+                <label className="text-sm font-medium text-[var(--modal-section-muted)]">Observações</label>
                 <Textarea
                   rows={2}
                   className="max-h-28 resize-y"
@@ -399,15 +399,15 @@ export default function CreateExpenseModal({ open, onClose, onCreated }: Props) 
           </section>
         ) : null}
 
-        <section className="rounded-[0.95rem] border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4">
-          <p className="text-sm font-semibold text-[var(--text-primary)]">Resumo de impacto</p>
+        <section className="rounded-[0.95rem] nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] p-4">
+          <p className="text-sm font-semibold text-[var(--modal-section-text)]">Resumo de impacto</p>
           <div className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-            <p><span className="text-[var(--text-muted)]">Título:</span> {impactSummary.title}</p>
-            <p><span className="text-[var(--text-muted)]">Valor:</span> {impactSummary.value}</p>
-            <p><span className="text-[var(--text-muted)]">Categoria:</span> {impactSummary.category}</p>
-            <p><span className="text-[var(--text-muted)]">Tipo:</span> {impactSummary.type}</p>
-            <p><span className="text-[var(--text-muted)]">Recorrência:</span> {impactSummary.recurrence}</p>
-            <p><span className="text-[var(--text-muted)]">Resultado:</span> {impactSummary.monthlyResult}</p>
+            <p><span className="text-[var(--modal-section-muted)]">Título:</span> {impactSummary.title}</p>
+            <p><span className="text-[var(--modal-section-muted)]">Valor:</span> {impactSummary.value}</p>
+            <p><span className="text-[var(--modal-section-muted)]">Categoria:</span> {impactSummary.category}</p>
+            <p><span className="text-[var(--modal-section-muted)]">Tipo:</span> {impactSummary.type}</p>
+            <p><span className="text-[var(--modal-section-muted)]">Recorrência:</span> {impactSummary.recurrence}</p>
+            <p><span className="text-[var(--modal-section-muted)]">Resultado:</span> {impactSummary.monthlyResult}</p>
           </div>
         </section>
       </form>

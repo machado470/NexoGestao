@@ -227,9 +227,9 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
       contentClassName="w-full max-w-[760px] border border-[var(--app-overlay-border)] bg-[var(--app-overlay-surface)] shadow-[var(--app-overlay-shadow)]"
       footer={
         <>
-          <div className="mr-auto flex flex-wrap gap-6 text-sm text-[var(--text-muted)]">
-            <span>Status: <strong className="text-[var(--text-primary)]">{operationalSummary.status}</strong></span>
-            <span>Contato: <strong className="text-[var(--text-primary)]">{operationalSummary.contact}</strong></span>
+          <div className="mr-auto flex flex-wrap gap-6 text-sm text-[var(--modal-section-muted)]">
+            <span>Status: <strong className="text-[var(--modal-section-text)]">{operationalSummary.status}</strong></span>
+            <span>Contato: <strong className="text-[var(--modal-section-text)]">{operationalSummary.contact}</strong></span>
           </div>
           <Button type="button" variant="outline" onClick={handleClose}>
             Cancelar
@@ -255,7 +255,7 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
     >
         <div className="space-y-5">
           {customerQuery.isLoading && !customer ? (
-            <div className="flex items-center justify-center py-8 text-sm text-[var(--text-muted)]">
+            <div className="flex items-center justify-center py-8 text-sm text-[var(--modal-section-muted)]">
               <Loader2 className="mr-2 h-5 w-5 animate-spin text-orange-500" />
               Carregando...
               {loadingTimedOut ? (
@@ -278,47 +278,47 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
             </div>
           ) : (
             <Accordion type="multiple" defaultValue={["main", "advanced"]} className="space-y-3">
-              <AccordionItem value="main" className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] px-4">
-                <AccordionTrigger className="py-3 text-sm font-semibold text-[var(--text-primary)]">
+              <AccordionItem value="main" className="rounded-xl nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] px-4">
+                <AccordionTrigger className="py-3 text-sm font-semibold text-[var(--modal-section-text)]">
                   Dados principais
-                  <span className="ml-2 text-xs font-normal text-[var(--text-muted)]">
+                  <span className="ml-2 text-xs font-normal text-[var(--modal-section-muted)]">
                     {name.trim() || "Sem nome"} · {phone.trim() || "Sem telefone"}
                   </span>
                 </AccordionTrigger>
                 <AccordionContent className="space-y-4 pb-4">
                   <div className="space-y-2">
                     <Label htmlFor="edit-customer-name">Nome *</Label>
-                    <Input id="edit-customer-name" value={name} onChange={(e) => setName(e.target.value)} className="border-[var(--border-subtle)] bg-[var(--surface-elevated)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] hover:border-[var(--accent-primary)]/40 focus-visible:border-orange-500/40 focus-visible:ring-[3px] focus-visible:ring-orange-500/30" placeholder="Ex: Cliente Demo" />
+                    <Input id="edit-customer-name" value={name} onChange={(e) => setName(e.target.value)} className="border-[var(--field-border)] bg-[var(--field-bg)] text-[var(--modal-section-text)] placeholder:text-[var(--modal-section-muted)] hover:border-[var(--accent-primary)]/40 focus-visible:border-orange-500/40 focus-visible:ring-[3px] focus-visible:ring-orange-500/30" placeholder="Ex: Cliente Demo" />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="edit-customer-phone">Telefone / WhatsApp *</Label>
-                    <Input id="edit-customer-phone" value={phone} onChange={(e) => setPhone(e.target.value)} className="border-[var(--border-subtle)] bg-[var(--surface-elevated)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] hover:border-[var(--accent-primary)]/40 focus-visible:border-orange-500/40 focus-visible:ring-[3px] focus-visible:ring-orange-500/30" placeholder="Ex: +5547999999999" />
+                    <Input id="edit-customer-phone" value={phone} onChange={(e) => setPhone(e.target.value)} className="border-[var(--field-border)] bg-[var(--field-bg)] text-[var(--modal-section-text)] placeholder:text-[var(--modal-section-muted)] hover:border-[var(--accent-primary)]/40 focus-visible:border-orange-500/40 focus-visible:ring-[3px] focus-visible:ring-orange-500/30" placeholder="Ex: +5547999999999" />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="edit-customer-email">Email</Label>
-                    <Input id="edit-customer-email" value={email} onChange={(e) => setEmail(e.target.value)} className="border-[var(--border-subtle)] bg-[var(--surface-elevated)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] hover:border-[var(--accent-primary)]/40 focus-visible:border-orange-500/40 focus-visible:ring-[3px] focus-visible:ring-orange-500/30" placeholder="cliente@demo.com" type="email" />
+                    <Input id="edit-customer-email" value={email} onChange={(e) => setEmail(e.target.value)} className="border-[var(--field-border)] bg-[var(--field-bg)] text-[var(--modal-section-text)] placeholder:text-[var(--modal-section-muted)] hover:border-[var(--accent-primary)]/40 focus-visible:border-orange-500/40 focus-visible:ring-[3px] focus-visible:ring-orange-500/30" placeholder="cliente@demo.com" type="email" />
                   </div>
                 </AccordionContent>
               </AccordionItem>
 
-              <AccordionItem value="advanced" className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] px-4">
-                <AccordionTrigger className="py-3 text-sm font-semibold text-[var(--text-primary)]">
+              <AccordionItem value="advanced" className="rounded-xl nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] px-4">
+                <AccordionTrigger className="py-3 text-sm font-semibold text-[var(--modal-section-text)]">
                   Avançado
-                  <span className="ml-2 text-xs font-normal text-[var(--text-muted)]">
+                  <span className="ml-2 text-xs font-normal text-[var(--modal-section-muted)]">
                     {active ? "Cliente ativo" : "Cliente inativo"}
                   </span>
                 </AccordionTrigger>
                 <AccordionContent className="space-y-4 pb-4">
                   <div className="space-y-2">
                     <Label htmlFor="edit-customer-notes">Observações</Label>
-                    <Textarea id="edit-customer-notes" value={notes} onChange={(e) => setNotes(e.target.value)} className="border-[var(--border-subtle)] bg-[var(--surface-elevated)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] hover:border-[var(--accent-primary)]/40 focus-visible:border-orange-500/40 focus-visible:ring-[3px] focus-visible:ring-orange-500/30" placeholder="Informações úteis sobre o cliente" rows={4} />
+                    <Textarea id="edit-customer-notes" value={notes} onChange={(e) => setNotes(e.target.value)} className="border-[var(--field-border)] bg-[var(--field-bg)] text-[var(--modal-section-text)] placeholder:text-[var(--modal-section-muted)] hover:border-[var(--accent-primary)]/40 focus-visible:border-orange-500/40 focus-visible:ring-[3px] focus-visible:ring-orange-500/30" placeholder="Informações úteis sobre o cliente" rows={4} />
                   </div>
-                  <div className="flex items-center justify-between rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] px-4 py-3">
+                  <div className="flex items-center justify-between rounded-xl nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] px-4 py-3">
                     <div>
-                      <p className="text-sm font-medium text-[var(--text-primary)]">Cliente ativo</p>
-                      <p className="text-xs text-[var(--text-muted)]">Desative para tirar o cliente do fluxo sem apagar histórico.</p>
+                      <p className="text-sm font-medium text-[var(--modal-section-text)]">Cliente ativo</p>
+                      <p className="text-xs text-[var(--modal-section-muted)]">Desative para tirar o cliente do fluxo sem apagar histórico.</p>
                     </div>
-                    <button type="button" onClick={() => setActive((prev) => !prev)} className={`inline-flex min-w-[88px] items-center justify-center rounded-full px-3 py-2 text-xs font-medium transition-colors ${active ? "bg-emerald-500/15 text-emerald-300" : "bg-[var(--surface-elevated)] text-[var(--text-muted)]"}`}>
+                    <button type="button" onClick={() => setActive((prev) => !prev)} className={`inline-flex min-w-[88px] items-center justify-center rounded-full px-3 py-2 text-xs font-medium transition-colors ${active ? "bg-emerald-500/15 text-emerald-300" : "bg-[var(--surface-elevated)] text-[var(--modal-section-muted)]"}`}>
                       {active ? "Ativo" : "Inativo"}
                     </button>
                   </div>
