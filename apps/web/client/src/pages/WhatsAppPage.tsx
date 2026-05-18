@@ -60,12 +60,7 @@ import {
   type WhatsAppSuggestedAction,
 } from "@/lib/whatsappActionExecution";
 
-type ConversationFilter =
-  | "all"
-  | "critical_now"
-  | "waiting_customer"
-  | "today_commitments"
-  | "resolved";
+type ConversationFilter = "all" | "waiting_customer" | "resolved";
 
 type WhatsAppConversationStatus = "OPEN" | "PENDING" | "RESOLVED" | "FAILED";
 type WhatsAppPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
@@ -569,9 +564,7 @@ const FILTERS: Array<{
   count: string;
 }> = [
   { value: "all", label: "Geral", count: "" },
-  { value: "critical_now", label: "Críticas", count: "" },
   { value: "waiting_customer", label: "Aguardando", count: "" },
-  { value: "today_commitments", label: "Com contexto", count: "" },
   { value: "resolved", label: "Resolvidas", count: "" },
 ];
 
@@ -1001,7 +994,8 @@ const ConversationRow = memo(function ConversationRow({
           "before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-full",
           isSelected
             ? "bg-[var(--accent-soft)]/40 before:bg-[var(--accent-primary)]"
-            : conversation.priority === "CRITICAL" || conversation.priority === "HIGH"
+            : conversation.priority === "CRITICAL" ||
+                conversation.priority === "HIGH"
               ? "bg-[color-mix(in_srgb,var(--warning)_8%,var(--app-card))] before:bg-[var(--warning)]/75 hover:bg-app-card/80"
               : "bg-app-card/35 before:bg-transparent hover:bg-app-card/75"
         )}
@@ -1037,7 +1031,9 @@ const ConversationRow = memo(function ConversationRow({
             </span>
             {statusBadge ? (
               <span className="inline-flex min-w-0 items-center gap-1 rounded-full bg-app-surface/80 px-2 py-1 text-app-muted">
-                <span className={cn("size-1.5 shrink-0 rounded-full", status.dot)} />
+                <span
+                  className={cn("size-1.5 shrink-0 rounded-full", status.dot)}
+                />
                 <span className="truncate">{statusBadge}</span>
               </span>
             ) : null}
@@ -1132,10 +1128,9 @@ function InboxQueueColumn({
               key={item.value}
               type="button"
               className={cn(
-                "h-7 shrink-0 rounded-full px-2.5 text-[11px] transition",
-                filter === item.value
-                  ? "bg-[var(--accent-soft)]/55 text-[var(--accent-primary)]"
-                  : "bg-app-surface text-app-muted hover:bg-app-card"
+                "relative h-7 shrink-0 rounded-lg px-2.5 text-[11px] font-medium text-app-muted transition-colors after:absolute after:inset-x-2 after:bottom-0 after:h-px after:rounded-full after:bg-transparent after:content-[''] hover:bg-app-card/70 hover:text-app-primary focus-visible:outline-none",
+                filter === item.value &&
+                  "bg-app-card/60 text-[var(--accent-primary)] after:bg-[var(--accent-primary)]/70"
               )}
               onClick={() => onFilter(item.value)}
             >
@@ -2373,16 +2368,8 @@ export default function WhatsAppPage() {
         const matchesSearch = !query || searchable.includes(query);
         if (!matchesSearch) return false;
         if (activeFilter === "all") return true;
-        if (activeFilter === "critical_now")
-          return item.priority === "CRITICAL" || item.status === "FAILED";
         if (activeFilter === "waiting_customer")
           return item.unreadCount > 0 || item.hasNoResponse;
-        if (activeFilter === "today_commitments")
-          return (
-            item.contextType === "APPOINTMENT" ||
-            item.contextType === "SERVICE_ORDER" ||
-            item.hasPendingCharge
-          );
         if (activeFilter === "resolved") return item.status === "RESOLVED";
         return true;
       })
@@ -2437,8 +2424,6 @@ export default function WhatsAppPage() {
     if (allInboxRows.length > 0 && filteredRows.length === 0)
       return "Nenhum resultado para esta busca";
     if (debouncedSearch.trim()) return "Nenhum resultado para esta busca";
-    if (activeFilter === "critical_now")
-      return "Nenhuma conversa crítica agora.";
     return "Nenhum cliente encontrado.";
   }, [
     activeFilter,
