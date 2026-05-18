@@ -1112,13 +1112,13 @@ function InboxQueueColumn({
             {rows.length} itens
           </span>
         </div>
-        <div className="flex h-9 items-center gap-2 rounded-xl border border-[var(--app-border)]/65 bg-app-surface px-3 focus-within:border-[color-mix(in_srgb,var(--app-border)_80%,var(--text-muted))]">
+        <div className="flex h-9 items-center gap-2 rounded-xl border border-[var(--app-border)]/50 bg-app-surface px-3 focus-within:border-[var(--app-border)]/80 focus-within:ring-0 focus-within:shadow-none">
           <Search className="size-3.5 shrink-0 text-[var(--text-muted)]" />
           <input
             value={search}
             onChange={e => onSearch(e.target.value)}
             placeholder="Buscar conversa..."
-            className="h-full min-w-0 flex-1 !border-transparent !bg-transparent text-xs text-app-primary !outline-none placeholder:text-app-muted/75 focus-visible:!border-transparent focus-visible:!shadow-none focus-visible:!outline-none"
+            className="h-full min-w-0 flex-1 !border-transparent !bg-transparent text-xs text-app-primary !shadow-none !outline-none placeholder:text-app-muted/75 focus-visible:!border-transparent focus-visible:!ring-0 focus-visible:!shadow-none focus-visible:!outline-none"
           />
         </div>
         <div className="scrollbar-thin-nexo flex gap-1.5 overflow-x-auto whitespace-nowrap pb-1">
