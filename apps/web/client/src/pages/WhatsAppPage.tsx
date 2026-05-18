@@ -991,13 +991,12 @@ const ConversationRow = memo(function ConversationRow({
         onClick={() => onSelect(conversation.id)}
         className={cn(
           "relative grid h-full w-full grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center gap-2.5 rounded-xl px-3 py-2 text-left text-app-primary transition duration-150",
-          "before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-full",
           isSelected
-            ? "bg-[var(--accent-soft)]/40 before:bg-[var(--accent-primary)]"
+            ? "bg-[var(--accent-soft)]/40 ring-1 ring-inset ring-[var(--accent-primary)]/18"
             : conversation.priority === "CRITICAL" ||
                 conversation.priority === "HIGH"
-              ? "bg-[color-mix(in_srgb,var(--warning)_8%,var(--app-card))] before:bg-[var(--warning)]/75 hover:bg-app-card/80"
-              : "bg-app-card/35 before:bg-transparent hover:bg-app-card/75"
+              ? "bg-[color-mix(in_srgb,var(--warning)_8%,var(--app-card))] hover:bg-app-card/80"
+              : "bg-app-card/35 hover:bg-app-card/75"
         )}
       >
         <div
