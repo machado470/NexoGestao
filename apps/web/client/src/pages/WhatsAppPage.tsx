@@ -3171,7 +3171,7 @@ export default function WhatsAppPage() {
   }
 
   return (
-    <AppPageShell className="h-[calc(100vh-5rem)] min-h-0 overflow-hidden bg-app-surface px-4 py-4 text-app-primary xl:py-5 2xl:py-6">
+    <AppPageShell className="h-[calc(100vh-5rem)] min-h-0 overflow-hidden bg-app-surface px-4 pb-6 pt-3 text-app-primary xl:pb-6 xl:pt-2 2xl:pb-6 2xl:pt-2">
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-0 overflow-hidden bg-transparent xl:grid-cols-[minmax(320px,360px)_minmax(0,1fr)_minmax(300px,340px)]">
         <div className="h-full min-h-0 min-w-0 overflow-hidden">
           <InboxQueueColumn
