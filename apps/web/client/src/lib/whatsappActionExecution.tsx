@@ -241,7 +241,7 @@ export function WhatsAppExecutionHistoryItem({
     execution.approvedAt ??
     execution.createdAt;
   return (
-    <article className="rounded-xl bg-[color-mix(in_srgb,var(--app-surface)_78%,transparent)] px-3 py-2">
+    <article className="border-t border-[var(--app-border)]/35 px-1 py-2">
       <div className="flex items-center justify-between gap-2">
         <p className="truncate text-[11px] font-semibold text-[var(--text-primary)]">
           {whatsappActionLabel(execution.suggestedAction)}
@@ -288,7 +288,7 @@ export function WhatsAppActionExecutionPanel({
 }) {
   const recentHistory = history.slice(0, 5);
   return (
-    <section className="space-y-3 rounded-2xl bg-[color-mix(in_srgb,var(--app-surface)_64%,transparent)] px-3 py-3">
+    <section className="space-y-3 px-1 py-3">
       <div className="flex items-center justify-between gap-2">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
@@ -354,7 +354,7 @@ export function WhatsAppActionExecutionPanel({
                 ))}
               </div>
             ) : (
-              <div className="rounded-xl bg-[color-mix(in_srgb,var(--app-surface)_78%,transparent)] p-3 text-[11px] text-[var(--text-secondary)]">
+              <div className="border-t border-[var(--app-border)]/40 py-3 text-[11px] text-[var(--text-secondary)]">
                 Nenhuma aprovação pendente para esta conversa.
               </div>
             )}
@@ -374,7 +374,7 @@ export function WhatsAppActionExecutionPanel({
                 ))}
               </div>
             ) : (
-              <div className="rounded-xl bg-[color-mix(in_srgb,var(--app-surface)_78%,transparent)] p-3 text-[11px] text-[var(--text-secondary)]">
+              <div className="border-t border-[var(--app-border)]/40 py-3 text-[11px] text-[var(--text-secondary)]">
                 Nenhuma execução recente registrada para esta conversa.
               </div>
             )}
