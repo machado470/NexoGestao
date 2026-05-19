@@ -1097,7 +1097,7 @@ function InboxQueueColumn({
   const visibleRows = rows.slice(startIndex, startIndex + visibleCount);
 
   return (
-    <aside className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-[var(--radius-panel)] border border-[var(--app-border)]/60 bg-app-panel p-2.5 text-app-primary">
+    <aside className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-transparent xl:border-r xl:border-[var(--app-border)]/40 p-2.5 text-app-primary">
       <div className="shrink-0 space-y-2 pb-2">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
@@ -1112,7 +1112,7 @@ function InboxQueueColumn({
             {rows.length} itens
           </span>
         </div>
-        <div className="flex h-9 items-center gap-2 rounded-xl border border-[var(--app-border)]/50 bg-app-surface px-3 focus-within:border-[var(--app-border)]/80 focus-within:ring-0 focus-within:shadow-none">
+        <div className="flex h-9 items-center gap-2 border-b border-[var(--app-border)]/45 bg-transparent px-1 focus-within:border-[var(--app-border)]/80 focus-within:ring-0 focus-within:shadow-none">
           <Search className="size-3.5 shrink-0 text-[var(--text-muted)]" />
           <input
             value={search}
@@ -1150,8 +1150,7 @@ function InboxQueueColumn({
             ))}
           </div>
         ) : rows.length === 0 ? (
-          <div className="rounded-xl bg-app-surface px-4 py-4">
-            <div className="mb-3 h-px w-full bg-app-border" />
+          <div className="border-t border-[var(--app-border)]/40 px-1 py-4">
             <p className="text-xs text-[var(--text-secondary)]">
               {hasError
                 ? (errorMessage ?? "Não foi possível carregar conversas")
@@ -1521,7 +1520,7 @@ function ExecutionChatColumn({
   };
 
   return (
-    <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-[var(--radius-panel)] border border-[var(--accent-primary)]/10 bg-app-panel text-app-primary">
+    <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-transparent xl:border-r xl:border-[var(--app-border)]/40 text-app-primary">
       <header className="flex shrink-0 items-center justify-between border-b border-[var(--app-border)]/55 px-5 py-3">
         <div className="flex items-center gap-3">
           <div className="flex size-10 items-center justify-center rounded-full border border-[var(--accent-primary)]/25 bg-[var(--accent-soft)]/60 text-sm font-semibold text-[var(--accent-primary)]">
@@ -1671,7 +1670,7 @@ function ExecutionChatColumn({
         )}
       </div>
 
-      <footer className="mt-0 shrink-0 border-t border-[var(--app-border)]/55 bg-app-panel px-4 pb-3 pt-2">
+      <footer className="mt-0 shrink-0 border-t border-[var(--app-border)]/55 bg-transparent px-4 pb-3 pt-2">
         {hasConversation && !canCompose ? (
           <div className="mb-2 rounded-xl bg-[color-mix(in_srgb,var(--danger)_10%,var(--app-surface))] px-3 py-2 text-[11px] font-medium text-[var(--danger)]">
             Envio bloqueado: cliente sem telefone cadastrado.
@@ -1817,10 +1816,10 @@ function OperationalContextColumn({
   if (!conversation && !selectedCustomer) {
     return (
       <aside
-        className="scrollbar-thin-nexo h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden rounded-[var(--radius-panel)] border border-[var(--app-border)]/60 bg-app-panel p-3 text-app-primary"
+        className="scrollbar-thin-nexo h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden bg-transparent p-3 text-app-primary"
         id="whatsapp-context-panel"
       >
-        <section className="rounded-2xl bg-app-surface px-4 py-4">
+        <section className="border-t border-[var(--app-border)]/40 px-1 py-4">
           <p className="text-xs font-semibold">Sem contexto ativo</p>
           <p className="mt-1 text-[11px] text-[var(--text-muted)]">
             Selecione uma conversa para ver cliente, agendamento, O.S. e
@@ -1843,7 +1842,7 @@ function OperationalContextColumn({
 
   return (
     <aside
-      className="scrollbar-thin-nexo h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden rounded-[var(--radius-panel)] border border-[var(--app-border)]/60 bg-app-panel p-3 text-app-primary"
+      className="scrollbar-thin-nexo h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden bg-transparent p-3 text-app-primary"
       id="whatsapp-context-panel"
     >
       {isLoading ? (
@@ -1853,8 +1852,8 @@ function OperationalContextColumn({
           ))}
         </div>
       ) : (
-        <div className="space-y-3 text-xs">
-          <section className="rounded-2xl bg-[color-mix(in_srgb,var(--app-surface)_62%,transparent)] px-3 py-3">
+        <div className="divide-y divide-[var(--app-border)]/40 text-xs">
+          <section className="px-1 py-3">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
               Cliente
             </p>
@@ -1904,7 +1903,7 @@ function OperationalContextColumn({
             isMutating={isExecutionMutating}
           />
 
-          <section className="rounded-2xl bg-[color-mix(in_srgb,var(--app-surface)_54%,transparent)] px-3 py-3">
+          <section className="px-1 py-3">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
               Próximo agendamento
             </p>
@@ -1942,7 +1941,7 @@ function OperationalContextColumn({
             </Button>
           </section>
 
-          <section className="rounded-2xl bg-[color-mix(in_srgb,var(--app-surface)_54%,transparent)] px-3 py-3">
+          <section className="px-1 py-3">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
               Ordem de serviço
             </p>
@@ -1980,7 +1979,7 @@ function OperationalContextColumn({
             </Button>
           </section>
 
-          <section className="rounded-2xl bg-[color-mix(in_srgb,var(--app-surface)_54%,transparent)] px-3 py-3">
+          <section className="px-1 py-3">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
               Financeiro
             </p>
@@ -2022,7 +2021,7 @@ function OperationalContextColumn({
             </Button>
           </section>
 
-          <section className="rounded-2xl bg-[color-mix(in_srgb,var(--app-surface)_44%,transparent)] px-3 py-3">
+          <section className="px-1 py-3">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
               Timeline resumida
             </p>
@@ -2037,7 +2036,7 @@ function OperationalContextColumn({
             </span>
           </section>
 
-          <section className="rounded-2xl bg-[color-mix(in_srgb,var(--app-surface)_72%,transparent)] px-3 py-3">
+          <section className="px-1 py-3">
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
               Ações rápidas
             </p>
@@ -3173,7 +3172,7 @@ export default function WhatsAppPage() {
 
   return (
     <AppPageShell className="h-[calc(100vh-5rem)] min-h-0 overflow-hidden bg-app-surface px-4 pb-0 pt-3 text-app-primary">
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden bg-transparent xl:grid-cols-[minmax(320px,360px)_minmax(0,1fr)_minmax(300px,340px)]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-0 overflow-hidden bg-transparent xl:grid-cols-[minmax(320px,360px)_minmax(0,1fr)_minmax(300px,340px)]">
         <div className="h-full min-h-0 min-w-0 overflow-hidden">
           <InboxQueueColumn
             rows={filteredRows}
