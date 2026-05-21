@@ -69,9 +69,9 @@ function statusToAction(status: AppointmentStatus): string {
     case 'CANCELED':
       return 'APPOINTMENT_CANCELED'
     case 'DONE':
-      return 'APPOINTMENT_DONE'
+      return 'APPOINTMENT_COMPLETED'
     case 'NO_SHOW':
-      return 'APPOINTMENT_NO_SHOW'
+      return 'APPOINTMENT_CANCELED'
     case 'SCHEDULED':
     default:
       return 'APPOINTMENT_UPDATED'
@@ -292,6 +292,13 @@ export class AppointmentsService {
       select: { id: true, name: true },
     })
     if (!customer) throw new BadRequestException('Cliente inválido para este org')
+    if (params.assignedToPersonId) {
+      const responsible = await this.prisma.person.findFirst({
+        where: { id: params.assignedToPersonId, orgId: params.orgId },
+        select: { id: true },
+      })
+      if (!responsible) throw new BadRequestException('Responsável inválido para este org')
+    }
 
     const idempotencyKey =
       params.idempotencyKey?.trim() ||
@@ -346,13 +353,12 @@ export class AppointmentsService {
         customerId: created.customerId,
         appointmentId: created.id,
         metadata: {
-          actorUserId: params.createdBy,
-          actorPersonId: params.personId,
-          assignedToPersonId: params.assignedToPersonId ?? null,
-          createdBy: params.createdBy,
-          startsAt: created.startsAt,
-          endsAt: created.endsAt,
-          status: created.status,
+          appointmentId: created.id,
+          customerId: created.customerId,
+          responsibleId: params.assignedToPersonId ?? null,
+          scheduledAt: created.startsAt,
+          previousStatus: null,
+          nextStatus: created.status,
         },
       })
 
@@ -543,10 +549,12 @@ export class AppointmentsService {
         customerId: updated.customerId,
         appointmentId: updated.id,
         metadata: {
-          actorUserId: params.updatedBy,
-          actorPersonId: params.personId,
-          updatedBy: params.updatedBy,
-          patch: data,
+          appointmentId: updated.id,
+          customerId: updated.customerId,
+          responsibleId: null,
+          scheduledAt: updated.startsAt,
+          previousStatus: before.status,
+          nextStatus: updated.status,
         },
       })
 
