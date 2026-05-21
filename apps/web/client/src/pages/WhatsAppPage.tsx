@@ -985,23 +985,23 @@ const ConversationRow = memo(function ConversationRow({
     "Sem mensagem recente";
 
   return (
-    <div style={style} className="px-1 py-1">
+    <div style={style} className="px-0.5 py-0.5">
       <button
         type="button"
         onClick={() => onSelect(conversation.id)}
         className={cn(
-          "relative grid h-full w-full grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center gap-2.5 rounded-xl px-3 py-2 text-left text-app-primary transition duration-150",
+          "relative grid h-full w-full grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-2 rounded-xl px-3 py-2.5 text-left text-app-primary transition duration-150",
           isSelected
-            ? "bg-[var(--accent-soft)]/40 ring-1 ring-inset ring-[var(--accent-primary)]/18"
+            ? "bg-[var(--accent-soft)]/35 ring-1 ring-inset ring-[var(--accent-primary)]/25 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.2)]"
             : conversation.priority === "CRITICAL" ||
                 conversation.priority === "HIGH"
-              ? "bg-[color-mix(in_srgb,var(--warning)_8%,var(--app-card))] hover:bg-app-card/80"
-              : "bg-app-card/35 hover:bg-app-card/75"
+              ? "bg-[color-mix(in_srgb,var(--warning)_6%,var(--app-card))] hover:bg-app-card/85"
+              : "hover:bg-app-card/70"
         )}
       >
         <div
           className={cn(
-            "flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold uppercase",
+            "flex size-10 shrink-0 items-center justify-center rounded-xl text-xs font-semibold uppercase",
             isSelected
               ? "bg-[var(--accent-primary)] text-white"
               : "bg-app-surface text-app-muted"
@@ -1521,34 +1521,42 @@ function ExecutionChatColumn({
 
   return (
     <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-transparent xl:border-r xl:border-[var(--app-border)]/40 text-app-primary">
-      <header className="flex shrink-0 items-center justify-between border-b border-[var(--app-border)]/55 px-5 py-3">
-        <div className="flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-full border border-[var(--accent-primary)]/25 bg-[var(--accent-soft)]/60 text-sm font-semibold text-[var(--accent-primary)]">
+      <header className="flex shrink-0 items-start justify-between border-b border-[var(--app-border)]/55 bg-[color-mix(in_srgb,var(--app-surface)_70%,transparent)] px-5 py-3.5">
+        <div className="flex items-start gap-3.5">
+          <div className="flex size-12 items-center justify-center rounded-2xl border border-[var(--accent-primary)]/20 bg-[var(--accent-soft)]/45 text-base font-semibold text-[var(--accent-primary)]">
             {conversation?.name?.slice(0, 1) ?? "-"}
           </div>
-          <div>
-            <p className="text-sm font-semibold">
+          <div className="min-w-0">
+            <p className="truncate text-base font-semibold leading-tight">
               {conversation?.name ?? "Selecione uma conversa"}
             </p>
-            <p className="text-xs text-[var(--text-muted)]">
-              {conversation?.phone ?? "Nenhuma conversa ativa"}
+            <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+              {conversation?.conversationId
+                ? conversation.title ?? conversation.contextHint ?? "Conversa operacional"
+                : "Nenhuma conversa ativa"}
             </p>
             {conversation ? (
-              <div className="mt-1 flex flex-wrap gap-1.5">
-                <span className="rounded-full bg-app-surface px-2 py-0.5 text-[10px] text-[var(--text-secondary)]">
-                  Contexto: {getContextTypeLabel(conversation.contextType)}
+              <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px]">
+                <span className="rounded-full bg-app-surface px-2 py-1 text-[var(--text-secondary)]">
+                  {conversation?.phone ?? "--"}
                 </span>
-                <span className="rounded-full bg-app-surface px-2 py-0.5 text-[10px] text-[var(--text-secondary)]">
-                  Status: {getOperationalStatus(conversation)}
+                <span className="rounded-full bg-app-surface px-2 py-1 text-[var(--text-secondary)]">
+                  {getContextTypeLabel(conversation.contextType)}
                 </span>
+                <span className="rounded-full bg-app-surface px-2 py-1 text-[var(--text-secondary)]">
+                  {getOperationalStatus(conversation)}
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-7 rounded-lg px-2.5 text-[10px] font-semibold"
+                  disabled={!canResolveConversation}
+                  onClick={onResolveConversation}
+                >
+                  Marcar resolvida
+                </Button>
               </div>
-            ) : null}
-            {conversation?.conversationId ? (
-              <p className="mt-1 text-[10px] text-[var(--text-muted)]">
-                {conversation.title ??
-                  conversation.contextHint ??
-                  "Conversa geral"}
-              </p>
             ) : null}
             {!conversation?.conversationId && conversation ? (
               <span className="mt-1 inline-flex rounded-full bg-[color-mix(in_srgb,var(--warning)_14%,var(--app-surface))] px-2 py-0.5 text-[10px] text-[var(--warning)]">
@@ -1557,7 +1565,7 @@ function ExecutionChatColumn({
             ) : null}
           </div>
         </div>
-        <div className="flex items-center gap-1.5 text-[var(--text-muted)]">
+        <div className="flex items-center gap-1 rounded-xl border border-[var(--app-border)]/45 bg-app-card/40 p-1 text-[var(--text-muted)]">
           <button
             type="button"
             className="rounded-lg p-1.5 transition enabled:hover:bg-app-surface disabled:opacity-45"
@@ -1670,13 +1678,38 @@ function ExecutionChatColumn({
         )}
       </div>
 
-      <footer className="mt-0 shrink-0 border-t border-[var(--app-border)]/55 bg-transparent px-4 pb-3 pt-2">
+      <footer className="mt-0 shrink-0 border-t border-[var(--app-border)]/55 bg-transparent px-4 pb-3 pt-2.5">
         {hasConversation && !canCompose ? (
           <div className="mb-2 rounded-xl bg-[color-mix(in_srgb,var(--danger)_10%,var(--app-surface))] px-3 py-2 text-[11px] font-medium text-[var(--danger)]">
             Envio bloqueado: cliente sem telefone cadastrado.
           </div>
         ) : null}
-        <div className="flex items-center gap-2 rounded-2xl bg-app-surface p-2">
+        <div className="rounded-2xl border border-[var(--app-border)]/45 bg-app-surface/80 p-2">
+          <div className="mb-2 flex flex-wrap items-center gap-1.5">
+            {["cobrança", "agendamento", "O.S.", "link pagamento", "lembrete"].map(chip => (
+              <button
+                key={chip}
+                type="button"
+                className="rounded-full border border-[var(--app-border)]/55 bg-app-card/60 px-2.5 py-1 text-[10px] font-medium text-[var(--text-secondary)] transition hover:border-[var(--accent-primary)]/35 hover:text-app-primary"
+                onClick={() =>
+                  onFillTemplate(
+                    chip === "cobrança"
+                      ? "Cobrança pendente"
+                      : chip === "agendamento"
+                        ? "Confirmação de agendamento"
+                        : chip === "O.S."
+                          ? "Atualização de O.S."
+                          : chip === "link pagamento"
+                            ? "Link de pagamento"
+                            : "Lembrete"
+                  )
+                }
+              >
+                {chip}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
           <input
             value={content}
             onChange={event => canCompose && setContent(event.target.value)}
@@ -1750,13 +1783,14 @@ function ExecutionChatColumn({
           <Button
             type="button"
             size="sm"
-            className="h-10 rounded-full bg-[var(--accent-primary)] px-3 text-[var(--primary-foreground)] hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-45"
+            className="h-9 rounded-xl bg-[var(--accent-primary)] px-3 text-[var(--primary-foreground)] hover:bg-[var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-45"
             onClick={sendMessage}
             disabled={!hasConversation || !canCompose}
             aria-label="Enviar mensagem"
           >
             <Send className="size-3.5" />
           </Button>
+          </div>
         </div>
       </footer>
       {error ? (
@@ -1852,9 +1886,9 @@ function OperationalContextColumn({
           ))}
         </div>
       ) : (
-        <div className="divide-y divide-[var(--app-border)]/40 text-xs">
+        <div className="space-y-2 text-xs">
           <section className="px-1 py-3">
-            <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[var(--text-muted)]">
               Cliente
             </p>
             <p className="mt-1 font-semibold">
@@ -1903,7 +1937,7 @@ function OperationalContextColumn({
             isMutating={isExecutionMutating}
           />
 
-          <section className="px-1 py-3">
+          <section className="rounded-xl border border-[var(--app-border)]/45 bg-app-card/30 px-3 py-3">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
               Próximo agendamento
             </p>
@@ -1941,7 +1975,7 @@ function OperationalContextColumn({
             </Button>
           </section>
 
-          <section className="px-1 py-3">
+          <section className="rounded-xl border border-[var(--app-border)]/45 bg-app-card/30 px-3 py-3">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
               Ordem de serviço
             </p>
@@ -1979,7 +2013,7 @@ function OperationalContextColumn({
             </Button>
           </section>
 
-          <section className="px-1 py-3">
+          <section className="rounded-xl border border-[var(--app-border)]/45 bg-app-card/30 px-3 py-3">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
               Financeiro
             </p>
@@ -2021,7 +2055,7 @@ function OperationalContextColumn({
             </Button>
           </section>
 
-          <section className="px-1 py-3">
+          <section className="rounded-xl border border-[var(--app-border)]/45 bg-app-card/30 px-3 py-3">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
               Timeline resumida
             </p>
@@ -2036,9 +2070,9 @@ function OperationalContextColumn({
             </span>
           </section>
 
-          <section className="px-1 py-3">
+          <section className="rounded-xl border border-[var(--app-border)]/45 bg-app-card/30 px-3 py-3">
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
-              Ações rápidas
+              Próxima melhor ação
             </p>
             <div className="mt-2.5 grid grid-cols-1 gap-2">
               <Button
