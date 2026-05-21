@@ -33,21 +33,22 @@ export type TemporalRiskResult = {
 export class TemporalRiskService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async calculate(personId: string): Promise<number> {
-    const detailed = await this.calculateDetailed(personId)
+  async calculate(personId: string, orgId?: string): Promise<number> {
+    const detailed = await this.calculateDetailed(personId, orgId)
     return detailed.score
   }
 
-  async calculateDetailed(personId: string): Promise<TemporalRiskResult> {
+  async calculateDetailed(personId: string, orgId?: string): Promise<TemporalRiskResult> {
     const openCorrectives = await this.prisma.correctiveAction.count({
       where: {
         personId,
         status: 'OPEN',
+        ...(orgId ? { person: { orgId } } : {}),
       },
     })
 
     const assignments = await this.prisma.assignment.findMany({
-      where: { personId },
+      where: { personId, ...(orgId ? { person: { orgId } } : {}) },
       select: { progress: true },
     })
 

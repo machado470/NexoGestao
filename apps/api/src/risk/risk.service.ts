@@ -14,18 +14,18 @@ export class RiskService {
   /**
    * 🔹 Apenas cálculo simples (compatível com o que já existia)
    */
-  async calculatePersonRisk(personId: string) {
-    return this.temporalRisk.calculate(personId)
+  async calculatePersonRisk(personId: string, orgId?: string) {
+    return this.temporalRisk.calculate(personId, orgId)
   }
 
   /**
    * 🔥 NOVO: cálculo completo com explicação (base do frontend inteligente)
    */
-  async getPersonRiskExplanation(personId: string) {
-    const detailed = await this.temporalRisk.calculateDetailed(personId)
+  async getPersonRiskExplanation(personId: string, orgId?: string) {
+    const detailed = await this.temporalRisk.calculateDetailed(personId, orgId)
 
-    const person = await this.prisma.person.findUnique({
-      where: { id: personId },
+    const person = await this.prisma.person.findFirst({
+      where: { id: personId, ...(orgId ? { orgId } : {}) },
       select: {
         id: true,
         name: true,
@@ -47,8 +47,17 @@ export class RiskService {
   /**
    * 🔹 Recalcula + persiste
    */
-  async recalculatePersonRisk(personId: string, reason?: string) {
-    const detailed = await this.temporalRisk.calculateDetailed(personId)
+  async recalculatePersonRisk(personId: string, reason?: string, orgId?: string) {
+    const detailed = await this.temporalRisk.calculateDetailed(personId, orgId)
+
+    const person = await this.prisma.person.findFirst({
+      where: { id: personId, ...(orgId ? { orgId } : {}) },
+      select: { id: true },
+    })
+
+    if (!person) {
+      throw new Error('Pessoa não encontrada')
+    }
 
     await this.prisma.person.update({
       where: { id: personId },
@@ -58,7 +67,7 @@ export class RiskService {
       },
     })
 
-    await this.snapshot(personId, detailed.score, reason)
+    await this.snapshot(personId, detailed.score, reason, orgId)
 
     return detailed
   }
@@ -66,13 +75,13 @@ export class RiskService {
   /**
    * 🔹 Snapshot + timeline
    */
-  async snapshot(personId: string, score: number, reason?: string) {
+  async snapshot(personId: string, score: number, reason?: string, orgId?: string) {
     const finalReason = reason?.trim()
       ? reason.trim()
       : 'Reavaliação automática'
 
-    const person = await this.prisma.person.findUnique({
-      where: { id: personId },
+    const person = await this.prisma.person.findFirst({
+      where: { id: personId, ...(orgId ? { orgId } : {}) },
       select: { orgId: true },
     })
 
