@@ -52,7 +52,7 @@ function statusToAction(status: ServiceOrderStatus): string {
     case 'IN_PROGRESS':
       return 'SERVICE_ORDER_STARTED'
     case 'DONE':
-      return 'SERVICE_ORDER_DONE'
+      return 'SERVICE_ORDER_COMPLETED'
     case 'CANCELED':
       return 'SERVICE_ORDER_CANCELED'
     case 'OPEN':
@@ -605,11 +605,12 @@ export class ServiceOrdersService {
       serviceOrderId: created.id,
       appointmentId: created.appointmentId ?? null,
       metadata: {
-        actorUserId: params.createdBy,
-        actorPersonId: params.personId,
-        createdBy: params.createdBy,
-        title: created.title,
-        status: created.status,
+        serviceOrderId: created.id,
+        customerId: created.customerId,
+        appointmentId: created.appointmentId ?? null,
+        responsibleId: created.assignedToPersonId ?? null,
+        previousStatus: null,
+        nextStatus: created.status,
       },
     })
 
@@ -889,10 +890,12 @@ export class ServiceOrdersService {
       serviceOrderId: updated.id,
       appointmentId: updated.appointmentId ?? null,
       metadata: {
-        actorUserId: params.updatedBy,
-        actorPersonId: params.personId,
-        updatedBy: params.updatedBy,
-        patch: data,
+        serviceOrderId: updated.id,
+        customerId: updated.customerId,
+        appointmentId: updated.appointmentId ?? null,
+        responsibleId: updated.assignedToPersonId ?? null,
+        previousStatus: before.status,
+        nextStatus: updated.status,
       },
     })
 
@@ -906,11 +909,12 @@ export class ServiceOrdersService {
         serviceOrderId: updated.id,
         appointmentId: updated.appointmentId ?? null,
         metadata: {
-          actorUserId: params.updatedBy,
-          actorPersonId: params.personId,
-          updatedBy: params.updatedBy,
+          serviceOrderId: updated.id,
+          customerId: updated.customerId,
+          appointmentId: updated.appointmentId ?? null,
+          responsibleId: updated.assignedToPersonId ?? null,
           previousStatus: before.status,
-          currentStatus: updated.status,
+          nextStatus: updated.status,
         },
       })
 

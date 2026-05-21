@@ -284,9 +284,8 @@ export class CustomersService {
       personId: params.personId,
       customerId: created.id,
       metadata: {
-        actorUserId: params.createdBy,
-        actorPersonId: params.personId,
-        createdBy: params.createdBy,
+        customerId: created.id,
+        customerName: created.name,
       },
     })
 
@@ -463,10 +462,9 @@ export class CustomersService {
       personId: params.personId,
       customerId: updated.id,
       metadata: {
-        actorUserId: params.updatedBy,
-        actorPersonId: params.personId,
-        updatedBy: params.updatedBy,
-        patch: data,
+        customerId: updated.id,
+        customerName: updated.name,
+        changedFields: Object.keys(data),
       },
     })
 
