@@ -299,6 +299,9 @@ export class FinanceService {
     serviceOrderId?: string | null
     idempotencyKey?: string | null
   }) {
+    if (input.amountCents <= 0) {
+      throw new BadRequestException('amountCents deve ser maior que zero')
+    }
     this.logCritical({
       level: 'log',
       action: 'CREATE_CHARGE_START',
@@ -490,6 +493,9 @@ export class FinanceService {
     if (input.status) {
       this.assertChargeStatusTransition(charge.status, input.status)
     }
+    if (charge.status === 'PAID' && input.status === 'CANCELED') {
+      throw new BadRequestException('Cobrança paga não pode ser cancelada')
+    }
 
     const expectedUpdatedAt = this.parseExpectedUpdatedAt(input.expectedUpdatedAt)
 
@@ -525,9 +531,27 @@ export class FinanceService {
       })
     }
 
-    return this.prisma.charge.findFirst({
+    const updated = await this.prisma.charge.findFirst({
       where: { id: charge.id, orgId: input.orgId },
     })
+    await this.safeTimelineLog({
+      orgId: input.orgId,
+      action: input.status === 'CANCELED' ? 'CHARGE_CANCELED' : 'CHARGE_UPDATED',
+      description:
+        input.status === 'CANCELED'
+          ? `Cobrança ${charge.id} cancelada`
+          : `Cobrança ${charge.id} atualizada`,
+      chargeId: charge.id,
+      metadata: {
+        actorUserId: input.actorUserId ?? null,
+        chargeId: charge.id,
+        previousStatus: charge.status,
+        nextStatus: input.status ?? charge.status,
+        amountCents: input.amountCents,
+        dueDate: input.dueDate?.toISOString() ?? null,
+      },
+    })
+    return updated
   }
 
   async deleteCharge(input: {
@@ -851,6 +875,21 @@ export class FinanceService {
           dueDate: input.dueDate ?? new Date(),
         },
       })
+      await this.safeTimelineLog({
+        orgId: input.orgId,
+        action: 'SERVICE_ORDER_CHARGE_CREATED',
+        description: `Cobrança ${created.id} gerada para O.S. ${input.serviceOrderId}`,
+        customerId: created.customerId,
+        serviceOrderId: created.serviceOrderId,
+        chargeId: created.id,
+        metadata: {
+          actorUserId: input.actorUserId ?? null,
+          serviceOrderId: created.serviceOrderId,
+          chargeId: created.id,
+          customerId: created.customerId,
+          amountCents: created.amountCents,
+        },
+      })
 
       const result = { created: true, chargeId: created.id }
       await this.idempotency.complete(idem.recordId, result)
@@ -894,7 +933,7 @@ export class FinanceService {
       )
     }
 
-    const result = await this.prisma.charge.updateMany({
+      const result = await this.prisma.charge.updateMany({
       where: {
         orgId,
         status: 'PENDING',
@@ -911,6 +950,23 @@ export class FinanceService {
     })
 
     for (const charge of overdue) {
+      await this.safeTimelineLog({
+        orgId,
+        action: 'CHARGE_OVERDUE',
+        description: `Cobrança ${charge.id} vencida`,
+        customerId: charge.customerId,
+        serviceOrderId: charge.serviceOrderId,
+        chargeId: charge.id,
+        metadata: {
+          chargeId: charge.id,
+          customerId: charge.customerId,
+          serviceOrderId: charge.serviceOrderId,
+          amountCents: charge.amountCents,
+          dueDate: charge.dueDate.toISOString(),
+          previousStatus: 'PENDING',
+          nextStatus: 'OVERDUE',
+        },
+      })
       await this.sendPaymentReminderWhatsApp(charge.id).catch((err) =>
         this.logger.error(`Erro overdue WhatsApp: ${err.message}`),
       )

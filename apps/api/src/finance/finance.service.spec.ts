@@ -174,6 +174,19 @@ describe('FinanceService hardening', () => {
     )
   })
 
+  it('bloqueia createCharge com amountCents <= 0', async () => {
+    const { service, prisma } = buildService()
+    prisma.customer.findFirst.mockResolvedValue({ id: 'c-1' })
+    await expect(
+      service.createCharge({
+        orgId: 'org-1',
+        customerId: 'c-1',
+        amountCents: 0,
+        dueDate: new Date('2026-01-01T00:00:00Z'),
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException)
+  })
+
   it('retorna duplicate quando idempotência replaya payCharge', async () => {
     const { service, idempotency } = buildService()
     idempotency.begin.mockResolvedValue({
@@ -238,6 +251,38 @@ describe('FinanceService hardening', () => {
         action: 'PAYMENT_RECEIVED',
         chargeId: 'ch-1',
         serviceOrderId: 'so-1',
+      }),
+    )
+  })
+
+  it('emite SERVICE_ORDER_CHARGE_CREATED ao vincular cobrança com O.S.', async () => {
+    const { service, prisma, idempotency } = buildService()
+    idempotency.begin.mockResolvedValue({ mode: 'execute', recordId: 'idem-1' })
+    prisma.serviceOrder.findFirst.mockResolvedValue({
+      id: 'so-1',
+      customerId: 'c-1',
+      status: 'DONE',
+    })
+    prisma.charge.findFirst.mockResolvedValue(null)
+    prisma.charge.create.mockResolvedValue({
+      id: 'ch-1',
+      customerId: 'c-1',
+      serviceOrderId: 'so-1',
+      amountCents: 1000,
+    })
+
+    await service.ensureChargeForServiceOrderDone({
+      orgId: 'org-1',
+      serviceOrderId: 'so-1',
+      customerId: 'c-1',
+      amountCents: 1000,
+    })
+
+    expect((service as any).timeline.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'SERVICE_ORDER_CHARGE_CREATED',
+        serviceOrderId: 'so-1',
+        chargeId: 'ch-1',
       }),
     )
   })
