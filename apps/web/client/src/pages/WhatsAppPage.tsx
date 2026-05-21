@@ -168,6 +168,18 @@ function normalizeContextStatus(value?: string | null) {
     .toUpperCase();
 }
 
+function resolveComposerErrorMessage(error: unknown) {
+  const fallback = "Falha ao enviar mensagem.";
+  const rawMessage =
+    typeof error === "string"
+      ? error
+      : (error as { message?: string })?.message ?? fallback;
+  if (rawMessage.includes("Please login (10001)")) {
+    return "Sessão expirada. Faça login novamente para enviar mensagens.";
+  }
+  return rawMessage;
+}
+
 function cloneRecommendedAction(
   action: ComposerActionDescriptor,
   description: string,
@@ -992,7 +1004,7 @@ const ConversationRow = memo(function ConversationRow({
         className={cn(
           "relative grid h-full w-full grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-2 rounded-xl px-3 py-2.5 text-left text-app-primary transition duration-150",
           isSelected
-            ? "bg-[var(--accent-soft)]/35 ring-1 ring-inset ring-[var(--accent-primary)]/25 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.2)]"
+            ? "bg-[var(--accent-soft)]/35 border border-[var(--accent-primary)]/25"
             : conversation.priority === "CRITICAL" ||
                 conversation.priority === "HIGH"
               ? "bg-[color-mix(in_srgb,var(--warning)_6%,var(--app-card))] hover:bg-app-card/85"
@@ -1112,13 +1124,13 @@ function InboxQueueColumn({
             {rows.length} itens
           </span>
         </div>
-        <div className="flex h-9 items-center gap-2 border-b border-[var(--app-border)]/45 bg-transparent px-1 focus-within:border-[var(--app-border)]/80 focus-within:ring-0 focus-within:shadow-none">
+        <div className="flex h-9 items-center gap-2 border-b border-[var(--app-border)]/45 bg-transparent px-1 focus-within:border-[var(--app-border)]/80">
           <Search className="size-3.5 shrink-0 text-[var(--text-muted)]" />
           <input
             value={search}
             onChange={e => onSearch(e.target.value)}
             placeholder="Buscar conversa..."
-            className="h-full min-w-0 flex-1 !border-transparent !bg-transparent text-xs text-app-primary !shadow-none !outline-none placeholder:text-app-muted/75 focus-visible:!border-transparent focus-visible:!ring-0 focus-visible:!shadow-none focus-visible:!outline-none"
+            className="h-full min-w-0 flex-1 !border-transparent !bg-transparent text-xs text-app-primary !outline-none placeholder:text-app-muted/75 focus-visible:!border-transparent focus-visible:!outline-none"
           />
         </div>
         <div className="scrollbar-thin-nexo flex gap-1.5 overflow-x-auto whitespace-nowrap pb-1">
@@ -1521,7 +1533,7 @@ function ExecutionChatColumn({
 
   return (
     <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-transparent xl:border-r xl:border-[var(--app-border)]/40 text-app-primary">
-      <header className="flex shrink-0 items-start justify-between border-b border-[var(--app-border)]/55 bg-[color-mix(in_srgb,var(--app-surface)_70%,transparent)] px-5 py-3.5">
+      <header className="flex shrink-0 items-start justify-between border-b border-[var(--app-border)]/55 bg-[color-mix(in_srgb,var(--app-surface)_70%,transparent)] px-5 py-3">
         <div className="flex items-start gap-3.5">
           <div className="flex size-12 items-center justify-center rounded-2xl border border-[var(--accent-primary)]/20 bg-[var(--accent-soft)]/45 text-base font-semibold text-[var(--accent-primary)]">
             {conversation?.name?.slice(0, 1) ?? "-"}
@@ -1535,34 +1547,6 @@ function ExecutionChatColumn({
                 ? conversation.title ?? conversation.contextHint ?? "Conversa operacional"
                 : "Nenhuma conversa ativa"}
             </p>
-            {conversation ? (
-              <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px]">
-                <span className="rounded-full bg-app-surface px-2 py-1 text-[var(--text-secondary)]">
-                  {conversation?.phone ?? "--"}
-                </span>
-                <span className="rounded-full bg-app-surface px-2 py-1 text-[var(--text-secondary)]">
-                  {getContextTypeLabel(conversation.contextType)}
-                </span>
-                <span className="rounded-full bg-app-surface px-2 py-1 text-[var(--text-secondary)]">
-                  {getOperationalStatus(conversation)}
-                </span>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-7 rounded-lg px-2.5 text-[10px] font-semibold"
-                  disabled={!canResolveConversation}
-                  onClick={onResolveConversation}
-                >
-                  Marcar resolvida
-                </Button>
-              </div>
-            ) : null}
-            {!conversation?.conversationId && conversation ? (
-              <span className="mt-1 inline-flex rounded-full bg-[color-mix(in_srgb,var(--warning)_14%,var(--app-surface))] px-2 py-0.5 text-[10px] text-[var(--warning)]">
-                Sem conversa ativa
-              </span>
-            ) : null}
           </div>
         </div>
         <div className="flex items-center gap-1 rounded-xl border border-[var(--app-border)]/45 bg-app-card/40 p-1 text-[var(--text-muted)]">
@@ -1619,7 +1603,7 @@ function ExecutionChatColumn({
 
       <div
         ref={messagesRef}
-        className="scrollbar-thin-nexo min-h-0 flex-1 overflow-y-auto bg-transparent px-6 pb-2 pt-4"
+        className="scrollbar-thin-nexo min-h-0 flex-1 overflow-y-auto bg-transparent px-6 pb-3 pt-3"
       >
         {!hasConversation ? (
           <div className="flex h-full items-center justify-center px-1 py-4 text-xs text-[var(--text-muted)]">
@@ -1678,37 +1662,13 @@ function ExecutionChatColumn({
         )}
       </div>
 
-      <footer className="mt-0 shrink-0 border-t border-[var(--app-border)]/55 bg-transparent px-4 pb-3 pt-2.5">
+      <footer className="mt-0 shrink-0 border-t border-[var(--app-border)]/55 bg-transparent px-4 pb-2.5 pt-2">
         {hasConversation && !canCompose ? (
           <div className="mb-2 rounded-xl bg-[color-mix(in_srgb,var(--danger)_10%,var(--app-surface))] px-3 py-2 text-[11px] font-medium text-[var(--danger)]">
             Envio bloqueado: cliente sem telefone cadastrado.
           </div>
         ) : null}
-        <div className="rounded-2xl border border-[var(--app-border)]/45 bg-app-surface/80 p-2">
-          <div className="mb-2 flex flex-wrap items-center gap-1.5">
-            {["cobrança", "agendamento", "O.S.", "link pagamento", "lembrete"].map(chip => (
-              <button
-                key={chip}
-                type="button"
-                className="rounded-full border border-[var(--app-border)]/55 bg-app-card/60 px-2.5 py-1 text-[10px] font-medium text-[var(--text-secondary)] transition hover:border-[var(--accent-primary)]/35 hover:text-app-primary"
-                onClick={() =>
-                  onFillTemplate(
-                    chip === "cobrança"
-                      ? "Cobrança pendente"
-                      : chip === "agendamento"
-                        ? "Confirmação de agendamento"
-                        : chip === "O.S."
-                          ? "Atualização de O.S."
-                          : chip === "link pagamento"
-                            ? "Link de pagamento"
-                            : "Lembrete"
-                  )
-                }
-              >
-                {chip}
-              </button>
-            ))}
-          </div>
+        <div className="rounded-2xl border border-[var(--app-border)]/40 bg-app-surface/75 p-2">
           <div className="flex items-center gap-2">
           <input
             value={content}
@@ -1724,7 +1684,7 @@ function ExecutionChatColumn({
                 : "Selecione uma conversa para responder..."
             }
             disabled={!hasConversation || !canCompose}
-            className="h-10 min-w-0 flex-1 rounded-xl bg-app-card px-3 text-sm text-app-primary outline-none placeholder:text-app-muted/70"
+            className="h-9 min-w-0 flex-1 rounded-xl bg-app-card px-3 text-sm text-app-primary outline-none placeholder:text-app-muted/70"
           />
           <DropdownMenu dir="rtl">
             <DropdownMenuTrigger asChild>
@@ -1886,8 +1846,8 @@ function OperationalContextColumn({
           ))}
         </div>
       ) : (
-        <div className="space-y-2 text-xs">
-          <section className="px-1 py-3">
+        <div className="space-y-1.5 text-xs">
+          <section className="rounded-xl bg-app-card/20 px-3 py-3">
             <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[var(--text-muted)]">
               Cliente
             </p>
@@ -1937,7 +1897,7 @@ function OperationalContextColumn({
             isMutating={isExecutionMutating}
           />
 
-          <section className="rounded-xl border border-[var(--app-border)]/45 bg-app-card/30 px-3 py-3">
+          <section className="rounded-xl border border-[var(--app-border)]/30 bg-app-card/20 px-3 py-3">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
               Próximo agendamento
             </p>
@@ -1975,7 +1935,7 @@ function OperationalContextColumn({
             </Button>
           </section>
 
-          <section className="rounded-xl border border-[var(--app-border)]/45 bg-app-card/30 px-3 py-3">
+          <section className="rounded-xl border border-[var(--app-border)]/30 bg-app-card/20 px-3 py-3">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
               Ordem de serviço
             </p>
@@ -2013,7 +1973,7 @@ function OperationalContextColumn({
             </Button>
           </section>
 
-          <section className="rounded-xl border border-[var(--app-border)]/45 bg-app-card/30 px-3 py-3">
+          <section className="rounded-xl border border-[var(--app-border)]/30 bg-app-card/20 px-3 py-3">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
               Financeiro
             </p>
@@ -2055,35 +2015,46 @@ function OperationalContextColumn({
             </Button>
           </section>
 
-          <section className="rounded-xl border border-[var(--app-border)]/45 bg-app-card/30 px-3 py-3">
+          <section className="rounded-xl border border-[var(--app-border)]/30 bg-app-card/20 px-3 py-2.5">
             <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
               Timeline resumida
             </p>
-            <p className="mt-1">
-              {context?.lastInteraction?.direction ?? "--"}
-            </p>
-            <p className="text-[11px] text-[var(--text-muted)]">
-              {fmtDateTime(context?.lastInteraction?.createdAt)}
-            </p>
-            <span className="mt-2 inline-flex whitespace-nowrap rounded-full bg-[color-mix(in_srgb,var(--success)_12%,var(--app-surface))] px-2 py-0.5 text-[10px] text-[var(--success)]">
-              {context?.lastInteraction?.status ?? "--"}
-            </span>
+            {context?.lastInteraction?.createdAt ? (
+              <>
+                <p className="mt-1">
+                  {context?.lastInteraction?.direction ?? "--"} ·{" "}
+                  {context?.lastInteraction?.status ?? "--"}
+                </p>
+                <p className="text-[11px] text-[var(--text-muted)]">
+                  {fmtDateTime(context?.lastInteraction?.createdAt)}
+                </p>
+              </>
+            ) : (
+              <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+                Sem eventos recentes.
+              </p>
+            )}
           </section>
 
-          <section className="rounded-xl border border-[var(--app-border)]/45 bg-app-card/30 px-3 py-3">
+          <section className="rounded-xl border border-[var(--app-border)]/30 bg-app-card/20 px-3 py-3">
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
               Próxima melhor ação
             </p>
-            <div className="mt-2.5 grid grid-cols-1 gap-2">
+            <div className="mt-2.5 rounded-lg border border-[var(--app-border)]/35 bg-app-surface/55 p-2.5">
+              <p className="text-[11px] font-semibold">Enviar cobrança</p>
+              <p className="mt-1 text-[10px] text-[var(--text-muted)]">
+                Cliente possui cobrança pendente ou conversa sem resolução.
+              </p>
               <Button
                 type="button"
                 size="sm"
-                variant="outline"
-                className="h-8 w-full min-w-0 justify-start truncate border-[color-mix(in_srgb,var(--app-border)_78%,transparent)] bg-[color-mix(in_srgb,var(--app-card)_86%,transparent)] px-2.5 text-[11px] font-semibold text-[var(--text-primary)] hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)]"
+                className="mt-2 h-8 w-full min-w-0 justify-start truncate bg-[var(--accent-primary)] px-2.5 text-[11px] font-semibold text-[var(--primary-foreground)] hover:bg-[var(--accent-primary-hover)]"
                 onClick={onSendCharge}
               >
                 Enviar cobrança
               </Button>
+            </div>
+            <div className="mt-2 grid grid-cols-1 gap-1.5">
               <Button
                 type="button"
                 size="sm"
@@ -3040,8 +3011,9 @@ export default function WhatsAppPage() {
       ]);
     } catch (error: any) {
       console.error(error);
-      setComposerError(error?.message ?? "Falha ao enviar mensagem.");
-      toast.error(error?.message ?? "Falha ao enviar mensagem.");
+      const message = resolveComposerErrorMessage(error);
+      setComposerError(message);
+      toast.error(message);
     }
   };
 
@@ -3206,7 +3178,7 @@ export default function WhatsAppPage() {
 
   return (
     <AppPageShell className="h-[calc(100vh-4.25rem)] min-h-0 bg-transparent px-4 pb-2 pt-2 text-app-primary xl:pb-3 xl:pt-2 2xl:pb-4 2xl:pt-2">
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-0 border-0 bg-transparent ring-0 shadow-none rounded-none xl:grid-cols-[minmax(320px,360px)_minmax(0,1fr)_minmax(300px,340px)]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-0 rounded-none border-0 bg-transparent xl:grid-cols-[minmax(320px,360px)_minmax(0,1fr)_minmax(300px,340px)]">
         <div className="h-full min-h-0 min-w-0 overflow-hidden">
           <InboxQueueColumn
             rows={filteredRows}
