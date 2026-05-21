@@ -5,6 +5,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common'
+import { Org } from '../auth/decorators/org.decorator'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { RiskService } from './risk.service'
 
@@ -15,9 +16,10 @@ export class RiskController {
 
   @Get('people/:personId')
   async getPersonRisk(
+    @Org() orgId: string,
     @Param('personId') personId: string,
   ) {
-    return this.risk.getPersonRiskExplanation(personId)
+    return this.risk.getPersonRiskExplanation(personId, orgId)
   }
 
   @Get('customers/:customerId')
