@@ -317,6 +317,14 @@ export class WhatsAppService {
   }
 
   async updateMessageStatus(orgId: string, input: { id: string; status: WhatsAppMessageStatus; errorMessage?: string | null }) {
+    const current = await this.prisma.whatsAppMessage.findFirst({ where: { id: input.id, orgId } })
+    if (!current) throw new NotFoundException('Mensagem WhatsApp não encontrada')
+    if ((current.status === 'DELIVERED' || current.status === 'READ') && input.status === 'FAILED') {
+      return current
+    }
+    if (current.status === 'CANCELED') {
+      return current
+    }
     const data: Prisma.WhatsAppMessageUpdateInput = { status: input.status }
     if (input.status === 'SENT') data.sentAt = new Date()
     if (input.status === 'DELIVERED') data.deliveredAt = new Date()
@@ -371,7 +379,7 @@ export class WhatsAppService {
       throw new BadRequestException('Apenas mensagens com status FAILED podem ser reenviadas')
     }
 
-    await this.prisma.whatsAppMessage.update({ where: { id: messageId }, data: { status: 'QUEUED', failedAt: null, errorMessage: null, errorCode: null } })
+    await this.prisma.whatsAppMessage.updateMany({ where: { id: messageId, orgId }, data: { status: 'QUEUED', failedAt: null, errorMessage: null, errorCode: null } })
     await this.queueService.addJob(QUEUE_NAMES.WHATSAPP, WHATSAPP_QUEUE_JOB_NAMES.DISPATCH_MESSAGE, { messageId, orgId, requestId: this.requestContext.requestId, userId: this.requestContext.userId }, { jobId: `whatsapp:dispatch:retry:${messageId}` })
     this.waMetrics.incQueuedJobs()
     await this.logMessageTimelineEventOnce({
@@ -667,8 +675,8 @@ export class WhatsAppService {
   }
 
   // Compat methods used elsewhere
-  async findById(id: string) {
-    return this.prisma.whatsAppMessage.findUnique({ where: { id } })
+  async findById(id: string, orgId?: string) {
+    return this.prisma.whatsAppMessage.findFirst({ where: { id, orgId: orgId ?? undefined } })
   }
 
   async getMessagesFeed(params: { orgId: string; customerId: string; limit?: number; cursor?: string }) {

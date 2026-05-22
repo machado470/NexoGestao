@@ -140,7 +140,7 @@ export class WhatsAppProcessor implements OnModuleInit, OnModuleDestroy {
       status: 'ACTIVE',
     })
 
-    const message = await this.whatsApp.findById(job.data.messageId)
+    const message = await this.whatsApp.findById(job.data.messageId, orgId)
     if (!message) return
 
     const result = await this.provider.sendText({
