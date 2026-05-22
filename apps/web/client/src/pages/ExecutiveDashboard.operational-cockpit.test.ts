@@ -8,11 +8,13 @@ describe("ExecutiveDashboard operational cockpit", () => {
     expect(source).toContain('/internal/operational-signals?limit=8');
     expect(source).toContain('/internal/operational-signals/next-best-action');
     expect(source).toContain("operationalSignalsQuery");
+    expect(source).toContain("/internal/operational-actions/execute");
     expect(source).toContain("nextBestActionQuery");
   });
 
   it("renders operational attention center with severity and fallback", () => {
     expect(source).toContain("Operational Attention Center");
+    expect(source).toContain("Executar ação assistida");
     expect(source).toContain("AppStatusBadge label={signal.severity}");
     expect(source).toContain("Sem sinais operacionais ativos no momento");
   });

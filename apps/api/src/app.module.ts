@@ -50,6 +50,7 @@ import { EmailModule } from './email/email.module'
 import { PaymentsModule } from './payments/payments.module'
 import { BillingModule } from './billing/billing.module'
 import { DemoModule } from './demo/demo.module'
+import { OperationalActionsModule } from './operational-actions/operational-actions.module'
 import { AnalyticsModule } from './analytics/analytics.module'
 import { CorrectiveActionsModule } from './corrective-actions/corrective-actions.module'
 import { AdminModule } from './admin/admin.module'
@@ -135,6 +136,7 @@ class AllowAllThrottlerGuard implements CanActivate {
     InvoicesModule,
     BillingModule,
     DemoModule,
+    OperationalActionsModule,
     WhatsAppModule,
     InvitesModule,
     AutomationModule,

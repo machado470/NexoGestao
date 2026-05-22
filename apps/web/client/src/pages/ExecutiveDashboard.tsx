@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import {
   ArrowRight,
@@ -60,6 +60,7 @@ type OperationalSignal = {
   serviceOrderId?: string | null;
   chargeId?: string | null;
   messageId?: string | null;
+  entityId?: string | null;
 };
 
 type NextBestActionSignal = {
@@ -236,6 +237,16 @@ const pulseSignals = [
     text: "Risco operacional permanece concentrado em agenda e financeiro neste turno.",
   },
 ] as const;
+
+
+const supportedAssistedActionTypes = new Set(["RETRY_WHATSAPP_MESSAGE", "SEND_PAYMENT_REMINDER", "RECALCULATE_RISK", "RUN_GOVERNANCE_CHECK"]);
+
+function resolveAssistedEntityId(signal: OperationalSignal): string | null {
+  if (signal.actionType === "RETRY_WHATSAPP_MESSAGE") return signal.messageId ?? signal.entityId ?? null;
+  if (signal.actionType === "SEND_PAYMENT_REMINDER") return signal.chargeId ?? signal.entityId ?? null;
+  if (signal.actionType === "RECALCULATE_RISK" || signal.actionType === "RUN_GOVERNANCE_CHECK") return signal.entityId ?? null;
+  return null;
+}
 
 const quickAccess = [
   {
@@ -491,6 +502,7 @@ function buildSignalCtaPath(signal: OperationalSignal) {
 }
 
 export default function ExecutiveDashboard() {
+  const [assistedActionState, setAssistedActionState] = useState<Record<string, "idle" | "loading" | "success" | "error">>({});
   useRenderWatchdog("ExecutiveDashboard");
   const [location, navigate] = useLocation();
   const { runAction } = useRunAction();
@@ -620,6 +632,26 @@ export default function ExecutiveDashboard() {
     : runtimeIndicators.whatsappFailures + runtimeIndicators.staleGovernance + runtimeIndicators.elevatedRisk > 0
       ? "Atenção necessária"
       : "Operação estável";
+
+
+  const executeAssistedAction = async (signal: OperationalSignal) => {
+    const entityId = resolveAssistedEntityId(signal);
+    if (!signal.actionType || !entityId) return;
+    setAssistedActionState(prev => ({ ...prev, [signal.id]: "loading" }));
+    try {
+      const response = await fetch("/internal/operational-actions/execute", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ actionType: signal.actionType, entityId, sourceSignalId: signal.id }),
+      });
+      if (!response.ok) throw new Error("failed_execute_assisted_action");
+      setAssistedActionState(prev => ({ ...prev, [signal.id]: "success" }));
+      void operationalSignalsQuery.refetch();
+    } catch {
+      setAssistedActionState(prev => ({ ...prev, [signal.id]: "error" }));
+    }
+  };
 
   const queue = useMemo(() => {
     const whatsappItems: QueueItem[] = pendingWhatsAppApprovals
@@ -821,7 +853,18 @@ export default function ExecutiveDashboard() {
                       <p className="mt-1 text-xs text-[var(--text-muted)]">Impacto: {signal.impact ?? "Impacto operacional em monitoramento."}</p>
                       <p className="mt-1 text-xs text-[var(--text-muted)]">Ação sugerida: {signal.suggestedAction ?? "Revisar no contexto operacional."}</p>
                     </div>
-                    <Button size="sm" variant="outline" onClick={() => navigate(buildSignalCtaPath(signal))}>Abrir contexto</Button>
+                    <div className="flex flex-col items-end gap-2">
+                      <Button size="sm" variant="outline" onClick={() => navigate(buildSignalCtaPath(signal))}>Abrir contexto</Button>
+                      {signal.actionType && supportedAssistedActionTypes.has(signal.actionType) ? (
+                        <>
+                          <Button size="sm" onClick={() => void executeAssistedAction(signal)} disabled={assistedActionState[signal.id] === "loading"}>
+                            {assistedActionState[signal.id] === "loading" ? "Executando..." : "Executar ação assistida"}
+                          </Button>
+                          {assistedActionState[signal.id] === "error" ? <p className="text-xs text-red-600">Falha ao executar ação assistida.</p> : null}
+                          {assistedActionState[signal.id] === "success" ? <p className="text-xs text-emerald-600">Ação assistida executada.</p> : null}
+                        </>
+                      ) : null}
+                    </div>
                   </div>
                 </article>
               ))}
