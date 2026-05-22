@@ -255,6 +255,23 @@ describe('FinanceService hardening', () => {
     )
   })
 
+
+  it('bloqueia lembrete de cobrança para charge paga', async () => {
+    const { service, prisma } = buildService()
+    prisma.charge.findFirst.mockResolvedValue({ id: 'ch-1', status: 'PAID' })
+
+    await expect(service.remindChargeInOrg('org-1', 'ch-1')).rejects.toBeInstanceOf(BadRequestException)
+  })
+
+  it('permite lembrete de cobrança pendente no mesmo orgId', async () => {
+    const { service, prisma } = buildService()
+    prisma.charge.findFirst.mockResolvedValue({ id: 'ch-1', status: 'PENDING' })
+    jest.spyOn(service, 'sendPaymentReminderWhatsApp').mockResolvedValue({} as any)
+
+    await expect(service.remindChargeInOrg('org-1', 'ch-1')).resolves.toBeUndefined()
+    expect(service.sendPaymentReminderWhatsApp).toHaveBeenCalledWith('ch-1')
+  })
+
   it('emite SERVICE_ORDER_CHARGE_CREATED ao vincular cobrança com O.S.', async () => {
     const { service, prisma, idempotency } = buildService()
     idempotency.begin.mockResolvedValue({ mode: 'execute', recordId: 'idem-1' })
