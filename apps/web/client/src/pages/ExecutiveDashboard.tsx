@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
+import { useQuery } from "@tanstack/react-query";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,6 +47,27 @@ type DashboardState =
   | "loading";
 type Severity = "critical" | "high" | "medium";
 type DashboardRecord = Record<string, unknown>;
+type SignalSeverity = "CRITICAL" | "WARNING" | "INFO";
+type OperationalSignal = {
+  id: string;
+  severity: SignalSeverity;
+  area: string;
+  title: string;
+  summary?: string;
+  impact?: string;
+  suggestedAction?: string;
+  actionType?: string;
+  serviceOrderId?: string | null;
+  chargeId?: string | null;
+  messageId?: string | null;
+};
+
+type NextBestActionSignal = {
+  actionType?: string;
+  title?: string;
+  reason?: string;
+  impact?: string;
+};
 
 type AttentionItem = {
   severity: Severity;
@@ -459,6 +481,15 @@ function QueueRow({
   );
 }
 
+
+function buildSignalCtaPath(signal: OperationalSignal) {
+  if (signal.area === "WHATSAPP" || signal.messageId) return "/whatsapp";
+  if (signal.area === "FINANCE" || signal.chargeId) return "/finances?view=charges";
+  if (signal.area === "GOVERNANCE" || signal.area === "RISK") return "/governance";
+  if (signal.serviceOrderId) return `/service-orders?id=${signal.serviceOrderId}`;
+  return "/timeline";
+}
+
 export default function ExecutiveDashboard() {
   useRenderWatchdog("ExecutiveDashboard");
   const [location, navigate] = useLocation();
@@ -474,6 +505,24 @@ export default function ExecutiveDashboard() {
       { limit: 10 },
       { retry: false }
     );
+  const operationalSignalsQuery = useQuery({
+    queryKey: ["internal-operational-signals"],
+    queryFn: async () => {
+      const response = await fetch("/internal/operational-signals?limit=8", { credentials: "include" });
+      if (!response.ok) throw new Error("signals fetch failed");
+      return (await response.json()) as { signals?: OperationalSignal[] };
+    },
+    retry: false,
+  });
+  const nextBestActionQuery = useQuery({
+    queryKey: ["internal-operational-signals-next-best-action"],
+    queryFn: async () => {
+      const response = await fetch("/internal/operational-signals/next-best-action", { credentials: "include" });
+      if (!response.ok) throw new Error("next best action fetch failed");
+      return (await response.json()) as NextBestActionSignal | null;
+    },
+    retry: false,
+  });
 
   const pendingWhatsAppApprovals = useMemo(() => {
     const data = Array.isArray(pendingWhatsAppApprovalsQuery.data)
@@ -545,15 +594,32 @@ export default function ExecutiveDashboard() {
           ? "Carregando operação"
           : normalizeOperationalState(dashboardState);
 
+  const operationalSignals = (operationalSignalsQuery.data?.signals ?? []).slice(0, 5);
   const nextBestAction = {
-    action: "Cobrar João Silva — R$ 4.280 vencido há 5 dias",
-    reason:
-      "Maior valor em atraso e sem contato recente, com risco de contaminar o fechamento do dia.",
-    impact:
-      "Libera caixa imediato, reduz risco operacional financeiro e destrava repasses do turno.",
-    ctaLabel: "Enviar cobrança",
-    ctaPath: "/finances?view=charges&status=overdue",
+    action: nextBestActionQuery.data?.title ?? "Revisar sinais críticos da operação",
+    reason: nextBestActionQuery.data?.reason ?? "Sinais críticos exigem priorização imediata.",
+    impact: nextBestActionQuery.data?.impact ?? "Reduz risco operacional e melhora previsibilidade do turno.",
+    ctaLabel: "Abrir contexto",
+    ctaPath:
+      nextBestActionQuery.data?.actionType?.includes("WHATSAPP")
+        ? "/whatsapp"
+        : nextBestActionQuery.data?.actionType?.includes("CHARGE")
+          ? "/finances?view=charges&status=overdue"
+          : "/timeline",
   };
+  const runtimeIndicators = useMemo(() => ({
+    whatsappFailures: operationalSignals.filter(item => item.area === "WHATSAPP" && item.severity !== "INFO").length,
+    criticalCharges: operationalSignals.filter(item => item.area === "FINANCE" && item.severity === "CRITICAL").length,
+    serviceOrderGaps: operationalSignals.filter(item => item.actionType === "CREATE_CHARGE_FOR_COMPLETED_OS").length,
+    criticalDiagnostics: operationalSignals.filter(item => item.area === "DIAGNOSTICS" && item.severity === "CRITICAL").length,
+    staleGovernance: operationalSignals.filter(item => item.area === "GOVERNANCE").length,
+    elevatedRisk: operationalSignals.filter(item => item.area === "RISK").length,
+  }), [operationalSignals]);
+  const operationalHealth = runtimeIndicators.whatsappFailures + runtimeIndicators.staleGovernance + runtimeIndicators.elevatedRisk + runtimeIndicators.criticalDiagnostics + runtimeIndicators.criticalCharges >= 3
+    ? "Estado crítico"
+    : runtimeIndicators.whatsappFailures + runtimeIndicators.staleGovernance + runtimeIndicators.elevatedRisk > 0
+      ? "Atenção necessária"
+      : "Operação estável";
 
   const queue = useMemo(() => {
     const whatsappItems: QueueItem[] = pendingWhatsAppApprovals
@@ -720,6 +786,46 @@ export default function ExecutiveDashboard() {
                 {nextBestAction.ctaLabel}
               </Button>
             </article>
+          </AppSectionBlock>
+          <AppSectionBlock title="Saúde operacional" subtitle="Heurística simples e explicável baseada em criticidade ativa." className="xl:col-span-4">
+            <article className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-4">
+              <p className="text-sm font-semibold text-[var(--text-primary)]">{operationalHealth}</p>
+              <p className="mt-2 text-xs text-[var(--text-secondary)]">CRITICAL: {operationalSignals.filter(item => item.severity === "CRITICAL").length} · WARNING: {operationalSignals.filter(item => item.severity === "WARNING").length}</p>
+            </article>
+          </AppSectionBlock>
+
+          <AppSectionBlock title="Executive runtime" subtitle="Leitura viva de degradação operacional." className="xl:col-span-8">
+            <div className="grid grid-cols-2 gap-3 xl:grid-cols-3">
+              <AppStatCard label="WhatsApp falhando" value={String(runtimeIndicators.whatsappFailures)} helper="Mensagens com falha exigem revisão." />
+              <AppStatCard label="Cobranças críticas" value={String(runtimeIndicators.criticalCharges)} helper="Pendências vencidas com maior impacto." />
+              <AppStatCard label="O.S. sem cobrança" value={String(runtimeIndicators.serviceOrderGaps)} helper="Serviços concluídos sem fechamento financeiro." />
+              <AppStatCard label="Diagnósticos críticos" value={String(runtimeIndicators.criticalDiagnostics)} helper="Incidentes com risco operacional." />
+              <AppStatCard label="Governança stale" value={String(runtimeIndicators.staleGovernance)} helper="Itens sem atualização recente." />
+              <AppStatCard label="Risco elevado" value={String(runtimeIndicators.elevatedRisk)} helper="Sinais de risco ativos no turno." />
+            </div>
+          </AppSectionBlock>
+
+          <AppSectionBlock title="Operational Attention Center" subtitle="Top sinais reais para ação imediata" className="xl:col-span-12">
+            {operationalSignals.length === 0 ? <p className="text-xs text-[var(--text-secondary)]">Sem sinais operacionais ativos no momento.</p> : null}
+            <div className="space-y-2.5">
+              {operationalSignals.map(signal => (
+                <article key={signal.id} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3.5">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <AppStatusBadge label={signal.severity} />
+                        <AppStatusBadge label={signal.area} />
+                        <p className="text-sm font-semibold text-[var(--text-primary)]">{signal.title}</p>
+                      </div>
+                      <p className="mt-1 text-xs text-[var(--text-secondary)]">{signal.summary ?? "Sinal operacional ativo."}</p>
+                      <p className="mt-1 text-xs text-[var(--text-muted)]">Impacto: {signal.impact ?? "Impacto operacional em monitoramento."}</p>
+                      <p className="mt-1 text-xs text-[var(--text-muted)]">Ação sugerida: {signal.suggestedAction ?? "Revisar no contexto operacional."}</p>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => navigate(buildSignalCtaPath(signal))}>Abrir contexto</Button>
+                  </div>
+                </article>
+              ))}
+            </div>
           </AppSectionBlock>
 
           <AppSectionBlock
