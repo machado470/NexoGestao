@@ -1152,9 +1152,16 @@ export class FinanceService {
   async remindChargeInOrg(orgId: string, chargeId: string) {
     const charge = await this.prisma.charge.findFirst({
       where: { id: chargeId, orgId },
-      select: { id: true },
+      select: { id: true, status: true },
     })
     if (!charge) throw new NotFoundException('Charge não encontrada')
+    if (charge.status === 'PAID') {
+      throw new BadRequestException({
+        code: 'CHARGE_STATE_INVALID_FOR_REMINDER',
+        message: 'Cobrança paga não deve receber lembrete de cobrança.',
+        details: { chargeId: charge.id, status: charge.status },
+      })
+    }
     await this.sendPaymentReminderWhatsApp(charge.id)
   }
 }
