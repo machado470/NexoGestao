@@ -5,6 +5,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
 import { Roles } from '../auth/decorators/roles.decorator'
 import { OperationalDiagnosticsService } from './operational-diagnostics.service'
+import { OperationalSignalsService } from './operational-signals.service'
 
 @Controller('internal')
 export class InternalStatsController {
@@ -12,6 +13,7 @@ export class InternalStatsController {
     private readonly queueService: QueueService,
     private readonly waMetrics: WhatsAppObservabilityService,
     private readonly operationalDiagnosticsService: OperationalDiagnosticsService,
+    private readonly operationalSignalsService: OperationalSignalsService,
   ) {}
 
   @Get('stats')
@@ -35,4 +37,21 @@ export class InternalStatsController {
     const parsedLimit = Number(limit ?? 100)
     return this.operationalDiagnosticsService.runForOrg(req.user.orgId, Number.isFinite(parsedLimit) ? parsedLimit : 100)
   }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @Get('operational-signals')
+  async operationalSignals(@Request() req: any, @Query('limit') limit?: string) {
+    const parsedLimit = Number(limit ?? 20)
+    return this.operationalSignalsService.listForOrg(req.user.orgId, Number.isFinite(parsedLimit) ? parsedLimit : 20)
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @Get('operational-signals/next-best-action')
+  async nextBestAction(@Request() req: any) {
+    return this.operationalSignalsService.getNextBestAction(req.user.orgId)
+  }
 }
+
+
