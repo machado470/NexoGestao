@@ -8,6 +8,8 @@ import helmet from 'helmet'
 import { AppModule } from './app.module'
 import { ApiResponseInterceptor } from './common/http/api-response.interceptor'
 import { getWhatsAppProviderReadiness } from './whatsapp/providers/provider.factory'
+import { PrismaService } from './prisma/prisma.service'
+import { runOperationalActionsStartupCheck } from './bootstrap/operational-actions-startup-check'
 
 function parseCorsOrigins(raw?: string): string[] {
   const v = (raw ?? '').trim()
@@ -46,6 +48,9 @@ async function bootstrap() {
     logger.log('[BOOT] Bootstrap iniciado: criando aplicação Nest...')
     const app = await NestFactory.create(AppModule, { rawBody: true })
     logger.log(`[BOOT] NestFactory.create concluído em ${Date.now() - bootStartedAt}ms`)
+
+    const prisma = app.get(PrismaService)
+    await runOperationalActionsStartupCheck(prisma, logger)
 
     app.use(
       helmet({

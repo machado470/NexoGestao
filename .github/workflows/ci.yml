@@ -36,7 +36,7 @@ jobs:
           cache: pnpm
 
       - name: Install
-        run: pnpm i
+        run: pnpm install --frozen-lockfile
 
       - name: Prisma generate
         run: pnpm --filter ./apps/api exec prisma generate
@@ -45,6 +45,11 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/nexogestao?schema=public
         run: pnpm --filter ./apps/api exec prisma migrate deploy
+
+      - name: CI preflight
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/nexogestao?schema=public
+        run: pnpm ci:preflight
 
       - name: Seed
         env:
