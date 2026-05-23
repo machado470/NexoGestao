@@ -511,6 +511,7 @@ function buildSignalCtaPath(signal: OperationalSignal) {
 export default function ExecutiveDashboard() {
   const [assistedActionState, setAssistedActionState] = useState<Record<string, "idle" | "loading" | "success" | "error">>({});
   const [requestedAssistedActions, setRequestedAssistedActions] = useState<Record<string, true>>({});
+  const [requestAssistedActionState, setRequestAssistedActionState] = useState<Record<string, "idle" | "loading" | "success" | "error">>({});
   useRenderWatchdog("ExecutiveDashboard");
   const [location, navigate] = useLocation();
   const { runAction } = useRunAction();
@@ -659,6 +660,38 @@ export default function ExecutiveDashboard() {
       ? "Atenção necessária"
       : "Operação estável";
 
+
+  const requestAssistedAction = async (signal: OperationalSignal) => {
+    const entityId = resolveAssistedEntityId(signal);
+    if (!signal.actionType || !entityId) return;
+    setRequestAssistedActionState(prev => ({ ...prev, [signal.id]: "loading" }));
+    try {
+      const response = await fetch("/internal/operational-actions/request", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          actionType: signal.actionType,
+          entityType: signal.area ?? "GENERAL",
+          entityId,
+          sourceSignalId: signal.id,
+          metadata: {
+            suggestedAction: signal.suggestedAction ?? null,
+            relatedChargeId: signal.chargeId ?? null,
+            relatedServiceOrderId: signal.serviceOrderId ?? null,
+            relatedMessageId: signal.messageId ?? null,
+          },
+        }),
+      });
+      if (!response.ok) throw new Error("failed_request_assisted_action");
+      setRequestAssistedActionState(prev => ({ ...prev, [signal.id]: "success" }));
+      setRequestedAssistedActions(prev => ({ ...prev, [signal.id]: true }));
+      void operationalSignalsQuery.refetch();
+      void nextBestActionQuery.refetch();
+    } catch {
+      setRequestAssistedActionState(prev => ({ ...prev, [signal.id]: "error" }));
+    }
+  };
 
   const executeAssistedAction = async (signal: OperationalSignal) => {
     const entityId = resolveAssistedEntityId(signal);
@@ -850,12 +883,7 @@ export default function ExecutiveDashboard() {
                     className="w-full"
                     size="sm"
                     variant="outline"
-                    onClick={() =>
-                      setRequestedAssistedActions(prev => ({
-                        ...prev,
-                        [nextBestActionOperationalSignal.id]: true,
-                      }))
-                    }
+                    onClick={() => void requestAssistedAction(nextBestActionOperationalSignal)}
                     disabled={assistedActionState[nextBestActionOperationalSignal.id] === "loading"}
                   >
                     Solicitar ação assistida
@@ -867,11 +895,13 @@ export default function ExecutiveDashboard() {
                       onClick={() => void executeAssistedAction(nextBestActionOperationalSignal)}
                       disabled={assistedActionState[nextBestActionOperationalSignal.id] === "loading"}
                     >
-                      {assistedActionState[nextBestActionOperationalSignal.id] === "loading" ? "Executando..." : "Executar por confirmação explícita"}
+                      {assistedActionState[nextBestActionOperationalSignal.id] === "loading" ? "Executando..." : "Executar ação assistida (confirmação explícita)"}
                     </Button>
                   ) : (
                     <p className="text-xs text-[var(--text-muted)]">Solicite a ação primeiro. A execução só ocorre por clique explícito.</p>
                   )}
+                  {requestAssistedActionState[nextBestActionOperationalSignal.id] === "error" ? <p className="text-xs text-red-600">Falha ao solicitar ação assistida.</p> : null}
+                  {requestAssistedActionState[nextBestActionOperationalSignal.id] === "success" ? <p className="text-xs text-emerald-600">Ação assistida solicitada (REQUESTED).</p> : null}
                   {assistedActionState[nextBestActionOperationalSignal.id] === "error" ? <p className="text-xs text-red-600">Falha ao executar ação assistida.</p> : null}
                   {assistedActionState[nextBestActionOperationalSignal.id] === "success" ? <p className="text-xs text-emerald-600">Ação assistida executada com sucesso.</p> : null}
                 </div>
@@ -916,9 +946,16 @@ export default function ExecutiveDashboard() {
                       <Button size="sm" variant="outline" onClick={() => navigate(buildSignalCtaPath(signal))}>Abrir contexto</Button>
                       {signal.actionType && supportedAssistedActionTypes.has(signal.actionType) ? (
                         <>
-                          <Button size="sm" onClick={() => void executeAssistedAction(signal)} disabled={assistedActionState[signal.id] === "loading"}>
-                            {assistedActionState[signal.id] === "loading" ? "Executando..." : "Executar ação assistida"}
+                          <Button size="sm" variant="outline" onClick={() => void requestAssistedAction(signal)} disabled={requestAssistedActionState[signal.id] === "loading"}>
+                            {requestAssistedActionState[signal.id] === "loading" ? "Solicitando..." : "Solicitar ação assistida"}
                           </Button>
+                          {requestedAssistedActions[signal.id] ? (
+                            <Button size="sm" onClick={() => void executeAssistedAction(signal)} disabled={assistedActionState[signal.id] === "loading"}>
+                              {assistedActionState[signal.id] === "loading" ? "Executando..." : "Executar ação assistida (confirmação explícita)"}
+                            </Button>
+                          ) : null}
+                          {requestAssistedActionState[signal.id] === "error" ? <p className="text-xs text-red-600">Falha ao solicitar ação assistida.</p> : null}
+                          {requestAssistedActionState[signal.id] === "success" ? <p className="text-xs text-emerald-600">Ação assistida solicitada (REQUESTED).</p> : null}
                           {assistedActionState[signal.id] === "error" ? <p className="text-xs text-red-600">Falha ao executar ação assistida.</p> : null}
                           {assistedActionState[signal.id] === "success" ? <p className="text-xs text-emerald-600">Ação assistida executada.</p> : null}
                         </>

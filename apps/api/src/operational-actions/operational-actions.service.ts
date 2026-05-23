@@ -7,16 +7,40 @@ import { RiskService } from '../risk/risk.service'
 import { GovernanceRunService } from '../governance/governance-run.service'
 
 export type OperationalActionType = 'RETRY_WHATSAPP_MESSAGE' | 'SEND_PAYMENT_REMINDER' | 'RECALCULATE_RISK' | 'RUN_GOVERNANCE_CHECK'
+export type OperationalActionStatus = 'REQUESTED' | 'EXECUTED' | 'FAILED' | 'CANCELED'
 
 @Injectable()
 export class OperationalActionsService {
   constructor(private readonly prisma: PrismaService, private readonly timeline: TimelineService, private readonly whatsapp: WhatsAppService, private readonly finance: FinanceService, private readonly risk: RiskService, private readonly governanceRun: GovernanceRunService) {}
   getSupportedActionTypes(): OperationalActionType[] { return ['RETRY_WHATSAPP_MESSAGE', 'SEND_PAYMENT_REMINDER', 'RECALCULATE_RISK', 'RUN_GOVERNANCE_CHECK'] }
+  async request(input: { orgId: string; actorUserId: string; actionType: OperationalActionType; entityType: string; entityId: string; sourceSignalId?: string | null; metadata?: Record<string, unknown> | null }) {
+    const { orgId, actorUserId, actionType, entityType, entityId, sourceSignalId, metadata } = input
+    if (!orgId || !actorUserId) throw new BadRequestException('orgId/actor obrigatórios')
+    const requestedAt = new Date().toISOString()
+    const requestMetadata = {
+      actionType,
+      entityType,
+      entityId,
+      requestedBy: actorUserId,
+      actorUserId,
+      sourceSignalId: sourceSignalId ?? null,
+      origin: 'dashboard',
+      suggestedAction: typeof metadata?.suggestedAction === 'string' ? metadata.suggestedAction : null,
+      relatedChargeId: typeof metadata?.relatedChargeId === 'string' ? metadata.relatedChargeId : null,
+      relatedServiceOrderId: typeof metadata?.relatedServiceOrderId === 'string' ? metadata.relatedServiceOrderId : null,
+      relatedMessageId: typeof metadata?.relatedMessageId === 'string' ? metadata.relatedMessageId : null,
+      requestedAt,
+      status: 'REQUESTED' as OperationalActionStatus,
+      context: metadata ?? {},
+    }
+    await this.timeline.log({ orgId, action: 'OPERATIONAL_ACTION_REQUESTED', metadata: requestMetadata })
+    return { actionType, entityType, entityId, status: 'REQUESTED' as OperationalActionStatus, requestedAt }
+  }
+
   async execute(input: { orgId: string; actorUserId: string; actionType: OperationalActionType; sourceSignalId?: string | null; entityId: string }) {
     const { orgId, actorUserId, actionType, sourceSignalId, entityId } = input
     if (!orgId || !actorUserId) throw new BadRequestException('orgId/actor obrigatórios')
     const baseMeta = { actionType, sourceSignalId: sourceSignalId ?? null, entityId, actorUserId }
-    await this.timeline.log({ orgId, action: 'OPERATIONAL_ACTION_REQUESTED', metadata: baseMeta })
     try {
       let result: Record<string, unknown>
       if (actionType === 'RETRY_WHATSAPP_MESSAGE') {
@@ -41,8 +65,8 @@ export class OperationalActionsService {
         const governance = await this.governanceRun.finish(orgId)
         result = { governanceScore: governance.institutionalRiskScore }
       }
-      await this.timeline.log({ orgId, action: 'OPERATIONAL_ACTION_EXECUTED', metadata: { ...baseMeta, nextStatus: 'SUCCEEDED', ...result } })
-      return { actionType, status: 'SUCCEEDED', result }
+      await this.timeline.log({ orgId, action: 'OPERATIONAL_ACTION_EXECUTED', metadata: { ...baseMeta, nextStatus: 'EXECUTED', status: 'EXECUTED', ...result } })
+      return { actionType, status: 'EXECUTED' as OperationalActionStatus, result }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'unknown_error'
       await this.timeline.log({ orgId, action: 'OPERATIONAL_ACTION_FAILED', metadata: { ...baseMeta, nextStatus: 'FAILED', errorMessage: message } })
