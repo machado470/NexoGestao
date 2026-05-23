@@ -920,7 +920,11 @@ export const nexoProxyRouter = router({
     }),
 
     update: protectedProcedure.input(z.any()).mutation(async ({ ctx, input }) => {
-      return authedPatch(ctx as CtxLike, "/organization-settings", input);
+      const payload = input && typeof input === "object" ? { ...(input as Record<string, unknown>) } : input;
+      if (payload && typeof payload === "object") {
+        delete (payload as Record<string, unknown>).orgId;
+      }
+      return authedPatch(ctx as CtxLike, "/organization-settings", payload);
     }),
   }),
 
