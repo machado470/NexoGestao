@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { TimelineService } from '../timeline/timeline.service'
 import { WhatsAppService } from '../whatsapp/whatsapp.service'
@@ -37,10 +37,38 @@ export class OperationalActionsService {
     return { actionType, entityType, entityId, status: 'REQUESTED' as OperationalActionStatus, requestedAt }
   }
 
+
+
+  private async getLatestLifecycleStatus(input: { orgId: string; actionType: OperationalActionType; entityId: string; sourceSignalId?: string | null }): Promise<OperationalActionStatus | null> {
+    const events = await this.prisma.timelineEvent.findMany({
+      where: { orgId: input.orgId, action: { in: ['OPERATIONAL_ACTION_REQUESTED', 'OPERATIONAL_ACTION_EXECUTED', 'OPERATIONAL_ACTION_FAILED', 'OPERATIONAL_ACTION_CANCELED'] } },
+      orderBy: { createdAt: 'desc' },
+      select: { metadata: true },
+      take: 200,
+    })
+    for (const event of events) {
+      const metadata = (event.metadata ?? {}) as Record<string, unknown>
+      if (metadata.actionType !== input.actionType) continue
+      if (metadata.entityId !== input.entityId) continue
+      const signalInEvent = typeof metadata.sourceSignalId === 'string' ? metadata.sourceSignalId : null
+      const signalInInput = input.sourceSignalId ?? null
+      if (signalInEvent !== signalInInput) continue
+      const nextStatus = metadata.nextStatus
+      const status = metadata.status
+      if (nextStatus === 'REQUESTED' || nextStatus === 'EXECUTED' || nextStatus === 'FAILED' || nextStatus === 'CANCELED') return nextStatus
+      if (status === 'REQUESTED' || status === 'EXECUTED' || status === 'FAILED' || status === 'CANCELED') return status
+    }
+    return null
+  }
   async execute(input: { orgId: string; actorUserId: string; actionType: OperationalActionType; sourceSignalId?: string | null; entityId: string }) {
     const { orgId, actorUserId, actionType, sourceSignalId, entityId } = input
     if (!orgId || !actorUserId) throw new BadRequestException('orgId/actor obrigatórios')
     const baseMeta = { actionType, sourceSignalId: sourceSignalId ?? null, entityId, actorUserId }
+    const previousStatus = await this.getLatestLifecycleStatus({ orgId, actionType, entityId, sourceSignalId })
+    if (previousStatus === 'CANCELED') throw new ConflictException('Ação cancelada não pode ser executada sem novo REQUEST')
+    if (previousStatus === 'EXECUTED') throw new ConflictException('Ação já executada para este REQUEST')
+    if (previousStatus === 'FAILED') throw new ConflictException('Ação falhou e é terminal para este REQUEST')
+    if (previousStatus !== 'REQUESTED') throw new ConflictException('Ação precisa estar REQUESTED para executar')
     try {
       let result: Record<string, unknown>
       if (actionType === 'RETRY_WHATSAPP_MESSAGE') {
@@ -65,12 +93,43 @@ export class OperationalActionsService {
         const governance = await this.governanceRun.finish(orgId)
         result = { governanceScore: governance.institutionalRiskScore }
       }
-      await this.timeline.log({ orgId, action: 'OPERATIONAL_ACTION_EXECUTED', metadata: { ...baseMeta, nextStatus: 'EXECUTED', status: 'EXECUTED', ...result } })
+      await this.timeline.log({ orgId, action: 'OPERATIONAL_ACTION_EXECUTED', metadata: { ...baseMeta, previousStatus, nextStatus: 'EXECUTED', status: 'EXECUTED', ...result } })
       return { actionType, status: 'EXECUTED' as OperationalActionStatus, result }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'unknown_error'
-      await this.timeline.log({ orgId, action: 'OPERATIONAL_ACTION_FAILED', metadata: { ...baseMeta, nextStatus: 'FAILED', errorMessage: message } })
+      await this.timeline.log({ orgId, action: 'OPERATIONAL_ACTION_FAILED', metadata: { ...baseMeta, previousStatus, nextStatus: 'FAILED', errorMessage: message } })
       throw error
     }
   }
+
+  async cancel(input: { orgId: string; actorUserId: string; actionType: OperationalActionType; entityType: string; entityId: string; sourceSignalId?: string | null; metadata?: Record<string, unknown> | null }) {
+    const { orgId, actorUserId, actionType, entityType, entityId, sourceSignalId, metadata } = input
+    if (!orgId || !actorUserId) throw new BadRequestException('orgId/actor obrigatórios')
+    const previousStatus = await this.getLatestLifecycleStatus({ orgId, actionType, entityId, sourceSignalId })
+    if (previousStatus !== 'REQUESTED') throw new ConflictException('Somente ação REQUESTED pode ser cancelada')
+    const canceledAt = new Date().toISOString()
+    await this.timeline.log({
+      orgId,
+      action: 'OPERATIONAL_ACTION_CANCELED',
+      metadata: {
+        actionType,
+        entityType,
+        entityId,
+        canceledBy: actorUserId,
+        actorUserId,
+        canceledAt,
+        sourceSignalId: sourceSignalId ?? null,
+        origin: 'dashboard',
+        suggestedAction: typeof metadata?.suggestedAction === 'string' ? metadata.suggestedAction : null,
+        relatedChargeId: typeof metadata?.relatedChargeId === 'string' ? metadata.relatedChargeId : null,
+        relatedServiceOrderId: typeof metadata?.relatedServiceOrderId === 'string' ? metadata.relatedServiceOrderId : null,
+        relatedMessageId: typeof metadata?.relatedMessageId === 'string' ? metadata.relatedMessageId : null,
+        previousStatus,
+        nextStatus: 'CANCELED',
+        status: 'CANCELED' as OperationalActionStatus,
+      },
+    })
+    return { actionType, entityType, entityId, status: 'CANCELED' as OperationalActionStatus, canceledAt }
+  }
+
 }
