@@ -32,7 +32,8 @@
     "dev:doctor": "./scripts/doctor.sh",
     "dev:ports": "./scripts/dev-ports.sh",
     "dev:health": "./scripts/dev-health.sh",
-    "dev:logs": "./scripts/dev-logs.sh"
+    "dev:logs": "./scripts/dev-logs.sh",
+    "test:tenant:isolation": "docker compose -f docker-compose.yml up -d postgres redis && RUN_REAL_INTEGRATION=true pnpm --filter ./apps/api test -- test/integration/canonical-operational-workflow.spec.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
