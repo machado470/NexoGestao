@@ -9,6 +9,11 @@
   ],
   "scripts": {
     "dev": "./scripts/dev-full.sh",
+    "prisma:generate": "pnpm --filter ./apps/api prisma:generate",
+    "prisma:migrate:deploy": "pnpm --filter ./apps/api prisma:migrate:deploy",
+    "prisma:check": "node scripts/check-prisma-client.mjs",
+    "db:smoke:operational-actions": "node scripts/check-operational-actions-db.mjs",
+    "ci:preflight": "pnpm prisma:check && pnpm -r typecheck && pnpm -s build && pnpm --filter ./apps/api test && pnpm --filter ./apps/web test",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "test": "turbo run test",
