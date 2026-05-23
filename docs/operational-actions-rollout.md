@@ -99,6 +99,39 @@ curl -sS -H "Authorization: Bearer $TOKEN" \
 - Se `topFailedActionTypes` concentrar em um único actionType.
 - Se `recentFailures` repetir o mesmo motivo (`failureReason`) por janela curta.
 
+## Manual HTTP smoke — diagnostics
+Pré-condição: API rodando e acessível em `API_BASE_URL`.
+
+Env vars:
+- `API_BASE_URL` (default no script: `http://127.0.0.1:3000`);
+- `SMOKE_ADMIN_EMAIL` (obrigatória);
+- `SMOKE_ADMIN_PASSWORD` (obrigatória);
+- `SMOKE_EXPECT_UNAUTHORIZED` (opcional, default ativo; use `0` para pular check sem token).
+
+Execução:
+```bash
+API_BASE_URL=http://127.0.0.1:3000 \
+SMOKE_ADMIN_EMAIL=admin@seu-tenant.com \
+SMOKE_ADMIN_PASSWORD='***' \
+pnpm smoke:operational-actions:diagnostics
+```
+
+Comportamento esperado:
+- valida rejeição sem token (`401/403`);
+- autentica admin em `POST /auth/login`;
+- chama `GET /internal/operational-actions/diagnostics` autenticado;
+- valida contrato mínimo e statuses esperados de `totalsByStatus`;
+- tenta `?orgId=fake-org` e confirma que endpoint responde normalmente sem depender de `orgId` externo.
+
+Se vier `401/403` no login autenticado:
+- validar e-mail/senha de admin seed/piloto;
+- validar se usuário é `ADMIN` e está ativo;
+- validar se API apontada por `API_BASE_URL` é o ambiente correto.
+
+Se contrato vier incompleto:
+- tratar como regressão de backend no endpoint de diagnostics;
+- comparar payload atual com os campos mandatórios desta seção e corrigir antes do rollout.
+
 ## Overrides e risco operacional
 - Use override (`REQUIRE_DATABASE_SMOKE=0` ou `OPERATIONAL_ACTIONS_DB_STARTUP_CHECK=0`) **apenas** para mitigação emergencial com janela curta.
 - Risco ao desligar: aceitar deploy com drift de schema (tabela/coluna/enum/índice ausentes), causando falhas em runtime e perda de idempotência.
