@@ -9,6 +9,22 @@ import { GovernanceRunService } from '../governance/governance-run.service'
 
 export type OperationalActionType = 'RETRY_WHATSAPP_MESSAGE' | 'SEND_PAYMENT_REMINDER' | 'RECALCULATE_RISK' | 'RUN_GOVERNANCE_CHECK'
 export type OperationalActionStatus = 'REQUESTED' | 'EXECUTING' | 'EXECUTED' | 'FAILED' | 'CANCELED'
+type DiagnosticsStatus = OperationalActionStatus
+
+const STUCK_EXECUTING_THRESHOLD_MS = 5 * 60 * 1000
+const RECENT_FAILURES_LIMIT = 10
+const TOP_FAILED_ACTION_TYPES_LIMIT = 5
+
+export type OperationalActionsDiagnostics = {
+  totalsByStatus: Record<DiagnosticsStatus, number>
+  pendingRequestedCount: number
+  stuckExecutingCount: number
+  failedLast24hCount: number
+  avgRequestedToExecutedMs: number | null
+  avgRequestedToFailedMs: number | null
+  topFailedActionTypes: Array<{ actionType: OperationalActionType; count: number }>
+  recentFailures: Array<{ id: string; actionType: OperationalActionType; entityType: string; entityId: string; failedAt: string; failureReason: string | null }>
+}
 
 @Injectable()
 export class OperationalActionsService {
@@ -117,5 +133,43 @@ export class OperationalActionsService {
 
     await this.timeline.log({ orgId, action: 'OPERATIONAL_ACTION_CANCELED', metadata: { actionType, entityType, entityId, actorUserId, sourceSignalId: sourceSignalId ?? null, logicalKey, previousStatus: 'REQUESTED', nextStatus: 'CANCELED', status: 'CANCELED' } })
     return { actionType, entityType, entityId, status: 'CANCELED' as OperationalActionStatus, idempotent: false }
+  }
+
+  async getOperationalActionsDiagnostics(orgId: string): Promise<OperationalActionsDiagnostics> {
+    const now = Date.now()
+    const failedSince = new Date(now - 24 * 60 * 60 * 1000)
+    const stuckBefore = new Date(now - STUCK_EXECUTING_THRESHOLD_MS)
+
+    const [totals, pendingRequestedCount, stuckExecutingCount, failedLast24hCount, executedDurations, failedDurations, topFailedActionTypesRaw, recentFailuresRaw] = await Promise.all([
+      this.prisma.operationalActionExecution.groupBy({ by: ['status'], where: { orgId }, _count: { _all: true } }),
+      this.prisma.operationalActionExecution.count({ where: { orgId, status: 'REQUESTED' } }),
+      this.prisma.operationalActionExecution.count({ where: { orgId, status: 'EXECUTING', updatedAt: { lt: stuckBefore } } }),
+      this.prisma.operationalActionExecution.count({ where: { orgId, status: 'FAILED', failedAt: { gte: failedSince } } }),
+      this.prisma.operationalActionExecution.findMany({ where: { orgId, status: 'EXECUTED', executedAt: { not: null } }, select: { requestedAt: true, executedAt: true }, take: 500, orderBy: { executedAt: 'desc' } }),
+      this.prisma.operationalActionExecution.findMany({ where: { orgId, status: 'FAILED', failedAt: { not: null } }, select: { requestedAt: true, failedAt: true }, take: 500, orderBy: { failedAt: 'desc' } }),
+      this.prisma.operationalActionExecution.groupBy({ by: ['actionType'], where: { orgId, status: 'FAILED' }, _count: { _all: true }, orderBy: { _count: { actionType: 'desc' } }, take: TOP_FAILED_ACTION_TYPES_LIMIT }),
+      this.prisma.operationalActionExecution.findMany({ where: { orgId, status: 'FAILED' }, select: { id: true, actionType: true, entityType: true, entityId: true, failedAt: true, failureReason: true }, orderBy: { failedAt: 'desc' }, take: RECENT_FAILURES_LIMIT }),
+    ])
+
+    const totalsByStatus: Record<DiagnosticsStatus, number> = { REQUESTED: 0, EXECUTING: 0, EXECUTED: 0, FAILED: 0, CANCELED: 0 }
+    for (const row of totals) totalsByStatus[row.status as DiagnosticsStatus] = row._count._all
+
+    const avgRequestedToExecutedMs = executedDurations.length > 0
+      ? Math.round(executedDurations.reduce((acc, row) => acc + (row.executedAt!.getTime() - row.requestedAt.getTime()), 0) / executedDurations.length)
+      : null
+    const avgRequestedToFailedMs = failedDurations.length > 0
+      ? Math.round(failedDurations.reduce((acc, row) => acc + (row.failedAt!.getTime() - row.requestedAt.getTime()), 0) / failedDurations.length)
+      : null
+
+    return {
+      totalsByStatus,
+      pendingRequestedCount,
+      stuckExecutingCount,
+      failedLast24hCount,
+      avgRequestedToExecutedMs,
+      avgRequestedToFailedMs,
+      topFailedActionTypes: topFailedActionTypesRaw.map((row) => ({ actionType: row.actionType as OperationalActionType, count: row._count._all })),
+      recentFailures: recentFailuresRaw.filter((row) => row.failedAt).map((row) => ({ id: row.id, actionType: row.actionType as OperationalActionType, entityType: row.entityType, entityId: row.entityId, failedAt: row.failedAt!.toISOString(), failureReason: row.failureReason })),
+    }
   }
 }

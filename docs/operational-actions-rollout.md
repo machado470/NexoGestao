@@ -70,6 +70,34 @@ rg -n "ci:preflight|prisma:check|db:smoke:operational-actions" .github package.j
 - Prisma Client stale:
   - rodar `pnpm prisma:check` antes de typecheck/build/test.
 
+## Operational Actions Diagnostics
+- Endpoint interno/admin: `GET /internal/operational-actions/diagnostics`.
+- Segurança:
+  - protegido por `JwtAuthGuard` + `RolesGuard` + `@Roles('ADMIN')`;
+  - `orgId` vem exclusivamente de `req.user.orgId` (não aceita query/body para org).
+- Métricas retornadas:
+  - `totalsByStatus`: contagem por `REQUESTED | EXECUTING | EXECUTED | FAILED | CANCELED`;
+  - `pendingRequestedCount`: total com status `REQUESTED`;
+  - `stuckExecutingCount`: total em `EXECUTING` com `updatedAt` há mais de 5 minutos;
+  - `failedLast24hCount`: total em `FAILED` com `failedAt` nas últimas 24h;
+  - `avgRequestedToExecutedMs`: média de `executedAt - requestedAt` (ms);
+  - `avgRequestedToFailedMs`: média de `failedAt - requestedAt` (ms);
+  - `topFailedActionTypes`: top tipos de ação por falha;
+  - `recentFailures`: últimas falhas (limitado, inclui `failureReason`).
+- Interpretação de `stuckExecutingCount`:
+  - valor > 0 indica possíveis execuções travadas (lock lógico/conectividade/dependência externa);
+  - investigar timeline + integradores quando subir sustentadamente.
+
+### Curl de exemplo
+```bash
+curl -sS -H "Authorization: Bearer $TOKEN" \
+  "$API_BASE/internal/operational-actions/diagnostics"
+```
+
+### Quando investigar FAILED alto
+- Se `failedLast24hCount` crescer acima do baseline do tenant.
+- Se `topFailedActionTypes` concentrar em um único actionType.
+- Se `recentFailures` repetir o mesmo motivo (`failureReason`) por janela curta.
 
 ## Overrides e risco operacional
 - Use override (`REQUIRE_DATABASE_SMOKE=0` ou `OPERATIONAL_ACTIONS_DB_STARTUP_CHECK=0`) **apenas** para mitigação emergencial com janela curta.
