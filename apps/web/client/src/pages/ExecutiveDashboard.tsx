@@ -512,6 +512,7 @@ export default function ExecutiveDashboard() {
   const [assistedActionState, setAssistedActionState] = useState<Record<string, "idle" | "loading" | "success" | "error">>({});
   const [requestedAssistedActions, setRequestedAssistedActions] = useState<Record<string, true>>({});
   const [requestAssistedActionState, setRequestAssistedActionState] = useState<Record<string, "idle" | "loading" | "success" | "error">>({});
+  const [cancelAssistedActionState, setCancelAssistedActionState] = useState<Record<string, "idle" | "loading" | "success" | "error">>({});
   useRenderWatchdog("ExecutiveDashboard");
   const [location, navigate] = useLocation();
   const { runAction } = useRunAction();
@@ -713,6 +714,44 @@ export default function ExecutiveDashboard() {
     }
   };
 
+
+
+  const cancelAssistedAction = async (signal: OperationalSignal) => {
+    const entityId = resolveAssistedEntityId(signal);
+    if (!signal.actionType || !entityId) return;
+    setCancelAssistedActionState(prev => ({ ...prev, [signal.id]: "loading" }));
+    try {
+      const response = await fetch("/internal/operational-actions/cancel", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          actionType: signal.actionType,
+          entityType: signal.area ?? "GENERAL",
+          entityId,
+          sourceSignalId: signal.id,
+          metadata: {
+            suggestedAction: signal.suggestedAction ?? null,
+            relatedChargeId: signal.chargeId ?? null,
+            relatedServiceOrderId: signal.serviceOrderId ?? null,
+            relatedMessageId: signal.messageId ?? null,
+          },
+        }),
+      });
+      if (!response.ok) throw new Error("failed_cancel_assisted_action");
+      setCancelAssistedActionState(prev => ({ ...prev, [signal.id]: "success" }));
+      setRequestedAssistedActions(prev => {
+        const next = { ...prev };
+        delete next[signal.id];
+        return next;
+      });
+      setAssistedActionState(prev => ({ ...prev, [signal.id]: "idle" }));
+      void operationalSignalsQuery.refetch();
+      void nextBestActionQuery.refetch();
+    } catch {
+      setCancelAssistedActionState(prev => ({ ...prev, [signal.id]: "error" }));
+    }
+  };
   const queue = useMemo(() => {
     const whatsappItems: QueueItem[] = pendingWhatsAppApprovals
       .slice(0, 2)
@@ -889,6 +928,7 @@ export default function ExecutiveDashboard() {
                     Solicitar ação assistida
                   </Button>
                   {requestedAssistedActions[nextBestActionOperationalSignal.id] ? (
+                    <>
                     <Button
                       className="w-full"
                       size="sm"
@@ -897,11 +937,23 @@ export default function ExecutiveDashboard() {
                     >
                       {assistedActionState[nextBestActionOperationalSignal.id] === "loading" ? "Executando..." : "Executar ação assistida (confirmação explícita)"}
                     </Button>
+                    <Button
+                      className="w-full"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => void cancelAssistedAction(nextBestActionOperationalSignal)}
+                      disabled={cancelAssistedActionState[nextBestActionOperationalSignal.id] === "loading"}
+                    >
+                      {cancelAssistedActionState[nextBestActionOperationalSignal.id] === "loading" ? "Cancelando..." : "Cancelar ação assistida"}
+                    </Button>
+                    </>
                   ) : (
                     <p className="text-xs text-[var(--text-muted)]">Solicite a ação primeiro. A execução só ocorre por clique explícito.</p>
                   )}
                   {requestAssistedActionState[nextBestActionOperationalSignal.id] === "error" ? <p className="text-xs text-red-600">Falha ao solicitar ação assistida.</p> : null}
                   {requestAssistedActionState[nextBestActionOperationalSignal.id] === "success" ? <p className="text-xs text-emerald-600">Ação assistida solicitada (REQUESTED).</p> : null}
+                  {cancelAssistedActionState[nextBestActionOperationalSignal.id] === "error" ? <p className="text-xs text-red-600">Falha ao cancelar ação assistida.</p> : null}
+                  {cancelAssistedActionState[nextBestActionOperationalSignal.id] === "success" ? <p className="text-xs text-emerald-600">Ação assistida cancelada (CANCELED).</p> : null}
                   {assistedActionState[nextBestActionOperationalSignal.id] === "error" ? <p className="text-xs text-red-600">Falha ao executar ação assistida.</p> : null}
                   {assistedActionState[nextBestActionOperationalSignal.id] === "success" ? <p className="text-xs text-emerald-600">Ação assistida executada com sucesso.</p> : null}
                 </div>
@@ -950,12 +1002,19 @@ export default function ExecutiveDashboard() {
                             {requestAssistedActionState[signal.id] === "loading" ? "Solicitando..." : "Solicitar ação assistida"}
                           </Button>
                           {requestedAssistedActions[signal.id] ? (
+                            <>
                             <Button size="sm" onClick={() => void executeAssistedAction(signal)} disabled={assistedActionState[signal.id] === "loading"}>
                               {assistedActionState[signal.id] === "loading" ? "Executando..." : "Executar ação assistida (confirmação explícita)"}
                             </Button>
+                            <Button size="sm" variant="ghost" onClick={() => void cancelAssistedAction(signal)} disabled={cancelAssistedActionState[signal.id] === "loading"}>
+                              {cancelAssistedActionState[signal.id] === "loading" ? "Cancelando..." : "Cancelar ação assistida"}
+                            </Button>
+                            </>
                           ) : null}
                           {requestAssistedActionState[signal.id] === "error" ? <p className="text-xs text-red-600">Falha ao solicitar ação assistida.</p> : null}
                           {requestAssistedActionState[signal.id] === "success" ? <p className="text-xs text-emerald-600">Ação assistida solicitada (REQUESTED).</p> : null}
+                          {cancelAssistedActionState[signal.id] === "error" ? <p className="text-xs text-red-600">Falha ao cancelar ação assistida.</p> : null}
+                          {cancelAssistedActionState[signal.id] === "success" ? <p className="text-xs text-emerald-600">Ação assistida cancelada (CANCELED).</p> : null}
                           {assistedActionState[signal.id] === "error" ? <p className="text-xs text-red-600">Falha ao executar ação assistida.</p> : null}
                           {assistedActionState[signal.id] === "success" ? <p className="text-xs text-emerald-600">Ação assistida executada.</p> : null}
                         </>

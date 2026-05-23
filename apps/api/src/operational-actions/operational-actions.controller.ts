@@ -19,4 +19,9 @@ export class OperationalActionsController {
   execute(@Request() req: any, @Body() body: { actionType: OperationalActionType; entityId: string; sourceSignalId?: string }) {
     return this.actions.execute({ orgId: req.user.orgId, actorUserId: req.user.id, actionType: body.actionType, entityId: body.entityId, sourceSignalId: body.sourceSignalId })
   }
+
+  @Post('cancel')
+  cancel(@Request() req: any, @Body() body: { actionType: OperationalActionType; entityType: string; entityId: string; sourceSignalId?: string; metadata?: Record<string, unknown> }) {
+    return this.actions.cancel({ orgId: req.user.orgId, actorUserId: req.user.id, actionType: body.actionType, entityType: body.entityType, entityId: body.entityId, sourceSignalId: body.sourceSignalId, metadata: body.metadata })
+  }
 }
