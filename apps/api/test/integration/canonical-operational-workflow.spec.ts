@@ -23,6 +23,12 @@ if (!RUN_REAL_INTEGRATION) {
   console.info(`[integration-run] ${REAL_INTEGRATION_ENABLED_MESSAGE}`)
 }
 
+
+const extractCollection = (payload: any): any[] => {
+  const items = payload?.data ?? payload?.items ?? payload
+  return Array.isArray(items) ? items : []
+}
+
 describeRealIntegration('Canonical Operational Workflow (e2e)', () => {
   // Real infra startup (Postgres/Redis + Prisma retries) can exceed 30s on cold boots.
   jest.setTimeout(90000)
@@ -119,10 +125,12 @@ describeRealIntegration('Canonical Operational Workflow (e2e)', () => {
     expect(forgedCustomerCrossTenant).toBeNull()
 
     const customerListMain = await request(app.getHttpServer()).get('/customers').set(mainAuth).expect(200)
-    expect(customerListMain.body.some((item: any) => item.id === customerId)).toBe(true)
+    const customerItemsMain = extractCollection(customerListMain.body)
+    expect(customerItemsMain.some((item: any) => item.id === customerId)).toBe(true)
 
     const customerListOther = await request(app.getHttpServer()).get('/customers').set(otherAuth).expect(200)
-    expect(customerListOther.body.some((item: any) => item.id === customerId)).toBe(false)
+    const customerItemsOther = extractCollection(customerListOther.body)
+    expect(customerItemsOther.some((item: any) => item.id === customerId)).toBe(false)
 
     // tenant isolation check
     await request(app.getHttpServer()).get(`/customers/${customerId}`).set(otherAuth).expect(404)
@@ -159,7 +167,8 @@ describeRealIntegration('Canonical Operational Workflow (e2e)', () => {
     expect(confirmedAppointmentDb?.status).toBe('CONFIRMED')
 
     await request(app.getHttpServer()).get('/appointments').set(otherAuth).expect(200).expect((res) => {
-      expect(res.body.some((item: any) => item.id === appointmentId)).toBe(false)
+      const appointmentItems = extractCollection(res.body)
+      expect(appointmentItems.some((item: any) => item.id === appointmentId)).toBe(false)
     })
 
     const confirmationMessage = await prisma.whatsAppMessage.findFirst({
@@ -190,7 +199,8 @@ describeRealIntegration('Canonical Operational Workflow (e2e)', () => {
     expect(serviceOrderDb?.status).toBe('ASSIGNED')
 
     await request(app.getHttpServer()).get('/service-orders').set(otherAuth).expect(200).expect((res) => {
-      expect(res.body.some((item: any) => item.id === serviceOrderId)).toBe(false)
+      const serviceOrderItems = extractCollection(res.body)
+      expect(serviceOrderItems.some((item: any) => item.id === serviceOrderId)).toBe(false)
     })
 
     await request(app.getHttpServer())
@@ -253,7 +263,8 @@ describeRealIntegration('Canonical Operational Workflow (e2e)', () => {
     // finance transition: cross-tenant fetch/list must fail
     await request(app.getHttpServer()).get(`/finance/charges/${chargeId}`).set(otherAuth).expect(404)
     await request(app.getHttpServer()).get('/finance/charges').set(otherAuth).expect(200).expect((res) => {
-      expect(res.body.data.some((item: any) => item.id === chargeId)).toBe(false)
+      const chargeItems = extractCollection(res.body)
+      expect(chargeItems.some((item: any) => item.id === chargeId)).toBe(false)
     })
 
     // 8) register payment
