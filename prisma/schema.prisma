@@ -461,6 +461,7 @@ model OperationalActionExecution {
   entityType            String
   entityId              String
   sourceSignalId        String?
+  logicalKey            String
   status                OperationalActionExecutionStatus @default(REQUESTED)
   requestedAt           DateTime
   requestedByUserId     String
@@ -482,7 +483,8 @@ model OperationalActionExecution {
   org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   @@index([orgId, status, createdAt])
-  @@index([orgId, actionType, entityId, sourceSignalId, createdAt])
+  @@index([orgId, actionType, entityType, entityId, sourceSignalId, createdAt])
+  @@index([orgId, logicalKey, createdAt])
   @@index([orgId, entityType, entityId, createdAt])
 }
 
@@ -1006,6 +1008,7 @@ enum WhatsAppSuggestedAction {
 
 enum OperationalActionExecutionStatus {
   REQUESTED
+  EXECUTING
   EXECUTED
   FAILED
   CANCELED
