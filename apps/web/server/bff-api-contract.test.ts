@@ -1,0 +1,102 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { appRouter } from "./routers";
+
+function makeReq(token = "token-1", authHeader?: string) {
+  return {
+    headers: {
+      cookie: `nexo_token=${token}`,
+      ...(authHeader ? { authorization: authHeader } : {}),
+    },
+    cookies: { nexo_token: token },
+  } as any;
+}
+
+function makeRes() {
+  return { cookie: vi.fn(), clearCookie: vi.fn() } as any;
+}
+
+describe("BFF↔API contract - lote 1", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("session.me chama /me e normaliza dados essenciais", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ data: { user: { id: "u1", orgId: "org-ctx", role: "ADMIN", email: "admin@nexo.dev" } } }), { status: 200 }),
+    );
+
+    const caller = appRouter.createCaller({ req: makeReq(), res: makeRes(), user: null } as any);
+    const result = await caller.session.me();
+
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringMatching(/\/me$/), expect.objectContaining({ method: "GET" }));
+    expect(result).toEqual(expect.objectContaining({ id: "u1", organizationId: "org-ctx", role: "ADMIN", email: "admin@nexo.dev" }));
+  });
+
+  it("nexo.me retorna UNAUTHORIZED sem sessão", async () => {
+    const caller = appRouter.createCaller({ req: { headers: {}, cookies: {} }, res: makeRes(), user: null } as any);
+    await expect(caller.nexo.me()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
+
+  it("nexo.me chama /me com bearer do usuário autenticado", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ user: { id: "u1" } }), { status: 200 }),
+    );
+
+    const caller = appRouter.createCaller({ req: makeReq("cookie-token", "Bearer forged-token"), res: makeRes(), user: { token: "trusted-user-token", validated: true } } as any);
+    await caller.nexo.me();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringMatching(/\/me$/),
+      expect.objectContaining({ headers: expect.objectContaining({ Authorization: "Bearer trusted-user-token" }) }),
+    );
+  });
+
+  it("nexo.settings.get e update usam /organization-settings e preservam payload", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({ theme: "dark", locale: "pt-BR" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, data: { theme: "light" } }), { status: 200 }));
+
+    const caller = appRouter.createCaller({ req: makeReq(), res: makeRes(), user: { token: "t1", validated: true } } as any);
+
+    const getResult = await caller.nexo.settings.get();
+    const updateResult = await caller.nexo.settings.update({ theme: "light", fromClientOrgId: "evil-org" });
+
+    expect(getResult).toEqual({ theme: "dark", locale: "pt-BR" });
+    expect(updateResult).toEqual({ ok: true, data: { theme: "light" } });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, expect.stringMatching(/\/organization-settings$/), expect.objectContaining({ headers: expect.objectContaining({ Authorization: "Bearer t1" }) }));
+    expect(fetchMock).toHaveBeenNthCalledWith(2, expect.stringMatching(/\/organization-settings$/), expect.objectContaining({ method: "PATCH" }));
+  });
+
+  it("people.list e people.statsLinked usam endpoints corretos e não aceitam orgId do client", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ id: "p1" }] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { linked: 3, unlinked: 1 } }), { status: 200 }));
+
+    const caller = appRouter.createCaller({ req: makeReq("cookie-token", "Bearer forged-token"), res: makeRes(), user: { token: "trusted-user-token", validated: true, organizationId: "org-trusted" } } as any);
+
+    const list = await caller.people.list();
+    const stats = await caller.people.statsLinked();
+
+    expect(list).toEqual([{ id: "p1" }]);
+    expect(stats).toEqual({ linked: 3, unlinked: 1 });
+
+    const calledUrls = fetchMock.mock.calls.map(([url]) => String(url));
+    expect(calledUrls[0]).toMatch(/\/people$/);
+    expect(calledUrls[1]).toMatch(/\/people\/stats\/linked$/);
+    expect(calledUrls.join(" ")).not.toContain("orgId=");
+
+    for (const [, options] of fetchMock.mock.calls) {
+      expect((options as RequestInit).headers).toEqual(expect.objectContaining({ Authorization: "Bearer trusted-user-token" }));
+    }
+  });
+
+  it("propaga erro de autenticação da API como UNAUTHORIZED", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ message: "token expired", code: "AUTH_EXPIRED" }), { status: 401 }),
+    );
+
+    const caller = appRouter.createCaller({ req: makeReq(), res: makeRes(), user: { token: "t1", validated: true } } as any);
+    await expect(caller.nexo.settings.get()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
+});
