@@ -99,8 +99,33 @@ describeRealIntegration('Canonical Operational Workflow (e2e)', () => {
     expect(customerDb).toBeTruthy()
     expect(customerDb?.phone).toBe('5511999990000')
 
+    // forged orgId from client must not escape authenticated tenant
+    const forgedCustomer = await request(app.getHttpServer())
+      .post('/customers')
+      .set(mainAuth)
+      .send({ name: 'Cliente Forjado', phone: '+55 (11) 98888-0000', email: `forged.${primaryOrgId}@mail.test`, orgId: secondaryOrgId })
+      .expect(201)
+
+    const forgedCustomerDb = await prisma.customer.findFirst({ where: { id: forgedCustomer.body.id, orgId: primaryOrgId } })
+    expect(forgedCustomerDb).toBeTruthy()
+    const forgedCustomerCrossTenant = await prisma.customer.findFirst({ where: { id: forgedCustomer.body.id, orgId: secondaryOrgId } })
+    expect(forgedCustomerCrossTenant).toBeNull()
+
+    const customerListMain = await request(app.getHttpServer()).get('/customers').set(mainAuth).expect(200)
+    expect(customerListMain.body.some((item: any) => item.id === customerId)).toBe(true)
+
+    const customerListOther = await request(app.getHttpServer()).get('/customers').set(otherAuth).expect(200)
+    expect(customerListOther.body.some((item: any) => item.id === customerId)).toBe(false)
+
     // tenant isolation check
     await request(app.getHttpServer()).get(`/customers/${customerId}`).set(otherAuth).expect(404)
+
+    // tenant isolation on update
+    await request(app.getHttpServer())
+      .patch(`/customers/${customerId}`)
+      .set(otherAuth)
+      .send({ name: 'Tentativa invasiva' })
+      .expect(404)
 
     // 2) appointment
     const startsAt = new Date(Date.now() + 60 * 60 * 1000).toISOString()
@@ -125,6 +150,10 @@ describeRealIntegration('Canonical Operational Workflow (e2e)', () => {
 
     const confirmedAppointmentDb = await prisma.appointment.findFirst({ where: { id: appointmentId, orgId: primaryOrgId } })
     expect(confirmedAppointmentDb?.status).toBe('CONFIRMED')
+
+    await request(app.getHttpServer()).get('/appointments').set(otherAuth).expect(200).expect((res) => {
+      expect(res.body.some((item: any) => item.id === appointmentId)).toBe(false)
+    })
 
     const confirmationMessage = await prisma.whatsAppMessage.findFirst({
       where: {
@@ -153,6 +182,16 @@ describeRealIntegration('Canonical Operational Workflow (e2e)', () => {
     const serviceOrderDb = await prisma.serviceOrder.findFirst({ where: { id: serviceOrderId, orgId: primaryOrgId } })
     expect(serviceOrderDb?.status).toBe('ASSIGNED')
 
+    await request(app.getHttpServer()).get('/service-orders').set(otherAuth).expect(200).expect((res) => {
+      expect(res.body.some((item: any) => item.id === serviceOrderId)).toBe(false)
+    })
+
+    await request(app.getHttpServer())
+      .patch(`/service-orders/${serviceOrderId}`)
+      .set(otherAuth)
+      .send({ status: 'CANCELLED' })
+      .expect(404)
+
     // 5) start execution
     const startExecution = await request(app.getHttpServer())
       .post('/executions/start')
@@ -161,6 +200,12 @@ describeRealIntegration('Canonical Operational Workflow (e2e)', () => {
       .expect(201)
 
     const executionId = startExecution.body.id as string
+
+    await request(app.getHttpServer())
+      .post('/executions/start')
+      .set(otherAuth)
+      .send({ serviceOrderId, notes: 'cross tenant try' })
+      .expect(404)
     const executionDb = await prisma.serviceOrder.findFirst({ where: { id: executionId, orgId: primaryOrgId } })
     expect(executionDb?.id).toBe(serviceOrderId)
 
@@ -168,6 +213,12 @@ describeRealIntegration('Canonical Operational Workflow (e2e)', () => {
     expect(serviceOrderInProgress?.status).toBe('IN_PROGRESS')
 
     // 6) complete execution
+    await request(app.getHttpServer())
+      .post(`/executions/${executionId}/complete`)
+      .set(otherAuth)
+      .send({ notes: 'cross-tenant complete' })
+      .expect(404)
+
     await request(app.getHttpServer())
       .post(`/executions/${executionId}/complete`)
       .set(mainAuth)
@@ -192,14 +243,17 @@ describeRealIntegration('Canonical Operational Workflow (e2e)', () => {
     const chargeDb = await prisma.charge.findFirst({ where: { id: chargeId, orgId: primaryOrgId } })
     expect(chargeDb?.status).toBe('PENDING')
 
-    // finance transition: cross-tenant fetch must fail
+    // finance transition: cross-tenant fetch/list must fail
     await request(app.getHttpServer()).get(`/finance/charges/${chargeId}`).set(otherAuth).expect(404)
+    await request(app.getHttpServer()).get('/finance/charges').set(otherAuth).expect(200).expect((res) => {
+      expect(res.body.data.some((item: any) => item.id === chargeId)).toBe(false)
+    })
 
     // 8) register payment
     const payResponse = await request(app.getHttpServer())
       .post(`/finance/charges/${chargeId}/pay`)
       .set(mainAuth)
-      .send({ method: 'PIX', amountCents: 15000 })
+      .send({ method: 'PIX', amountCents: 15000, orgId: secondaryOrgId })
       .expect(201)
 
     expect(payResponse.body.ok).toBe(true)
@@ -214,6 +268,9 @@ describeRealIntegration('Canonical Operational Workflow (e2e)', () => {
     expect(paidChargeDb?.paidAt).toBeTruthy()
 
     // 9) whatsapp notification for receipt
+    const crossTenantReceipt = await prisma.whatsAppMessage.findFirst({ where: { orgId: secondaryOrgId, entityType: 'CHARGE', entityId: chargeId } })
+    expect(crossTenantReceipt).toBeNull()
+
     const receiptMessage = await prisma.whatsAppMessage.findFirst({
       where: {
         orgId: primaryOrgId,
