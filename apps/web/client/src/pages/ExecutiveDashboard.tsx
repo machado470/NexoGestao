@@ -77,6 +77,23 @@ type NextBestActionSignal = {
   suggestedAction?: string;
 };
 
+
+
+type OperationalActionsDiagnostics = {
+  pendingRequestedCount: number;
+  stuckExecutingCount: number;
+  failedLast24hCount: number;
+  avgRequestedToExecutedMs: number | null;
+  topFailedActionTypes: Array<{ actionType: string; count: number }>;
+  recentFailures: Array<{
+    id: string;
+    actionType: string;
+    entityType: string;
+    entityId: string;
+    failedAt: string;
+    failureReason: string | null;
+  }>;
+};
 type AttentionItem = {
   severity: Severity;
   title: string;
@@ -500,6 +517,22 @@ function QueueRow({
 }
 
 
+
+
+function formatDurationMs(value: number | null) {
+  if (!value || value <= 0) return "—";
+  const totalSeconds = Math.round(value / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes <= 0) return `${seconds}s`;
+  if (seconds === 0) return `${minutes}min`;
+  return `${minutes}min ${seconds}s`;
+}
+
+function formatFailureTime(value: string) {
+  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
+}
+
 function buildSignalCtaPath(signal: OperationalSignal) {
   if (signal.area === "WHATSAPP" || signal.messageId) return "/whatsapp";
   if (signal.area === "FINANCE" || signal.chargeId) return "/finances?view=charges";
@@ -542,6 +575,17 @@ export default function ExecutiveDashboard() {
       const response = await fetch("/internal/operational-signals/next-best-action", { credentials: "include" });
       if (!response.ok) throw new Error("next best action fetch failed");
       return (await response.json()) as NextBestActionSignal | null;
+    },
+    retry: false,
+  });
+
+  const operationalActionsDiagnosticsQuery = useQuery({
+    queryKey: ["internal-operational-actions-diagnostics"],
+    queryFn: async () => {
+      const response = await fetch("/internal/operational-actions/diagnostics", { credentials: "include" });
+      if (response.status === 401 || response.status === 403) throw new Error("diagnostics forbidden");
+      if (!response.ok) throw new Error("diagnostics fetch failed");
+      return (await response.json()) as OperationalActionsDiagnostics;
     },
     retry: false,
   });
@@ -874,6 +918,7 @@ export default function ExecutiveDashboard() {
             void dashboardKpisQuery.refetch();
             void dashboardAlertsQuery.refetch();
             void pendingWhatsAppApprovalsQuery.refetch();
+            void operationalActionsDiagnosticsQuery.refetch();
           }}
         />
       ) : null}
@@ -987,6 +1032,63 @@ export default function ExecutiveDashboard() {
               <AppStatCard label="Governança stale" value={String(runtimeIndicators.staleGovernance)} helper="Itens sem atualização recente." />
               <AppStatCard label="Risco elevado" value={String(runtimeIndicators.elevatedRisk)} helper="Sinais de risco ativos no turno." />
             </div>
+          </AppSectionBlock>
+
+
+          <AppSectionBlock title="Saúde das ações assistidas" subtitle="Sinais compactos para destravar execução assistida." className="xl:col-span-12">
+            {operationalActionsDiagnosticsQuery.isLoading ? (
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+                {Array.from({ length: 4 }).map((_, idx) => (
+                  <article key={idx} className="h-20 animate-pulse rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3" />
+                ))}
+              </div>
+            ) : null}
+            {operationalActionsDiagnosticsQuery.isError ? (
+              <article className="rounded-lg border border-[var(--dashboard-danger)]/35 bg-[var(--surface-subtle)] p-4">
+                <p className="text-sm font-semibold text-[var(--text-primary)]">Não foi possível carregar o diagnóstico.</p>
+                <Button className="mt-3" size="sm" variant="outline" onClick={() => void operationalActionsDiagnosticsQuery.refetch()}>Tentar novamente</Button>
+              </article>
+            ) : null}
+            {operationalActionsDiagnosticsQuery.data ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+                  <AppStatCard label="Pendentes" value={String(operationalActionsDiagnosticsQuery.data.pendingRequestedCount)} helper="REQUESTED aguardando execução." />
+                  <AppStatCard label="Travadas" value={String(operationalActionsDiagnosticsQuery.data.stuckExecutingCount)} helper={operationalActionsDiagnosticsQuery.data.stuckExecutingCount > 0 ? "Há EXECUTING travadas; investigar agora." : "Sem ações travadas."} />
+                  <AppStatCard label="Falhas 24h" value={String(operationalActionsDiagnosticsQuery.data.failedLast24hCount)} helper={operationalActionsDiagnosticsQuery.data.failedLast24hCount > 0 ? "Falhas recentes acima de zero." : "Nenhuma falha recente."} />
+                  <AppStatCard label="Tempo médio execução" value={formatDurationMs(operationalActionsDiagnosticsQuery.data.avgRequestedToExecutedMs)} helper="Média REQUESTED → EXECUTED." />
+                </div>
+                {(operationalActionsDiagnosticsQuery.data.stuckExecutingCount > 0 || operationalActionsDiagnosticsQuery.data.failedLast24hCount > 0) ? (
+                  <p className="text-xs font-semibold text-[var(--dashboard-danger)]">Estado crítico: existem ações travadas ou falhas recentes.</p>
+                ) : (
+                  <p className="text-xs text-[var(--dashboard-success)]">Saudável: sem travas e sem falhas recentes relevantes.</p>
+                )}
+                <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+                  <article className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-[var(--text-primary)]">Top falhas por tipo</p>
+                      <Button size="sm" variant="ghost" onClick={() => void operationalActionsDiagnosticsQuery.refetch()}>Atualizar</Button>
+                    </div>
+                    {operationalActionsDiagnosticsQuery.data.topFailedActionTypes.length === 0 ? <p className="mt-2 text-xs text-[var(--text-secondary)]">Nenhuma falha recente.</p> : (
+                      <ul className="mt-2 space-y-1.5 text-xs text-[var(--text-secondary)]">
+                        {operationalActionsDiagnosticsQuery.data.topFailedActionTypes.slice(0, 3).map((item) => (
+                          <li key={item.actionType} className="flex items-center justify-between gap-2"><span>{item.actionType}</span><span>{item.count}</span></li>
+                        ))}
+                      </ul>
+                    )}
+                  </article>
+                  <article className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3.5">
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">Últimas falhas</p>
+                    {operationalActionsDiagnosticsQuery.data.recentFailures.length === 0 ? <p className="mt-2 text-xs text-[var(--text-secondary)]">Nenhuma falha recente.</p> : (
+                      <ul className="mt-2 space-y-2 text-xs text-[var(--text-secondary)]">
+                        {operationalActionsDiagnosticsQuery.data.recentFailures.slice(0, 3).map((failure) => (
+                          <li key={failure.id}><p className="font-medium text-[var(--text-primary)]">{failure.actionType}</p><p>{formatFailureTime(failure.failedAt)} · {failure.failureReason ?? "Sem motivo informado"}</p></li>
+                        ))}
+                      </ul>
+                    )}
+                  </article>
+                </div>
+              </div>
+            ) : null}
           </AppSectionBlock>
 
           <AppSectionBlock title="Operational Attention Center" subtitle="Top sinais reais para ação imediata" className="xl:col-span-12">

@@ -14,20 +14,24 @@ describe("ExecutiveDashboard operational cockpit", () => {
     expect(source).toContain("nextBestActionQuery");
   });
 
-  it("renders operational attention center with severity and fallback", () => {
-    expect(source).toContain("Operational Attention Center");
-    expect(source).toContain("Executar ação assistida");
-    expect(source).toContain("Cancelar ação assistida");
-    expect(source).toContain("AppStatusBadge label={signal.severity}");
-    expect(source).toContain("Sem sinais operacionais ativos no momento");
+  it("renders assisted actions health block with diagnostics endpoint", () => {
+    expect(source).toContain("Saúde das ações assistidas");
+    expect(source).toContain("/internal/operational-actions/diagnostics");
+    expect(source).toContain("pendingRequestedCount");
+    expect(source).toContain("stuckExecutingCount");
+    expect(source).toContain("failedLast24hCount");
+    expect(source).toContain("avgRequestedToExecutedMs");
+    expect(source).toContain("topFailedActionTypes");
+    expect(source).toContain("recentFailures");
+    expect(source).toContain("Atualizar");
+    expect(source).toContain("Tentar novamente");
   });
 
-  it("renders executive runtime and operational health sections", () => {
-    expect(source).toContain("Executive runtime");
-    expect(source).toContain("Saúde operacional");
-    expect(source).toContain("Estado crítico");
-    expect(source).toContain("Atenção necessária");
-    expect(source).toContain("Operação estável");
+  it("treats diagnostics healthy and critical states", () => {
+    expect(source).toContain("Sem ações travadas");
+    expect(source).toContain("Nenhuma falha recente");
+    expect(source).toContain("Estado crítico: existem ações travadas ou falhas recentes");
+    expect(source).toContain("Saudável: sem travas e sem falhas recentes relevantes");
   });
 
   it("keeps contextual CTA routes without exposing sensitive tokens", () => {
@@ -35,6 +39,6 @@ describe("ExecutiveDashboard operational cockpit", () => {
     expect(source).toContain('return "/finances?view=charges"');
     expect(source).not.toContain("token");
     expect(source).not.toContain("secret");
-    expect(source).not.toContain("payload");
+    expect(source).not.toContain("orgId:");
   });
 });

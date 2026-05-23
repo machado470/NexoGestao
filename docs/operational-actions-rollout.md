@@ -135,3 +135,11 @@ Se contrato vier incompleto:
 ## Overrides e risco operacional
 - Use override (`REQUIRE_DATABASE_SMOKE=0` ou `OPERATIONAL_ACTIONS_DB_STARTUP_CHECK=0`) **apenas** para mitigação emergencial com janela curta.
 - Risco ao desligar: aceitar deploy com drift de schema (tabela/coluna/enum/índice ausentes), causando falhas em runtime e perda de idempotência.
+
+## Dashboard/Admin — Saúde das ações assistidas
+- O `ExecutiveDashboard` exibe o bloco compacto **"Saúde das ações assistidas"** consumindo `GET /internal/operational-actions/diagnostics` com `credentials: include` e sem enviar `orgId`.
+- Leitura operacional no bloco:
+  - `EXECUTING` travado (`stuckExecutingCount > 0`) = investigar lock, integração externa e timeline imediatamente;
+  - `FAILED` 24h alto (`failedLast24hCount > 0` acima do baseline) = revisar `actionType`/provider concentrados em `topFailedActionTypes`;
+  - `REQUESTED` pendente alto (`pendingRequestedCount`) = gargalo humano/fila sem avanço.
+- O bloco inclui estados de loading, erro com retry, saudável e crítico para uso operacional rápido no turno.
