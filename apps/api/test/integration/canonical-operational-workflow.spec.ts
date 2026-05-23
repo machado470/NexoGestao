@@ -6,7 +6,12 @@ import { randomUUID } from 'crypto'
 
 import { AppModule } from '../../src/app.module'
 import { PrismaService } from '../../src/prisma/prisma.service'
-import { describeRealIntegration, REAL_INTEGRATION_SKIP_REASON, RUN_REAL_INTEGRATION } from './infra-guards'
+import {
+  describeRealIntegration,
+  REAL_INTEGRATION_ENABLED_MESSAGE,
+  REAL_INTEGRATION_SKIP_REASON,
+  RUN_REAL_INTEGRATION,
+} from './infra-guards'
 
 type WorkflowPrisma = PrismaService & {
   serviceOrder: PrismaService['serviceOrder']
@@ -14,6 +19,8 @@ type WorkflowPrisma = PrismaService & {
 
 if (!RUN_REAL_INTEGRATION) {
   console.warn(`[integration-skip] ${REAL_INTEGRATION_SKIP_REASON}`)
+} else {
+  console.info(`[integration-run] ${REAL_INTEGRATION_ENABLED_MESSAGE}`)
 }
 
 describeRealIntegration('Canonical Operational Workflow (e2e)', () => {

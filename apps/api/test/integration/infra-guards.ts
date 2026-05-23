@@ -8,4 +8,6 @@ export const RUN_REAL_INTEGRATION = asBool(process.env.RUN_REAL_INTEGRATION)
 export const REAL_INTEGRATION_SKIP_REASON =
   'Real integration/e2e tests are disabled. Set RUN_REAL_INTEGRATION=true and provide Postgres/Redis infrastructure.'
 
+export const REAL_INTEGRATION_ENABLED_MESSAGE = 'Real integration/e2e tests enabled (RUN_REAL_INTEGRATION=true). Expecting live Postgres/Redis.'
+
 export const describeRealIntegration = RUN_REAL_INTEGRATION ? describe : describe.skip
