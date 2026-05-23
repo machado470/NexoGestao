@@ -8,7 +8,7 @@ export const peopleRouter = router({
    * Nest: GET /people
    */
   list: protectedProcedure.query(async ({ ctx }) => {
-    const raw = await nexoFetch<any>(ctx.req, `/people`, { method: "GET" });
+    const raw = await nexoFetch<any>(ctx, `/people`, { method: "GET" });
     // Nest retorna array direto ou { ok, data: [] }
     return Array.isArray(raw) ? raw : (raw?.data ?? raw ?? []);
   }),
@@ -20,7 +20,7 @@ export const peopleRouter = router({
   getById: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ input, ctx }) => {
-      const raw = await nexoFetch<any>(ctx.req, `/people/${input.id}`, { method: "GET" });
+      const raw = await nexoFetch<any>(ctx, `/people/${input.id}`, { method: "GET" });
       return raw?.data ?? raw;
     }),
 
@@ -37,7 +37,7 @@ export const peopleRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const raw = await nexoFetch<any>(ctx.req, `/people`, {
+      const raw = await nexoFetch<any>(ctx, `/people`, {
         method: "POST",
         body: JSON.stringify(input),
       });
@@ -61,7 +61,7 @@ export const peopleRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const { id, ...data } = input;
-      const raw = await nexoFetch<any>(ctx.req, `/people/${id}`, {
+      const raw = await nexoFetch<any>(ctx, `/people/${id}`, {
         method: "PATCH",
         body: JSON.stringify(data),
       });
@@ -73,7 +73,7 @@ export const peopleRouter = router({
    * Nest: GET /people/stats/linked
    */
   statsLinked: protectedProcedure.query(async ({ ctx }) => {
-    const raw = await nexoFetch<any>(ctx.req, `/people/stats/linked`, { method: "GET" });
+    const raw = await nexoFetch<any>(ctx, `/people/stats/linked`, { method: "GET" });
     return raw?.data ?? raw;
   }),
 
@@ -85,7 +85,7 @@ export const peopleRouter = router({
   deactivate: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      const raw = await nexoFetch<any>(ctx.req, `/people/${input.id}`, {
+      const raw = await nexoFetch<any>(ctx, `/people/${input.id}`, {
         method: "DELETE",
       });
       return raw?.data ?? raw;
