@@ -64,10 +64,17 @@ type OperationalSignal = {
 };
 
 type NextBestActionSignal = {
+  id?: string;
   actionType?: string;
+  entityId?: string | null;
+  serviceOrderId?: string | null;
+  chargeId?: string | null;
+  messageId?: string | null;
+  area?: string;
   title?: string;
   reason?: string;
   impact?: string;
+  suggestedAction?: string;
 };
 
 type AttentionItem = {
@@ -503,6 +510,7 @@ function buildSignalCtaPath(signal: OperationalSignal) {
 
 export default function ExecutiveDashboard() {
   const [assistedActionState, setAssistedActionState] = useState<Record<string, "idle" | "loading" | "success" | "error">>({});
+  const [requestedAssistedActions, setRequestedAssistedActions] = useState<Record<string, true>>({});
   useRenderWatchdog("ExecutiveDashboard");
   const [location, navigate] = useLocation();
   const { runAction } = useRunAction();
@@ -607,11 +615,13 @@ export default function ExecutiveDashboard() {
           : normalizeOperationalState(dashboardState);
 
   const operationalSignals = (operationalSignalsQuery.data?.signals ?? []).slice(0, 5);
+  const nextBestActionSignal = nextBestActionQuery.data;
   const nextBestAction = {
+    id: nextBestActionSignal?.id ?? "next-best-action",
     action: nextBestActionQuery.data?.title ?? "Revisar sinais críticos da operação",
     reason: nextBestActionQuery.data?.reason ?? "Sinais críticos exigem priorização imediata.",
     impact: nextBestActionQuery.data?.impact ?? "Reduz risco operacional e melhora previsibilidade do turno.",
-    ctaLabel: "Abrir contexto",
+    ctaLabel: "Abrir contexto operacional",
     ctaPath:
       nextBestActionQuery.data?.actionType?.includes("WHATSAPP")
         ? "/whatsapp"
@@ -619,6 +629,22 @@ export default function ExecutiveDashboard() {
           ? "/finances?view=charges&status=overdue"
           : "/timeline",
   };
+  const nextBestActionOperationalSignal: OperationalSignal | null = nextBestActionSignal
+    ? {
+      id: nextBestAction.id,
+      severity: "CRITICAL",
+      area: nextBestActionSignal.area ?? "OPERATIONS",
+      title: nextBestAction.action,
+      summary: nextBestAction.reason,
+      impact: nextBestAction.impact,
+      suggestedAction: nextBestActionSignal.suggestedAction,
+      actionType: nextBestActionSignal.actionType,
+      serviceOrderId: nextBestActionSignal.serviceOrderId ?? null,
+      chargeId: nextBestActionSignal.chargeId ?? null,
+      messageId: nextBestActionSignal.messageId ?? null,
+      entityId: nextBestActionSignal.entityId ?? null,
+    }
+    : null;
   const runtimeIndicators = useMemo(() => ({
     whatsappFailures: operationalSignals.filter(item => item.area === "WHATSAPP" && item.severity !== "INFO").length,
     criticalCharges: operationalSignals.filter(item => item.area === "FINANCE" && item.severity === "CRITICAL").length,
@@ -817,6 +843,38 @@ export default function ExecutiveDashboard() {
               >
                 {nextBestAction.ctaLabel}
               </Button>
+              {nextBestActionOperationalSignal?.actionType && supportedAssistedActionTypes.has(nextBestActionOperationalSignal.actionType) ? (
+                <div className="mt-2 space-y-2">
+                  <Button
+                    className="w-full"
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      setRequestedAssistedActions(prev => ({
+                        ...prev,
+                        [nextBestActionOperationalSignal.id]: true,
+                      }))
+                    }
+                    disabled={assistedActionState[nextBestActionOperationalSignal.id] === "loading"}
+                  >
+                    Solicitar ação assistida
+                  </Button>
+                  {requestedAssistedActions[nextBestActionOperationalSignal.id] ? (
+                    <Button
+                      className="w-full"
+                      size="sm"
+                      onClick={() => void executeAssistedAction(nextBestActionOperationalSignal)}
+                      disabled={assistedActionState[nextBestActionOperationalSignal.id] === "loading"}
+                    >
+                      {assistedActionState[nextBestActionOperationalSignal.id] === "loading" ? "Executando..." : "Executar por confirmação explícita"}
+                    </Button>
+                  ) : (
+                    <p className="text-xs text-[var(--text-muted)]">Solicite a ação primeiro. A execução só ocorre por clique explícito.</p>
+                  )}
+                  {assistedActionState[nextBestActionOperationalSignal.id] === "error" ? <p className="text-xs text-red-600">Falha ao executar ação assistida.</p> : null}
+                  {assistedActionState[nextBestActionOperationalSignal.id] === "success" ? <p className="text-xs text-emerald-600">Ação assistida executada com sucesso.</p> : null}
+                </div>
+              ) : null}
             </article>
           </AppSectionBlock>
           <AppSectionBlock title="Saúde operacional" subtitle="Heurística simples e explicável baseada em criticidade ativa." className="xl:col-span-4">
