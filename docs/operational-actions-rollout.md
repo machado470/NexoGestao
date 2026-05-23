@@ -143,3 +143,64 @@ Se contrato vier incompleto:
   - `FAILED` 24h alto (`failedLast24hCount > 0` acima do baseline) = revisar `actionType`/provider concentrados em `topFailedActionTypes`;
   - `REQUESTED` pendente alto (`pendingRequestedCount`) = gargalo humano/fila sem avanço.
 - O bloco inclui estados de loading, erro com retry, saudável e crítico para uso operacional rápido no turno.
+
+## Recuperação manual de EXECUTING travado (admin)
+
+- Endpoint interno/admin: `POST /internal/operational-actions/recover-stuck`.
+- Uso: encerrar manualmente uma execução em `EXECUTING` que ultrapassou o threshold de travamento (5 minutos sem atualização).
+- Segurança:
+  - protegido por `JwtAuthGuard` + `RolesGuard` + `@Roles('ADMIN')`;
+  - `orgId` sempre derivado de `req.user` (não vem de body/query).
+- Input mínimo:
+  - `executionId` (obrigatório)
+  - `recoveryReason` (opcional)
+
+### Modelagem escolhida
+
+Foi adotada a opção **A**:
+- mantém `status=FAILED` no lifecycle materializado;
+- grava metadata de recovery em `metadata.recovery`:
+  - `recovered: true`
+  - `recoveredBy`
+  - `recoveredAt`
+  - `recoveryReason`
+
+Isso evita introduzir novo estado de máquina (`FAILED_RECOVERED`) e preserva simplicidade operacional.
+
+### Regras de recuperação
+
+- só permite recuperar quando `status=EXECUTING`;
+- só permite quando está realmente `stuck` (threshold atual);
+- bloqueia `REQUESTED/EXECUTED/CANCELED/FAILED`;
+- não executa retry automático;
+- não reexecuta ação assistida.
+
+### Timeline de auditoria
+
+Ao recuperar, registra `OPERATIONAL_ACTION_RECOVERED` com:
+- `executionId`
+- `previousStatus=EXECUTING`
+- `nextStatus=FAILED`
+- `recoveredBy`
+- `recoveryReason`
+- `actionType`
+- `entityType`
+- `entityId`
+
+### Diagnóstico e dashboard
+
+`GET /internal/operational-actions/diagnostics` passa a incluir:
+- `recoveredLast24hCount`
+- `recentStuckExecuting` (lista compacta para ação manual)
+
+No Dashboard (bloco "Saúde das ações assistidas"):
+- mostra botão "Marcar como recuperado" somente para itens em `recentStuckExecuting`;
+- exige confirmação explícita;
+- aplica loading local;
+- após sucesso, refaz diagnostics.
+
+### Quando usar e riscos
+
+Use somente após investigar causa provável (integração externa, lock, timeout lógico, inconsistência de entidade de destino).
+
+Risco principal: marcar como recuperado uma execução que ainda poderia concluir por conta própria, produzindo percepção de falha operacional sem necessidade. Por isso, a ação é manual, admin-only e auditável em timeline.

@@ -30,4 +30,10 @@ export class OperationalActionsController {
   cancel(@Request() req: any, @Body() body: { actionType: OperationalActionType; entityType: string; entityId: string; sourceSignalId?: string; metadata?: Record<string, unknown> }) {
     return this.actions.cancel({ orgId: req.user.orgId, actorUserId: req.user.id, actionType: body.actionType, entityType: body.entityType, entityId: body.entityId, sourceSignalId: body.sourceSignalId, metadata: body.metadata })
   }
+
+  @Post('recover-stuck')
+  recoverStuck(@Request() req: any, @Body() body: { executionId: string; recoveryReason?: string }) {
+    return this.actions.recoverStuckExecution({ orgId: req.user.orgId, actorUserId: req.user.id, executionId: body.executionId, recoveryReason: body.recoveryReason })
+  }
 }
+
