@@ -674,6 +674,7 @@ export default function ExecutiveDashboard() {
       if (!response.ok) throw new Error("failed_execute_assisted_action");
       setAssistedActionState(prev => ({ ...prev, [signal.id]: "success" }));
       void operationalSignalsQuery.refetch();
+      void nextBestActionQuery.refetch();
     } catch {
       setAssistedActionState(prev => ({ ...prev, [signal.id]: "error" }));
     }
