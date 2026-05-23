@@ -8,6 +8,7 @@ describe("ExecutiveDashboard operational cockpit", () => {
     expect(source).toContain('/internal/operational-signals?limit=8');
     expect(source).toContain('/internal/operational-signals/next-best-action');
     expect(source).toContain("operationalSignalsQuery");
+    expect(source).toContain("/internal/operational-actions/request");
     expect(source).toContain("/internal/operational-actions/execute");
     expect(source).toContain("nextBestActionQuery");
   });
