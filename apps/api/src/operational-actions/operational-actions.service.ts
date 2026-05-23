@@ -13,6 +13,7 @@ type DiagnosticsStatus = OperationalActionStatus
 
 const STUCK_EXECUTING_THRESHOLD_MS = 5 * 60 * 1000
 const RECENT_FAILURES_LIMIT = 10
+const RECENT_STUCK_EXECUTING_LIMIT = 10
 const TOP_FAILED_ACTION_TYPES_LIMIT = 5
 
 export type OperationalActionsDiagnostics = {
@@ -20,10 +21,12 @@ export type OperationalActionsDiagnostics = {
   pendingRequestedCount: number
   stuckExecutingCount: number
   failedLast24hCount: number
+  recoveredLast24hCount: number
   avgRequestedToExecutedMs: number | null
   avgRequestedToFailedMs: number | null
   topFailedActionTypes: Array<{ actionType: OperationalActionType; count: number }>
   recentFailures: Array<{ id: string; actionType: OperationalActionType; entityType: string; entityId: string; failedAt: string; failureReason: string | null }>
+  recentStuckExecuting: Array<{ id: string; actionType: OperationalActionType; entityType: string; entityId: string; sourceSignalId: string | null; updatedAt: string }>
 }
 
 @Injectable()
@@ -135,20 +138,68 @@ export class OperationalActionsService {
     return { actionType, entityType, entityId, status: 'CANCELED' as OperationalActionStatus, idempotent: false }
   }
 
+
+  async recoverStuckExecution(input: { orgId: string; actorUserId: string; executionId: string; recoveryReason?: string | null }) {
+    const { orgId, actorUserId, executionId, recoveryReason } = input
+    if (!orgId || !actorUserId || !executionId) throw new BadRequestException('orgId/actor/executionId obrigatórios')
+
+    const stuckBefore = new Date(Date.now() - STUCK_EXECUTING_THRESHOLD_MS)
+    const execution = await this.prisma.operationalActionExecution.findFirst({ where: { id: executionId, orgId } })
+    if (!execution) throw new NotFoundException('Execution não encontrada para org')
+    if (execution.status !== 'EXECUTING') throw new ConflictException('Somente EXECUTING pode ser recuperada manualmente')
+    if (execution.updatedAt.getTime() >= stuckBefore.getTime()) throw new ConflictException('Execution ainda não atingiu threshold de stuck')
+
+    const recoveredAt = new Date()
+    const metadata = (execution.metadata && typeof execution.metadata === 'object' ? execution.metadata : {}) as Record<string, unknown>
+    const recoveryMetadata = { recovered: true, recoveredBy: actorUserId, recoveredAt: recoveredAt.toISOString(), recoveryReason: recoveryReason?.trim() || null }
+
+    const updated = await this.prisma.operationalActionExecution.updateMany({
+      where: { id: executionId, orgId, status: 'EXECUTING', updatedAt: { lt: stuckBefore } },
+      data: {
+        status: 'FAILED',
+        failedAt: recoveredAt,
+        failureReason: recoveryReason?.trim() || 'manual_stuck_recovery',
+        metadata: { ...(metadata ?? {}), recovery: recoveryMetadata } as Prisma.InputJsonValue,
+      },
+    })
+    if (updated.count !== 1) throw new ConflictException('Execution já foi transicionada por outro operador')
+
+    await this.timeline.log({
+      orgId,
+      action: 'OPERATIONAL_ACTION_RECOVERED',
+      metadata: {
+        executionId: execution.id,
+        actionType: execution.actionType,
+        entityType: execution.entityType,
+        entityId: execution.entityId,
+        sourceSignalId: execution.sourceSignalId ?? null,
+        previousStatus: 'EXECUTING',
+        nextStatus: 'FAILED',
+        recoveredBy: actorUserId,
+        recoveryReason: recoveryReason?.trim() || null,
+        recoveredAt: recoveredAt.toISOString(),
+      },
+    })
+
+    return { executionId: execution.id, previousStatus: 'EXECUTING' as OperationalActionStatus, nextStatus: 'FAILED' as OperationalActionStatus, recovered: true }
+  }
+
   async getOperationalActionsDiagnostics(orgId: string): Promise<OperationalActionsDiagnostics> {
     const now = Date.now()
     const failedSince = new Date(now - 24 * 60 * 60 * 1000)
     const stuckBefore = new Date(now - STUCK_EXECUTING_THRESHOLD_MS)
 
-    const [totals, pendingRequestedCount, stuckExecutingCount, failedLast24hCount, executedDurations, failedDurations, topFailedActionTypesRaw, recentFailuresRaw] = await Promise.all([
+    const [totals, pendingRequestedCount, stuckExecutingCount, failedLast24hCount, recoveredLast24hCount, executedDurations, failedDurations, topFailedActionTypesRaw, recentFailuresRaw, recentStuckExecutingRaw] = await Promise.all([
       this.prisma.operationalActionExecution.groupBy({ by: ['status'], where: { orgId }, _count: { _all: true } }),
       this.prisma.operationalActionExecution.count({ where: { orgId, status: 'REQUESTED' } }),
       this.prisma.operationalActionExecution.count({ where: { orgId, status: 'EXECUTING', updatedAt: { lt: stuckBefore } } }),
       this.prisma.operationalActionExecution.count({ where: { orgId, status: 'FAILED', failedAt: { gte: failedSince } } }),
+      this.prisma.operationalActionExecution.count({ where: { orgId, status: 'FAILED', metadata: { path: ['recovery', 'recovered'], equals: true }, failedAt: { gte: failedSince } } }),
       this.prisma.operationalActionExecution.findMany({ where: { orgId, status: 'EXECUTED', executedAt: { not: null } }, select: { requestedAt: true, executedAt: true }, take: 500, orderBy: { executedAt: 'desc' } }),
       this.prisma.operationalActionExecution.findMany({ where: { orgId, status: 'FAILED', failedAt: { not: null } }, select: { requestedAt: true, failedAt: true }, take: 500, orderBy: { failedAt: 'desc' } }),
       this.prisma.operationalActionExecution.groupBy({ by: ['actionType'], where: { orgId, status: 'FAILED' }, _count: { _all: true }, orderBy: { _count: { actionType: 'desc' } }, take: TOP_FAILED_ACTION_TYPES_LIMIT }),
       this.prisma.operationalActionExecution.findMany({ where: { orgId, status: 'FAILED' }, select: { id: true, actionType: true, entityType: true, entityId: true, failedAt: true, failureReason: true }, orderBy: { failedAt: 'desc' }, take: RECENT_FAILURES_LIMIT }),
+      this.prisma.operationalActionExecution.findMany({ where: { orgId, status: 'EXECUTING', updatedAt: { lt: stuckBefore } }, select: { id: true, actionType: true, entityType: true, entityId: true, sourceSignalId: true, updatedAt: true }, orderBy: { updatedAt: 'asc' }, take: RECENT_STUCK_EXECUTING_LIMIT }),
     ])
 
     const totalsByStatus: Record<DiagnosticsStatus, number> = { REQUESTED: 0, EXECUTING: 0, EXECUTED: 0, FAILED: 0, CANCELED: 0 }
@@ -166,10 +217,12 @@ export class OperationalActionsService {
       pendingRequestedCount,
       stuckExecutingCount,
       failedLast24hCount,
+      recoveredLast24hCount,
       avgRequestedToExecutedMs,
       avgRequestedToFailedMs,
       topFailedActionTypes: topFailedActionTypesRaw.map((row) => ({ actionType: row.actionType as OperationalActionType, count: row._count._all })),
       recentFailures: recentFailuresRaw.filter((row) => row.failedAt).map((row) => ({ id: row.id, actionType: row.actionType as OperationalActionType, entityType: row.entityType, entityId: row.entityId, failedAt: row.failedAt!.toISOString(), failureReason: row.failureReason })),
+      recentStuckExecuting: recentStuckExecutingRaw.map((row) => ({ id: row.id, actionType: row.actionType as OperationalActionType, entityType: row.entityType, entityId: row.entityId, sourceSignalId: row.sourceSignalId, updatedAt: row.updatedAt.toISOString() })),
     }
   }
 }

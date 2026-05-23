@@ -83,6 +83,7 @@ type OperationalActionsDiagnostics = {
   pendingRequestedCount: number;
   stuckExecutingCount: number;
   failedLast24hCount: number;
+  recoveredLast24hCount: number;
   avgRequestedToExecutedMs: number | null;
   topFailedActionTypes: Array<{ actionType: string; count: number }>;
   recentFailures: Array<{
@@ -92,6 +93,14 @@ type OperationalActionsDiagnostics = {
     entityId: string;
     failedAt: string;
     failureReason: string | null;
+  }>;
+  recentStuckExecuting: Array<{
+    id: string;
+    actionType: string;
+    entityType: string;
+    entityId: string;
+    sourceSignalId: string | null;
+    updatedAt: string;
   }>;
 };
 type AttentionItem = {
@@ -546,6 +555,7 @@ export default function ExecutiveDashboard() {
   const [requestedAssistedActions, setRequestedAssistedActions] = useState<Record<string, true>>({});
   const [requestAssistedActionState, setRequestAssistedActionState] = useState<Record<string, "idle" | "loading" | "success" | "error">>({});
   const [cancelAssistedActionState, setCancelAssistedActionState] = useState<Record<string, "idle" | "loading" | "success" | "error">>({});
+  const [recoverStuckState, setRecoverStuckState] = useState<Record<string, "idle" | "loading" | "success" | "error">>({});
   useRenderWatchdog("ExecutiveDashboard");
   const [location, navigate] = useLocation();
   const { runAction } = useRunAction();
@@ -807,6 +817,25 @@ export default function ExecutiveDashboard() {
       setCancelAssistedActionState(prev => ({ ...prev, [signal.id]: "error" }));
     }
   };
+
+  const recoverStuckExecution = async (executionId: string) => {
+    if (!window.confirm('Confirmar recuperação manual desta EXECUTING travada?')) return
+    setRecoverStuckState(prev => ({ ...prev, [executionId]: 'loading' }))
+    try {
+      const response = await fetch('/internal/operational-actions/recover-stuck', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ executionId, recoveryReason: 'manual_dashboard_recovery' }),
+      })
+      if (!response.ok) throw new Error('failed_recover_stuck')
+      setRecoverStuckState(prev => ({ ...prev, [executionId]: 'success' }))
+      void operationalActionsDiagnosticsQuery.refetch()
+    } catch {
+      setRecoverStuckState(prev => ({ ...prev, [executionId]: 'error' }))
+    }
+  }
+
   const queue = useMemo(() => {
     const whatsappItems: QueueItem[] = pendingWhatsAppApprovals
       .slice(0, 2)
@@ -1055,6 +1084,7 @@ export default function ExecutiveDashboard() {
                   <AppStatCard label="Pendentes" value={String(operationalActionsDiagnosticsQuery.data.pendingRequestedCount)} helper="REQUESTED aguardando execução." />
                   <AppStatCard label="Travadas" value={String(operationalActionsDiagnosticsQuery.data.stuckExecutingCount)} helper={operationalActionsDiagnosticsQuery.data.stuckExecutingCount > 0 ? "Há EXECUTING travadas; investigar agora." : "Sem ações travadas."} />
                   <AppStatCard label="Falhas 24h" value={String(operationalActionsDiagnosticsQuery.data.failedLast24hCount)} helper={operationalActionsDiagnosticsQuery.data.failedLast24hCount > 0 ? "Falhas recentes acima de zero." : "Nenhuma falha recente."} />
+                  <AppStatCard label="Recuperadas 24h" value={String(operationalActionsDiagnosticsQuery.data.recoveredLast24hCount)} helper="EXECUTING travadas encerradas manualmente." />
                   <AppStatCard label="Tempo médio execução" value={formatDurationMs(operationalActionsDiagnosticsQuery.data.avgRequestedToExecutedMs)} helper="Média REQUESTED → EXECUTED." />
                 </div>
                 {(operationalActionsDiagnosticsQuery.data.stuckExecutingCount > 0 || operationalActionsDiagnosticsQuery.data.failedLast24hCount > 0) ? (
@@ -1062,7 +1092,7 @@ export default function ExecutiveDashboard() {
                 ) : (
                   <p className="text-xs text-[var(--dashboard-success)]">Saudável: sem travas e sem falhas recentes relevantes.</p>
                 )}
-                <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+                <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
                   <article className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3.5">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-sm font-semibold text-[var(--text-primary)]">Top falhas por tipo</p>
@@ -1082,6 +1112,25 @@ export default function ExecutiveDashboard() {
                       <ul className="mt-2 space-y-2 text-xs text-[var(--text-secondary)]">
                         {operationalActionsDiagnosticsQuery.data.recentFailures.slice(0, 3).map((failure) => (
                           <li key={failure.id}><p className="font-medium text-[var(--text-primary)]">{failure.actionType}</p><p>{formatFailureTime(failure.failedAt)} · {failure.failureReason ?? "Sem motivo informado"}</p></li>
+                        ))}
+                      </ul>
+                    )}
+                  </article>
+
+                  <article className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3.5">
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">EXECUTING travadas</p>
+                    {operationalActionsDiagnosticsQuery.data.recentStuckExecuting.length === 0 ? <p className="mt-2 text-xs text-[var(--text-secondary)]">Nenhuma execução travada.</p> : (
+                      <ul className="mt-2 space-y-2 text-xs text-[var(--text-secondary)]">
+                        {operationalActionsDiagnosticsQuery.data.recentStuckExecuting.slice(0, 3).map((execution) => (
+                          <li key={execution.id}>
+                            <p className="font-medium text-[var(--text-primary)]">{execution.actionType}</p>
+                            <p>{execution.entityType} · {execution.entityId}</p>
+                            <div className="mt-1 flex items-center gap-2">
+                              <Button size="sm" variant="outline" onClick={() => void recoverStuckExecution(execution.id)} disabled={recoverStuckState[execution.id] === 'loading'}>
+                                {recoverStuckState[execution.id] === 'loading' ? 'Recuperando...' : 'Marcar como recuperado'}
+                              </Button>
+                            </div>
+                          </li>
                         ))}
                       </ul>
                     )}

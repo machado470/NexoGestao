@@ -83,6 +83,32 @@ describe('OperationalActionsService', () => {
     await expect(service.execute({ orgId: '', actorUserId: '', actionType: 'RUN_GOVERNANCE_CHECK', entityType: 'GENERAL', entityId: 'x' })).rejects.toBeInstanceOf(BadRequestException)
   })
 
+
+
+  it('recover stuck só funciona para EXECUTING travado e gera timeline', async () => {
+    const prisma: any = {
+      operationalActionExecution: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'exec-1', orgId: 'org-1', status: 'EXECUTING', updatedAt: new Date(Date.now() - 10 * 60 * 1000), metadata: { a: 1 }, actionType: 'RUN_GOVERNANCE_CHECK', entityType: 'GENERAL', entityId: 'e-1', sourceSignalId: 'sig-1' }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+    }
+    const service = new OperationalActionsService(prisma, timeline as any, whatsapp as any, finance as any, risk as any, governanceRun as any)
+
+    const out = await service.recoverStuckExecution({ orgId: 'org-1', actorUserId: 'u-1', executionId: 'exec-1', recoveryReason: 'stuck manual' })
+
+    expect(out.recovered).toBe(true)
+    expect(prisma.operationalActionExecution.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ id: 'exec-1', status: 'EXECUTING' }) }))
+    expect(timeline.log).toHaveBeenCalledWith(expect.objectContaining({ action: 'OPERATIONAL_ACTION_RECOVERED', metadata: expect.objectContaining({ executionId: 'exec-1', previousStatus: 'EXECUTING', nextStatus: 'FAILED', recoveredBy: 'u-1' }) }))
+  })
+
+  it('recover stuck bloqueia status inválidos e execução não travada', async () => {
+    const serviceFailed = new OperationalActionsService({ operationalActionExecution: { findFirst: jest.fn().mockResolvedValue({ id: 'e1', status: 'FAILED', updatedAt: new Date(Date.now() - 10 * 60 * 1000) }) } } as any, timeline as any, whatsapp as any, finance as any, risk as any, governanceRun as any)
+    await expect(serviceFailed.recoverStuckExecution({ orgId: 'org-1', actorUserId: 'u-1', executionId: 'e1' })).rejects.toBeInstanceOf(ConflictException)
+
+    const serviceFresh = new OperationalActionsService({ operationalActionExecution: { findFirst: jest.fn().mockResolvedValue({ id: 'e2', status: 'EXECUTING', updatedAt: new Date() }) } } as any, timeline as any, whatsapp as any, finance as any, risk as any, governanceRun as any)
+    await expect(serviceFresh.recoverStuckExecution({ orgId: 'org-1', actorUserId: 'u-1', executionId: 'e2' })).rejects.toBeInstanceOf(ConflictException)
+  })
+
   it('diagnostics agrega por org/status e calcula médias/limites', async () => {
     const prisma: any = {
       operationalActionExecution: {
@@ -90,12 +116,13 @@ describe('OperationalActionsService', () => {
           .fn()
           .mockResolvedValueOnce([{ status: 'REQUESTED', _count: { _all: 2 } }, { status: 'FAILED', _count: { _all: 3 } }])
           .mockResolvedValueOnce([{ actionType: 'RETRY_WHATSAPP_MESSAGE', _count: { _all: 2 } }, { actionType: 'RUN_GOVERNANCE_CHECK', _count: { _all: 1 } }]),
-        count: jest.fn().mockResolvedValueOnce(2).mockResolvedValueOnce(1).mockResolvedValueOnce(3),
+        count: jest.fn().mockResolvedValueOnce(2).mockResolvedValueOnce(1).mockResolvedValueOnce(3).mockResolvedValueOnce(1),
         findMany: jest
           .fn()
           .mockResolvedValueOnce([{ requestedAt: new Date('2026-01-01T00:00:00Z'), executedAt: new Date('2026-01-01T00:01:00Z') }])
           .mockResolvedValueOnce([{ requestedAt: new Date('2026-01-01T00:00:00Z'), failedAt: new Date('2026-01-01T00:02:00Z') }])
-          .mockResolvedValueOnce([{ id: 'f1', actionType: 'RETRY_WHATSAPP_MESSAGE', entityType: 'WHATSAPP', entityId: 'm1', failedAt: new Date('2026-01-02T00:00:00Z'), failureReason: 'boom' }]),
+          .mockResolvedValueOnce([{ id: 'f1', actionType: 'RETRY_WHATSAPP_MESSAGE', entityType: 'WHATSAPP', entityId: 'm1', failedAt: new Date('2026-01-02T00:00:00Z'), failureReason: 'boom' }])
+          .mockResolvedValueOnce([{ id: 's1', actionType: 'RUN_GOVERNANCE_CHECK', entityType: 'GENERAL', entityId: 'e2', sourceSignalId: 'sig-2', updatedAt: new Date('2026-01-02T00:00:00Z') }]),
       },
     }
     const service = new OperationalActionsService(prisma, timeline as any, whatsapp as any, finance as any, risk as any, governanceRun as any)
@@ -105,11 +132,13 @@ describe('OperationalActionsService', () => {
     expect(out.pendingRequestedCount).toBe(2)
     expect(out.stuckExecutingCount).toBe(1)
     expect(out.failedLast24hCount).toBe(3)
+    expect(out.recoveredLast24hCount).toBe(1)
     expect(out.avgRequestedToExecutedMs).toBe(60000)
     expect(out.avgRequestedToFailedMs).toBe(120000)
     expect(out.topFailedActionTypes).toEqual([{ actionType: 'RETRY_WHATSAPP_MESSAGE', count: 2 }, { actionType: 'RUN_GOVERNANCE_CHECK', count: 1 }])
     expect(out.recentFailures).toHaveLength(1)
     expect(out.recentFailures[0].failedAt).toBe('2026-01-02T00:00:00.000Z')
+    expect(out.recentStuckExecuting).toHaveLength(1)
 
     expect(prisma.operationalActionExecution.count).toHaveBeenCalledWith({ where: { orgId: 'org-9', status: 'REQUESTED' } })
     expect(prisma.operationalActionExecution.groupBy).toHaveBeenCalledWith(expect.objectContaining({ by: ['status'], where: { orgId: 'org-9' } }))

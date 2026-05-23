@@ -11,6 +11,7 @@ describe("ExecutiveDashboard operational cockpit", () => {
     expect(source).toContain("/internal/operational-actions/request");
     expect(source).toContain("/internal/operational-actions/execute");
     expect(source).toContain("/internal/operational-actions/cancel");
+    expect(source).toContain("/internal/operational-actions/recover-stuck");
     expect(source).toContain("nextBestActionQuery");
   });
 
@@ -20,6 +21,9 @@ describe("ExecutiveDashboard operational cockpit", () => {
     expect(source).toContain("pendingRequestedCount");
     expect(source).toContain("stuckExecutingCount");
     expect(source).toContain("failedLast24hCount");
+    expect(source).toContain("recoveredLast24hCount");
+    expect(source).toContain("recentStuckExecuting");
+    expect(source).toContain("Marcar como recuperado");
     expect(source).toContain("avgRequestedToExecutedMs");
     expect(source).toContain("topFailedActionTypes");
     expect(source).toContain("recentFailures");
