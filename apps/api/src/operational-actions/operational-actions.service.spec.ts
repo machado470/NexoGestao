@@ -82,4 +82,37 @@ describe('OperationalActionsService', () => {
     const service = new OperationalActionsService(prisma, timeline as any, whatsapp as any, finance as any, risk as any, governanceRun as any)
     await expect(service.execute({ orgId: '', actorUserId: '', actionType: 'RUN_GOVERNANCE_CHECK', entityType: 'GENERAL', entityId: 'x' })).rejects.toBeInstanceOf(BadRequestException)
   })
+
+  it('diagnostics agrega por org/status e calcula médias/limites', async () => {
+    const prisma: any = {
+      operationalActionExecution: {
+        groupBy: jest
+          .fn()
+          .mockResolvedValueOnce([{ status: 'REQUESTED', _count: { _all: 2 } }, { status: 'FAILED', _count: { _all: 3 } }])
+          .mockResolvedValueOnce([{ actionType: 'RETRY_WHATSAPP_MESSAGE', _count: { _all: 2 } }, { actionType: 'RUN_GOVERNANCE_CHECK', _count: { _all: 1 } }]),
+        count: jest.fn().mockResolvedValueOnce(2).mockResolvedValueOnce(1).mockResolvedValueOnce(3),
+        findMany: jest
+          .fn()
+          .mockResolvedValueOnce([{ requestedAt: new Date('2026-01-01T00:00:00Z'), executedAt: new Date('2026-01-01T00:01:00Z') }])
+          .mockResolvedValueOnce([{ requestedAt: new Date('2026-01-01T00:00:00Z'), failedAt: new Date('2026-01-01T00:02:00Z') }])
+          .mockResolvedValueOnce([{ id: 'f1', actionType: 'RETRY_WHATSAPP_MESSAGE', entityType: 'WHATSAPP', entityId: 'm1', failedAt: new Date('2026-01-02T00:00:00Z'), failureReason: 'boom' }]),
+      },
+    }
+    const service = new OperationalActionsService(prisma, timeline as any, whatsapp as any, finance as any, risk as any, governanceRun as any)
+    const out = await service.getOperationalActionsDiagnostics('org-9')
+
+    expect(out.totalsByStatus).toEqual({ REQUESTED: 2, EXECUTING: 0, EXECUTED: 0, FAILED: 3, CANCELED: 0 })
+    expect(out.pendingRequestedCount).toBe(2)
+    expect(out.stuckExecutingCount).toBe(1)
+    expect(out.failedLast24hCount).toBe(3)
+    expect(out.avgRequestedToExecutedMs).toBe(60000)
+    expect(out.avgRequestedToFailedMs).toBe(120000)
+    expect(out.topFailedActionTypes).toEqual([{ actionType: 'RETRY_WHATSAPP_MESSAGE', count: 2 }, { actionType: 'RUN_GOVERNANCE_CHECK', count: 1 }])
+    expect(out.recentFailures).toHaveLength(1)
+    expect(out.recentFailures[0].failedAt).toBe('2026-01-02T00:00:00.000Z')
+
+    expect(prisma.operationalActionExecution.count).toHaveBeenCalledWith({ where: { orgId: 'org-9', status: 'REQUESTED' } })
+    expect(prisma.operationalActionExecution.groupBy).toHaveBeenCalledWith(expect.objectContaining({ by: ['status'], where: { orgId: 'org-9' } }))
+    expect(prisma.operationalActionExecution.findMany).toHaveBeenNthCalledWith(3, expect.objectContaining({ where: { orgId: 'org-9', status: 'FAILED' }, take: 10 }))
+  })
 })

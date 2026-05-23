@@ -11,6 +11,12 @@ export class OperationalActionsController {
   constructor(private readonly actions: OperationalActionsService) {}
   @Get()
   list() { return { supportedActionTypes: this.actions.getSupportedActionTypes() } }
+
+  @Get('diagnostics')
+  diagnostics(@Request() req: any) {
+    return this.actions.getOperationalActionsDiagnostics(req.user.orgId)
+  }
+
   @Post('request')
   request(@Request() req: any, @Body() body: { actionType: OperationalActionType; entityType: string; entityId: string; sourceSignalId?: string; metadata?: Record<string, unknown> }) {
     return this.actions.request({ orgId: req.user.orgId, actorUserId: req.user.id, actionType: body.actionType, entityType: body.entityType, entityId: body.entityId, sourceSignalId: body.sourceSignalId, metadata: body.metadata })
