@@ -51,6 +51,13 @@ else
   log "AUTO_MIGRATE disabled"
 fi
 
+if [ "${REQUIRE_DATABASE_SMOKE:-0}" = "1" ]; then
+  log "REQUIRE_DATABASE_SMOKE=1 -> running db:smoke:operational-actions (strict)"
+  pnpm --dir /app run db:smoke:operational-actions
+else
+  log "database smoke optional (set REQUIRE_DATABASE_SMOKE=1 to enforce in staging/prod)"
+fi
+
 log "running prisma generate"
 pnpm run prisma:generate
 
