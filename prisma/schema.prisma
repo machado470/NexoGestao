@@ -37,6 +37,7 @@ model Organization {
   whatsAppTemplates       WhatsAppTemplate[]
   whatsAppWebhookEvents   WhatsAppWebhookEvent[]
   whatsAppActionExecutions WhatsAppActionExecution[]
+  operationalActionExecutions OperationalActionExecution[]
 
   subscription Subscription?
   executionConfig OrganizationExecutionConfig?
@@ -451,6 +452,38 @@ model Payment {
   @@index([orgId, createdAt])
   @@index([chargeId, createdAt])
   @@index([orgId, paidAt])
+}
+
+model OperationalActionExecution {
+  id                    String                           @id @default(uuid())
+  orgId                 String
+  actionType            String
+  entityType            String
+  entityId              String
+  sourceSignalId        String?
+  status                OperationalActionExecutionStatus @default(REQUESTED)
+  requestedAt           DateTime
+  requestedByUserId     String
+  executedAt            DateTime?
+  executedByUserId      String?
+  failedAt              DateTime?
+  failureReason         String?
+  canceledAt            DateTime?
+  canceledByUserId      String?
+  origin                String?
+  suggestedAction       String?
+  relatedChargeId       String?
+  relatedServiceOrderId String?
+  relatedMessageId      String?
+  metadata              Json?
+  createdAt             DateTime                         @default(now())
+  updatedAt             DateTime                         @updatedAt
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, status, createdAt])
+  @@index([orgId, actionType, entityId, sourceSignalId, createdAt])
+  @@index([orgId, entityType, entityId, createdAt])
 }
 
 model IdempotencyRecord {
@@ -969,6 +1002,13 @@ enum WhatsAppSuggestedAction {
   ESCALATE_TO_OPERATOR
   MARK_RESOLVED
   REPLY_WITH_TEMPLATE
+}
+
+enum OperationalActionExecutionStatus {
+  REQUESTED
+  EXECUTED
+  FAILED
+  CANCELED
 }
 
 enum WhatsAppActionExecutionStatus {

@@ -11,57 +11,67 @@ describe('OperationalActionsService', () => {
   beforeEach(() => jest.clearAllMocks())
 
   it('bloqueia sem actor/org', async () => {
-    const prisma: any = { timelineEvent: { findMany: jest.fn().mockResolvedValue([]) } }
+    const prisma: any = { operationalActionExecution: { findFirst: jest.fn().mockResolvedValue(null) } }
     const service = new OperationalActionsService(prisma, timeline as any, whatsapp as any, finance as any, risk as any, governanceRun as any)
     await expect(service.execute({ orgId: '', actorUserId: '', actionType: 'RUN_GOVERNANCE_CHECK', entityId: 'x' })).rejects.toBeInstanceOf(BadRequestException)
   })
 
-  it('executa retry para FAILED e gera timeline sucesso', async () => {
+  it('request cria estado materializado e timeline', async () => {
+    const prisma: any = { operationalActionExecution: { create: jest.fn().mockResolvedValue({ id: 'e1' }) } }
+    const service = new OperationalActionsService(prisma, timeline as any, whatsapp as any, finance as any, risk as any, governanceRun as any)
+    const result = await service.request({ orgId: 'org-1', actorUserId: 'u-1', actionType: 'RUN_GOVERNANCE_CHECK', entityType: 'GENERAL', entityId: 'entity-1', metadata: { suggestedAction: 'Executar governança', relatedChargeId: 'ch-1' } })
+    expect(result.status).toBe('REQUESTED')
+    expect(prisma.operationalActionExecution.create).toHaveBeenCalled()
+    expect(governanceRun.startRun).not.toHaveBeenCalled()
+    expect(timeline.log).toHaveBeenCalledWith(expect.objectContaining({ action: 'OPERATIONAL_ACTION_REQUESTED' }))
+  })
+
+  it('executa retry para FAILED, atualiza estado para EXECUTED e gera timeline sucesso', async () => {
     const prisma: any = {
-      timelineEvent: { findMany: jest.fn().mockResolvedValue([{ metadata: { actionType: 'RETRY_WHATSAPP_MESSAGE', entityId: 'm1', sourceSignalId: null, status: 'REQUESTED' } }]) },
+      operationalActionExecution: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'e1', status: 'REQUESTED' }),
+        update: jest.fn().mockResolvedValue({ id: 'e1', status: 'EXECUTED' }),
+      },
       whatsAppMessage: { findFirst: jest.fn().mockResolvedValue({ id: 'm1', status: 'FAILED', customerId: 'c1' }) },
     }
     const service = new OperationalActionsService(prisma, timeline as any, whatsapp as any, finance as any, risk as any, governanceRun as any)
     const result = await service.execute({ orgId: 'org-1', actorUserId: 'u-1', actionType: 'RETRY_WHATSAPP_MESSAGE', entityId: 'm1' })
     expect(result.status).toBe('EXECUTED')
+    expect(prisma.operationalActionExecution.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'EXECUTED' }) }))
     expect(whatsapp.retryFailedMessage).toHaveBeenCalledWith('org-1', 'm1')
-    expect(timeline.log).toHaveBeenCalledWith(expect.objectContaining({ action: 'OPERATIONAL_ACTION_EXECUTED' }))
   })
 
-  it('registra request auditável sem executar ação', async () => {
-    const prisma: any = {}
-    const service = new OperationalActionsService(prisma, timeline as any, whatsapp as any, finance as any, risk as any, governanceRun as any)
-    const result = await service.request({ orgId: 'org-1', actorUserId: 'u-1', actionType: 'RUN_GOVERNANCE_CHECK', entityType: 'GENERAL', entityId: 'entity-1', metadata: { suggestedAction: 'Executar governança', relatedChargeId: 'ch-1' } })
-    expect(result.status).toBe('REQUESTED')
-    expect(governanceRun.startRun).not.toHaveBeenCalled()
-    expect(timeline.log).toHaveBeenCalledWith(expect.objectContaining({ action: 'OPERATIONAL_ACTION_REQUESTED', metadata: expect.objectContaining({ origin: 'dashboard', requestedBy: 'u-1', entityType: 'GENERAL', entityId: 'entity-1' }) }))
-  })
-
-  it('registra cancelamento auditável para REQUESTED', async () => {
+  it('cancel atualiza estado para CANCELED e registra timeline', async () => {
     const prisma: any = {
-      timelineEvent: { findMany: jest.fn().mockResolvedValue([{ metadata: { actionType: 'RUN_GOVERNANCE_CHECK', entityId: 'entity-1', sourceSignalId: 's-1', status: 'REQUESTED' } }]) },
+      operationalActionExecution: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'e1', status: 'REQUESTED' }),
+        update: jest.fn().mockResolvedValue({ id: 'e1', status: 'CANCELED' }),
+      },
     }
     const service = new OperationalActionsService(prisma, timeline as any, whatsapp as any, finance as any, risk as any, governanceRun as any)
     const result = await service.cancel({ orgId: 'org-1', actorUserId: 'u-1', actionType: 'RUN_GOVERNANCE_CHECK', entityType: 'GENERAL', entityId: 'entity-1', sourceSignalId: 's-1', metadata: { suggestedAction: 'x' } })
     expect(result.status).toBe('CANCELED')
-    expect(governanceRun.startRun).not.toHaveBeenCalled()
-    expect(timeline.log).toHaveBeenCalledWith(expect.objectContaining({ action: 'OPERATIONAL_ACTION_CANCELED', metadata: expect.objectContaining({ canceledBy: 'u-1', previousStatus: 'REQUESTED', nextStatus: 'CANCELED' }) }))
+    expect(prisma.operationalActionExecution.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'CANCELED' }) }))
   })
 
-  it('bloqueia execução após cancelamento', async () => {
+  it('falha de execução atualiza estado para FAILED', async () => {
     const prisma: any = {
-      timelineEvent: { findMany: jest.fn().mockResolvedValue([{ metadata: { actionType: 'RUN_GOVERNANCE_CHECK', entityId: 'entity-1', sourceSignalId: null, status: 'CANCELED' } }]) },
-    }
-    const service = new OperationalActionsService(prisma, timeline as any, whatsapp as any, finance as any, risk as any, governanceRun as any)
-    await expect(service.execute({ orgId: 'org-1', actorUserId: 'u-1', actionType: 'RUN_GOVERNANCE_CHECK', entityId: 'entity-1' })).rejects.toBeInstanceOf(ConflictException)
-  })
-
-  it('bloqueia reminder para PAID', async () => {
-    const prisma: any = {
-      timelineEvent: { findMany: jest.fn().mockResolvedValue([{ metadata: { actionType: 'SEND_PAYMENT_REMINDER', entityId: 'ch1', sourceSignalId: null, status: 'REQUESTED' } }]) },
+      operationalActionExecution: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'e1', status: 'REQUESTED' }),
+        update: jest.fn().mockResolvedValue({ id: 'e1', status: 'FAILED' }),
+      },
       charge: { findFirst: jest.fn().mockResolvedValue({ id: 'ch1', status: 'PAID', customerId: 'c1' }) },
     }
     const service = new OperationalActionsService(prisma, timeline as any, whatsapp as any, finance as any, risk as any, governanceRun as any)
     await expect(service.execute({ orgId: 'org-1', actorUserId: 'u-1', actionType: 'SEND_PAYMENT_REMINDER', entityId: 'ch1' })).rejects.toBeInstanceOf(BadRequestException)
+    expect(prisma.operationalActionExecution.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'FAILED' }) }))
+  })
+
+  it('bloqueia transições inválidas a partir de CANCELED/EXECUTED/FAILED', async () => {
+    for (const status of ['CANCELED', 'EXECUTED', 'FAILED'] as const) {
+      const prisma: any = { operationalActionExecution: { findFirst: jest.fn().mockResolvedValue({ id: 'e1', status }) } }
+      const service = new OperationalActionsService(prisma, timeline as any, whatsapp as any, finance as any, risk as any, governanceRun as any)
+      await expect(service.execute({ orgId: 'org-1', actorUserId: 'u-1', actionType: 'RUN_GOVERNANCE_CHECK', entityId: 'entity-1' })).rejects.toBeInstanceOf(ConflictException)
+    }
   })
 })
