@@ -703,7 +703,18 @@ export default function ExecutiveDashboard() {
         method: "POST",
         credentials: "include",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ actionType: signal.actionType, entityId, sourceSignalId: signal.id }),
+        body: JSON.stringify({
+          actionType: signal.actionType,
+          entityType: signal.area ?? "GENERAL",
+          entityId,
+          sourceSignalId: signal.id,
+          metadata: {
+            suggestedAction: signal.suggestedAction ?? null,
+            relatedChargeId: signal.chargeId ?? null,
+            relatedServiceOrderId: signal.serviceOrderId ?? null,
+            relatedMessageId: signal.messageId ?? null,
+          },
+        }),
       });
       if (!response.ok) throw new Error("failed_execute_assisted_action");
       setAssistedActionState(prev => ({ ...prev, [signal.id]: "success" }));
