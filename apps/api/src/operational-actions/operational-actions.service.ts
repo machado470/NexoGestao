@@ -26,9 +26,6 @@ export class OperationalActionsService {
     return `${input.actionType}:${input.entityType}:${input.entityId}:${this.resolveSourceKey(input.sourceSignalId, input.metadata)}`
   }
 
-  private async findLatestByLegacyLookup(input: { orgId: string; actionType: OperationalActionType; entityId: string; sourceSignalId?: string | null }) {
-    return this.prisma.operationalActionExecution.findFirst({ where: { orgId: input.orgId, actionType: input.actionType, entityId: input.entityId, sourceSignalId: input.sourceSignalId ?? null }, orderBy: { createdAt: 'desc' } })
-  }
 
   async request(input: { orgId: string; actorUserId: string; actionType: OperationalActionType; entityType: string; entityId: string; sourceSignalId?: string | null; metadata?: Record<string, unknown> | null }) {
     const { orgId, actorUserId, actionType, entityType, entityId, sourceSignalId, metadata } = input
@@ -52,10 +49,18 @@ export class OperationalActionsService {
     return { actionType, entityType, entityId, status: 'REQUESTED' as OperationalActionStatus, requestedAt: requestedAt.toISOString(), idempotent: false }
   }
 
-  async execute(input: { orgId: string; actorUserId: string; actionType: OperationalActionType; sourceSignalId?: string | null; entityId: string }) {
-    const { orgId, actorUserId, actionType, sourceSignalId, entityId } = input
+  private buildExecutionWhere(input: { orgId: string; actionType: OperationalActionType; entityType: string; entityId: string; sourceSignalId?: string | null; metadata?: Record<string, unknown> | null }) {
+    return { orgId: input.orgId, logicalKey: this.buildLogicalKey(input) }
+  }
+
+  private async findExecution(input: { orgId: string; actionType: OperationalActionType; entityType: string; entityId: string; sourceSignalId?: string | null; metadata?: Record<string, unknown> | null }) {
+    return this.prisma.operationalActionExecution.findFirst({ where: this.buildExecutionWhere(input), orderBy: { createdAt: 'desc' } })
+  }
+
+  async execute(input: { orgId: string; actorUserId: string; actionType: OperationalActionType; entityType: string; sourceSignalId?: string | null; entityId: string; metadata?: Record<string, unknown> | null }) {
+    const { orgId, actorUserId, actionType, entityType, sourceSignalId, entityId, metadata } = input
     if (!orgId || !actorUserId) throw new BadRequestException('orgId/actor obrigatórios')
-    const execution = await this.findLatestByLegacyLookup({ orgId, actionType, entityId, sourceSignalId })
+    const execution = await this.findExecution({ orgId, actionType, entityType, entityId, sourceSignalId, metadata })
     if (!execution) throw new ConflictException('Ação precisa estar REQUESTED para executar')
     if (execution.status === 'EXECUTED') return { actionType, status: 'EXECUTED' as OperationalActionStatus, idempotent: true }
     if (execution.status !== 'REQUESTED') throw new ConflictException('Somente ação REQUESTED pode transicionar')
@@ -88,12 +93,12 @@ export class OperationalActionsService {
         result = { governanceScore: governance.institutionalRiskScore }
       }
       await this.prisma.operationalActionExecution.update({ where: { id: execution.id }, data: { status: 'EXECUTED', executedAt: new Date(), executedByUserId: actorUserId } })
-      await this.timeline.log({ orgId, action: 'OPERATIONAL_ACTION_EXECUTED', metadata: { actionType, sourceSignalId: sourceSignalId ?? null, entityId, actorUserId, logicalKey: execution.logicalKey, previousStatus: 'REQUESTED', nextStatus: 'EXECUTED', status: 'EXECUTED', ...result } })
+      await this.timeline.log({ orgId, action: 'OPERATIONAL_ACTION_EXECUTED', metadata: { actionType, entityType, sourceSignalId: sourceSignalId ?? null, entityId, actorUserId, logicalKey: execution.logicalKey, previousStatus: 'REQUESTED', nextStatus: 'EXECUTED', status: 'EXECUTED', ...result } })
       return { actionType, status: 'EXECUTED' as OperationalActionStatus, result }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'unknown_error'
       await this.prisma.operationalActionExecution.update({ where: { id: execution.id }, data: { status: 'FAILED', failedAt: new Date(), failureReason: message } })
-      await this.timeline.log({ orgId, action: 'OPERATIONAL_ACTION_FAILED', metadata: { actionType, sourceSignalId: sourceSignalId ?? null, entityId, actorUserId, logicalKey: execution.logicalKey, previousStatus: 'EXECUTING', nextStatus: 'FAILED', status: 'FAILED', errorMessage: message } })
+      await this.timeline.log({ orgId, action: 'OPERATIONAL_ACTION_FAILED', metadata: { actionType, entityType, sourceSignalId: sourceSignalId ?? null, entityId, actorUserId, logicalKey: execution.logicalKey, previousStatus: 'EXECUTING', nextStatus: 'FAILED', status: 'FAILED', errorMessage: message } })
       throw error
     }
   }
@@ -102,7 +107,7 @@ export class OperationalActionsService {
     const { orgId, actorUserId, actionType, entityType, entityId, sourceSignalId } = input
     if (!orgId || !actorUserId) throw new BadRequestException('orgId/actor obrigatórios')
     const logicalKey = this.buildLogicalKey(input)
-    const execution = await this.prisma.operationalActionExecution.findFirst({ where: { orgId, logicalKey }, orderBy: { createdAt: 'desc' } })
+    const execution = await this.findExecution(input)
     if (!execution) throw new ConflictException('Somente ação REQUESTED pode ser cancelada')
     if (execution.status === 'CANCELED') return { actionType, entityType, entityId, status: 'CANCELED' as OperationalActionStatus, idempotent: true }
     if (execution.status !== 'REQUESTED') throw new ConflictException('Somente ação REQUESTED pode transicionar')
