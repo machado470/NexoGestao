@@ -1,99 +1,68 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common'
+import { Prisma } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { TimelineService } from '../timeline/timeline.service'
 import { WhatsAppService } from '../whatsapp/whatsapp.service'
 import { FinanceService } from '../finance/finance.service'
 import { RiskService } from '../risk/risk.service'
 import { GovernanceRunService } from '../governance/governance-run.service'
-import { Prisma } from '@prisma/client'
 
 export type OperationalActionType = 'RETRY_WHATSAPP_MESSAGE' | 'SEND_PAYMENT_REMINDER' | 'RECALCULATE_RISK' | 'RUN_GOVERNANCE_CHECK'
-export type OperationalActionStatus = 'REQUESTED' | 'EXECUTED' | 'FAILED' | 'CANCELED'
-
-
-type OperationalActionExecutionRecord = {
-  id: string
-  status: OperationalActionStatus
-}
+export type OperationalActionStatus = 'REQUESTED' | 'EXECUTING' | 'EXECUTED' | 'FAILED' | 'CANCELED'
 
 @Injectable()
 export class OperationalActionsService {
   constructor(private readonly prisma: PrismaService, private readonly timeline: TimelineService, private readonly whatsapp: WhatsAppService, private readonly finance: FinanceService, private readonly risk: RiskService, private readonly governanceRun: GovernanceRunService) {}
+
   getSupportedActionTypes(): OperationalActionType[] { return ['RETRY_WHATSAPP_MESSAGE', 'SEND_PAYMENT_REMINDER', 'RECALCULATE_RISK', 'RUN_GOVERNANCE_CHECK'] }
+
+  private resolveSourceKey(sourceSignalId?: string | null, metadata?: Record<string, unknown> | null) {
+    if (sourceSignalId?.trim()) return sourceSignalId
+    const metadataSignal = typeof metadata?.sourceSignalId === 'string' ? metadata.sourceSignalId.trim() : ''
+    return metadataSignal || '__NO_SIGNAL__'
+  }
+
+  private buildLogicalKey(input: { actionType: OperationalActionType; entityType: string; entityId: string; sourceSignalId?: string | null; metadata?: Record<string, unknown> | null }) {
+    return `${input.actionType}:${input.entityType}:${input.entityId}:${this.resolveSourceKey(input.sourceSignalId, input.metadata)}`
+  }
+
+  private async findLatestByLegacyLookup(input: { orgId: string; actionType: OperationalActionType; entityId: string; sourceSignalId?: string | null }) {
+    return this.prisma.operationalActionExecution.findFirst({ where: { orgId: input.orgId, actionType: input.actionType, entityId: input.entityId, sourceSignalId: input.sourceSignalId ?? null }, orderBy: { createdAt: 'desc' } })
+  }
+
   async request(input: { orgId: string; actorUserId: string; actionType: OperationalActionType; entityType: string; entityId: string; sourceSignalId?: string | null; metadata?: Record<string, unknown> | null }) {
     const { orgId, actorUserId, actionType, entityType, entityId, sourceSignalId, metadata } = input
     if (!orgId || !actorUserId) throw new BadRequestException('orgId/actor obrigatórios')
-    const requestedAt = new Date().toISOString()
-    const requestMetadata = {
-      actionType,
-      entityType,
-      entityId,
-      requestedBy: actorUserId,
-      actorUserId,
-      sourceSignalId: sourceSignalId ?? null,
-      origin: 'dashboard',
-      suggestedAction: typeof metadata?.suggestedAction === 'string' ? metadata.suggestedAction : null,
-      relatedChargeId: typeof metadata?.relatedChargeId === 'string' ? metadata.relatedChargeId : null,
-      relatedServiceOrderId: typeof metadata?.relatedServiceOrderId === 'string' ? metadata.relatedServiceOrderId : null,
-      relatedMessageId: typeof metadata?.relatedMessageId === 'string' ? metadata.relatedMessageId : null,
-      requestedAt,
-      status: 'REQUESTED' as OperationalActionStatus,
-      context: metadata ?? {},
+    const requestedAt = new Date()
+    const logicalKey = this.buildLogicalKey({ actionType, entityType, entityId, sourceSignalId, metadata })
+    const existing = await this.prisma.operationalActionExecution.findFirst({ where: { orgId, logicalKey, status: 'REQUESTED' }, orderBy: { createdAt: 'desc' } })
+    if (existing) return { actionType, entityType, entityId, status: 'REQUESTED' as OperationalActionStatus, requestedAt: existing.requestedAt.toISOString(), idempotent: true }
+
+    try {
+      await this.prisma.operationalActionExecution.create({ data: { orgId, actionType, entityType, entityId, sourceSignalId: sourceSignalId ?? null, logicalKey, status: 'REQUESTED', requestedAt, requestedByUserId: actorUserId, origin: 'dashboard', suggestedAction: typeof metadata?.suggestedAction === 'string' ? metadata.suggestedAction : null, relatedChargeId: typeof metadata?.relatedChargeId === 'string' ? metadata.relatedChargeId : null, relatedServiceOrderId: typeof metadata?.relatedServiceOrderId === 'string' ? metadata.relatedServiceOrderId : null, relatedMessageId: typeof metadata?.relatedMessageId === 'string' ? metadata.relatedMessageId : null, metadata: (metadata ?? {}) as Prisma.InputJsonValue } })
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const duplicate = await this.prisma.operationalActionExecution.findFirst({ where: { orgId, logicalKey, status: 'REQUESTED' }, orderBy: { createdAt: 'desc' } })
+        if (duplicate) return { actionType, entityType, entityId, status: 'REQUESTED' as OperationalActionStatus, requestedAt: duplicate.requestedAt.toISOString(), idempotent: true }
+      }
+      throw error
     }
-    await this.prisma.operationalActionExecution.create({
-      data: {
-        orgId,
-        actionType,
-        entityType,
-        entityId,
-        sourceSignalId: sourceSignalId ?? null,
-        status: 'REQUESTED',
-        requestedAt: new Date(requestedAt),
-        requestedByUserId: actorUserId,
-        origin: 'dashboard',
-        suggestedAction: typeof metadata?.suggestedAction === 'string' ? metadata.suggestedAction : null,
-        relatedChargeId: typeof metadata?.relatedChargeId === 'string' ? metadata.relatedChargeId : null,
-        relatedServiceOrderId: typeof metadata?.relatedServiceOrderId === 'string' ? metadata.relatedServiceOrderId : null,
-        relatedMessageId: typeof metadata?.relatedMessageId === 'string' ? metadata.relatedMessageId : null,
-        metadata: (metadata ?? {}) as Prisma.InputJsonValue,
-      },
-    })
-    await this.timeline.log({ orgId, action: 'OPERATIONAL_ACTION_REQUESTED', metadata: requestMetadata })
-    return { actionType, entityType, entityId, status: 'REQUESTED' as OperationalActionStatus, requestedAt }
-  }
 
-
-
-  private assertValidTransition(currentStatus: OperationalActionStatus, nextStatus: OperationalActionStatus) {
-    if (currentStatus !== 'REQUESTED') throw new ConflictException('Somente ação REQUESTED pode transicionar')
-    if (nextStatus === 'REQUESTED') throw new ConflictException('REQUESTED não é transição válida')
-  }
-
-  private buildExecutionWhere(input: { orgId: string; actionType: OperationalActionType; entityId: string; sourceSignalId?: string | null }) {
-    return {
-      orgId: input.orgId,
-      actionType: input.actionType,
-      entityId: input.entityId,
-      sourceSignalId: input.sourceSignalId ?? null,
-    }
-  }
-
-  private async findExecution(input: { orgId: string; actionType: OperationalActionType; entityId: string; sourceSignalId?: string | null }): Promise<OperationalActionExecutionRecord | null> {
-    return this.prisma.operationalActionExecution.findFirst({
-      where: this.buildExecutionWhere(input),
-      orderBy: { createdAt: 'desc' },
-      select: { id: true, status: true },
-    })
+    await this.timeline.log({ orgId, action: 'OPERATIONAL_ACTION_REQUESTED', metadata: { actionType, entityType, entityId, requestedBy: actorUserId, actorUserId, sourceSignalId: sourceSignalId ?? null, logicalKey, origin: 'dashboard', requestedAt: requestedAt.toISOString(), status: 'REQUESTED', context: metadata ?? {} } })
+    return { actionType, entityType, entityId, status: 'REQUESTED' as OperationalActionStatus, requestedAt: requestedAt.toISOString(), idempotent: false }
   }
 
   async execute(input: { orgId: string; actorUserId: string; actionType: OperationalActionType; sourceSignalId?: string | null; entityId: string }) {
     const { orgId, actorUserId, actionType, sourceSignalId, entityId } = input
     if (!orgId || !actorUserId) throw new BadRequestException('orgId/actor obrigatórios')
-    const baseMeta = { actionType, sourceSignalId: sourceSignalId ?? null, entityId, actorUserId }
-    const execution = await this.findExecution({ orgId, actionType, entityId, sourceSignalId })
+    const execution = await this.findLatestByLegacyLookup({ orgId, actionType, entityId, sourceSignalId })
     if (!execution) throw new ConflictException('Ação precisa estar REQUESTED para executar')
-    const previousStatus = execution.status
-    this.assertValidTransition(previousStatus, 'EXECUTED')
+    if (execution.status === 'EXECUTED') return { actionType, status: 'EXECUTED' as OperationalActionStatus, idempotent: true }
+    if (execution.status !== 'REQUESTED') throw new ConflictException('Somente ação REQUESTED pode transicionar')
+
+    const reserved = await this.prisma.operationalActionExecution.updateMany({ where: { id: execution.id, orgId, status: 'REQUESTED' }, data: { status: 'EXECUTING' } })
+    if (reserved.count !== 1) throw new ConflictException('Ação já está em execução ou foi transicionada por outro operador')
+
     try {
       let result: Record<string, unknown>
       if (actionType === 'RETRY_WHATSAPP_MESSAGE') {
@@ -101,13 +70,13 @@ export class OperationalActionsService {
         if (!m) throw new NotFoundException('Mensagem não encontrada para org')
         if (m.status !== 'FAILED') throw new BadRequestException('Retry permitido somente para FAILED')
         await this.whatsapp.retryFailedMessage(orgId, m.id)
-        result = { messageId: m.id, customerId: m.customerId ?? null }
+        result = { messageId: m.id }
       } else if (actionType === 'SEND_PAYMENT_REMINDER') {
-        const c = await this.prisma.charge.findFirst({ where: { id: entityId, orgId }, select: { id: true, status: true, customerId: true } })
+        const c = await this.prisma.charge.findFirst({ where: { id: entityId, orgId }, select: { id: true, status: true } })
         if (!c) throw new NotFoundException('Charge não encontrada para org')
         if (c.status === 'PAID' || c.status === 'CANCELED') throw new BadRequestException('Reminder bloqueado para PAID/CANCELED')
         await this.finance.remindChargeInOrg(orgId, c.id)
-        result = { chargeId: c.id, customerId: c.customerId ?? null }
+        result = { chargeId: c.id }
       } else if (actionType === 'RECALCULATE_RISK') {
         const p = await this.prisma.person.findFirst({ where: { id: entityId, orgId }, select: { id: true } })
         if (!p) throw new NotFoundException('Pessoa não encontrada para org')
@@ -118,57 +87,30 @@ export class OperationalActionsService {
         const governance = await this.governanceRun.finish(orgId)
         result = { governanceScore: governance.institutionalRiskScore }
       }
-      await this.prisma.operationalActionExecution.update({
-        where: { id: execution.id },
-        data: { status: 'EXECUTED', executedAt: new Date(), executedByUserId: actorUserId },
-      })
-      await this.timeline.log({ orgId, action: 'OPERATIONAL_ACTION_EXECUTED', metadata: { ...baseMeta, previousStatus, nextStatus: 'EXECUTED', status: 'EXECUTED', ...result } })
+      await this.prisma.operationalActionExecution.update({ where: { id: execution.id }, data: { status: 'EXECUTED', executedAt: new Date(), executedByUserId: actorUserId } })
+      await this.timeline.log({ orgId, action: 'OPERATIONAL_ACTION_EXECUTED', metadata: { actionType, sourceSignalId: sourceSignalId ?? null, entityId, actorUserId, logicalKey: execution.logicalKey, previousStatus: 'REQUESTED', nextStatus: 'EXECUTED', status: 'EXECUTED', ...result } })
       return { actionType, status: 'EXECUTED' as OperationalActionStatus, result }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'unknown_error'
-      await this.prisma.operationalActionExecution.update({
-        where: { id: execution.id },
-        data: { status: 'FAILED', failedAt: new Date(), failureReason: message },
-      })
-      await this.timeline.log({ orgId, action: 'OPERATIONAL_ACTION_FAILED', metadata: { ...baseMeta, previousStatus, nextStatus: 'FAILED', status: 'FAILED', errorMessage: message } })
+      await this.prisma.operationalActionExecution.update({ where: { id: execution.id }, data: { status: 'FAILED', failedAt: new Date(), failureReason: message } })
+      await this.timeline.log({ orgId, action: 'OPERATIONAL_ACTION_FAILED', metadata: { actionType, sourceSignalId: sourceSignalId ?? null, entityId, actorUserId, logicalKey: execution.logicalKey, previousStatus: 'EXECUTING', nextStatus: 'FAILED', status: 'FAILED', errorMessage: message } })
       throw error
     }
   }
 
   async cancel(input: { orgId: string; actorUserId: string; actionType: OperationalActionType; entityType: string; entityId: string; sourceSignalId?: string | null; metadata?: Record<string, unknown> | null }) {
-    const { orgId, actorUserId, actionType, entityType, entityId, sourceSignalId, metadata } = input
+    const { orgId, actorUserId, actionType, entityType, entityId, sourceSignalId } = input
     if (!orgId || !actorUserId) throw new BadRequestException('orgId/actor obrigatórios')
-    const execution = await this.findExecution({ orgId, actionType, entityId, sourceSignalId })
+    const logicalKey = this.buildLogicalKey(input)
+    const execution = await this.prisma.operationalActionExecution.findFirst({ where: { orgId, logicalKey }, orderBy: { createdAt: 'desc' } })
     if (!execution) throw new ConflictException('Somente ação REQUESTED pode ser cancelada')
-    const previousStatus = execution.status
-    this.assertValidTransition(previousStatus, 'CANCELED')
-    const canceledAt = new Date().toISOString()
-    await this.prisma.operationalActionExecution.update({
-      where: { id: execution.id },
-      data: { status: 'CANCELED', canceledAt: new Date(canceledAt), canceledByUserId: actorUserId },
-    })
-    await this.timeline.log({
-      orgId,
-      action: 'OPERATIONAL_ACTION_CANCELED',
-      metadata: {
-        actionType,
-        entityType,
-        entityId,
-        canceledBy: actorUserId,
-        actorUserId,
-        canceledAt,
-        sourceSignalId: sourceSignalId ?? null,
-        origin: 'dashboard',
-        suggestedAction: typeof metadata?.suggestedAction === 'string' ? metadata.suggestedAction : null,
-        relatedChargeId: typeof metadata?.relatedChargeId === 'string' ? metadata.relatedChargeId : null,
-        relatedServiceOrderId: typeof metadata?.relatedServiceOrderId === 'string' ? metadata.relatedServiceOrderId : null,
-        relatedMessageId: typeof metadata?.relatedMessageId === 'string' ? metadata.relatedMessageId : null,
-        previousStatus,
-        nextStatus: 'CANCELED',
-        status: 'CANCELED' as OperationalActionStatus,
-      },
-    })
-    return { actionType, entityType, entityId, status: 'CANCELED' as OperationalActionStatus, canceledAt }
-  }
+    if (execution.status === 'CANCELED') return { actionType, entityType, entityId, status: 'CANCELED' as OperationalActionStatus, idempotent: true }
+    if (execution.status !== 'REQUESTED') throw new ConflictException('Somente ação REQUESTED pode transicionar')
 
+    const updated = await this.prisma.operationalActionExecution.updateMany({ where: { id: execution.id, orgId, status: 'REQUESTED' }, data: { status: 'CANCELED', canceledAt: new Date(), canceledByUserId: actorUserId } })
+    if (updated.count !== 1) throw new ConflictException('Ação já foi transicionada por outro operador')
+
+    await this.timeline.log({ orgId, action: 'OPERATIONAL_ACTION_CANCELED', metadata: { actionType, entityType, entityId, actorUserId, sourceSignalId: sourceSignalId ?? null, logicalKey, previousStatus: 'REQUESTED', nextStatus: 'CANCELED', status: 'CANCELED' } })
+    return { actionType, entityType, entityId, status: 'CANCELED' as OperationalActionStatus, idempotent: false }
+  }
 }
