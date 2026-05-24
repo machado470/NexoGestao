@@ -78,21 +78,27 @@ describeRealIntegration('Canonical Operational Workflow (e2e)', () => {
   afterAll(async () => {
     try {
       if (prisma) {
-        await prisma.payment.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
-        await prisma.whatsAppMessage.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
-        await prisma.charge.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
-        await prisma.serviceOrder.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
-        await prisma.appointment.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
-        await prisma.customer.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
-        await prisma.timelineEvent.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
-        await prisma.auditEvent.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
-        await prisma.usageMetric.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
-        await prisma.idempotencyRecord.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
-        await prisma.organizationExecutionConfig.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
-        await prisma.tenantFeatureOverride.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
-        await prisma.subscription.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
-        await prisma.person.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
-        await prisma.organization.deleteMany({ where: { id: { in: [primaryOrgId, secondaryOrgId] } } })
+        const orgIds = [primaryOrgId, secondaryOrgId]
+
+        await prisma.payment.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.whatsAppMessage.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.whatsAppActionExecution.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.whatsAppConversation.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.whatsAppTemplate.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.whatsAppWebhookEvent.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.charge.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.serviceOrder.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.appointment.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.customer.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.timelineEvent.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.auditEvent.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.usageMetric.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.idempotencyRecord.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.organizationExecutionConfig.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.tenantFeatureOverride.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.subscription.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.person.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.organization.deleteMany({ where: { id: { in: orgIds } } })
       }
     } finally {
       if (app) {
