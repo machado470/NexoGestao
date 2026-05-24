@@ -1,12 +1,19 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { CreateWebhookDto } from './dto/create-webhook.dto'
 import { UpdateWebhookDto } from './dto/update-webhook.dto'
 import { randomBytes } from 'crypto'
+import { QueueService } from '../queue/queue.service'
+import { QUEUE_NAMES, WEBHOOK_QUEUE_JOB_NAMES } from '../queue/queue.constants'
 
 @Injectable()
 export class WebhookService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(WebhookService.name)
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly queueService: QueueService,
+  ) {}
 
   private get webhookEndpointDelegate(): any | null {
     const prismaAny = this.prisma as any
@@ -221,5 +228,59 @@ export class WebhookService {
       const events = Array.isArray(endpoint.events) ? endpoint.events : []
       return events.includes(eventType)
     })
+  }
+
+  async replayFailedDelivery(input: {
+    orgId: string
+    deliveryId: string
+    actorUserId: string
+  }) {
+    const delivery = await this.getDeliveryContext(input.deliveryId)
+
+    if (!delivery || delivery.endpoint?.orgId !== input.orgId) {
+      throw new NotFoundException('Webhook delivery não encontrado')
+    }
+
+    if (delivery.status === 'SUCCESS') {
+      throw new BadRequestException('Webhook delivery em SUCCESS não permite replay')
+    }
+
+    if (delivery.status !== 'FAILED') {
+      throw new BadRequestException(`Webhook delivery com status=${delivery.status} não permite replay`)
+    }
+
+    const jobId = `webhook:dispatch:${delivery.id}`
+    const queue = this.queueService.getQueue(QUEUE_NAMES.WEBHOOKS)
+    const existingJob = await queue.getJob(jobId)
+    const existingState = existingJob ? await existingJob.getState() : null
+    if (existingState && ['active', 'waiting', 'delayed', 'prioritized', 'waiting-children'].includes(existingState)) {
+      throw new ConflictException('Webhook delivery já possui replay/dispatch em andamento')
+    }
+
+    await this.markDeliveryAttempt({ deliveryId: delivery.id, attempts: delivery.attempts, status: 'PENDING' })
+
+    await this.queueService.addJob(
+      QUEUE_NAMES.WEBHOOKS,
+      WEBHOOK_QUEUE_JOB_NAMES.DISPATCH,
+      { deliveryId: delivery.id },
+      {
+        attempts: 5,
+        backoff: { type: 'exponential', delay: 1_000, jitter: 0.3 },
+        jobId,
+      },
+    )
+
+    this.logger.log(JSON.stringify({
+      action: 'webhook.delivery.replay_requested',
+      orgId: input.orgId,
+      deliveryId: delivery.id,
+      webhookId: delivery.endpointId,
+      actorUserId: input.actorUserId,
+      previousStatus: 'FAILED',
+      nextStatus: 'PENDING',
+      jobId,
+    }))
+
+    return { ok: true, deliveryId: delivery.id, jobId, previousStatus: 'FAILED', nextStatus: 'PENDING' as const }
   }
 }

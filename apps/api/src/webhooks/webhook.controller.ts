@@ -51,4 +51,15 @@ export class WebhookController {
     const data = await this.webhookService.listDeliveries(orgId, query)
     return { ok: true, data }
   }
+
+  @Post('deliveries/:deliveryId/replay')
+  @Roles('ADMIN')
+  async replayFailedDelivery(@Request() req: any, @Param('deliveryId') deliveryId: string) {
+    const data = await this.webhookService.replayFailedDelivery({
+      orgId: req.user.orgId,
+      deliveryId,
+      actorUserId: req.user?.id ?? 'unknown',
+    })
+    return { ok: true, data }
+  }
 }
