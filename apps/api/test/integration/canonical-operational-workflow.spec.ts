@@ -160,7 +160,7 @@ describeRealIntegration('Canonical Operational Workflow (e2e)', () => {
     await request(app.getHttpServer())
       .patch(`/appointments/${appointmentId}`)
       .set(mainAuth)
-      .send({ status: 'CONFIRMED' })
+      .send({ status: 'CONFIRMED', expectedUpdatedAt: createAppointment.body.updatedAt })
       .expect(200)
 
     const confirmedAppointmentDb = await prisma.appointment.findFirst({ where: { id: appointmentId, orgId: primaryOrgId } })

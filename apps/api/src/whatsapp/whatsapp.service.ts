@@ -279,24 +279,46 @@ export class WhatsAppService {
       throw new BadRequestException('Conversa não encontrada para envio de WhatsApp')
     }
 
-    const message = await this.prisma.whatsAppMessage.create({
-      data: {
-        orgId,
-        conversationId: conversation.id,
-        customerId: input.customerId ?? conversation.customerId ?? null,
-        direction: 'OUTBOUND',
-        entityType: (input.entityType ?? 'GENERAL') as WhatsAppEntityType,
-        entityId: String(input.entityId ?? input.customerId ?? conversation.customerId ?? conversation.id),
-        messageType: (input.messageType ?? 'MANUAL') as WhatsAppMessageType,
-        messageKey: input.messageKey ?? null,
-        toPhone,
-        fromPhone: input.fromPhone ?? null,
-        renderedText: String(input.content ?? input.renderedText ?? '').trim(),
-        content: String(input.content ?? input.renderedText ?? '').trim(),
-        status: 'QUEUED',
-        metadata: input.metadata ?? Prisma.JsonNull,
-      },
-    })
+    if (input.messageKey) {
+      const existing = await this.prisma.whatsAppMessage.findFirst({
+        where: { orgId, messageKey: String(input.messageKey) },
+      })
+      if (existing) {
+        return { created: false, message: existing }
+      }
+    }
+
+    let message
+    try {
+      message = await this.prisma.whatsAppMessage.create({
+        data: {
+          orgId,
+          conversationId: conversation.id,
+          customerId: input.customerId ?? conversation.customerId ?? null,
+          direction: 'OUTBOUND',
+          entityType: (input.entityType ?? 'GENERAL') as WhatsAppEntityType,
+          entityId: String(input.entityId ?? input.customerId ?? conversation.customerId ?? conversation.id),
+          messageType: (input.messageType ?? 'MANUAL') as WhatsAppMessageType,
+          messageKey: input.messageKey ?? null,
+          toPhone,
+          fromPhone: input.fromPhone ?? null,
+          renderedText: String(input.content ?? input.renderedText ?? '').trim(),
+          content: String(input.content ?? input.renderedText ?? '').trim(),
+          status: 'QUEUED',
+          metadata: input.metadata ?? Prisma.JsonNull,
+        },
+      })
+    } catch (err: any) {
+      if (input.messageKey && err?.code === 'P2002') {
+        const existing = await this.prisma.whatsAppMessage.findFirst({
+          where: { orgId, messageKey: String(input.messageKey) },
+        })
+        if (existing) {
+          return { created: false, message: existing }
+        }
+      }
+      throw err
+    }
 
     await this.touchConversation(conversation.id, {
       lastMessageAt: message.createdAt,
