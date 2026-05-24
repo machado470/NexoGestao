@@ -60,7 +60,7 @@ function brl(valueCents: number) {
 
 function statusText(status: string) {
   if (status === "ACTIVE") return "Ativo";
-  if (status === "TRIALING") return "Trial";
+  if (status === "TRIALING" || status === "TRIAL") return "Trial";
   if (status === "PAST_DUE") return "Em atraso";
   if (status === "CANCELED") return "Cancelado";
   return status;
@@ -106,6 +106,9 @@ export default function BillingPage() {
   });
 
   const invoices = Array.isArray(statusQuery.data?.events) ? statusQuery.data?.events : [];
+  const nextChargeAt = statusQuery.data?.nextBillingAt ?? statusQuery.data?.currentPeriodEnd ?? limitsQuery.data?.trial?.endsAt ?? null;
+  const paymentMethodLabel = String(statusQuery.data?.paymentMethodBrand ?? statusQuery.data?.paymentMethod ?? "Não informado");
+  const statusReason = String(statusQuery.data?.reason ?? statusQuery.data?.statusReason ?? "Sem bloqueio informado.");
   const isLoading = [plansQuery, statusQuery, limitsQuery, readinessQuery].some(query => query.isLoading);
   const hasError = [plansQuery, statusQuery, limitsQuery, readinessQuery].some(query => query.isError);
 
@@ -145,6 +148,7 @@ export default function BillingPage() {
               <AppStatusBadge label={`Assinatura ${statusText(currentStatus)}`} />
               <AppStatusBadge label={`Plano atual: ${PLAN_META[currentPlan].title}`} />
               <AppStatusBadge label={`Status: ${statusText(currentStatus)}`} />
+              <AppStatusBadge label={nextChargeAt ? `Próxima cobrança ${new Date(nextChargeAt).toLocaleDateString("pt-BR")}` : "Próxima cobrança não informada"} />
               <AppStatusBadge label={stripeConfigured ? "Pagamento automático ativo" : "Pagamento automático pendente"} />
             </>
           }
@@ -175,8 +179,10 @@ export default function BillingPage() {
                       Status da assinatura: <AppStatusBadge label={statusText(currentStatus)} />
                     </p>
                     <p className="mt-1">
-                      Renovação: <strong className="text-[var(--text-primary)]">{limitsQuery.data?.trial?.endsAt ? new Date(limitsQuery.data.trial.endsAt).toLocaleDateString("pt-BR") : "Ciclo não informado"}</strong>
+                      Próxima cobrança: <strong className="text-[var(--text-primary)]">{nextChargeAt ? new Date(nextChargeAt).toLocaleDateString("pt-BR") : "Ciclo não informado"}</strong>
                     </p>
+                    <p className="mt-1">Método de pagamento: <strong className="text-[var(--text-primary)]">{paymentMethodLabel}</strong></p>
+                    <p className="mt-1">Motivo/status: {statusReason}</p>
                     <p className="mt-1">Impacto: atrasos de pagamento podem restringir acesso operacional.</p>
                   </div>
                 </div>
@@ -186,7 +192,7 @@ export default function BillingPage() {
                 <div className="space-y-2">
                   <Button size="sm" className="w-full" onClick={() => upgrade("PRO")} disabled={!stripeConfigured || checkoutMutation.isPending}>Trocar para Pro</Button>
                   <Button size="sm" variant="outline" className="w-full" onClick={() => navigate("/settings?section=integracoes")}>Atualizar método de pagamento</Button>
-                  <Button size="sm" variant="outline" className="w-full" onClick={() => navigate("/billing")}>Ver histórico</Button>
+                  <Button size="sm" variant="outline" className="w-full" onClick={() => navigate("/billing?tab=history")}>Ver histórico/faturas</Button>
                   <Button size="sm" variant="outline" className="w-full" disabled={cancelMutation.isPending || currentPlan === "FREE"} onClick={() => cancelMutation.mutate()}>
                     {cancelMutation.isPending ? "Cancelando..." : "Cancelar assinatura"}
                   </Button>

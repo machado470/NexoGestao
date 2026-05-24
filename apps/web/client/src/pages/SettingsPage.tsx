@@ -17,21 +17,25 @@ import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload, normalizeObjectPayload } from "@/lib/query-helpers";
 import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
 
-type SettingsSectionKey = "geral" | "equipe" | "financeiro" | "whatsapp" | "agenda" | "notificacoes" | "integracoes";
+type SettingsSectionKey = "empresa" | "usuarios" | "operacao" | "financeiro" | "whatsapp" | "automacoes" | "governanca" | "integracoes" | "sistema";
 
 const SECTION_ORDER: Array<{
   key: SettingsSectionKey;
   title: string;
   description: string;
+  impact: string;
   route?: string;
+  soon?: boolean;
 }> = [
-  { key: "geral", title: "Geral", description: "Identidade da empresa e horário padrão do sistema." },
-  { key: "equipe", title: "Equipe", description: "Pessoas com acesso e papéis da operação.", route: "/people" },
-  { key: "financeiro", title: "Financeiro", description: "Cobrança e pagamento para manter fluxo de caixa.", route: "/finances" },
-  { key: "whatsapp", title: "WhatsApp", description: "Canal de confirmação, lembrete e retorno com clientes.", route: "/whatsapp" },
-  { key: "agenda", title: "Agenda", description: "Organização da rotina e compromissos da equipe.", route: "/calendar" },
-  { key: "notificacoes", title: "Notificações", description: "Alertas para time e gestor agirem no tempo certo." },
-  { key: "integracoes", title: "Integrações", description: "Conexões externas que sustentam a operação." },
+  { key: "empresa", title: "Empresa", description: "Identidade e base de horário da operação.", impact: "Impacta agenda, prazos e leitura de contexto." },
+  { key: "usuarios", title: "Usuários e permissões", description: "Quem pode agir e em quais módulos.", impact: "Impacta segurança operacional e governança.", route: "/people" },
+  { key: "operacao", title: "Operação", description: "Regras que orientam execução do dia a dia.", impact: "Impacta fluxo de atendimento e execução.", route: "/service-orders" },
+  { key: "financeiro", title: "Financeiro", description: "Cobrança, recorrência e previsibilidade de caixa.", impact: "Impacta faturamento e saúde financeira.", route: "/finances" },
+  { key: "whatsapp", title: "WhatsApp/comunicação", description: "Canal operacional com cliente.", impact: "Impacta confirmação, cobrança e retenção.", route: "/whatsapp" },
+  { key: "automacoes", title: "Automações", description: "Ações automáticas por gatilho operacional.", impact: "Impacta velocidade e padronização.", soon: true },
+  { key: "governanca", title: "Governança/risco", description: "Nível de intervenção e leitura de risco.", impact: "Impacta prevenção de falhas críticas.", route: "/governance" },
+  { key: "integracoes", title: "Integrações", description: "Conexões externas essenciais.", impact: "Impacta continuidade da operação." },
+  { key: "sistema", title: "Sistema", description: "Saúde e comportamento global.", impact: "Impacta estabilidade e confiança.", soon: true },
 ];
 
 export default function SettingsPage() {
@@ -49,7 +53,7 @@ export default function SettingsPage() {
   const [timezone, setTimezone] = useState("America/Sao_Paulo");
   const [notifyAppointments, setNotifyAppointments] = useOperationalMemoryState<boolean>("nexo.settings.notify-appointments.v1", true);
   const [notifyFinance, setNotifyFinance] = useOperationalMemoryState<boolean>("nexo.settings.notify-finance.v1", true);
-  const [focusedSection, setFocusedSection] = useOperationalMemoryState<SettingsSectionKey>("nexo.settings.focused-section.v3", "geral");
+  const [focusedSection, setFocusedSection] = useOperationalMemoryState<SettingsSectionKey>("nexo.settings.focused-section.v3", "empresa");
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
 
   useEffect(() => {
@@ -146,13 +150,15 @@ export default function SettingsPage() {
                   >
                     <p className="text-sm font-semibold text-[var(--text-primary)]">{section.title}</p>
                     <p className="mt-1 text-xs text-[var(--text-secondary)]">{section.description}</p>
+                    <p className="mt-1 text-[11px] text-[var(--text-muted)]">Impacto: {section.impact}</p>
+                    {section.soon ? <div className="mt-1"><AppStatusBadge label="Em breve" /></div> : null}
                   </button>
                 ))}
               </div>
             </AppSectionBlock>
 
             <div className="grid gap-4 xl:grid-cols-2">
-              <AppSectionBlock title="4) Blocos de configuração · geral" subtitle="Dados principais da empresa.">
+              <AppSectionBlock title="4) Empresa" subtitle="Dados principais da empresa.">
                 <div className="grid gap-2 md:grid-cols-2">
                   <input className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm" value={organizationName} onChange={event => setOrganizationName(event.target.value)} placeholder="Nome da empresa" />
                   <input className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm" value={timezone} onChange={event => setTimezone(event.target.value)} placeholder="Fuso horário" />
@@ -161,7 +167,7 @@ export default function SettingsPage() {
                 </div>
               </AppSectionBlock>
 
-              <AppSectionBlock title="4) Blocos de configuração · equipe" subtitle="Quem opera e quais acessos estão ativos.">
+              <AppSectionBlock title="5) Usuários e permissões" subtitle="Quem opera e quais acessos estão ativos.">
                 {members.length === 0 ? (
                   <AppPageEmptyState title="Equipe ainda vazia" description="Adicione pessoas para distribuir responsabilidades." />
                 ) : (
@@ -179,7 +185,7 @@ export default function SettingsPage() {
                 )}
               </AppSectionBlock>
 
-              <AppSectionBlock title="4) Blocos de configuração · financeiro" subtitle="Condição de pagamento e cobrança da operação.">
+              <AppSectionBlock title="6) Financeiro" subtitle="Condição de pagamento e cobrança da operação.">
                 <div className="space-y-2 text-sm text-[var(--text-secondary)]">
                   <p>Pagamentos automáticos: <strong className="text-[var(--text-primary)]">{readiness?.stripe?.configured ? "Conectado" : "Pendente"}</strong></p>
                   <p>Cobrança recorrente: <strong className="text-[var(--text-primary)]">Monitorada pelo módulo financeiro</strong></p>
@@ -187,7 +193,7 @@ export default function SettingsPage() {
                 <div className="mt-3"><Button size="sm" variant="outline" onClick={() => navigate("/finances")}>Abrir financeiro</Button></div>
               </AppSectionBlock>
 
-              <AppSectionBlock title="4) Blocos de configuração · whatsapp" subtitle="Comunicação de rotina com clientes.">
+              <AppSectionBlock title="7) WhatsApp/comunicação" subtitle="Comunicação de rotina com clientes.">
                 <div className="space-y-2 text-sm text-[var(--text-secondary)]">
                   <p>Canal principal: <strong className="text-[var(--text-primary)]">WhatsApp</strong></p>
                   <p>Status da conexão: <strong className="text-[var(--text-primary)]">{readiness?.twilio?.configured ? "Conectado" : "Pendente"}</strong></p>
@@ -195,12 +201,12 @@ export default function SettingsPage() {
                 <div className="mt-3"><Button size="sm" variant="outline" onClick={() => navigate("/whatsapp")}>Abrir WhatsApp</Button></div>
               </AppSectionBlock>
 
-              <AppSectionBlock title="4) Blocos de configuração · agenda" subtitle="Visão de compromissos e conflitos do dia.">
+              <AppSectionBlock title="8) Operação" subtitle="Visão de compromissos e conflitos do dia.">
                 <p className="text-sm text-[var(--text-secondary)]">Use a agenda para ajustar janelas, confirmar horários e evitar sobreposição de atendimento.</p>
                 <div className="mt-3"><Button size="sm" variant="outline" onClick={() => navigate("/calendar")}>Abrir agenda</Button></div>
               </AppSectionBlock>
 
-              <AppSectionBlock title="4) Blocos de configuração · notificações" subtitle="Defina alertas úteis para a rotina, sem excesso.">
+              <AppSectionBlock title="9) Sistema de alertas" subtitle="Defina alertas úteis para a rotina, sem excesso.">
                 <div className="space-y-2 text-sm text-[var(--text-secondary)]">
                   <label className="flex items-center justify-between rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3">
                     <span>Lembrete de agenda para equipe</span>
@@ -213,7 +219,7 @@ export default function SettingsPage() {
                 </div>
               </AppSectionBlock>
 
-              <AppSectionBlock title="4) Blocos de configuração · integrações" subtitle="Conexões que mantêm o sistema rodando sem retrabalho.">
+              <AppSectionBlock title="10) Integrações" subtitle="Conexões que mantêm o sistema rodando sem retrabalho.">
                 <div className="space-y-2 text-sm text-[var(--text-secondary)]">
                   <p>WhatsApp: <strong className="text-[var(--text-primary)]">{readiness?.twilio?.configured ? "Ativo" : "Pendente"}</strong></p>
                   <p>Pagamentos: <strong className="text-[var(--text-primary)]">{readiness?.stripe?.configured ? "Ativo" : "Pendente"}</strong></p>
@@ -221,7 +227,18 @@ export default function SettingsPage() {
               </AppSectionBlock>
             </div>
 
-            <AppSectionBlock title="5) Feedback imediato" subtitle="Confirmação visual para evitar dúvida após ajuste.">
+
+            <AppSectionBlock title="11) Automações" subtitle="Comportamentos automáticos com impacto real na rotina.">
+              <p className="text-sm text-[var(--text-secondary)]">Em breve: regras automáticas de confirmação, cobrança e follow-up contextual com trilha na timeline.</p>
+              <div className="mt-2"><AppStatusBadge label="Em breve" /></div>
+            </AppSectionBlock>
+
+            <AppSectionBlock title="12) Governança/risco" subtitle="Controle de intervenção e prevenção operacional.">
+              <p className="text-sm text-[var(--text-secondary)]">Use Governança para intervir em risco real da operação e manter decisões auditáveis.</p>
+              <div className="mt-3"><Button size="sm" variant="outline" onClick={() => navigate("/governance")}>Abrir governança</Button></div>
+            </AppSectionBlock>
+
+            <AppSectionBlock title="13) Feedback imediato" subtitle="Confirmação visual para evitar dúvida após ajuste.">
               <div className="flex flex-wrap gap-2">
                 <AppStatusBadge label={hasUnsavedChanges ? "Alterações não salvas" : "Sem pendências para salvar"} />
                 <AppStatusBadge label={notifyAppointments ? "Lembrete de agenda ativo" : "Lembrete de agenda desligado"} />

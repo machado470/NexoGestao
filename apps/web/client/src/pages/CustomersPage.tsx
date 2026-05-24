@@ -1100,6 +1100,14 @@ export default function CustomersPage() {
                     <MessageCircle className="mr-1.5 h-3.5 w-3.5" />
                     WhatsApp
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => navigate(`/governance?customerId=${activeCustomerId}&source=customers`)}
+                  >
+                    <ShieldAlert className="mr-1.5 h-3.5 w-3.5" />
+                    Ver risco
+                  </Button>
                 </div>
 
                 <div className="grid gap-2 md:grid-cols-2">
