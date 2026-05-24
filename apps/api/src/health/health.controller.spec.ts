@@ -7,8 +7,9 @@ describe('HealthController operational hardening', () => {
     const tenantOps = { snapshot: jest.fn().mockReturnValue({}) } as any
     const commercial = { getAdminTenantCommercialOverview: jest.fn().mockResolvedValue({ ok: true }) } as any
     const config = { get: jest.fn().mockReturnValue('') } as any
+    const queueObservability = { snapshot: jest.fn().mockReturnValue({ counters: {}, gauges: {}, duration: {} }) } as any
 
-    const controller = new HealthController(prisma, metrics, tenantOps, commercial, config, undefined)
+    const controller = new HealthController(prisma, metrics, tenantOps, commercial, config, queueObservability, undefined)
 
     const result = await controller.health()
 

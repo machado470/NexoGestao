@@ -7,6 +7,7 @@ import { isGoogleOAuthConfigured } from '../common/config/google-oauth-env'
 import { getWhatsAppProviderReadiness } from '../whatsapp/providers/provider.factory'
 import { TenantOperationsService } from '../common/tenant-ops/tenant-ops.service'
 import { CommercialPolicyService } from '../common/commercial/commercial-policy.service'
+import { QueueObservabilityService } from '../common/metrics/queue-observability.service'
 
 @Controller('health')
 export class HealthController {
@@ -18,6 +19,7 @@ export class HealthController {
     private readonly tenantOps: TenantOperationsService,
     private readonly commercial: CommercialPolicyService,
     private readonly config: ConfigService,
+    private readonly queueObservability: QueueObservabilityService,
     @Optional() private readonly queueService?: QueueService,
   ) {}
 
@@ -119,6 +121,7 @@ export class HealthController {
       },
       degradedReasons,
       metrics: this.metrics.snapshot(),
+      queueObservability: this.queueObservability.snapshot(),
       diagnostics,
     }
   }

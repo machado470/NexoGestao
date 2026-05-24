@@ -5,6 +5,7 @@ import { createHmac } from 'crypto'
 import { QUEUE_CONNECTION, QUEUE_DEFAULT_WORKER_OPTIONS, QUEUE_NAMES, WEBHOOK_QUEUE_JOB_NAMES } from '../queue.constants'
 import { QueueService } from '../queue.service'
 import { WebhookService } from '../../webhooks/webhook.service'
+import { QueueObservabilityService } from '../../common/metrics/queue-observability.service'
 
 @Injectable()
 export class WebhookProcessor implements OnModuleInit, OnModuleDestroy {
@@ -15,6 +16,7 @@ export class WebhookProcessor implements OnModuleInit, OnModuleDestroy {
     @Inject(QUEUE_CONNECTION) private readonly connection: IORedis,
     private readonly queueService: QueueService,
     private readonly webhookService: WebhookService,
+    private readonly queueMetrics: QueueObservabilityService,
   ) {}
 
   async onModuleInit() {
@@ -35,10 +37,13 @@ export class WebhookProcessor implements OnModuleInit, OnModuleDestroy {
 
           const payloadText = JSON.stringify(delivery.payload)
           const signature = createHmac('sha256', delivery.endpoint.secret).update(payloadText).digest('hex')
+          const webhookStartedAt = Date.now()
           const response = await fetch(delivery.endpoint.url, {
             signal: AbortSignal.timeout(15_000), method: 'POST', headers: { 'content-type': 'application/json', 'x-nexo-signature': signature }, body: payloadText,
           })
 
+          const webhookLatencyMs = Date.now() - webhookStartedAt
+          this.queueMetrics.observeDuration('webhook.dispatch.latency_ms', webhookLatencyMs)
           if (!response.ok) throw new Error(`Webhook HTTP error status=${response.status}`)
 
           await this.webhookService.markDeliveryAttempt({ deliveryId: delivery.id, attempts: job.attemptsMade + 1, status: 'SUCCESS' })
@@ -69,6 +74,8 @@ export class WebhookProcessor implements OnModuleInit, OnModuleDestroy {
     const deliveryId = job?.data?.deliveryId ?? null
     const delivery = deliveryId ? await this.webhookService.getDeliveryContext(deliveryId) : null
 
+    this.queueMetrics.increment('webhook.dispatch.failed.total')
+    if (!finalFailure) this.queueMetrics.increment('webhook.dispatch.retry.total')
     this.logger.warn(JSON.stringify({ action: 'webhook.dispatch.job_failed', queue: QUEUE_NAMES.WEBHOOKS, jobId: job?.id?.toString() ?? null, attemptsMade, maxAttempts, finalFailure, deliveryId, orgId: delivery?.endpoint?.orgId ?? null, webhookId: delivery?.endpointId ?? null, error: err.message }))
 
     if (!job || !deliveryId) return
@@ -86,6 +93,7 @@ export class WebhookProcessor implements OnModuleInit, OnModuleDestroy {
       jobId: job.id?.toString() ?? null,
     }, { jobId: `webhook:dispatch:dlq:${deliveryId}` })
 
+    this.queueMetrics.increment('webhook.dispatch.dlq.total')
     this.logger.error(JSON.stringify({ action: 'webhook.dispatch.job_dead_lettered', queue: QUEUE_NAMES.WEBHOOKS_DLQ, jobId: job.id?.toString() ?? null, deliveryId, orgId: delivery?.endpoint?.orgId ?? null, webhookId: delivery?.endpointId ?? null, attemptsMade, error: err.message }))
   }
 

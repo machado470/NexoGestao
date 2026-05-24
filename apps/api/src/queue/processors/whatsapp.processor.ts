@@ -21,6 +21,7 @@ import {
 } from '../queue.constants'
 import { QueueService } from '../queue.service'
 import { WhatsAppObservabilityService } from '../../common/metrics/whatsapp-observability.service'
+import { QueueObservabilityService } from '../../common/metrics/queue-observability.service'
 
 @Injectable()
 export class WhatsAppProcessor implements OnModuleInit, OnModuleDestroy {
@@ -33,6 +34,7 @@ export class WhatsAppProcessor implements OnModuleInit, OnModuleDestroy {
     private readonly whatsApp: WhatsAppService,
     private readonly queueService: QueueService,
     private readonly waMetrics: WhatsAppObservabilityService,
+    private readonly queueMetrics: QueueObservabilityService,
   ) {}
 
   async process(job: Job<any>) {
@@ -84,6 +86,7 @@ export class WhatsAppProcessor implements OnModuleInit, OnModuleDestroy {
       const latencyMs = Date.now() - startedAt
       this.waMetrics.incInboundWebhookCompleted()
       this.waMetrics.observeProcessingDuration(latencyMs)
+      this.queueMetrics.observeDuration('whatsapp.inbound_webhook.latency_ms', latencyMs)
       this.logger.log(
         JSON.stringify({
           action: 'whatsapp.inbound_webhook.job_completed',
@@ -217,6 +220,7 @@ export class WhatsAppProcessor implements OnModuleInit, OnModuleDestroy {
     const isInboundWebhook =
       job?.name === WHATSAPP_QUEUE_JOB_NAMES.INBOUND_WEBHOOK
     this.waMetrics.incRetry()
+    this.queueMetrics.increment('whatsapp.job.retry.total')
     this.logger.warn(
       JSON.stringify({
         action: isInboundWebhook
@@ -240,8 +244,10 @@ export class WhatsAppProcessor implements OnModuleInit, OnModuleDestroy {
 
     if (job && finalFailure) {
       this.waMetrics.incFailedJobs()
+      this.queueMetrics.increment('whatsapp.job.failed.total')
       if (isInboundWebhook) {
         this.waMetrics.incInboundWebhookDeadLettered()
+        this.queueMetrics.increment('whatsapp.inbound_webhook.dlq.total')
         await this.whatsApp.deadLetterWebhookEvent({
           id: job.data?.webhookEventId,
           orgId: job.data?.orgId,

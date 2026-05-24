@@ -28,7 +28,7 @@ describe('WhatsAppProcessor inbound webhook jobs', () => {
       incRetry: jest.fn(),
       observeProcessingDuration: jest.fn(),
     }
-    const processor = new WhatsAppProcessor({} as any, whatsApp as any, queueService as any, metrics as any)
+    const processor = new WhatsAppProcessor({} as any, whatsApp as any, queueService as any, metrics as any, { increment: jest.fn(), observeDuration: jest.fn() } as any)
     return { processor, whatsApp, queueService, metrics }
   }
 

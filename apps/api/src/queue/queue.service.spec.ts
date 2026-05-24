@@ -44,7 +44,7 @@ describe('QueueService degraded mode', () => {
     const redis = new FakeRedis()
     redis.status = 'connecting'
     process.nextTick(() => redis.emit('error', new Error('ECONNREFUSED')))
-    const service = new QueueService(redis as any, {} as any)
+    const service = new QueueService(redis as any, {} as any, { increment: jest.fn(), setGauge: jest.fn() } as any)
 
     expect(queueCtor).not.toHaveBeenCalled()
     expect(queueEventsCtor).not.toHaveBeenCalled()
@@ -68,7 +68,7 @@ describe('QueueService degraded mode', () => {
       redis.status = 'ready'
       redis.emit('ready')
     })
-    const service = new QueueService(redis as any, {} as any)
+    const service = new QueueService(redis as any, {} as any, { increment: jest.fn(), setGauge: jest.fn() } as any)
 
     await expect(service.ensureEnabled()).resolves.toBe(true)
     await expect(service.ensureEnabled()).resolves.toBe(true)
