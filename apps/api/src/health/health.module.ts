@@ -6,11 +6,12 @@ import { InternalStatsController } from './internal-stats.controller'
 import { WhatsAppObservabilityService } from '../common/metrics/whatsapp-observability.service'
 import { OperationalDiagnosticsService } from './operational-diagnostics.service'
 import { OperationalSignalsService } from './operational-signals.service'
+import { QueueMetricsExporterService } from '../common/metrics/queue-metrics-exporter.service'
 
 @Module({
   imports: [PrismaModule, QueueModule],
   controllers: [HealthController, InternalStatsController],
-  providers: [WhatsAppObservabilityService, OperationalDiagnosticsService, OperationalSignalsService],
+  providers: [WhatsAppObservabilityService, OperationalDiagnosticsService, OperationalSignalsService, QueueMetricsExporterService],
   exports: [WhatsAppObservabilityService],
 })
 export class HealthModule {}

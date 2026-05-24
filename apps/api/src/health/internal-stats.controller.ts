@@ -1,4 +1,5 @@
 import { Controller, Get, Query, Request, UseGuards } from '@nestjs/common'
+import { QueueMetricsExporterService } from '../common/metrics/queue-metrics-exporter.service'
 import { QueueService } from '../queue/queue.service'
 import { WhatsAppObservabilityService } from '../common/metrics/whatsapp-observability.service'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
@@ -16,6 +17,7 @@ export class InternalStatsController {
     private readonly operationalDiagnosticsService: OperationalDiagnosticsService,
     private readonly operationalSignalsService: OperationalSignalsService,
     private readonly queueObservability: QueueObservabilityService,
+    private readonly queueMetricsExporter: QueueMetricsExporterService,
   ) {}
 
   @Get('stats')
@@ -33,6 +35,13 @@ export class InternalStatsController {
     }
   }
 
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @Get('metrics')
+  metrics() {
+    return this.queueMetricsExporter.exportJson()
+  }
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
   @Get('diagnostics/operational')
