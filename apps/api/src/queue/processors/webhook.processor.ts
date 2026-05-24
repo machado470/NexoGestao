@@ -34,12 +34,13 @@ export class WebhookProcessor implements OnModuleInit, OnModuleDestroy {
 
           const delivery = await this.webhookService.getDeliveryContext(job.data.deliveryId)
           if (!delivery || !delivery.endpoint?.active) return
+          const correlationId = job.data?.meta?.correlationId ?? job.data?.correlationId ?? null
 
           const payloadText = JSON.stringify(delivery.payload)
           const signature = createHmac('sha256', delivery.endpoint.secret).update(payloadText).digest('hex')
           const webhookStartedAt = Date.now()
           const response = await fetch(delivery.endpoint.url, {
-            signal: AbortSignal.timeout(15_000), method: 'POST', headers: { 'content-type': 'application/json', 'x-nexo-signature': signature }, body: payloadText,
+            signal: AbortSignal.timeout(15_000), method: 'POST', headers: { 'content-type': 'application/json', 'x-nexo-signature': signature, ...(correlationId ? { 'x-correlation-id': String(correlationId) } : {}) }, body: payloadText,
           })
 
           const webhookLatencyMs = Date.now() - webhookStartedAt
@@ -76,7 +77,7 @@ export class WebhookProcessor implements OnModuleInit, OnModuleDestroy {
 
     this.queueMetrics.increment('webhook.dispatch.failed.total')
     if (!finalFailure) this.queueMetrics.increment('webhook.dispatch.retry.total')
-    this.logger.warn(JSON.stringify({ action: 'webhook.dispatch.job_failed', queue: QUEUE_NAMES.WEBHOOKS, jobId: job?.id?.toString() ?? null, attemptsMade, maxAttempts, finalFailure, deliveryId, orgId: delivery?.endpoint?.orgId ?? null, webhookId: delivery?.endpointId ?? null, error: err.message }))
+    this.logger.warn(JSON.stringify({ action: 'webhook.dispatch.job_failed', queue: QUEUE_NAMES.WEBHOOKS, jobId: job?.id?.toString() ?? null, requestId: job?.data?.meta?.requestId ?? job?.data?.requestId ?? null, correlationId: job?.data?.meta?.correlationId ?? job?.data?.correlationId ?? null, attemptsMade, maxAttempts, finalFailure, deliveryId, orgId: delivery?.endpoint?.orgId ?? null, webhookId: delivery?.endpointId ?? null, error: err.message }))
 
     if (!job || !deliveryId) return
 

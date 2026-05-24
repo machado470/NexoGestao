@@ -4,6 +4,8 @@ import IORedis from 'ioredis'
 import { PrismaService } from '../prisma/prisma.service'
 import { QUEUE_CONNECTION, QUEUE_DEFAULT_JOB_OPTIONS, QUEUE_NAMES, QueueName } from './queue.constants'
 import { QueueObservabilityService } from '../common/metrics/queue-observability.service'
+import { RequestContextService } from '../common/context/request-context.service'
+import { sanitizeTracingId } from '../common/context/request-tracing.util'
 
 @Injectable()
 export class QueueService implements OnModuleInit, OnModuleDestroy {
@@ -21,7 +23,28 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     private readonly connection: IORedis,
     private readonly prisma: PrismaService,
     private readonly queueMetrics: QueueObservabilityService,
+    private readonly requestContext: RequestContextService,
   ) {}
+
+  private withRequestTracing<T>(payload: T): T {
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return payload
+    const data = payload as Record<string, unknown>
+    const currentMeta = (data.meta && typeof data.meta === 'object' && !Array.isArray(data.meta))
+      ? data.meta as Record<string, unknown>
+      : {}
+    const requestId = sanitizeTracingId(currentMeta.requestId) ?? sanitizeTracingId(data.requestId) ?? this.requestContext.requestId
+    const correlationId = sanitizeTracingId(currentMeta.correlationId) ?? sanitizeTracingId(data.correlationId) ?? this.requestContext.correlationId ?? requestId
+    return {
+      ...data,
+      meta: {
+        ...currentMeta,
+        ...(requestId ? { requestId } : {}),
+        ...(correlationId ? { correlationId } : {}),
+      },
+      ...(requestId ? { requestId } : {}),
+      ...(correlationId ? { correlationId } : {}),
+    } as T
+  }
 
   async onModuleInit() {
     await this.ensureEnabled()
@@ -201,7 +224,8 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     let job: Job<T>
 
     try {
-      job = await queue.add(name, payload, {
+      const payloadWithTracing = this.withRequestTracing(payload)
+      job = await queue.add(name, payloadWithTracing, {
         ...QUEUE_DEFAULT_JOB_OPTIONS,
         ...options,
       })

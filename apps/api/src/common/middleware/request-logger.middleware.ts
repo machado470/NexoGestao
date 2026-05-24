@@ -1,8 +1,8 @@
 import { Injectable, NestMiddleware } from '@nestjs/common'
 import { Request, Response, NextFunction } from 'express'
-import { randomUUID } from 'crypto'
 import { MetricsService } from '../metrics/metrics.service'
 import { trace } from '@opentelemetry/api'
+import { resolveRequestTracing } from '../context/request-tracing.util'
 
 @Injectable()
 export class RequestLoggerMiddleware implements NestMiddleware {
@@ -30,9 +30,7 @@ export class RequestLoggerMiddleware implements NestMiddleware {
     const startTime = Date.now()
 
     // ✅ Gera ou propaga requestId para rastreabilidade
-    const requestId = (req.headers['x-request-id'] as string) || randomUUID()
-    const correlationId =
-      (req.headers['x-correlation-id'] as string) || requestId
+    const { requestId, correlationId } = resolveRequestTracing(req.headers as Record<string, unknown>)
     ;(req as any).requestId = requestId
     ;(req as any).correlationId = correlationId
     res.setHeader('X-Request-ID', requestId)
