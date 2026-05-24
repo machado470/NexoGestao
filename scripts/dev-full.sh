@@ -277,6 +277,11 @@ docker compose -f docker-compose.yml up -d postgres redis >/dev/null
 # 4) validar infra
 wait_tcp 127.0.0.1 5432 60 || fail "Banco PostgreSQL não disponível na porta 5432. Verifique: pnpm dev:logs"
 wait_tcp 127.0.0.1 6379 60 || fail "Redis não disponível na porta 6379. Verifique: pnpm dev:logs"
+echo "[BOOT] aguardando postgres aceitar conexões..."
+until docker exec nexogestao_postgres pg_isready -U postgres >/dev/null 2>&1; do
+  sleep 2
+done
+echo "[BOOT] postgres pronto"
 
 # 5) sincronizar Prisma (migrations -> generate -> seed opcional)
 log "[BOOT] aplicando migrations Prisma..."
