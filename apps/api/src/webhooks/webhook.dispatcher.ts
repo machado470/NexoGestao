@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { QueueService } from '../queue/queue.service'
-import { QUEUE_NAMES } from '../queue/queue.constants'
+import { QUEUE_NAMES, WEBHOOK_QUEUE_JOB_NAMES } from '../queue/queue.constants'
 import { WebhookService } from './webhook.service'
 
 @Injectable()
@@ -44,7 +44,7 @@ export class WebhookDispatcher {
 
       await this.queueService.addJob(
         QUEUE_NAMES.WEBHOOKS,
-        'dispatch-webhook',
+        WEBHOOK_QUEUE_JOB_NAMES.DISPATCH,
         {
           deliveryId: delivery.id,
         },
