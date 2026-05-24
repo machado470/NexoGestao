@@ -191,7 +191,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
           ...QUEUE_DEFAULT_JOB_OPTIONS,
           ...options,
         },
-      } as Job<T>
+      } as unknown as Job<T>
     }
 
     const queue = this.getQueue(queueName)
