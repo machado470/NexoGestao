@@ -15,6 +15,7 @@ import type {
 } from './execution.types'
 import { MetricsService } from '../common/metrics/metrics.service'
 import { TenantOperationsService } from '../common/tenant-ops/tenant-ops.service'
+import { buildOperationalLogContext } from '../common/logging/operational-log-context'
 import {
   CommercialPolicyService,
   isCommercialBlocked,
@@ -1096,14 +1097,17 @@ export class ExecutionRunner {
 
       this.logger.error(
         JSON.stringify({
-          event: 'execution_runner_failed',
-          orgId: candidate.orgId,
-          actionId: candidate.actionId,
-          entityType: candidate.entityType,
-          entityId: candidate.entityId,
+          ...buildOperationalLogContext({
+            event: 'execution_runner_failed',
+            orgId: candidate.orgId,
+            correlationId: executionContext.correlationId,
+            actionId: candidate.actionId,
+            entityType: candidate.entityType,
+            entityId: candidate.entityId,
+            error,
+          }),
           decisionId: candidate.decisionId,
           executionKey,
-          error: error instanceof Error ? error.message : String(error),
         }),
       )
       this.countOperationalStatus('failed')

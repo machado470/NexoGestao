@@ -5,6 +5,7 @@ import { UpdateWebhookDto } from './dto/update-webhook.dto'
 import { randomBytes } from 'crypto'
 import { QueueService } from '../queue/queue.service'
 import { QUEUE_NAMES, WEBHOOK_QUEUE_JOB_NAMES } from '../queue/queue.constants'
+import { buildOperationalLogContext } from '../common/logging/operational-log-context'
 
 @Injectable()
 export class WebhookService {
@@ -242,10 +243,26 @@ export class WebhookService {
     }
 
     if (delivery.status === 'SUCCESS') {
+      this.logger.warn(JSON.stringify(buildOperationalLogContext({
+        event: 'webhook.delivery.replay_blocked',
+        orgId: input.orgId,
+        deliveryId: delivery.id,
+        webhookId: delivery.endpointId,
+        errorCode: 'INVALID_STATUS',
+        errorMessage: 'Webhook delivery em SUCCESS não permite replay',
+      })))
       throw new BadRequestException('Webhook delivery em SUCCESS não permite replay')
     }
 
     if (delivery.status !== 'FAILED') {
+      this.logger.warn(JSON.stringify(buildOperationalLogContext({
+        event: 'webhook.delivery.replay_blocked',
+        orgId: input.orgId,
+        deliveryId: delivery.id,
+        webhookId: delivery.endpointId,
+        errorCode: 'INVALID_STATUS',
+        errorMessage: `Webhook delivery com status=${delivery.status} não permite replay`,
+      })))
       throw new BadRequestException(`Webhook delivery com status=${delivery.status} não permite replay`)
     }
 
@@ -271,14 +288,16 @@ export class WebhookService {
     )
 
     this.logger.log(JSON.stringify({
-      action: 'webhook.delivery.replay_requested',
-      orgId: input.orgId,
-      deliveryId: delivery.id,
-      webhookId: delivery.endpointId,
+      ...buildOperationalLogContext({
+        event: 'webhook.delivery.replay_requested',
+        orgId: input.orgId,
+        jobId,
+        deliveryId: delivery.id,
+        webhookId: delivery.endpointId,
+      }),
       actorUserId: input.actorUserId,
       previousStatus: 'FAILED',
       nextStatus: 'PENDING',
-      jobId,
     }))
 
     return { ok: true, deliveryId: delivery.id, jobId, previousStatus: 'FAILED', nextStatus: 'PENDING' as const }
