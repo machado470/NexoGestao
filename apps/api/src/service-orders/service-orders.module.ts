@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common'
 import { ServiceOrdersService } from './service-orders.service'
 import { ServiceOrdersController } from './service-orders.controller'
+import { ServiceOrderTenantAccessGuard } from './service-order-tenant-access.guard'
 
 import { PrismaModule } from '../prisma/prisma.module'
 import { TimelineModule } from '../timeline/timeline.module'
@@ -29,7 +30,7 @@ import { AnalyticsModule } from '../analytics/analytics.module'
     AnalyticsModule,
   ],
   controllers: [ServiceOrdersController],
-  providers: [ServiceOrdersService],
+  providers: [ServiceOrdersService, ServiceOrderTenantAccessGuard],
   exports: [ServiceOrdersService],
 })
 export class ServiceOrdersModule {}

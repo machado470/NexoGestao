@@ -17,6 +17,7 @@ import { Org } from '../auth/decorators/org.decorator'
 import { User } from '../auth/decorators/user.decorator'
 
 import { ServiceOrdersService } from './service-orders.service'
+import { ServiceOrderTenantAccessGuard } from './service-order-tenant-access.guard'
 import { CreateServiceOrderDto } from './dto/create-service-order.dto'
 import { UpdateServiceOrderDto } from './dto/update-service-order.dto'
 import { QuotasService } from '../quotas/quotas.service'
@@ -75,6 +76,7 @@ export class ServiceOrdersController {
 
   @Patch(':id')
   @Roles('ADMIN', 'MANAGER', 'STAFF')
+  @UseGuards(ServiceOrderTenantAccessGuard)
   update(
     @Org() orgId: string,
     @User() user: any,

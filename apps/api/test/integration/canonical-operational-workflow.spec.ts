@@ -86,6 +86,11 @@ describeRealIntegration('Canonical Operational Workflow (e2e)', () => {
         await prisma.customer.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
         await prisma.timelineEvent.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
         await prisma.auditEvent.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
+        await prisma.usageMetric.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
+        await prisma.idempotencyRecord.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
+        await prisma.organizationExecutionConfig.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
+        await prisma.tenantFeatureOverride.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
+        await prisma.subscription.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
         await prisma.person.deleteMany({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
         await prisma.organization.deleteMany({ where: { id: { in: [primaryOrgId, secondaryOrgId] } } })
       }
