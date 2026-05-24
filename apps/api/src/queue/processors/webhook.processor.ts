@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nest
 import { Job, Worker } from 'bullmq'
 import IORedis from 'ioredis'
 import { createHmac } from 'crypto'
-import { QUEUE_CONNECTION, QUEUE_DEFAULT_WORKER_OPTIONS, QUEUE_NAMES } from '../queue.constants'
+import { QUEUE_CONNECTION, QUEUE_DEFAULT_WORKER_OPTIONS, QUEUE_NAMES, WEBHOOK_QUEUE_JOB_NAMES } from '../queue.constants'
 import { QueueService } from '../queue.service'
 import { WebhookService } from '../../webhooks/webhook.service'
 
@@ -27,46 +27,30 @@ export class WebhookProcessor implements OnModuleInit, OnModuleDestroy {
       this.worker = new Worker(
         QUEUE_NAMES.WEBHOOKS,
         async (job: Job<any>) => {
-          await this.queueService.updateJobStatus({
-            queue: QUEUE_NAMES.WEBHOOKS,
-            jobId: job.id?.toString() ?? '',
-            status: 'ACTIVE',
-          })
-
-          if (job.name !== 'dispatch-webhook') return
+          await this.queueService.updateJobStatus({ queue: QUEUE_NAMES.WEBHOOKS, jobId: job.id?.toString() ?? '', status: 'ACTIVE' })
+          if (job.name !== WEBHOOK_QUEUE_JOB_NAMES.DISPATCH) return
 
           const delivery = await this.webhookService.getDeliveryContext(job.data.deliveryId)
           if (!delivery || !delivery.endpoint?.active) return
 
           const payloadText = JSON.stringify(delivery.payload)
-          const signature = createHmac('sha256', delivery.endpoint.secret)
-            .update(payloadText)
-            .digest('hex')
-
+          const signature = createHmac('sha256', delivery.endpoint.secret).update(payloadText).digest('hex')
           const response = await fetch(delivery.endpoint.url, {
-            signal: AbortSignal.timeout(15_000),
-            method: 'POST',
-            headers: {
-              'content-type': 'application/json',
-              'x-nexo-signature': signature,
-            },
-            body: payloadText,
+            signal: AbortSignal.timeout(15_000), method: 'POST', headers: { 'content-type': 'application/json', 'x-nexo-signature': signature }, body: payloadText,
           })
 
-          if (!response.ok) {
-            throw new Error(`Webhook HTTP error status=${response.status}`)
-          }
+          if (!response.ok) throw new Error(`Webhook HTTP error status=${response.status}`)
 
-          await this.queueService.updateJobStatus({
-            queue: QUEUE_NAMES.WEBHOOKS,
-            jobId: job.id?.toString() ?? '',
-            status: 'COMPLETED',
-            completed: true,
-          })
+          await this.webhookService.markDeliveryAttempt({ deliveryId: delivery.id, attempts: job.attemptsMade + 1, status: 'SUCCESS' })
+          await this.queueService.updateJobStatus({ queue: QUEUE_NAMES.WEBHOOKS, jobId: job.id?.toString() ?? '', status: 'COMPLETED', completed: true })
         },
         { connection: this.connection, ...QUEUE_DEFAULT_WORKER_OPTIONS },
       )
 
+      this.worker.on('failed', async (job, error) => {
+        await this.handleFailedJob(job, error)
+      })
+      this.worker.on('stalled', (jobId) => this.logger.warn(JSON.stringify({ action: 'webhook.dispatch.job_stalled', queue: QUEUE_NAMES.WEBHOOKS, jobId })))
       this.worker.on('error', (error) => {
         this.logger.error(`Webhook worker error: ${error.message}`)
       })
@@ -76,6 +60,33 @@ export class WebhookProcessor implements OnModuleInit, OnModuleDestroy {
       const error = err as Error
       this.logger.error(`Falha ao iniciar webhook worker: ${error.message}`)
     }
+  }
+
+  async handleFailedJob(job: Job<any> | undefined, err: Error) {
+    const attemptsMade = job?.attemptsMade ?? 0
+    const maxAttempts = job?.opts.attempts ?? 1
+    const finalFailure = !!job && attemptsMade >= maxAttempts
+    const deliveryId = job?.data?.deliveryId ?? null
+    const delivery = deliveryId ? await this.webhookService.getDeliveryContext(deliveryId) : null
+
+    this.logger.warn(JSON.stringify({ action: 'webhook.dispatch.job_failed', queue: QUEUE_NAMES.WEBHOOKS, jobId: job?.id?.toString() ?? null, attemptsMade, maxAttempts, finalFailure, deliveryId, orgId: delivery?.endpoint?.orgId ?? null, webhookId: delivery?.endpointId ?? null, error: err.message }))
+
+    if (!job || !deliveryId) return
+
+    await this.webhookService.markDeliveryAttempt({ deliveryId, attempts: attemptsMade, status: finalFailure ? 'FAILED' : 'PENDING' })
+
+    if (!finalFailure) return
+
+    await this.queueService.addJob(QUEUE_NAMES.WEBHOOKS_DLQ, WEBHOOK_QUEUE_JOB_NAMES.DISPATCH_DLQ, {
+      deliveryId,
+      orgId: delivery?.endpoint?.orgId ?? null,
+      webhookId: delivery?.endpointId ?? null,
+      failedReason: err.message,
+      attemptsMade,
+      jobId: job.id?.toString() ?? null,
+    }, { jobId: `webhook:dispatch:dlq:${deliveryId}` })
+
+    this.logger.error(JSON.stringify({ action: 'webhook.dispatch.job_dead_lettered', queue: QUEUE_NAMES.WEBHOOKS_DLQ, jobId: job.id?.toString() ?? null, deliveryId, orgId: delivery?.endpoint?.orgId ?? null, webhookId: delivery?.endpointId ?? null, attemptsMade, error: err.message }))
   }
 
   async onModuleDestroy() {

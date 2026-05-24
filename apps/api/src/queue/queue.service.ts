@@ -261,6 +261,22 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
       result[queueName] = counts
     }
 
+    const webhookFailed = Number(result[QUEUE_NAMES.WEBHOOKS]?.failed ?? 0)
+    const webhookDlqWaiting = Number(result[QUEUE_NAMES.WEBHOOKS_DLQ]?.waiting ?? 0)
+    const degraded = webhookFailed > 0 || webhookDlqWaiting > 0
+
+    if (degraded) {
+      return {
+        ok: false,
+        reason: 'queue_degraded_webhook_failures',
+        details: {
+          webhookFailed,
+          webhookDlqWaiting,
+        },
+        queues: result,
+      }
+    }
+
     return result
   }
 

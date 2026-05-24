@@ -5,6 +5,7 @@ export const QUEUE_NAMES = {
   WHATSAPP_DLQ: 'whatsapp-dlq',
   FINANCE: 'finance',
   WEBHOOKS: 'webhooks',
+  WEBHOOKS_DLQ: 'webhooks-dlq',
 } as const
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES]
@@ -35,3 +36,9 @@ export const QUEUE_DEFAULT_WORKER_OPTIONS = {
 } as const
 
 export const QUEUE_CONNECTION = 'QUEUE_CONNECTION'
+
+
+export const WEBHOOK_QUEUE_JOB_NAMES = {
+  DISPATCH: 'dispatch-webhook',
+  DISPATCH_DLQ: 'webhook.dispatch.dlq',
+} as const
