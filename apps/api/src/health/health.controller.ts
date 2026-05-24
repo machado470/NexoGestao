@@ -51,7 +51,10 @@ export class HealthController {
           ok: false,
           reason: error instanceof Error ? error.message : String(error),
         }))
-      : { ok: true, reason: 'queue_service_not_bound' }
+      : {
+          ok: false,
+          reason: 'queue_service_not_bound',
+        }
     const queue = {
       ok: (queueSummary as any)?.ok === false ? false : true,
       provider: 'bullmq',
@@ -69,6 +72,11 @@ export class HealthController {
     }
 
     const ok = database.ok && prismaClient.ok && queue.ok
+    const degradedReasons = [
+      ...(database.ok ? [] : ['database_unavailable']),
+      ...(prismaClient.ok ? [] : ['prisma_unavailable']),
+      ...(queue.ok ? [] : [(queue.summary as any)?.reason ?? 'queue_unavailable']),
+    ]
 
     let diagnostics: Record<string, unknown> | undefined
     if (includeDetails) {
@@ -109,6 +117,7 @@ export class HealthController {
         prismaClient,
         queue,
       },
+      degradedReasons,
       metrics: this.metrics.snapshot(),
       diagnostics,
     }
