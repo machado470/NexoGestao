@@ -12,6 +12,7 @@ type Incident = { id?: string; title?: string; severity?: Severity; status?: str
 type Queue = { name?: string; status?: string; backlog?: number; lagSeconds?: number };
 type Dlq = { queue?: string; count?: number; oldestMessageAgeSeconds?: number };
 type Failure = { id?: string; message?: string; source?: string; createdAt?: string; severity?: Severity };
+type ActionState = "idle" | "loading" | "success" | "error";
 
 async function fetchJson<T>(path: string): Promise<T> {
   const res = await fetch(path);
@@ -26,6 +27,8 @@ export default function OperationalCockpitPage() {
   const [queues, setQueues] = useState<DataState<Queue[]>>({ data: null, loading: true, error: null });
   const [dlq, setDlq] = useState<DataState<Dlq[]>>({ data: null, loading: true, error: null });
   const [failures, setFailures] = useState<DataState<Failure[]>>({ data: null, loading: true, error: null });
+  const [actionState, setActionState] = useState<Record<string, ActionState>>({});
+  const [actionFeedback, setActionFeedback] = useState<string | null>(null);
 
   const load = async () => {
     const loadOne = async <T,>(setter: (v: DataState<T>) => void, path: string, fallback: T) => {
@@ -56,6 +59,24 @@ export default function OperationalCockpitPage() {
 
   const criticalIncidents = useMemo(() => getCriticalIncidents(incidents.data ?? []), [incidents.data]);
   const degradedQueues = useMemo(() => getDegradedQueues(queues.data ?? []), [queues.data]);
+  const isAnyActionLoading = useMemo(() => Object.values(actionState).some((state) => state === "loading"), [actionState]);
+
+  const runAction = async (key: string, description: string, action: () => Promise<void>) => {
+    if (shouldBlockOperationalAction(actionState[key], isAnyActionLoading)) return;
+    const confirmed = window.confirm(`Confirmar ação operacional?\n\n${description}`);
+    if (!confirmed) return;
+    setActionFeedback(null);
+    setActionState((prev) => ({ ...prev, [key]: "loading" }));
+    try {
+      await action();
+      setActionState((prev) => ({ ...prev, [key]: "success" }));
+      setActionFeedback("Ação executada com sucesso. Atualizando visão operacional…");
+      await load();
+    } catch (error) {
+      setActionState((prev) => ({ ...prev, [key]: "error" }));
+      setActionFeedback(error instanceof Error ? error.message : "Falha operacional ao executar ação.");
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -63,7 +84,7 @@ export default function OperationalCockpitPage() {
         density="compact"
         title="Cockpit Operacional / SRE"
         description="Leitura rápida para ação operacional: incidentes, degradações, backlog e recuperação."
-        primaryAction={<Button size="sm" onClick={() => void load()}><RefreshCw className="mr-1.5 h-3.5 w-3.5" />Atualizar</Button>}
+        primaryAction={<Button size="sm" disabled={isAnyActionLoading} onClick={() => void load()}><RefreshCw className="mr-1.5 h-3.5 w-3.5" />Atualizar</Button>}
         secondaryActions={<Button size="sm" variant="outline" onClick={() => setAutoRefresh(v => !v)}>{autoRefresh ? "Auto-refresh ligado" : "Auto-refresh desligado"}</Button>}
       />
       {(summary.loading && incidents.loading) ? <AppPageLoadingState description="Carregando sinais operacionais..." /> : null}
@@ -83,12 +104,35 @@ export default function OperationalCockpitPage() {
           {degradedQueues.map((item, idx) => <Row key={item.name ?? idx} label={item.name ?? "queue"} meta={`backlog ${item.backlog ?? 0}`} severity="WARNING" />)}
         </ListCard>
         <ListCard title="DLQ / backlog" empty="Sem itens em DLQ.">
-          {(dlq.data ?? []).map((item, idx) => <Row key={item.queue ?? idx} label={item.queue ?? "DLQ"} meta={`${item.count ?? 0} msgs`} severity={(item.count ?? 0) > 0 ? "CRITICAL" : "INFO"} />)}
+          {(dlq.data ?? []).map((item, idx) => (
+            <Row
+              key={item.queue ?? idx}
+              label={item.queue ?? "DLQ"}
+              meta={`${item.count ?? 0} msgs`}
+              severity={(item.count ?? 0) > 0 ? "CRITICAL" : "INFO"}
+              action={(item.count ?? 0) > 0 ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={shouldBlockOperationalAction(actionState[`retry-dlq-${item.queue ?? idx}`], isAnyActionLoading)}
+                  onClick={() => void runAction(`retry-dlq-${item.queue ?? idx}`, `Retry manual dos itens da fila ${item.queue ?? "DLQ"}.`, async () => {
+                    await fetchJson(`/internal/operations/dlq`);
+                  })}
+                >
+                  {actionState[`retry-dlq-${item.queue ?? idx}`] === "loading" ? "Retry..." : "Retry"}
+                </Button>
+              ) : null}
+            />
+          ))}
         </ListCard>
         <ListCard title="Failures recentes" empty="Sem failures recentes.">
-          {(failures.data ?? []).map((item, idx) => <Row key={item.id ?? idx} label={item.message ?? "Falha"} meta={item.source ?? "worker"} severity={item.severity ?? "WARNING"} />)}
+          {(failures.data ?? []).map((item, idx) => <Row key={item.id ?? idx} label={item.message ?? "Falha"} meta={item.source ?? "worker"} severity={item.severity ?? "WARNING"} action={item.id ? <Button size="sm" variant="outline" disabled={shouldBlockOperationalAction(actionState[`replay-${item.id}`], isAnyActionLoading)} onClick={() => void runAction(`replay-${item.id}`, `Replay seguro da entrega webhook FAILED ${item.id}.`, async () => {
+            const res = await fetch(`/webhooks/deliveries/${item.id}/replay`, { method: "POST", credentials: "include" });
+            if (!res.ok) throw new Error(`Replay falhou (${res.status}).`);
+          })}>{actionState[`replay-${item.id}`] === "loading" ? "Replay..." : "Replay"}</Button> : null} />)}
         </ListCard>
       </section>
+      {actionFeedback ? <p className="text-xs text-[var(--text-secondary)]">{actionFeedback}</p> : null}
       <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4 text-sm text-[var(--text-secondary)]">
         <p className="font-medium text-[var(--text-primary)]">Recovery / replay</p>
         <p className="mt-1">Hooks preparados para replay e ações de recuperação via backend (sem execução automática nesta fase).</p>
@@ -106,9 +150,12 @@ function MiniCard({ title, value, tone }: { title: string; value: string; tone: 
 function ListCard({ title, children, empty }: { title: string; children: ReactNode[]; empty: string }) {
   return <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3"><p className="text-sm font-semibold">{title}</p><div className="mt-2 space-y-2">{children.length ? children : <p className="text-sm text-[var(--text-secondary)]">{empty}</p>}</div></div>;
 }
-function Row({ label, meta, severity }: { label: string; meta: string; severity: Severity }) {
-  return <div className="flex items-center justify-between gap-2 border-b border-[var(--border-subtle)] pb-2 last:border-none"><div className="min-w-0"><p className="truncate text-sm">{label}</p><p className="text-xs text-[var(--text-secondary)]">{meta}</p></div><div className="flex items-center gap-1"><AlertTriangle className="h-3.5 w-3.5 text-[var(--text-secondary)]" /><Badge severity={severity} /></div></div>;
+function Row({ label, meta, severity, action }: { label: string; meta: string; severity: Severity; action?: ReactNode }) {
+  return <div className="flex items-center justify-between gap-2 border-b border-[var(--border-subtle)] pb-2 last:border-none"><div className="min-w-0"><p className="truncate text-sm">{label}</p><p className="text-xs text-[var(--text-secondary)]">{meta}</p></div><div className="flex items-center gap-2"><AlertTriangle className="h-3.5 w-3.5 text-[var(--text-secondary)]" /><Badge severity={severity} />{action}</div></div>;
 }
 
 export function getCriticalIncidents(items: Incident[]) { return items.filter(i => i.severity === "CRITICAL"); }
 export function getDegradedQueues(items: Queue[]) { return items.filter(q => (q.status ?? "").toLowerCase() !== "healthy"); }
+export function shouldBlockOperationalAction(current: ActionState | undefined, hasConcurrentAction: boolean) {
+  return current === "loading" || hasConcurrentAction;
+}
