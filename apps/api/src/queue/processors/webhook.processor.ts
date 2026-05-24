@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nest
 import { Job, Worker } from 'bullmq'
 import IORedis from 'ioredis'
 import { createHmac } from 'crypto'
-import { QUEUE_CONNECTION, QUEUE_NAMES } from '../queue.constants'
+import { QUEUE_CONNECTION, QUEUE_DEFAULT_WORKER_OPTIONS, QUEUE_NAMES } from '../queue.constants'
 import { QueueService } from '../queue.service'
 import { WebhookService } from '../../webhooks/webhook.service'
 
@@ -44,6 +44,7 @@ export class WebhookProcessor implements OnModuleInit, OnModuleDestroy {
             .digest('hex')
 
           const response = await fetch(delivery.endpoint.url, {
+            signal: AbortSignal.timeout(15_000),
             method: 'POST',
             headers: {
               'content-type': 'application/json',
@@ -63,7 +64,7 @@ export class WebhookProcessor implements OnModuleInit, OnModuleDestroy {
             completed: true,
           })
         },
-        { connection: this.connection },
+        { connection: this.connection, ...QUEUE_DEFAULT_WORKER_OPTIONS },
       )
 
       this.worker.on('error', (error) => {

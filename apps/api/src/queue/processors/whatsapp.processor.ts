@@ -15,6 +15,7 @@ import {
 import { createWhatsAppProvider } from '../../whatsapp/providers/provider.factory'
 import {
   QUEUE_CONNECTION,
+  QUEUE_DEFAULT_WORKER_OPTIONS,
   QUEUE_NAMES,
   WHATSAPP_QUEUE_JOB_NAMES,
 } from '../queue.constants'
@@ -292,6 +293,7 @@ export class WhatsAppProcessor implements OnModuleInit, OnModuleDestroy {
         async (job: Job<any>) => this.process(job),
         {
           connection: this.connection,
+          ...QUEUE_DEFAULT_WORKER_OPTIONS,
           concurrency: 5,
           limiter: { max: 10, duration: 1000 },
         },

@@ -21,8 +21,17 @@ export const QUEUE_DEFAULT_JOB_OPTIONS = {
   backoff: {
     type: 'exponential' as const,
     delay: 1_000,
+    jitter: 0.3,
   },
+  removeOnFail: 2_000,
   removeOnComplete: true,
 }
+
+export const QUEUE_DEFAULT_WORKER_OPTIONS = {
+  concurrency: 4,
+  lockDuration: 60_000,
+  stalledInterval: 30_000,
+  maxStalledCount: 1,
+} as const
 
 export const QUEUE_CONNECTION = 'QUEUE_CONNECTION'

@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nest
 import { Job, Worker } from 'bullmq'
 import IORedis from 'ioredis'
 import { FinanceService } from '../../finance/finance.service'
-import { QUEUE_CONNECTION, QUEUE_NAMES } from '../queue.constants'
+import { QUEUE_CONNECTION, QUEUE_DEFAULT_WORKER_OPTIONS, QUEUE_NAMES } from '../queue.constants'
 import { QueueService } from '../queue.service'
 
 @Injectable()
@@ -50,7 +50,7 @@ export class FinanceProcessor implements OnModuleInit, OnModuleDestroy {
             completed: true,
           })
         },
-        { connection: this.connection },
+        { connection: this.connection, ...QUEUE_DEFAULT_WORKER_OPTIONS },
       )
 
       this.worker.on('error', (error) => {

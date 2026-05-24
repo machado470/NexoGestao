@@ -50,7 +50,8 @@ export class WebhookDispatcher {
         },
         {
           attempts: 5,
-          backoff: { type: 'exponential', delay: 1_000 },
+          backoff: { type: 'exponential', delay: 1_000, jitter: 0.3 },
+          jobId: `webhook:dispatch:${delivery.id}`,
         },
       )
     }
