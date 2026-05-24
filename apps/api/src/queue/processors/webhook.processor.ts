@@ -6,6 +6,7 @@ import { QUEUE_CONNECTION, QUEUE_DEFAULT_WORKER_OPTIONS, QUEUE_NAMES, WEBHOOK_QU
 import { QueueService } from '../queue.service'
 import { WebhookService } from '../../webhooks/webhook.service'
 import { QueueObservabilityService } from '../../common/metrics/queue-observability.service'
+import { buildOperationalLogContext } from '../../common/logging/operational-log-context'
 
 @Injectable()
 export class WebhookProcessor implements OnModuleInit, OnModuleDestroy {
@@ -56,7 +57,7 @@ export class WebhookProcessor implements OnModuleInit, OnModuleDestroy {
       this.worker.on('failed', async (job, error) => {
         await this.handleFailedJob(job, error)
       })
-      this.worker.on('stalled', (jobId) => this.logger.warn(JSON.stringify({ action: 'webhook.dispatch.job_stalled', queue: QUEUE_NAMES.WEBHOOKS, jobId })))
+      this.worker.on('stalled', (jobId) => this.logger.warn(JSON.stringify(buildOperationalLogContext({ event: 'webhook.dispatch.job_stalled', jobId: jobId?.toString() ?? null }))))
       this.worker.on('error', (error) => {
         this.logger.error(`Webhook worker error: ${error.message}`)
       })
@@ -77,7 +78,22 @@ export class WebhookProcessor implements OnModuleInit, OnModuleDestroy {
 
     this.queueMetrics.increment('webhook.dispatch.failed.total')
     if (!finalFailure) this.queueMetrics.increment('webhook.dispatch.retry.total')
-    this.logger.warn(JSON.stringify({ action: 'webhook.dispatch.job_failed', queue: QUEUE_NAMES.WEBHOOKS, jobId: job?.id?.toString() ?? null, requestId: job?.data?.meta?.requestId ?? job?.data?.requestId ?? null, correlationId: job?.data?.meta?.correlationId ?? job?.data?.correlationId ?? null, attemptsMade, maxAttempts, finalFailure, deliveryId, orgId: delivery?.endpoint?.orgId ?? null, webhookId: delivery?.endpointId ?? null, error: err.message }))
+    this.logger.warn(JSON.stringify({
+      ...buildOperationalLogContext({
+        event: 'webhook.dispatch.job_failed',
+        orgId: delivery?.endpoint?.orgId ?? null,
+        requestId: job?.data?.meta?.requestId ?? job?.data?.requestId ?? null,
+        correlationId: job?.data?.meta?.correlationId ?? job?.data?.correlationId ?? null,
+        jobId: job?.id?.toString() ?? null,
+        deliveryId,
+        webhookId: delivery?.endpointId ?? null,
+        attempt: attemptsMade,
+        error: err,
+      }),
+      queue: QUEUE_NAMES.WEBHOOKS,
+      maxAttempts,
+      finalFailure,
+    }))
 
     if (!job || !deliveryId) return
 
@@ -95,7 +111,20 @@ export class WebhookProcessor implements OnModuleInit, OnModuleDestroy {
     }, { jobId: `webhook:dispatch:dlq:${deliveryId}` })
 
     this.queueMetrics.increment('webhook.dispatch.dlq.total')
-    this.logger.error(JSON.stringify({ action: 'webhook.dispatch.job_dead_lettered', queue: QUEUE_NAMES.WEBHOOKS_DLQ, jobId: job.id?.toString() ?? null, deliveryId, orgId: delivery?.endpoint?.orgId ?? null, webhookId: delivery?.endpointId ?? null, attemptsMade, error: err.message }))
+    this.logger.error(JSON.stringify({
+      ...buildOperationalLogContext({
+        event: 'webhook.dispatch.job_dead_lettered',
+        orgId: delivery?.endpoint?.orgId ?? null,
+        requestId: job?.data?.meta?.requestId ?? job?.data?.requestId ?? null,
+        correlationId: job?.data?.meta?.correlationId ?? job?.data?.correlationId ?? null,
+        jobId: job.id?.toString() ?? null,
+        deliveryId,
+        webhookId: delivery?.endpointId ?? null,
+        attempt: attemptsMade,
+        error: err,
+      }),
+      queue: QUEUE_NAMES.WEBHOOKS_DLQ,
+    }))
   }
 
   async onModuleDestroy() {

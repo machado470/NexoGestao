@@ -14,6 +14,7 @@ describe('WebhookProcessor DLQ hardening', () => {
     } as any
 
     const processor = new WebhookProcessor({} as any, queueService, webhookService, { increment: jest.fn(), observeDuration: jest.fn() } as any)
+    const warnSpy = jest.spyOn((processor as any).logger, 'warn')
     const job = { id: 'job-1', attemptsMade: 5, opts: { attempts: 5 }, data: { deliveryId: 'd1' } } as any
 
     await processor.handleFailedJob(job, new Error('timeout'))
@@ -25,5 +26,15 @@ describe('WebhookProcessor DLQ hardening', () => {
       expect.objectContaining({ deliveryId: 'd1', orgId: 'org1', webhookId: 'w1', attemptsMade: 5 }),
       { jobId: 'webhook:dispatch:dlq:d1' },
     )
+
+    const payload = JSON.parse((warnSpy.mock.calls[0]?.[0] ?? '{}') as string)
+    expect(payload).toEqual(expect.objectContaining({
+      event: 'webhook.dispatch.job_failed',
+      orgId: 'org1',
+      jobId: 'job-1',
+      deliveryId: 'd1',
+      webhookId: 'w1',
+      errorMessage: 'timeout',
+    }))
   })
 })
