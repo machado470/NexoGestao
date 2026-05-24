@@ -65,6 +65,8 @@ export class WhatsAppProcessor implements OnModuleInit, OnModuleDestroy {
         orgId: data.orgId,
         provider: data.provider,
         traceId: data.traceId ?? null,
+        requestId: data.meta?.requestId ?? data.requestId ?? null,
+        correlationId: data.meta?.correlationId ?? data.correlationId ?? null,
       }),
     )
 
@@ -96,6 +98,8 @@ export class WhatsAppProcessor implements OnModuleInit, OnModuleDestroy {
           orgId: data.orgId,
           provider: data.provider,
           traceId: data.traceId ?? null,
+          requestId: data.meta?.requestId ?? data.requestId ?? null,
+          correlationId: data.meta?.correlationId ?? data.correlationId ?? null,
           processed: result?.processed ?? 0,
           latencyMs,
         }),
@@ -125,6 +129,8 @@ export class WhatsAppProcessor implements OnModuleInit, OnModuleDestroy {
           orgId: data.orgId,
           provider: data.provider,
           traceId: data.traceId ?? null,
+          requestId: data.meta?.requestId ?? data.requestId ?? null,
+          correlationId: data.meta?.correlationId ?? data.correlationId ?? null,
           error: err.message,
           latencyMs: Date.now() - startedAt,
         }),
