@@ -56,6 +56,7 @@ const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const ProfilePage = lazy(() => import("./pages/ProfilePage"));
 const TimelinePage = lazy(() => import("./pages/TimelinePage"));
 const BillingPage = lazy(() => import("./pages/BillingPage"));
+const OperationalCockpitPage = lazy(() => import("./pages/OperationalCockpitPage"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
@@ -531,6 +532,10 @@ const BillingRoute = lazyProtectedPage(BillingPage, {
   requireCompletedOnboarding: true,
 });
 
+const OperationalCockpitRoute = lazyProtectedPage(OperationalCockpitPage, {
+  requireCompletedOnboarding: true,
+});
+
 function LegacyAliasRoute({
   targetPath,
   message,
@@ -573,6 +578,7 @@ function Router() {
       "/settings",
       "/timeline",
       "/billing",
+      "/cockpit",
       "/onboarding",
     ];
     const isAppRoute = appPrefixes.some(
@@ -694,6 +700,7 @@ function Router() {
       <Route path="/profile" component={ProfileRoute} />
       <Route path="/timeline" component={TimelineRoute} />
       <Route path="/billing" component={BillingRoute} />
+      <Route path="/cockpit/operations" component={OperationalCockpitRoute} />
       <Route
         path="/operations"
         component={() => (
