@@ -74,6 +74,25 @@ describe('WhatsAppService inbound/outbound', () => {
     expect(addJob).toHaveBeenCalled()
   })
 
+
+  it('deduplica outbound por messageKey sem violar unique', async () => {
+    const addJob = jest.fn().mockResolvedValue({ id: 'j1' })
+    const prisma: any = {
+      customer: { findFirst: jest.fn().mockResolvedValue({ id: 'c1', phone: '+5511999999999' }) },
+      whatsAppConversation: { findFirst: jest.fn().mockResolvedValue({ id: 'conv1', customerId: 'c1', phone: '+5511999999999' }), updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      whatsAppMessage: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'm-existing', createdAt: new Date(), customerId: 'c1', conversationId: 'conv1', status: 'QUEUED', messageKey: 'service_order_done:so1' }),
+        create: jest.fn(),
+      },
+    }
+    const svc = new WhatsAppService(prisma, { addJob } as any, { incOutbound: jest.fn(), incInbound: jest.fn(), incFailed: jest.fn(), incFailedWebhook: jest.fn(), incQueuedJobs: jest.fn(), observeProcessingDuration: jest.fn() } as any, { log: jest.fn().mockResolvedValue({}) } as any, { orgId: 'test-org', userId: 'test-user', requestId: 'test-request' } as any, { increment: jest.fn() } as any, { enforceMeter: jest.fn().mockResolvedValue({ allowed: true }) } as any)
+
+    const result = await svc.enqueueMessage('org1', { customerId: 'c1', content: 'oi', entityType: 'SERVICE_ORDER', entityId: 'so1', messageType: 'EXECUTION_CONFIRMATION', messageKey: 'service_order_done:so1' })
+
+    expect(result).toEqual(expect.objectContaining({ created: false, message: expect.objectContaining({ id: 'm-existing' }) }))
+    expect(prisma.whatsAppMessage.create).not.toHaveBeenCalled()
+    expect(addJob).not.toHaveBeenCalled()
+  })
   it('emite eventos críticos MESSAGE_SENT e PAYMENT_LINK_SENT ao marcar envio confirmado', async () => {
     const timeline = { log: jest.fn().mockResolvedValue({}) }
     const prisma: any = {
