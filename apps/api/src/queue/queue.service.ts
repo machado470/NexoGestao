@@ -3,6 +3,7 @@ import { Job, JobsOptions, JobScheduler, Queue, QueueOptions, QueueEvents } from
 import IORedis from 'ioredis'
 import { PrismaService } from '../prisma/prisma.service'
 import { QUEUE_CONNECTION, QUEUE_DEFAULT_JOB_OPTIONS, QUEUE_NAMES, QueueName } from './queue.constants'
+import { QueueObservabilityService } from '../common/metrics/queue-observability.service'
 
 @Injectable()
 export class QueueService implements OnModuleInit, OnModuleDestroy {
@@ -19,6 +20,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     @Inject(QUEUE_CONNECTION)
     private readonly connection: IORedis,
     private readonly prisma: PrismaService,
+    private readonly queueMetrics: QueueObservabilityService,
   ) {}
 
   async onModuleInit() {
@@ -46,6 +48,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
       this.redisEnabled = false
       this.logger.error(`Redis indisponível no bootstrap da fila: ${msg}`)
       this.logger.warn('Fila em modo degradado (sem Redis): jobs serão ignorados em ambiente local.')
+      this.queueMetrics.increment('queue.degraded.total')
       return false
     }
   }
@@ -205,6 +208,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
       this.logger.error(`Falha ao enfileirar job (${queueName}:${name}): ${msg}`)
+      this.queueMetrics.increment(`queue.job.enqueue.failed.${queueName}`)
       throw error
     }
 
@@ -261,11 +265,19 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
       result[queueName] = counts
     }
 
+    for (const [queueName, counts] of Object.entries(result)) {
+      const sample = counts as Record<string, number>
+      this.queueMetrics.setGauge(`queue.backlog.waiting.${queueName}`, Number(sample.waiting ?? 0))
+      this.queueMetrics.setGauge(`queue.backlog.failed.${queueName}`, Number(sample.failed ?? 0))
+      this.queueMetrics.setGauge(`queue.backlog.active.${queueName}`, Number(sample.active ?? 0))
+    }
+
     const webhookFailed = Number(result[QUEUE_NAMES.WEBHOOKS]?.failed ?? 0)
     const webhookDlqWaiting = Number(result[QUEUE_NAMES.WEBHOOKS_DLQ]?.waiting ?? 0)
     const degraded = webhookFailed > 0 || webhookDlqWaiting > 0
 
     if (degraded) {
+      this.queueMetrics.increment('queue.degraded.total')
       return {
         ok: false,
         reason: 'queue_degraded_webhook_failures',

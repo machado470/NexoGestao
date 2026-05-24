@@ -5,6 +5,7 @@ import { PrismaModule } from '../prisma/prisma.module'
 import { QUEUE_CONNECTION } from './queue.constants'
 import { QueueController } from './queue.controller'
 import { QueueService } from './queue.service'
+import { QueueObservabilityService } from '../common/metrics/queue-observability.service'
 
 function isRunningInDocker() {
   return existsSync('/.dockerenv')
@@ -63,7 +64,8 @@ function parseRedisConfig() {
       },
     },
     QueueService,
+    QueueObservabilityService,
   ],
-  exports: [QUEUE_CONNECTION, QueueService],
+  exports: [QUEUE_CONNECTION, QueueService, QueueObservabilityService],
 })
 export class QueueModule {}

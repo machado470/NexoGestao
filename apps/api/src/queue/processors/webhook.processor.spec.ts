@@ -13,7 +13,7 @@ describe('WebhookProcessor DLQ hardening', () => {
       markDeliveryAttempt: jest.fn().mockResolvedValue({}),
     } as any
 
-    const processor = new WebhookProcessor({} as any, queueService, webhookService)
+    const processor = new WebhookProcessor({} as any, queueService, webhookService, { increment: jest.fn(), observeDuration: jest.fn() } as any)
     const job = { id: 'job-1', attemptsMade: 5, opts: { attempts: 5 }, data: { deliveryId: 'd1' } } as any
 
     await processor.handleFailedJob(job, new Error('timeout'))

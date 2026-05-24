@@ -6,6 +6,7 @@ import { RolesGuard } from '../auth/guards/roles.guard'
 import { Roles } from '../auth/decorators/roles.decorator'
 import { OperationalDiagnosticsService } from './operational-diagnostics.service'
 import { OperationalSignalsService } from './operational-signals.service'
+import { QueueObservabilityService } from '../common/metrics/queue-observability.service'
 
 @Controller('internal')
 export class InternalStatsController {
@@ -14,6 +15,7 @@ export class InternalStatsController {
     private readonly waMetrics: WhatsAppObservabilityService,
     private readonly operationalDiagnosticsService: OperationalDiagnosticsService,
     private readonly operationalSignalsService: OperationalSignalsService,
+    private readonly queueObservability: QueueObservabilityService,
   ) {}
 
   @Get('stats')
@@ -23,6 +25,7 @@ export class InternalStatsController {
     const totalJobs = Object.values(queues as any).reduce((acc: number, q: any) => acc + (q.waiting ?? 0) + (q.active ?? 0) + (q.completed ?? 0) + (q.failed ?? 0), 0)
     const failedJobs = Object.values(queues as any).reduce((acc: number, q: any) => acc + (q.failed ?? 0), 0)
     return {
+      queueObservability: this.queueObservability.snapshot(),
       totalJobs,
       failedJobs,
       retryRate: wa.whatsapp_retry_total / Math.max(1, wa.whatsapp_outbound_total),
