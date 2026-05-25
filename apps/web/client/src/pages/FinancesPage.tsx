@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { operationalCopy } from "@/lib/operational-semantics";
 import { compareOperationalPriority } from "@/lib/operational-prioritization";
+import { aggregateOperationalHealth } from "@/lib/operational-health";
 import {
   getAttentionSummary,
   getVisibleAttentionItems,
@@ -382,6 +383,16 @@ export default function FinancesPage() {
 
     return { received, receivable, overdue, projected };
   }, [enrichedCharges]);
+
+  const operationalHealth = useMemo(
+    () =>
+      aggregateOperationalHealth({
+        charges: enrichedCharges,
+        payments: enrichedCharges.flatMap(item => (Array.isArray(item.payments) ? item.payments : [])),
+        serviceOrders,
+      }),
+    [enrichedCharges, serviceOrders]
+  );
 
   const nextBestAction = useMemo(() => {
     const pendingOrOverdue = getVisibleAttentionItems(
@@ -956,13 +967,13 @@ export default function FinancesPage() {
             </AppInfoCard>
             <AppInfoCard>
               <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                Gargalo principal
+                Saúde financeira
               </p>
               <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
-                {cashHealth.collectionBottleneck}
+                {operationalHealth.label}
               </p>
               <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                Use a ação principal da linha antes de abrir detalhes.
+                {operationalHealth.bottleneck.label}: {operationalHealth.bottleneck.reason}
               </p>
             </AppInfoCard>
           </div>
