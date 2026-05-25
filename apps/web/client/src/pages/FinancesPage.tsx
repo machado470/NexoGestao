@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { operationalCopy } from "@/lib/operational-semantics";
 import { compareOperationalPriority } from "@/lib/operational-prioritization";
+import {
+  getAttentionSummary,
+  getVisibleAttentionItems,
+  type OperationalAttentionItem,
+} from "@/lib/operational-attention";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { Button } from "@/components/design-system";
@@ -379,16 +384,49 @@ export default function FinancesPage() {
   }, [enrichedCharges]);
 
   const nextBestAction = useMemo(() => {
-    const pendingOrOverdue = [...enrichedCharges]
+    const pendingOrOverdue = getVisibleAttentionItems(
+      [...enrichedCharges]
       .filter(item => ["PENDING", "OVERDUE"].includes(item.status))
-      .sort((a, b) =>
-        compareOperationalPriority(
-          { severity: a.status === "OVERDUE" ? "WARNING" : "ATTENTION", dueDate: a.dueDate, amountCents: Number(a.amountCents ?? 0) },
-          { severity: b.status === "OVERDUE" ? "WARNING" : "ATTENTION", dueDate: b.dueDate, amountCents: Number(b.amountCents ?? 0) }
-        )
-      );
+      .map(
+        item =>
+          ({
+            ...item,
+            key: String(item.id ?? ""),
+            domain: "finances",
+            type: item.status === "OVERDUE" ? "overdue_charge" : "pending_charge",
+            severity: item.status === "OVERDUE" ? "WARNING" : "ATTENTION",
+            amountCents: Number(item.amountCents ?? 0),
+          }) as OperationalAttentionItem
+      ),
+      1
+    );
     return (pendingOrOverdue[0] as ChargeRecord | null) ?? null;
   }, [enrichedCharges]);
+
+  const highlightedFinancialAttention = useMemo(
+    () =>
+      getVisibleAttentionItems(
+        enrichedCharges
+          .filter(item => item.status === "OVERDUE")
+          .map(
+            item =>
+              ({
+                ...item,
+                key: String(item.id ?? ""),
+                domain: "finances",
+                type: "overdue_charge",
+                severity: "WARNING",
+                amountCents: Number(item.amountCents ?? 0),
+              }) as OperationalAttentionItem
+          ),
+        2
+      ),
+    [enrichedCharges]
+  );
+  const highlightedFinancialSummary = useMemo(
+    () => getAttentionSummary(highlightedFinancialAttention),
+    [highlightedFinancialAttention]
+  );
 
   useEffect(() => {
     if (queryParams.chargeId) {
@@ -536,8 +574,8 @@ export default function FinancesPage() {
     return [
       {
         key: "overdue",
-        title: "Cobrança vencida",
-        value: String(overdueCharges.length),
+            title: "Cobrança vencida",
+        value: String(highlightedFinancialAttention.length),
         consequence:
           overdueCharges.length > 0
             ? "Priorize cobrança por WhatsApp ou registre pagamento."
@@ -932,7 +970,7 @@ export default function FinancesPage() {
 
         <AppSectionBlock
           title={operationalCopy.immediateAttention}
-          subtitle="Pendências que afetam cobrança, comunicação e registro de pagamento."
+          subtitle={`Pendências que afetam cobrança, comunicação e registro de pagamento. ${highlightedFinancialSummary.hidden > 0 ? highlightedFinancialSummary.hiddenMessage : ""}`}
         >
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
             {immediateAttentionItems.map(item => (
