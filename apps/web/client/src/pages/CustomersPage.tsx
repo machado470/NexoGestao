@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   ArrowRight,
@@ -14,6 +14,8 @@ import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import CreateCustomerModal from "@/components/CreateCustomerModal";
 import EditCustomerModal from "@/components/EditCustomerModal";
+import { CreateAppointmentModal } from "@/components/CreateAppointmentModal";
+import CreateServiceOrderModal from "@/components/CreateServiceOrderModal";
 import {
   normalizeArrayPayload,
   normalizeObjectPayload,
@@ -385,6 +387,11 @@ export default function CustomersPage() {
     string | null
   >(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [createAppointmentOpen, setCreateAppointmentOpen] = useState(false);
+  const [createServiceOrderOpen, setCreateServiceOrderOpen] = useState(false);
+  const [showInlineCharges, setShowInlineCharges] = useState(false);
+  const [whatsAppQuickMessage, setWhatsAppQuickMessage] = useState("");
+  const timelineAnchorRef = useRef<HTMLElement | null>(null);
 
   const customersQuery = trpc.nexo.customers.list.useQuery(
     { page: 1, limit: 300 },
@@ -402,6 +409,8 @@ export default function CustomersPage() {
     { page: 1, limit: 500 },
     { retry: false }
   );
+  const peopleQuery = trpc.people.list.useQuery(undefined, { retry: false });
+  const sendInlineWhatsApp = trpc.nexo.whatsapp.send.useMutation();
 
   const customers = useMemo(
     () => normalizeArrayPayload<Customer>(customersQuery.data),
@@ -536,6 +545,14 @@ export default function CustomersPage() {
     ? (profileById.get(String(activeCustomerId)) ?? null)
     : null;
   const selectedCustomer = selectedProfile?.customer ?? null;
+  const people = useMemo(
+    () =>
+      normalizeArrayPayload<any>(peopleQuery.data).map(person => ({
+        id: String(person.id ?? ""),
+        name: String(person.name ?? "Colaborador"),
+      })),
+    [peopleQuery.data]
+  );
 
   const workspaceCharges = (workspace.charges ?? selectedProfile?.charges ?? [])
     .slice()
@@ -1095,17 +1112,17 @@ export default function CustomersPage() {
                 </article>
 
                 <AppActionBar className="gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2 py-2">
-                  <Button size="sm" variant="outline" onClick={() => navigate(`/service-orders?customerId=${activeCustomerId}`)}>
+                  <Button size="sm" variant="outline" onClick={() => setCreateServiceOrderOpen(true)}>
                     <Wrench className="mr-1.5 h-3.5 w-3.5" />
                     Abrir O.S.
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => navigate(`/appointments?customerId=${activeCustomerId}`)}>
+                  <Button size="sm" variant="outline" onClick={() => setCreateAppointmentOpen(true)}>
                     <CalendarClock className="mr-1.5 h-3.5 w-3.5" />
                     Agendar
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => navigate(`/finances?customerId=${activeCustomerId}`)}>
+                  <Button size="sm" variant="outline" onClick={() => setShowInlineCharges(value => !value)}>
                     <CreditCard className="mr-1.5 h-3.5 w-3.5" />
-                    Cobrar
+                    {showInlineCharges ? "Ocultar cobranças" : "Cobrar"}
                   </Button>
                   <Button
                     size="sm"
@@ -1120,7 +1137,7 @@ export default function CustomersPage() {
                     }
                   >
                     <MessageCircle className="mr-1.5 h-3.5 w-3.5" />
-                    Enviar WhatsApp
+                    WhatsApp rápido
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => navigate(`/finances?customerId=${activeCustomerId}`)}>
                     Ver financeiro
@@ -1129,10 +1146,85 @@ export default function CustomersPage() {
                     <ShieldAlert className="mr-1.5 h-3.5 w-3.5" />
                     Ver risco
                   </Button>
-                  <Button size="sm" variant="outline" disabled={(workspace.timeline ?? []).length === 0} title={(workspace.timeline ?? []).length === 0 ? "Sem eventos de timeline disponíveis para este cliente." : undefined}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={(workspace.timeline ?? []).length === 0}
+                    title={(workspace.timeline ?? []).length === 0 ? "Sem eventos de timeline disponíveis para este cliente." : undefined}
+                    onClick={() =>
+                      timelineAnchorRef.current?.scrollIntoView({
+                        behavior: "smooth",
+                        block: "start",
+                      })
+                    }
+                  >
                     Ver timeline
                   </Button>
                 </AppActionBar>
+                {showInlineCharges ? (
+                  <article className="rounded-xl border border-[var(--border-subtle)] p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                        Cobranças pendentes/vencidas
+                      </p>
+                      <Button size="sm" variant="outline" onClick={() => navigate(`/finances?customerId=${activeCustomerId}`)}>
+                        Abrir financeiro
+                      </Button>
+                    </div>
+                    <div className="mt-2 space-y-1.5">
+                      {workspaceCharges.filter(isChargePending).slice(0, 5).map((charge, index) => (
+                        <div key={`${String(charge.id ?? "charge")}-${index}`} className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/30 p-2">
+                          <p className="text-xs font-medium text-[var(--text-primary)]">
+                            {formatCurrency(Number(charge.amountCents ?? charge.amount ?? 0))} · {String(charge.status ?? "PENDING")}
+                          </p>
+                          <p className="text-[11px] text-[var(--text-muted)]">
+                            Vencimento: {formatDateTime(charge.dueDate, "Não informado")}
+                          </p>
+                        </div>
+                      ))}
+                      {workspaceCharges.filter(isChargePending).length === 0 ? (
+                        <p className="text-xs text-[var(--text-muted)]">Nenhuma cobrança pendente/vencida retornada para este cliente.</p>
+                      ) : null}
+                    </div>
+                  </article>
+                ) : null}
+                <article className="rounded-xl border border-[var(--border-subtle)] p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">WhatsApp inline</p>
+                  <textarea
+                    value={whatsAppQuickMessage}
+                    onChange={event => setWhatsAppQuickMessage(event.target.value)}
+                    placeholder="Mensagem rápida para este cliente"
+                    className="mt-2 min-h-[70px] w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+                  />
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      disabled={
+                        !String(selectedCustomer.phone ?? "").trim() ||
+                        whatsAppQuickMessage.trim().length === 0 ||
+                        sendInlineWhatsApp.isPending
+                      }
+                      title={!String(selectedCustomer.phone ?? "").trim() ? "Cliente sem telefone/WhatsApp cadastrado." : undefined}
+                      onClick={async () => {
+                        if (!activeCustomerId || !whatsAppQuickMessage.trim()) return;
+                        await sendInlineWhatsApp.mutateAsync({
+                          customerId: activeCustomerId,
+                          content: whatsAppQuickMessage.trim(),
+                          entityType: "CUSTOMER",
+                          entityId: activeCustomerId,
+                          messageType: "MANUAL",
+                        });
+                        toast.success("Mensagem enviada para processamento.");
+                        setWhatsAppQuickMessage("");
+                      }}
+                    >
+                      Enviar inline
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => openCustomerWhatsApp(selectedCustomer, String(workspaceCharges.find(isChargePending)?.id ?? "") || null)}>
+                      Abrir WhatsApp completo
+                    </Button>
+                  </div>
+                </article>
 
                 <AppOperationalKpiGrid className="xl:grid-cols-2">
                   <AppStatCard label="Saldo em aberto" value={formatCurrency(workspacePendingCents || selectedProfile.pendingCents)} helper="Somatório real de cobranças pendentes/vencidas." />
@@ -1166,7 +1258,7 @@ export default function CustomersPage() {
                   ]}
                 />
 
-                <article className="rounded-xl border border-[var(--border-subtle)] p-3">
+                <article ref={timelineAnchorRef} className="rounded-xl border border-[var(--border-subtle)] p-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
                     O.S. relacionadas
                   </p>
@@ -1286,6 +1378,27 @@ export default function CustomersPage() {
             if (saved?.id) setActiveCustomerId(String(saved.id));
             toast.success("Cliente atualizado com sucesso.");
           }}
+        />
+        <CreateAppointmentModal
+          isOpen={createAppointmentOpen}
+          onClose={() => setCreateAppointmentOpen(false)}
+          onSuccess={async () => {
+            await appointmentsQuery.refetch();
+            await workspaceQuery.refetch();
+          }}
+          customers={customers.map(customer => ({ id: String(customer.id ?? ""), name: String(customer.name ?? "Cliente") }))}
+          initialCustomerId={activeCustomerId}
+        />
+        <CreateServiceOrderModal
+          isOpen={createServiceOrderOpen}
+          onClose={() => setCreateServiceOrderOpen(false)}
+          onSuccess={async () => {
+            await serviceOrdersQuery.refetch();
+            await workspaceQuery.refetch();
+          }}
+          customers={customers.map(customer => ({ id: String(customer.id ?? ""), name: String(customer.name ?? "Cliente") }))}
+          people={people}
+          initialCustomerId={activeCustomerId}
         />
       </div>
     </PageWrapper>
