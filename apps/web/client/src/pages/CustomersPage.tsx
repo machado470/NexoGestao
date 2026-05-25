@@ -96,6 +96,12 @@ type AttentionItem = {
   chargeId?: string | null;
 };
 
+type CustomerOperationalEventType =
+  | "CUSTOMER_APPOINTMENT_CREATED"
+  | "CUSTOMER_SERVICE_ORDER_CREATED"
+  | "CUSTOMER_WHATSAPP_MESSAGE_SENT"
+  | "CUSTOMER_CHARGE_CONTEXT_UPDATED";
+
 const pageSize = 8;
 const openServiceOrderStatuses = ["OPEN", "ASSIGNED", "IN_PROGRESS"];
 const pendingChargeStatuses = ["OVERDUE", "PENDING"];
@@ -608,21 +614,92 @@ export default function CustomersPage() {
         new Date(String(a.updatedAt ?? a.createdAt ?? 0)).getTime()
     )[0];
 
-  async function refreshCustomerWorkspace(customerId: string, options?: { includeTimeline?: boolean }) {
+  async function refreshCustomerWorkspace(
+    customerId: string,
+    options?: { includeTimeline?: boolean }
+  ) {
     if (!customerId) return;
     setIsRefreshingWorkspace(true);
     try {
       const includeTimeline = options?.includeTimeline ?? false;
-      await Promise.all([
+      const operations: Promise<unknown>[] = [
         trpcUtils.nexo.customers.list.invalidate(),
         trpcUtils.nexo.customers.workspace.invalidate({ id: customerId }),
         trpcUtils.nexo.appointments.list.invalidate(),
         trpcUtils.nexo.serviceOrders.list.invalidate(),
         trpcUtils.finance.charges.list.invalidate(),
-        includeTimeline
-          ? trpcUtils.nexo.customers.workspace.refetch({ id: customerId })
-          : Promise.resolve(),
-      ]);
+      ];
+      if (includeTimeline) {
+        operations.push(trpcUtils.nexo.customers.workspace.refetch({ id: customerId }));
+      }
+      await Promise.all(operations);
+    } finally {
+      setIsRefreshingWorkspace(false);
+    }
+  }
+
+  async function propagateCustomerOperationalChange(
+    customerId: string,
+    eventType: CustomerOperationalEventType,
+    options?: { includeTimeline?: boolean }
+  ) {
+    if (!customerId) return;
+    setIsRefreshingWorkspace(true);
+    try {
+      const includeTimeline = options?.includeTimeline ?? false;
+      const dashboardUtils = (trpcUtils as any).dashboard;
+      const whatsappUtils = (trpcUtils as any).whatsapp;
+      const peopleUtils = (trpcUtils as any).people;
+      const nexoUtils = (trpcUtils as any).nexo;
+      const operations: Promise<unknown>[] = [];
+      const safePush = (candidate: unknown) => {
+        if (
+          candidate &&
+          typeof (candidate as Promise<unknown>).then === "function"
+        ) {
+          operations.push(candidate as Promise<unknown>);
+        }
+      };
+
+      safePush(trpcUtils.nexo.customers.list.invalidate());
+      safePush(trpcUtils.nexo.customers.workspace.invalidate({ id: customerId }));
+
+      switch (eventType) {
+        case "CUSTOMER_APPOINTMENT_CREATED":
+          safePush(trpcUtils.nexo.appointments.list.invalidate());
+          safePush(dashboardUtils?.kpis?.invalidate?.());
+          safePush(dashboardUtils?.alerts?.invalidate?.());
+          safePush(nexoUtils?.timeline?.customer?.invalidate?.({ customerId }));
+          safePush(nexoUtils?.timeline?.org?.invalidate?.());
+          break;
+        case "CUSTOMER_SERVICE_ORDER_CREATED":
+          safePush(trpcUtils.nexo.serviceOrders.list.invalidate());
+          safePush(trpcUtils.nexo.appointments.list.invalidate());
+          safePush(dashboardUtils?.kpis?.invalidate?.());
+          safePush(dashboardUtils?.alerts?.invalidate?.());
+          safePush(nexoUtils?.timeline?.customer?.invalidate?.({ customerId }));
+          safePush(nexoUtils?.timeline?.org?.invalidate?.());
+          safePush(peopleUtils?.stats?.invalidate?.());
+          safePush(peopleUtils?.workload?.invalidate?.());
+          break;
+        case "CUSTOMER_WHATSAPP_MESSAGE_SENT":
+          safePush(whatsappUtils?.conversations?.invalidate?.());
+          safePush(whatsappUtils?.messages?.invalidate?.());
+          safePush(whatsappUtils?.context?.invalidate?.({ customerId }));
+          safePush(nexoUtils?.timeline?.customer?.invalidate?.({ customerId }));
+          safePush(nexoUtils?.timeline?.org?.invalidate?.());
+          safePush(dashboardUtils?.alerts?.invalidate?.());
+          safePush(nexoUtils?.nextBestAction?.invalidate?.({ customerId }));
+          break;
+        case "CUSTOMER_CHARGE_CONTEXT_UPDATED":
+          safePush(trpcUtils.finance.charges.list.invalidate());
+          break;
+      }
+
+      if (includeTimeline) {
+        safePush(trpcUtils.nexo.customers.workspace.refetch({ id: customerId }));
+      }
+      await Promise.all(operations);
     } finally {
       setIsRefreshingWorkspace(false);
     }
@@ -1192,7 +1269,19 @@ export default function CustomersPage() {
                       <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
                         Cobranças pendentes/vencidas
                       </p>
-                      <Button size="sm" variant="outline" onClick={() => navigate(`/finances?customerId=${activeCustomerId}`)}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          if (activeCustomerId) {
+                            void propagateCustomerOperationalChange(
+                              activeCustomerId,
+                              "CUSTOMER_CHARGE_CONTEXT_UPDATED"
+                            );
+                          }
+                          navigate(`/finances?customerId=${activeCustomerId}`);
+                        }}
+                      >
                         Abrir financeiro
                       </Button>
                     </div>
@@ -1243,9 +1332,13 @@ export default function CustomersPage() {
                           });
                           setWhatsAppQuickMessage("");
                           toast.success("Mensagem enviada.");
-                          await refreshCustomerWorkspace(activeCustomerId, {
+                          await propagateCustomerOperationalChange(
+                            activeCustomerId,
+                            "CUSTOMER_WHATSAPP_MESSAGE_SENT",
+                            {
                             includeTimeline: true,
-                          });
+                            }
+                          );
                         } catch (error) {
                           toast.error("Não foi possível enviar a mensagem. Tente novamente.");
                         }
@@ -1421,9 +1514,13 @@ export default function CustomersPage() {
           onSuccess={async () => {
             setCreateAppointmentOpen(false);
             if (!activeCustomerId) return;
-            await refreshCustomerWorkspace(activeCustomerId, {
+            await propagateCustomerOperationalChange(
+              activeCustomerId,
+              "CUSTOMER_APPOINTMENT_CREATED",
+              {
               includeTimeline: true,
-            });
+              }
+            );
             toast.success("Agendamento criado.");
           }}
           customers={customers.map(customer => ({ id: String(customer.id ?? ""), name: String(customer.name ?? "Cliente") }))}
@@ -1435,9 +1532,13 @@ export default function CustomersPage() {
           onSuccess={async () => {
             setCreateServiceOrderOpen(false);
             if (!activeCustomerId) return;
-            await refreshCustomerWorkspace(activeCustomerId, {
+            await propagateCustomerOperationalChange(
+              activeCustomerId,
+              "CUSTOMER_SERVICE_ORDER_CREATED",
+              {
               includeTimeline: true,
-            });
+              }
+            );
             toast.success("O.S. criada.");
           }}
           customers={customers.map(customer => ({ id: String(customer.id ?? ""), name: String(customer.name ?? "Cliente") }))}
