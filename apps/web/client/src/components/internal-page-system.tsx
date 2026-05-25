@@ -1163,6 +1163,80 @@ export function AppPageEmptyState({
   );
 }
 
+export const AppAttentionBlock = AppSectionBlock;
+export const AppNextBestActionBlock = AppSectionBlock;
+export const AppOperationalToolbar = AppFiltersBar;
+export const AppActionBar = AppFiltersBar;
+export const AppActionRail = AppListBlock;
+export const AppContextWorkspace = AppSectionBlock;
+export const AppOperationalEmptyState = AppPageEmptyState;
+export const AppOperationalLoadingState = AppPageLoadingState;
+export const AppOperationalErrorState = AppPageErrorState;
+
+export function AppOperationalKpiGrid({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return <div className={cn("grid gap-3 sm:grid-cols-2 xl:grid-cols-4", className)}>{children}</div>;
+}
+
+export function AppOperationalStatusSummary({
+  items,
+  className,
+}: {
+  items: Array<{ label: string; value: ReactNode; helper?: ReactNode }>;
+  className?: string;
+}) {
+  return (
+    <div className={cn("grid gap-2 sm:grid-cols-2 xl:grid-cols-4", className)}>
+      {items.map(item => (
+        <div key={item.label} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3">
+          <p className="text-xs text-[var(--text-muted)]">{item.label}</p>
+          <p className="mt-1 text-lg font-semibold text-[var(--text-primary)]">{item.value}</p>
+          {item.helper ? <p className="mt-1 text-xs text-[var(--text-secondary)]">{item.helper}</p> : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function AppEmbeddedTimeline({
+  items,
+  emptyMessage = "Sem eventos para este contexto.",
+}: {
+  items: Array<{
+    id: string;
+    type: string;
+    summary: string;
+    entity?: string;
+    actor?: string;
+    happenedAt?: string;
+    action?: ReactNode;
+  }>;
+  emptyMessage?: string;
+}) {
+  if (items.length === 0) {
+    return <p className="text-xs text-[var(--text-muted)]">{emptyMessage}</p>;
+  }
+  return (
+    <ul className="space-y-2">
+      {items.map(item => (
+        <li key={item.id} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-2.5">
+          <p className="text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">{item.type}</p>
+          <p className="text-xs font-medium text-[var(--text-primary)]">{item.summary}</p>
+          <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
+            {item.entity ?? "Entidade não informada"} · {item.actor ?? "Sistema"} · {item.happenedAt ?? "Data indisponível"}
+          </p>
+          {item.action ? <div className="mt-1.5">{item.action}</div> : null}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function AppInlineSuccessState({ message }: { message: string }) {
   return (
     <div className="inline-flex items-center gap-2 rounded-lg border border-[var(--success)]/30 bg-[var(--success)]/10 px-2.5 py-1.5 text-xs font-medium text-[var(--success)]">
