@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { operationalCopy } from "@/lib/operational-semantics";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { Button } from "@/components/design-system";
@@ -940,7 +941,7 @@ export default function FinancesPage() {
         </AppSectionBlock>
 
         <AppSectionBlock
-          title="Atenção imediata"
+          title={operationalCopy.immediateAttention}
           subtitle="Pendências que afetam cobrança, comunicação e registro de pagamento."
         >
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
