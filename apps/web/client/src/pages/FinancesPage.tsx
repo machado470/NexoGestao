@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { operationalCopy } from "@/lib/operational-semantics";
+import { compareOperationalPriority } from "@/lib/operational-prioritization";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { Button } from "@/components/design-system";
@@ -308,7 +309,7 @@ export default function FinancesPage() {
   }, [enrichedCharges, queryParams.customerId, queryParams.serviceOrderId]);
 
   const filteredCharges = useMemo(() => {
-    return scopedCharges.filter(charge => {
+    const filtered = scopedCharges.filter(charge => {
       if (!statusMatchesFilter(charge.status, statusFilter)) return false;
       const source =
         `${charge.customerName} ${charge.serviceOrderLabel} ${charge.status} ${charge.id ?? ""}`.toLowerCase();
@@ -319,6 +320,13 @@ export default function FinancesPage() {
         return false;
       return true;
     });
+
+    return [...filtered].sort((a, b) =>
+      compareOperationalPriority(
+        { severity: a.status === "OVERDUE" ? "WARNING" : a.status === "PENDING" ? "ATTENTION" : "NORMAL", dueDate: a.dueDate, amountCents: Number(a.amountCents ?? 0) },
+        { severity: b.status === "OVERDUE" ? "WARNING" : b.status === "PENDING" ? "ATTENTION" : "NORMAL", dueDate: b.dueDate, amountCents: Number(b.amountCents ?? 0) }
+      )
+    );
   }, [scopedCharges, searchTerm, statusFilter]);
   const paginatedCharges = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
@@ -371,33 +379,15 @@ export default function FinancesPage() {
   }, [enrichedCharges]);
 
   const nextBestAction = useMemo(() => {
-    const pendingOrOverdue = enrichedCharges.filter(item =>
-      ["PENDING", "OVERDUE"].includes(item.status)
-    );
-    if (pendingOrOverdue.length === 0) return null;
-
-    const overdue = pendingOrOverdue.filter(item => item.status === "OVERDUE");
-    if (overdue.length > 0) {
-      return [...overdue].sort((a, b) => {
-        if (b.overdueDays !== a.overdueDays)
-          return b.overdueDays - a.overdueDays;
-        return Number(b?.amountCents ?? 0) - Number(a?.amountCents ?? 0);
-      })[0];
-    }
-
-    const pending = pendingOrOverdue.filter(item => item.status === "PENDING");
-    if (pending.length === 0) return null;
-
-    const byAmount = [...pending].sort(
-      (a, b) => Number(b?.amountCents ?? 0) - Number(a?.amountCents ?? 0)
-    )[0];
-    if (Number(byAmount?.amountCents ?? 0) > 0) return byAmount;
-
-    return [...pending].sort((a, b) => {
-      const dueA = safeDate(a?.dueDate)?.getTime() ?? Number.MAX_SAFE_INTEGER;
-      const dueB = safeDate(b?.dueDate)?.getTime() ?? Number.MAX_SAFE_INTEGER;
-      return dueA - dueB;
-    })[0];
+    const pendingOrOverdue = [...enrichedCharges]
+      .filter(item => ["PENDING", "OVERDUE"].includes(item.status))
+      .sort((a, b) =>
+        compareOperationalPriority(
+          { severity: a.status === "OVERDUE" ? "WARNING" : "ATTENTION", dueDate: a.dueDate, amountCents: Number(a.amountCents ?? 0) },
+          { severity: b.status === "OVERDUE" ? "WARNING" : "ATTENTION", dueDate: b.dueDate, amountCents: Number(b.amountCents ?? 0) }
+        )
+      );
+    return (pendingOrOverdue[0] as ChargeRecord | null) ?? null;
   }, [enrichedCharges]);
 
   useEffect(() => {

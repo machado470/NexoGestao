@@ -43,6 +43,11 @@ import {
 } from "@/components/internal-page-system";
 import { cn } from "@/lib/utils";
 import { operationalCopy } from "@/lib/operational-semantics";
+import {
+  compareOperationalPriority,
+  getDominantOperationalAction,
+  getOperationalAttentionReason,
+} from "@/lib/operational-prioritization";
 
 type Customer = Record<string, any>;
 type Appointment = Record<string, any>;
@@ -507,10 +512,13 @@ export default function CustomersPage() {
   }, [currentPage, filteredProfiles]);
 
   const attentionItems = useMemo<AttentionItem[]>(() => {
-    const items: AttentionItem[] = [];
+    const items: Array<AttentionItem & Record<string, any>> = [];
     for (const profile of profiles) {
       if (profile.overdue > 0) {
         items.push({
+          severity: "WARNING",
+          dueDate: profile.charges.find(charge => String(charge.status ?? "").toUpperCase() === "OVERDUE")?.dueDate,
+          amountCents: profile.pendingCents,
           key: `${profile.customerId}-overdue`,
           title: String(profile.customer.name ?? "Cliente sem nome"),
           context: `${formatCurrency(profile.pendingCents)} em cobrança vencida ou pendente.`,
@@ -524,6 +532,8 @@ export default function CustomersPage() {
       }
       if (profile.hasOpenServiceOrder) {
         items.push({
+          severity: "ATTENTION",
+          isBlocked: true,
           key: `${profile.customerId}-open-os`,
           title: String(profile.customer.name ?? "Cliente sem nome"),
           context: profile.lastService
@@ -537,6 +547,8 @@ export default function CustomersPage() {
       }
       if (profile.daysWithoutContact >= 15) {
         items.push({
+          severity: profile.daysWithoutContact >= 30 ? "CRITICAL" : "ATTENTION",
+          customerNoResponse: true,
           key: `${profile.customerId}-silent`,
           title: String(profile.customer.name ?? "Cliente sem nome"),
           context: `Sem interação registrada há ${profile.daysWithoutContact} dias.`,
@@ -547,12 +559,34 @@ export default function CustomersPage() {
         });
       }
     }
-    return items.slice(0, 4);
+    return [...items]
+      .sort((a, b) =>
+        compareOperationalPriority(
+          { severity: a.severity, dueDate: a.dueDate, amountCents: a.amountCents, isBlocked: a.isBlocked, customerNoResponse: a.customerNoResponse },
+          { severity: b.severity, dueDate: b.dueDate, amountCents: b.amountCents, isBlocked: b.isBlocked, customerNoResponse: b.customerNoResponse }
+        )
+      )
+      .map(item => ({
+        ...item,
+        context: `${String(item.context ?? "")} · ${getOperationalAttentionReason({ severity: item.severity, dueDate: item.dueDate, amountCents: item.amountCents, isBlocked: item.isBlocked, customerNoResponse: item.customerNoResponse })}`,
+      }) as AttentionItem)
+      .slice(0, 4);
   }, [profiles]);
 
   const selectedProfile = activeCustomerId
     ? (profileById.get(String(activeCustomerId)) ?? null)
     : null;
+
+  const selectedDominantAction = useMemo(() => {
+    if (!selectedProfile) return null;
+    const candidates = [
+      ...(selectedProfile.overdue > 0 ? [{ severity: "WARNING", dueDate: selectedProfile.charges.find(c => String(c.status ?? "").toUpperCase() === "OVERDUE")?.dueDate, amountCents: selectedProfile.pendingCents }] : []),
+      ...(selectedProfile.nextAppointment ? [{ severity: "ATTENTION", scheduledAt: selectedProfile.nextAppointment.startsAt ?? selectedProfile.nextAppointment.scheduledAt }] : []),
+      ...(selectedProfile.hasOpenServiceOrder ? [{ severity: "ATTENTION", isBlocked: true }] : []),
+      ...(selectedProfile.daysWithoutContact >= 15 ? [{ severity: selectedProfile.daysWithoutContact >= 30 ? "CRITICAL" : "ATTENTION", customerNoResponse: true }] : []),
+    ];
+    return getDominantOperationalAction(candidates);
+  }, [selectedProfile]);
   const selectedCustomer = selectedProfile?.customer ?? null;
   const people = useMemo(
     () =>
@@ -1200,8 +1234,7 @@ export default function CustomersPage() {
                     <AppStatusBadge label={selectedProfile.status} />
                   </div>
                   <p className="mt-3 text-xs leading-5 text-[var(--text-secondary)]">
-                    {selectedProfile.riskSignal}. Próxima ação sugerida:{" "}
-                    {selectedProfile.nextActionLabel}.
+                    {selectedProfile.riskSignal}. Próxima ação sugerida: {selectedDominantAction?.label ?? selectedProfile.nextActionLabel}.
                   </p>
                   <p className="mt-2 text-xs text-[var(--text-muted)]">
                     Observações:{" "}
