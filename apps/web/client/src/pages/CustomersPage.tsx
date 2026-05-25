@@ -410,7 +410,9 @@ export default function CustomersPage() {
     { retry: false }
   );
   const peopleQuery = trpc.people.list.useQuery(undefined, { retry: false });
+  const trpcUtils = trpc.useUtils();
   const sendInlineWhatsApp = trpc.nexo.whatsapp.send.useMutation();
+  const [isRefreshingWorkspace, setIsRefreshingWorkspace] = useState(false);
 
   const customers = useMemo(
     () => normalizeArrayPayload<Customer>(customersQuery.data),
@@ -605,6 +607,26 @@ export default function CustomersPage() {
         new Date(String(b.updatedAt ?? b.createdAt ?? 0)).getTime() -
         new Date(String(a.updatedAt ?? a.createdAt ?? 0)).getTime()
     )[0];
+
+  async function refreshCustomerWorkspace(customerId: string, options?: { includeTimeline?: boolean }) {
+    if (!customerId) return;
+    setIsRefreshingWorkspace(true);
+    try {
+      const includeTimeline = options?.includeTimeline ?? false;
+      await Promise.all([
+        trpcUtils.nexo.customers.list.invalidate(),
+        trpcUtils.nexo.customers.workspace.invalidate({ id: customerId }),
+        trpcUtils.nexo.appointments.list.invalidate(),
+        trpcUtils.nexo.serviceOrders.list.invalidate(),
+        trpcUtils.finance.charges.list.invalidate(),
+        includeTimeline
+          ? trpcUtils.nexo.customers.workspace.refetch({ id: customerId })
+          : Promise.resolve(),
+      ]);
+    } finally {
+      setIsRefreshingWorkspace(false);
+    }
+  }
 
   function openCustomerWhatsApp(customer: Customer, chargeId?: string | null) {
     const customerId = String(customer?.id ?? "");
@@ -1077,7 +1099,7 @@ export default function CustomersPage() {
                 title="Selecione um cliente"
                 description="Escolha um cliente na carteira para abrir o centro contextual."
               />
-            ) : workspaceQuery.isLoading ? (
+            ) : workspaceQuery.isLoading && !workspaceQuery.data ? (
               <AppPageLoadingState description="Carregando detalhe do cliente..." />
             ) : workspaceQuery.error ? (
               <AppPageErrorState
@@ -1161,6 +1183,9 @@ export default function CustomersPage() {
                     Ver timeline
                   </Button>
                 </AppActionBar>
+                {isRefreshingWorkspace ? (
+                  <p className="text-xs text-[var(--text-muted)]">Atualizando dados do cliente...</p>
+                ) : null}
                 {showInlineCharges ? (
                   <article className="rounded-xl border border-[var(--border-subtle)] p-3">
                     <div className="flex items-center justify-between gap-2">
@@ -1207,18 +1232,26 @@ export default function CustomersPage() {
                       title={!String(selectedCustomer.phone ?? "").trim() ? "Cliente sem telefone/WhatsApp cadastrado." : undefined}
                       onClick={async () => {
                         if (!activeCustomerId || !whatsAppQuickMessage.trim()) return;
-                        await sendInlineWhatsApp.mutateAsync({
-                          customerId: activeCustomerId,
-                          content: whatsAppQuickMessage.trim(),
-                          entityType: "CUSTOMER",
-                          entityId: activeCustomerId,
-                          messageType: "MANUAL",
-                        });
-                        toast.success("Mensagem enviada para processamento.");
-                        setWhatsAppQuickMessage("");
+                        try {
+                          const content = whatsAppQuickMessage.trim();
+                          await sendInlineWhatsApp.mutateAsync({
+                            customerId: activeCustomerId,
+                            content,
+                            entityType: "CUSTOMER",
+                            entityId: activeCustomerId,
+                            messageType: "MANUAL",
+                          });
+                          setWhatsAppQuickMessage("");
+                          toast.success("Mensagem enviada.");
+                          await refreshCustomerWorkspace(activeCustomerId, {
+                            includeTimeline: true,
+                          });
+                        } catch (error) {
+                          toast.error("Não foi possível enviar a mensagem. Tente novamente.");
+                        }
                       }}
                     >
-                      Enviar inline
+                      {sendInlineWhatsApp.isPending ? "Enviando..." : "Enviar inline"}
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => openCustomerWhatsApp(selectedCustomer, String(workspaceCharges.find(isChargePending)?.id ?? "") || null)}>
                       Abrir WhatsApp completo
@@ -1360,7 +1393,10 @@ export default function CustomersPage() {
             await appointmentsQuery.refetch();
             await serviceOrdersQuery.refetch();
             await chargesQuery.refetch();
-            if (created?.id) setActiveCustomerId(created.id);
+            if (created?.id) {
+              setActiveCustomerId(created.id);
+              await refreshCustomerWorkspace(String(created.id));
+            }
           }}
         />
 
@@ -1383,8 +1419,12 @@ export default function CustomersPage() {
           isOpen={createAppointmentOpen}
           onClose={() => setCreateAppointmentOpen(false)}
           onSuccess={async () => {
-            await appointmentsQuery.refetch();
-            await workspaceQuery.refetch();
+            setCreateAppointmentOpen(false);
+            if (!activeCustomerId) return;
+            await refreshCustomerWorkspace(activeCustomerId, {
+              includeTimeline: true,
+            });
+            toast.success("Agendamento criado.");
           }}
           customers={customers.map(customer => ({ id: String(customer.id ?? ""), name: String(customer.name ?? "Cliente") }))}
           initialCustomerId={activeCustomerId}
@@ -1393,8 +1433,12 @@ export default function CustomersPage() {
           isOpen={createServiceOrderOpen}
           onClose={() => setCreateServiceOrderOpen(false)}
           onSuccess={async () => {
-            await serviceOrdersQuery.refetch();
-            await workspaceQuery.refetch();
+            setCreateServiceOrderOpen(false);
+            if (!activeCustomerId) return;
+            await refreshCustomerWorkspace(activeCustomerId, {
+              includeTimeline: true,
+            });
+            toast.success("O.S. criada.");
           }}
           customers={customers.map(customer => ({ id: String(customer.id ?? ""), name: String(customer.name ?? "Cliente") }))}
           people={people}
