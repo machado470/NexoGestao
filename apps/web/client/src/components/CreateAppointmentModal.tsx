@@ -16,6 +16,7 @@ interface CreateAppointmentModalProps {
   onClose: () => void;
   onSuccess: () => void;
   customers: Array<{ id: string | number; name: string }>;
+  initialCustomerId?: string | null;
   initialStartsAt?: string;
   initialEndsAt?: string;
 }
@@ -43,6 +44,7 @@ export function CreateAppointmentModal({
   onClose,
   onSuccess,
   customers,
+  initialCustomerId,
   initialStartsAt,
   initialEndsAt,
 }: CreateAppointmentModalProps) {
@@ -69,6 +71,7 @@ export function CreateAppointmentModal({
 
     setFormData({
       ...INITIAL_FORM,
+      customerId: initialCustomerId ? String(initialCustomerId) : "",
       date: initialStartsAt ? initialStartsAt.slice(0, 10) : "",
       time: initialStartsAt ? initialStartsAt.slice(11, 16) : "",
       durationMinutes:
@@ -85,7 +88,7 @@ export function CreateAppointmentModal({
             )
           : "60",
     });
-  }, [initialEndsAt, initialStartsAt, isOpen]);
+  }, [initialCustomerId, initialEndsAt, initialStartsAt, isOpen]);
 
   const createAppointment = trpc.nexo.appointments.create.useMutation();
 
