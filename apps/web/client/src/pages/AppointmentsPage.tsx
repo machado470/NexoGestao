@@ -15,12 +15,11 @@ import {
   AppRowActionsDropdown,
   AppSelect,
   AppStatusBadge,
-  AppTimeline,
-  AppTimelineItem,
 } from "@/components/app-system";
 import CreateServiceOrderModal from "@/components/CreateServiceOrderModal";
 import {
   AppFiltersBar,
+  AppEmbeddedTimeline,
   AppOperationalHeader,
   AppPageEmptyState,
   AppPageErrorState,
@@ -526,15 +525,17 @@ export default function AppointmentsPage() {
               <div className="pt-1">
                 <p className="mb-2 text-xs uppercase text-[var(--modal-section-muted)]">Timeline / histórico</p>
                 {queryParams.customerId ? (
-                  <AppTimeline>
-                    {timeline.slice(0, 5).map((event: any) => (
-                      <AppTimelineItem key={String(event?.id ?? `${event?.createdAt}-${event?.action}`)}>
-                        <p className="text-xs text-[var(--modal-section-text)]">{String(event?.action ?? "Evento")}</p>
-                        <p className="text-xs text-[var(--modal-section-muted)]">{String(event?.description ?? event?.summary ?? "Sem descrição")}</p>
-                      </AppTimelineItem>
-                    ))}
-                    {!timeline.length ? <p className="text-xs text-[var(--modal-section-muted)]">Sem histórico para este cliente.</p> : null}
-                  </AppTimeline>
+                  <AppEmbeddedTimeline
+                    items={timeline.slice(0, 5).map((event: any) => ({
+                      id: String(event?.id ?? `${event?.createdAt}-${event?.action}`),
+                      type: String(event?.action ?? "Evento"),
+                      summary: String(event?.description ?? event?.summary ?? "Sem descrição"),
+                      entity: String(event?.entityType ?? "Agendamento"),
+                      actor: String(event?.actorName ?? event?.actor ?? "Sistema"),
+                      happenedAt: formatDateTime(String(event?.createdAt ?? event?.occurredAt ?? "")),
+                    }))}
+                    emptyMessage="Sem histórico para este cliente."
+                  />
                 ) : (
                   <p className="text-xs text-[var(--modal-section-muted)]">Histórico disponível ao abrir com customerId na URL.</p>
                 )}
