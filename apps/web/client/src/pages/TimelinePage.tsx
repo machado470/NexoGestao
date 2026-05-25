@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { operationalCopy } from "@/lib/operational-semantics";
 import {
   AlertTriangle,
   ArrowRight,
@@ -742,7 +743,7 @@ export default function TimelinePage() {
 
         <div className="grid gap-3 lg:grid-cols-3">
           <AppSectionBlock
-            title="Atenção imediata"
+            title={operationalCopy.immediateAttention}
             subtitle="Até 3 sinais críticos para ação imediata."
             className="lg:col-span-2"
           >
@@ -786,7 +787,7 @@ export default function TimelinePage() {
           </AppSectionBlock>
 
           <AppSectionBlock
-            title="Próxima melhor ação"
+            title={operationalCopy.nextBestAction}
             subtitle="Recomendação contextual para reduzir risco operacional."
           >
             {nextAction ? (

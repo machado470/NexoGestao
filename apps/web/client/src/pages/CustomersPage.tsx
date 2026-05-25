@@ -42,6 +42,7 @@ import {
   AppStatusBadge,
 } from "@/components/internal-page-system";
 import { cn } from "@/lib/utils";
+import { operationalCopy } from "@/lib/operational-semantics";
 
 type Customer = Record<string, any>;
 type Appointment = Record<string, any>;
@@ -904,7 +905,7 @@ export default function CustomersPage() {
         </div>
 
         <AppSectionBlock
-          title="Atenção imediata"
+          title={operationalCopy.immediateAttention}
           subtitle="Clientes que podem travar caixa, execução ou resposta no turno."
           compact
         >

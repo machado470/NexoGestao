@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { operationalCopy } from "@/lib/operational-semantics";
 import { useLocation } from "wouter";
 import {
   ArrowRight,
@@ -961,7 +962,7 @@ export default function ExecutiveDashboard() {
       {!isPageLoading && !hasPageError && dashboardState !== "empty" ? (
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
           <AppSectionBlock
-            title="Atenção imediata"
+            title={operationalCopy.immediateAttention}
             subtitle="Problemas que exigem ação agora; nenhum alerta fica sem destino."
             className="xl:col-span-8"
           >
@@ -977,7 +978,7 @@ export default function ExecutiveDashboard() {
           </AppSectionBlock>
 
           <AppSectionBlock
-            title="Próxima melhor ação"
+            title={operationalCopy.nextBestAction}
             subtitle="A decisão com maior efeito para o turno atual."
             className="xl:col-span-4"
           >

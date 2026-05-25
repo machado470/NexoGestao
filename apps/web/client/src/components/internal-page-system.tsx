@@ -1,4 +1,5 @@
 import type { ComponentProps, ReactNode } from "react";
+import { operationalSeverityLabel, operationalSeverityTone } from "@/lib/operational-semantics";
 import {
   ArrowDownRight,
   ArrowRight,
@@ -930,55 +931,17 @@ export function AppRecentActivity({ items }: { items: string[] }) {
   );
 }
 
-const statusTone: Record<
-  string,
-  "success" | "warning" | "danger" | "info" | "neutral" | "accent"
-> = {
-  "prioridade alta": "danger",
-  "em risco": "danger",
-  bloqueado: "danger",
-  urgente: "danger",
-  atenção: "warning",
-  pendente: "neutral",
-  confirmado: "info",
-  ok: "success",
-  seguro: "success",
-  concluído: "success",
-  pago: "success",
-  médio: "warning",
-  alta: "danger",
-  alto: "danger",
-  falhou: "danger",
-};
-
-function normalizeStatusLabel(label: string) {
-  const raw = label.trim().toLowerCase();
-  if (raw === "high priority" || raw === "prioridade alta")
-    return "Prioridade alta";
-  if (raw === "critical" || raw === "crítico") return "Em risco";
-  if (raw === "overdue" || raw === "atrasado") return "Atenção";
-  if (raw === "healthy") return "Seguro";
-  if (raw === "warning") return "Atenção";
-  if (raw === "done" || raw === "paid") return "Concluído";
-  if (raw === "pending") return "Pendente";
-  if (raw === "blocked") return "Bloqueado";
-  if (raw === "confirmed") return "Confirmado";
-  if (raw === "medium") return "Médio";
-  if (raw === "high") return "Alto";
-  if (raw === "success") return "OK";
-  return label;
-}
-
 export function AppStatusBadge({ label }: { label: string }) {
-  const normalized =
+  const normalizedLabel =
     typeof label === "string" && label.trim().length > 0
-      ? normalizeStatusLabel(label)
-      : "Pendente";
-  const safeLabel = normalized.trim().length > 0 ? normalized : "Pendente";
+      ? operationalSeverityLabel(label)
+      : operationalSeverityLabel("pending");
+  const safeLabel = normalizedLabel.trim().length > 0 ? normalizedLabel : operationalSeverityLabel("pending");
+
   return (
     <NexoStatusBadge
       label={safeLabel}
-      tone={statusTone[safeLabel.toLowerCase()] ?? "neutral"}
+      tone={operationalSeverityTone(label)}
       className="h-6 px-2.5 py-0 text-[10px] font-semibold uppercase tracking-[0.08em]"
     />
   );
