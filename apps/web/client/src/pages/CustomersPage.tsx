@@ -43,6 +43,7 @@ import {
 } from "@/components/internal-page-system";
 import { cn } from "@/lib/utils";
 import { operationalCopy } from "@/lib/operational-semantics";
+import { aggregateOperationalHealth } from "@/lib/operational-health";
 import {
   compareOperationalPriority,
   getDominantOperationalAction,
@@ -628,6 +629,18 @@ export default function CustomersPage() {
     workspace.serviceOrders ?? selectedProfile?.serviceOrders ?? [];
   const workspaceAppointments =
     workspace.appointments ?? selectedProfile?.appointments ?? [];
+  const customerOperationalHealth = useMemo(
+    () =>
+      aggregateOperationalHealth({
+        customers: selectedCustomer ? [selectedCustomer] : [],
+        appointments: workspaceAppointments,
+        serviceOrders: workspaceServiceOrders,
+        charges: workspaceCharges,
+        timelineEvents: workspace.timeline ?? [],
+      }),
+    [selectedCustomer, workspaceAppointments, workspaceServiceOrders, workspaceCharges, workspace.timeline]
+  );
+
   const workspacePendingCents = workspaceCharges.reduce((total, charge) => {
     if (!isChargePending(charge)) return total;
     return total + Number(charge.amountCents ?? charge.amount ?? 0);
@@ -1255,6 +1268,12 @@ export default function CustomersPage() {
                   </div>
                   <p className="mt-3 text-xs leading-5 text-[var(--text-secondary)]">
                     {selectedProfile.riskSignal}. Próxima ação sugerida: {selectedDominantAction?.label ?? selectedProfile.nextActionLabel}.
+                  </p>
+                  <p className="mt-2 text-xs text-[var(--text-secondary)]">
+                    Saúde operacional: <span className="font-medium">{customerOperationalHealth.label}</span> · {customerOperationalHealth.summary}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">
+                    Foco: {customerOperationalHealth.recommendedFocus}
                   </p>
                   <p className="mt-2 text-xs text-[var(--text-muted)]">
                     Observações:{" "}
