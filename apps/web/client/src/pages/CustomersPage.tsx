@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   CreditCard,
   MessageCircle,
-  Phone,
   ShieldAlert,
   Wrench,
 } from "lucide-react";
@@ -27,6 +26,11 @@ import { OperationalTopCard } from "@/components/operating-system/OperationalTop
 import { AppRowActionsDropdown, AppStatCard } from "@/components/app-system";
 import {
   AppFiltersBar,
+  AppActionBar,
+  AppContextWorkspace,
+  AppEmbeddedTimeline,
+  AppOperationalKpiGrid,
+  AppOperationalStatusSummary,
   AppOperationalHeader,
   AppPageEmptyState,
   AppPageErrorState,
@@ -548,6 +552,42 @@ export default function CustomersPage() {
     if (!isChargePending(charge)) return total;
     return total + Number(charge.amountCents ?? charge.amount ?? 0);
   }, 0);
+  const workspaceOverdueCharges = workspaceCharges.filter(
+    charge => String(charge.status ?? "").toUpperCase() === "OVERDUE"
+  );
+  const workspaceLastPayment = workspaceCharges
+    .filter(charge =>
+      ["PAID", "SETTLED"].includes(String(charge.status ?? "").toUpperCase())
+    )
+    .sort(
+      (a, b) =>
+        new Date(String(b.paidAt ?? b.updatedAt ?? b.createdAt ?? 0)).getTime() -
+        new Date(String(a.paidAt ?? a.updatedAt ?? a.createdAt ?? 0)).getTime()
+    )[0];
+  const workspaceNextAppointment = workspaceAppointments
+    .filter(item => {
+      const startsAt = toDate(item.startsAt ?? item.scheduledAt);
+      return startsAt && startsAt.getTime() >= Date.now();
+    })
+    .sort(
+      (a, b) =>
+        new Date(String(a.startsAt ?? a.scheduledAt ?? a.createdAt ?? 0)).getTime() -
+        new Date(String(b.startsAt ?? b.scheduledAt ?? b.createdAt ?? 0)).getTime()
+    )[0];
+  const workspaceOpenServiceOrder = workspaceServiceOrders
+    .filter(isServiceOrderOpen)
+    .sort(
+      (a, b) =>
+        new Date(String(b.updatedAt ?? b.createdAt ?? 0)).getTime() -
+        new Date(String(a.updatedAt ?? a.createdAt ?? 0)).getTime()
+    )[0];
+  const workspaceLastCompletedServiceOrder = workspaceServiceOrders
+    .filter(order => String(order.status ?? "").toUpperCase() === "COMPLETED")
+    .sort(
+      (a, b) =>
+        new Date(String(b.updatedAt ?? b.createdAt ?? 0)).getTime() -
+        new Date(String(a.updatedAt ?? a.createdAt ?? 0)).getTime()
+    )[0];
 
   function openCustomerWhatsApp(customer: Customer, chargeId?: string | null) {
     const customerId = String(customer?.id ?? "");
@@ -1010,7 +1050,7 @@ export default function CustomersPage() {
             )}
           </AppSectionBlock>
 
-          <AppSectionBlock
+          <AppContextWorkspace
             title="Detalhe do cliente"
             subtitle="Resumo, ações principais, financeiro, O.S., agenda, comunicação e histórico disponível."
             className="xl:col-span-5"
@@ -1054,88 +1094,77 @@ export default function CustomersPage() {
                   </p>
                 </article>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() =>
-                      navigate(`/service-orders?customerId=${activeCustomerId}`)
-                    }
-                  >
+                <AppActionBar className="gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2 py-2">
+                  <Button size="sm" variant="outline" onClick={() => navigate(`/service-orders?customerId=${activeCustomerId}`)}>
                     <Wrench className="mr-1.5 h-3.5 w-3.5" />
-                    Nova O.S.
+                    Abrir O.S.
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() =>
-                      navigate(`/appointments?customerId=${activeCustomerId}`)
-                    }
-                  >
+                  <Button size="sm" variant="outline" onClick={() => navigate(`/appointments?customerId=${activeCustomerId}`)}>
                     <CalendarClock className="mr-1.5 h-3.5 w-3.5" />
                     Agendar
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() =>
-                      navigate(`/finances?customerId=${activeCustomerId}`)
-                    }
-                  >
+                  <Button size="sm" variant="outline" onClick={() => navigate(`/finances?customerId=${activeCustomerId}`)}>
                     <CreditCard className="mr-1.5 h-3.5 w-3.5" />
                     Cobrar
                   </Button>
                   <Button
                     size="sm"
                     variant="outline"
+                    disabled={!String(selectedCustomer.phone ?? "").trim()}
+                    title={!String(selectedCustomer.phone ?? "").trim() ? "Cliente sem telefone/WhatsApp cadastrado." : undefined}
                     onClick={() =>
                       openCustomerWhatsApp(
                         selectedCustomer,
-                        String(
-                          workspaceCharges.find(isChargePending)?.id ?? ""
-                        ) || null
+                        String(workspaceCharges.find(isChargePending)?.id ?? "") || null
                       )
                     }
                   >
                     <MessageCircle className="mr-1.5 h-3.5 w-3.5" />
-                    WhatsApp
+                    Enviar WhatsApp
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => navigate(`/governance?customerId=${activeCustomerId}&source=customers`)}
-                  >
+                  <Button size="sm" variant="outline" onClick={() => navigate(`/finances?customerId=${activeCustomerId}`)}>
+                    Ver financeiro
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => navigate(`/governance?customerId=${activeCustomerId}&source=customers`)}>
                     <ShieldAlert className="mr-1.5 h-3.5 w-3.5" />
                     Ver risco
                   </Button>
-                </div>
+                  <Button size="sm" variant="outline" disabled={(workspace.timeline ?? []).length === 0} title={(workspace.timeline ?? []).length === 0 ? "Sem eventos de timeline disponíveis para este cliente." : undefined}>
+                    Ver timeline
+                  </Button>
+                </AppActionBar>
 
-                <div className="grid gap-2 md:grid-cols-2">
-                  <article className="rounded-xl border border-[var(--border-subtle)] p-3">
-                    <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-                      <CreditCard className="h-3.5 w-3.5" /> Financeiro
-                    </p>
-                    <p className="mt-2 text-lg font-semibold text-[var(--text-primary)]">
-                      {formatCurrency(
-                        workspacePendingCents || selectedProfile.pendingCents
-                      )}
-                    </p>
-                    <p className="text-xs text-[var(--text-muted)]">
-                      {workspaceCharges.length} cobrança(s) relacionadas.
-                    </p>
-                  </article>
-                  <article className="rounded-xl border border-[var(--border-subtle)] p-3">
-                    <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-                      <Phone className="h-3.5 w-3.5" /> Comunicação
-                    </p>
-                    <p className="mt-2 text-xs leading-5 text-[var(--text-primary)]">
-                      {String(selectedCustomer.phone ?? "Sem telefone")}
-                    </p>
-                    <p className="text-xs text-[var(--text-muted)]">
-                      WhatsApp abre com contexto do cliente quando há telefone.
-                    </p>
-                  </article>
-                </div>
+                <AppOperationalKpiGrid className="xl:grid-cols-2">
+                  <AppStatCard label="Saldo em aberto" value={formatCurrency(workspacePendingCents || selectedProfile.pendingCents)} helper="Somatório real de cobranças pendentes/vencidas." />
+                  <AppStatCard label="Cobranças vencidas" value={workspaceOverdueCharges.length} helper={workspaceOverdueCharges.length > 0 ? "Priorizar ação de cobrança." : "Sem cobrança vencida retornada."} />
+                  <AppStatCard label="Próximo agendamento" value={workspaceNextAppointment ? formatDateTime(workspaceNextAppointment.startsAt ?? workspaceNextAppointment.scheduledAt) : "Sem agenda futura"} helper={workspaceNextAppointment ? String(workspaceNextAppointment.status ?? "Status não informado") : "Nenhum agendamento futuro disponível."} />
+                  <AppStatCard label="Comunicação" value={String(selectedCustomer.phone ?? "Sem telefone")} helper={selectedProfile.lastInteractionAt ? `Última interação em ${formatDateTime(selectedProfile.lastInteractionAt)}` : "Sem interação registrada."} />
+                </AppOperationalKpiGrid>
+
+                <AppOperationalStatusSummary
+                  items={[
+                    {
+                      label: "O.S. aberta mais relevante",
+                      value: workspaceOpenServiceOrder ? String(workspaceOpenServiceOrder.title ?? workspaceOpenServiceOrder.id ?? "O.S.") : "Sem O.S. aberta",
+                      helper: workspaceOpenServiceOrder ? `${String(workspaceOpenServiceOrder.status ?? "-")} · ${formatDateTime(workspaceOpenServiceOrder.updatedAt ?? workspaceOpenServiceOrder.createdAt)}` : "Nada em execução no momento.",
+                    },
+                    {
+                      label: "Última O.S. concluída",
+                      value: workspaceLastCompletedServiceOrder ? String(workspaceLastCompletedServiceOrder.title ?? workspaceLastCompletedServiceOrder.id ?? "O.S.") : "Sem O.S. concluída",
+                      helper: workspaceLastCompletedServiceOrder ? formatDateTime(workspaceLastCompletedServiceOrder.updatedAt ?? workspaceLastCompletedServiceOrder.createdAt) : "Histórico sem conclusão retornada.",
+                    },
+                    {
+                      label: "Último pagamento",
+                      value: workspaceLastPayment ? formatCurrency(Number(workspaceLastPayment.amountCents ?? workspaceLastPayment.amount ?? 0)) : "Não encontrado",
+                      helper: workspaceLastPayment ? formatDateTime(workspaceLastPayment.paidAt ?? workspaceLastPayment.updatedAt ?? workspaceLastPayment.createdAt) : "Sem pagamento nos dados disponíveis.",
+                    },
+                    {
+                      label: "Governança/Risco",
+                      value: selectedProfile.status,
+                      helper: "Detalhe completo disponível em Governança.",
+                    },
+                  ]}
+                />
 
                 <article className="rounded-xl border border-[var(--border-subtle)] p-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
@@ -1206,34 +1235,28 @@ export default function CustomersPage() {
                   <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
                     <AlertTriangle className="h-3.5 w-3.5" /> Timeline recente
                   </p>
-                  <ul className="mt-2 space-y-1.5 text-xs text-[var(--text-secondary)]">
-                    {(workspace.timeline ?? [])
-                      .slice(0, 5)
-                      .map((event, index) => (
-                        <li
-                          key={`${String(event.id ?? "event")}-${index}`}
-                          className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/30 p-2"
-                        >
-                          <p className="font-medium text-[var(--text-primary)]">
-                            {String(
-                              event.description ?? event.title ?? "Evento"
-                            )}
-                          </p>
-                          <p className="text-[11px] text-[var(--text-muted)]">
-                            {formatDateTime(
-                              event.occurredAt ?? event.createdAt
-                            )}
-                          </p>
-                        </li>
-                      ))}
-                    {(workspace.timeline ?? []).length === 0 ? (
-                      <li>Sem timeline retornada para este cliente.</li>
-                    ) : null}
-                  </ul>
+                  <div className="mt-2">
+                    <AppEmbeddedTimeline
+                      items={(workspace.timeline ?? []).slice(0, 5).map((event, index) => ({
+                        id: String(event.id ?? `event-${index}`),
+                        type: String(event.type ?? event.category ?? "Evento"),
+                        summary: String(event.summary ?? event.description ?? event.title ?? "Evento sem resumo"),
+                        entity: String(event.entity ?? event.entityType ?? event.target ?? "Cliente"),
+                        actor: String(event.actor ?? event.author ?? event.createdBy ?? "Sistema"),
+                        happenedAt: formatDateTime(event.occurredAt ?? event.createdAt),
+                        action: event.link ? (
+                          <Button size="sm" variant="ghost" onClick={() => navigate(String(event.link))}>
+                            Ver detalhe
+                          </Button>
+                        ) : null,
+                      }))}
+                      emptyMessage="Sem timeline retornada para este cliente."
+                    />
+                  </div>
                 </article>
               </div>
             )}
-          </AppSectionBlock>
+          </AppContextWorkspace>
         </div>
 
         <CreateCustomerModal
