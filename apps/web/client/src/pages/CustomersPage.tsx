@@ -48,6 +48,11 @@ import {
   getDominantOperationalAction,
   getOperationalAttentionReason,
 } from "@/lib/operational-prioritization";
+import {
+  getAttentionSummary,
+  getVisibleAttentionItems,
+  type OperationalAttentionItem,
+} from "@/lib/operational-attention";
 
 type Customer = Record<string, any>;
 type Appointment = Record<string, any>;
@@ -511,12 +516,14 @@ export default function CustomersPage() {
     return filteredProfiles.slice(start, start + pageSize);
   }, [currentPage, filteredProfiles]);
 
-  const attentionItems = useMemo<AttentionItem[]>(() => {
-    const items: Array<AttentionItem & Record<string, any>> = [];
+  const rawAttentionItems = useMemo<OperationalAttentionItem[]>(() => {
+    const items: OperationalAttentionItem[] = [];
     for (const profile of profiles) {
       if (profile.overdue > 0) {
         items.push({
           severity: "WARNING",
+          domain: "finances",
+          type: "overdue_charge",
           dueDate: profile.charges.find(charge => String(charge.status ?? "").toUpperCase() === "OVERDUE")?.dueDate,
           amountCents: profile.pendingCents,
           key: `${profile.customerId}-overdue`,
@@ -533,6 +540,8 @@ export default function CustomersPage() {
       if (profile.hasOpenServiceOrder) {
         items.push({
           severity: "ATTENTION",
+          domain: "service_orders",
+          type: "overdue_service_order",
           isBlocked: true,
           key: `${profile.customerId}-open-os`,
           title: String(profile.customer.name ?? "Cliente sem nome"),
@@ -548,6 +557,8 @@ export default function CustomersPage() {
       if (profile.daysWithoutContact >= 15) {
         items.push({
           severity: profile.daysWithoutContact >= 30 ? "CRITICAL" : "ATTENTION",
+          domain: "customers",
+          type: "no_recent_contact",
           customerNoResponse: true,
           key: `${profile.customerId}-silent`,
           title: String(profile.customer.name ?? "Cliente sem nome"),
@@ -570,8 +581,17 @@ export default function CustomersPage() {
         ...item,
         context: `${String(item.context ?? "")} · ${getOperationalAttentionReason({ severity: item.severity, dueDate: item.dueDate, amountCents: item.amountCents, isBlocked: item.isBlocked, customerNoResponse: item.customerNoResponse })}`,
       }) as AttentionItem)
-      .slice(0, 4);
   }, [profiles]);
+
+  const attentionItems = useMemo<AttentionItem[]>(
+    () => getVisibleAttentionItems(rawAttentionItems, 4) as AttentionItem[],
+    [rawAttentionItems]
+  );
+
+  const attentionSummary = useMemo(
+    () => getAttentionSummary(rawAttentionItems),
+    [rawAttentionItems]
+  );
 
   const selectedProfile = activeCustomerId
     ? (profileById.get(String(activeCustomerId)) ?? null)
@@ -940,7 +960,7 @@ export default function CustomersPage() {
 
         <AppSectionBlock
           title={operationalCopy.immediateAttention}
-          subtitle="Clientes que podem travar caixa, execução ou resposta no turno."
+          subtitle={`Clientes que podem travar caixa, execução ou resposta no turno. ${attentionSummary.hidden > 0 ? attentionSummary.hiddenMessage : ""}`}
           compact
         >
           {isLoading ? (
