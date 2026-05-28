@@ -40,10 +40,12 @@ import {
   AppPagination,
   AppSectionBlock,
   AppStatusBadge,
+  AppNextBestActionBlock,
 } from "@/components/internal-page-system";
 import { cn } from "@/lib/utils";
 import { operationalCopy } from "@/lib/operational-semantics";
 import { aggregateOperationalHealth } from "@/lib/operational-health";
+import { detectOperationalInterventions, getPrimaryOperationalIntervention, getOperationalInterventionImpact, getOperationalInterventionReason } from "@/lib/operational-interventions";
 import {
   compareOperationalPriority,
   getDominantOperationalAction,
@@ -474,6 +476,14 @@ export default function CustomersPage() {
     [workspaceQuery.data]
   );
 
+
+  const primaryIntervention = useMemo(() => getPrimaryOperationalIntervention(detectOperationalInterventions({
+    customers: workspace.customer ? [workspace.customer] : [],
+    appointments: workspace.appointments,
+    serviceOrders: workspace.serviceOrders,
+    charges: workspace.charges,
+    people: normalizeArrayPayload(peopleQuery.data),
+  })), [workspace, peopleQuery.data]);
   const filteredProfiles = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
 
@@ -971,6 +981,21 @@ export default function CustomersPage() {
           />
         </div>
 
+
+        <AppNextBestActionBlock
+          title="Intervenção operacional recomendada"
+          subtitle="Sugestão contextual para destravar fluxo sem execução automática."
+          compact
+        >
+          {primaryIntervention ? (
+            <div className="space-y-2">
+              <p className="text-sm font-semibold text-[var(--text-primary)]">{primaryIntervention.label}</p>
+              <p className="text-xs text-[var(--text-secondary)]">Motivo: {getOperationalInterventionReason(primaryIntervention)}</p>
+              <p className="text-xs text-[var(--text-secondary)]">Impacto: {getOperationalInterventionImpact(primaryIntervention)}</p>
+              <p className="text-xs text-[var(--text-secondary)]">Responsável sugerido: {primaryIntervention.recommendedOwner}</p>
+            </div>
+          ) : <AppPageEmptyState title="Sem intervenção dominante" description="Contexto insuficiente para recomendar intervenção segura." />}
+        </AppNextBestActionBlock>
         <AppSectionBlock
           title={operationalCopy.immediateAttention}
           subtitle={`Clientes que podem travar caixa, execução ou resposta no turno. ${attentionSummary.hidden > 0 ? attentionSummary.hiddenMessage : ""}`}

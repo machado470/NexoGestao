@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { operationalCopy } from "@/lib/operational-semantics";
 import { compareOperationalPriority } from "@/lib/operational-prioritization";
 import { aggregateOperationalHealth } from "@/lib/operational-health";
+import { detectOperationalInterventions, getPrimaryOperationalIntervention } from "@/lib/operational-interventions";
 import {
   getAttentionSummary,
   getVisibleAttentionItems,
@@ -394,6 +395,12 @@ export default function FinancesPage() {
     [enrichedCharges, serviceOrders]
   );
 
+
+  const financeIntervention = useMemo(() => getPrimaryOperationalIntervention(detectOperationalInterventions({
+    charges: enrichedCharges,
+    payments: enrichedCharges.flatMap(item => (Array.isArray(item.payments) ? item.payments : [])),
+    serviceOrders,
+  })), [enrichedCharges, serviceOrders]);
   const nextBestAction = useMemo(() => {
     const pendingOrOverdue = getVisibleAttentionItems(
       [...enrichedCharges]
@@ -977,6 +984,19 @@ export default function FinancesPage() {
               </p>
             </AppInfoCard>
           </div>
+        </AppSectionBlock>
+
+        <AppSectionBlock
+          title="Intervenção financeira dominante"
+          subtitle="Recomendação contextual para destravar cobrança → pagamento."
+        >
+          {financeIntervention ? (
+            <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
+              <p className="text-sm font-semibold text-[var(--text-primary)]">{financeIntervention.label}</p>
+              <p className="mt-1 text-xs text-[var(--text-secondary)]">{financeIntervention.summary}</p>
+              <p className="mt-1 text-xs text-[var(--text-secondary)]">Owner sugerido: {financeIntervention.recommendedOwner}</p>
+            </div>
+          ) : <p className="text-xs text-[var(--text-secondary)]">Sem intervenção financeira dominante no momento.</p>}
         </AppSectionBlock>
 
         <AppSectionBlock

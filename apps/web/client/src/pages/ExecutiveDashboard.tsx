@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { operationalCopy } from "@/lib/operational-semantics";
+import { detectOperationalInterventions, getPrimaryOperationalIntervention } from "@/lib/operational-interventions";
 import { useLocation } from "wouter";
 import {
   ArrowRight,
@@ -710,6 +711,12 @@ export default function ExecutiveDashboard() {
     staleGovernance: operationalSignals.filter(item => item.area === "GOVERNANCE").length,
     elevatedRisk: operationalSignals.filter(item => item.area === "RISK").length,
   }), [operationalSignals]);
+  const globalIntervention = useMemo(() => getPrimaryOperationalIntervention(detectOperationalInterventions({
+    charges: operationalSignals.filter(item => item.area === "FINANCE").map(item => ({ status: item.severity === "CRITICAL" ? "OVERDUE" : "PENDING" })),
+    serviceOrders: operationalSignals.filter(item => item.actionType === "CREATE_CHARGE_FOR_COMPLETED_OS").map(() => ({ status: "DONE" })),
+    riskSummary: runtimeIndicators.elevatedRisk > 0 ? { level: "critical" } : null,
+  })), [operationalSignals, runtimeIndicators.elevatedRisk]);
+
   const operationalHealth = runtimeIndicators.whatsappFailures + runtimeIndicators.staleGovernance + runtimeIndicators.elevatedRisk + runtimeIndicators.criticalDiagnostics + runtimeIndicators.criticalCharges >= 3
     ? "Estado crítico"
     : runtimeIndicators.whatsappFailures + runtimeIndicators.staleGovernance + runtimeIndicators.elevatedRisk > 0
@@ -1142,6 +1149,13 @@ export default function ExecutiveDashboard() {
           </AppSectionBlock>
 
           <AppSectionBlock title="Operational Attention Center" subtitle="Top sinais reais para ação imediata" className="xl:col-span-12">
+            {globalIntervention ? (
+              <div className="mb-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Intervenção dominante global</p>
+                <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">{globalIntervention.label}</p>
+                <p className="text-xs text-[var(--text-secondary)]">{globalIntervention.summary}</p>
+              </div>
+            ) : null}
             {operationalSignals.length === 0 ? <p className="text-xs text-[var(--text-secondary)]">Sem sinais operacionais ativos no momento.</p> : null}
             <div className="space-y-2.5">
               {operationalSignals.map(signal => (
