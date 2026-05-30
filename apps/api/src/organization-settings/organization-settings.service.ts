@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { UpdateOrganizationSettingsDto } from './dto/update-organization-settings.dto'
 
 @Injectable()
 export class OrganizationSettingsService {
@@ -42,15 +43,15 @@ export class OrganizationSettingsService {
 
   async updateOrganizationSettings(
     orgId: string,
-    data: { name?: string; timezone?: string; currency?: string },
+    data: UpdateOrganizationSettingsDto,
   ) {
     try {
       const organization = await this.prisma.organization.update({
         where: { id: orgId },
         data: {
-          ...(data.name ? { name: data.name } : {}),
-          ...(data.timezone ? { timezone: data.timezone } : {}),
-          ...(data.currency ? { currency: data.currency } : {}),
+          ...(data.name !== undefined ? { name: data.name } : {}),
+          ...(data.timezone !== undefined ? { timezone: data.timezone } : {}),
+          ...(data.currency !== undefined ? { currency: data.currency } : {}),
         },
         select: {
           id: true,

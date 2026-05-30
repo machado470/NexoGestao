@@ -49,7 +49,7 @@ export default function SettingsPage() {
   const members = useMemo(() => normalizeArrayPayload<any>(membersQuery.data), [membersQuery.data]);
   const readiness = useMemo(() => normalizeObjectPayload<any>(readinessQuery.data) ?? {}, [readinessQuery.data]);
 
-  const [organizationName, setOrganizationName] = useState("");
+  const [name, setName] = useState("");
   const [timezone, setTimezone] = useState("America/Sao_Paulo");
   const [notifyAppointments, setNotifyAppointments] = useOperationalMemoryState<boolean>("nexo.settings.notify-appointments.v1", true);
   const [notifyFinance, setNotifyFinance] = useOperationalMemoryState<boolean>("nexo.settings.notify-finance.v1", true);
@@ -57,7 +57,7 @@ export default function SettingsPage() {
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
 
   useEffect(() => {
-    setOrganizationName(String(settings.organizationName ?? settings.name ?? ""));
+    setName(String(settings.name ?? ""));
     setTimezone(String(settings.timezone ?? "America/Sao_Paulo"));
   }, [settings]);
 
@@ -73,17 +73,17 @@ export default function SettingsPage() {
   const isLoading = settingsQuery.isLoading || membersQuery.isLoading || readinessQuery.isLoading;
   const hasError = settingsQuery.isError || membersQuery.isError || readinessQuery.isError;
   const hasUnsavedChanges =
-    organizationName !== String(settings.organizationName ?? settings.name ?? "") ||
+    name !== String(settings.name ?? "") ||
     timezone !== String(settings.timezone ?? "America/Sao_Paulo");
 
   const problems = useMemo(() => {
     const items: string[] = [];
-    if (!organizationName.trim()) items.push("Preencher o nome da empresa.");
+    if (!name.trim()) items.push("Preencher o nome da empresa.");
     if (members.length === 0) items.push("Adicionar pelo menos uma pessoa na equipe.");
     if (!readiness?.stripe?.configured) items.push("Conectar pagamentos para evitar falhas de cobrança.");
     if (!readiness?.twilio?.configured) items.push("Conectar WhatsApp para manter confirmações e lembretes.");
     return items;
-  }, [organizationName, members.length, readiness?.stripe?.configured, readiness?.twilio?.configured]);
+  }, [name, members.length, readiness?.stripe?.configured, readiness?.twilio?.configured]);
 
   const refetchAll = () => {
     void Promise.all([settingsQuery.refetch(), membersQuery.refetch(), readinessQuery.refetch()]);
@@ -98,7 +98,7 @@ export default function SettingsPage() {
           title="Configurações"
           description="Ajuste regras do dia a dia sem entrar em painéis técnicos."
           primaryAction={
-            <Button onClick={() => updateMutation.mutate({ organizationName, timezone })} isLoading={updateMutation.isPending}>
+            <Button onClick={() => updateMutation.mutate({ name, timezone })} isLoading={updateMutation.isPending}>
               Salvar ajustes
             </Button>
           }
@@ -160,7 +160,7 @@ export default function SettingsPage() {
             <div className="grid gap-4 xl:grid-cols-2">
               <AppSectionBlock title="4) Empresa" subtitle="Dados principais da empresa.">
                 <div className="grid gap-2 md:grid-cols-2">
-                  <input className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm" value={organizationName} onChange={event => setOrganizationName(event.target.value)} placeholder="Nome da empresa" />
+                  <input className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm" value={name} onChange={event => setName(event.target.value)} placeholder="Nome da empresa" />
                   <input className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm" value={timezone} onChange={event => setTimezone(event.target.value)} placeholder="Fuso horário" />
                   <input className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm" value={String(settings.cnpj ?? "")} readOnly placeholder="CNPJ" />
                   <input className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm" value={String(settings.address ?? "")} readOnly placeholder="Endereço" />
