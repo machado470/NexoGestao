@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service'
 
 export type PeopleLoadStatus = 'IDLE' | 'NORMAL' | 'BUSY' | 'OVERLOADED'
 export type PeopleCapacityStatus = 'UNDER_CAPACITY' | 'AT_CAPACITY' | 'OVER_CAPACITY'
+export type PeopleAvailabilityStatus = 'AVAILABLE' | 'UNAVAILABLE_NOW' | 'UNAVAILABLE_SOON'
 
 const OPEN_SERVICE_ORDER_STATUSES: ServiceOrderStatus[] = [
   ServiceOrderStatus.OPEN,
@@ -40,6 +41,31 @@ export function calculatePeopleLoadStatus(input: {
 function calculateUsagePct(current: number, capacity: number | null): number | null {
   if (!capacity || capacity <= 0) return null
   return Math.round((current / capacity) * 100)
+}
+
+export function calculatePeopleAvailability(input: {
+  exceptions: Array<{ id: string; startsAt: Date; endsAt: Date; reason: string | null }>
+  now: Date
+}) {
+  const current = input.exceptions.find((exception) => exception.startsAt <= input.now && exception.endsAt > input.now) ?? null
+  const next = input.exceptions.find((exception) => exception.startsAt > input.now) ?? null
+  const soonUntil = new Date(input.now.getTime() + 48 * 60 * 60 * 1000)
+  const availabilityStatus: PeopleAvailabilityStatus = current
+    ? 'UNAVAILABLE_NOW'
+    : next && next.startsAt <= soonUntil
+      ? 'UNAVAILABLE_SOON'
+      : 'AVAILABLE'
+  const serialize = (exception: typeof current) => exception ? {
+    id: exception.id,
+    startsAt: exception.startsAt.toISOString(),
+    endsAt: exception.endsAt.toISOString(),
+    reason: exception.reason,
+  } : null
+  return {
+    availabilityStatus,
+    currentAvailabilityException: serialize(current),
+    nextAvailabilityException: serialize(next),
+  }
 }
 
 export function calculatePeopleCapacityStatus(input: {
@@ -88,7 +114,7 @@ export class PeopleOperationalSummaryService {
 
     if (personIds.length === 0) return { people: [] }
 
-    const [serviceOrders, appointments, lastActivities] = await Promise.all([
+    const [serviceOrders, appointments, lastActivities, availabilityExceptions] = await Promise.all([
       this.prisma.serviceOrder.findMany({
         where: { orgId, assignedToPersonId: { in: personIds }, status: { in: OPEN_SERVICE_ORDER_STATUSES } },
         select: { assignedToPersonId: true, dueDate: true },
@@ -102,6 +128,11 @@ export class PeopleOperationalSummaryService {
         select: { personId: true, createdAt: true },
         distinct: ['personId'],
         orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.personAvailabilityException.findMany({
+        where: { orgId, personId: { in: personIds }, endsAt: { gt: now } },
+        select: { id: true, personId: true, startsAt: true, endsAt: true, reason: true },
+        orderBy: { startsAt: 'asc' },
       }),
     ])
 
@@ -117,6 +148,10 @@ export class PeopleOperationalSummaryService {
         const futureAppointmentsCount = assignedAppointments.filter((appointment) => appointment.startsAt > now).length
         const todayAppointmentsCount = assignedAppointments.filter((appointment) => appointment.startsAt >= todayStart && appointment.startsAt < tomorrowStart).length
         const load = { openServiceOrdersCount: assignedServiceOrders.length, overdueServiceOrdersCount, futureAppointmentsCount, todayAppointmentsCount }
+        const availability = calculatePeopleAvailability({
+          exceptions: availabilityExceptions.filter((exception) => exception.personId === person.id),
+          now,
+        })
         const capacity = {
           dailyServiceOrderCapacity: person.dailyServiceOrderCapacity,
           dailyAppointmentCapacity: person.dailyAppointmentCapacity,
@@ -138,6 +173,7 @@ export class PeopleOperationalSummaryService {
           status: person.active ? 'ACTIVE' : 'INACTIVE',
           ...load,
           ...capacity,
+          ...availability,
           lastActivityAt: lastActivityByPersonId.get(person.id)?.toISOString() ?? null,
           loadStatus: calculatePeopleLoadStatus(load),
         }

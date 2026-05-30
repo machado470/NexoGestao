@@ -80,6 +80,37 @@ export const peopleRouter = router({
       return raw?.data ?? raw;
     }),
 
+
+  /** Listar indisponibilidades temporárias tenant-scoped. */
+  listAvailabilityExceptions: protectedProcedure
+    .input(z.object({ personId: z.string().min(1) }).strict())
+    .query(async ({ input, ctx }) => {
+      const raw = await nexoFetch<any>(ctx, `/people/${input.personId}/availability-exceptions`, { method: "GET" });
+      return raw?.data ?? raw;
+    }),
+
+  /** Criar indisponibilidade temporária sem aceitar orgId do client. */
+  createAvailabilityException: protectedProcedure
+    .input(z.object({
+      personId: z.string().min(1),
+      startsAt: z.string().datetime(),
+      endsAt: z.string().datetime(),
+      reason: z.string().max(200).nullable().optional(),
+    }).strict().refine(({ startsAt, endsAt }) => new Date(startsAt) < new Date(endsAt), { message: "Início deve ser anterior ao fim", path: ["endsAt"] }))
+    .mutation(async ({ input, ctx }) => {
+      const { personId, ...data } = input;
+      const raw = await nexoFetch<any>(ctx, `/people/${personId}/availability-exceptions`, { method: "POST", body: JSON.stringify(data) });
+      return raw?.data ?? raw;
+    }),
+
+  /** Remover indisponibilidade temporária tenant-scoped. */
+  deleteAvailabilityException: protectedProcedure
+    .input(z.object({ personId: z.string().min(1), exceptionId: z.string().min(1) }).strict())
+    .mutation(async ({ input, ctx }) => {
+      const raw = await nexoFetch<any>(ctx, `/people/${input.personId}/availability-exceptions/${input.exceptionId}`, { method: "DELETE" });
+      return raw?.data ?? raw;
+    }),
+
   /**
    * Métricas de pessoas vinculadas
    * Nest: GET /people/stats/linked

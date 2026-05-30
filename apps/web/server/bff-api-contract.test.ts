@@ -84,6 +84,20 @@ describe("BFF↔API contract - lote 1", () => {
     expect(String(url)).not.toContain("orgId");
   });
 
+  it("people availability exceptions usam endpoints tenant-scoped e rejeitam orgId do client", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: "ex-1" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    const caller = appRouter.createCaller({ req: makeReq(), res: makeRes(), user: { token: "t1", validated: true, organizationId: "org-trusted" } } as any);
+    await caller.people.listAvailabilityExceptions({ personId: "person-1" });
+    await caller.people.createAvailabilityException({ personId: "person-1", startsAt: "2026-05-30T12:00:00.000Z", endsAt: "2026-05-30T14:00:00.000Z", reason: "Consulta" });
+    await caller.people.deleteAvailabilityException({ personId: "person-1", exceptionId: "ex-1" });
+    expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual(expect.arrayContaining([expect.stringMatching(/\/people\/person-1\/availability-exceptions$/), expect.stringMatching(/\/people\/person-1\/availability-exceptions\/ex-1$/)]));
+    expect(JSON.parse(String((fetchMock.mock.calls[1][1] as RequestInit).body))).toEqual({ startsAt: "2026-05-30T12:00:00.000Z", endsAt: "2026-05-30T14:00:00.000Z", reason: "Consulta" });
+    await expect(caller.people.createAvailabilityException({ personId: "person-1", startsAt: "2026-05-30T12:00:00.000Z", endsAt: "2026-05-30T14:00:00.000Z", orgId: "forged" } as any)).rejects.toBeDefined();
+  });
+
   it("people.list e people.statsLinked usam endpoints corretos e não aceitam orgId do client", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ id: "p1" }] }), { status: 200 }))
