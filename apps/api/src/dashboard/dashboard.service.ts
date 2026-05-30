@@ -92,7 +92,7 @@ export class DashboardService {
       }),
       this.governanceRead.getAutoScore(orgId),
       this.prisma.whatsAppMessage.count({ where: { orgId, status: 'FAILED' } }),
-      this.prisma.whatsAppConversation.count({ where: { orgId, status: 'PENDING' } }),
+      this.prisma.whatsAppConversation.count({ where: { orgId, status: 'WAITING_OPERATOR' } }),
       this.prisma.charge.count({ where: { orgId, status: 'OVERDUE' } }),
     ])
 
@@ -198,6 +198,7 @@ export class DashboardService {
     todayStart.setHours(0, 0, 0, 0)
     const todayEnd = new Date(now)
     todayEnd.setHours(23, 59, 59, 999)
+    const unconfirmedAppointmentWindowEnd = new Date(now.getTime() + 48 * 60 * 60 * 1000)
 
     const [
       overdueOrders,
@@ -206,6 +207,8 @@ export class DashboardService {
       customersWithPending,
       doneOrdersWithoutCharge,
       failedMessages,
+      awaitingResponseConversations,
+      unconfirmedAppointments,
     ] = await Promise.all([
       this.prisma.serviceOrder.findMany({
         where: {
@@ -310,6 +313,39 @@ export class DashboardService {
         orderBy: [{ failedAt: 'desc' }, { createdAt: 'desc' }],
         take: 2,
       }),
+      this.prisma.whatsAppConversation.findMany({
+        where: { orgId, status: 'WAITING_OPERATOR' },
+        select: {
+          id: true,
+          title: true,
+          phone: true,
+          waitingSince: true,
+          lastInboundAt: true,
+          lastMessageAt: true,
+          customer: { select: { id: true, name: true } },
+        },
+        orderBy: [
+          { waitingSince: 'asc' },
+          { lastInboundAt: 'asc' },
+          { lastMessageAt: 'asc' },
+        ],
+        take: 6,
+      }),
+      this.prisma.appointment.findMany({
+        where: {
+          orgId,
+          status: 'SCHEDULED',
+          startsAt: { gte: now, lte: unconfirmedAppointmentWindowEnd },
+        },
+        select: {
+          id: true,
+          startsAt: true,
+          notes: true,
+          customer: { select: { id: true, name: true } },
+        },
+        orderBy: { startsAt: 'asc' },
+        take: 6,
+      }),
     ])
 
     const operationalQueue = [
@@ -328,24 +364,35 @@ export class DashboardService {
         chargeId: charge.id,
         amountCents: charge.amountCents,
       })),
-      ...todayAppointments
-        .filter((appointment) => appointment.status === 'SCHEDULED')
-        .slice(0, 1)
-        .map((appointment) => ({
-          id: appointment.id,
-          type: 'UNCONFIRMED_APPOINTMENT',
-          title:
-            appointment.notes?.trim() ||
-            `Agendamento com ${appointment.customer.name}`,
-          context: 'Confirmação pendente',
-          appointmentId: appointment.id,
-        })),
-      ...failedMessages.slice(0, 1).map((message) => ({
+      ...failedMessages.slice(0, 2).map((message) => ({
         id: message.id,
         type: 'FAILED_MESSAGE',
         title: message.customer?.name ?? 'Mensagem WhatsApp',
         context: message.errorMessage ?? 'Falha retornada pelo backend',
         messageId: message.id,
+      })),
+      ...awaitingResponseConversations.slice(0, 2).map((conversation) => ({
+        id: conversation.id,
+        type: 'CUSTOMER_AWAITING_RESPONSE',
+        title:
+          conversation.customer?.name ||
+          conversation.title?.trim() ||
+          conversation.phone,
+        context: 'Conversa aguardando resposta da operação',
+        customerId: conversation.customer?.id,
+        conversationId: conversation.id,
+        lastMessageAt: conversation.lastMessageAt,
+      })),
+      ...unconfirmedAppointments.slice(0, 2).map((appointment) => ({
+        id: appointment.id,
+        type: 'UNCONFIRMED_APPOINTMENT',
+        title:
+          appointment.notes?.trim() ||
+          `Agendamento com ${appointment.customer.name}`,
+        context: 'Confirmação pendente nas próximas 48 horas',
+        appointmentId: appointment.id,
+        customerId: appointment.customer.id,
+        startsAt: appointment.startsAt,
       })),
     ].slice(0, 6)
 

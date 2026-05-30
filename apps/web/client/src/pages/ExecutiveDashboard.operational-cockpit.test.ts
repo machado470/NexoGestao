@@ -65,6 +65,9 @@ describe("ExecutiveDashboard decision center", () => {
     expect(source).toContain("OVERDUE_SERVICE_ORDER");
     expect(source).toContain("OVERDUE_CHARGE");
     expect(source).toContain("UNCONFIRMED_APPOINTMENT");
+    expect(source).toContain("CUSTOMER_AWAITING_RESPONSE");
+    expect(source).toContain('path: "/appointments"');
+    expect(source).toContain('path: "/whatsapp"');
   });
 
   it("does not disguise errors as a healthy empty operation", () => {

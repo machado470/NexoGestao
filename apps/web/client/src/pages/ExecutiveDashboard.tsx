@@ -143,7 +143,8 @@ function buildQueue(alerts: DashboardAlerts): QueueItem[] {
     const type = String(item.type);
     if (type === "OVERDUE_SERVICE_ORDER") return { id: String(item.id), type: "O.S. atrasada", entity: String(item.title ?? "Ordem de serviço"), context: String(item.context ?? "Prazo operacional vencido"), ctaLabel: "Destravar O.S.", path: `/service-orders?id=${String(item.id)}` };
     if (type === "OVERDUE_CHARGE") return { id: String(item.id), type: "Cobrança vencida", entity: String(item.title ?? "Cliente"), context: formatCurrencyFromCents(typeof item.amountCents === "number" ? item.amountCents : 0), ctaLabel: "Abrir cobrança", path: "/finances?view=charges&status=overdue" };
-    if (type === "UNCONFIRMED_APPOINTMENT") return { id: String(item.id), type: "Agendamento sem confirmação", entity: String(item.title ?? "Agendamento do dia"), context: String(item.context ?? "Confirmação pendente"), ctaLabel: "Confirmar agenda", path: "/appointments?status=pending-confirmation" };
+    if (type === "CUSTOMER_AWAITING_RESPONSE") return { id: String(item.id), type: "Cliente aguardando resposta", entity: String(item.title ?? "Conversa WhatsApp"), context: String(item.context ?? "Conversa aguardando resposta da operação"), ctaLabel: "Responder cliente", path: "/whatsapp" };
+    if (type === "UNCONFIRMED_APPOINTMENT") return { id: String(item.id), type: "Agendamento sem confirmação", entity: String(item.title ?? "Agendamento futuro"), context: String(item.context ?? "Confirmação pendente"), ctaLabel: "Confirmar agenda", path: "/appointments" };
     return { id: String(item.id), type: "Mensagem com falha", entity: String(item.title ?? "Mensagem WhatsApp"), context: String(item.context ?? "Falha retornada pelo backend"), ctaLabel: "Resolver mensagem", path: "/whatsapp" };
   });
 }
