@@ -196,12 +196,13 @@ export default function ServiceOrdersPage() {
     { enabled: Boolean(selectedOrderId), retry: false }
   );
 
-  const updateMutation = trpc.nexo.serviceOrders.update.useMutation();
+  const startExecutionMutation = trpc.nexo.executions.start.useMutation();
+  const completeExecutionMutation = trpc.nexo.executions.complete.useMutation();
   const generateChargeMutation = trpc.nexo.serviceOrders.generateCharge.useMutation();
 
   const capabilities = {
-    start: Boolean(updateMutation),
-    complete: Boolean(updateMutation),
+    start: Boolean(startExecutionMutation),
+    complete: Boolean(completeExecutionMutation),
     generateCharge: Boolean(generateChargeMutation),
     edit: true,
   };
@@ -470,11 +471,27 @@ export default function ServiceOrdersPage() {
     [counts]
   );
 
-  const anyActionPending = updateMutation.isPending || generateChargeMutation.isPending;
+  const anyActionPending =
+    startExecutionMutation.isPending ||
+    completeExecutionMutation.isPending ||
+    generateChargeMutation.isPending;
   const isPendingAction = (orderId: string, type: "start" | "complete" | "charge") =>
     pendingAction?.orderId === orderId && pendingAction.type === type;
 
-  async function refreshEverything() {
+  async function refreshEverything(orderId?: string) {
+    await Promise.all([
+      utils.nexo.serviceOrders.list.invalidate(),
+      ...(orderId
+        ? [
+            utils.nexo.serviceOrders.getById.invalidate({ id: orderId }),
+            utils.nexo.executions.listByServiceOrder.invalidate({ serviceOrderId: orderId }),
+            utils.nexo.timeline.listByServiceOrder.invalidate({ serviceOrderId: orderId }),
+          ]
+        : []),
+      utils.nexo.timeline.listByOrg.invalidate(),
+      utils.finance.charges.list.invalidate(),
+      utils.finance.charges.stats.invalidate(),
+    ]);
     await Promise.all([
       serviceOrdersQuery.refetch(),
       chargesQuery.refetch(),
@@ -491,10 +508,10 @@ export default function ServiceOrdersPage() {
     try {
       setPendingAction({ orderId, type: "start" });
       setActionFeedback("Iniciando O.S...");
-      await updateMutation.mutateAsync({ id: orderId, status: "IN_PROGRESS" });
+      await startExecutionMutation.mutateAsync({ serviceOrderId: orderId });
       setActionFeedback("O.S. iniciada com sucesso.");
       toast.success("O.S. iniciada.");
-      await refreshEverything();
+      await refreshEverything(orderId);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Não foi possível iniciar a O.S.";
@@ -513,8 +530,14 @@ export default function ServiceOrdersPage() {
     try {
       setPendingAction({ orderId, type: "complete" });
       setActionFeedback("Concluindo O.S...");
-      await updateMutation.mutateAsync({ id: orderId, status: "DONE" });
-      await refreshEverything();
+      const outcomeSummary = String(
+        enrichedOrders.find(item => item.id === orderId)?.raw?.outcomeSummary ?? ""
+      ).trim();
+      await completeExecutionMutation.mutateAsync({
+        executionId: orderId,
+        ...(outcomeSummary ? { notes: outcomeSummary } : {}),
+      });
+      await refreshEverything(orderId);
       const updated = normalizeObjectPayload<any>(
         await utils.nexo.serviceOrders.getById.fetch({ id: orderId })
       );
@@ -567,7 +590,7 @@ export default function ServiceOrdersPage() {
       await generateChargeMutation.mutateAsync({ id: orderId });
       setActionFeedback("Cobrança gerada com sucesso.");
       toast.success("Cobrança gerada.");
-      await refreshEverything();
+      await refreshEverything(orderId);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Não foi possível gerar cobrança.";

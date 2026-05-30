@@ -270,6 +270,7 @@ describeRealIntegration('Canonical Operational Workflow (e2e)', () => {
 
     const serviceOrderInProgress = await prisma.serviceOrder.findFirst({ where: { id: serviceOrderId, orgId: primaryOrgId } })
     expect(serviceOrderInProgress?.status).toBe('IN_PROGRESS')
+    expect(serviceOrderInProgress?.startedAt).toBeTruthy()
 
     // 6) complete execution
     await request(app.getHttpServer())
@@ -286,6 +287,7 @@ describeRealIntegration('Canonical Operational Workflow (e2e)', () => {
 
     const completedExecutionDb = await prisma.serviceOrder.findFirst({ where: { id: executionId, orgId: primaryOrgId } })
     expect(completedExecutionDb?.finishedAt).toBeTruthy()
+    expect(completedExecutionDb?.outcomeSummary).toBe('Concluído com sucesso')
 
     const serviceOrderDone = await prisma.serviceOrder.findFirst({ where: { id: serviceOrderId, orgId: primaryOrgId } })
     expect(serviceOrderDone?.status).toBe('DONE')

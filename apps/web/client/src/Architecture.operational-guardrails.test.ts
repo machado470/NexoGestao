@@ -101,4 +101,20 @@ describe("Operational page guardrails", () => {
     expect(serviceOrders).not.toContain("status IN_PROGRESS");
     expect(serviceOrders).not.toContain("status DONE");
   });
+
+  it("roteia início e conclusão de O.S. pelo domínio de execução", () => {
+    const serviceOrders = readFileSync("client/src/pages/ServiceOrdersPage.tsx", "utf8");
+    expect(serviceOrders).toContain("trpc.nexo.executions.start.useMutation()");
+    expect(serviceOrders).toContain("trpc.nexo.executions.complete.useMutation()");
+    expect(serviceOrders).toContain("startExecutionMutation.mutateAsync({ serviceOrderId: orderId })");
+    expect(serviceOrders).toContain("completeExecutionMutation.mutateAsync({");
+    expect(serviceOrders).toContain("...(outcomeSummary ? { notes: outcomeSummary } : {})");
+    expect(serviceOrders).toContain("utils.nexo.serviceOrders.getById.invalidate({ id: orderId })");
+    expect(serviceOrders).toContain("utils.nexo.executions.listByServiceOrder.invalidate({ serviceOrderId: orderId })");
+    expect(serviceOrders).toContain("utils.nexo.timeline.listByServiceOrder.invalidate({ serviceOrderId: orderId })");
+    expect(serviceOrders).toContain("utils.finance.charges.list.invalidate()");
+    expect(serviceOrders).not.toContain('serviceOrders.update.useMutation()');
+    expect(serviceOrders).not.toContain('status: "IN_PROGRESS"');
+    expect(serviceOrders).not.toContain('status: "DONE"');
+  });
 });
