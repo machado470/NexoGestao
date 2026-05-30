@@ -32,6 +32,9 @@ type PersonDetails = {
   email: string | null;
   active: boolean;
   updatedAt: string | null;
+  dailyServiceOrderCapacity: number | null;
+  dailyAppointmentCapacity: number | null;
+  workloadNotes: string | null;
 };
 
 type FormData = {
@@ -39,6 +42,9 @@ type FormData = {
   role: string;
   email: string;
   active: boolean;
+  dailyServiceOrderCapacity: string;
+  dailyAppointmentCapacity: string;
+  workloadNotes: string;
 };
 
 const DEFAULT_FORM: FormData = {
@@ -46,6 +52,9 @@ const DEFAULT_FORM: FormData = {
   role: "",
   email: "",
   active: true,
+  dailyServiceOrderCapacity: "",
+  dailyAppointmentCapacity: "",
+  workloadNotes: "",
 };
 
 function normalizePersonPayload(payload: unknown): PersonDetails | null {
@@ -64,6 +73,9 @@ function normalizePersonPayload(payload: unknown): PersonDetails | null {
     email: typeof candidate.email === "string" ? candidate.email : null,
     active: candidate.active === false ? false : true,
     updatedAt: typeof candidate.updatedAt === "string" ? candidate.updatedAt : null,
+    dailyServiceOrderCapacity: typeof candidate.dailyServiceOrderCapacity === "number" ? candidate.dailyServiceOrderCapacity : null,
+    dailyAppointmentCapacity: typeof candidate.dailyAppointmentCapacity === "number" ? candidate.dailyAppointmentCapacity : null,
+    workloadNotes: typeof candidate.workloadNotes === "string" ? candidate.workloadNotes : null,
   };
 }
 
@@ -77,6 +89,9 @@ function buildForm(person: PersonDetails | null): FormData {
     role: person.role || "",
     email: person.email || "",
     active: person.active !== false,
+    dailyServiceOrderCapacity: person.dailyServiceOrderCapacity?.toString() ?? "",
+    dailyAppointmentCapacity: person.dailyAppointmentCapacity?.toString() ?? "",
+    workloadNotes: person.workloadNotes ?? "",
   };
 }
 
@@ -85,7 +100,10 @@ function formsAreEqual(a: FormData, b: FormData) {
     a.name.trim() === b.name.trim() &&
     a.role.trim() === b.role.trim() &&
     a.email.trim() === b.email.trim() &&
-    a.active === b.active
+    a.active === b.active &&
+    a.dailyServiceOrderCapacity === b.dailyServiceOrderCapacity &&
+    a.dailyAppointmentCapacity === b.dailyAppointmentCapacity &&
+    a.workloadNotes.trim() === b.workloadNotes.trim()
   );
 }
 
@@ -166,6 +184,8 @@ export default function EditPersonModal({
     const name = formData.name.trim();
     const role = formData.role.trim();
     const email = formData.email.trim();
+    const dailyServiceOrderCapacity = formData.dailyServiceOrderCapacity ? Number(formData.dailyServiceOrderCapacity) : undefined;
+    const dailyAppointmentCapacity = formData.dailyAppointmentCapacity ? Number(formData.dailyAppointmentCapacity) : undefined;
 
     if (!name) {
       toast.error("Informe o nome da pessoa.");
@@ -188,6 +208,9 @@ export default function EditPersonModal({
       role,
       email: email || undefined,
       active: formData.active,
+      dailyServiceOrderCapacity,
+      dailyAppointmentCapacity,
+      workloadNotes: formData.workloadNotes.trim() || null,
       expectedUpdatedAt: personData?.updatedAt ?? undefined,
     });
   };
@@ -256,6 +279,22 @@ export default function EditPersonModal({
                 className="border-[var(--border-subtle)] bg-[var(--surface-base)]"
                 placeholder="Email"
               />
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="edit-person-service-order-capacity">Capacidade diária de O.S.</Label>
+                <Input id="edit-person-service-order-capacity" type="number" min="1" max="100" value={formData.dailyServiceOrderCapacity} onChange={(e) => handleChange("dailyServiceOrderCapacity", e.target.value)} className="border-[var(--border-subtle)] bg-[var(--surface-base)]" placeholder="Não configurada" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-person-appointment-capacity">Capacidade diária de agendamentos</Label>
+                <Input id="edit-person-appointment-capacity" type="number" min="1" max="100" value={formData.dailyAppointmentCapacity} onChange={(e) => handleChange("dailyAppointmentCapacity", e.target.value)} className="border-[var(--border-subtle)] bg-[var(--surface-base)]" placeholder="Não configurada" />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-person-workload-notes">Nota operacional</Label>
+              <textarea id="edit-person-workload-notes" maxLength={500} value={formData.workloadNotes} onChange={(e) => handleChange("workloadNotes", e.target.value)} className="min-h-20 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2 text-sm" placeholder="Contexto opcional sobre a capacidade planejada" />
             </div>
 
             <label className="flex items-center gap-2 rounded-lg border border-zinc-800 bg-[var(--surface-base)]/60 p-3 text-sm">

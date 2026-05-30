@@ -3,6 +3,7 @@ import { AppointmentStatus, ServiceOrderStatus } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 
 export type PeopleLoadStatus = 'IDLE' | 'NORMAL' | 'BUSY' | 'OVERLOADED'
+export type PeopleCapacityStatus = 'UNDER_CAPACITY' | 'AT_CAPACITY' | 'OVER_CAPACITY'
 
 const OPEN_SERVICE_ORDER_STATUSES: ServiceOrderStatus[] = [
   ServiceOrderStatus.OPEN,
@@ -36,6 +37,30 @@ export function calculatePeopleLoadStatus(input: {
   return 'NORMAL'
 }
 
+function calculateUsagePct(current: number, capacity: number | null): number | null {
+  if (!capacity || capacity <= 0) return null
+  return Math.round((current / capacity) * 100)
+}
+
+export function calculatePeopleCapacityStatus(input: {
+  openServiceOrdersCount: number
+  todayAppointmentsCount: number
+  dailyServiceOrderCapacity: number | null
+  dailyAppointmentCapacity: number | null
+}): PeopleCapacityStatus {
+  const { dailyServiceOrderCapacity, dailyAppointmentCapacity } = input
+  if (!dailyServiceOrderCapacity || !dailyAppointmentCapacity) return 'AT_CAPACITY'
+  if (
+    input.openServiceOrdersCount > dailyServiceOrderCapacity ||
+    input.todayAppointmentsCount > dailyAppointmentCapacity
+  ) return 'OVER_CAPACITY'
+  if (
+    input.openServiceOrdersCount === dailyServiceOrderCapacity ||
+    input.todayAppointmentsCount === dailyAppointmentCapacity
+  ) return 'AT_CAPACITY'
+  return 'UNDER_CAPACITY'
+}
+
 @Injectable()
 export class PeopleOperationalSummaryService {
   constructor(private readonly prisma: PrismaService) {}
@@ -48,7 +73,15 @@ export class PeopleOperationalSummaryService {
 
     const people = await this.prisma.person.findMany({
       where: { orgId },
-      select: { id: true, name: true, role: true, active: true },
+      select: {
+        id: true,
+        name: true,
+        role: true,
+        active: true,
+        dailyServiceOrderCapacity: true,
+        dailyAppointmentCapacity: true,
+        workloadNotes: true,
+      },
       orderBy: { name: 'asc' },
     })
     const personIds = people.map((person) => person.id)
@@ -57,20 +90,11 @@ export class PeopleOperationalSummaryService {
 
     const [serviceOrders, appointments, lastActivities] = await Promise.all([
       this.prisma.serviceOrder.findMany({
-        where: {
-          orgId,
-          assignedToPersonId: { in: personIds },
-          status: { in: OPEN_SERVICE_ORDER_STATUSES },
-        },
+        where: { orgId, assignedToPersonId: { in: personIds }, status: { in: OPEN_SERVICE_ORDER_STATUSES } },
         select: { assignedToPersonId: true, dueDate: true },
       }),
       this.prisma.appointment.findMany({
-        where: {
-          orgId,
-          assignedToPersonId: { in: personIds },
-          status: { in: ACTIVE_APPOINTMENT_STATUSES },
-          startsAt: { gte: todayStart },
-        },
+        where: { orgId, assignedToPersonId: { in: personIds }, status: { in: ACTIVE_APPOINTMENT_STATUSES }, startsAt: { gte: todayStart } },
         select: { assignedToPersonId: true, startsAt: true },
       }),
       this.prisma.timelineEvent.findMany({
@@ -81,30 +105,30 @@ export class PeopleOperationalSummaryService {
       }),
     ])
 
-    const lastActivityByPersonId = new Map(
-      lastActivities.flatMap((activity) => activity.personId
-        ? [[activity.personId, activity.createdAt] as const]
-        : []),
-    )
+    const lastActivityByPersonId = new Map(lastActivities.flatMap((activity) => activity.personId
+      ? [[activity.personId, activity.createdAt] as const]
+      : []))
 
     return {
       people: people.map((person) => {
         const assignedServiceOrders = serviceOrders.filter((order) => order.assignedToPersonId === person.id)
         const assignedAppointments = appointments.filter((appointment) => appointment.assignedToPersonId === person.id)
-        const overdueServiceOrdersCount = assignedServiceOrders.filter(
-          (order) => order.dueDate && order.dueDate < now,
-        ).length
-        const futureAppointmentsCount = assignedAppointments.filter(
-          (appointment) => appointment.startsAt > now,
-        ).length
-        const todayAppointmentsCount = assignedAppointments.filter(
-          (appointment) => appointment.startsAt >= todayStart && appointment.startsAt < tomorrowStart,
-        ).length
-        const load = {
-          openServiceOrdersCount: assignedServiceOrders.length,
-          overdueServiceOrdersCount,
-          futureAppointmentsCount,
-          todayAppointmentsCount,
+        const overdueServiceOrdersCount = assignedServiceOrders.filter((order) => order.dueDate && order.dueDate < now).length
+        const futureAppointmentsCount = assignedAppointments.filter((appointment) => appointment.startsAt > now).length
+        const todayAppointmentsCount = assignedAppointments.filter((appointment) => appointment.startsAt >= todayStart && appointment.startsAt < tomorrowStart).length
+        const load = { openServiceOrdersCount: assignedServiceOrders.length, overdueServiceOrdersCount, futureAppointmentsCount, todayAppointmentsCount }
+        const capacity = {
+          dailyServiceOrderCapacity: person.dailyServiceOrderCapacity,
+          dailyAppointmentCapacity: person.dailyAppointmentCapacity,
+          workloadNotes: person.workloadNotes,
+          serviceOrderCapacityUsagePct: calculateUsagePct(load.openServiceOrdersCount, person.dailyServiceOrderCapacity),
+          appointmentCapacityUsagePct: calculateUsagePct(load.todayAppointmentsCount, person.dailyAppointmentCapacity),
+          capacityStatus: calculatePeopleCapacityStatus({
+            openServiceOrdersCount: load.openServiceOrdersCount,
+            todayAppointmentsCount: load.todayAppointmentsCount,
+            dailyServiceOrderCapacity: person.dailyServiceOrderCapacity,
+            dailyAppointmentCapacity: person.dailyAppointmentCapacity,
+          }),
         }
 
         return {
@@ -113,6 +137,7 @@ export class PeopleOperationalSummaryService {
           role: person.role,
           status: person.active ? 'ACTIVE' : 'INACTIVE',
           ...load,
+          ...capacity,
           lastActivityAt: lastActivityByPersonId.get(person.id)?.toISOString() ?? null,
           loadStatus: calculatePeopleLoadStatus(load),
         }

@@ -1,28 +1,23 @@
-# Pessoas: resumo operacional e gaps
+# Pessoas — capacidade operacional e gaps conhecidos
 
-## O que agora é real
+## Entregue
 
-- A tela Pessoas usa `GET /people/operational-summary`, sempre limitado ao tenant autenticado no backend.
-- A carga por responsável usa `ServiceOrder.assignedToPersonId` para O.S. abertas e atrasadas.
-- A agenda por responsável usa `Appointment.assignedToPersonId` para agendamentos futuros ativos e para o recorte de hoje.
-- Nome, função e estado ativo/inativo vêm de `Person`.
-- A última atividade exibida, quando disponível, vem do último `TimelineEvent` da pessoa dentro do tenant.
+- A tela Pessoas usa `GET /people/operational-summary`, sempre limitado ao tenant autenticado por `orgId`.
+- A carga atual continua baseada em atribuições reais: O.S. abertas, O.S. atrasadas, agendamentos de hoje, próximos agendamentos e última atividade da timeline.
+- A capacidade planejada agora é configurável por pessoa: capacidade diária de O.S., capacidade diária de agendamentos e nota operacional opcional.
+- A comparação expõe percentuais de uso e `capacityStatus` sem alterar o `loadStatus` operacional existente.
+- O modal estável de edição de pessoa permite ajustar os três campos mínimos de capacidade.
 
-## O que ainda não é medido
+## Semântica importante
 
-- Não existe medição confiável de produtividade, performance, eficiência, tempo médio de execução ou qualidade individual.
-- Não existe capacidade configurável por pessoa, turno ou especialidade.
-- Não existe distribuição automática de O.S. ou agenda com base na carga.
+Capacidade não é produtividade. A capacidade responde quanto a pessoa aguenta hoje segundo o planejamento operacional. O produto ainda não mede quanto a pessoa entrega bem e não cria score de produtividade.
 
-## O que depende de backend futuro
+Quando uma capacidade estiver ausente ou for zero em um registro legado, o percentual correspondente fica indisponível e o status consolidado é conservador (`AT_CAPACITY`), em vez de presumir folga operacional.
 
-- Histórico detalhado de carga por período.
-- Capacidade planejada por jornada, turno, ausência e especialidade.
-- Alertas proativos e recomendações de redistribuição.
-- Um workspace detalhado da pessoa com paginação própria para O.S., agenda e timeline.
+## Gaps intencionais
 
-## O que não foi inventado
-
-- A tela não cria score de performance.
-- A tela não estima O.S. concluídas, tempo médio, impacto financeiro ou risco individual profundo.
-- Os badges de carga são classificações simples e transparentes sobre contagens reais atuais.
+- Ainda não existem turnos, escalas completas ou calendário de jornada.
+- Ainda não existem ausências, férias ou indisponibilidades temporárias.
+- Ainda não existem especialidades ou compatibilidade entre responsável e tipo de serviço.
+- Ainda não existe redistribuição automática ou recomendação automática de atribuição.
+- Ainda não existe score de produtividade, ranking individual ou avaliação de desempenho.

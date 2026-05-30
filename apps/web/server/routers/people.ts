@@ -65,6 +65,9 @@ export const peopleRouter = router({
         role: z.string().optional(),
         email: z.string().email().optional(),
         active: z.boolean().optional(),
+        dailyServiceOrderCapacity: z.number().int().min(1).max(100).optional(),
+        dailyAppointmentCapacity: z.number().int().min(1).max(100).optional(),
+        workloadNotes: z.string().max(500).nullable().optional(),
         expectedUpdatedAt: z.string().datetime().optional(),
       })
     )

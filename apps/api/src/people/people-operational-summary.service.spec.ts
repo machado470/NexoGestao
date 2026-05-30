@@ -1,6 +1,6 @@
 import { AppointmentStatus, ServiceOrderStatus } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
-import { calculatePeopleLoadStatus, PeopleOperationalSummaryService } from './people-operational-summary.service'
+import { calculatePeopleCapacityStatus, calculatePeopleLoadStatus, PeopleOperationalSummaryService } from './people-operational-summary.service'
 
 const mockPrisma = {
   person: { findMany: jest.fn() },
@@ -16,8 +16,8 @@ describe('PeopleOperationalSummaryService', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     mockPrisma.person.findMany.mockResolvedValue([
-      { id: 'person-1', name: 'Ana', role: 'TECH', active: true },
-      { id: 'person-idle', name: 'Bia', role: 'TECH', active: true },
+      { id: 'person-1', name: 'Ana', role: 'TECH', active: true, dailyServiceOrderCapacity: 5, dailyAppointmentCapacity: 2, workloadNotes: 'Campo externo' },
+      { id: 'person-idle', name: 'Bia', role: 'TECH', active: true, dailyServiceOrderCapacity: 5, dailyAppointmentCapacity: 5, workloadNotes: null },
     ])
     mockPrisma.serviceOrder.findMany.mockResolvedValue([])
     mockPrisma.appointment.findMany.mockResolvedValue([])
@@ -44,6 +44,12 @@ describe('PeopleOperationalSummaryService', () => {
       futureAppointmentsCount: 2,
       todayAppointmentsCount: 2,
       loadStatus: 'OVERLOADED',
+      dailyServiceOrderCapacity: 5,
+      dailyAppointmentCapacity: 2,
+      workloadNotes: 'Campo externo',
+      serviceOrderCapacityUsagePct: 40,
+      appointmentCapacityUsagePct: 100,
+      capacityStatus: 'AT_CAPACITY',
     }))
     expect(result.people[1]).toEqual(expect.objectContaining({ personId: 'person-idle', loadStatus: 'IDLE' }))
   })
@@ -64,6 +70,15 @@ describe('PeopleOperationalSummaryService', () => {
 
     expect(result.people[0].lastActivityAt).toBe('2026-05-30T10:00:00.000Z')
     expect(result.people[1].lastActivityAt).toBeNull()
+  })
+
+  it.each([
+    [{ openServiceOrdersCount: 2, todayAppointmentsCount: 1, dailyServiceOrderCapacity: 5, dailyAppointmentCapacity: 5 }, 'UNDER_CAPACITY'],
+    [{ openServiceOrdersCount: 5, todayAppointmentsCount: 1, dailyServiceOrderCapacity: 5, dailyAppointmentCapacity: 5 }, 'AT_CAPACITY'],
+    [{ openServiceOrdersCount: 6, todayAppointmentsCount: 1, dailyServiceOrderCapacity: 5, dailyAppointmentCapacity: 5 }, 'OVER_CAPACITY'],
+    [{ openServiceOrdersCount: 0, todayAppointmentsCount: 0, dailyServiceOrderCapacity: null, dailyAppointmentCapacity: 5 }, 'AT_CAPACITY'],
+  ])('compara carga atual com capacidade planejada: %p -> %s', (input, expected) => {
+    expect(calculatePeopleCapacityStatus(input)).toBe(expected)
   })
 
   it.each([
