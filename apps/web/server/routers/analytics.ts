@@ -27,6 +27,18 @@ const assigneeWarningMetadata = z.object({
 }).strict();
 
 export const analyticsRouter = router({
+  assigneeWarningSummary: protectedProcedure
+    .input(z.object({
+      from: z.string().datetime({ offset: true }).optional(),
+      to: z.string().datetime({ offset: true }).optional(),
+    }).strict().optional())
+    .query(async ({ ctx, input }) => {
+      const search = new URLSearchParams();
+      if (input?.from) search.set("from", input.from);
+      if (input?.to) search.set("to", input.to);
+      const query = search.toString();
+      return await nexoFetch(ctx.req, `/analytics/assignee-warning-summary${query ? `?${query}` : ""}`);
+    }),
   track: protectedProcedure
     .input(
       z.union([

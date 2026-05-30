@@ -70,6 +70,21 @@ describe("BFF↔API contract - lote 1", () => {
     expect(JSON.parse(String((patchOptions as RequestInit).body))).toEqual({ name: "Oficina Nova", timezone: "UTC" });
   });
 
+  it("analytics.assigneeWarningSummary usa endpoint tenant-scoped, valida ISO e rejeita orgId do client", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ totals: { shown: 2, confirmed: 1, confirmationRatePct: 50 } }), { status: 200 }),
+    );
+    const caller = appRouter.createCaller({ req: makeReq(), res: makeRes(), user: { token: "t1", validated: true, organizationId: "org-trusted" } } as any);
+
+    await caller.analytics.assigneeWarningSummary({ from: "2026-05-01T00:00:00.000Z", to: "2026-05-30T00:00:00.000Z" });
+
+    const [url] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain("/analytics/assignee-warning-summary?from=2026-05-01T00%3A00%3A00.000Z&to=2026-05-30T00%3A00%3A00.000Z");
+    expect(String(url)).not.toContain("orgId");
+    await expect(caller.analytics.assigneeWarningSummary({ from: "not-iso" } as any)).rejects.toBeDefined();
+    await expect(caller.analytics.assigneeWarningSummary({ orgId: "forged" } as any)).rejects.toBeDefined();
+  });
+
   it("people.operationalSummary usa endpoint tenant-scoped sem aceitar orgId do client", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(JSON.stringify({ people: [] }), { status: 200 }),
