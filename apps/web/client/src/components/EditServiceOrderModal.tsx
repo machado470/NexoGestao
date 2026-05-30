@@ -27,6 +27,7 @@ import { buildServiceOrdersDeepLink } from "@/lib/operations/operations.utils";
 import { useCriticalActionGuard } from "@/hooks/useCriticalActionGuard";
 import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
 import { PersonAssignmentWarning } from "@/components/PersonAssignmentWarning";
+import { useAssigneeWarningTelemetry } from "@/hooks/useAssigneeWarningTelemetry";
 import {
   getConcurrencyErrorMessage,
   isConcurrentConflictError,
@@ -205,6 +206,7 @@ export default function EditServiceOrderModal({
 }: EditServiceOrderModalProps) {
   const [, navigate] = useLocation();
   const utils = trpc.useUtils();
+  const assigneeWarningTelemetry = useAssigneeWarningTelemetry("SERVICE_ORDER");
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -234,6 +236,10 @@ export default function EditServiceOrderModal({
     reason: "Atualizando O.S. com sincronização global.",
   });
   const [loadingTimedOut, setLoadingTimedOut] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) assigneeWarningTelemetry.reset();
+  }, [assigneeWarningTelemetry.reset, isOpen]);
 
   useEffect(() => {
     if (!getServiceOrder.data) return;
@@ -393,6 +399,8 @@ export default function EditServiceOrderModal({
     }
 
     try {
+      assigneeWarningTelemetry.trackConfirmed(parsed.data.assignedToPersonId, serviceOrderId);
+
       const updated = await updateServiceOrder.mutateAsync({
         id: serviceOrderId,
         title: parsed.data.title,
@@ -730,7 +738,10 @@ export default function EditServiceOrderModal({
                     Responsável final: {selectedPersonName}
                   </p>
                   <div className="mt-2">
-                    <PersonAssignmentWarning personId={formData.assignedToPersonId} />
+                    <PersonAssignmentWarning
+                      personId={formData.assignedToPersonId}
+                      onWarningShown={assigneeWarningTelemetry.trackShown}
+                    />
                   </div>
                 </div>
 

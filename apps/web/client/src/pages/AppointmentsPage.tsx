@@ -18,6 +18,7 @@ import {
 } from "@/components/app-system";
 import CreateServiceOrderModal from "@/components/CreateServiceOrderModal";
 import { PersonAssignmentWarning } from "@/components/PersonAssignmentWarning";
+import { useAssigneeWarningTelemetry } from "@/hooks/useAssigneeWarningTelemetry";
 import {
   AppFiltersBar,
   AppEmbeddedTimeline,
@@ -234,10 +235,14 @@ export default function AppointmentsPage() {
 
   const selected = filtered.find((row) => String(row.item.id ?? "") === String(selectedAppointmentId ?? "")) ?? null;
 
+  const assigneeWarningTelemetry = useAssigneeWarningTelemetry("APPOINTMENT");
   const [form, setForm] = useState({ customerId: "", date: "", time: "", status: "SCHEDULED" as AppointmentStatus, notes: "", assignedToPersonId: "unassigned", durationMinutes: "60" });
 
   useEffect(() => {
-    if (!openModal) return;
+    if (!openModal) {
+      assigneeWarningTelemetry.reset();
+      return;
+    }
     if (editing) {
       const start = asDate(editing.startsAt);
       const end = asDate(editing.endsAt);
@@ -253,7 +258,7 @@ export default function AppointmentsPage() {
       return;
     }
     setForm({ customerId: queryParams.customerId ?? "", date: "", time: "", status: "SCHEDULED", notes: "", assignedToPersonId: "unassigned", durationMinutes: "60" });
-  }, [openModal, editing, queryParams.customerId]);
+  }, [assigneeWarningTelemetry.reset, openModal, editing, queryParams.customerId]);
 
   const saveAppointment = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -266,6 +271,9 @@ export default function AppointmentsPage() {
     const endsAt = new Date(startsAt.getTime() + Math.max(15, Number(form.durationMinutes) || 60) * 60000);
 
     try {
+      const assignedToPersonId = form.assignedToPersonId === "unassigned" ? undefined : form.assignedToPersonId;
+      assigneeWarningTelemetry.trackConfirmed(assignedToPersonId, editing?.id ? String(editing.id) : undefined);
+
       if (editing?.id) {
         await updateMutation.mutateAsync({
           id: String(editing.id),
@@ -601,7 +609,10 @@ export default function AppointmentsPage() {
           </div>
           <AppField label="Responsável">
             <AppSelect value={form.assignedToPersonId} onValueChange={(assignedToPersonId) => setForm((prev) => ({ ...prev, assignedToPersonId }))} placeholder="Opcional" options={[{ value: "unassigned", label: "Sem responsável" }, ...people.map((item: any) => ({ value: String(item.id), label: String(item.name ?? "Responsável") }))]} />
-            <PersonAssignmentWarning personId={form.assignedToPersonId === "unassigned" ? null : form.assignedToPersonId} />
+            <PersonAssignmentWarning
+              personId={form.assignedToPersonId === "unassigned" ? null : form.assignedToPersonId}
+              onWarningShown={assigneeWarningTelemetry.trackShown}
+            />
           </AppField>
           <AppField label="Observação"><AppInput value={form.notes} onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))} placeholder="Observação operacional" /></AppField>
         </AppForm>

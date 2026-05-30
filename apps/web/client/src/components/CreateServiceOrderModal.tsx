@@ -11,6 +11,7 @@ import { useCriticalActionGuard } from "@/hooks/useCriticalActionGuard";
 import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
 import { PersonAssignmentWarning } from "@/components/PersonAssignmentWarning";
 import { useProductAnalytics } from "@/hooks/useProductAnalytics";
+import { useAssigneeWarningTelemetry } from "@/hooks/useAssigneeWarningTelemetry";
 import { notify } from "@/stores/notificationStore";
 import { FormModal } from "@/components/app-modal-system";
 import {
@@ -99,6 +100,7 @@ export default function CreateServiceOrderModal({
   const [, navigate] = useLocation();
   const utils = trpc.useUtils();
   const { track } = useProductAnalytics();
+  const assigneeWarningTelemetry = useAssigneeWarningTelemetry("SERVICE_ORDER");
   const resolvedOpen = open ?? isOpen ?? false;
   const [createdServiceOrder, setCreatedServiceOrder] = useState<{
     id: string;
@@ -147,12 +149,15 @@ export default function CreateServiceOrderModal({
   };
 
   useEffect(() => {
-    if (!resolvedOpen) return;
+    if (!resolvedOpen) {
+      assigneeWarningTelemetry.reset();
+      return;
+    }
     setFormData((current) => ({
       ...current,
       customerId: current.customerId || (initialCustomerId ? String(initialCustomerId) : ""),
     }));
-  }, [initialCustomerId, resolvedOpen]);
+  }, [assigneeWarningTelemetry.reset, initialCustomerId, resolvedOpen]);
 
   const submit = async () => {
     const priority = Number(formData.priority);
@@ -207,6 +212,8 @@ export default function CreateServiceOrderModal({
       if (raw && Array.isArray(raw.data)) return { ...raw, data: [optimistic, ...raw.data] };
       return [optimistic];
     });
+
+    assigneeWarningTelemetry.trackConfirmed(payload.assignedToPersonId);
 
     createMutation.mutate(payload, {
       onSuccess: async (created) => {
@@ -434,7 +441,10 @@ export default function CreateServiceOrderModal({
                         label: person.name,
                       }))}
                     />
-                    <PersonAssignmentWarning personId={formData.assignedToPersonId} />
+                    <PersonAssignmentWarning
+                      personId={formData.assignedToPersonId}
+                      onWarningShown={assigneeWarningTelemetry.trackShown}
+                    />
                     {formData.assignedToPersonId ? (
                       <button
                         type="button"

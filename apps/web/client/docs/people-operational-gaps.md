@@ -24,3 +24,8 @@ Quando uma capacidade estiver ausente ou for zero em um registro legado, o perce
 - Os alertas de atribuição não bloqueiam o salvamento: a decisão operacional continua humana.
 - Ainda não existe redistribuição automática ou recomendação automática de atribuição.
 - Ainda não existe score de produtividade, ranking individual ou avaliação de desempenho.
+
+## Telemetria dos alertas passivos
+
+- Os alertas passivos de atribuição manual agora registram telemetria de exibição e de confirmação do salvamento para agendamentos e O.S.
+- A medição não muda a decisão operacional: ainda não há bloqueio, recomendação ou redistribuição automática.

@@ -9,7 +9,9 @@ type ProductEventName =
   | "payment_registered"
   | "upgrade_click"
   | "checkout_started"
-  | "checkout_completed";
+  | "checkout_completed"
+  | "ASSIGNEE_WARNING_SHOWN"
+  | "ASSIGNEE_WARNING_CONFIRMED";
 
 type ProductEventMetadata = Record<string, unknown>;
 
@@ -17,13 +19,13 @@ export function useProductAnalytics() {
   const mutation = trpc.analytics.track.useMutation();
 
   const track = (eventName: ProductEventName, metadata: ProductEventMetadata = {}) => {
-    void mutation.mutateAsync({
+    mutation.mutate({
       eventName,
       metadata: {
         timestamp: new Date().toISOString(),
         ...metadata,
       },
-    });
+    } as any);
   };
 
   return {
