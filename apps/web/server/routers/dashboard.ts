@@ -89,25 +89,17 @@ export const dashboardRouter = router({
   }),
 
   kpis: protectedProcedure.query(async ({ ctx }) => {
-    try {
-      const raw = await nexoFetch<any>(ctx.req, `/dashboard/metrics`, {
-        method: "GET",
-      });
-      return raw?.data ?? raw ?? {};
-    } catch {
-      return {} as Record<string, unknown>;
-    }
+    const raw = await nexoFetch<any>(ctx.req, `/dashboard/metrics`, {
+      method: "GET",
+    });
+    return raw?.data ?? raw ?? {};
   }),
 
   alerts: protectedProcedure.query(async ({ ctx }) => {
-    try {
-      const raw = await nexoFetch<any>(ctx.req, `/dashboard/alerts`, {
-        method: "GET",
-      });
-      return raw?.data ?? raw ?? {};
-    } catch {
-      return {} as Record<string, unknown>;
-    }
+    const raw = await nexoFetch<any>(ctx.req, `/dashboard/alerts`, {
+      method: "GET",
+    });
+    return raw?.data ?? raw ?? {};
   }),
 
   revenueTrend: protectedProcedure.query(async ({ ctx }) => {
