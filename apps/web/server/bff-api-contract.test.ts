@@ -70,6 +70,20 @@ describe("BFF↔API contract - lote 1", () => {
     expect(JSON.parse(String((patchOptions as RequestInit).body))).toEqual({ name: "Oficina Nova", timezone: "UTC" });
   });
 
+  it("people.operationalSummary usa endpoint tenant-scoped sem aceitar orgId do client", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ people: [] }), { status: 200 }),
+    );
+    const caller = appRouter.createCaller({ req: makeReq(), res: makeRes(), user: { token: "t1", validated: true, organizationId: "org-trusted" } } as any);
+
+    await caller.people.operationalSummary();
+
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(String(url)).toMatch(/\/people\/operational-summary$/);
+    expect((options as RequestInit).body).toBeUndefined();
+    expect(String(url)).not.toContain("orgId");
+  });
+
   it("people.list e people.statsLinked usam endpoints corretos e não aceitam orgId do client", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ id: "p1" }] }), { status: 200 }))

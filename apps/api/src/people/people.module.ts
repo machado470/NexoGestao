@@ -8,6 +8,7 @@ import { PeopleService } from './people.service'
 import { PeopleController } from './people.controller'
 import { OperationalStateService } from './operational-state.service'
 import { OperationalStateRepository } from './operational-state.repository'
+import { PeopleOperationalSummaryService } from './people-operational-summary.service'
 
 @Module({
   imports: [
@@ -19,7 +20,8 @@ import { OperationalStateRepository } from './operational-state.repository'
   providers: [
     PeopleService,
     OperationalStateService,
-    OperationalStateRepository
+    OperationalStateRepository,
+    PeopleOperationalSummaryService
   ],
   controllers: [
     PeopleController

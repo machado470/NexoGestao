@@ -14,6 +14,15 @@ export const peopleRouter = router({
   }),
 
   /**
+   * Resumo operacional tenant-scoped da equipe
+   * Nest: GET /people/operational-summary
+   */
+  operationalSummary: protectedProcedure.query(async ({ ctx }) => {
+    const raw = await nexoFetch<any>(ctx, `/people/operational-summary`, { method: "GET" });
+    return raw?.data ?? raw;
+  }),
+
+  /**
    * Buscar pessoa por ID
    * Nest: GET /people/:id
    */
