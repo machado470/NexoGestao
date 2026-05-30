@@ -55,6 +55,8 @@ type QueueItem = {
   path: string;
 };
 type FlowStage = { label: string; value: string; context: string; path: string; action: string };
+type ComparisonKey = "revenueReceivedPct" | "completedServiceOrdersPct" | "overdueChargesPct" | "failedMessagesPct";
+type QueueRecord = DashboardRecord & { id?: unknown; type?: unknown; title?: unknown; context?: unknown; amountCents?: unknown };
 
 type DashboardAlerts = {
   overdueOrders?: { count?: number; items?: DashboardRecord[] };
@@ -62,6 +64,7 @@ type DashboardAlerts = {
   todayServices?: { count?: number; items?: DashboardRecord[] };
   customersWithPending?: { count?: number; items?: DashboardRecord[] };
   doneOrdersWithoutCharge?: { count?: number; totalAmountCents?: number; items?: DashboardRecord[] };
+  operationalQueue?: QueueRecord[];
 };
 
 const severityWeight: Record<Severity, number> = { critical: 3, high: 2, medium: 1 };
@@ -76,6 +79,18 @@ function asAlerts(value: unknown): DashboardAlerts {
 
 function readNumber(record: DashboardRecord, key: string) {
   return typeof record[key] === "number" && Number.isFinite(record[key]) ? (record[key] as number) : 0;
+}
+
+function readNullableNumber(record: DashboardRecord, key: string) {
+  return typeof record[key] === "number" && Number.isFinite(record[key]) ? (record[key] as number) : null;
+}
+
+function describeComparison(label: string, value: number | null, lowerIsBetter = false) {
+  if (value === null) return `${label}: sem base histórica suficiente.`;
+  if (value === 0) return `${label}: estável em relação ao período anterior.`;
+
+  const improved = lowerIsBetter ? value < 0 : value > 0;
+  return `${label}: ${improved ? "melhorou" : "piorou"} ${Math.abs(value).toLocaleString("pt-BR")}% em relação ao período anterior.`;
 }
 
 function formatCurrencyFromCents(value: number) {
@@ -123,20 +138,14 @@ function buildAttention(alerts: DashboardAlerts, signals: OperationalSignal[]) {
   return items.sort((a, b) => severityWeight[b.severity] - severityWeight[a.severity]).slice(0, 5);
 }
 
-function buildQueue(alerts: DashboardAlerts, signals: OperationalSignal[]): QueueItem[] {
-  const overdueOrders = (alerts.overdueOrders?.items ?? []).slice(0, 2).map(item => ({
-    id: String(item.id), type: "O.S. atrasada", entity: String(item.title ?? "Ordem de serviço"), context: "Prazo operacional vencido", ctaLabel: "Destravar O.S.", path: `/service-orders?id=${String(item.id)}`,
-  }));
-  const overdueCharges = (alerts.overdueCharges?.items ?? []).slice(0, 2).map(item => ({
-    id: String(item.id), type: "Cobrança vencida", entity: String(asRecord(item.customer).name ?? "Cliente"), context: formatCurrencyFromCents(typeof item.amountCents === "number" ? item.amountCents : 0), ctaLabel: "Abrir cobrança", path: "/finances?view=charges&status=overdue",
-  }));
-  const unconfirmedAppointments = (alerts.todayServices?.items ?? []).filter(item => item.status === "SCHEDULED").slice(0, 1).map(item => ({
-    id: String(item.id), type: "Agendamento sem confirmação", entity: String(item.label ?? "Agendamento do dia"), context: "Confirmação pendente", ctaLabel: "Confirmar agenda", path: "/appointments?status=pending-confirmation",
-  }));
-  const messageFailures = signals.filter(signal => signal.area === "WHATSAPP" || Boolean(signal.messageId)).slice(0, 1).map(signal => ({
-    id: signal.id, type: "Mensagem com falha", entity: signal.title, context: signal.summary ?? "Falha retornada pelo backend", ctaLabel: "Resolver mensagem", path: buildSignalPath(signal),
-  }));
-  return [...overdueOrders, ...overdueCharges, ...unconfirmedAppointments, ...messageFailures].slice(0, 6);
+function buildQueue(alerts: DashboardAlerts): QueueItem[] {
+  return (alerts.operationalQueue ?? []).slice(0, 6).map(item => {
+    const type = String(item.type);
+    if (type === "OVERDUE_SERVICE_ORDER") return { id: String(item.id), type: "O.S. atrasada", entity: String(item.title ?? "Ordem de serviço"), context: String(item.context ?? "Prazo operacional vencido"), ctaLabel: "Destravar O.S.", path: `/service-orders?id=${String(item.id)}` };
+    if (type === "OVERDUE_CHARGE") return { id: String(item.id), type: "Cobrança vencida", entity: String(item.title ?? "Cliente"), context: formatCurrencyFromCents(typeof item.amountCents === "number" ? item.amountCents : 0), ctaLabel: "Abrir cobrança", path: "/finances?view=charges&status=overdue" };
+    if (type === "UNCONFIRMED_APPOINTMENT") return { id: String(item.id), type: "Agendamento sem confirmação", entity: String(item.title ?? "Agendamento do dia"), context: String(item.context ?? "Confirmação pendente"), ctaLabel: "Confirmar agenda", path: "/appointments?status=pending-confirmation" };
+    return { id: String(item.id), type: "Mensagem com falha", entity: String(item.title ?? "Mensagem WhatsApp"), context: String(item.context ?? "Falha retornada pelo backend"), ctaLabel: "Resolver mensagem", path: "/whatsapp" };
+  });
 }
 
 function AttentionRow({ item, navigate }: { item: AttentionItem; navigate: (path: string) => void }) {
@@ -171,10 +180,17 @@ export default function ExecutiveDashboard() {
   const alerts = useMemo(() => asAlerts(alertsQuery.data), [alertsQuery.data]);
   const signals = operationalSignalsQuery.data?.signals ?? [];
   const attention = useMemo(() => buildAttention(alerts, signals), [alerts, signals]);
-  const queue = useMemo(() => buildQueue(alerts, signals), [alerts, signals]);
+  const queue = useMemo(() => buildQueue(alerts), [alerts]);
   const pendingWhatsAppApprovals = Array.isArray(pendingWhatsAppApprovalsQuery.data) ? pendingWhatsAppApprovalsQuery.data as WhatsAppActionExecution[] : [];
   const pageLoading = kpisQuery.isLoading || alertsQuery.isLoading;
   const pageError = kpisQuery.isError || alertsQuery.isError;
+  const comparison = asRecord(metrics.comparison);
+  const pulseComparisons: Array<[string, ComparisonKey, boolean?]> = [
+    ["Receita recebida", "revenueReceivedPct"],
+    ["O.S. concluídas", "completedServiceOrdersPct"],
+    ["Cobranças vencidas", "overdueChargesPct", true],
+    ["Mensagens falhando", "failedMessagesPct", true],
+  ];
   const criticalCount = attention.filter(item => item.severity === "critical").length;
   const operationState = pageError ? "Leitura operacional indisponível" : criticalCount > 0 ? `${criticalCount} risco(s) crítico(s) ativo(s)` : attention.length > 0 ? `${attention.length} ponto(s) pedem atenção` : "Sem riscos ativos retornados";
 
@@ -183,7 +199,7 @@ export default function ExecutiveDashboard() {
     { label: "Agendamento", value: String(alerts.todayServices?.count ?? 0), context: "agendamentos hoje", path: "/appointments", action: "Ver agenda" },
     { label: "O.S.", value: String(readNumber(metrics, "openServiceOrders")), context: "ordens abertas", path: "/service-orders", action: "Ver execução" },
     { label: "Cobrança", value: String(readNumber(metrics, "chargesGenerated")), context: "cobranças geradas", path: "/finances?view=charges", action: "Ver cobranças" },
-    { label: "Pagamento", value: "—", context: "volume não exposto pelo backend", path: "/finances?view=paid", action: "Ver pagamentos" },
+    { label: "Pagamento", value: readNullableNumber(metrics, "paymentsReceivedCount") === null ? "—" : String(readNullableNumber(metrics, "paymentsReceivedCount")), context: readNullableNumber(metrics, "paymentsReceivedCount") === null ? "volume não disponível no contrato" : "pagamentos recebidos nesta semana", path: "/finances?view=paid", action: "Ver pagamentos" },
   ];
   const overdueOrders = alerts.overdueOrders?.count ?? 0;
   const overdueCharges = alerts.overdueCharges?.count ?? 0;
@@ -239,7 +255,7 @@ export default function ExecutiveDashboard() {
 
       <AppSectionBlock title="Pulso da operação" subtitle="Leitura humana baseada nos sinais disponíveis neste momento.">
         <div className="grid gap-2 md:grid-cols-2">
-          <p className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm text-[var(--text-secondary)]"><TrendingDown className="mr-2 inline h-4 w-4" />Tendência histórica: indisponível neste lote. O backend atual não expõe comparação operacional entre períodos.</p>
+          {pulseComparisons.map(([label, key, lowerIsBetter]) => <p key={key} className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm text-[var(--text-secondary)]"><TrendingDown className="mr-2 inline h-4 w-4" />{describeComparison(label, readNullableNumber(comparison, key), lowerIsBetter)}</p>)}
           <p className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm text-[var(--text-secondary)]"><ShieldAlert className="mr-2 inline h-4 w-4" />Principal risco: {bottleneck?.label ?? "nenhum gargalo identificado com a leitura disponível"}.</p>
           <p className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm text-[var(--text-secondary)]"><Clock3 className="mr-2 inline h-4 w-4" />Execução: {overdueOrders > 0 ? `${overdueOrders} O.S. atrasada(s) precisam avançar primeiro.` : "sem atraso de O.S. retornado."}</p>
           <p className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm text-[var(--text-secondary)]"><MessageSquareWarning className="mr-2 inline h-4 w-4" />Comunicação: {readNumber(asRecord(metrics.whatsappSignals), "failedMessages")} mensagem(ns) com falha retornada(s).</p>
