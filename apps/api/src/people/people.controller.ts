@@ -14,6 +14,7 @@ import { RolesGuard } from '../auth/guards/roles.guard'
 import { Roles } from '../auth/decorators/roles.decorator'
 import { Org } from '../auth/decorators/org.decorator'
 import { User } from '../auth/decorators/user.decorator'
+import { PeopleOperationalSummaryService } from './people-operational-summary.service'
 
 type CreatePersonDTO = {
   name: string
@@ -26,6 +27,7 @@ type CreatePersonDTO = {
 export class PeopleController {
   constructor(
     private readonly people: PeopleService,
+    private readonly operationalSummary: PeopleOperationalSummaryService,
   ) {}
 
   /**
@@ -49,6 +51,16 @@ export class PeopleController {
     return {
       count: await this.people.countUsersWithPerson(),
     }
+  }
+
+  /**
+   * 👑 ADMIN — resumo operacional real da equipe autenticada
+   * GET /people/operational-summary
+   */
+  @Get('operational-summary')
+  @Roles('ADMIN')
+  async getOperationalSummary(@Org() orgId: string) {
+    return this.operationalSummary.getSummary(orgId)
   }
 
   /**
