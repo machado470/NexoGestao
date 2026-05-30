@@ -17,6 +17,7 @@ import {
   AppStatusBadge,
 } from "@/components/app-system";
 import CreateServiceOrderModal from "@/components/CreateServiceOrderModal";
+import { PersonAssignmentWarning } from "@/components/PersonAssignmentWarning";
 import {
   AppFiltersBar,
   AppEmbeddedTimeline,
@@ -600,6 +601,7 @@ export default function AppointmentsPage() {
           </div>
           <AppField label="Responsável">
             <AppSelect value={form.assignedToPersonId} onValueChange={(assignedToPersonId) => setForm((prev) => ({ ...prev, assignedToPersonId }))} placeholder="Opcional" options={[{ value: "unassigned", label: "Sem responsável" }, ...people.map((item: any) => ({ value: String(item.id), label: String(item.name ?? "Responsável") }))]} />
+            <PersonAssignmentWarning personId={form.assignedToPersonId === "unassigned" ? null : form.assignedToPersonId} />
           </AppField>
           <AppField label="Observação"><AppInput value={form.notes} onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))} placeholder="Observação operacional" /></AppField>
         </AppForm>

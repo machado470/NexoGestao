@@ -26,6 +26,7 @@ import { useLocation } from "wouter";
 import { buildServiceOrdersDeepLink } from "@/lib/operations/operations.utils";
 import { useCriticalActionGuard } from "@/hooks/useCriticalActionGuard";
 import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
+import { PersonAssignmentWarning } from "@/components/PersonAssignmentWarning";
 import {
   getConcurrencyErrorMessage,
   isConcurrentConflictError,
@@ -728,6 +729,9 @@ export default function EditServiceOrderModal({
                   <p className="mt-1 text-xs text-[var(--modal-section-muted)]">
                     Responsável final: {selectedPersonName}
                   </p>
+                  <div className="mt-2">
+                    <PersonAssignmentWarning personId={formData.assignedToPersonId} />
+                  </div>
                 </div>
 
                 {!canAssignOrStart && !isPersistedClosed ? (
