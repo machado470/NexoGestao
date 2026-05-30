@@ -37,6 +37,24 @@ export class AnalyticsController {
   }
 
   /**
+   * GET /analytics/assignee-warning-summary
+   * Resume os alertas passivos de atribuição manual da organização.
+   */
+  @Get('assignee-warning-summary')
+  @Roles('ADMIN')
+  getAssigneeWarningSummary(
+    @Org() orgId: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.analytics.getAssigneeWarningSummary(
+      orgId,
+      from ? new Date(from) : undefined,
+      to ? new Date(to) : undefined,
+    )
+  }
+
+  /**
    * GET /analytics/daily
    * Retorna métricas diárias dos últimos N dias
    */

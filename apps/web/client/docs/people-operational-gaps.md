@@ -28,4 +28,6 @@ Quando uma capacidade estiver ausente ou for zero em um registro legado, o perce
 ## Telemetria dos alertas passivos
 
 - Os alertas passivos de atribuição manual agora registram telemetria de exibição e de confirmação do salvamento para agendamentos e O.S.
-- A medição não muda a decisão operacional: ainda não há bloqueio, recomendação ou redistribuição automática.
+- A página Pessoas possui uma leitura agregada administrativa dos últimos 30 dias: totais exibidos e confirmados, taxa de confirmação, contextos e tipo de alerta mais frequente.
+- Esses dados servem somente para observação operacional dos avisos e das decisões manuais mantidas após o aviso. Não representam produtividade, ranking, punição ou avaliação de desempenho.
+- A medição não muda a decisão operacional: ainda não há recomendação automática, bloqueio de atribuição ou redistribuição automática.

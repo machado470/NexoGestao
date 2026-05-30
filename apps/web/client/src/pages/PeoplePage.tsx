@@ -15,6 +15,12 @@ type LoadStatus = "IDLE" | "NORMAL" | "BUSY" | "OVERLOADED";
 type CapacityStatus = "UNDER_CAPACITY" | "AT_CAPACITY" | "OVER_CAPACITY";
 type AvailabilityStatus = "AVAILABLE" | "UNAVAILABLE_NOW" | "UNAVAILABLE_SOON";
 type AvailabilityException = { id: string; startsAt: string; endsAt: string; reason?: string | null };
+type AssigneeWarningType = "UNAVAILABLE_NOW" | "UNAVAILABLE_SOON" | "OVER_CAPACITY" | "OVERLOADED";
+type AssigneeWarningSummary = {
+  totals: { shown: number; confirmed: number; confirmationRatePct: number | null };
+  byContext: Array<{ context: "APPOINTMENT" | "SERVICE_ORDER"; shown: number; confirmed: number }>;
+  byWarningType: Array<{ warningType: AssigneeWarningType; shown: number; confirmed: number }>;
+};
 type OperationalPerson = {
   personId: string; name: string; role: string; status: "ACTIVE" | "INACTIVE";
   openServiceOrdersCount: number; overdueServiceOrdersCount: number; futureAppointmentsCount: number; todayAppointmentsCount: number;
@@ -27,6 +33,8 @@ type OperationalPerson = {
 const loadLabels: Record<LoadStatus, string> = { IDLE: "Sem carga", NORMAL: "Normal", BUSY: "Ocupado", OVERLOADED: "Sobrecarregado" };
 const capacityLabels: Record<CapacityStatus, string> = { UNDER_CAPACITY: "Dentro da capacidade", AT_CAPACITY: "Perto do limite", OVER_CAPACITY: "Acima da capacidade" };
 const availabilityLabels: Record<AvailabilityStatus, string> = { AVAILABLE: "Disponível", UNAVAILABLE_NOW: "Indisponível agora", UNAVAILABLE_SOON: "Indisponível em breve" };
+const warningTypeLabels: Record<AssigneeWarningType, string> = { UNAVAILABLE_NOW: "Indisponibilidade atual", UNAVAILABLE_SOON: "Indisponibilidade próxima", OVER_CAPACITY: "Capacidade planejada excedida", OVERLOADED: "Carga operacional alta" };
+const contextLabels = { APPOINTMENT: "Agendamentos", SERVICE_ORDER: "O.S." } as const;
 const formatDateTime = (value?: string | null) => value ? new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value)) : "Não registrada";
 const formatCapacity = (value: number | null) => value == null ? "Não configurada" : `${value}/dia`;
 const formatUsage = (value: number | null) => value == null ? "Uso indisponível" : `${value}% usado`;
@@ -43,6 +51,7 @@ export default function PeoplePage() {
   const [endsAt, setEndsAt] = useState("");
   const [reason, setReason] = useState("");
   const summaryQuery = trpc.people.operationalSummary.useQuery(undefined, { enabled: isAuthenticated, retry: false, refetchOnWindowFocus: false });
+  const warningSummaryQuery = trpc.analytics.assigneeWarningSummary.useQuery(undefined, { enabled: isAuthenticated && role === "ADMIN", retry: false, refetchOnWindowFocus: false });
   const exceptionsQuery = trpc.people.listAvailabilityExceptions.useQuery({ personId: selectedPersonId ?? "" }, { enabled: Boolean(selectedPersonId), retry: false });
   const createAvailabilityException = trpc.people.createAvailabilityException.useMutation({ onSuccess: async () => { setStartsAt(""); setEndsAt(""); setReason(""); await Promise.all([utils.people.operationalSummary.invalidate(), utils.people.listAvailabilityExceptions.invalidate()]); } });
   const deleteAvailabilityException = trpc.people.deleteAvailabilityException.useMutation({ onSuccess: async () => { await Promise.all([utils.people.operationalSummary.invalidate(), utils.people.listAvailabilityExceptions.invalidate()]); } });
@@ -50,6 +59,8 @@ export default function PeoplePage() {
   const selectedPerson = people.find((person) => person.personId === selectedPersonId) ?? null;
   const exceptions = (exceptionsQuery.data ?? []) as AvailabilityException[];
   const isAdmin = role === "ADMIN";
+  const warningSummary = warningSummaryQuery.data as AssigneeWarningSummary | null | undefined;
+  const mostFrequentWarningType = warningSummary?.byWarningType.reduce((current, warningType) => warningType.shown > current.shown ? warningType : current, warningSummary.byWarningType[0]);
   const header = useMemo(() => ({
     activePeople: people.filter((person) => person.status === "ACTIVE").length,
     overloadedPeople: people.filter((person) => person.loadStatus === "OVERLOADED").length,
@@ -67,6 +78,11 @@ export default function PeoplePage() {
     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4" data-testid="people-operational-header">
       <AppStatCard label="Pessoas ativas" value={`${header.activePeople}`} helper="Responsáveis cadastrados na operação." /><AppStatCard label="Sobrecarregados" value={`${header.overloadedPeople}`} helper="Carga operacional atual alta ou com atraso." /><AppStatCard label="O.S. atrasadas atribuídas" value={`${header.overdueServiceOrders}`} helper="O.S. abertas vencidas com responsável." /><AppStatCard label="Agendamentos hoje" value={`${header.todayAppointments}`} helper="Agenda ativa de hoje por responsável." />
     </div>
+    {isAdmin ? <AppSectionBlock title="Sinais de atribuição" subtitle="Leitura agregada dos alertas passivos exibidos durante atribuições manuais. Serve somente para observação operacional das decisões manuais.">
+      {warningSummaryQuery.isLoading ? <p className="text-sm text-[var(--text-muted)]">Consolidando sinais dos últimos 30 dias...</p> : null}
+      {warningSummaryQuery.isError ? <p className="text-sm text-[var(--text-muted)]">Não foi possível carregar os sinais agregados agora.</p> : null}
+      {warningSummary ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4" data-testid="assignee-warning-summary"><AppStatCard label="Alertas exibidos" value={`${warningSummary.totals.shown}`} helper="Avisos passivos durante atribuições manuais." /><AppStatCard label="Confirmações após alerta" value={`${warningSummary.totals.confirmed}`} helper="Decisões manuais mantidas após o aviso." /><AppStatCard label="Taxa de confirmação" value={warningSummary.totals.confirmationRatePct == null ? "Sem exibições" : `${warningSummary.totals.confirmationRatePct}%`} helper="Confirmações divididas por alertas exibidos." /><div className="rounded-xl border border-[var(--border-subtle)] p-4 text-sm"><p className="text-xs text-[var(--text-muted)]">Contextos observados</p>{warningSummary.byContext.map((context) => <p key={context.context} className="mt-1"><span className="font-semibold">{contextLabels[context.context]}</span>: {context.shown} exibidos · {context.confirmed} confirmados</p>)}<p className="mt-3 text-xs text-[var(--text-muted)]">Sinal mais frequente</p><p className="font-semibold">{mostFrequentWarningType && mostFrequentWarningType.shown > 0 ? warningTypeLabels[mostFrequentWarningType.warningType] : "Nenhum sinal registrado"}</p></div></div> : null}
+    </AppSectionBlock> : null}
     {summaryQuery.isLoading ? <AppPageLoadingState title="Consolidando carga por responsável" /> : null}
     {summaryQuery.isError ? <AppPageErrorState description="Não foi possível carregar o resumo operacional da equipe." onAction={refresh} /> : null}
     {!summaryQuery.isLoading && !summaryQuery.isError ? <AppSectionBlock title="Carga por responsável" subtitle="Carga real, capacidade planejada e disponibilidade como sinais separados.">
