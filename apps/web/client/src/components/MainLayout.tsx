@@ -13,6 +13,7 @@ import {
   CreditCard,
   DollarSign,
   History,
+  ClipboardList,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -28,7 +29,7 @@ import {
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import { canAny, type Permission } from "@/lib/rbac";
+import { canAny, type Permission, type Role } from "@/lib/rbac";
 import { useIsMobile } from "@/hooks/useMobile";
 import { useNotificationStore } from "@/stores/notificationStore";
 import { useAutomationRunner } from "@/hooks/useAutomationRunner";
@@ -58,6 +59,7 @@ type MenuItem = {
   route: string;
   icon: React.ComponentType<{ className?: string }>;
   permissions?: Permission[];
+  requiredRoles?: Role[];
 };
 
 type MenuSection = {
@@ -217,6 +219,13 @@ export function MainLayout({ children }: MainLayoutProps) {
           permissions: ["people:manage"],
         },
         {
+          id: "audit",
+          label: "Auditoria",
+          route: "/audit",
+          icon: ClipboardList,
+          requiredRoles: ["ADMIN"],
+        },
+        {
           id: "profile",
           label: "Perfil",
           route: "/profile",
@@ -238,6 +247,7 @@ export function MainLayout({ children }: MainLayoutProps) {
         .map(section => ({
           ...section,
           items: section.items.filter(item => {
+            if (item.requiredRoles?.length && (!role || !item.requiredRoles.includes(role))) return false;
             if (!item.permissions?.length) return true;
             if (!role) return false;
             return canAny(role, item.permissions);

@@ -26,7 +26,7 @@ import {
   BootProbeProvider,
   type BootProbeStage,
 } from "./contexts/BootProbeContext";
-import { canAny, type Permission } from "./lib/rbac";
+import { canAny, type Permission, type Role } from "./lib/rbac";
 import { setBootPhase } from "./lib/bootPhase";
 import { extractPathname, isPublicOrAuthPath } from "./lib/routeAccess";
 import { pushAuditEvent, setAuditField } from "./lib/renderAudit";
@@ -55,6 +55,7 @@ const CalendarPage = lazy(() => import("./pages/CalendarPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const ProfilePage = lazy(() => import("./pages/ProfilePage"));
 const TimelinePage = lazy(() => import("./pages/TimelinePage"));
+const AuditPage = lazy(() => import("./pages/AuditPage"));
 const BillingPage = lazy(() => import("./pages/BillingPage"));
 const OperationalCockpitPage = lazy(() => import("./pages/OperationalCockpitPage"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
@@ -260,9 +261,11 @@ function ProtectedRoute({
   permissions,
   requireCompletedOnboarding = false,
   onboardingOnly = false,
+  requiredRoles,
 }: {
   component: ComponentType;
   permissions?: Permission[];
+  requiredRoles?: Role[];
   requireCompletedOnboarding?: boolean;
   onboardingOnly?: boolean;
 }) {
@@ -327,7 +330,8 @@ function ProtectedRoute({
     );
   }
 
-  if (permissions?.length && (!role || !canAny(role, permissions))) {
+  if ((requiredRoles?.length && (!role || !requiredRoles.includes(role))) ||
+      (permissions?.length && (!role || !canAny(role, permissions)))) {
     return (
       <FullScreenMessage
         title="Acesso restrito"
@@ -405,6 +409,7 @@ function protectedPage(
     permissions?: Permission[];
     requireCompletedOnboarding?: boolean;
     onboardingOnly?: boolean;
+    requiredRoles?: Role[];
   }
 ) {
   const Wrapped = withMainLayout(Page);
@@ -416,6 +421,7 @@ function protectedPage(
         permissions={options?.permissions}
         requireCompletedOnboarding={options?.requireCompletedOnboarding}
         onboardingOnly={options?.onboardingOnly}
+        requiredRoles={options?.requiredRoles}
       />
     );
   };
@@ -427,6 +433,7 @@ function lazyProtectedPage(
     permissions?: Permission[];
     requireCompletedOnboarding?: boolean;
     onboardingOnly?: boolean;
+    requiredRoles?: Role[];
   }
 ) {
   return protectedPage(
@@ -527,6 +534,11 @@ const TimelineRoute = lazyProtectedPage(TimelinePage, {
   requireCompletedOnboarding: true,
 });
 
+const AuditRoute = lazyProtectedPage(AuditPage, {
+  requiredRoles: ["ADMIN"],
+  requireCompletedOnboarding: true,
+});
+
 const BillingRoute = lazyProtectedPage(BillingPage, {
   permissions: ["settings:manage"],
   requireCompletedOnboarding: true,
@@ -577,6 +589,7 @@ function Router() {
       "/calendar",
       "/settings",
       "/timeline",
+      "/audit",
       "/billing",
       "/cockpit",
       "/onboarding",
@@ -699,6 +712,7 @@ function Router() {
       <Route path="/settings" component={SettingsRoute} />
       <Route path="/profile" component={ProfileRoute} />
       <Route path="/timeline" component={TimelineRoute} />
+      <Route path="/audit" component={AuditRoute} />
       <Route path="/billing" component={BillingRoute} />
       <Route path="/cockpit/operations" component={OperationalCockpitRoute} />
       <Route
