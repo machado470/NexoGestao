@@ -569,6 +569,20 @@ export class FinanceService {
     return this.prisma.charge.delete({ where: { id: charge.id } })
   }
 
+  private parseManualPaymentDate(value?: string | null): Date {
+    if (!value) return new Date()
+
+    const paidAt = new Date(value)
+    if (Number.isNaN(paidAt.getTime())) {
+      throw new BadRequestException('paidAt inválido')
+    }
+    if (paidAt.getTime() > Date.now() + 24 * 60 * 60 * 1000) {
+      throw new BadRequestException('paidAt não pode estar no futuro')
+    }
+
+    return paidAt
+  }
+
   // =========================
   // PAYMENT
   // =========================
@@ -579,7 +593,15 @@ export class FinanceService {
     method: $Enums.PaymentMethod
     actorUserId?: string | null
     idempotencyKey?: string | null
+    paidAt?: string | null
+    notes?: string | null
   }) {
+    const paidAt = this.parseManualPaymentDate(input.paidAt)
+    const notes = input.notes?.trim() || null
+    if (notes && notes.length > 2000) {
+      throw new BadRequestException('notes deve ter no máximo 2000 caracteres')
+    }
+
     this.logCritical({
       level: 'log',
       action: 'PAY_CHARGE_START',
@@ -599,6 +621,8 @@ export class FinanceService {
         chargeId: input.chargeId,
         amountCents: input.amountCents,
         method: input.method,
+        paidAt: paidAt.toISOString(),
+        notes,
       },
     })
     if (idem.mode === 'replay') {
@@ -633,7 +657,6 @@ export class FinanceService {
         throw new BadRequestException('amountCents deve ser maior que zero')
       }
 
-      const paidAt = new Date()
       const mutation = await tx.charge.updateMany({
         where: {
           id: charge.id,
@@ -677,6 +700,7 @@ export class FinanceService {
           amountCents: input.amountCents,
           method: input.method,
           paidAt,
+          notes,
         },
       })
 
@@ -731,6 +755,8 @@ export class FinanceService {
         paymentId: payment.id,
         amountCents: input.amountCents,
         method: input.method,
+        paidAt: paidAt.toISOString(),
+        notes,
       },
     })
     await this.safeTimelineLog({
@@ -748,6 +774,8 @@ export class FinanceService {
         paymentId: payment.id,
         amountCents: input.amountCents,
         method: input.method,
+        paidAt: paidAt.toISOString(),
+        notes,
       },
     })
 

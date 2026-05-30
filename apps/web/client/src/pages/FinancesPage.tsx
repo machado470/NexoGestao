@@ -716,6 +716,10 @@ export default function FinancesPage() {
         chargeId: String(openPayModalFor.id),
         amountCents,
         method: payMethod,
+        paidAt: payDate
+          ? new Date(`${payDate}T12:00:00`).toISOString()
+          : new Date().toISOString(),
+        notes: payNotes.trim() || undefined,
       });
       toast.success("Pagamento registrado com sucesso.");
       setOpenPayModalFor(null);
@@ -1542,9 +1546,10 @@ export default function FinancesPage() {
                 value={payDate}
                 onChange={event => setPayDate(event.target.value)}
                 type="date"
+                max={new Date().toISOString().slice(0, 10)}
               />
               <span className="text-[11px] text-[var(--text-muted)]">
-                Campo informativo (backend atual não persiste data manual).
+                A data selecionada será registrada no pagamento.
               </span>
             </label>
             <label className="space-y-1 text-sm">
@@ -1558,8 +1563,7 @@ export default function FinancesPage() {
                 placeholder="Observação operacional"
               />
               <span className="text-[11px] text-[var(--text-muted)]">
-                Campo informativo (endpoint pay não recebe observação neste
-                ambiente).
+                A observação será salva no histórico do pagamento.
               </span>
             </label>
           </div>

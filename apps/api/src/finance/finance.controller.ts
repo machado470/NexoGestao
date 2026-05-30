@@ -247,6 +247,8 @@ export class FinanceController {
       actorUserId,
       method: body.method,
       amountCents: body.amountCents,
+      paidAt: body.paidAt,
+      notes: body.notes,
       idempotencyKey: body.idempotencyKey ?? idempotencyKeyHeader,
     })
     this.tenantOps.increment(orgId, 'finance_charge_pay')
