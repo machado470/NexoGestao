@@ -1,12 +1,13 @@
 import { AppointmentStatus, ServiceOrderStatus } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
-import { calculatePeopleCapacityStatus, calculatePeopleLoadStatus, PeopleOperationalSummaryService } from './people-operational-summary.service'
+import { calculatePeopleAvailability, calculatePeopleCapacityStatus, calculatePeopleLoadStatus, PeopleOperationalSummaryService } from './people-operational-summary.service'
 
 const mockPrisma = {
   person: { findMany: jest.fn() },
   serviceOrder: { findMany: jest.fn() },
   appointment: { findMany: jest.fn() },
   timelineEvent: { findMany: jest.fn() },
+  personAvailabilityException: { findMany: jest.fn() },
 }
 
 describe('PeopleOperationalSummaryService', () => {
@@ -22,6 +23,7 @@ describe('PeopleOperationalSummaryService', () => {
     mockPrisma.serviceOrder.findMany.mockResolvedValue([])
     mockPrisma.appointment.findMany.mockResolvedValue([])
     mockPrisma.timelineEvent.findMany.mockResolvedValue([])
+    mockPrisma.personAvailabilityException.findMany.mockResolvedValue([])
   })
 
   it('conta O.S. abertas, atrasadas e agenda futura/de hoje por responsável real', async () => {
@@ -61,6 +63,7 @@ describe('PeopleOperationalSummaryService', () => {
     expect(mockPrisma.serviceOrder.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ orgId: 'org-trusted', assignedToPersonId: { in: ['person-1', 'person-idle'] }, status: { in: [ServiceOrderStatus.OPEN, ServiceOrderStatus.ASSIGNED, ServiceOrderStatus.IN_PROGRESS] } }) }))
     expect(mockPrisma.appointment.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ orgId: 'org-trusted', assignedToPersonId: { in: ['person-1', 'person-idle'] }, status: { in: [AppointmentStatus.SCHEDULED, AppointmentStatus.CONFIRMED] } }) }))
     expect(mockPrisma.timelineEvent.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ orgId: 'org-trusted' }) }))
+    expect(mockPrisma.personAvailabilityException.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ orgId: 'org-trusted' }) }))
   })
 
   it('usa timeline tenant-scoped como fonte confiável da última atividade', async () => {
@@ -70,6 +73,25 @@ describe('PeopleOperationalSummaryService', () => {
 
     expect(result.people[0].lastActivityAt).toBe('2026-05-30T10:00:00.000Z')
     expect(result.people[1].lastActivityAt).toBeNull()
+  })
+
+  it.each([
+    [{ id: 'now', personId: 'person-1', startsAt: new Date('2026-05-30T11:00:00.000Z'), endsAt: new Date('2026-05-30T13:00:00.000Z'), reason: 'Consulta' }, 'UNAVAILABLE_NOW'],
+    [{ id: 'soon', personId: 'person-1', startsAt: new Date('2026-06-01T11:00:00.000Z'), endsAt: new Date('2026-06-01T13:00:00.000Z'), reason: null }, 'UNAVAILABLE_SOON'],
+    [null, 'AVAILABLE'],
+  ])('retorna disponibilidade no operational-summary: %p -> %s', async (exception, expected) => {
+    mockPrisma.personAvailabilityException.findMany.mockResolvedValue(exception ? [exception] : [])
+    const result = await service.getSummary('org-trusted', now)
+    expect(result.people[0].availabilityStatus).toBe(expected)
+  })
+
+  it.each([
+    [[{ id: 'now', startsAt: new Date('2026-05-30T11:00:00.000Z'), endsAt: new Date('2026-05-30T13:00:00.000Z'), reason: null }], 'UNAVAILABLE_NOW'],
+    [[{ id: 'soon', startsAt: new Date('2026-06-01T11:00:00.000Z'), endsAt: new Date('2026-06-01T13:00:00.000Z'), reason: null }], 'UNAVAILABLE_SOON'],
+    [[{ id: 'later', startsAt: new Date('2026-06-03T12:00:00.000Z'), endsAt: new Date('2026-06-03T13:00:00.000Z'), reason: null }], 'AVAILABLE'],
+    [[], 'AVAILABLE'],
+  ])('classifica disponibilidade temporária sem alterar capacidade: %p -> %s', (exceptions, expected) => {
+    expect(calculatePeopleAvailability({ exceptions, now }).availabilityStatus).toBe(expected)
   })
 
   it.each([

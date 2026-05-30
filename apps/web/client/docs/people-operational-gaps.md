@@ -7,6 +7,7 @@
 - A capacidade planejada agora é configurável por pessoa: capacidade diária de O.S., capacidade diária de agendamentos e nota operacional opcional.
 - A comparação expõe percentuais de uso e `capacityStatus` sem alterar o `loadStatus` operacional existente.
 - O modal estável de edição de pessoa permite ajustar os três campos mínimos de capacidade.
+- Indisponibilidades temporárias simples agora podem ser registradas por pessoa com início, fim e motivo opcional. O resumo operacional expõe disponibilidade atual e próxima exceção sem alterar `capacityStatus`.
 
 ## Semântica importante
 
@@ -17,7 +18,7 @@ Quando uma capacidade estiver ausente ou for zero em um registro legado, o perce
 ## Gaps intencionais
 
 - Ainda não existem turnos, escalas completas ou calendário de jornada.
-- Ainda não existem ausências, férias ou indisponibilidades temporárias.
+- A indisponibilidade temporária não modela férias complexas, recorrência ou políticas de RH.
 - Ainda não existem especialidades ou compatibilidade entre responsável e tipo de serviço.
 - Ainda não existe redistribuição automática ou recomendação automática de atribuição.
 - Ainda não existe score de produtividade, ranking individual ou avaliação de desempenho.

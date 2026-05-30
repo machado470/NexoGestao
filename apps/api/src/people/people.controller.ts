@@ -15,6 +15,7 @@ import { Roles } from '../auth/decorators/roles.decorator'
 import { Org } from '../auth/decorators/org.decorator'
 import { User } from '../auth/decorators/user.decorator'
 import { PeopleOperationalSummaryService } from './people-operational-summary.service'
+import { PersonAvailabilityExceptionsService } from './person-availability-exceptions.service'
 
 type CreatePersonDTO = {
   name: string
@@ -28,6 +29,7 @@ export class PeopleController {
   constructor(
     private readonly people: PeopleService,
     private readonly operationalSummary: PeopleOperationalSummaryService,
+    private readonly availabilityExceptions: PersonAvailabilityExceptionsService,
   ) {}
 
   /**
@@ -61,6 +63,35 @@ export class PeopleController {
   @Roles('ADMIN')
   async getOperationalSummary(@Org() orgId: string) {
     return this.operationalSummary.getSummary(orgId)
+  }
+
+  /** 👑 ADMIN — lista indisponibilidades temporárias tenant-scoped. */
+  @Get(':personId/availability-exceptions')
+  @Roles('ADMIN')
+  async listAvailabilityExceptions(@Param('personId') personId: string, @Org() orgId: string) {
+    return this.availabilityExceptions.list(personId, orgId)
+  }
+
+  /** 👑 ADMIN — cria indisponibilidade temporária tenant-scoped. */
+  @Post(':personId/availability-exceptions')
+  @Roles('ADMIN')
+  async createAvailabilityException(
+    @Param('personId') personId: string,
+    @Org() orgId: string,
+    @Body() body: { startsAt: string; endsAt: string; reason?: string | null },
+  ) {
+    return this.availabilityExceptions.create(personId, orgId, body)
+  }
+
+  /** 👑 ADMIN — remove indisponibilidade temporária tenant-scoped. */
+  @Delete(':personId/availability-exceptions/:exceptionId')
+  @Roles('ADMIN')
+  async deleteAvailabilityException(
+    @Param('personId') personId: string,
+    @Param('exceptionId') exceptionId: string,
+    @Org() orgId: string,
+  ) {
+    return this.availabilityExceptions.delete(personId, exceptionId, orgId)
   }
 
   /**

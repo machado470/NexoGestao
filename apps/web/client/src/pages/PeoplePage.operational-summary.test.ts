@@ -44,3 +44,19 @@ describe("PeoplePage operational workload contract", () => {
     expect(source).not.toContain("impacto financeiro");
   });
 });
+
+describe("PeoplePage temporary availability contract", () => {
+  it("renderiza disponibilidade atual, próxima indisponibilidade e lista de exceções", () => {
+    expect(source).toContain("availabilityLabels[person.availabilityStatus]");
+    expect(source).toContain("Disponibilidade atual");
+    expect(source).toContain("Próxima indisponibilidade:");
+    expect(source).toContain("Indisponibilidades recentes e futuras");
+  });
+
+  it("envia create e delete pelas procedures tenant-scoped", () => {
+    expect(source).toContain("trpc.people.createAvailabilityException.useMutation");
+    expect(source).toContain("trpc.people.deleteAvailabilityException.useMutation");
+    expect(source).toContain("createAvailabilityException.mutate({ personId: selectedPersonId");
+    expect(source).toContain("deleteAvailabilityException.mutate({ personId: selectedPerson.personId, exceptionId: exception.id })");
+  });
+});

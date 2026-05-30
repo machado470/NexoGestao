@@ -25,6 +25,7 @@ model Organization {
   launches                Launch[]
   payments                Payment[]
   persons                 Person[]
+  personAvailabilityExceptions PersonAvailabilityException[]
   referrals               Referral[]
   serviceOrders           ServiceOrder[]
   serviceOrderAttachments ServiceOrderAttachment[]
@@ -105,6 +106,7 @@ model Person {
   org                       Organization          @relation(fields: [orgId], references: [id])
   user                      User?                 @relation(fields: [userId], references: [id])
   exceptions                PersonException[]
+  availabilityExceptions    PersonAvailabilityException[]
   riskSnapshots             RiskSnapshot[]
   appointmentsAssigned      Appointment[]         @relation("AppointmentAssignedTo")
   serviceOrdersAssigned     ServiceOrder[]        @relation("ServiceOrderAssignedTo")
@@ -257,6 +259,21 @@ model PersonException {
 
   @@index([personId, startsAt, endsAt])
   @@index([endsAt, processedAt])
+}
+
+model PersonAvailabilityException {
+  id        String       @id @default(uuid())
+  orgId     String
+  personId  String
+  startsAt  DateTime
+  endsAt    DateTime
+  reason    String?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  person    Person       @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, personId, startsAt])
 }
 
 model AuditEvent {

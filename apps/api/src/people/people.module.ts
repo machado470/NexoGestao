@@ -9,6 +9,7 @@ import { PeopleController } from './people.controller'
 import { OperationalStateService } from './operational-state.service'
 import { OperationalStateRepository } from './operational-state.repository'
 import { PeopleOperationalSummaryService } from './people-operational-summary.service'
+import { PersonAvailabilityExceptionsService } from './person-availability-exceptions.service'
 
 @Module({
   imports: [
@@ -21,7 +22,8 @@ import { PeopleOperationalSummaryService } from './people-operational-summary.se
     PeopleService,
     OperationalStateService,
     OperationalStateRepository,
-    PeopleOperationalSummaryService
+    PeopleOperationalSummaryService,
+    PersonAvailabilityExceptionsService
   ],
   controllers: [
     PeopleController
