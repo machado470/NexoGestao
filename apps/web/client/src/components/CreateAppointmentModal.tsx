@@ -11,6 +11,7 @@ import { AppField, AppForm, AppSelect } from "@/components/app-system";
 import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
 import { PersonAssignmentWarning } from "@/components/PersonAssignmentWarning";
+import { useAssigneeWarningTelemetry } from "@/hooks/useAssigneeWarningTelemetry";
 
 interface CreateAppointmentModalProps {
   isOpen: boolean;
@@ -50,6 +51,7 @@ export function CreateAppointmentModal({
   initialEndsAt,
 }: CreateAppointmentModalProps) {
   const [formData, setFormData] = useState(INITIAL_FORM);
+  const assigneeWarningTelemetry = useAssigneeWarningTelemetry("APPOINTMENT");
   const utils = trpc.useUtils();
   const peopleQuery = trpc.people.list.useQuery(undefined, {
     retry: false,
@@ -68,7 +70,10 @@ export function CreateAppointmentModal({
   );
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      assigneeWarningTelemetry.reset();
+      return;
+    }
 
     setFormData({
       ...INITIAL_FORM,
@@ -89,7 +94,7 @@ export function CreateAppointmentModal({
             )
           : "60",
     });
-  }, [initialCustomerId, initialEndsAt, initialStartsAt, isOpen]);
+  }, [assigneeWarningTelemetry.reset, initialCustomerId, initialEndsAt, initialStartsAt, isOpen]);
 
   const createAppointment = trpc.nexo.appointments.create.useMutation();
 
@@ -163,6 +168,8 @@ export function CreateAppointmentModal({
         return { ...raw, data: [optimistic, ...raw.data] };
       return [optimistic];
     });
+
+    assigneeWarningTelemetry.trackConfirmed(payload.assignedToPersonId);
 
     createAppointment.mutate(payload, {
       onSuccess: created => {
@@ -257,7 +264,10 @@ export function CreateAppointmentModal({
               placeholder="Selecione um colaborador"
               options={collaboratorOptions}
             />
-            <PersonAssignmentWarning personId={formData.assignedToPersonId} />
+            <PersonAssignmentWarning
+              personId={formData.assignedToPersonId}
+              onWarningShown={assigneeWarningTelemetry.trackShown}
+            />
             {formData.assignedToPersonId ? (
               <button
                 type="button"

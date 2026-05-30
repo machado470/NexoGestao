@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { AlertTriangle } from "lucide-react";
+import type { AssigneeWarningType } from "@/lib/assignee-warning-telemetry";
 import { trpc } from "@/lib/trpc";
 
 type AvailabilityException = {
@@ -19,6 +21,17 @@ export type PersonOperationalSummary = {
   currentAvailabilityException?: AvailabilityException | null;
   nextAvailabilityException?: AvailabilityException | null;
 };
+
+export function getPersonAssignmentWarningTypes(personSummary?: PersonOperationalSummary | null): AssigneeWarningType[] {
+  if (!personSummary) return [];
+
+  const warningTypes: AssigneeWarningType[] = [];
+  if (personSummary.availabilityStatus === "UNAVAILABLE_NOW") warningTypes.push("UNAVAILABLE_NOW");
+  if (personSummary.availabilityStatus === "UNAVAILABLE_SOON") warningTypes.push("UNAVAILABLE_SOON");
+  if (personSummary.capacityStatus === "OVER_CAPACITY") warningTypes.push("OVER_CAPACITY");
+  if (personSummary.loadStatus === "OVERLOADED") warningTypes.push("OVERLOADED");
+  return warningTypes;
+}
 
 export function getPersonAssignmentWarning(personSummary?: PersonOperationalSummary | null) {
   if (!personSummary) return [];
@@ -77,7 +90,13 @@ function getAssignmentContext(personSummary: PersonOperationalSummary) {
   return context;
 }
 
-export function PersonAssignmentWarning({ personId }: { personId?: string | null }) {
+export function PersonAssignmentWarning({
+  personId,
+  onWarningShown,
+}: {
+  personId?: string | null;
+  onWarningShown?: (payload: { personId: string; warningTypes: AssigneeWarningType[] }) => void;
+}) {
   const summaryQuery = trpc.people.operationalSummary.useQuery(undefined, {
     enabled: Boolean(personId),
     retry: false,
@@ -87,7 +106,14 @@ export function PersonAssignmentWarning({ personId }: { personId?: string | null
     people?: PersonOperationalSummary[];
   }).people ?? [];
   const personSummary = people.find((person) => person.personId === personId);
+  const warningTypes = getPersonAssignmentWarningTypes(personSummary);
   const warnings = getPersonAssignmentWarning(personSummary);
+  const warningTypesKey = warningTypes.join(",");
+
+  useEffect(() => {
+    if (!personId || warningTypes.length === 0) return;
+    onWarningShown?.({ personId, warningTypes });
+  }, [onWarningShown, personId, warningTypesKey]);
 
   if (!personSummary || warnings.length === 0) return null;
 

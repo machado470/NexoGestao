@@ -62,15 +62,23 @@ describe("passive manual assignee warning UI contract", () => {
   });
 
   it("exibe o aviso no fluxo de agendamentos sem alterar o assignedToPersonId enviado", () => {
-    expect(appointmentPage).toContain("<PersonAssignmentWarning personId={form.assignedToPersonId");
-    expect(createAppointmentModal).toContain("<PersonAssignmentWarning personId={formData.assignedToPersonId} />");
+    expect(appointmentPage).toContain("personId={form.assignedToPersonId === \"unassigned\" ? null : form.assignedToPersonId}");
+    expect(appointmentPage).toContain("onWarningShown={assigneeWarningTelemetry.trackShown}");
+    expect(createAppointmentModal).toContain("personId={formData.assignedToPersonId}");
+    expect(createAppointmentModal).toContain("onWarningShown={assigneeWarningTelemetry.trackShown}");
+    expect(appointmentPage).toContain("assigneeWarningTelemetry.trackConfirmed(assignedToPersonId");
+    expect(createAppointmentModal).toContain("assigneeWarningTelemetry.trackConfirmed(payload.assignedToPersonId)");
     expect(appointmentPage).toContain('assignedToPersonId: form.assignedToPersonId === "unassigned" ? null : form.assignedToPersonId');
     expect(createAppointmentModal).toContain("assignedToPersonId: formData.assignedToPersonId || undefined");
   });
 
   it("exibe o aviso na criação e edição manual de O.S. sem criar bloqueio automático", () => {
-    expect(createServiceOrderModal).toContain("<PersonAssignmentWarning personId={formData.assignedToPersonId} />");
-    expect(editServiceOrderModal).toContain("<PersonAssignmentWarning personId={formData.assignedToPersonId} />");
+    expect(createServiceOrderModal).toContain("personId={formData.assignedToPersonId}");
+    expect(editServiceOrderModal).toContain("personId={formData.assignedToPersonId}");
+    expect(createServiceOrderModal).toContain("onWarningShown={assigneeWarningTelemetry.trackShown}");
+    expect(editServiceOrderModal).toContain("onWarningShown={assigneeWarningTelemetry.trackShown}");
+    expect(createServiceOrderModal).toContain("assigneeWarningTelemetry.trackConfirmed(payload.assignedToPersonId)");
+    expect(editServiceOrderModal).toContain("assigneeWarningTelemetry.trackConfirmed(parsed.data.assignedToPersonId, serviceOrderId)");
     expect(createServiceOrderModal).toContain("assignedToPersonId: parsed.data.assignedToPersonId || undefined");
     expect(editServiceOrderModal).toContain("? parsed.data.assignedToPersonId\n          : null");
     expect(createServiceOrderModal).not.toContain("getPersonAssignmentWarning(");

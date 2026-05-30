@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { BadRequestException, Injectable, Logger } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { UsageMetricEvent } from '@prisma/client'
 
@@ -39,6 +39,8 @@ export class AnalyticsService {
     'upgrade_click',
     'checkout_started',
     'checkout_completed',
+    'ASSIGNEE_WARNING_SHOWN',
+    'ASSIGNEE_WARNING_CONFIRMED',
   ])
 
   constructor(private readonly prisma: PrismaService) {}
@@ -62,14 +64,19 @@ export class AnalyticsService {
   }
 
   async trackProductEvent(params: TrackProductEventParams): Promise<void> {
-    const normalizedEvent = String(params.eventName ?? '')
-      .trim()
-      .toLowerCase()
+    const rawEventName = String(params.eventName ?? '').trim()
+    const normalizedEvent = rawEventName.startsWith('ASSIGNEE_WARNING_')
+      ? rawEventName.toUpperCase()
+      : rawEventName.toLowerCase()
 
     if (!this.allowedProductEvents.has(normalizedEvent)) {
-      this.logger.warn(`Evento de produto ignorado: ${params.eventName}`)
-      return
+      throw new BadRequestException('Evento de produto não permitido')
     }
+
+    const isAssigneeWarning = normalizedEvent.startsWith('ASSIGNEE_WARNING_')
+    const metadata = isAssigneeWarning
+      ? this.sanitizeAssigneeWarningMetadata(normalizedEvent, params.metadata)
+      : params.metadata ?? {}
 
     await this.track({
       orgId: params.orgId,
@@ -77,11 +84,49 @@ export class AnalyticsService {
       event: ((UsageMetricEvent as any)?.PRODUCT_EVENT ??
         (UsageMetricEvent as any)?.LOGIN) as UsageMetricEvent,
       metadata: {
-        category: 'product_conversion',
+        category: isAssigneeWarning ? 'passive_assignee_warning' : 'product_conversion',
         eventName: normalizedEvent,
-        ...(params.metadata ?? {}),
+        ...metadata,
       },
     })
+  }
+
+  private sanitizeAssigneeWarningMetadata(
+    eventName: string,
+    metadata?: Record<string, unknown>,
+  ): Record<string, unknown> {
+    const context = metadata?.context
+    const personId = metadata?.personId
+    const warningTypes = metadata?.warningTypes
+    const entityId = metadata?.entityId
+    const allowedWarningTypes = new Set([
+      'UNAVAILABLE_NOW',
+      'UNAVAILABLE_SOON',
+      'OVER_CAPACITY',
+      'OVERLOADED',
+    ])
+
+    if (
+      (context !== 'APPOINTMENT' && context !== 'SERVICE_ORDER') ||
+      typeof personId !== 'string' ||
+      personId.length === 0 ||
+      personId.length > 100 ||
+      !Array.isArray(warningTypes) ||
+      warningTypes.length === 0 ||
+      warningTypes.length > 4 ||
+      warningTypes.some((warningType) => !allowedWarningTypes.has(String(warningType))) ||
+      (eventName === 'ASSIGNEE_WARNING_SHOWN' && entityId !== undefined) ||
+      (entityId !== undefined && (typeof entityId !== 'string' || entityId.length === 0 || entityId.length > 100))
+    ) {
+      throw new BadRequestException('Payload de alerta de atribuição inválido')
+    }
+
+    return {
+      context,
+      personId,
+      warningTypes: [...new Set(warningTypes.map(String))],
+      ...(entityId ? { entityId } : {}),
+    }
   }
 
   async getUsageSummary(orgId: string, from?: Date, to?: Date) {
