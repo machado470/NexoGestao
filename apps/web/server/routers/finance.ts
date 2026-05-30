@@ -196,6 +196,11 @@ export const financeRouter = router({
           chargeId: z.union([z.string(), z.number()]).transform((v) => String(v)),
           method: z.enum(["PIX", "CASH", "CARD", "TRANSFER", "OTHER"]).default("PIX"),
           amountCents: z.number().int().min(1),
+          paidAt: z.string().datetime().refine(
+            value => new Date(value).getTime() <= Date.now() + 24 * 60 * 60 * 1000,
+            "Data de pagamento não pode estar no futuro",
+          ).optional(),
+          notes: z.string().max(2000).optional(),
           idempotencyKey: z.string().min(8).optional(),
         })
       )
@@ -208,6 +213,8 @@ export const financeRouter = router({
             body: JSON.stringify({
               method: input.method,
               amountCents: input.amountCents,
+              paidAt: input.paidAt,
+              notes: input.notes,
               idempotencyKey: input.idempotencyKey,
             }),
             headers: input.idempotencyKey

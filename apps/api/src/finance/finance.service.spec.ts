@@ -255,6 +255,74 @@ describe('FinanceService hardening', () => {
     )
   })
 
+  it('persiste paidAt e notes informados no pagamento manual e na timeline', async () => {
+    const { service, prisma, idempotency } = buildService()
+    idempotency.begin.mockResolvedValue({ mode: 'execute', recordId: 'idem-1' })
+    const updateMany = jest.fn().mockResolvedValue({ count: 1 })
+    const create = jest.fn().mockResolvedValue({ id: 'pay-1' })
+    prisma.$transaction.mockImplementation(async (cb: any) => cb({
+      charge: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'ch-1', orgId: 'org-1', customerId: 'c-1', serviceOrderId: null, status: 'PENDING' }),
+        updateMany,
+      },
+      payment: { create, findFirst: jest.fn() },
+    }))
+    jest.spyOn(service, 'sendPaymentConfirmationWhatsApp').mockResolvedValue({} as any)
+
+    await service.payCharge({
+      orgId: 'org-1',
+      chargeId: 'ch-1',
+      amountCents: 1000,
+      method: 'PIX',
+      paidAt: '2026-01-15T12:00:00.000Z',
+      notes: '  Pago no caixa  ',
+    })
+
+    expect(updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ orgId: 'org-1' }),
+      data: { status: 'PAID', paidAt: new Date('2026-01-15T12:00:00.000Z') },
+    }))
+    expect(create).toHaveBeenCalledWith({ data: expect.objectContaining({
+      orgId: 'org-1',
+      paidAt: new Date('2026-01-15T12:00:00.000Z'),
+      notes: 'Pago no caixa',
+    }) })
+    expect((service as any).timeline.log).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'PAYMENT_RECEIVED',
+      metadata: expect.objectContaining({ paidAt: '2026-01-15T12:00:00.000Z', notes: 'Pago no caixa' }),
+    }))
+  })
+
+  it('usa a data atual como fallback quando paidAt não é informado', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-02-10T09:30:00.000Z'))
+    const { service, prisma, idempotency } = buildService()
+    idempotency.begin.mockResolvedValue({ mode: 'execute', recordId: 'idem-1' })
+    const create = jest.fn().mockResolvedValue({ id: 'pay-1' })
+    prisma.$transaction.mockImplementation(async (cb: any) => cb({
+      charge: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'ch-1', orgId: 'org-1', customerId: 'c-1', serviceOrderId: null, status: 'PENDING' }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      payment: { create, findFirst: jest.fn() },
+    }))
+    jest.spyOn(service, 'sendPaymentConfirmationWhatsApp').mockResolvedValue({} as any)
+
+    await service.payCharge({ orgId: 'org-1', chargeId: 'ch-1', amountCents: 1000, method: 'PIX' })
+
+    expect(create).toHaveBeenCalledWith({ data: expect.objectContaining({ paidAt: new Date('2026-02-10T09:30:00.000Z') }) })
+    jest.useRealTimers()
+  })
+
+  it('rejeita paidAt inválido ou mais de 24 horas no futuro antes de persistir', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-02-10T09:30:00.000Z'))
+    const { service, idempotency } = buildService()
+    const base = { orgId: 'org-1', chargeId: 'ch-1', amountCents: 1000, method: 'PIX' as const }
+
+    await expect(service.payCharge({ ...base, paidAt: 'data-invalida' })).rejects.toThrow('paidAt inválido')
+    await expect(service.payCharge({ ...base, paidAt: '2026-02-12T09:30:00.001Z' })).rejects.toThrow('paidAt não pode estar no futuro')
+    expect(idempotency.begin).not.toHaveBeenCalled()
+    jest.useRealTimers()
+  })
 
   it('bloqueia lembrete de cobrança para charge paga', async () => {
     const { service, prisma } = buildService()

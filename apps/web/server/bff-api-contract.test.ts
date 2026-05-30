@@ -100,3 +100,39 @@ describe("BFF↔API contract - lote 1", () => {
     await expect(caller.nexo.settings.get()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
   });
 });
+
+describe("BFF↔API contract - pagamento manual", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("finance.charges.pay repassa paidAt e notes sem aceitar orgId do client", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ data: { paymentId: "pay-1" } }), { status: 200 }),
+    );
+    const caller = appRouter.createCaller({ req: makeReq(), res: makeRes(), user: { token: "t1", validated: true, organizationId: "org-trusted" } } as any);
+
+    await caller.finance.charges.pay({
+      chargeId: "ch-1",
+      amountCents: 1000,
+      method: "PIX",
+      paidAt: "2026-01-15T12:00:00.000Z",
+      notes: "Pago no caixa",
+    });
+
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(String(url)).toMatch(/\/finance\/charges\/ch-1\/pay$/);
+    expect(JSON.parse(String((options as RequestInit).body))).toEqual({
+      method: "PIX",
+      amountCents: 1000,
+      paidAt: "2026-01-15T12:00:00.000Z",
+      notes: "Pago no caixa",
+    });
+    expect(String((options as RequestInit).body)).not.toContain("orgId");
+  });
+
+  it("finance.charges.pay rejeita paidAt inválido no BFF", async () => {
+    const caller = appRouter.createCaller({ req: makeReq(), res: makeRes(), user: { token: "t1", validated: true } } as any);
+    await expect(caller.finance.charges.pay({ chargeId: "ch-1", amountCents: 1000, method: "PIX", paidAt: "data-invalida" })).rejects.toBeDefined();
+  });
+});
