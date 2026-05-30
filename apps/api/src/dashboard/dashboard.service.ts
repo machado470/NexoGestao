@@ -6,6 +6,12 @@ import { GovernanceReadService } from '../governance/governance-read.service'
 const CACHE_TTL_METRICS = 300_000 // 5 minutos
 const CACHE_TTL_CHARTS = 900_000 // 15 minutos
 
+function calculatePercentageChange(current: number, previous: number) {
+  if (previous === 0) return null
+
+  return Number((((current - previous) / previous) * 100).toFixed(1))
+}
+
 @Injectable()
 export class DashboardService {
   constructor(
@@ -27,6 +33,15 @@ export class DashboardService {
     const startOfWeek = new Date(now)
     startOfWeek.setDate(now.getDate() - now.getDay())
     startOfWeek.setHours(0, 0, 0, 0)
+    const startOfPreviousWeek = new Date(startOfWeek)
+    startOfPreviousWeek.setDate(startOfPreviousWeek.getDate() - 7)
+    const endOfPreviousComparablePeriod = new Date(now)
+    endOfPreviousComparablePeriod.setDate(endOfPreviousComparablePeriod.getDate() - 7)
+    const currentPeriod = { gte: startOfWeek, lte: now }
+    const previousPeriod = {
+      gte: startOfPreviousWeek,
+      lte: endOfPreviousComparablePeriod,
+    }
 
     // Executa as consultas em lotes menores para não sobrecarregar a conexão com o banco
     const batch1 = await Promise.all([
@@ -44,7 +59,7 @@ export class DashboardService {
         },
       }),
       this.prisma.payment.aggregate({
-        where: { orgId, createdAt: { gte: startOfWeek } },
+        where: { orgId, paidAt: currentPeriod },
         _sum: { amountCents: true },
       }),
     ])
@@ -81,9 +96,44 @@ export class DashboardService {
       this.prisma.charge.count({ where: { orgId, status: 'OVERDUE' } }),
     ])
 
+    const comparisonBatch = await Promise.all([
+      this.prisma.payment.count({ where: { orgId, paidAt: currentPeriod } }),
+      this.prisma.payment.aggregate({
+        where: { orgId, paidAt: previousPeriod },
+        _sum: { amountCents: true },
+      }),
+      this.prisma.serviceOrder.count({
+        where: { orgId, status: 'DONE', finishedAt: currentPeriod },
+      }),
+      this.prisma.serviceOrder.count({
+        where: { orgId, status: 'DONE', finishedAt: previousPeriod },
+      }),
+      this.prisma.charge.count({
+        where: {
+          orgId,
+          status: { in: ['PENDING', 'OVERDUE'] },
+          dueDate: currentPeriod,
+        },
+      }),
+      this.prisma.charge.count({
+        where: {
+          orgId,
+          status: { in: ['PENDING', 'OVERDUE'] },
+          dueDate: previousPeriod,
+        },
+      }),
+      this.prisma.whatsAppMessage.count({
+        where: { orgId, status: 'FAILED', failedAt: currentPeriod },
+      }),
+      this.prisma.whatsAppMessage.count({
+        where: { orgId, status: 'FAILED', failedAt: previousPeriod },
+      }),
+    ])
+
     const [totalCustomers, createdCustomers, totalServiceOrders, openServiceOrders, overdueServiceOrders, weeklyRevenueAgg] = batch1
     const [pendingPaymentsAgg, inProgressOrders, completedOrders, riskTickets, chargesGenerated] = batch2
     const [totalRevenue, paidRevenue, autoScore, failedMessagesCount, customersNoResponseCount, ignoredChargesCount] = batch3
+    const [paymentsReceivedCount, previousRevenueAgg, currentCompletedOrders, previousCompletedOrders, currentOverdueCharges, previousOverdueCharges, currentFailedMessages, previousFailedMessages] = comparisonBatch
 
     // Reutiliza valores já calculados para evitar redundância
     const delayedOrders = overdueServiceOrders
@@ -96,6 +146,25 @@ export class DashboardService {
       openServiceOrders,
       overdueServiceOrders,
       weeklyRevenueInCents: weeklyRevenueAgg._sum.amountCents ?? 0,
+      paymentsReceivedCount,
+      comparison: {
+        revenueReceivedPct: calculatePercentageChange(
+          weeklyRevenueAgg._sum.amountCents ?? 0,
+          previousRevenueAgg._sum.amountCents ?? 0,
+        ),
+        completedServiceOrdersPct: calculatePercentageChange(
+          currentCompletedOrders,
+          previousCompletedOrders,
+        ),
+        overdueChargesPct: calculatePercentageChange(
+          currentOverdueCharges,
+          previousOverdueCharges,
+        ),
+        failedMessagesPct: calculatePercentageChange(
+          currentFailedMessages,
+          previousFailedMessages,
+        ),
+      },
       pendingPaymentsInCents: pendingPaymentsAgg._sum.amountCents ?? 0,
       inProgressOrders,
       completedOrders,
@@ -136,6 +205,7 @@ export class DashboardService {
       todayAppointments,
       customersWithPending,
       doneOrdersWithoutCharge,
+      failedMessages,
     ] = await Promise.all([
       this.prisma.serviceOrder.findMany({
         where: {
@@ -228,9 +298,59 @@ export class DashboardService {
         orderBy: [{ finishedAt: 'desc' }, { createdAt: 'desc' }],
         take: 10,
       }),
+      this.prisma.whatsAppMessage.findMany({
+        where: { orgId, status: 'FAILED' },
+        select: {
+          id: true,
+          errorMessage: true,
+          failedAt: true,
+          createdAt: true,
+          customer: { select: { id: true, name: true } },
+        },
+        orderBy: [{ failedAt: 'desc' }, { createdAt: 'desc' }],
+        take: 2,
+      }),
     ])
 
+    const operationalQueue = [
+      ...overdueOrders.slice(0, 2).map((order) => ({
+        id: order.id,
+        type: 'OVERDUE_SERVICE_ORDER',
+        title: order.title,
+        context: 'Prazo operacional vencido',
+        serviceOrderId: order.id,
+      })),
+      ...overdueCharges.slice(0, 2).map((charge) => ({
+        id: charge.id,
+        type: 'OVERDUE_CHARGE',
+        title: charge.customer.name,
+        context: `${charge.amountCents} centavos pendentes`,
+        chargeId: charge.id,
+        amountCents: charge.amountCents,
+      })),
+      ...todayAppointments
+        .filter((appointment) => appointment.status === 'SCHEDULED')
+        .slice(0, 1)
+        .map((appointment) => ({
+          id: appointment.id,
+          type: 'UNCONFIRMED_APPOINTMENT',
+          title:
+            appointment.notes?.trim() ||
+            `Agendamento com ${appointment.customer.name}`,
+          context: 'Confirmação pendente',
+          appointmentId: appointment.id,
+        })),
+      ...failedMessages.slice(0, 1).map((message) => ({
+        id: message.id,
+        type: 'FAILED_MESSAGE',
+        title: message.customer?.name ?? 'Mensagem WhatsApp',
+        context: message.errorMessage ?? 'Falha retornada pelo backend',
+        messageId: message.id,
+      })),
+    ].slice(0, 6)
+
     return {
+      operationalQueue,
       overdueOrders: {
         count: overdueOrders.length,
         items: overdueOrders,

@@ -19,6 +19,7 @@ const mockPrisma = {
   },
   payment: {
     aggregate: jest.fn(),
+    count: jest.fn(),
     findMany: jest.fn(),
   },
   charge: {
@@ -34,6 +35,7 @@ const mockPrisma = {
   },
   whatsAppMessage: {
     count: jest.fn(),
+    findMany: jest.fn(),
   },
   whatsAppConversation: {
     count: jest.fn(),
@@ -59,6 +61,20 @@ describe('DashboardService', () => {
     cache = module.get<MemoryCacheService>(MemoryCacheService)
     jest.clearAllMocks()
     cache.clear()
+    mockPrisma.customer.count.mockResolvedValue(0)
+    mockPrisma.customer.findMany.mockResolvedValue([])
+    mockPrisma.serviceOrder.count.mockResolvedValue(0)
+    mockPrisma.serviceOrder.findMany.mockResolvedValue([])
+    mockPrisma.payment.aggregate.mockResolvedValue({ _sum: { amountCents: 0 } })
+    mockPrisma.payment.count.mockResolvedValue(0)
+    mockPrisma.charge.aggregate.mockResolvedValue({ _sum: { amountCents: 0 } })
+    mockPrisma.charge.count.mockResolvedValue(0)
+    mockPrisma.charge.findMany.mockResolvedValue([])
+    mockPrisma.appointment.findMany.mockResolvedValue([])
+    mockPrisma.correctiveAction.count.mockResolvedValue(0)
+    mockPrisma.whatsAppMessage.count.mockResolvedValue(0)
+    mockPrisma.whatsAppMessage.findMany.mockResolvedValue([])
+    mockPrisma.whatsAppConversation.count.mockResolvedValue(0)
   })
 
   afterEach(async () => {
@@ -84,6 +100,63 @@ describe('DashboardService', () => {
       expect(result).toHaveProperty('openServiceOrders')
       expect(result).toHaveProperty('weeklyRevenueInCents')
       expect(result).toHaveProperty('pendingPaymentsInCents')
+    })
+
+    it('deve contar pagamentos reais do período somente para o tenant autenticado', async () => {
+      mockPrisma.payment.count.mockResolvedValue(4)
+
+      const result = await service.getMetrics('org-1')
+
+      expect(result.paymentsReceivedCount).toBe(4)
+      expect(mockPrisma.payment.count).toHaveBeenCalledWith({
+        where: { orgId: 'org-1', paidAt: expect.any(Object) },
+      })
+      expect(mockPrisma.payment.count).not.toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ orgId: 'org-2' }) }),
+      )
+    })
+
+    it('deve calcular comparação real contra a janela equivalente da semana anterior', async () => {
+      mockPrisma.payment.aggregate
+        .mockResolvedValueOnce({ _sum: { amountCents: 15000 } })
+        .mockResolvedValueOnce({ _sum: { amountCents: 10000 } })
+      mockPrisma.serviceOrder.count
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(6)
+        .mockResolvedValueOnce(4)
+      mockPrisma.charge.count
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(3)
+        .mockResolvedValueOnce(6)
+      mockPrisma.whatsAppMessage.count
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(2)
+        .mockResolvedValueOnce(1)
+
+      const result = await service.getMetrics('org-1')
+
+      expect(result.comparison).toEqual({
+        revenueReceivedPct: 50,
+        completedServiceOrdersPct: 50,
+        overdueChargesPct: -50,
+        failedMessagesPct: 100,
+      })
+    })
+
+    it('deve retornar null na comparação quando o período anterior não tem base', async () => {
+      const result = await service.getMetrics('org-1')
+
+      expect(result.comparison).toEqual({
+        revenueReceivedPct: null,
+        completedServiceOrdersPct: null,
+        overdueChargesPct: null,
+        failedMessagesPct: null,
+      })
     })
 
     it('deve usar cache na segunda chamada', async () => {
@@ -120,6 +193,29 @@ describe('DashboardService', () => {
       expect(result).toHaveProperty('overdueCharges')
       expect(result).toHaveProperty('todayServices')
       expect(result).toHaveProperty('customersWithPending')
+      expect(result).toHaveProperty('operationalQueue')
+    })
+
+    it('deve expor fila transversal leve com itens reais e tenant isolado', async () => {
+      mockPrisma.serviceOrder.findMany
+        .mockResolvedValueOnce([{ id: 'so-1', title: 'O.S. atrasada', customer: { id: 'c1', name: 'Cliente 1' } }])
+        .mockResolvedValueOnce([])
+      mockPrisma.charge.findMany.mockResolvedValue([{ id: 'ch-1', amountCents: 2500, customer: { id: 'c1', name: 'Cliente 1' } }])
+      mockPrisma.appointment.findMany.mockResolvedValue([{ id: 'ap-1', status: 'SCHEDULED', notes: null, customer: { id: 'c1', name: 'Cliente 1' } }])
+      mockPrisma.whatsAppMessage.findMany.mockResolvedValue([{ id: 'msg-1', errorMessage: 'Provider indisponível', customer: { id: 'c1', name: 'Cliente 1' } }])
+
+      const result = await service.getAlerts('org-1')
+
+      expect(result.operationalQueue).toHaveLength(4)
+      expect(result.operationalQueue.map((item) => item.type)).toEqual([
+        'OVERDUE_SERVICE_ORDER',
+        'OVERDUE_CHARGE',
+        'UNCONFIRMED_APPOINTMENT',
+        'FAILED_MESSAGE',
+      ])
+      expect(mockPrisma.whatsAppMessage.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { orgId: 'org-1', status: 'FAILED' } }),
+      )
     })
 
     it('deve retornar contagem correta de ordens atrasadas', async () => {

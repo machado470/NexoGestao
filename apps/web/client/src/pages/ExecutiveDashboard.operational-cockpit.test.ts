@@ -43,9 +43,28 @@ describe("ExecutiveDashboard decision center", () => {
     expect(source).toContain('/whatsapp');
   });
 
-  it("shows the full operational flow and documents unavailable payment volume", () => {
+  it("shows the real payment volume in the full operational flow and keeps an honest unavailable state", () => {
     ["Cliente", "Agendamento", "O.S.", "Cobrança", "Pagamento"].forEach(stage => expect(source).toContain(`label: "${stage}"`));
-    expect(source).toContain("volume não exposto pelo backend");
+    expect(source).toContain('readNullableNumber(metrics, "paymentsReceivedCount")');
+    expect(source).toContain("pagamentos recebidos nesta semana");
+    expect(source).toContain("volume não disponível no contrato");
+    expect(source).not.toContain("volume não exposto pelo backend");
+  });
+
+  it("uses the real backend comparison and renders honest pulse readings", () => {
+    ["revenueReceivedPct", "completedServiceOrdersPct", "overdueChargesPct", "failedMessagesPct"].forEach(field => expect(source).toContain(field));
+    expect(source).toContain("melhorou");
+    expect(source).toContain("piorou");
+    expect(source).toContain("estável em relação ao período anterior");
+    expect(source).toContain("sem base histórica suficiente");
+    expect(source).not.toContain("Tendência histórica: indisponível neste lote");
+  });
+
+  it("uses the light transversal queue exposed by dashboard alerts", () => {
+    expect(source).toContain("alerts.operationalQueue");
+    expect(source).toContain("OVERDUE_SERVICE_ORDER");
+    expect(source).toContain("OVERDUE_CHARGE");
+    expect(source).toContain("UNCONFIRMED_APPOINTMENT");
   });
 
   it("does not disguise errors as a healthy empty operation", () => {
