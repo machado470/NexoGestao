@@ -929,13 +929,17 @@ export const nexoProxyRouter = router({
       return authedGet(ctx as CtxLike, "/organization-settings");
     }),
 
-    update: protectedProcedure.input(z.any()).mutation(async ({ ctx, input }) => {
-      const payload = input && typeof input === "object" ? { ...(input as Record<string, unknown>) } : input;
-      if (payload && typeof payload === "object") {
-        delete (payload as Record<string, unknown>).orgId;
-      }
-      return authedPatch(ctx as CtxLike, "/organization-settings", payload);
-    }),
+    update: protectedProcedure
+      .input(
+        z.object({
+          name: z.string().optional(),
+          timezone: z.string().optional(),
+          currency: z.enum(["BRL", "USD", "EUR"]).optional(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        return authedPatch(ctx as CtxLike, "/organization-settings", input);
+      }),
   }),
 
   onboarding: router({

@@ -53,19 +53,21 @@ describe("BFF↔API contract - lote 1", () => {
 
   it("nexo.settings.get e update usam /organization-settings e preservam payload", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(new Response(JSON.stringify({ theme: "dark", locale: "pt-BR" }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, data: { theme: "light" } }), { status: 200 }));
+      .mockResolvedValueOnce(new Response(JSON.stringify({ name: "Oficina Antiga", timezone: "America/Sao_Paulo", currency: "BRL" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ name: "Oficina Nova", timezone: "UTC", currency: "BRL" }), { status: 200 }));
 
     const caller = appRouter.createCaller({ req: makeReq(), res: makeRes(), user: { token: "t1", validated: true } } as any);
 
     const getResult = await caller.nexo.settings.get();
-    const updateResult = await caller.nexo.settings.update({ theme: "light", fromClientOrgId: "evil-org" });
+    const updateResult = await caller.nexo.settings.update({ name: "Oficina Nova", timezone: "UTC", orgId: "evil-org" });
 
-    expect(getResult).toEqual({ theme: "dark", locale: "pt-BR" });
-    expect(updateResult).toEqual({ ok: true, data: { theme: "light" } });
+    expect(getResult).toEqual({ name: "Oficina Antiga", timezone: "America/Sao_Paulo", currency: "BRL" });
+    expect(updateResult).toEqual({ name: "Oficina Nova", timezone: "UTC", currency: "BRL" });
 
     expect(fetchMock).toHaveBeenNthCalledWith(1, expect.stringMatching(/\/organization-settings$/), expect.objectContaining({ headers: expect.objectContaining({ Authorization: "Bearer t1" }) }));
     expect(fetchMock).toHaveBeenNthCalledWith(2, expect.stringMatching(/\/organization-settings$/), expect.objectContaining({ method: "PATCH" }));
+    const [, patchOptions] = fetchMock.mock.calls[1];
+    expect(JSON.parse(String((patchOptions as RequestInit).body))).toEqual({ name: "Oficina Nova", timezone: "UTC" });
   });
 
   it("people.list e people.statsLinked usam endpoints corretos e não aceitam orgId do client", async () => {

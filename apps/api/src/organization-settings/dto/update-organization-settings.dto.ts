@@ -1,12 +1,14 @@
-import { IsOptional, IsString, IsIn } from 'class-validator';
+import { IsOptional, IsString, IsIn, IsNotEmpty } from 'class-validator';
 
 export class UpdateOrganizationSettingsDto {
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   name?: string;
 
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   timezone?: string;
 
   @IsOptional()

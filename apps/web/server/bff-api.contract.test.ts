@@ -75,11 +75,11 @@ describe("BFF↔API contract: critical frontend consumers", () => {
       new Response(JSON.stringify({ ok: true }), { status: 200 }),
     );
 
-    await makeAuthedCaller().nexo.settings.update({ timezone: "UTC", orgId: "org-forged" });
+    await makeAuthedCaller().nexo.settings.update({ name: "Nexo Oficina", timezone: "UTC", orgId: "org-forged" });
 
     const [, init] = vi.mocked(globalThis.fetch).mock.calls[0]!;
     const body = JSON.parse(String((init as RequestInit).body));
-    expect(body).toEqual({ timezone: "UTC" });
+    expect(body).toEqual({ name: "Nexo Oficina", timezone: "UTC" });
     expect(body.orgId).toBeUndefined();
   });
 
