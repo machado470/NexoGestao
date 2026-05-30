@@ -95,6 +95,9 @@ model Person {
   operationalRiskScore      Int                   @default(0)
   operationalState          OperationalStateValue @default(NORMAL)
   operationalStateUpdatedAt DateTime?
+  dailyServiceOrderCapacity Int?                  @default(5)
+  dailyAppointmentCapacity  Int?                  @default(5)
+  workloadNotes             String?
   assessments               Assessment[]
   assignments               Assignment[]
   auditEvents               AuditEvent[]

@@ -5,6 +5,9 @@ import { TimelineService } from '../timeline/timeline.service'
 
 @Injectable()
 export class PeopleService {
+  private static readonly MAX_DAILY_CAPACITY = 100
+  private static readonly MAX_WORKLOAD_NOTES_LENGTH = 500
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
@@ -23,6 +26,21 @@ export class PeopleService {
       throw new BadRequestException('expectedUpdatedAt inválido (use ISO)')
     }
     return parsed
+  }
+
+  private validateCapacityPatch(data: any) {
+    for (const field of ['dailyServiceOrderCapacity', 'dailyAppointmentCapacity'] as const) {
+      const value = data?.[field]
+      if (value === undefined) continue
+      if (!Number.isInteger(value) || value <= 0 || value > PeopleService.MAX_DAILY_CAPACITY) {
+        throw new BadRequestException(`${field} deve ser um inteiro entre 1 e ${PeopleService.MAX_DAILY_CAPACITY}.`)
+      }
+    }
+    if (data?.workloadNotes !== undefined && data.workloadNotes !== null) {
+      if (typeof data.workloadNotes !== 'string' || data.workloadNotes.length > PeopleService.MAX_WORKLOAD_NOTES_LENGTH) {
+        throw new BadRequestException(`workloadNotes deve ter no máximo ${PeopleService.MAX_WORKLOAD_NOTES_LENGTH} caracteres.`)
+      }
+    }
   }
 
   async listActiveByOrg(orgId: string) {
@@ -60,6 +78,7 @@ export class PeopleService {
     })
     if (!person) throw new NotFoundException('Pessoa não encontrada')
     const expectedUpdatedAt = this.parseExpectedUpdatedAt(data?.expectedUpdatedAt)
+    this.validateCapacityPatch(data)
     const { expectedUpdatedAt: _expectedUpdatedAt, ...patch } = data ?? {}
     const mutation = await this.prisma.person.updateMany({
       where: { id, orgId, updatedAt: expectedUpdatedAt },
@@ -68,6 +87,9 @@ export class PeopleService {
         role: patch.role,
         email: patch.email,
         active: patch.active,
+        dailyServiceOrderCapacity: patch.dailyServiceOrderCapacity,
+        dailyAppointmentCapacity: patch.dailyAppointmentCapacity,
+        workloadNotes: patch.workloadNotes,
       },
     })
     if (mutation.count !== 1) {
