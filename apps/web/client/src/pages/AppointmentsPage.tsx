@@ -93,6 +93,7 @@ export default function AppointmentsPage() {
   const [location, navigate] = useLocation();
   const [selectedFilter, setSelectedFilter] = useState<FilterKey>("today");
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
+  const [responsibleFilter, setResponsibleFilter] = useState("all");
   const [queryText, setQueryText] = useState("");
   const [openModal, setOpenModal] = useState(false);
   const [editing, setEditing] = useState<AppointmentRow | null>(null);
@@ -113,7 +114,10 @@ export default function AppointmentsPage() {
   }, [location]);
 
   const utils = trpc.useUtils();
-  const appointmentsQuery = trpc.nexo.appointments.list.useQuery(undefined, { retry: false });
+  const appointmentsQuery = trpc.nexo.appointments.list.useQuery(
+    responsibleFilter === "all" ? { limit: 100 } : { assignedToPersonId: responsibleFilter, limit: 100 },
+    { retry: false }
+  );
   const customersQuery = trpc.nexo.customers.list.useQuery(undefined, { retry: false });
   const peopleQuery = trpc.people.list.useQuery(undefined, { retry: false });
   const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery({ page: 1, limit: 100 }, { retry: false });
@@ -212,7 +216,7 @@ export default function AppointmentsPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [queryText, queryParams.customerId, selectedFilter]);
+  }, [queryText, queryParams.customerId, responsibleFilter, selectedFilter]);
 
   useEffect(() => {
     const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -229,7 +233,7 @@ export default function AppointmentsPage() {
 
   const selected = filtered.find((row) => String(row.item.id ?? "") === String(selectedAppointmentId ?? "")) ?? null;
 
-  const [form, setForm] = useState({ customerId: "", date: "", time: "", status: "SCHEDULED" as AppointmentStatus, notes: "", assignedToPersonId: "", durationMinutes: "60" });
+  const [form, setForm] = useState({ customerId: "", date: "", time: "", status: "SCHEDULED" as AppointmentStatus, notes: "", assignedToPersonId: "unassigned", durationMinutes: "60" });
 
   useEffect(() => {
     if (!openModal) return;
@@ -242,12 +246,12 @@ export default function AppointmentsPage() {
         time: start ? start.toISOString().slice(11, 16) : "",
         status: String(editing.status ?? "SCHEDULED").toUpperCase() as AppointmentStatus,
         notes: String(editing.notes ?? ""),
-        assignedToPersonId: String(editing.assignedToPersonId ?? editing.personId ?? ""),
+        assignedToPersonId: String(editing.assignedToPersonId ?? editing.personId ?? "unassigned"),
         durationMinutes: start && end ? String(Math.max(15, Math.round((end.getTime() - start.getTime()) / 60000))) : "60",
       });
       return;
     }
-    setForm({ customerId: queryParams.customerId ?? "", date: "", time: "", status: "SCHEDULED", notes: "", assignedToPersonId: "", durationMinutes: "60" });
+    setForm({ customerId: queryParams.customerId ?? "", date: "", time: "", status: "SCHEDULED", notes: "", assignedToPersonId: "unassigned", durationMinutes: "60" });
   }, [openModal, editing, queryParams.customerId]);
 
   const saveAppointment = async (event: React.FormEvent) => {
@@ -268,13 +272,14 @@ export default function AppointmentsPage() {
           endsAt: endsAt.toISOString(),
           status: form.status,
           notes: form.notes.trim() || undefined,
+          assignedToPersonId: form.assignedToPersonId === "unassigned" ? null : form.assignedToPersonId,
           expectedUpdatedAt: editing.updatedAt ?? undefined,
         });
         setSuccessMessage("Agendamento atualizado com sucesso.");
       } else {
         await createMutation.mutateAsync({
           customerId: form.customerId,
-          assignedToPersonId: form.assignedToPersonId || undefined,
+          assignedToPersonId: form.assignedToPersonId === "unassigned" ? undefined : form.assignedToPersonId,
           startsAt: startsAt.toISOString(),
           endsAt: endsAt.toISOString(),
           status: form.status,
@@ -365,6 +370,14 @@ export default function AppointmentsPage() {
               {filter.label}
             </button>
           ))}
+          <select
+            className="h-8 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 text-xs text-[var(--modal-section-muted)]"
+            value={responsibleFilter}
+            onChange={(event) => setResponsibleFilter(event.target.value)}
+          >
+            <option value="all">Responsável: todos</option>
+            {people.map((person: any) => <option key={String(person.id)} value={String(person.id)}>{String(person.name ?? "Colaborador")}</option>)}
+          </select>
         </AppFiltersBar>
 
         {successMessage ? <p className="text-sm text-emerald-400">{successMessage}</p> : null}
@@ -586,7 +599,7 @@ export default function AppointmentsPage() {
             <AppField label="Duração (min)"><AppInput type="number" min={15} value={form.durationMinutes} onChange={(event) => setForm((prev) => ({ ...prev, durationMinutes: event.target.value }))} /></AppField>
           </div>
           <AppField label="Responsável">
-            <AppSelect value={form.assignedToPersonId || undefined} onValueChange={(assignedToPersonId) => setForm((prev) => ({ ...prev, assignedToPersonId }))} placeholder="Opcional" options={people.map((item: any) => ({ value: String(item.id), label: String(item.name ?? "Responsável") }))} />
+            <AppSelect value={form.assignedToPersonId} onValueChange={(assignedToPersonId) => setForm((prev) => ({ ...prev, assignedToPersonId }))} placeholder="Opcional" options={[{ value: "unassigned", label: "Sem responsável" }, ...people.map((item: any) => ({ value: String(item.id), label: String(item.name ?? "Responsável") }))]} />
           </AppField>
           <AppField label="Observação"><AppInput value={form.notes} onChange={(event) => setForm((prev) => ({ ...prev, notes: event.target.value }))} placeholder="Observação operacional" /></AppField>
         </AppForm>

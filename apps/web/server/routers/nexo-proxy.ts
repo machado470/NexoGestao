@@ -287,6 +287,7 @@ const appointmentCreateInput = z.object({
 
 const appointmentUpdateInput = z.object({
   id: z.string().min(1),
+  assignedToPersonId: z.string().nullable().optional(),
   startsAt: z.string().optional(),
   endsAt: z.string().optional(),
   status: z.enum(["SCHEDULED", "CONFIRMED", "CANCELED", "DONE", "NO_SHOW"]).optional(),
@@ -573,7 +574,16 @@ export const nexoProxyRouter = router({
   }),
 
   appointments: router({
-    list: protectedProcedure.input(anyInput).query(async ({ ctx, input }) => {
+    list: protectedProcedure.input(z.object({
+      from: z.string().optional(),
+      to: z.string().optional(),
+      status: z.enum(["SCHEDULED", "CONFIRMED", "CANCELED", "DONE", "NO_SHOW"]).optional(),
+      customerId: z.string().optional(),
+      assignedToPersonId: z.string().optional(),
+      page: z.number().int().positive().optional(),
+      limit: z.number().int().positive().optional(),
+      search: z.string().optional(),
+    }).optional()).query(async ({ ctx, input }) => {
       return authedGet(ctx as CtxLike, "/appointments", input);
     }),
 

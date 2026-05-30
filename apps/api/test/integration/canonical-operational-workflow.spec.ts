@@ -160,18 +160,49 @@ describeRealIntegration('Canonical Operational Workflow (e2e)', () => {
     const createAppointment = await request(app.getHttpServer())
       .post('/appointments')
       .set(mainAuth)
-      .send({ customerId, title: 'Visita técnica', startsAt, endsAt })
+      .send({ customerId, title: 'Visita técnica', assignedToPersonId: primaryPersonId, startsAt, endsAt })
       .expect(201)
 
     const appointmentId = createAppointment.body.id as string
     const appointmentDb = await prisma.appointment.findFirst({ where: { id: appointmentId, orgId: primaryOrgId } })
     expect(appointmentDb?.status).toBe('SCHEDULED')
+    expect(appointmentDb?.assignedToPersonId).toBe(primaryPersonId)
+    expect(createAppointment.body.assignedToPersonId).toBe(primaryPersonId)
+
+    await request(app.getHttpServer())
+      .get(`/appointments?assignedToPersonId=${primaryPersonId}`)
+      .set(mainAuth)
+      .expect(200)
+      .expect((res) => {
+        const appointmentItems = extractCollection(res.body)
+        expect(appointmentItems.some((item: any) => item.id === appointmentId)).toBe(true)
+      })
+
+    await request(app.getHttpServer())
+      .patch(`/appointments/${appointmentId}`)
+      .set(mainAuth)
+      .send({ assignedToPersonId: secondaryPersonId, expectedUpdatedAt: createAppointment.body.updatedAt })
+      .expect(400)
+
+    const unassignedAppointment = await request(app.getHttpServer())
+      .patch(`/appointments/${appointmentId}`)
+      .set(mainAuth)
+      .send({ assignedToPersonId: null, expectedUpdatedAt: createAppointment.body.updatedAt })
+      .expect(200)
+    expect(unassignedAppointment.body.assignedToPersonId).toBeNull()
+
+    const reassignedAppointment = await request(app.getHttpServer())
+      .patch(`/appointments/${appointmentId}`)
+      .set(mainAuth)
+      .send({ assignedToPersonId: primaryPersonId, expectedUpdatedAt: unassignedAppointment.body.updatedAt })
+      .expect(200)
+    expect(reassignedAppointment.body.assignedToPersonId).toBe(primaryPersonId)
 
     // 3) confirm appointment + whatsapp
     await request(app.getHttpServer())
       .patch(`/appointments/${appointmentId}`)
       .set(mainAuth)
-      .send({ status: 'CONFIRMED', expectedUpdatedAt: createAppointment.body.updatedAt })
+      .send({ status: 'CONFIRMED', expectedUpdatedAt: reassignedAppointment.body.updatedAt })
       .expect(200)
 
     const confirmedAppointmentDb = await prisma.appointment.findFirst({ where: { id: appointmentId, orgId: primaryOrgId } })

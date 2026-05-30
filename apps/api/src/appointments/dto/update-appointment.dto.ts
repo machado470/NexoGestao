@@ -1,4 +1,4 @@
-import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator'
+import { IsIn, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator'
 
 // Enums alinhados com o schema Prisma: AppointmentStatus
 const APPOINTMENT_STATUSES = [
@@ -10,6 +10,11 @@ const APPOINTMENT_STATUSES = [
 ] as const
 
 export class UpdateAppointmentDto {
+  @IsOptional()
+  @ValidateIf((_, value) => typeof value === 'string')
+  @IsString()
+  assignedToPersonId?: string | null
+
   @IsOptional()
   @IsString()
   startsAt?: string

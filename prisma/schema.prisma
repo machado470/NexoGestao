@@ -103,6 +103,7 @@ model Person {
   user                      User?                 @relation(fields: [userId], references: [id])
   exceptions                PersonException[]
   riskSnapshots             RiskSnapshot[]
+  appointmentsAssigned      Appointment[]         @relation("AppointmentAssignedTo")
   serviceOrdersAssigned     ServiceOrder[]        @relation("ServiceOrderAssignedTo")
   timelineEvents            TimelineEvent[]
   itemCompletions           TrackItemCompletion[]
@@ -337,24 +338,27 @@ model Customer {
 }
 
 model Appointment {
-  id             String            @id @default(uuid())
-  orgId          String
-  customerId     String
-  idempotencyKey String?           @unique
-  startsAt       DateTime
-  endsAt         DateTime
-  status         AppointmentStatus @default(SCHEDULED)
-  notes          String?
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
-  customer       Customer          @relation(fields: [customerId], references: [id])
-  org            Organization      @relation(fields: [orgId], references: [id])
-  serviceOrder   ServiceOrder?
-  timelineEvents TimelineEvent[]
+  id                 String            @id @default(uuid())
+  orgId              String
+  customerId         String
+  assignedToPersonId String?
+  idempotencyKey     String?           @unique
+  startsAt           DateTime
+  endsAt             DateTime
+  status             AppointmentStatus @default(SCHEDULED)
+  notes              String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  assignedTo         Person?           @relation("AppointmentAssignedTo", fields: [assignedToPersonId], references: [id])
+  customer           Customer          @relation(fields: [customerId], references: [id])
+  org                Organization      @relation(fields: [orgId], references: [id])
+  serviceOrder       ServiceOrder?
+  timelineEvents     TimelineEvent[]
 
   @@index([orgId, startsAt])
   @@index([orgId, startsAt, endsAt])
   @@index([orgId, status, startsAt])
+  @@index([orgId, assignedToPersonId, startsAt])
   @@index([customerId, startsAt])
 }
 
