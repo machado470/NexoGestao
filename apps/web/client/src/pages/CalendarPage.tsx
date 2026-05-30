@@ -73,7 +73,10 @@ export default function CalendarPage() {
   const [statusFilter, setStatusFilter] = useOperationalMemoryState("nexo.calendar.status-filter.v1", "all");
   const [customerFilter, setCustomerFilter] = useOperationalMemoryState("nexo.calendar.customer-filter.v1", "all");
 
-  const appointmentsQuery = trpc.nexo.appointments.list.useQuery(undefined, { retry: false });
+  const appointmentsQuery = trpc.nexo.appointments.list.useQuery(
+    teamFilter === "all" ? { limit: 1000 } : { assignedToPersonId: teamFilter, limit: 1000 },
+    { retry: false }
+  );
   const customersQuery = trpc.nexo.customers.list.useQuery(undefined, { retry: false });
   const peopleQuery = trpc.people.list.useQuery(undefined, { retry: false });
   const updateAppointment = trpc.nexo.appointments.update.useMutation();
@@ -103,7 +106,8 @@ export default function CalendarPage() {
   const conflictIds = useMemo(() => {
     const byOwner = new Map<string, Appointment[]>();
     filteredAppointments.forEach(item => {
-      const ownerKey = String(item.assignedToPersonId ?? "unassigned");
+      if (!item.assignedToPersonId) return;
+      const ownerKey = String(item.assignedToPersonId);
       const group = byOwner.get(ownerKey) ?? [];
       group.push(item);
       byOwner.set(ownerKey, group);
@@ -177,10 +181,14 @@ export default function CalendarPage() {
     }).length;
     const confirmed = filteredAppointments.filter(item => item.status === "CONFIRMED").length;
     const inProgress = 0;
-    const possibleFits = Math.max(0, 12 - filteredAppointments.length);
+    const activePeople = teamFilter === "all" ? Math.max(people.length, 1) : 1;
+    const assignedActiveAppointments = filteredAppointments.filter(item =>
+      Boolean(item.assignedToPersonId) && !["CANCELED", "DONE", "NO_SHOW"].includes(item.status)
+    ).length;
+    const possibleFits = Math.max(0, activePeople * 12 - assignedActiveAppointments);
 
     return { conflicts, overload, confirmed, inProgress, possibleFits };
-  }, [filteredAppointments, conflictIds, now]);
+  }, [filteredAppointments, conflictIds, now, people.length, teamFilter]);
 
   const immediateAttention = useMemo(() => {
     return filteredAppointments

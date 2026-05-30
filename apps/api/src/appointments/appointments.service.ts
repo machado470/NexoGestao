@@ -103,6 +103,7 @@ function buildAppointmentIdempotencyKey(input: {
   startsAt: Date
   endsAt: Date
   status: AppointmentStatus
+  assignedToPersonId?: string | null
 }): string {
   return [
     'appointment-create',
@@ -111,6 +112,7 @@ function buildAppointmentIdempotencyKey(input: {
     input.startsAt.toISOString(),
     input.endsAt.toISOString(),
     input.status,
+    input.assignedToPersonId ?? 'unassigned',
   ].join(':')
 }
 
@@ -167,6 +169,7 @@ export class AppointmentsService {
       to?: string
       status?: AppointmentStatus
       customerId?: string
+      assignedToPersonId?: string
       page?: number
       limit?: number
       search?: string
@@ -183,6 +186,7 @@ export class AppointmentsService {
     const where: Prisma.AppointmentWhereInput = { orgId }
 
     if (filters.customerId) where.customerId = filters.customerId
+    if (filters.assignedToPersonId) where.assignedToPersonId = filters.assignedToPersonId
 
     if (filters.status != null) {
       if (!isStatus(filters.status)) throw new BadRequestException('status inválido')
@@ -218,6 +222,7 @@ export class AppointmentsService {
         take: limit,
         skip,
         include: {
+          assignedTo: { select: { id: true, name: true } },
           customer: { select: { id: true, name: true, phone: true } },
         },
       }),
@@ -242,6 +247,7 @@ export class AppointmentsService {
     const appt = await this.prisma.appointment.findFirst({
       where: { id, orgId },
       include: {
+        assignedTo: { select: { id: true, name: true } },
         customer: { select: { id: true, name: true, phone: true } },
       },
     })
@@ -308,6 +314,7 @@ export class AppointmentsService {
       startsAt,
       endsAt,
       status,
+      assignedToPersonId: params.assignedToPersonId,
     })
 
     const idem = await this.idempotency.begin({
@@ -332,6 +339,7 @@ export class AppointmentsService {
         data: {
           orgId: params.orgId,
           customerId: params.customerId,
+          assignedToPersonId: params.assignedToPersonId ?? null,
           idempotencyKey,
           startsAt,
           endsAt,
@@ -339,6 +347,7 @@ export class AppointmentsService {
           notes,
         },
         include: {
+          assignedTo: { select: { id: true, name: true } },
           customer: { select: { id: true, name: true, phone: true } },
         },
       }) as any
@@ -401,6 +410,7 @@ export class AppointmentsService {
         const existing = await this.prisma.appointment.findFirst({
           where: { orgId: params.orgId, idempotencyKey },
           include: {
+            assignedTo: { select: { id: true, name: true } },
             customer: { select: { id: true, name: true, phone: true } },
           },
         })
@@ -459,6 +469,7 @@ export class AppointmentsService {
       endsAt?: string
       status?: AppointmentStatus
       notes?: string
+      assignedToPersonId?: string | null
       expectedUpdatedAt?: string
     }
   }) {
@@ -493,6 +504,16 @@ export class AppointmentsService {
     }
     if (params.data.notes !== undefined) {
       data.notes = normalizeNotes(params.data.notes)
+    }
+    if (params.data.assignedToPersonId !== undefined) {
+      if (params.data.assignedToPersonId) {
+        const responsible = await this.prisma.person.findFirst({
+          where: { id: params.data.assignedToPersonId, orgId: params.orgId },
+          select: { id: true },
+        })
+        if (!responsible) throw new BadRequestException('Responsável inválido para este org')
+      }
+      data.assignedToPersonId = params.data.assignedToPersonId || null
     }
 
     if (Object.keys(data).length === 0) {
@@ -534,6 +555,7 @@ export class AppointmentsService {
       const updated = await this.prisma.appointment.findFirst({
         where: { id: params.id, orgId: params.orgId },
         include: {
+          assignedTo: { select: { id: true, name: true } },
           customer: { select: { id: true, name: true, phone: true } },
         },
       })
@@ -551,7 +573,7 @@ export class AppointmentsService {
         metadata: {
           appointmentId: updated.id,
           customerId: updated.customerId,
-          responsibleId: null,
+          responsibleId: updated.assignedToPersonId ?? null,
           scheduledAt: updated.startsAt,
           previousStatus: before.status,
           nextStatus: updated.status,
@@ -597,12 +619,14 @@ export class AppointmentsService {
             endsAt: before.endsAt,
             status: before.status,
             notes: before.notes,
+            assignedToPersonId: before.assignedToPersonId,
           },
           after: {
             startsAt: updated.startsAt,
             endsAt: updated.endsAt,
             status: updated.status,
             notes: updated.notes,
+            assignedToPersonId: updated.assignedToPersonId,
           },
           patch: data,
         },
