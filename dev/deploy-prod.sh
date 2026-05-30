@@ -175,15 +175,14 @@ $COMPOSE -f docker-compose.prod.yml exec -T api \
 log_ok "Migrações aplicadas"
 
 # ─── 8. Aguardar API ficar saudável ──────────────────────────
-log "Aguardando API /health responder..."
+log "Aguardando API /v1/health responder dentro do container..."
 
-API_PORT="${API_PORT:-3000}"
 MAX_WAIT=180
 ELAPSED=0
 
 while [[ $ELAPSED -lt $MAX_WAIT ]]; do
-  if curl -sf "http://localhost:${API_PORT}/health" >/dev/null 2>&1; then
-    log_ok "API respondendo em /health"
+  if $COMPOSE -f docker-compose.prod.yml exec -T api curl -sf "http://localhost:3000/v1/health" >/dev/null 2>&1; then
+    log_ok "API respondendo em /v1/health dentro do container"
     break
   fi
   sleep 5
@@ -223,9 +222,11 @@ fi
 # ─── 10. Rodar smoke test ─────────────────────────────────────
 log "Executando smoke test de produção..."
 
-if [[ -f "dev/smoke-prod.sh" ]]; then
-  API_BASE="http://localhost:${API_PORT}" bash dev/smoke-prod.sh
+if [[ -f "dev/smoke-prod.sh" && -n "$DOMAIN" ]]; then
+  API_BASE="https://api.${DOMAIN}" WEB_BASE="https://app.${DOMAIN}" bash dev/smoke-prod.sh
   log_ok "Smoke test passou!"
+elif [[ -z "$DOMAIN" ]]; then
+  log_warn "DOMAIN não configurado — smoke público pulado; health interno da API já foi validado"
 else
   log_warn "dev/smoke-prod.sh não encontrado — pulando smoke test"
 fi
@@ -235,7 +236,7 @@ echo ""
 echo -e "${GREEN}╔══════════════════════════════════════════════════════╗${NC}"
 echo -e "${GREEN}║       Deploy concluído com sucesso! 🚀               ║${NC}"
 echo -e "${GREEN}╠══════════════════════════════════════════════════════╣${NC}"
-echo -e "${GREEN}║${NC}  API Health:  http://localhost:${API_PORT}/health"
+echo -e "${GREEN}║${NC}  API Health:  http://localhost/v1/health"
 if [[ -n "$DOMAIN" ]]; then
   echo -e "${GREEN}║${NC}  App:         https://app.${DOMAIN}"
   echo -e "${GREEN}║${NC}  API:         https://api.${DOMAIN}"

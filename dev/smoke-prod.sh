@@ -57,11 +57,11 @@ require_command jq
 log_section "Iniciando Smoke Test de Produção"
 
 # Teste 1: API /health
-log_info "Testando API Health Check: $API_BASE/health"
-if curl -s -o /dev/null -w "%{http_code}" "$API_BASE/health" | grep -q "200"; then
-  log_ok "API Health Check ($API_BASE/health) respondeu 200 OK."
+log_info "Testando API Health Check: $API_BASE/v1/health"
+if curl -s -o /dev/null -w "%{http_code}" "$API_BASE/v1/health" | grep -q "200"; then
+  log_ok "API Health Check ($API_BASE/v1/health) respondeu 200 OK."
 else
-  log_fail "API Health Check ($API_BASE/health) falhou."
+  log_fail "API Health Check ($API_BASE/v1/health) falhou."
 fi
 
 # Teste 2: Web Frontend (página inicial)
@@ -74,7 +74,7 @@ fi
 
 # Teste 3: Login na API
 log_info "Testando login na API como $ADMIN_EMAIL"
-LOGIN_RESPONSE=$(curl -s -X POST "$API_BASE/auth/login" \
+LOGIN_RESPONSE=$(curl -s -X POST "$API_BASE/v1/auth/login" \
   -H "Content-Type: application/json" \
   -d "{\"email\":\"$ADMIN_EMAIL\",\"password\":\"$ADMIN_PASSWORD\"}")
 
@@ -88,13 +88,13 @@ fi
 
 # Teste 4: Acesso a endpoint autenticado (ex: /me)
 if [[ -n "$TOKEN" ]]; then
-  log_info "Testando acesso a endpoint autenticado ($API_BASE/me)"
-  ME_RESPONSE=$(curl -s -H "Authorization: Bearer $TOKEN" "$API_BASE/me")
+  log_info "Testando acesso a endpoint autenticado ($API_BASE/v1/me)"
+  ME_RESPONSE=$(curl -s -H "Authorization: Bearer $TOKEN" "$API_BASE/v1/me")
   USER_ID=$(echo "$ME_RESPONSE" | jq -r ".data.user.id // empty")
   if [[ -n "$USER_ID" ]]; then
-    log_ok "Acesso a /me bem-sucedido. User ID: $USER_ID."
+    log_ok "Acesso a /v1/me bem-sucedido. User ID: $USER_ID."
   else
-    log_fail "Acesso a /me falhou. Resposta: $ME_RESPONSE"
+    log_fail "Acesso a /v1/me falhou. Resposta: $ME_RESPONSE"
   fi
 else
   log_info "Pulando teste de endpoint autenticado: login falhou."

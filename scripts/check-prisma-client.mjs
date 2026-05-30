@@ -39,7 +39,7 @@ let markerPath = clientMarkerPaths.find((candidate) => existsSync(candidate))
 if (!markerPath) {
   const discovery = spawnSync(
     'bash',
-    ['-lc', "find node_modules -path '*@prisma*client*' -name 'default.d.ts' | head -n 1"],
+    ['-lc', "find node_modules -path '*/node_modules/.prisma/client/default.d.ts' | head -n 1"],
     { cwd: repoRoot, encoding: 'utf8' },
   )
   const discovered = discovery.stdout?.trim()

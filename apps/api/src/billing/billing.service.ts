@@ -12,6 +12,8 @@ import {
   SubscriptionStatus,
   BillingEventType,
   BillingEventStatus,
+  BillingProvider,
+  Prisma,
 } from '@prisma/client'
 import Stripe from 'stripe'
 import { QuotasService } from '../quotas/quotas.service'
@@ -225,16 +227,186 @@ export class BillingService {
       )
     }
 
-    const event = this.stripe.webhooks.constructEvent(
-      rawBody,
-      signature,
-      secret,
-    )
-
+    const event = this.stripe.webhooks.constructEvent(rawBody, signature, secret)
     this.logger.log(`Webhook recebido: ${event.type}`)
 
-    return { received: true }
+    const processed = await this.prisma.$transaction(async tx => {
+      const duplicate = await tx.billingEvent.findUnique({
+        where: { providerEventId: event.id },
+      })
+      if (duplicate) return false
 
+      return this.processWebhookEvent(tx, event)
+    })
+
+    return { received: true, processed }
+  }
+
+  private async processWebhookEvent(tx: Prisma.TransactionClient, event: Stripe.Event) {
+    switch (event.type) {
+      case 'checkout.session.completed':
+        return this.processCheckoutCompleted(tx, event)
+      case 'invoice.paid':
+        return this.processInvoice(tx, event, SubscriptionStatus.ACTIVE, BillingEventStatus.COMPLETED)
+      case 'invoice.payment_failed':
+        return this.processInvoice(tx, event, SubscriptionStatus.PAST_DUE, BillingEventStatus.FAILED)
+      case 'customer.subscription.updated':
+        return this.processStripeSubscription(tx, event)
+      case 'customer.subscription.deleted':
+        return this.processStripeSubscription(tx, event, SubscriptionStatus.CANCELED)
+      default:
+        this.logger.log(`Webhook ignorado: ${event.type}`)
+        return false
+    }
+  }
+
+  private async processCheckoutCompleted(
+    tx: Prisma.TransactionClient,
+    event: Stripe.CheckoutSessionCompletedEvent,
+  ) {
+    const session = event.data.object
+    const orgId = session.metadata?.orgId
+    const planName = this.toPlanName(session.metadata?.planName)
+    const externalRef = this.stripeId(session.subscription)
+
+    if (!orgId || !planName || !externalRef) {
+      throw new BadRequestException('checkout.session.completed sem metadata orgId/planName ou subscription id')
+    }
+
+    const plan = await tx.plan.findUnique({ where: { name: planName } })
+    if (!plan) throw new NotFoundException(`Plano ${planName} não encontrado`)
+
+    const now = new Date()
+    const subscription = await tx.subscription.upsert({
+      where: { orgId },
+      create: {
+        orgId,
+        planId: plan.id,
+        status: SubscriptionStatus.ACTIVE,
+        billingProvider: BillingProvider.STRIPE,
+        billingCustomerRef: this.stripeId(session.customer),
+        billingExternalRef: externalRef,
+        currentPeriodStart: now,
+        currentPeriodEnd: new Date(now.getTime() + 30 * 86400000),
+      },
+      update: {
+        planId: plan.id,
+        status: SubscriptionStatus.ACTIVE,
+        billingProvider: BillingProvider.STRIPE,
+        billingCustomerRef: this.stripeId(session.customer),
+        billingExternalRef: externalRef,
+        canceledAt: null,
+      },
+    })
+
+    await this.createProviderEvent(tx, subscription.id, event, BillingEventType.PAYMENT, BillingEventStatus.COMPLETED, plan.priceCents, 'Stripe checkout concluído')
+    return true
+  }
+
+  private async processInvoice(
+    tx: Prisma.TransactionClient,
+    event: Stripe.InvoicePaidEvent | Stripe.InvoicePaymentFailedEvent,
+    status: SubscriptionStatus,
+    eventStatus: BillingEventStatus,
+  ) {
+    const invoice = event.data.object
+    const externalRef = this.stripeId(invoice.subscription)
+    if (!externalRef) return this.ignoreWebhook(event, 'invoice sem subscription id')
+
+    const current = await tx.subscription.findFirst({ where: { billingExternalRef: externalRef } })
+    if (!current) return this.ignoreWebhook(event, `assinatura ${externalRef} não encontrada`)
+
+    const subscription = await tx.subscription.update({
+      where: { id: current.id },
+      data: {
+        status,
+        currentPeriodStart: this.fromUnix(invoice.period_start) ?? current.currentPeriodStart,
+        currentPeriodEnd: this.fromUnix(invoice.period_end) ?? current.currentPeriodEnd,
+        canceledAt: status === SubscriptionStatus.ACTIVE ? null : undefined,
+      },
+    })
+    const amount = event.type === 'invoice.paid' ? invoice.amount_paid : invoice.amount_due
+    await this.createProviderEvent(tx, subscription.id, event, BillingEventType.PAYMENT, eventStatus, amount, `Stripe ${event.type}`)
+    return true
+  }
+
+  private async processStripeSubscription(
+    tx: Prisma.TransactionClient,
+    event: Stripe.CustomerSubscriptionUpdatedEvent | Stripe.CustomerSubscriptionDeletedEvent,
+    forcedStatus?: SubscriptionStatus,
+  ) {
+    const stripeSubscription = event.data.object
+    const current = await tx.subscription.findFirst({ where: { billingExternalRef: stripeSubscription.id } })
+    if (!current) return this.ignoreWebhook(event, `assinatura ${stripeSubscription.id} não encontrada`)
+
+    const planName = this.planFromStripeSubscription(stripeSubscription)
+    const plan = planName ? await tx.plan.findUnique({ where: { name: planName } }) : null
+    const status = forcedStatus ?? this.fromStripeSubscriptionStatus(stripeSubscription.status)
+    const subscription = await tx.subscription.update({
+      where: { id: current.id },
+      data: {
+        status,
+        planId: plan?.id ?? current.planId,
+        billingProvider: BillingProvider.STRIPE,
+        billingCustomerRef: this.stripeId(stripeSubscription.customer) ?? current.billingCustomerRef,
+        currentPeriodStart: this.fromUnix(stripeSubscription.current_period_start) ?? current.currentPeriodStart,
+        currentPeriodEnd: this.fromUnix(stripeSubscription.current_period_end) ?? current.currentPeriodEnd,
+        canceledAt: status === SubscriptionStatus.CANCELED
+          ? this.fromUnix(stripeSubscription.canceled_at) ?? new Date()
+          : null,
+      },
+    })
+
+    await this.createProviderEvent(tx, subscription.id, event, BillingEventType.ADJUSTMENT, BillingEventStatus.COMPLETED, 0, `Stripe ${event.type}`)
+    return true
+  }
+
+  private async createProviderEvent(
+    tx: Prisma.TransactionClient,
+    subscriptionId: string,
+    event: Stripe.Event,
+    type: BillingEventType,
+    status: BillingEventStatus,
+    amountCents: number,
+    description: string,
+  ) {
+    await tx.billingEvent.create({
+      data: { subscriptionId, providerEventId: event.id, type, status, amountCents, description },
+    })
+  }
+
+  private ignoreWebhook(event: Stripe.Event, reason: string) {
+    this.logger.warn(`Webhook ${event.type} ignorado: ${reason}`)
+    return false
+  }
+
+  private stripeId(value: string | { id: string } | null | undefined) {
+    return typeof value === 'string' ? value : value?.id
+  }
+
+  private fromUnix(value?: number | null) {
+    return value ? new Date(value * 1000) : undefined
+  }
+
+  private toPlanName(value?: string | null): PlanName | undefined {
+    const normalized = value === 'SCALE' ? 'BUSINESS' : value
+    return normalized && ['FREE', 'STARTER', 'PRO', 'BUSINESS'].includes(normalized)
+      ? normalized as PlanName
+      : undefined
+  }
+
+  private planFromStripeSubscription(subscription: Stripe.Subscription) {
+    const priceId = subscription.items.data[0]?.price.id
+    const entry = Object.entries(this.getPlanPriceMap()).find(([, configuredPrice]) => configuredPrice && configuredPrice === priceId)
+    return this.toPlanName(entry?.[0] ?? subscription.metadata?.planName)
+  }
+
+  private fromStripeSubscriptionStatus(status: Stripe.Subscription.Status) {
+    if (status === 'active') return SubscriptionStatus.ACTIVE
+    if (status === 'trialing') return SubscriptionStatus.TRIALING
+    if (status === 'past_due' || status === 'unpaid') return SubscriptionStatus.PAST_DUE
+    if (status === 'canceled') return SubscriptionStatus.CANCELED
+    return SubscriptionStatus.SUSPENDED
   }
 
   /*
@@ -296,23 +468,51 @@ export class BillingService {
   }
 
   async cancelSubscription(orgId: string) {
+    const subscription = await this.prisma.subscription.findUnique({ where: { orgId } })
+    if (!subscription) throw new NotFoundException('Nenhuma assinatura encontrada')
 
-    const subscription = await this.prisma.subscription.findUnique({
-      where: { orgId },
-    })
+    if (subscription.billingProvider === BillingProvider.STRIPE) {
+      if (!subscription.billingExternalRef) {
+        throw new ServiceUnavailableException('Assinatura Stripe sem billingExternalRef; cancelamento local bloqueado')
+      }
+      this.assertStripeAvailable('cancel_subscription')
 
-    if (!subscription) {
-      throw new NotFoundException('Nenhuma assinatura encontrada')
+      const canceled = await this.stripe.subscriptions.cancel(subscription.billingExternalRef)
+      const canceledAt = this.fromUnix(canceled.canceled_at) ?? new Date()
+      return this.prisma.$transaction(async tx => {
+        const updated = await tx.subscription.update({
+          where: { orgId },
+          data: { status: SubscriptionStatus.CANCELED, canceledAt },
+        })
+        await tx.billingEvent.create({
+          data: {
+            subscriptionId: subscription.id,
+            type: BillingEventType.ADJUSTMENT,
+            amountCents: 0,
+            status: BillingEventStatus.COMPLETED,
+            description: 'Stripe subscription cancelada imediatamente',
+          },
+        })
+        return updated
+      })
     }
 
-    return this.prisma.subscription.update({
-      where: { orgId },
-      data: {
-        status: SubscriptionStatus.CANCELED,
-        canceledAt: new Date(),
-      },
+    return this.prisma.$transaction(async tx => {
+      const updated = await tx.subscription.update({
+        where: { orgId },
+        data: { status: SubscriptionStatus.CANCELED, canceledAt: new Date() },
+      })
+      await tx.billingEvent.create({
+        data: {
+          subscriptionId: subscription.id,
+          type: BillingEventType.ADJUSTMENT,
+          amountCents: 0,
+          status: BillingEventStatus.COMPLETED,
+          description: '[SIMULADO] cancelamento local',
+        },
+      })
+      return updated
     })
-
   }
 
   /*

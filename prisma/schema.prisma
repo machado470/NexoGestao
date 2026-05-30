@@ -812,6 +812,7 @@ model TenantFeatureOverride {
 model BillingEvent {
   id             String             @id @default(uuid())
   subscriptionId String
+  providerEventId String?            @unique
   type           BillingEventType
   amountCents    Int
   status         BillingEventStatus
