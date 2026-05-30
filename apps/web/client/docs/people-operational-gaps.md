@@ -8,6 +8,7 @@
 - A comparação expõe percentuais de uso e `capacityStatus` sem alterar o `loadStatus` operacional existente.
 - O modal estável de edição de pessoa permite ajustar os três campos mínimos de capacidade.
 - Indisponibilidades temporárias simples agora podem ser registradas por pessoa com início, fim e motivo opcional. O resumo operacional expõe disponibilidade atual e próxima exceção sem alterar `capacityStatus`.
+- Os fluxos manuais estáveis de atribuição de agendamentos e O.S. exibem alertas passivos quando a pessoa selecionada está indisponível, ficará indisponível em breve, excedeu a capacidade planejada ou apresenta carga operacional alta.
 
 ## Semântica importante
 
@@ -20,5 +21,6 @@ Quando uma capacidade estiver ausente ou for zero em um registro legado, o perce
 - Ainda não existem turnos, escalas completas ou calendário de jornada.
 - A indisponibilidade temporária não modela férias complexas, recorrência ou políticas de RH.
 - Ainda não existem especialidades ou compatibilidade entre responsável e tipo de serviço.
+- Os alertas de atribuição não bloqueiam o salvamento: a decisão operacional continua humana.
 - Ainda não existe redistribuição automática ou recomendação automática de atribuição.
 - Ainda não existe score de produtividade, ranking individual ou avaliação de desempenho.

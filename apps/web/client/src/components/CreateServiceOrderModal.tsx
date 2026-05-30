@@ -9,6 +9,7 @@ import { useLocation } from "wouter";
 import { buildServiceOrdersDeepLink } from "@/lib/operations/operations.utils";
 import { useCriticalActionGuard } from "@/hooks/useCriticalActionGuard";
 import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
+import { PersonAssignmentWarning } from "@/components/PersonAssignmentWarning";
 import { useProductAnalytics } from "@/hooks/useProductAnalytics";
 import { notify } from "@/stores/notificationStore";
 import { FormModal } from "@/components/app-modal-system";
@@ -433,6 +434,7 @@ export default function CreateServiceOrderModal({
                         label: person.name,
                       }))}
                     />
+                    <PersonAssignmentWarning personId={formData.assignedToPersonId} />
                     {formData.assignedToPersonId ? (
                       <button
                         type="button"

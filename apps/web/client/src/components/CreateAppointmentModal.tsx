@@ -10,6 +10,7 @@ import { FormModal } from "@/components/app-modal-system";
 import { AppField, AppForm, AppSelect } from "@/components/app-system";
 import { invalidateOperationalGraph } from "@/lib/operationalConsistency";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
+import { PersonAssignmentWarning } from "@/components/PersonAssignmentWarning";
 
 interface CreateAppointmentModalProps {
   isOpen: boolean;
@@ -256,6 +257,7 @@ export function CreateAppointmentModal({
               placeholder="Selecione um colaborador"
               options={collaboratorOptions}
             />
+            <PersonAssignmentWarning personId={formData.assignedToPersonId} />
             {formData.assignedToPersonId ? (
               <button
                 type="button"
