@@ -39,6 +39,7 @@ const mockPrisma = {
   },
   whatsAppConversation: {
     count: jest.fn(),
+    findMany: jest.fn(),
   },
 }
 
@@ -75,6 +76,7 @@ describe('DashboardService', () => {
     mockPrisma.whatsAppMessage.count.mockResolvedValue(0)
     mockPrisma.whatsAppMessage.findMany.mockResolvedValue([])
     mockPrisma.whatsAppConversation.count.mockResolvedValue(0)
+    mockPrisma.whatsAppConversation.findMany.mockResolvedValue([])
   })
 
   afterEach(async () => {
@@ -114,6 +116,17 @@ describe('DashboardService', () => {
       expect(mockPrisma.payment.count).not.toHaveBeenCalledWith(
         expect.objectContaining({ where: expect.objectContaining({ orgId: 'org-2' }) }),
       )
+    })
+
+    it('deve contar conversas reais aguardando resposta da operação', async () => {
+      mockPrisma.whatsAppConversation.count.mockResolvedValue(3)
+
+      const result = await service.getMetrics('org-1')
+
+      expect(result.whatsappSignals.customersNoResponse).toBe(3)
+      expect(mockPrisma.whatsAppConversation.count).toHaveBeenCalledWith({
+        where: { orgId: 'org-1', status: 'WAITING_OPERATOR' },
+      })
     })
 
     it('deve calcular comparação real contra a janela equivalente da semana anterior', async () => {
@@ -196,26 +209,110 @@ describe('DashboardService', () => {
       expect(result).toHaveProperty('operationalQueue')
     })
 
-    it('deve expor fila transversal leve com itens reais e tenant isolado', async () => {
+    it('deve expor fila transversal leve com itens reais, prioridade explícita e tenant isolado', async () => {
+      const startsAt = new Date('2026-05-31T10:00:00Z')
+      const lastMessageAt = new Date('2026-05-30T08:00:00Z')
       mockPrisma.serviceOrder.findMany
         .mockResolvedValueOnce([{ id: 'so-1', title: 'O.S. atrasada', customer: { id: 'c1', name: 'Cliente 1' } }])
         .mockResolvedValueOnce([])
       mockPrisma.charge.findMany.mockResolvedValue([{ id: 'ch-1', amountCents: 2500, customer: { id: 'c1', name: 'Cliente 1' } }])
-      mockPrisma.appointment.findMany.mockResolvedValue([{ id: 'ap-1', status: 'SCHEDULED', notes: null, customer: { id: 'c1', name: 'Cliente 1' } }])
+      mockPrisma.appointment.findMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ id: 'ap-1', startsAt, notes: null, customer: { id: 'c1', name: 'Cliente 1' } }])
       mockPrisma.whatsAppMessage.findMany.mockResolvedValue([{ id: 'msg-1', errorMessage: 'Provider indisponível', customer: { id: 'c1', name: 'Cliente 1' } }])
+      mockPrisma.whatsAppConversation.findMany.mockResolvedValue([{ id: 'conv-1', title: null, phone: '5511999999999', lastMessageAt, customer: { id: 'c1', name: 'Cliente 1' } }])
 
       const result = await service.getAlerts('org-1')
 
-      expect(result.operationalQueue).toHaveLength(4)
+      expect(result.operationalQueue).toHaveLength(5)
       expect(result.operationalQueue.map((item) => item.type)).toEqual([
         'OVERDUE_SERVICE_ORDER',
         'OVERDUE_CHARGE',
-        'UNCONFIRMED_APPOINTMENT',
         'FAILED_MESSAGE',
+        'CUSTOMER_AWAITING_RESPONSE',
+        'UNCONFIRMED_APPOINTMENT',
       ])
+      expect(result.operationalQueue[3]).toEqual(expect.objectContaining({
+        customerId: 'c1', conversationId: 'conv-1', lastMessageAt,
+      }))
+      expect(result.operationalQueue[4]).toEqual(expect.objectContaining({
+        appointmentId: 'ap-1', customerId: 'c1', startsAt,
+      }))
       expect(mockPrisma.whatsAppMessage.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: { orgId: 'org-1', status: 'FAILED' } }),
       )
+      expect(mockPrisma.whatsAppConversation.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { orgId: 'org-1', status: 'WAITING_OPERATOR' } }),
+      )
+    })
+
+    it('deve buscar somente agendamentos SCHEDULED nas próximas 48 horas e ordená-los por início', async () => {
+      const before = Date.now()
+
+      await service.getAlerts('org-1')
+
+      const after = Date.now()
+      const futureAppointmentsQuery = mockPrisma.appointment.findMany.mock.calls[1][0]
+      expect(futureAppointmentsQuery).toEqual(expect.objectContaining({
+        where: {
+          orgId: 'org-1',
+          status: 'SCHEDULED',
+          startsAt: { gte: expect.any(Date), lte: expect.any(Date) },
+        },
+        orderBy: { startsAt: 'asc' },
+        take: 6,
+      }))
+      expect(futureAppointmentsQuery.where.startsAt.gte.getTime()).toBeGreaterThanOrEqual(before)
+      expect(futureAppointmentsQuery.where.startsAt.gte.getTime()).toBeLessThanOrEqual(after)
+      expect(futureAppointmentsQuery.where.startsAt.lte.getTime() - futureAppointmentsQuery.where.startsAt.gte.getTime()).toBe(48 * 60 * 60 * 1000)
+      expect(futureAppointmentsQuery.where.status).not.toBe('CANCELED')
+      expect(futureAppointmentsQuery.where.status).not.toBe('DONE')
+    })
+
+    it('não fabrica cliente ou conversa aguardando resposta quando não há conversa real individualizada', async () => {
+      mockPrisma.whatsAppConversation.count.mockResolvedValue(3)
+      mockPrisma.whatsAppConversation.findMany.mockResolvedValue([])
+
+      const result = await service.getAlerts('org-1')
+
+      expect(result.operationalQueue).not.toEqual(expect.arrayContaining([
+        expect.objectContaining({ type: 'CUSTOMER_AWAITING_RESPONSE' }),
+      ]))
+    })
+
+    it('mantém a fila final limitada a seis itens respeitando prioridade entre categorias', async () => {
+      mockPrisma.serviceOrder.findMany
+        .mockResolvedValueOnce([
+          { id: 'so-1', title: 'O.S. 1', customer: { id: 'c1', name: 'Cliente 1' } },
+          { id: 'so-2', title: 'O.S. 2', customer: { id: 'c2', name: 'Cliente 2' } },
+        ])
+        .mockResolvedValueOnce([])
+      mockPrisma.charge.findMany.mockResolvedValue([
+        { id: 'ch-1', amountCents: 100, customer: { id: 'c1', name: 'Cliente 1' } },
+        { id: 'ch-2', amountCents: 200, customer: { id: 'c2', name: 'Cliente 2' } },
+      ])
+      mockPrisma.whatsAppMessage.findMany.mockResolvedValue([
+        { id: 'msg-1', customer: null },
+        { id: 'msg-2', customer: null },
+      ])
+      mockPrisma.whatsAppConversation.findMany.mockResolvedValue([
+        { id: 'conv-1', title: null, phone: '5511000000001', customer: null },
+      ])
+      mockPrisma.appointment.findMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ id: 'ap-1', notes: null, customer: { id: 'c1', name: 'Cliente 1' } }])
+
+      const result = await service.getAlerts('org-1')
+
+      expect(result.operationalQueue).toHaveLength(6)
+      expect(result.operationalQueue.map((item) => item.type)).toEqual([
+        'OVERDUE_SERVICE_ORDER',
+        'OVERDUE_SERVICE_ORDER',
+        'OVERDUE_CHARGE',
+        'OVERDUE_CHARGE',
+        'FAILED_MESSAGE',
+        'FAILED_MESSAGE',
+      ])
     })
 
     it('deve retornar contagem correta de ordens atrasadas', async () => {
