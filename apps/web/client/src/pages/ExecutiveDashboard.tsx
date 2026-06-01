@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { ArrowRight, Clock3, MessageSquareWarning, ShieldAlert, TrendingDown } from "lucide-react";
+import { ArrowRight, CheckCircle2, ChevronRight, Clock3, MessageSquareWarning, ShieldAlert, TrendingDown, WalletCards } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -55,6 +55,7 @@ type QueueItem = {
   path: string;
 };
 type FlowStage = { label: string; value: string; context: string; path: string; action: string };
+type RecommendedAction = { title: string; reason: string; impact: string; path: string; ctaLabel: string };
 type ComparisonKey = "revenueReceivedPct" | "completedServiceOrdersPct" | "overdueChargesPct" | "failedMessagesPct";
 type QueueRecord = DashboardRecord & { id?: unknown; type?: unknown; title?: unknown; context?: unknown; amountCents?: unknown };
 
@@ -85,8 +86,7 @@ function readNullableNumber(record: DashboardRecord, key: string) {
   return typeof record[key] === "number" && Number.isFinite(record[key]) ? (record[key] as number) : null;
 }
 
-function describeComparison(label: string, value: number | null, lowerIsBetter = false) {
-  if (value === null) return `${label}: sem base histórica suficiente.`;
+function describeComparison(label: string, value: number, lowerIsBetter = false) {
   if (value === 0) return `${label}: estável em relação ao período anterior.`;
 
   const improved = lowerIsBetter ? value < 0 : value > 0;
@@ -150,14 +150,14 @@ function buildQueue(alerts: DashboardAlerts): QueueItem[] {
 }
 
 function AttentionRow({ item, navigate }: { item: AttentionItem; navigate: (path: string) => void }) {
-  return <article className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3.5">
+  return <article className="py-3 first:pt-0 last:pb-0">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2"><AppStatusBadge label={item.severity === "critical" ? "Urgente" : item.severity === "high" ? "Atenção" : "Monitorar"} /><p className="text-sm font-semibold text-[var(--text-primary)]">{item.title}</p></div>
-        <p className="mt-2 text-xs leading-5 text-[var(--text-secondary)]">Motivo: {item.reason}</p>
-        <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">Impacto: {item.impact}</p>
+        <p className="mt-1.5 text-xs leading-5 text-[var(--text-secondary)]"><strong>Motivo:</strong> {item.reason}</p>
+        <p className="text-xs leading-5 text-[var(--text-muted)]"><strong>Impacto:</strong> {item.impact}</p>
       </div>
-      <Button size="sm" onClick={() => navigate(item.path)}>{item.ctaLabel}</Button>
+      <Button className="shrink-0" size="sm" onClick={() => navigate(item.path)}>{item.ctaLabel}</Button>
     </div>
   </article>;
 }
@@ -210,11 +210,26 @@ export default function ExecutiveDashboard() {
     : overdueOrders > 0 ? { label: "Agendamento → O.S.", action: "Destravar O.S. atrasadas", path: "/service-orders?status=attention" }
     : missingCharges > 0 ? { label: "O.S. → Cobrança", action: "Gerar cobranças pendentes", path: "/service-orders?status=done" }
     : null;
+  const failedMessages = readNumber(asRecord(metrics.whatsappSignals), "failedMessages");
   const nextBestAction = nextBestActionQuery.data;
+  const fallbackAction: RecommendedAction = overdueCharges > 0
+    ? { title: "Cobrar carteira vencida", reason: `${overdueCharges} cobrança(s) vencida(s) aguardam tratamento.`, impact: "A recuperação da carteira reduz pressão imediata sobre o caixa.", path: "/finances?view=charges&status=overdue", ctaLabel: "Cobrar carteira vencida" }
+    : overdueOrders > 0
+      ? { title: "Revisar O.S. atrasadas", reason: `${overdueOrders} O.S. atrasada(s) precisam avançar.`, impact: "Destravar a execução protege as próximas janelas de atendimento.", path: "/service-orders?status=attention", ctaLabel: "Revisar O.S. atrasadas" }
+      : failedMessages > 0
+        ? { title: "Revisar WhatsApp", reason: `${failedMessages} mensagem(ns) com falha podem interromper o contato com clientes.`, impact: "Restabelecer a comunicação evita perda de confirmações e retornos.", path: "/whatsapp", ctaLabel: "Revisar WhatsApp" }
+        : { title: "Operação sem urgência detectada", reason: "A leitura atual não retornou cobrança vencida, O.S. atrasada ou mensagem com falha.", impact: "Faça uma revisão geral para manter o fluxo saudável.", path: "/timeline", ctaLabel: "Revisar operação" };
+  const recommendedAction: RecommendedAction = nextBestAction
+    ? { title: nextBestAction.title, reason: nextBestAction.reason ?? nextBestAction.summary ?? "Prioridade indicada pelo motor operacional.", impact: nextBestAction.impact ?? "Valide o impacto no módulo responsável antes de executar.", path: buildSignalPath(nextBestAction), ctaLabel: nextBestAction.suggestedAction ?? "Abrir ação prioritária" }
+    : fallbackAction;
+  const availableComparisons = pulseComparisons.flatMap(([label, key, lowerIsBetter]) => {
+    const value = readNullableNumber(comparison, key);
+    return value === null ? [] : [describeComparison(label, value, lowerIsBetter)];
+  });
+  const missingComparisonCount = pulseComparisons.length - availableComparisons.length;
   const hasOperationalData = Object.keys(metrics).length > 0 || attention.length > 0 || queue.length > 0;
-
   return <AppPageShell className="space-y-4">
-    <AppOperationalHeader title="Centro de decisão operacional" description="Priorize o que destrava a operação antes de navegar pelos módulos." contextChips={<><AppStatusBadge label={formatPeriod()} /><AppStatusBadge label={operationState} /></>} />
+    <AppOperationalHeader className="px-4" density="compact" title="Centro de decisão operacional" description="Priorize o que destrava a operação antes de navegar pelos módulos." contextChips={<><AppStatusBadge label={formatPeriod()} /><AppStatusBadge label={operationState} /></>} />
 
     {pageLoading ? <AppPageLoadingState title="Carregando mesa de comando" description="Buscando riscos, fila e indicadores operacionais reais." /> : null}
     {pageError ? <AppPageErrorState title="Não foi possível ler a operação" description="Falhou a consulta de métricas ou alertas. O dashboard não assume que está tudo bem quando a leitura está indisponível." onAction={() => { void kpisQuery.refetch(); void alertsQuery.refetch(); }} /> : null}
@@ -222,50 +237,61 @@ export default function ExecutiveDashboard() {
 
     {!pageLoading && !pageError && hasOperationalData ? <>
       <AppSectionBlock title="Atenção imediata" subtitle="Até 5 riscos ordenados por severidade, cada um com um próximo passo.">
-        {attention.length > 0 ? <div className="space-y-2.5">{attention.map(item => <AttentionRow key={item.id} item={item} navigate={navigate} />)}</div> : <AppPageEmptyState title="Nenhum alerta operacional retornado" description="A leitura foi concluída sem riscos ativos. Continue acompanhando a fila operacional." />}
+        {attention.length > 0 ? <div className="divide-y divide-[var(--border-subtle)]">{attention.map(item => <AttentionRow key={item.id} item={item} navigate={navigate} />)}</div> : <AppPageEmptyState title="Nenhum alerta operacional retornado" description="A leitura foi concluída sem riscos ativos. Continue acompanhando a fila operacional." />}
       </AppSectionBlock>
 
-      <AppSectionBlock title="Próxima Melhor Ação" subtitle="Recomendação específica retornada pelo endpoint operacional existente.">
-        {nextBestActionQuery.isLoading ? <AppPageLoadingState title="Buscando próxima ação" description="Consultando o priorizador operacional." /> : nextBestActionQuery.isError ? <AppPageErrorState title="Próxima ação indisponível" description="O priorizador não respondeu. Revise a atenção imediata e tente novamente." onAction={() => void nextBestActionQuery.refetch()} /> : nextBestAction ? <article className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-4">
-          <p className="text-sm font-semibold text-[var(--text-primary)]">{nextBestAction.title}</p>
-          <p className="mt-2 text-xs leading-5 text-[var(--text-secondary)]">Motivo: {nextBestAction.reason ?? nextBestAction.summary ?? "Prioridade indicada pelo motor operacional."}</p>
-          <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">Impacto: {nextBestAction.impact ?? "Valide o impacto no módulo responsável antes de executar."}</p>
-          <Button className="mt-4" size="sm" onClick={() => navigate(buildSignalPath(nextBestAction))}>{nextBestAction.suggestedAction ?? "Abrir ação prioritária"}<ArrowRight className="ml-2 h-4 w-4" /></Button>
-        </article> : <AppPageEmptyState title="Nenhuma Próxima Melhor Ação disponível" description="O backend não retornou uma recomendação operacional agora. Use a atenção imediata e a fila; nenhuma ação artificial foi criada." />}
+      <AppSectionBlock title="Próxima Melhor Ação" subtitle="Uma ação principal sempre disponível com base na leitura operacional atual.">
+        <div className="flex flex-wrap items-start justify-between gap-4 py-1">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2"><AppStatusBadge label={nextBestAction ? "Priorizador operacional" : "Recomendação local"} /><p className="text-sm font-semibold text-[var(--text-primary)]">{recommendedAction.title}</p></div>
+            <p className="mt-2 text-xs leading-5 text-[var(--text-secondary)]"><strong>Motivo:</strong> {recommendedAction.reason}</p>
+            <p className="text-xs leading-5 text-[var(--text-muted)]"><strong>Impacto:</strong> {recommendedAction.impact}</p>
+          </div>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            {nextBestActionQuery.isError ? <Button variant="ghost" size="sm" onClick={() => void nextBestActionQuery.refetch()}>Tentar novamente</Button> : null}
+            <Button size="sm" onClick={() => navigate(recommendedAction.path)}>{recommendedAction.ctaLabel}<ArrowRight className="ml-2 h-4 w-4" /></Button>
+          </div>
+        </div>
       </AppSectionBlock>
 
-      <AppSectionBlock title="KPIs operacionais" subtitle="Poucos indicadores com contexto e destino útil.">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <AppSectionBlock title="KPIs operacionais" subtitle="Indicadores essenciais com contexto para decidir o próximo movimento.">
+        <div className="grid gap-x-5 gap-y-4 md:grid-cols-2 xl:grid-cols-4">
           {[
-            ["Receita recebida", formatCurrencyFromCents(readNumber(metrics, "paidRevenueInCents")), "Valor recebido acumulado exposto pelo backend.", "Ver pagamentos", "/finances?view=paid"],
-            ["O.S. abertas", String(readNumber(metrics, "openServiceOrders")), overdueOrders > 0 ? `${overdueOrders} atrasada(s) exigem avanço.` : "Sem O.S. atrasadas retornadas.", "Abrir execução", "/service-orders?status=open"],
-            ["Cobranças vencidas", String(overdueCharges), overdueCharges > 0 ? `${formatCurrencyFromCents(alerts.overdueCharges?.totalAmountCents ?? 0)} aguardando recebimento.` : "Sem cobrança vencida retornada.", "Abrir cobranças", "/finances?view=charges&status=overdue"],
-            ["Mensagens falhando", String(readNumber(asRecord(metrics.whatsappSignals), "failedMessages")), "Falhas podem interromper confirmação e retorno ao cliente.", "Revisar WhatsApp", "/whatsapp"],
-          ].map(([label, value, context, cta, path]) => <article key={label} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-4"><p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">{label}</p><p className="mt-2 text-2xl font-semibold text-[var(--text-primary)]">{value}</p><p className="mt-2 min-h-10 text-xs leading-5 text-[var(--text-secondary)]">{context}</p><Button className="mt-3" variant="outline" size="sm" onClick={() => navigate(path)}>{cta}</Button></article>)}
+            ["Receita recebida", formatCurrencyFromCents(readNumber(metrics, "paidRevenueInCents")), "Total recebido registrado na operação.", "Ver pagamentos", "/finances?view=paid"],
+            ["O.S. abertas", String(readNumber(metrics, "openServiceOrders")), overdueOrders > 0 ? `${overdueOrders} atrasada(s) exigem avanço.` : "Nenhuma O.S. atrasada na leitura atual.", "Abrir execução", "/service-orders?status=open"],
+            ["Cobranças vencidas", String(overdueCharges), overdueCharges > 0 ? `${formatCurrencyFromCents(alerts.overdueCharges?.totalAmountCents ?? 0)} aguardando recebimento.` : "Carteira vencida sem pendências retornadas.", "Abrir cobranças", "/finances?view=charges&status=overdue"],
+            ["Mensagens falhando", String(failedMessages), failedMessages > 0 ? "Falhas podem interromper confirmações e retornos." : "Comunicação sem falhas retornadas.", "Revisar WhatsApp", "/whatsapp"],
+          ].map(([label, value, context, cta, path], index) => <article key={label} className={index > 0 ? "border-t border-[var(--border-subtle)] pt-4 md:border-t-0 md:pt-0" : ""}><p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">{label}</p><p className="mt-1.5 text-2xl font-semibold text-[var(--text-primary)]">{value}</p><p className="mt-1.5 min-h-10 text-xs leading-5 text-[var(--text-secondary)]">{context}</p><Button className="mt-2 px-0" variant="link" size="sm" onClick={() => navigate(path)}>{cta}<ArrowRight className="ml-1 h-3.5 w-3.5" /></Button></article>)}
         </div>
       </AppSectionBlock>
 
-      <AppSectionBlock title="Fluxo operacional" subtitle="Cliente → Agendamento → O.S. → Cobrança → Pagamento. Volumes disponíveis sem completar lacunas com estimativas.">
-        <div className="grid gap-2 md:grid-cols-5">{flow.map(stage => <article key={stage.label} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3"><p className="text-xs text-[var(--text-muted)]">{stage.label}</p><p className="mt-1 text-xl font-semibold text-[var(--text-primary)]">{stage.value}</p><p className="mt-1 text-xs text-[var(--text-secondary)]">{stage.context}</p><Button className="mt-3 px-0" variant="link" size="sm" onClick={() => navigate(stage.path)}>{stage.action}</Button></article>)}</div>
-        <div className="mt-3 rounded-lg border border-[var(--border-subtle)] p-3 text-sm text-[var(--text-secondary)]">{bottleneck ? <>Gargalo principal: <strong className="text-[var(--text-primary)]">{bottleneck.label}</strong>. <Button variant="link" size="sm" onClick={() => navigate(bottleneck.path)}>{bottleneck.action}</Button></> : "Nenhum gargalo foi identificado com os dados disponíveis."}</div>
-      </AppSectionBlock>
-
-      <AppSectionBlock title="Fila operacional" subtitle="Lista curta de itens acionáveis; não é uma tabela exaustiva.">
-        {queue.length > 0 ? <div className="grid gap-2 md:grid-cols-2">{queue.map(item => <article key={`${item.type}-${item.id}`} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3"><p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">{item.type}</p><p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">{item.entity}</p><p className="mt-1 text-xs text-[var(--text-secondary)]">{item.context}</p><Button className="mt-2" variant="outline" size="sm" onClick={() => navigate(item.path)}>{item.ctaLabel}</Button></article>)}</div> : <AppPageEmptyState title="Fila operacional sem itens retornados" description="Não há itens acionáveis na leitura atual. O dashboard não preenche a fila com exemplos." />}
-      </AppSectionBlock>
-
-      <AppSectionBlock title="Pulso da operação" subtitle="Leitura humana baseada nos sinais disponíveis neste momento.">
-        <div className="grid gap-2 md:grid-cols-2">
-          {pulseComparisons.map(([label, key, lowerIsBetter]) => <p key={key} className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm text-[var(--text-secondary)]"><TrendingDown className="mr-2 inline h-4 w-4" />{describeComparison(label, readNullableNumber(comparison, key), lowerIsBetter)}</p>)}
-          <p className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm text-[var(--text-secondary)]"><ShieldAlert className="mr-2 inline h-4 w-4" />Principal risco: {bottleneck?.label ?? "nenhum gargalo identificado com a leitura disponível"}.</p>
-          <p className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm text-[var(--text-secondary)]"><Clock3 className="mr-2 inline h-4 w-4" />Execução: {overdueOrders > 0 ? `${overdueOrders} O.S. atrasada(s) precisam avançar primeiro.` : "sem atraso de O.S. retornado."}</p>
-          <p className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm text-[var(--text-secondary)]"><MessageSquareWarning className="mr-2 inline h-4 w-4" />Comunicação: {readNumber(asRecord(metrics.whatsappSignals), "failedMessages")} mensagem(ns) com falha retornada(s).</p>
+      <AppSectionBlock title="Fluxo operacional" subtitle="Cliente → Agendamento → O.S. → Cobrança → Pagamento. Volumes disponíveis sem estimar lacunas.">
+        <div className="grid gap-0 overflow-hidden md:grid-cols-5">
+          {flow.map((stage, index) => <article key={stage.label} className="relative border-t border-[var(--border-subtle)] py-3 first:border-t-0 md:border-l md:border-t-0 md:px-4 md:py-1 md:first:border-l-0">
+            <div className="flex items-center justify-between gap-2"><p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">{stage.label}</p>{index < flow.length - 1 ? <ChevronRight className="hidden h-4 w-4 text-[var(--text-muted)] md:block" /> : null}</div>
+            <p className="mt-1.5 text-xl font-semibold text-[var(--text-primary)]">{stage.value}</p><p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">{stage.context}</p><Button className="mt-1 px-0" variant="link" size="sm" onClick={() => navigate(stage.path)}>{stage.action}</Button>
+          </article>)}
         </div>
+        <div className="mt-3 bg-[var(--surface-subtle)] px-3 py-2.5 text-sm text-[var(--text-secondary)]">{bottleneck ? <><strong className="text-[var(--text-primary)]">Gargalo principal · {bottleneck.label}</strong><span className="mx-2 text-[var(--text-muted)]">—</span><Button className="px-0" variant="link" size="sm" onClick={() => navigate(bottleneck.path)}>{bottleneck.action}</Button></> : <><CheckCircle2 className="mr-2 inline h-4 w-4" />Nenhum gargalo foi identificado com os dados disponíveis.</>}</div>
       </AppSectionBlock>
 
-      <AppSectionBlock title="Acessos rápidos contextuais" subtitle="Atalhos para continuar a decisão nos módulos responsáveis.">
-        <div className="flex flex-wrap gap-2">{[["Financeiro em atraso", "/finances?view=charges&status=overdue"], ["O.S. com atenção", "/service-orders?status=attention"], ["Agenda sem confirmação", "/appointments?status=pending-confirmation"], ["WhatsApp operacional", "/whatsapp"]].map(([label, path]) => <Button key={path} variant="outline" size="sm" onClick={() => navigate(path)}>{label}</Button>)}</div>
-        <div className="mt-4 border-t border-[var(--border-subtle)] pt-4"><p className="text-sm font-semibold text-[var(--text-primary)]">Aprovações WhatsApp · {pendingWhatsAppApprovals.length}</p>{pendingWhatsAppApprovalsQuery.isError ? <p className="mt-2 text-xs text-[var(--danger)]">Não foi possível carregar aprovações WhatsApp no dashboard.</p> : pendingWhatsAppApprovals.length > 0 ? <div className="mt-2 space-y-2">{pendingWhatsAppApprovals.slice(0, 2).map(execution => <button type="button" key={execution.id} className="block w-full rounded-lg border border-[var(--border-subtle)] p-3 text-left text-xs text-[var(--text-secondary)]" onClick={() => navigate(buildWhatsAppExecutionPath(execution))}>{whatsappActionLabel(execution.suggestedAction)} · {formatWhatsAppExecutionDate(execution.createdAt)}</button>)}</div> : <p className="mt-2 text-xs text-[var(--text-muted)]">Nenhuma aprovação pendente retornada.</p>}</div>
+      <AppSectionBlock title="Fila operacional" subtitle="Lista de execução priorizada pela leitura atual; não é uma tabela exaustiva.">
+        {queue.length > 0 ? <div className="divide-y divide-[var(--border-subtle)]">{queue.map(item => <article key={`${item.type}-${item.id}`} className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"><div className="min-w-0 flex-1"><p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">{item.type}</p><p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">{item.entity}</p><p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">{item.context}</p></div><Button className="shrink-0" variant="ghost" size="sm" onClick={() => navigate(item.path)}>{item.ctaLabel}<ArrowRight className="ml-1 h-3.5 w-3.5" /></Button></article>)}</div> : <AppPageEmptyState title="Fila operacional sem itens retornados" description="Não há itens acionáveis na leitura atual. O dashboard não preenche a fila com exemplos." />}
+      </AppSectionBlock>
+
+      <AppSectionBlock title="Pulso da operação" subtitle="Leitura humana dos sinais úteis neste momento.">
+        <div className="grid gap-x-6 gap-y-3 md:grid-cols-2">
+          <p className="text-sm leading-5 text-[var(--text-secondary)]"><ShieldAlert className="mr-2 inline h-4 w-4" /><strong className="text-[var(--text-primary)]">Principal risco:</strong> {bottleneck?.label ?? "nenhum gargalo identificado na leitura atual"}.</p>
+          <p className="text-sm leading-5 text-[var(--text-secondary)]"><Clock3 className="mr-2 inline h-4 w-4" /><strong className="text-[var(--text-primary)]">Execução:</strong> {overdueOrders > 0 ? `${overdueOrders} O.S. atrasada(s) precisam avançar primeiro.` : "sem atraso de O.S. retornado."}</p>
+          <p className="text-sm leading-5 text-[var(--text-secondary)]"><MessageSquareWarning className="mr-2 inline h-4 w-4" /><strong className="text-[var(--text-primary)]">Comunicação:</strong> {failedMessages} mensagem(ns) com falha retornada(s).</p>
+          <p className="text-sm leading-5 text-[var(--text-secondary)]"><WalletCards className="mr-2 inline h-4 w-4" /><strong className="text-[var(--text-primary)]">Cobrança:</strong> {overdueCharges > 0 ? `${overdueCharges} vencida(s), somando ${formatCurrencyFromCents(alerts.overdueCharges?.totalAmountCents ?? 0)}.` : "sem vencimentos retornados."}</p>
+        </div>
+        {availableComparisons.length > 0 || missingComparisonCount > 0 ? <div className="mt-4 border-t border-[var(--border-subtle)] pt-3 text-xs leading-5 text-[var(--text-muted)]">{availableComparisons.map(item => <p key={item}><TrendingDown className="mr-1.5 inline h-3.5 w-3.5" />{item}</p>)}{missingComparisonCount > 0 ? <p className="mt-1">Histórico em formação para {missingComparisonCount} de {pulseComparisons.length} indicador(es); a leitura atual continua disponível acima.</p> : null}</div> : null}
+      </AppSectionBlock>
+
+      <AppSectionBlock title="Continuar em" subtitle="Atalhos contextuais para seguir a decisão nos módulos responsáveis.">
+        <div className="grid gap-x-4 sm:grid-cols-2">{[["Financeiro em atraso", "/finances?view=charges&status=overdue"], ["O.S. com atenção", "/service-orders?status=attention"], ["Agenda sem confirmação", "/appointments?status=pending-confirmation"], ["WhatsApp operacional", "/whatsapp"]].map(([label, path]) => <button type="button" key={path} className="flex items-center justify-between gap-3 border-t border-[var(--border-subtle)] py-2.5 text-left text-sm font-medium text-[var(--text-primary)] first:border-t-0 sm:[&:nth-child(2)]:border-t-0" onClick={() => navigate(path)}><span>{label}</span><ArrowRight className="h-4 w-4 shrink-0 text-[var(--text-muted)]" /></button>)}</div>
+        <div className="mt-3 border-t border-[var(--border-subtle)] pt-3"><p className="text-sm font-semibold text-[var(--text-primary)]">Aprovações WhatsApp · {pendingWhatsAppApprovals.length}</p>{pendingWhatsAppApprovalsQuery.isError ? <p className="mt-2 text-xs text-[var(--danger)]">Não foi possível carregar aprovações WhatsApp no dashboard.</p> : pendingWhatsAppApprovals.length > 0 ? <div className="mt-2 divide-y divide-[var(--border-subtle)]">{pendingWhatsAppApprovals.slice(0, 2).map(execution => <button type="button" key={execution.id} className="flex w-full items-center justify-between gap-3 py-2 text-left text-xs text-[var(--text-secondary)]" onClick={() => navigate(buildWhatsAppExecutionPath(execution))}><span>{whatsappActionLabel(execution.suggestedAction)} · {formatWhatsAppExecutionDate(execution.createdAt)}</span><ArrowRight className="h-3.5 w-3.5 shrink-0" /></button>)}</div> : <p className="mt-2 text-xs text-[var(--text-muted)]">Nenhuma aprovação pendente retornada.</p>}</div>
       </AppSectionBlock>
     </> : null}
   </AppPageShell>;
