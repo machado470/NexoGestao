@@ -145,6 +145,10 @@ export class AnalyticsService {
       where: {
         orgId,
         createdAt: { gte: periodFrom, lte: periodTo },
+        OR: [
+          { metadata: { path: ['eventName'], equals: 'ASSIGNEE_WARNING_SHOWN' } },
+          { metadata: { path: ['eventName'], equals: 'ASSIGNEE_WARNING_CONFIRMED' } },
+        ],
       },
       select: { metadata: true },
     })

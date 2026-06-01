@@ -26,12 +26,17 @@ const assigneeWarningMetadata = z.object({
   entityId: z.string().min(1).max(100).optional(),
 }).strict();
 
+const assigneeWarningSummaryPeriod = z.object({
+  from: z.string().datetime({ offset: true }).optional(),
+  to: z.string().datetime({ offset: true }).optional(),
+}).strict().refine(
+  ({ from, to }) => !from || !to || new Date(from).getTime() <= new Date(to).getTime(),
+  { message: "O início do período deve ser anterior ao fim" }
+);
+
 export const analyticsRouter = router({
   assigneeWarningSummary: protectedProcedure
-    .input(z.object({
-      from: z.string().datetime({ offset: true }).optional(),
-      to: z.string().datetime({ offset: true }).optional(),
-    }).strict().optional())
+    .input(assigneeWarningSummaryPeriod.optional())
     .query(async ({ ctx, input }) => {
       const search = new URLSearchParams();
       if (input?.from) search.set("from", input.from);

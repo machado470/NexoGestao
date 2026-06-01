@@ -82,6 +82,7 @@ describe("BFF↔API contract - lote 1", () => {
     expect(String(url)).toContain("/analytics/assignee-warning-summary?from=2026-05-01T00%3A00%3A00.000Z&to=2026-05-30T00%3A00%3A00.000Z");
     expect(String(url)).not.toContain("orgId");
     await expect(caller.analytics.assigneeWarningSummary({ from: "not-iso" } as any)).rejects.toBeDefined();
+    await expect(caller.analytics.assigneeWarningSummary({ from: "2026-05-30T00:00:00.000Z", to: "2026-05-01T00:00:00.000Z" })).rejects.toBeDefined();
     await expect(caller.analytics.assigneeWarningSummary({ orgId: "forged" } as any)).rejects.toBeDefined();
   });
 

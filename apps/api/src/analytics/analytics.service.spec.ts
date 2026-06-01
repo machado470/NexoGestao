@@ -84,7 +84,13 @@ describe('AnalyticsService passive assignee warning telemetry', () => {
       )
 
       expect(usageMetricFindMany).toHaveBeenCalledWith(expect.objectContaining({
-        where: expect.objectContaining({ orgId: 'org-authenticated' }),
+        where: expect.objectContaining({
+          orgId: 'org-authenticated',
+          OR: [
+            { metadata: { path: ['eventName'], equals: 'ASSIGNEE_WARNING_SHOWN' } },
+            { metadata: { path: ['eventName'], equals: 'ASSIGNEE_WARNING_CONFIRMED' } },
+          ],
+        }),
       }))
       expect(personFindMany).toHaveBeenCalledWith({
         where: { orgId: 'org-authenticated', id: { in: ['person-1', 'person-2'] } },
@@ -109,6 +115,20 @@ describe('AnalyticsService passive assignee warning telemetry', () => {
         { personId: 'person-1', name: 'Ana', shown: 2, confirmed: 1 },
         { personId: 'person-2', name: null, shown: 1, confirmed: 0 },
       ])
+    })
+
+    it('rejeita datas inválidas e intervalo invertido', async () => {
+      const summaryService = new AnalyticsService({ usageMetric: { findMany: jest.fn() } } as any)
+
+      await expect(summaryService.getAssigneeWarningSummary(
+        'org-authenticated',
+        new Date('invalid'),
+      )).rejects.toBeInstanceOf(BadRequestException)
+      await expect(summaryService.getAssigneeWarningSummary(
+        'org-authenticated',
+        new Date('2026-05-30T00:00:00.000Z'),
+        new Date('2026-05-01T00:00:00.000Z'),
+      )).rejects.toBeInstanceOf(BadRequestException)
     })
 
     it('retorna taxa nula quando não existem alertas exibidos', async () => {

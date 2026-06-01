@@ -64,13 +64,15 @@ describe("PeoplePage temporary availability contract", () => {
 describe("PeoplePage assignee warning summary", () => {
   it("renderiza a leitura agregada administrativa com linguagem observacional", () => {
     expect(source).toContain("trpc.analytics.assigneeWarningSummary.useQuery");
-    expect(source).toContain('title="Sinais de atribuição"');
+    expect(source).toContain('{isAdmin ? <AppSectionBlock title="Sinais de atribuição"');
+    expect(source).toContain('enabled: isAuthenticated && role === "ADMIN"');
     expect(source).toContain('data-testid="assignee-warning-summary"');
     expect(source).toContain('label="Alertas exibidos"');
     expect(source).toContain('label="Confirmações após alerta"');
     expect(source).toContain('label="Taxa de confirmação"');
     expect(source).toContain("Contextos observados");
     expect(source).toContain("Sinal mais frequente");
+    expect(source).toContain("Serve somente para observação operacional das decisões manuais.");
     expect(source).not.toContain("ranking competitivo");
     expect(source).not.toContain("score de produtividade");
   });
