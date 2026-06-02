@@ -1,12 +1,17 @@
 import { useMemo } from "react";
 import {
   ArrowRight,
+  CalendarClock,
   CheckCircle2,
   ChevronRight,
+  CircleDollarSign,
+  ClipboardList,
   Clock3,
+  CreditCard,
   MessageSquareWarning,
   ShieldAlert,
   TrendingDown,
+  UserRound,
   WalletCards,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -237,7 +242,7 @@ function buildQueue(alerts: DashboardAlerts): QueueItem[] {
         type: "O.S. atrasada",
         entity: String(item.title ?? "Ordem de serviço"),
         context: String(item.context ?? "Prazo operacional vencido"),
-        ctaLabel: "Destravar O.S.",
+        ctaLabel: "Destravar",
         path: `/service-orders?id=${String(item.id)}`,
       };
     if (type === "OVERDUE_CHARGE")
@@ -245,10 +250,10 @@ function buildQueue(alerts: DashboardAlerts): QueueItem[] {
         id: String(item.id),
         type: "Cobrança vencida",
         entity: String(item.title ?? "Cliente"),
-        context: formatCurrencyFromCents(
+        context: `${String(item.context ?? "Prazo financeiro vencido")} · ${formatCurrencyFromCents(
           typeof item.amountCents === "number" ? item.amountCents : 0
-        ),
-        ctaLabel: "Abrir cobrança",
+        )}`,
+        ctaLabel: "Cobrar",
         path: "/finances?view=charges&status=overdue",
       };
     if (type === "CUSTOMER_AWAITING_RESPONSE")
@@ -290,7 +295,8 @@ function AttentionRow({
   navigate: (path: string) => void;
 }) {
   return (
-    <article className="py-3 first:pt-0 last:pb-0">
+    <article className="relative py-3.5 pl-6 first:pt-0 last:pb-0">
+      <ShieldAlert className="absolute left-0 top-4 h-4 w-4 text-[var(--danger)] first:top-0" />
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -524,9 +530,9 @@ export default function ExecutiveDashboard() {
   const hasOperationalData =
     Object.keys(metrics).length > 0 || attention.length > 0 || queue.length > 0;
   return (
-    <AppPageShell className="space-y-3">
+    <AppPageShell className="space-y-5 bg-[radial-gradient(circle_at_top_right,color-mix(in_srgb,var(--accent-primary)_7%,transparent),transparent_36%),linear-gradient(145deg,color-mix(in_srgb,var(--surface-subtle)_92%,transparent),var(--surface-base))]">
       <AppOperationalHeader
-        className="px-4 !py-3"
+        className="border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface-subtle)_88%,transparent)] px-4 !py-3"
         density="compact"
         title="Centro de decisão operacional"
         description="Decida primeiro o que destrava execução e caixa."
@@ -535,7 +541,12 @@ export default function ExecutiveDashboard() {
             <span className="text-xs text-[var(--text-muted)]">
               {formatPeriod()}
             </span>
-            <AppStatusBadge label={`Estado operacional · ${operationState}`} />
+            <AppStatusBadge label={`Estado: ${operationState}`} />
+            {criticalCount > 0 ? (
+              <span className="text-xs font-medium text-[var(--danger)]">
+                {criticalCount} risco(s) crítico(s)
+              </span>
+            ) : null}
           </>
         }
       />
@@ -565,82 +576,89 @@ export default function ExecutiveDashboard() {
 
       {!pageLoading && !pageError && hasOperationalData ? (
         <>
-          <AppSectionBlock title="Atenção imediata"
-            className="border-[color-mix(in_srgb,var(--danger)_38%,var(--border-subtle))] bg-[color-mix(in_srgb,var(--danger)_4%,var(--surface-base))]"
-            subtitle="Comece aqui: riscos que interrompem execução, recebimento ou atendimento, em ordem de severidade."
-          >
-            {attention.length > 0 ? (
-              <div className="divide-y divide-[var(--border-subtle)]">
-                {attention.map(item => (
-                  <AttentionRow key={item.id} item={item} navigate={navigate} />
-                ))}
-              </div>
-            ) : (
-              <AppPageEmptyState
-                title="Nenhum alerta operacional retornado"
-                description="A leitura foi concluída sem riscos ativos. Continue acompanhando a fila operacional."
-              />
-            )}
-          </AppSectionBlock>
-
-          <AppSectionBlock title="Próxima Melhor Ação"
-            className="border-[color-mix(in_srgb,var(--accent-primary)_38%,var(--border-subtle))] bg-[color-mix(in_srgb,var(--accent-primary)_4%,var(--surface-base))]"
-            subtitle="Uma decisão principal para converter a leitura operacional em avanço imediato."
-          >
-            {recommendedAction ? (
-              <div className="flex flex-wrap items-start justify-between gap-4 py-1">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <AppStatusBadge
-                      label={
-                        nextBestAction
-                          ? "Priorizador operacional"
-                          : "Prioridade calculada localmente"
-                      }
+          <div className="grid items-start gap-5 xl:grid-cols-[1.25fr_0.75fr]">
+            <AppSectionBlock title="Atenção imediata"
+              className="border-[color-mix(in_srgb,var(--danger)_42%,var(--border-subtle))] bg-[linear-gradient(145deg,color-mix(in_srgb,var(--danger)_5%,var(--surface-base)),var(--surface-base))]"
+              subtitle="Comece aqui: riscos que interrompem execução, recebimento ou atendimento, em ordem de severidade."
+            >
+              {attention.length > 0 ? (
+                <div className="divide-y divide-[var(--border-subtle)]">
+                  {attention.map(item => (
+                    <AttentionRow
+                      key={item.id}
+                      item={item}
+                      navigate={navigate}
                     />
-                    <p className="text-base font-semibold text-[var(--text-primary)]">
-                      {recommendedAction.title}
+                  ))}
+                </div>
+              ) : (
+                <AppPageEmptyState
+                  title="Nenhum alerta operacional retornado"
+                  description="A leitura foi concluída sem riscos ativos. Continue acompanhando a fila operacional."
+                />
+              )}
+            </AppSectionBlock>
+
+            <AppSectionBlock title="Próxima Melhor Ação"
+              className="border-[color-mix(in_srgb,var(--accent-primary)_44%,var(--border-subtle))] bg-[linear-gradient(145deg,color-mix(in_srgb,var(--accent-primary)_7%,var(--surface-base)),var(--surface-base))]"
+              subtitle="Uma decisão principal para converter a leitura operacional em avanço imediato."
+            >
+              {recommendedAction ? (
+                <div className="flex flex-wrap items-start justify-between gap-4 py-1">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <AppStatusBadge
+                        label={
+                          nextBestAction
+                            ? "Próximo passo recomendado"
+                            : "Prioridade operacional"
+                        }
+                      />
+                      <p className="text-base font-semibold text-[var(--text-primary)]">
+                        {recommendedAction.title}
+                      </p>
+                    </div>
+                    <p className="mt-2 text-sm leading-5 text-[var(--text-secondary)]">
+                      <strong>Por que agora:</strong> {recommendedAction.reason}
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
+                      <strong>Efeito esperado:</strong>{" "}
+                      {recommendedAction.impact}
                     </p>
                   </div>
-                  <p className="mt-2 text-sm leading-5 text-[var(--text-secondary)]">
-                    <strong>Por que agora:</strong> {recommendedAction.reason}
-                  </p>
-                  <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
-                    <strong>Efeito esperado:</strong> {recommendedAction.impact}
-                  </p>
-                </div>
-                <div className="flex shrink-0 flex-wrap gap-2">
-                  {nextBestActionQuery.isError ? (
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    {nextBestActionQuery.isError ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => void nextBestActionQuery.refetch()}
+                      >
+                        Tentar novamente
+                      </Button>
+                    ) : null}
                     <Button
-                      variant="ghost"
                       size="sm"
-                      onClick={() => void nextBestActionQuery.refetch()}
+                      onClick={() => navigate(recommendedAction.path)}
                     >
-                      Tentar novamente
+                      {recommendedAction.ctaLabel}
+                      <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>
-                  ) : null}
-                  <Button
-                    size="sm"
-                    onClick={() => navigate(recommendedAction.path)}
-                  >
-                    {recommendedAction.ctaLabel}
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <AppPageEmptyState
-                title="Nenhuma Próxima Melhor Ação disponível"
-                description="A leitura atual não identificou urgências acionáveis; nenhuma ação artificial foi criada."
-              />
-            )}
-          </AppSectionBlock>
+              ) : (
+                <AppPageEmptyState
+                  title="Nenhuma Próxima Melhor Ação disponível"
+                  description="A leitura atual não identificou urgências acionáveis; nenhuma ação artificial foi criada."
+                />
+              )}
+            </AppSectionBlock>
+          </div>
 
           <AppSectionBlock title="KPIs operacionais"
             compact
             subtitle="Poucos indicadores com contexto e destino útil."
           >
-            <div className="grid gap-x-5 gap-y-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               {[
                 [
                   "Caixa recebido",
@@ -672,7 +690,7 @@ export default function ExecutiveDashboard() {
                   "/finances?view=charges&status=overdue",
                 ],
                 [
-                  "Comunicação interrompida",
+                  "Falhas de comunicação",
                   String(failedMessages),
                   failedMessages > 0
                     ? "Falhas podem bloquear confirmações."
@@ -680,14 +698,10 @@ export default function ExecutiveDashboard() {
                   "Revisar WhatsApp",
                   "/whatsapp",
                 ],
-              ].map(([label, value, context, cta, path], index) => (
+              ].map(([label, value, context, cta, path]) => (
                 <article
                   key={label}
-                  className={
-                    index > 0
-                      ? "border-t border-[var(--border-subtle)] pt-3 md:border-t-0 md:pt-0"
-                      : ""
-                  }
+                  className="min-w-0 rounded-lg border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface-subtle)_74%,transparent)] px-3.5 py-3"
                 >
                   <p className="text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">
                     {label}
@@ -712,7 +726,7 @@ export default function ExecutiveDashboard() {
             </div>
           </AppSectionBlock>
 
-          <div className="grid items-start gap-3 xl:grid-cols-[1.35fr_0.65fr]">
+          <div className="grid items-start gap-5 xl:grid-cols-[1.42fr_0.58fr]">
             <AppSectionBlock title="Fluxo operacional"
               subtitle="Pipeline vivo: a quebra prioritária aparece antes dos detalhes."
             >
@@ -741,20 +755,37 @@ export default function ExecutiveDashboard() {
                   </>
                 )}
               </div>
-              <div className="grid gap-0 overflow-hidden md:grid-cols-5">
+              <div className="grid min-w-0 gap-0 overflow-hidden md:grid-cols-5">
                 {flow.map((stage, index) => {
                   const isBreak = bottleneck?.label.startsWith(stage.label);
+                  const StageIcon = [
+                    UserRound,
+                    CalendarClock,
+                    ClipboardList,
+                    CircleDollarSign,
+                    CreditCard,
+                  ][index];
                   return (
                     <article
                       key={stage.label}
-                      className={`relative border-t py-3 first:border-t-0 md:border-l md:border-t-0 md:px-3 md:py-1 md:first:border-l-0 ${isBreak ? "border-[var(--danger)] bg-[color-mix(in_srgb,var(--danger)_6%,transparent)]" : "border-[var(--border-subtle)]"}`}
+                      className={`relative min-w-0 border-t px-2 py-3 first:border-t-0 md:border-l md:border-t-0 md:px-3 md:py-2 md:first:border-l-0 ${isBreak ? "border-[var(--danger)] bg-[color-mix(in_srgb,var(--danger)_7%,var(--surface-subtle))]" : "border-[var(--border-subtle)]"}`}
                     >
-                      <div className="flex items-center justify-between gap-2">
-                        <p
-                          className={`text-[11px] font-semibold uppercase tracking-[0.08em] ${isBreak ? "text-[var(--danger)]" : "text-[var(--text-muted)]"}`}
-                        >
-                          {stage.label}
+                      {isBreak ? (
+                        <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--danger)]">
+                          Gargalo principal
                         </p>
+                      ) : null}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <StageIcon
+                            className={`h-4 w-4 shrink-0 ${isBreak ? "text-[var(--danger)]" : "text-[var(--text-muted)]"}`}
+                          />
+                          <p
+                            className={`text-[11px] font-semibold uppercase tracking-[0.08em] ${isBreak ? "text-[var(--danger)]" : "text-[var(--text-muted)]"}`}
+                          >
+                            {stage.label}
+                          </p>
+                        </div>
                         {index < flow.length - 1 ? (
                           <ChevronRight
                             className={`hidden h-4 w-4 md:block ${isBreak ? "text-[var(--danger)]" : "text-[var(--text-muted)]"}`}
@@ -782,14 +813,15 @@ export default function ExecutiveDashboard() {
             </AppSectionBlock>
 
             <AppSectionBlock title="Fila operacional"
-              subtitle="Próximas execuções, não uma lista exaustiva."
+              compact
+              subtitle="Lista curta para execução direta."
             >
               {queue.length > 0 ? (
                 <div className="divide-y divide-[var(--border-subtle)]">
                   {queue.map(item => (
                     <article
                       key={`${item.type}-${item.id}`}
-                      className="py-2.5 first:pt-0 last:pb-0"
+                      className="py-3 first:pt-0 last:pb-0"
                     >
                       <p className="text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">
                         {item.type}
@@ -811,6 +843,15 @@ export default function ExecutiveDashboard() {
                       </Button>
                     </article>
                   ))}
+                  <Button
+                    className="mt-2 px-0"
+                    variant="link"
+                    size="sm"
+                    onClick={() => navigate("/timeline")}
+                  >
+                    Ver todas as pendências
+                    <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                  </Button>
                 </div>
               ) : (
                 <AppPageEmptyState
@@ -821,48 +862,46 @@ export default function ExecutiveDashboard() {
             </AppSectionBlock>
           </div>
 
-          <div className="grid items-start gap-3 xl:grid-cols-[1.35fr_0.65fr]">
+          <div className="grid items-start gap-5 xl:grid-cols-[1.35fr_0.65fr]">
             <AppSectionBlock title="Pulso da operação"
               compact
               subtitle="Interpretação dos sinais para orientar a decisão."
             >
-              <div className="grid gap-x-6 gap-y-2 md:grid-cols-2">
-                <p className="text-sm leading-5 text-[var(--text-secondary)]">
-                  <ShieldAlert className="mr-2 inline h-4 w-4" />
+              <div className="grid gap-3 md:grid-cols-2">
+                <article className="rounded-lg border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface-subtle)_72%,transparent)] p-3 text-sm leading-5 text-[var(--text-secondary)]">
+                  <ShieldAlert className="mr-2 inline h-4 w-4 text-[var(--danger)]" />
                   <strong className="text-[var(--text-primary)]">
                     Prioridade:
                   </strong>{" "}
                   {bottleneck
                     ? `${bottleneck.label} concentra a principal quebra do fluxo; trate esse ponto antes de dispersar a equipe.`
                     : "o pipeline não expõe quebra ativa; mantenha monitoramento da fila."}
-                </p>
-                <p className="text-sm leading-5 text-[var(--text-secondary)]">
-                  <Clock3 className="mr-2 inline h-4 w-4" />
+                </article>
+                <article className="rounded-lg border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface-subtle)_72%,transparent)] p-3 text-sm leading-5 text-[var(--text-secondary)]">
+                  <Clock3 className="mr-2 inline h-4 w-4 text-[var(--text-muted)]" />
                   <strong className="text-[var(--text-primary)]">
                     Capacidade:
                   </strong>{" "}
                   {overdueOrders > 0
                     ? `${overdueOrders} O.S. atrasada(s) indicam pressão na execução e risco para as próximas janelas.`
                     : "a execução não retornou atraso; preserve o ritmo das próximas janelas."}
-                </p>
-                <p className="text-sm leading-5 text-[var(--text-secondary)]">
-                  <MessageSquareWarning className="mr-2 inline h-4 w-4" />
+                </article>
+                <article className="rounded-lg border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface-subtle)_72%,transparent)] p-3 text-sm leading-5 text-[var(--text-secondary)]">
+                  <MessageSquareWarning className="mr-2 inline h-4 w-4 text-[var(--text-muted)]" />
                   <strong className="text-[var(--text-primary)]">
                     Contato:
                   </strong>{" "}
                   {failedMessages > 0
                     ? `${failedMessages} falha(s) podem quebrar confirmações e retorno ao cliente.`
                     : "nenhuma falha retornada; o canal não bloqueia o fluxo agora."}
-                </p>
-                <p className="text-sm leading-5 text-[var(--text-secondary)]">
-                  <WalletCards className="mr-2 inline h-4 w-4" />
-                  <strong className="text-[var(--text-primary)]">
-                    Caixa:
-                  </strong>{" "}
+                </article>
+                <article className="rounded-lg border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface-subtle)_72%,transparent)] p-3 text-sm leading-5 text-[var(--text-secondary)]">
+                  <WalletCards className="mr-2 inline h-4 w-4 text-[var(--text-muted)]" />
+                  <strong className="text-[var(--text-primary)]">Caixa:</strong>{" "}
                   {overdueCharges > 0
                     ? `${formatCurrencyFromCents(alerts.overdueCharges?.totalAmountCents ?? 0)} vencidos prolongam o ciclo até recebimento.`
                     : "sem vencimentos retornados; caixa não exige reação imediata."}
-                </p>
+                </article>
               </div>
               {availableComparisons.length > 0 || missingComparisonCount > 0 ? (
                 <div className="mt-3 border-t border-[var(--border-subtle)] pt-2 text-xs leading-5 text-[var(--text-muted)]">
@@ -887,7 +926,7 @@ export default function ExecutiveDashboard() {
               compact
               subtitle="Navegação secundária para continuar a decisão."
             >
-              <div>
+              <div className="grid gap-x-4 sm:grid-cols-2">
                 {[
                   [
                     "Financeiro em atraso",
@@ -903,7 +942,7 @@ export default function ExecutiveDashboard() {
                   <button
                     type="button"
                     key={path}
-                    className="flex w-full items-center justify-between gap-3 border-t border-[var(--border-subtle)] py-2 text-left text-xs font-medium text-[var(--text-secondary)] first:border-t-0"
+                    className="flex w-full items-center justify-between gap-3 border-t border-[var(--border-subtle)] py-2 text-left text-xs font-medium text-[var(--text-secondary)] transition-colors first:border-t-0 hover:text-[var(--text-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-primary)]"
                     onClick={() => navigate(path)}
                   >
                     <span>{label}</span>
