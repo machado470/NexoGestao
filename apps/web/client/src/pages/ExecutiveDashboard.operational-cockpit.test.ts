@@ -9,9 +9,9 @@ describe("ExecutiveDashboard decision center", () => {
 
   it("renders the operational structure in decision order", () => {
     const sections = [
-      "Centro de decisão operacional",
+      "Operação hoje",
       "Atenção imediata",
-      "Próxima Melhor Ação",
+      "Próxima melhor ação",
       "KPIs operacionais",
       "Fluxo operacional",
       "Fila operacional",
