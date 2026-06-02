@@ -44,7 +44,9 @@ describe("ExecutiveDashboard decision center", () => {
   });
 
   it("gives every KPI context and CTA routes to its owning module", () => {
-    expect(source).toContain("Poucos indicadores com contexto e destino útil.");
+    expect(source).toContain(
+      "Suporte rápido para a decisão, sem virar vitrine de números."
+    );
     expect(source).toContain("/finances?view=paid");
     expect(source).toContain("/service-orders?status=open");
     expect(source).toContain("/finances?view=charges&status=overdue");
@@ -93,7 +95,7 @@ describe("ExecutiveDashboard decision center", () => {
     expect(source).toContain("Não foi possível ler a operação");
     expect(source).toContain("não assume que está tudo bem");
     expect(source).toContain(
-      "O dashboard não cria alertas ou recomendações fictícias"
+      "A operação não cria alertas ou recomendações fictícias"
     );
   });
 

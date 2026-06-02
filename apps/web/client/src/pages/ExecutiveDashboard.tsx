@@ -257,17 +257,21 @@ function buildQueue(alerts: DashboardAlerts): QueueItem[] {
         ctaLabel: "Destravar",
         path: `/service-orders?id=${String(item.id)}`,
       };
-    if (type === "OVERDUE_CHARGE")
+    if (type === "OVERDUE_CHARGE") {
+      const amount =
+        typeof item.amountCents === "number" ? item.amountCents : 0;
+      const context = formatCurrencyMentions(
+        String(item.context ?? "Prazo financeiro vencido")
+      );
       return {
         id: String(item.id),
         type: "Cobrança vencida",
         entity: String(item.title ?? "Cliente"),
-        context: `${formatCurrencyFromCents(
-          typeof item.amountCents === "number" ? item.amountCents : 0
-        )} · ${formatCurrencyMentions(String(item.context ?? "Prazo financeiro vencido"))}`,
+        context: `${formatCurrencyFromCents(amount)} pendentes · ${context}`,
         ctaLabel: "Cobrar",
         path: "/finances?view=charges&status=overdue",
       };
+    }
     if (type === "CUSTOMER_AWAITING_RESPONSE")
       return {
         id: String(item.id),
@@ -312,7 +316,7 @@ function AttentionRow({
 }) {
   return (
     <article className="relative py-2.5 pl-6 first:pt-0 last:pb-0">
-      <ShieldAlert className="absolute left-0 top-3 h-4 w-4 text-[var(--danger)] first:top-0" />
+      <ShieldAlert className="absolute left-0 top-3 h-4 w-4 text-[#EF4444] first:top-0" />
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -321,23 +325,23 @@ function AttentionRow({
                 item.severity === "critical"
                   ? "Risco crítico"
                   : item.severity === "high"
-                    ? "Atenção"
+                    ? "Aguardando ação"
                     : "Monitorar"
               }
             />
-            <p className="text-sm font-semibold text-[var(--text-primary)]">
+            <p className="text-sm font-semibold text-[#F3F6FB]">
               {item.title}
             </p>
           </div>
-          <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
-            <strong>Motivo:</strong> {item.reason}
+          <p className="mt-1 text-xs leading-5 text-[#8DA4C4]">
+            <strong className="text-[#F3F6FB]">Motivo:</strong> {item.reason}
           </p>
-          <p className="text-xs leading-5 text-[var(--text-muted)]">
-            <strong>Impacto:</strong> {item.impact}
+          <p className="text-xs leading-5 text-[#8DA4C4]">
+            <strong className="text-[#F3F6FB]">Impacto:</strong> {item.impact}
           </p>
         </div>
         <Button
-          className="w-full shrink-0 md:w-auto"
+          className="w-full shrink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F97316] md:w-auto"
           size="sm"
           onClick={() => navigate(item.path)}
         >
@@ -662,24 +666,39 @@ export default function ExecutiveDashboard() {
           : "Sem vencimentos retornados; caixa não exige reação imediata.",
     },
   ];
+  const statusLabel =
+    operationState === "Normal"
+      ? "Operação normal"
+      : "Atenção / Aguardando ação";
+  const cockpitSurface =
+    "rounded-2xl border border-white/[0.06] bg-[linear-gradient(180deg,rgba(6,18,36,0.72),rgba(9,30,56,0.58))] p-2.5 sm:p-3 lg:p-4";
+  const sectionSurface =
+    "border-white/[0.06] bg-[rgba(6,18,36,0.42)]";
+
   return (
-    <AppPageShell className="space-y-4 bg-[radial-gradient(circle_at_top_right,color-mix(in_srgb,var(--accent-primary)_7%,transparent),transparent_36%),linear-gradient(145deg,color-mix(in_srgb,var(--surface-subtle)_92%,transparent),var(--surface-base))]">
+    <AppPageShell className="space-y-3 bg-[#061224] bg-[radial-gradient(circle_at_16%_0%,rgba(59,130,246,0.13),transparent_28%),radial-gradient(circle_at_92%_12%,rgba(249,115,22,0.10),transparent_24%),linear-gradient(145deg,#061224,#07192E_48%,#081D34)] text-[#F3F6FB]">
       <AppOperationalHeader
-        className="border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface-subtle)_88%,transparent)] px-4 !py-2.5"
+        className="border-white/[0.06] bg-[rgba(6,18,36,0.65)] px-4 !py-2"
         density="compact"
         title="Operação hoje"
         description="Decida primeiro o que destrava execução e caixa."
         contextChips={
           <>
-            <span className="text-xs text-[var(--text-muted)]">
+            <span className="rounded-full border border-white/[0.06] bg-[rgba(9,30,56,0.72)] px-2 py-0.5 text-xs text-[#8DA4C4]">
               {formatPeriod()}
             </span>
-            <AppStatusBadge label={`Estado: ${operationState}`} />
-            <span
-              className={`text-xs font-medium ${criticalCount > 0 ? "text-[var(--danger)]" : "text-[var(--text-muted)]"}`}
-            >
+            <span className="rounded-full border border-[#F97316]/25 bg-[#F97316]/10 px-2 py-0.5 text-xs font-medium text-[#FDBA74]">
+              Estado: {statusLabel}
+            </span>
+            <span className="rounded-full border border-[#EF4444]/25 bg-[#EF4444]/10 px-2 py-0.5 text-xs font-medium text-[#FCA5A5]">
               {criticalCount}{" "}
               {criticalCount === 1 ? "risco crítico" : "riscos críticos"}
+            </span>
+            <span className="rounded-full border border-white/[0.06] bg-[rgba(9,30,56,0.72)] px-2 py-0.5 text-xs text-[#8DA4C4]">
+              {overdueCharges} cobranças vencidas
+            </span>
+            <span className="rounded-full border border-white/[0.06] bg-[rgba(9,30,56,0.72)] px-2 py-0.5 text-xs text-[#8DA4C4]">
+              {overdueOrders} O.S. atrasadas
             </span>
           </>
         }
@@ -694,7 +713,7 @@ export default function ExecutiveDashboard() {
       {pageError ? (
         <AppPageErrorState
           title="Não foi possível ler a operação"
-          description="Falhou a consulta de métricas ou alertas. O dashboard não assume que está tudo bem quando a leitura está indisponível."
+          description="Falhou a consulta de métricas ou alertas. A operação não assume que está tudo bem quando a leitura está indisponível."
           onAction={() => {
             void kpisQuery.refetch();
             void alertsQuery.refetch();
@@ -704,366 +723,392 @@ export default function ExecutiveDashboard() {
       {!pageLoading && !pageError && !hasOperationalData ? (
         <AppPageEmptyState
           title="Ainda não há dados operacionais para priorizar"
-          description="Cadastre clientes, agendamentos, O.S. e cobranças. O dashboard não cria alertas ou recomendações fictícias para preencher este espaço."
+          description="Cadastre clientes, agendamentos, O.S. e cobranças. A operação não cria alertas ou recomendações fictícias para preencher este espaço."
         />
       ) : null}
 
       {!pageLoading && !pageError && hasOperationalData ? (
-        <>
-          <AppSectionBlock
-            title="Atenção imediata"
-            className="border-[color-mix(in_srgb,var(--danger)_42%,var(--border-subtle))] bg-[linear-gradient(145deg,color-mix(in_srgb,var(--danger)_5%,var(--surface-base)),var(--surface-base))]"
-            subtitle="Comece aqui: riscos que interrompem execução, recebimento ou atendimento, em ordem de severidade."
-          >
-            {attention.length > 0 ? (
-              <div className="divide-y divide-[var(--border-subtle)]">
-                {attention.map(item => (
-                  <AttentionRow key={item.id} item={item} navigate={navigate} />
+        <div className={cockpitSurface}>
+          <div className="space-y-3">
+            <AppSectionBlock
+              title="Atenção imediata"
+              className="border-[#EF4444]/25 bg-[linear-gradient(135deg,rgba(239,68,68,0.13),rgba(6,18,36,0.70)_45%,rgba(9,30,56,0.58))]"
+              subtitle="Comece aqui: riscos que interrompem execução, recebimento ou atendimento, em ordem de severidade."
+            >
+              {attention.length > 0 ? (
+                <div className="divide-y divide-white/[0.06]">
+                  {attention.map(item => (
+                    <AttentionRow key={item.id} item={item} navigate={navigate} />
+                  ))}
+                </div>
+              ) : (
+                <AppPageEmptyState
+                  title="Nenhum alerta operacional retornado"
+                  description="A leitura foi concluída sem riscos ativos. Continue acompanhando a fila operacional."
+                />
+              )}
+            </AppSectionBlock>
+
+            <AppSectionBlock
+              title="Próxima melhor ação"
+              className="border-[#F97316]/30 bg-[linear-gradient(135deg,rgba(249,115,22,0.14),rgba(6,18,36,0.68)_48%,rgba(9,30,56,0.60))]"
+              subtitle="Uma decisão principal para converter a leitura operacional em avanço imediato."
+            >
+              {recommendedAction ? (
+                <div className="flex flex-col gap-3 py-0.5 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full border border-[#F97316]/25 bg-[#F97316]/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#FDBA74]">
+                        Aguardando ação
+                      </span>
+                      <Zap className="h-4 w-4 text-[#F97316]" />
+                      <p className="text-lg font-semibold leading-tight text-[#F3F6FB]">
+                        {recommendedAction.title}
+                      </p>
+                    </div>
+                    <div className="mt-2 grid gap-1.5 text-sm leading-5 text-[#8DA4C4] md:grid-cols-2">
+                      <p>
+                        <strong className="text-[#F3F6FB]">Por que agora:</strong> {recommendedAction.reason}
+                      </p>
+                      <p>
+                        <strong className="text-[#F3F6FB]">Efeito esperado:</strong> {recommendedAction.impact}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex w-full flex-wrap gap-2 lg:w-auto lg:shrink-0 lg:justify-end">
+                    {nextBestActionQuery.isError ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => void nextBestActionQuery.refetch()}
+                      >
+                        Tentar novamente
+                      </Button>
+                    ) : null}
+                    <Button
+                      className="w-full bg-[#F97316] text-white hover:bg-[#EA580C] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#FDBA74] sm:w-auto"
+                      onClick={() => navigate(recommendedAction.path)}
+                    >
+                      {recommendedAction.ctaLabel}
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <AppPageEmptyState
+                  title="Nenhuma Próxima Melhor Ação disponível"
+                  description="A leitura atual não identificou urgências acionáveis; nenhuma ação artificial foi criada."
+                />
+              )}
+            </AppSectionBlock>
+
+            <AppSectionBlock
+              title="KPIs operacionais"
+              compact
+              className={sectionSurface}
+              subtitle="Suporte rápido para a decisão, sem virar vitrine de números."
+            >
+              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                {kpiCards.map(({ label, value, context, cta, path, Icon }) => (
+                  <article
+                    key={label}
+                    className="min-w-0 rounded-xl border border-white/[0.06] bg-[rgba(9,30,56,0.46)] px-3 py-2.5"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#8DA4C4]">
+                        {label}
+                      </p>
+                      <Icon className="h-4 w-4 shrink-0 text-[#8DA4C4]" />
+                    </div>
+                    <p className="mt-1 text-xl font-semibold leading-tight text-[#F3F6FB]">
+                      {value}
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-[#8DA4C4]">
+                      {context}
+                    </p>
+                    <Button
+                      className="mt-1 h-auto px-0 py-0 text-[#F97316]"
+                      variant="link"
+                      size="sm"
+                      onClick={() => navigate(path)}
+                    >
+                      {cta}
+                      <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                    </Button>
+                  </article>
                 ))}
               </div>
-            ) : (
-              <AppPageEmptyState
-                title="Nenhum alerta operacional retornado"
-                description="A leitura foi concluída sem riscos ativos. Continue acompanhando a fila operacional."
-              />
-            )}
-          </AppSectionBlock>
+            </AppSectionBlock>
 
-          <AppSectionBlock
-            title="Próxima melhor ação"
-            className="border-[color-mix(in_srgb,var(--accent-primary)_44%,var(--border-subtle))] bg-[linear-gradient(145deg,color-mix(in_srgb,var(--accent-primary)_7%,var(--surface-base)),var(--surface-base))]"
-            subtitle="Uma decisão principal para converter a leitura operacional em avanço imediato."
-          >
-            {recommendedAction ? (
-              <div className="flex flex-col gap-4 py-0.5 lg:flex-row lg:items-center lg:justify-between">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <AppStatusBadge label="Aguardando ação" />
-                    <Zap className="h-4 w-4 text-[var(--accent-primary)]" />
-                    <p className="text-lg font-semibold text-[var(--text-primary)]">
-                      {recommendedAction.title}
-                    </p>
-                  </div>
-                  <p className="mt-2 text-sm leading-5 text-[var(--text-secondary)]">
-                    <strong>Por que agora:</strong> {recommendedAction.reason}
-                  </p>
-                  <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
-                    <strong>Efeito esperado:</strong> {recommendedAction.impact}
-                  </p>
-                </div>
-                <div className="flex w-full flex-wrap gap-2 lg:w-auto lg:shrink-0 lg:justify-end">
-                  {nextBestActionQuery.isError ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => void nextBestActionQuery.refetch()}
-                    >
-                      Tentar novamente
-                    </Button>
-                  ) : null}
-                  <Button
-                    className="w-full bg-[var(--accent-primary)] text-[var(--on-accent)] hover:bg-[color-mix(in_srgb,var(--accent-primary)_88%,var(--text-primary))] sm:w-auto"
-                    onClick={() => navigate(recommendedAction.path)}
-                  >
-                    {recommendedAction.ctaLabel}
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <AppPageEmptyState
-                title="Nenhuma Próxima Melhor Ação disponível"
-                description="A leitura atual não identificou urgências acionáveis; nenhuma ação artificial foi criada."
-              />
-            )}
-          </AppSectionBlock>
-
-          <AppSectionBlock
-            title="KPIs operacionais"
-            compact
-            className="bg-[color-mix(in_srgb,var(--surface-subtle)_62%,var(--surface-base))]"
-            subtitle="Poucos indicadores com contexto e destino útil."
-          >
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              {kpiCards.map(({ label, value, context, cta, path, Icon }) => (
-                <article
-                  key={label}
-                  className="min-w-0 rounded-lg border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface-subtle)_74%,transparent)] px-3.5 py-2.5"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                      {label}
-                    </p>
-                    <Icon className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
-                  </div>
-                  <p className="mt-1 text-xl font-semibold text-[var(--text-primary)]">
-                    {value}
-                  </p>
-                  <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
-                    {context}
-                  </p>
-                  <Button
-                    className="mt-1 px-0 text-[var(--accent-primary)]"
-                    variant="link"
-                    size="sm"
-                    onClick={() => navigate(path)}
-                  >
-                    {cta}
-                    <ArrowRight className="ml-1 h-3.5 w-3.5" />
-                  </Button>
-                </article>
-              ))}
-            </div>
-          </AppSectionBlock>
-
-          <AppSectionBlock
-            title="Fluxo operacional"
-            className="border-[color-mix(in_srgb,var(--accent-primary)_28%,var(--border-subtle))] bg-[linear-gradient(145deg,color-mix(in_srgb,var(--surface-subtle)_82%,transparent),var(--surface-base))]"
-            subtitle="Cliente → Agendamento → O.S. → Cobrança → Pagamento"
-          >
-            <div
-              className={`mb-3 rounded-lg px-3 py-2 text-sm ${bottleneck ? "border border-[color-mix(in_srgb,var(--accent-primary)_42%,var(--border-subtle))] bg-[color-mix(in_srgb,var(--accent-primary)_8%,var(--surface-subtle))] text-[var(--text-secondary)]" : "bg-[var(--surface-subtle)] text-[var(--text-secondary)]"}`}
+            <AppSectionBlock
+              title="Fluxo operacional"
+              className="border-white/[0.10] bg-[linear-gradient(180deg,rgba(9,30,56,0.74),rgba(6,18,36,0.66))]"
+              subtitle="Cliente → Agendamento → O.S. → Cobrança → Pagamento"
             >
-              {bottleneck ? (
-                <>
-                  <strong className="text-[var(--accent-primary)]">
-                    {bottleneckStage} · Gargalo principal · {bottleneck.label}
-                  </strong>
-                  <span className="mx-2 text-[var(--text-muted)]">—</span>
-                  <Button
-                    className="px-0"
-                    variant="link"
-                    size="sm"
-                    onClick={() => navigate(bottleneck.path)}
-                  >
-                    {bottleneck.action}
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="mr-2 inline h-4 w-4" />
-                  Nenhum gargalo foi identificado com os dados disponíveis.
-                </>
-              )}
-            </div>
-            <div className="grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-5">
-              {flow.map((stage, index) => {
-                const isBreak = bottleneck?.label.startsWith(stage.label);
-                const StageIcon = [
-                  UserRound,
-                  CalendarClock,
-                  ClipboardList,
-                  CircleDollarSign,
-                  CreditCard,
-                ][index];
-                return (
-                  <article
-                    key={stage.label}
-                    className={`relative min-w-0 rounded-lg border px-3 py-2.5 ${isBreak ? "border-[var(--accent-primary)] bg-[color-mix(in_srgb,var(--accent-primary)_8%,var(--surface-subtle))]" : "border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface-subtle)_54%,transparent)]"}`}
-                  >
-                    {isBreak ? (
-                      <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--accent-primary)]">
-                        Gargalo principal
+              <div
+                className={`mb-3 flex flex-col gap-2 rounded-xl px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between ${
+                  bottleneck
+                    ? "border border-[#F97316]/35 bg-[#F97316]/10 text-[#8DA4C4]"
+                    : "border border-white/[0.06] bg-[rgba(9,30,56,0.42)] text-[#8DA4C4]"
+                }`}
+              >
+                {bottleneck ? (
+                  <>
+                    <div className="min-w-0">
+                      <strong className="text-[#F97316]">
+                        Gargalo principal: {bottleneck.label}
+                      </strong>
+                      <p className="text-xs text-[#8DA4C4]">
+                        {bottleneckStage} concentra a quebra do fluxo até recebimento.
                       </p>
-                    ) : null}
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex min-w-0 items-center gap-2">
+                    </div>
+                    <Button
+                      className="h-auto px-0 py-0 text-[#F97316] sm:shrink-0"
+                      variant="link"
+                      size="sm"
+                      onClick={() => navigate(bottleneck.path)}
+                    >
+                      {bottleneck.action}
+                    </Button>
+                  </>
+                ) : (
+                  <span>
+                    <CheckCircle2 className="mr-2 inline h-4 w-4 text-[#10B981]" />
+                    Nenhum gargalo foi identificado com os dados disponíveis.
+                  </span>
+                )}
+              </div>
+              <div className="grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+                {flow.map((stage, index) => {
+                  const isBreak = bottleneck?.label.startsWith(stage.label);
+                  const StageIcon = [
+                    UserRound,
+                    CalendarClock,
+                    ClipboardList,
+                    CircleDollarSign,
+                    CreditCard,
+                  ][index];
+                  return (
+                    <article
+                      key={stage.label}
+                      className={`relative min-w-0 rounded-xl border px-3 py-3 ${
+                        isBreak
+                          ? "border-[#F97316]/60 bg-[#F97316]/12"
+                          : "border-white/[0.06] bg-[rgba(6,18,36,0.46)]"
+                      }`}
+                    >
+                      {index < flow.length - 1 ? (
+                        <ChevronRight
+                          className={`absolute right-2 top-3 hidden h-4 w-4 lg:block ${
+                            isBreak ? "text-[#F97316]" : "text-[#8DA4C4]/70"
+                          }`}
+                        />
+                      ) : null}
+                      <div className="flex min-w-0 items-center gap-2 pr-4">
                         <StageIcon
-                          className={`h-4 w-4 shrink-0 ${isBreak ? "text-[var(--accent-primary)]" : "text-[var(--text-muted)]"}`}
+                          className={`h-4 w-4 shrink-0 ${isBreak ? "text-[#F97316]" : "text-[#8DA4C4]"}`}
                         />
                         <p
-                          className={`text-[11px] font-semibold uppercase tracking-[0.08em] ${isBreak ? "text-[var(--accent-primary)]" : "text-[var(--text-muted)]"}`}
+                          className={`text-[11px] font-semibold uppercase tracking-[0.08em] ${
+                            isBreak ? "text-[#FDBA74]" : "text-[#8DA4C4]"
+                          }`}
                         >
                           {stage.label}
                         </p>
                       </div>
-                      {index < flow.length - 1 ? (
-                        <ChevronRight
-                          className={`hidden h-4 w-4 lg:block ${isBreak ? "text-[var(--accent-primary)]" : "text-[var(--text-muted)]"}`}
-                        />
+                      {isBreak ? (
+                        <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#F97316]">
+                          Gargalo principal
+                        </p>
                       ) : null}
-                    </div>
-                    <p className="mt-1.5 text-xl font-semibold text-[var(--text-primary)]">
-                      {stage.value}
-                    </p>
-                    <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
-                      {stage.context}
-                    </p>
-                    <Button
-                      className="mt-1 px-0"
-                      variant="link"
-                      size="sm"
-                      onClick={() => navigate(stage.path)}
-                    >
-                      {stage.action}
-                    </Button>
-                  </article>
-                );
-              })}
-            </div>
-          </AppSectionBlock>
-
-          <AppSectionBlock
-            title="Fila operacional"
-            compact
-            subtitle="Lista curta para execução direta."
-          >
-            {queue.length > 0 ? (
-              <div>
-                <div className="grid gap-2 md:grid-cols-2">
-                  {queue.map(item => (
-                    <article
-                      key={`${item.type}-${item.id}`}
-                      className="min-w-0 rounded-lg border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface-subtle)_58%,transparent)] p-3"
-                    >
-                      <p className="text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                        {item.type}
+                      <p className="mt-1.5 text-2xl font-semibold leading-tight text-[#F3F6FB]">
+                        {stage.value}
                       </p>
-                      <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
-                        {item.entity}
-                      </p>
-                      <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
-                        {item.context}
+                      <p className="mt-1 text-xs leading-5 text-[#8DA4C4]">
+                        {stage.context}
                       </p>
                       <Button
-                        className="mt-1 px-0"
+                        className="mt-1 h-auto px-0 py-0 text-[#F97316]"
                         variant="link"
                         size="sm"
-                        onClick={() => navigate(item.path)}
+                        onClick={() => navigate(stage.path)}
                       >
-                        {item.ctaLabel}
-                        <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                        {stage.action}
                       </Button>
                     </article>
-                  ))}
-                </div>
-                <Button
-                  className="mt-1 px-0"
-                  variant="link"
-                  size="sm"
-                  onClick={() => navigate("/timeline")}
-                >
-                  Ver todas as pendências
-                  <ArrowRight className="ml-1 h-3.5 w-3.5" />
-                </Button>
+                  );
+                })}
               </div>
-            ) : (
-              <AppPageEmptyState
-                title="Fila operacional sem itens retornados"
-                description="Não há itens acionáveis na leitura atual. O dashboard não preenche a fila com exemplos."
-              />
-            )}
-          </AppSectionBlock>
+            </AppSectionBlock>
 
-          <AppSectionBlock
-            title="Pulso da operação"
-            compact
-            subtitle="Interpretação dos sinais para orientar a decisão."
-          >
-            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-              {pulseInsights.map(({ label, Icon, iconClass, text }) => (
-                <article
-                  key={label}
-                  className="rounded-lg border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface-subtle)_68%,transparent)] p-3 text-sm leading-5 text-[var(--text-secondary)]"
-                >
-                  <div className="mb-2 flex items-center gap-2">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--surface-base)_82%,transparent)]">
-                      <Icon className={`h-4 w-4 ${iconClass}`} />
-                    </span>
-                    <strong className="text-[var(--text-primary)]">
-                      {label}
-                    </strong>
+            <AppSectionBlock
+              title="Fila operacional"
+              compact
+              className={sectionSurface}
+              subtitle="Consequência direta do fluxo: itens curtos para destravar agora."
+            >
+              {queue.length > 0 ? (
+                <div>
+                  <div className="grid gap-2 md:grid-cols-2">
+                    {queue.map(item => (
+                      <article
+                        key={`${item.type}-${item.id}`}
+                        className="min-w-0 rounded-xl border border-white/[0.06] bg-[rgba(9,30,56,0.44)] p-3"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#8DA4C4]">
+                              {item.type}
+                            </p>
+                            <p className="mt-1 text-sm font-semibold text-[#F3F6FB]">
+                              {item.entity}
+                            </p>
+                          </div>
+                          <Button
+                            className="h-auto shrink-0 px-0 py-0 text-[#F97316]"
+                            variant="link"
+                            size="sm"
+                            onClick={() => navigate(item.path)}
+                          >
+                            {item.ctaLabel}
+                          </Button>
+                        </div>
+                        <p className="mt-1 text-xs leading-5 text-[#8DA4C4]">
+                          {item.context}
+                        </p>
+                      </article>
+                    ))}
                   </div>
-                  <p>{text}</p>
-                </article>
-              ))}
-            </div>
-            {availableComparisons.length > 0 || missingComparisonCount > 0 ? (
-              <div className="mt-3 border-t border-[var(--border-subtle)] pt-2 text-xs leading-5 text-[var(--text-muted)]">
-                {availableComparisons.map(item => (
-                  <p key={item}>
-                    <TrendingDown className="mr-1.5 inline h-3.5 w-3.5" />
-                    {item}
-                  </p>
-                ))}
-                {missingComparisonCount > 0 ? (
-                  <p className="mt-1">
-                    Histórico em formação: sem base histórica suficiente para{" "}
-                    {missingComparisonCount} de {pulseComparisons.length}{" "}
-                    indicador(es).
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
-          </AppSectionBlock>
-
-          <AppSectionBlock
-            title="Acessos rápidos contextuais"
-            compact
-            subtitle="Navegação secundária para continuar a decisão."
-          >
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              {quickAccesses.map(({ label, path, Icon }) => (
-                <button
-                  type="button"
-                  key={path}
-                  className="flex w-full items-center justify-between gap-3 rounded-lg border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface-subtle)_52%,transparent)] px-3 py-2 text-left text-xs font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-primary)]"
-                  onClick={() => navigate(path)}
-                >
-                  <span className="flex min-w-0 items-center gap-2">
-                    <Icon className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
-                    <span>{label}</span>
-                  </span>
-                  <ArrowRight className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
-                </button>
-              ))}
-            </div>
-            <div className="mt-3 rounded-lg border border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--surface-subtle)_48%,transparent)] p-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs font-semibold text-[var(--text-primary)]">
-                  Aprovações WhatsApp · {pendingWhatsAppApprovals.length}
-                </p>
-                <Button
-                  className="px-0 text-[var(--accent-primary)]"
-                  variant="link"
-                  size="sm"
-                  onClick={() => navigate("/whatsapp")}
-                >
-                  Abrir aprovações
-                  <ArrowRight className="ml-1 h-3.5 w-3.5" />
-                </Button>
-              </div>
-              {pendingWhatsAppApprovalsQuery.isError ? (
-                <p className="mt-2 text-xs text-[var(--danger)]">
-                  Não foi possível carregar aprovações WhatsApp no dashboard.
-                </p>
-              ) : pendingWhatsAppApprovals.length > 0 ? (
-                <div className="mt-1 divide-y divide-[var(--border-subtle)]">
-                  {pendingWhatsAppApprovals.slice(0, 2).map(execution => (
-                    <button
-                      type="button"
-                      key={execution.id}
-                      className="flex w-full items-center justify-between gap-3 py-2 text-left text-xs text-[var(--text-secondary)]"
-                      onClick={() =>
-                        navigate(buildWhatsAppExecutionPath(execution))
-                      }
-                    >
-                      <span>
-                        {whatsappActionLabel(execution.suggestedAction)} ·{" "}
-                        {formatWhatsAppExecutionDate(execution.createdAt)}
-                      </span>
-                      <ArrowRight className="h-3.5 w-3.5 shrink-0" />
-                    </button>
-                  ))}
+                  <Button
+                    className="mt-2 h-auto px-0 py-0 text-[#F97316]"
+                    variant="link"
+                    size="sm"
+                    onClick={() => navigate("/timeline")}
+                  >
+                    Ver todas as pendências
+                    <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                  </Button>
                 </div>
               ) : (
-                <p className="mt-2 text-xs text-[var(--text-muted)]">
-                  Nenhuma aprovação pendente retornada.
-                </p>
+                <AppPageEmptyState
+                  title="Fila operacional sem itens retornados"
+                  description="Não há itens acionáveis na leitura atual. A operação não preenche a fila com exemplos."
+                />
               )}
-            </div>
-          </AppSectionBlock>
-        </>
+            </AppSectionBlock>
+
+            <AppSectionBlock
+              title="Pulso da operação"
+              compact
+              className={sectionSurface}
+              subtitle="Interpretação dos sinais para orientar a decisão."
+            >
+              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                {pulseInsights.map(({ label, Icon, iconClass, text }) => (
+                  <article
+                    key={label}
+                    className="rounded-xl bg-[rgba(9,30,56,0.34)] p-3 text-sm leading-5 text-[#8DA4C4]"
+                  >
+                    <div className="mb-2 flex items-center gap-2">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-full border border-white/[0.06] bg-[rgba(6,18,36,0.55)]">
+                        <Icon className={`h-4 w-4 ${iconClass}`} />
+                      </span>
+                      <strong className="text-[#F3F6FB]">{label}</strong>
+                    </div>
+                    <p>{text}</p>
+                  </article>
+                ))}
+              </div>
+              {availableComparisons.length > 0 || missingComparisonCount > 0 ? (
+                <div className="mt-3 border-t border-white/[0.06] pt-2 text-xs leading-5 text-[#8DA4C4]">
+                  {availableComparisons.map(item => (
+                    <p key={item}>
+                      <TrendingDown className="mr-1.5 inline h-3.5 w-3.5" />
+                      {item}
+                    </p>
+                  ))}
+                  {missingComparisonCount > 0 ? (
+                    <p className="mt-1">
+                      Histórico em formação: sem base histórica suficiente para {" "}
+                      {missingComparisonCount} de {pulseComparisons.length}{" "}
+                      indicador(es).
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+            </AppSectionBlock>
+
+            <AppSectionBlock
+              title="Acessos rápidos contextuais"
+              compact
+              className="border-white/[0.06] bg-[rgba(6,18,36,0.34)]"
+              subtitle="Rodapé operacional secundário."
+            >
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                {quickAccesses.map(({ label, path, Icon }) => (
+                  <button
+                    type="button"
+                    key={path}
+                    className="flex w-full items-center justify-between gap-3 rounded-lg border border-white/[0.06] bg-[rgba(9,30,56,0.38)] px-3 py-2 text-left text-xs font-medium text-[#8DA4C4] transition-colors hover:text-[#F3F6FB] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F97316]"
+                    onClick={() => navigate(path)}
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      <Icon className="h-3.5 w-3.5 shrink-0 text-[#8DA4C4]" />
+                      <span>{label}</span>
+                    </span>
+                    <ArrowRight className="h-3.5 w-3.5 shrink-0 text-[#8DA4C4]" />
+                  </button>
+                ))}
+              </div>
+              <div className="mt-3 rounded-lg border border-white/[0.06] bg-[rgba(9,30,56,0.34)] p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-semibold text-[#F3F6FB]">
+                    Aprovações WhatsApp · {pendingWhatsAppApprovals.length}
+                  </p>
+                  {pendingWhatsAppApprovals.length > 0 ? (
+                    <Button
+                      className="h-auto px-0 py-0 text-[#F97316]"
+                      variant="link"
+                      size="sm"
+                      onClick={() => navigate("/whatsapp")}
+                    >
+                      Abrir aprovações
+                      <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                    </Button>
+                  ) : null}
+                </div>
+                {pendingWhatsAppApprovalsQuery.isError ? (
+                  <p className="mt-2 text-xs text-[#FCA5A5]">
+                    Não foi possível carregar aprovações WhatsApp nesta leitura.
+                  </p>
+                ) : pendingWhatsAppApprovals.length > 0 ? (
+                  <div className="mt-1 divide-y divide-white/[0.06]">
+                    {pendingWhatsAppApprovals.slice(0, 2).map(execution => (
+                      <button
+                        type="button"
+                        key={execution.id}
+                        className="flex w-full items-center justify-between gap-3 py-2 text-left text-xs text-[#8DA4C4] transition-colors hover:text-[#F3F6FB] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F97316]"
+                        onClick={() =>
+                          navigate(buildWhatsAppExecutionPath(execution))
+                        }
+                      >
+                        <span>
+                          {whatsappActionLabel(execution.suggestedAction)} · {" "}
+                          {formatWhatsAppExecutionDate(execution.createdAt)}
+                        </span>
+                        <ArrowRight className="h-3.5 w-3.5 shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-2 text-xs text-[#8DA4C4]">
+                    Nenhuma aprovação pendente retornada.
+                  </p>
+                )}
+              </div>
+            </AppSectionBlock>
+          </div>
+        </div>
       ) : null}
     </AppPageShell>
   );
