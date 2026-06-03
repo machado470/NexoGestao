@@ -160,19 +160,48 @@
     --sidebar-border: var(--border-subtle);
     --sidebar-ring: var(--ring);
 
-    --nexo-app-bg: #edf2f8;
-    --nexo-page-surface: #e8eff8;
-    --nexo-section-surface: #f2f6fc;
+    /* Nexo foundation contract: aliases preserve existing colors while giving pages a stable namespace. */
+    --nexo-surface-0: #edf2f8;
     --nexo-surface-1: rgba(255, 255, 255, 0.94);
     --nexo-surface-2: #ffffff;
-    --nexo-card-surface: #ffffff;
+    --nexo-surface-3: #f3f7fd;
+    --nexo-app-bg: var(--nexo-surface-0);
+    --nexo-shell-bg: var(--nexo-surface-1);
+    --nexo-sidebar-bg: var(--sidebar-bg);
+    --nexo-topbar-bg: var(--bg-header);
+    --nexo-panel-bg: var(--nexo-surface-1);
+    --nexo-page-surface: #e8eff8;
+    --nexo-section-surface: #f2f6fc;
+    --nexo-card-surface: var(--nexo-surface-2);
     --nexo-card-muted: #f6f9ff;
+    --nexo-overlay-bg: var(--app-overlay-bg);
+    --nexo-overlay-surface: var(--nexo-surface-3);
     --nexo-border-soft: #d4deec;
     --nexo-border-strong: #bfcbdf;
+    --nexo-text-primary: var(--text-primary);
+    --nexo-text-secondary: var(--text-secondary);
+    --nexo-text-muted: var(--text-muted);
+    --nexo-accent: var(--accent-primary);
+    --nexo-accent-hover: var(--accent-primary-hover);
+    --nexo-success: var(--success);
+    --nexo-warning: var(--warning);
+    --nexo-danger: var(--danger);
+    --nexo-info: var(--info);
+    --nexo-input-bg: var(--field-bg);
+    --nexo-input-border: var(--field-border);
+    --nexo-table-row-hover: color-mix(in srgb, var(--accent-primary) 8%, var(--nexo-card-muted));
+    --nexo-focus-ring: var(--ring);
     --nexo-shadow-soft: 0 10px 24px rgba(17, 35, 64, 0.08);
     --nexo-shadow-panel: 0 20px 44px rgba(17, 35, 64, 0.1);
     --nexo-shadow-elev-1: 0 8px 20px rgba(17, 35, 64, 0.08);
     --nexo-shadow-elev-2: 0 18px 36px rgba(17, 35, 64, 0.12);
+    --nexo-space-page-padding-x: 1.5rem;
+    --nexo-space-page-padding-y: 0.5rem;
+    --nexo-space-section-gap: 1.25rem;
+    --nexo-space-card-padding: 1rem;
+    --nexo-space-toolbar-gap: 0.625rem;
+    --nexo-control-height-md: 2.5rem;
+    --nexo-table-row-height: 2.85rem;
   }
 
   .app-root.dark,
@@ -240,19 +269,47 @@
     --summary-muted: #b8c2d4;
     --modal-card-shadow-light: 0 14px 30px rgba(2, 6, 23, 0.34);
 
-    --nexo-app-bg: #05080f;
-    --nexo-page-surface: #03060d;
-    --nexo-section-surface: rgba(12, 16, 24, 0.82);
+    --nexo-surface-0: #05080f;
     --nexo-surface-1: rgba(15, 19, 28, 0.9);
     --nexo-surface-2: rgba(14, 18, 27, 0.96);
+    --nexo-surface-3: #152036;
+    --nexo-app-bg: var(--nexo-surface-0);
+    --nexo-shell-bg: var(--nexo-surface-1);
+    --nexo-sidebar-bg: var(--sidebar-bg);
+    --nexo-topbar-bg: var(--bg-header);
+    --nexo-panel-bg: var(--nexo-surface-1);
+    --nexo-page-surface: #03060d;
+    --nexo-section-surface: rgba(12, 16, 24, 0.82);
     --nexo-card-surface: rgba(16, 21, 31, 0.96);
     --nexo-card-muted: rgba(19, 25, 36, 0.9);
+    --nexo-overlay-bg: var(--app-overlay-bg);
+    --nexo-overlay-surface: var(--nexo-surface-3);
     --nexo-border-soft: rgba(148, 163, 184, 0.2);
     --nexo-border-strong: rgba(148, 163, 184, 0.36);
+    --nexo-text-primary: var(--text-primary);
+    --nexo-text-secondary: var(--text-secondary);
+    --nexo-text-muted: var(--text-muted);
+    --nexo-accent: var(--accent-primary);
+    --nexo-accent-hover: var(--accent-primary-hover);
+    --nexo-success: var(--success);
+    --nexo-warning: var(--warning);
+    --nexo-danger: var(--danger);
+    --nexo-info: var(--info);
+    --nexo-input-bg: var(--field-bg);
+    --nexo-input-border: var(--field-border);
+    --nexo-table-row-hover: color-mix(in srgb, var(--accent-primary) 10%, var(--nexo-card-muted));
+    --nexo-focus-ring: var(--ring);
     --nexo-shadow-soft: 0 10px 24px rgba(2, 6, 23, 0.36);
     --nexo-shadow-panel: 0 22px 56px rgba(2, 6, 23, 0.55);
     --nexo-shadow-elev-1: 0 14px 30px rgba(2, 6, 23, 0.34);
     --nexo-shadow-elev-2: 0 24px 60px rgba(2, 6, 23, 0.52);
+    --nexo-space-page-padding-x: 1.5rem;
+    --nexo-space-page-padding-y: 0.5rem;
+    --nexo-space-section-gap: 1.25rem;
+    --nexo-space-card-padding: 1rem;
+    --nexo-space-toolbar-gap: 0.625rem;
+    --nexo-control-height-md: 2.5rem;
+    --nexo-table-row-height: 2.85rem;
   }
 }
 
@@ -1250,7 +1307,7 @@
   }
 
   .nexo-data-table tbody tr:hover {
-    @apply bg-slate-100/70 dark:bg-white/[0.04];
+    background: var(--nexo-table-row-hover);
   }
 }
 
@@ -2115,7 +2172,7 @@ html {
   }
 
   .nexo-data-table tbody tr:hover {
-    background: color-mix(in srgb, var(--surface-contrast) 80%, transparent);
+    background: var(--nexo-table-row-hover);
   }
 }
 
