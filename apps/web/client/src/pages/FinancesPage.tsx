@@ -2,7 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { operationalCopy } from "@/lib/operational-semantics";
 import { compareOperationalPriority } from "@/lib/operational-prioritization";
 import { aggregateOperationalHealth } from "@/lib/operational-health";
-import { detectOperationalInterventions, getPrimaryOperationalIntervention } from "@/lib/operational-interventions";
+import {
+  detectOperationalInterventions,
+  getPrimaryOperationalIntervention,
+} from "@/lib/operational-interventions";
 import {
   getAttentionSummary,
   getVisibleAttentionItems,
@@ -12,9 +15,7 @@ import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { Button } from "@/components/design-system";
 import { CreateChargeModal } from "@/components/CreateChargeModal";
-import { QuickActionModal } from "@/components/app-modal-system";
-import { PageWrapper } from "@/components/operating-system/Wrappers";
-import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
+import { FormModal } from "@/components/app-modal-system";
 import {
   AppDataTable,
   AppPageEmptyState,
@@ -24,13 +25,24 @@ import {
   AppPageLoadingState,
   AppPagination,
   AppSectionBlock,
-  AppStatusBadge,
 } from "@/components/internal-page-system";
 import {
+  AppField,
+  AppFieldGroup,
+  AppFormSection,
   AppInfoCard,
+  AppInput,
+  AppOperationalStatusBadge,
   AppPageShell,
+  AppPriorityBadge,
   AppRowActionsDropdown,
+  AppSectionCard,
+  AppSelect,
   AppStatCard,
+  AppStatusBadge,
+  AppTextarea,
+  type AppOperationalStatus,
+  type AppPriorityLevel,
 } from "@/components/app-system";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
 import { safeDate } from "@/lib/operational/kpi";
@@ -90,6 +102,49 @@ function latestPaymentMethod(charge: ChargeRecord): string {
     return bTime - aTime;
   });
   return String(sorted[0]?.method ?? "—");
+}
+
+function getChargeStatusTone(
+  status: string
+): "warning" | "success" | "danger" | "neutral" {
+  if (status === "PAID") return "success";
+  if (status === "OVERDUE") return "danger";
+  if (status === "CANCELED") return "neutral";
+  return "warning";
+}
+
+function getFinanceOperationalStatus(
+  overdueCount: number,
+  pendingCount: number
+): AppOperationalStatus {
+  if (overdueCount >= 5) return "CRÍTICO";
+  if (overdueCount > 0) return "RISCO";
+  if (pendingCount > 0) return "ATENÇÃO";
+  return "NORMAL";
+}
+
+function getChargePriority(charge: ChargeRecord): AppPriorityLevel {
+  const status = normalizeStatus(charge?.status);
+  const amountCents = Number(charge?.amountCents ?? 0);
+  const overdueDays = Number(
+    charge?.overdueDays ?? computeDaysOverdue(charge?.dueDate)
+  );
+  if (status === "OVERDUE" && (overdueDays >= 15 || amountCents >= 500000))
+    return "P0";
+  if (status === "OVERDUE") return "P1";
+  if (status === "PENDING") {
+    const dueDate = safeDate(charge?.dueDate);
+    if (!dueDate) return "P2";
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const due = new Date(dueDate);
+    due.setHours(0, 0, 0, 0);
+    const daysUntilDue = Math.ceil(
+      (due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+    );
+    return daysUntilDue <= 3 ? "P2" : "P3";
+  }
+  return "P3";
 }
 
 function chargeStatusLabel(status: string) {
@@ -330,8 +385,26 @@ export default function FinancesPage() {
 
     return [...filtered].sort((a, b) =>
       compareOperationalPriority(
-        { severity: a.status === "OVERDUE" ? "WARNING" : a.status === "PENDING" ? "ATTENTION" : "NORMAL", dueDate: a.dueDate, amountCents: Number(a.amountCents ?? 0) },
-        { severity: b.status === "OVERDUE" ? "WARNING" : b.status === "PENDING" ? "ATTENTION" : "NORMAL", dueDate: b.dueDate, amountCents: Number(b.amountCents ?? 0) }
+        {
+          severity:
+            a.status === "OVERDUE"
+              ? "WARNING"
+              : a.status === "PENDING"
+                ? "ATTENTION"
+                : "NORMAL",
+          dueDate: a.dueDate,
+          amountCents: Number(a.amountCents ?? 0),
+        },
+        {
+          severity:
+            b.status === "OVERDUE"
+              ? "WARNING"
+              : b.status === "PENDING"
+                ? "ATTENTION"
+                : "NORMAL",
+          dueDate: b.dueDate,
+          amountCents: Number(b.amountCents ?? 0),
+        }
       )
     );
   }, [scopedCharges, searchTerm, statusFilter]);
@@ -389,33 +462,43 @@ export default function FinancesPage() {
     () =>
       aggregateOperationalHealth({
         charges: enrichedCharges,
-        payments: enrichedCharges.flatMap(item => (Array.isArray(item.payments) ? item.payments : [])),
+        payments: enrichedCharges.flatMap(item =>
+          Array.isArray(item.payments) ? item.payments : []
+        ),
         serviceOrders,
       }),
     [enrichedCharges, serviceOrders]
   );
 
-
-  const financeIntervention = useMemo(() => getPrimaryOperationalIntervention(detectOperationalInterventions({
-    charges: enrichedCharges,
-    payments: enrichedCharges.flatMap(item => (Array.isArray(item.payments) ? item.payments : [])),
-    serviceOrders,
-  })), [enrichedCharges, serviceOrders]);
+  const financeIntervention = useMemo(
+    () =>
+      getPrimaryOperationalIntervention(
+        detectOperationalInterventions({
+          charges: enrichedCharges,
+          payments: enrichedCharges.flatMap(item =>
+            Array.isArray(item.payments) ? item.payments : []
+          ),
+          serviceOrders,
+        })
+      ),
+    [enrichedCharges, serviceOrders]
+  );
   const nextBestAction = useMemo(() => {
     const pendingOrOverdue = getVisibleAttentionItems(
       [...enrichedCharges]
-      .filter(item => ["PENDING", "OVERDUE"].includes(item.status))
-      .map(
-        item =>
-          ({
-            ...item,
-            key: String(item.id ?? ""),
-            domain: "finances",
-            type: item.status === "OVERDUE" ? "overdue_charge" : "pending_charge",
-            severity: item.status === "OVERDUE" ? "WARNING" : "ATTENTION",
-            amountCents: Number(item.amountCents ?? 0),
-          }) as OperationalAttentionItem
-      ),
+        .filter(item => ["PENDING", "OVERDUE"].includes(item.status))
+        .map(
+          item =>
+            ({
+              ...item,
+              key: String(item.id ?? ""),
+              domain: "finances",
+              type:
+                item.status === "OVERDUE" ? "overdue_charge" : "pending_charge",
+              severity: item.status === "OVERDUE" ? "WARNING" : "ATTENTION",
+              amountCents: Number(item.amountCents ?? 0),
+            }) as OperationalAttentionItem
+        ),
       1
     );
     return (pendingOrOverdue[0] as ChargeRecord | null) ?? null;
@@ -573,6 +656,11 @@ export default function FinancesPage() {
     health.receivable,
   ]);
 
+  const financeOperationalStatus = getFinanceOperationalStatus(
+    cashHealth.overdueCount,
+    cashHealth.pendingCount
+  );
+
   const immediateAttentionItems = useMemo(() => {
     const overdueCharges = enrichedCharges.filter(
       item => item.status === "OVERDUE"
@@ -592,7 +680,7 @@ export default function FinancesPage() {
     return [
       {
         key: "overdue",
-            title: "Cobrança vencida",
+        title: "Cobrança vencida",
         value: String(highlightedFinancialAttention.length),
         consequence:
           overdueCharges.length > 0
@@ -818,824 +906,827 @@ export default function FinancesPage() {
   }
 
   return (
-    <PageWrapper
-      title="Financeiro"
-      subtitle="cobrança, recebimento e risco financeiro operacional"
-    >
-      <AppPageShell className="space-y-4">
-        <AppOperationalHeader
-          title="Financeiro"
-          description={`Centro operacional de cobrança e receita · ${enrichedCharges.length} cobrança(s), ${cashHealth.overdueCount} vencida(s) e ${completedOrdersWithoutCharge.length} O.S. concluída(s) sem cobrança.`}
-          secondaryActions={
-            <Button variant="ghost" size="sm" onClick={() => void refreshAll()}>
-              Atualizar
-            </Button>
-          }
-          primaryAction={
-            <Button onClick={() => setOpenCreate(true)}>Nova cobrança</Button>
-          }
-          contextChips={
-            <>
-              <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1 text-xs text-[var(--text-secondary)]">
-                Carteira: {enrichedCharges.length}
-              </span>
-              <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1 text-xs text-[var(--text-secondary)]">
-                Atrasos: {cashHealth.overdueCount}
-              </span>
-              <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1 text-xs text-[var(--text-secondary)]">
-                Pendências: {cashHealth.pendingCount}
-              </span>
-              {hasFiltersContext ? (
-                <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1 text-xs text-[var(--text-secondary)]">
-                  Contexto via operação
-                </span>
-              ) : null}
-            </>
-          }
-        >
-          <p className="text-sm text-[var(--text-secondary)]">
-            Ação real primeiro: cobrar, enviar link ou registrar pagamento antes
-            de navegar para cliente/O.S.
-          </p>
-        </AppOperationalHeader>
+    <AppPageShell className="space-y-4">
+      <AppOperationalHeader
+        title="Financeiro"
+        description={`Centro operacional de cobrança e receita · ${enrichedCharges.length} cobrança(s), ${cashHealth.overdueCount} vencida(s) e ${completedOrdersWithoutCharge.length} O.S. concluída(s) sem cobrança.`}
+        secondaryActions={
+          <Button variant="ghost" size="sm" onClick={() => void refreshAll()}>
+            Atualizar
+          </Button>
+        }
+        primaryAction={
+          <Button onClick={() => setOpenCreate(true)}>Nova cobrança</Button>
+        }
+        contextChips={
+          <>
+            <AppOperationalStatusBadge
+              status={financeOperationalStatus}
+              label={`Saúde ${financeOperationalStatus.toLowerCase()}`}
+            />
+            <AppStatusBadge
+              label={`Carteira: ${enrichedCharges.length}`}
+              tone="info"
+            />
+            <AppStatusBadge
+              label={`Atrasos: ${cashHealth.overdueCount}`}
+              tone={cashHealth.overdueCount > 0 ? "danger" : "success"}
+            />
+            <AppStatusBadge
+              label={`Pendências: ${cashHealth.pendingCount}`}
+              tone={cashHealth.pendingCount > 0 ? "warning" : "neutral"}
+            />
+            {hasFiltersContext ? (
+              <AppStatusBadge label="Contexto via operação" tone="accent" />
+            ) : null}
+          </>
+        }
+      >
+        <p className="text-sm text-[var(--text-secondary)]">
+          Ação real primeiro: cobrar, enviar link ou registrar pagamento antes
+          de navegar para cliente/O.S.
+        </p>
+      </AppOperationalHeader>
 
-        <OperationalTopCard
-          contextLabel="Próxima decisão financeira"
-          title={
-            nextBestAction
-              ? `Cobrar ${nextBestAction.customerName}`
-              : "Caixa sem cobrança crítica agora"
-          }
-          description={
-            nextBestAction
-              ? `${formatCurrency(Number(nextBestAction?.amountCents ?? 0))} · ${nextBestAction.status === "OVERDUE" ? `${nextBestAction.overdueDays} dia(s) em atraso` : "pendência ativa"} · Origem/O.S.: ${nextBestAction.serviceOrderLabel}`
-              : "Nenhuma cobrança pendente ou vencida foi retornada pelo backend para ação imediata."
-          }
-          chips={
-            nextBestAction ? (
-              <>
-                <AppStatusBadge
-                  label={chargeStatusLabel(nextBestAction.status)}
+      <AppSectionCard className="space-y-4 border-[var(--nexo-border-strong)] bg-[var(--nexo-card-surface)]">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <AppStatusBadge label="Próxima decisão financeira" tone="info" />
+              {nextBestAction ? (
+                <>
+                  <AppPriorityBadge
+                    priority={getChargePriority(nextBestAction)}
+                  />
+                  <AppStatusBadge
+                    label={chargeStatusLabel(nextBestAction.status)}
+                    tone={getChargeStatusTone(nextBestAction.status)}
+                  />
+                </>
+              ) : (
+                <AppOperationalStatusBadge
+                  status="NORMAL"
+                  label="Sem cobrança crítica"
                 />
-                <span className="rounded-full border border-[var(--border-subtle)] px-2.5 py-1 text-xs text-[var(--text-muted)]">
-                  {getChargeRisk(nextBestAction)}
-                </span>
+              )}
+            </div>
+            <h2 className="text-xl font-semibold leading-tight text-[var(--nexo-text-primary)]">
+              {nextBestAction
+                ? `Cobrar ${nextBestAction.customerName}`
+                : "Caixa sem cobrança crítica agora"}
+            </h2>
+            <p className="max-w-3xl text-sm leading-6 text-[var(--nexo-text-secondary)]">
+              {nextBestAction
+                ? `${formatCurrency(Number(nextBestAction?.amountCents ?? 0))} · ${nextBestAction.status === "OVERDUE" ? `${nextBestAction.overdueDays} dia(s) em atraso` : "pendência ativa"} · Origem/O.S.: ${nextBestAction.serviceOrderLabel}`
+                : "Nenhuma cobrança pendente ou vencida foi retornada pelo backend para ação imediata."}
+            </p>
+            {nextBestAction ? (
+              <p className="text-xs text-[var(--nexo-text-muted)]">
+                Motivo: {getChargeRisk(nextBestAction)}
+              </p>
+            ) : null}
+          </div>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            {nextBestAction ? (
+              <>
+                <Button
+                  onClick={() => {
+                    setSelectedChargeId(String(nextBestAction?.id ?? ""));
+                    goToWhatsApp(nextBestAction);
+                  }}
+                >
+                  Cobrar agora
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => void openMarkAsPaid(nextBestAction)}
+                >
+                  Marcar como pago
+                </Button>
               </>
-            ) : null
-          }
-          primaryAction={
-            nextBestAction ? (
-              <Button
-                onClick={() => {
-                  setSelectedChargeId(String(nextBestAction?.id ?? ""));
-                  goToWhatsApp(nextBestAction);
-                }}
-              >
-                Cobrar agora
-              </Button>
             ) : (
               <Button variant="outline" onClick={() => setStatusFilter("all")}>
                 Ver carteira
               </Button>
-            )
-          }
-          secondaryActions={
-            nextBestAction ? (
-              <Button
-                variant="outline"
-                onClick={() => void openMarkAsPaid(nextBestAction)}
-              >
-                Marcar como pago
-              </Button>
-            ) : null
+            )}
+          </div>
+        </div>
+      </AppSectionCard>
+
+      <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+        <AppStatCard
+          label="Recebido"
+          value={formatCurrency(health.received)}
+          helper={`Consequência: ${cashHealth.paidCount} cobrança(s) confirmada(s) no caixa.`}
+        />
+        <AppStatCard
+          label="A receber"
+          value={formatCurrency(health.receivable)}
+          helper={`Consequência: ${cashHealth.pendingCount} cobrança(s) ainda pedem acompanhamento.`}
+        />
+        <AppStatCard
+          label="Vencido"
+          value={formatCurrency(health.overdue)}
+          helper={
+            cashHealth.overdueCount > 0
+              ? "Consequência: cobrar antes de navegar."
+              : "Consequência: manter rotina preventiva."
           }
         />
+        <AppStatCard
+          label="Previsto"
+          value={formatCurrency(health.projected)}
+          helper="Consequência: visão dos próximos 30 dias com dados de vencimento."
+        />
+      </div>
 
-        <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
-          <AppStatCard
-            label="Recebido"
-            value={formatCurrency(health.received)}
-            helper={`Consequência: ${cashHealth.paidCount} cobrança(s) confirmada(s) no caixa.`}
-          />
-          <AppStatCard
-            label="A receber"
-            value={formatCurrency(health.receivable)}
-            helper={`Consequência: ${cashHealth.pendingCount} cobrança(s) ainda pedem acompanhamento.`}
-          />
-          <AppStatCard
-            label="Vencido"
-            value={formatCurrency(health.overdue)}
-            helper={
-              cashHealth.overdueCount > 0
-                ? "Consequência: cobrar antes de navegar."
-                : "Consequência: manter rotina preventiva."
-            }
-          />
-          <AppStatCard
-            label="Previsto"
-            value={formatCurrency(health.projected)}
-            helper="Consequência: visão dos próximos 30 dias com dados de vencimento."
-          />
+      <AppSectionBlock
+        title="Saúde do caixa"
+        subtitle="Leitura operacional do dinheiro e do gargalo cobrança → pagamento."
+      >
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <AppInfoCard>
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+              Dinheiro recebido
+            </p>
+            <p className="mt-2 text-xl font-semibold text-[var(--text-primary)]">
+              {formatCurrency(health.received)}
+            </p>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">
+              Já entrou no caixa conforme cobranças pagas.
+            </p>
+          </AppInfoCard>
+          <AppInfoCard>
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+              Dinheiro pendente
+            </p>
+            <p className="mt-2 text-xl font-semibold text-[var(--text-primary)]">
+              {formatCurrency(cashHealth.pendingAmount)}
+            </p>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">
+              Precisa de acompanhamento antes do vencimento.
+            </p>
+          </AppInfoCard>
+          <AppInfoCard>
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+              Dinheiro em risco
+            </p>
+            <p className="mt-2 text-xl font-semibold text-[var(--text-primary)]">
+              {formatCurrency(cashHealth.riskAmount)}
+            </p>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">
+              Toda cobrança vencida sugere cobrança imediata.
+            </p>
+          </AppInfoCard>
+          <AppInfoCard>
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+              Saúde financeira
+            </p>
+            <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
+              {operationalHealth.label}
+            </p>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">
+              {operationalHealth.bottleneck.label}:{" "}
+              {operationalHealth.bottleneck.reason}
+            </p>
+          </AppInfoCard>
         </div>
+      </AppSectionBlock>
 
-        <AppSectionBlock
-          title="Saúde do caixa"
-          subtitle="Leitura operacional do dinheiro e do gargalo cobrança → pagamento."
-        >
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <AppInfoCard>
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                Dinheiro recebido
-              </p>
-              <p className="mt-2 text-xl font-semibold text-[var(--text-primary)]">
-                {formatCurrency(health.received)}
-              </p>
-              <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                Já entrou no caixa conforme cobranças pagas.
-              </p>
-            </AppInfoCard>
-            <AppInfoCard>
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                Dinheiro pendente
-              </p>
-              <p className="mt-2 text-xl font-semibold text-[var(--text-primary)]">
-                {formatCurrency(cashHealth.pendingAmount)}
-              </p>
-              <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                Precisa de acompanhamento antes do vencimento.
-              </p>
-            </AppInfoCard>
-            <AppInfoCard>
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                Dinheiro em risco
-              </p>
-              <p className="mt-2 text-xl font-semibold text-[var(--text-primary)]">
-                {formatCurrency(cashHealth.riskAmount)}
-              </p>
-              <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                Toda cobrança vencida sugere cobrança imediata.
-              </p>
-            </AppInfoCard>
-            <AppInfoCard>
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                Saúde financeira
-              </p>
-              <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
-                {operationalHealth.label}
-              </p>
-              <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                {operationalHealth.bottleneck.label}: {operationalHealth.bottleneck.reason}
-              </p>
-            </AppInfoCard>
-          </div>
-        </AppSectionBlock>
+      <AppSectionBlock
+        title="Intervenção financeira dominante"
+        subtitle="Recomendação contextual para destravar cobrança → pagamento."
+      >
+        {financeIntervention ? (
+          <AppInfoCard>
+            <p className="text-sm font-semibold text-[var(--text-primary)]">
+              {financeIntervention.label}
+            </p>
+            <p className="mt-1 text-xs text-[var(--text-secondary)]">
+              {financeIntervention.summary}
+            </p>
+            <p className="mt-1 text-xs text-[var(--text-secondary)]">
+              Owner sugerido: {financeIntervention.recommendedOwner}
+            </p>
+          </AppInfoCard>
+        ) : (
+          <p className="text-xs text-[var(--text-secondary)]">
+            Sem intervenção financeira dominante no momento.
+          </p>
+        )}
+      </AppSectionBlock>
 
-        <AppSectionBlock
-          title="Intervenção financeira dominante"
-          subtitle="Recomendação contextual para destravar cobrança → pagamento."
-        >
-          {financeIntervention ? (
-            <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
-              <p className="text-sm font-semibold text-[var(--text-primary)]">{financeIntervention.label}</p>
-              <p className="mt-1 text-xs text-[var(--text-secondary)]">{financeIntervention.summary}</p>
-              <p className="mt-1 text-xs text-[var(--text-secondary)]">Owner sugerido: {financeIntervention.recommendedOwner}</p>
-            </div>
-          ) : <p className="text-xs text-[var(--text-secondary)]">Sem intervenção financeira dominante no momento.</p>}
-        </AppSectionBlock>
-
-        <AppSectionBlock
-          title={operationalCopy.immediateAttention}
-          subtitle={`Pendências que afetam cobrança, comunicação e registro de pagamento. ${highlightedFinancialSummary.hidden > 0 ? highlightedFinancialSummary.hiddenMessage : ""}`}
-        >
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-            {immediateAttentionItems.map(item => (
-              <article
-                key={item.key}
-                className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3"
+      <AppSectionBlock
+        title={operationalCopy.immediateAttention}
+        subtitle={`Pendências que afetam cobrança, comunicação e registro de pagamento. ${highlightedFinancialSummary.hidden > 0 ? highlightedFinancialSummary.hiddenMessage : ""}`}
+      >
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          {immediateAttentionItems.map(item => (
+            <AppInfoCard key={item.key}>
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-sm font-semibold text-[var(--text-primary)]">
+                  {item.title}
+                </p>
+                <AppStatusBadge label={item.value} tone="neutral" />
+              </div>
+              <p className="mt-2 min-h-12 text-xs leading-5 text-[var(--text-secondary)]">
+                {item.consequence}
+              </p>
+              <Button
+                className="mt-3 w-full"
+                size="sm"
+                variant="outline"
+                onClick={item.onAction}
               >
-                <div className="flex items-start justify-between gap-2">
-                  <p className="text-sm font-semibold text-[var(--text-primary)]">
-                    {item.title}
+                {item.actionLabel}
+              </Button>
+            </AppInfoCard>
+          ))}
+        </div>
+      </AppSectionBlock>
+
+      <AppSectionBlock
+        title="Carteira operacional"
+        subtitle="Cobranças reais com risco, origem e ação primária antes da navegação."
+      >
+        <AppOperationalBar
+          tabs={[
+            { value: "all", label: "Todas" },
+            { value: "pending", label: "Pendentes" },
+            { value: "overdue", label: "Vencidas" },
+            { value: "paid", label: "Pagas" },
+            { value: "canceled", label: "Canceladas" },
+          ]}
+          activeTab={statusFilter}
+          onTabChange={setStatusFilter}
+          searchValue={searchTerm}
+          onSearchChange={setSearchTerm}
+          searchPlaceholder="Buscar cliente, O.S., status ou ID"
+          quickFilters={
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setStatusFilter("overdue")}
+              >
+                Priorizar atraso
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setStatusFilter("pending")}
+              >
+                Cobrar pendências
+              </Button>
+            </>
+          }
+          variant="embedded"
+        />
+
+        {hasFiltersContext ? (
+          <p className="text-xs text-[var(--text-muted)]">
+            Contexto ativo via URL:{" "}
+            {queryParams.customerId
+              ? `customerId=${queryParams.customerId} `
+              : ""}
+            {queryParams.serviceOrderId
+              ? `serviceOrderId=${queryParams.serviceOrderId}`
+              : ""}
+          </p>
+        ) : null}
+
+        {allQueriesLoading && enrichedCharges.length === 0 ? (
+          <AppPageLoadingState description="Carregando cobranças, clientes e O.S...." />
+        ) : null}
+
+        {allQueriesErrored ? (
+          <AppPageErrorState
+            description={
+              chargesQuery.error?.message ??
+              "Falha ao carregar dados financeiros."
+            }
+            actionLabel="Tentar novamente"
+            onAction={() => void refreshAll()}
+          />
+        ) : null}
+
+        {!allQueriesLoading &&
+        !allQueriesErrored &&
+        filteredCharges.length === 0 ? (
+          hasSearchNoResults ? (
+            <AppPageEmptyState
+              title="Busca sem resultado"
+              description="Nenhuma cobrança encontrada para os termos pesquisados."
+            />
+          ) : (
+            <AppPageEmptyState
+              title="Nenhuma cobrança disponível"
+              description="Não há cobranças para o contexto atual."
+            />
+          )
+        ) : null}
+
+        {!allQueriesLoading &&
+        !allQueriesErrored &&
+        filteredCharges.length > 0 ? (
+          <>
+            <AppDataTable>
+              <table className="w-full min-w-[1120px] text-sm">
+                <thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]">
+                  <tr>
+                    <th className="p-2.5 text-left">Cliente</th>
+                    <th className="text-left">Valor</th>
+                    <th className="text-left">Status</th>
+                    <th className="text-left">Prioridade</th>
+                    <th className="text-left">Vencimento</th>
+                    <th className="text-left">Atraso</th>
+                    <th className="text-left">Origem/O.S.</th>
+                    <th className="text-left">Risco/pendência</th>
+                    <th className="text-left">Ação primária</th>
+                    <th className="p-2.5 text-left">Menu</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedCharges.map(row => {
+                    const primaryAction = getChargePrimaryAction(row);
+                    return (
+                      <tr
+                        key={String(row?.id ?? "")}
+                        className="cursor-pointer border-t border-[var(--border-subtle)] hover:bg-[var(--surface-subtle)]/60"
+                        onClick={() =>
+                          setSelectedChargeId(String(row?.id ?? ""))
+                        }
+                      >
+                        <td className="p-2.5">
+                          <div>
+                            <p className="font-medium text-[var(--text-primary)]">
+                              {row.customerName}
+                            </p>
+                            <p className="text-xs text-[var(--text-muted)]">
+                              {safeText(
+                                row?.customer?.phone,
+                                "Telefone não retornado"
+                              )}
+                            </p>
+                          </div>
+                        </td>
+                        <td>{formatCurrency(Number(row?.amountCents ?? 0))}</td>
+                        <td>
+                          <AppStatusBadge
+                            label={chargeStatusLabel(row.status)}
+                            tone={getChargeStatusTone(row.status)}
+                          />
+                        </td>
+                        <td>
+                          <AppPriorityBadge priority={getChargePriority(row)} />
+                        </td>
+                        <td>{formatDate(row?.dueDate)}</td>
+                        <td>
+                          {row.status === "OVERDUE"
+                            ? `${row.overdueDays} dia(s)`
+                            : "—"}
+                        </td>
+                        <td>{safeText(row.serviceOrderLabel, "Sem O.S.")}</td>
+                        <td>
+                          <p className="max-w-[220px] text-xs leading-5 text-[var(--text-secondary)]">
+                            {getChargeRisk(row)}
+                          </p>
+                        </td>
+                        <td onClick={event => event.stopPropagation()}>
+                          <Button
+                            size="sm"
+                            variant={
+                              primaryAction.kind === "collect"
+                                ? "default"
+                                : "outline"
+                            }
+                            onClick={() => {
+                              setSelectedChargeId(String(row?.id ?? ""));
+                              if (primaryAction.kind === "collect")
+                                goToWhatsApp(row);
+                            }}
+                            disabled={row.status === "CANCELED"}
+                          >
+                            {primaryAction.label}
+                          </Button>
+                          <p className="mt-1 max-w-[180px] text-[11px] text-[var(--text-muted)]">
+                            {primaryAction.reason}
+                          </p>
+                        </td>
+                        <td
+                          className="p-2.5"
+                          onClick={event => event.stopPropagation()}
+                        >
+                          <AppRowActionsDropdown
+                            items={[
+                              {
+                                label: "Marcar como pago",
+                                onSelect: () => void openMarkAsPaid(row),
+                                disabled:
+                                  row.status === "PAID" ||
+                                  row.status === "CANCELED",
+                                tone: "primary",
+                              },
+                              {
+                                label:
+                                  normalizeStatus(row?.status) === "PAID"
+                                    ? "WhatsApp pós-pagamento"
+                                    : "Cobrar via WhatsApp",
+                                onSelect: () => goToWhatsApp(row),
+                                disabled: !row.customerId,
+                                tone: "primary",
+                              },
+                              {
+                                label: "Editar cobrança",
+                                onSelect: () => openEditCharge(row),
+                                disabled:
+                                  row.status === "PAID" ||
+                                  row.status === "CANCELED",
+                              },
+                              {
+                                label: "Cancelar cobrança",
+                                onSelect: () => void handleCancelCharge(row),
+                                disabled:
+                                  row.status === "PAID" ||
+                                  row.status === "CANCELED",
+                              },
+                              { type: "separator", label: "Navegação" },
+                              {
+                                label: "Abrir cliente",
+                                onSelect: () => goToCustomer(row),
+                                disabled: !row.customerId,
+                              },
+                              {
+                                label: "Abrir O.S.",
+                                onSelect: () => goToServiceOrder(row),
+                                disabled: !row.serviceOrderId,
+                              },
+                            ]}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </AppDataTable>
+            <AppPagination
+              currentPage={currentPage}
+              totalItems={filteredCharges.length}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+            />
+          </>
+        ) : null}
+      </AppSectionBlock>
+
+      <AppSectionBlock
+        title="Detalhe financeiro"
+        subtitle="Resumo, cliente, origem operacional, histórico e comunicação quando disponíveis."
+      >
+        {selectedCharge ? (
+          <div className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <AppInfoCard>
+                <p className="text-xs text-[var(--text-muted)]">
+                  Cliente vinculado
+                </p>
+                <p className="text-sm font-semibold text-[var(--text-primary)]">
+                  {selectedFinancialRecord.customerName}
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  {safeText(
+                    selectedFinancialRecord?.customer?.phone,
+                    "Telefone não retornado"
+                  )}
+                </p>
+              </AppInfoCard>
+              <AppInfoCard>
+                <p className="text-xs text-[var(--text-muted)]">
+                  Valor da cobrança
+                </p>
+                <p className="text-sm font-semibold text-[var(--text-primary)]">
+                  {formatCurrency(
+                    Number(selectedFinancialRecord?.amountCents ?? 0)
+                  )}
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  Método recebido:{" "}
+                  {latestPaymentMethod(selectedFinancialRecord)}
+                </p>
+              </AppInfoCard>
+              <AppInfoCard>
+                <p className="text-xs text-[var(--text-muted)]">
+                  Status / vencimento
+                </p>
+                <p className="text-sm font-semibold text-[var(--text-primary)]">
+                  {chargeStatusLabel(selectedFinancialRecord.status)} ·{" "}
+                  {formatDate(selectedFinancialRecord?.dueDate)}
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  {getChargeRisk(selectedFinancialRecord)}
+                </p>
+              </AppInfoCard>
+              <AppInfoCard>
+                <p className="text-xs text-[var(--text-muted)]">
+                  Origem operacional
+                </p>
+                <p className="text-sm font-semibold text-[var(--text-primary)]">
+                  {safeText(
+                    selectedFinancialRecord.serviceOrderLabel,
+                    "Sem O.S. vinculada"
+                  )}
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  ID: {safeText(selectedFinancialRecord?.id)}
+                </p>
+              </AppInfoCard>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={() => goToWhatsApp(selectedFinancialRecord)}
+                disabled={selectedFinancialRecord.status === "CANCELED"}
+              >
+                {selectedFinancialRecord.status === "OVERDUE"
+                  ? "Cobrar agora"
+                  : "Enviar link"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => void openMarkAsPaid(selectedFinancialRecord)}
+                disabled={
+                  selectedFinancialRecord.status === "PAID" ||
+                  selectedFinancialRecord.status === "CANCELED" ||
+                  markPaidMutation.isPending
+                }
+              >
+                {markPaidMutation.isPending
+                  ? "Salvando..."
+                  : "Marcar como pago"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => openEditCharge(selectedFinancialRecord)}
+                disabled={
+                  selectedFinancialRecord.status === "PAID" ||
+                  selectedFinancialRecord.status === "CANCELED" ||
+                  editMutation.isPending
+                }
+              >
+                {editMutation.isPending ? "Salvando..." : "Editar cobrança"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => void handleCancelCharge(selectedFinancialRecord)}
+                disabled={
+                  selectedFinancialRecord.status === "PAID" ||
+                  selectedFinancialRecord.status === "CANCELED" ||
+                  cancelMutation.isPending
+                }
+              >
+                {cancelMutation.isPending ? "Salvando..." : "Cancelar"}
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => goToCustomer(selectedFinancialRecord)}
+              >
+                Abrir cliente
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => goToServiceOrder(selectedFinancialRecord)}
+              >
+                Abrir O.S.
+              </Button>
+            </div>
+
+            <div className="grid gap-3 lg:grid-cols-3">
+              <AppInfoCard className="lg:col-span-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                  Histórico / timeline
+                </p>
+                {timelineByCustomerQuery.isLoading ||
+                timelineByServiceOrderQuery.isLoading ? (
+                  <p className="mt-2 text-sm text-[var(--text-secondary)]">
+                    Carregando histórico...
                   </p>
-                  <span className="rounded-full border border-[var(--border-subtle)] px-2 py-0.5 text-xs text-[var(--text-muted)]">
-                    {item.value}
-                  </span>
-                </div>
-                <p className="mt-2 min-h-12 text-xs leading-5 text-[var(--text-secondary)]">
-                  {item.consequence}
+                ) : timelineItems.length === 0 ? (
+                  <p className="mt-2 text-sm text-[var(--text-secondary)]">
+                    Histórico indisponível neste ambiente para cliente/O.S.
+                    selecionados.
+                  </p>
+                ) : (
+                  <ul className="mt-2 space-y-2 text-sm text-[var(--text-secondary)]">
+                    {timelineItems.map(item => (
+                      <li
+                        key={String(
+                          item?.id ??
+                            `${item?.createdAt ?? ""}-${item?.title ?? ""}`
+                        )}
+                        className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)]/40 p-2.5"
+                      >
+                        <p className="font-medium text-[var(--text-primary)]">
+                          {String(item?.title ?? item?.description ?? "Evento")}
+                        </p>
+                        <p className="text-xs text-[var(--text-muted)]">
+                          {formatDate(item?.createdAt)}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </AppInfoCard>
+              <AppInfoCard>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                  Comunicação / WhatsApp
+                </p>
+                <p className="mt-2 text-sm text-[var(--text-secondary)]">
+                  {getCommunicationState(selectedFinancialRecord) === "sent"
+                    ? "Envio de cobrança identificado nos campos retornados."
+                    : getCommunicationState(selectedFinancialRecord) ===
+                        "not_sent"
+                      ? "Sem envio registrado nos campos retornados."
+                      : "Backend não retornou telemetria de envio; ação disponível via WhatsApp contextual."}
+                </p>
+                <p className="mt-2 text-xs text-[var(--text-muted)]">
+                  {paymentsListAvailable
+                    ? "Listagem de pagamentos/mensagens conectada."
+                    : "Fallback: endpoint de lista geral de pagamentos/mensagens não exposto no BFF."}
                 </p>
                 <Button
                   className="mt-3 w-full"
-                  size="sm"
                   variant="outline"
-                  onClick={item.onAction}
-                >
-                  {item.actionLabel}
-                </Button>
-              </article>
-            ))}
-          </div>
-        </AppSectionBlock>
-
-        <AppSectionBlock
-          title="Carteira operacional"
-          subtitle="Cobranças reais com risco, origem e ação primária antes da navegação."
-        >
-          <AppOperationalBar
-            tabs={[
-              { value: "all", label: "Todas" },
-              { value: "pending", label: "Pendentes" },
-              { value: "overdue", label: "Vencidas" },
-              { value: "paid", label: "Pagas" },
-              { value: "canceled", label: "Canceladas" },
-            ]}
-            activeTab={statusFilter}
-            onTabChange={setStatusFilter}
-            searchValue={searchTerm}
-            onSearchChange={setSearchTerm}
-            searchPlaceholder="Buscar cliente, O.S., status ou ID"
-            quickFilters={
-              <>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setStatusFilter("overdue")}
-                >
-                  Priorizar atraso
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setStatusFilter("pending")}
-                >
-                  Cobrar pendências
-                </Button>
-              </>
-            }
-            variant="embedded"
-          />
-
-          {hasFiltersContext ? (
-            <p className="text-xs text-[var(--text-muted)]">
-              Contexto ativo via URL:{" "}
-              {queryParams.customerId
-                ? `customerId=${queryParams.customerId} `
-                : ""}
-              {queryParams.serviceOrderId
-                ? `serviceOrderId=${queryParams.serviceOrderId}`
-                : ""}
-            </p>
-          ) : null}
-
-          {allQueriesLoading && enrichedCharges.length === 0 ? (
-            <AppPageLoadingState description="Carregando cobranças, clientes e O.S...." />
-          ) : null}
-
-          {allQueriesErrored ? (
-            <AppPageErrorState
-              description={
-                chargesQuery.error?.message ??
-                "Falha ao carregar dados financeiros."
-              }
-              actionLabel="Tentar novamente"
-              onAction={() => void refreshAll()}
-            />
-          ) : null}
-
-          {!allQueriesLoading &&
-          !allQueriesErrored &&
-          filteredCharges.length === 0 ? (
-            hasSearchNoResults ? (
-              <AppPageEmptyState
-                title="Busca sem resultado"
-                description="Nenhuma cobrança encontrada para os termos pesquisados."
-              />
-            ) : (
-              <AppPageEmptyState
-                title="Nenhuma cobrança disponível"
-                description="Não há cobranças para o contexto atual."
-              />
-            )
-          ) : null}
-
-          {!allQueriesLoading &&
-          !allQueriesErrored &&
-          filteredCharges.length > 0 ? (
-            <>
-              <AppDataTable>
-                <table className="w-full min-w-[1120px] text-sm">
-                  <thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]">
-                    <tr>
-                      <th className="p-2.5 text-left">Cliente</th>
-                      <th className="text-left">Valor</th>
-                      <th className="text-left">Status</th>
-                      <th className="text-left">Vencimento</th>
-                      <th className="text-left">Atraso</th>
-                      <th className="text-left">Origem/O.S.</th>
-                      <th className="text-left">Risco/pendência</th>
-                      <th className="text-left">Ação primária</th>
-                      <th className="p-2.5 text-left">Menu</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paginatedCharges.map(row => {
-                      const primaryAction = getChargePrimaryAction(row);
-                      return (
-                        <tr
-                          key={String(row?.id ?? "")}
-                          className="cursor-pointer border-t border-[var(--border-subtle)] hover:bg-[var(--surface-subtle)]/60"
-                          onClick={() =>
-                            setSelectedChargeId(String(row?.id ?? ""))
-                          }
-                        >
-                          <td className="p-2.5">
-                            <div>
-                              <p className="font-medium text-[var(--text-primary)]">
-                                {row.customerName}
-                              </p>
-                              <p className="text-xs text-[var(--text-muted)]">
-                                {safeText(
-                                  row?.customer?.phone,
-                                  "Telefone não retornado"
-                                )}
-                              </p>
-                            </div>
-                          </td>
-                          <td>
-                            {formatCurrency(Number(row?.amountCents ?? 0))}
-                          </td>
-                          <td>
-                            <AppStatusBadge
-                              label={chargeStatusLabel(row.status)}
-                            />
-                          </td>
-                          <td>{formatDate(row?.dueDate)}</td>
-                          <td>
-                            {row.status === "OVERDUE"
-                              ? `${row.overdueDays} dia(s)`
-                              : "—"}
-                          </td>
-                          <td>{safeText(row.serviceOrderLabel, "Sem O.S.")}</td>
-                          <td>
-                            <p className="max-w-[220px] text-xs leading-5 text-[var(--text-secondary)]">
-                              {getChargeRisk(row)}
-                            </p>
-                          </td>
-                          <td onClick={event => event.stopPropagation()}>
-                            <Button
-                              size="sm"
-                              variant={
-                                primaryAction.kind === "collect"
-                                  ? "default"
-                                  : "outline"
-                              }
-                              onClick={() => {
-                                setSelectedChargeId(String(row?.id ?? ""));
-                                if (primaryAction.kind === "collect")
-                                  goToWhatsApp(row);
-                              }}
-                              disabled={row.status === "CANCELED"}
-                            >
-                              {primaryAction.label}
-                            </Button>
-                            <p className="mt-1 max-w-[180px] text-[11px] text-[var(--text-muted)]">
-                              {primaryAction.reason}
-                            </p>
-                          </td>
-                          <td
-                            className="p-2.5"
-                            onClick={event => event.stopPropagation()}
-                          >
-                            <AppRowActionsDropdown
-                              items={[
-                                {
-                                  label: "Marcar como pago",
-                                  onSelect: () => void openMarkAsPaid(row),
-                                  disabled:
-                                    row.status === "PAID" ||
-                                    row.status === "CANCELED",
-                                  tone: "primary",
-                                },
-                                {
-                                  label:
-                                    normalizeStatus(row?.status) === "PAID"
-                                      ? "WhatsApp pós-pagamento"
-                                      : "Cobrar via WhatsApp",
-                                  onSelect: () => goToWhatsApp(row),
-                                  disabled: !row.customerId,
-                                  tone: "primary",
-                                },
-                                {
-                                  label: "Editar cobrança",
-                                  onSelect: () => openEditCharge(row),
-                                  disabled:
-                                    row.status === "PAID" ||
-                                    row.status === "CANCELED",
-                                },
-                                {
-                                  label: "Cancelar cobrança",
-                                  onSelect: () => void handleCancelCharge(row),
-                                  disabled:
-                                    row.status === "PAID" ||
-                                    row.status === "CANCELED",
-                                },
-                                { type: "separator", label: "Navegação" },
-                                {
-                                  label: "Abrir cliente",
-                                  onSelect: () => goToCustomer(row),
-                                  disabled: !row.customerId,
-                                },
-                                {
-                                  label: "Abrir O.S.",
-                                  onSelect: () => goToServiceOrder(row),
-                                  disabled: !row.serviceOrderId,
-                                },
-                              ]}
-                            />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </AppDataTable>
-              <AppPagination
-                currentPage={currentPage}
-                totalItems={filteredCharges.length}
-                pageSize={pageSize}
-                onPageChange={setCurrentPage}
-              />
-            </>
-          ) : null}
-        </AppSectionBlock>
-
-        <AppSectionBlock
-          title="Detalhe financeiro"
-          subtitle="Resumo, cliente, origem operacional, histórico e comunicação quando disponíveis."
-        >
-          {selectedCharge ? (
-            <div className="space-y-4">
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3">
-                  <p className="text-xs text-[var(--text-muted)]">
-                    Cliente vinculado
-                  </p>
-                  <p className="text-sm font-semibold text-[var(--text-primary)]">
-                    {selectedFinancialRecord.customerName}
-                  </p>
-                  <p className="mt-1 text-xs text-[var(--text-muted)]">
-                    {safeText(
-                      selectedFinancialRecord?.customer?.phone,
-                      "Telefone não retornado"
-                    )}
-                  </p>
-                </div>
-                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3">
-                  <p className="text-xs text-[var(--text-muted)]">
-                    Valor da cobrança
-                  </p>
-                  <p className="text-sm font-semibold text-[var(--text-primary)]">
-                    {formatCurrency(
-                      Number(selectedFinancialRecord?.amountCents ?? 0)
-                    )}
-                  </p>
-                  <p className="mt-1 text-xs text-[var(--text-muted)]">
-                    Método recebido:{" "}
-                    {latestPaymentMethod(selectedFinancialRecord)}
-                  </p>
-                </div>
-                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3">
-                  <p className="text-xs text-[var(--text-muted)]">
-                    Status / vencimento
-                  </p>
-                  <p className="text-sm font-semibold text-[var(--text-primary)]">
-                    {chargeStatusLabel(selectedFinancialRecord.status)} ·{" "}
-                    {formatDate(selectedFinancialRecord?.dueDate)}
-                  </p>
-                  <p className="mt-1 text-xs text-[var(--text-muted)]">
-                    {getChargeRisk(selectedFinancialRecord)}
-                  </p>
-                </div>
-                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3">
-                  <p className="text-xs text-[var(--text-muted)]">
-                    Origem operacional
-                  </p>
-                  <p className="text-sm font-semibold text-[var(--text-primary)]">
-                    {safeText(
-                      selectedFinancialRecord.serviceOrderLabel,
-                      "Sem O.S. vinculada"
-                    )}
-                  </p>
-                  <p className="mt-1 text-xs text-[var(--text-muted)]">
-                    ID: {safeText(selectedFinancialRecord?.id)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <Button
                   onClick={() => goToWhatsApp(selectedFinancialRecord)}
-                  disabled={selectedFinancialRecord.status === "CANCELED"}
                 >
-                  {selectedFinancialRecord.status === "OVERDUE"
-                    ? "Cobrar agora"
-                    : "Enviar link"}
+                  Ir para WhatsApp com contexto
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => void openMarkAsPaid(selectedFinancialRecord)}
-                  disabled={
-                    selectedFinancialRecord.status === "PAID" ||
-                    selectedFinancialRecord.status === "CANCELED" ||
-                    markPaidMutation.isPending
-                  }
-                >
-                  {markPaidMutation.isPending
-                    ? "Salvando..."
-                    : "Marcar como pago"}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => openEditCharge(selectedFinancialRecord)}
-                  disabled={
-                    selectedFinancialRecord.status === "PAID" ||
-                    selectedFinancialRecord.status === "CANCELED" ||
-                    editMutation.isPending
-                  }
-                >
-                  {editMutation.isPending ? "Salvando..." : "Editar cobrança"}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() =>
-                    void handleCancelCharge(selectedFinancialRecord)
-                  }
-                  disabled={
-                    selectedFinancialRecord.status === "PAID" ||
-                    selectedFinancialRecord.status === "CANCELED" ||
-                    cancelMutation.isPending
-                  }
-                >
-                  {cancelMutation.isPending ? "Salvando..." : "Cancelar"}
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={() => goToCustomer(selectedFinancialRecord)}
-                >
-                  Abrir cliente
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={() => goToServiceOrder(selectedFinancialRecord)}
-                >
-                  Abrir O.S.
-                </Button>
-              </div>
-
-              <div className="grid gap-3 lg:grid-cols-3">
-                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3 lg:col-span-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                    Histórico / timeline
-                  </p>
-                  {timelineByCustomerQuery.isLoading ||
-                  timelineByServiceOrderQuery.isLoading ? (
-                    <p className="mt-2 text-sm text-[var(--text-secondary)]">
-                      Carregando histórico...
-                    </p>
-                  ) : timelineItems.length === 0 ? (
-                    <p className="mt-2 text-sm text-[var(--text-secondary)]">
-                      Histórico indisponível neste ambiente para cliente/O.S.
-                      selecionados.
-                    </p>
-                  ) : (
-                    <ul className="mt-2 space-y-2 text-sm text-[var(--text-secondary)]">
-                      {timelineItems.map(item => (
-                        <li
-                          key={String(
-                            item?.id ??
-                              `${item?.createdAt ?? ""}-${item?.title ?? ""}`
-                          )}
-                          className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)]/40 p-2.5"
-                        >
-                          <p className="font-medium text-[var(--text-primary)]">
-                            {String(
-                              item?.title ?? item?.description ?? "Evento"
-                            )}
-                          </p>
-                          <p className="text-xs text-[var(--text-muted)]">
-                            {formatDate(item?.createdAt)}
-                          </p>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                    Comunicação / WhatsApp
-                  </p>
-                  <p className="mt-2 text-sm text-[var(--text-secondary)]">
-                    {getCommunicationState(selectedFinancialRecord) === "sent"
-                      ? "Envio de cobrança identificado nos campos retornados."
-                      : getCommunicationState(selectedFinancialRecord) ===
-                          "not_sent"
-                        ? "Sem envio registrado nos campos retornados."
-                        : "Backend não retornou telemetria de envio; ação disponível via WhatsApp contextual."}
-                  </p>
-                  <p className="mt-2 text-xs text-[var(--text-muted)]">
-                    {paymentsListAvailable
-                      ? "Listagem de pagamentos/mensagens conectada."
-                      : "Fallback: endpoint de lista geral de pagamentos/mensagens não exposto no BFF."}
-                  </p>
-                  <Button
-                    className="mt-3 w-full"
-                    variant="outline"
-                    onClick={() => goToWhatsApp(selectedFinancialRecord)}
-                  >
-                    Ir para WhatsApp com contexto
-                  </Button>
-                </div>
-              </div>
+              </AppInfoCard>
             </div>
-          ) : (
-            <p className="text-sm text-[var(--text-secondary)]">
-              Selecione uma cobrança para abrir o painel detalhado.
+          </div>
+        ) : (
+          <p className="text-sm text-[var(--text-secondary)]">
+            Selecione uma cobrança para abrir o painel detalhado.
+          </p>
+        )}
+      </AppSectionBlock>
+
+      <CreateChargeModal
+        isOpen={openCreate}
+        onClose={() => setOpenCreate(false)}
+        onSuccess={() => {
+          toast.success("Cobrança criada com sucesso.");
+          void refreshAll();
+        }}
+      />
+
+      <FormModal
+        open={Boolean(openPayModalFor)}
+        onOpenChange={open => {
+          if (!open) setOpenPayModalFor(null);
+        }}
+        title="Marcar como pago"
+        description="Registrar recebimento real da cobrança."
+        size="md"
+        closeBlocked={markPaidMutation.isPending}
+        footer={
+          <div className="flex w-full items-center justify-between gap-3">
+            <p className="text-xs text-[var(--text-muted)]">
+              Resumo:{" "}
+              {openPayModalFor
+                ? formatCurrency(Number(openPayModalFor?.amountCents ?? 0))
+                : "—"}
             </p>
-          )}
-        </AppSectionBlock>
-
-        <CreateChargeModal
-          isOpen={openCreate}
-          onClose={() => setOpenCreate(false)}
-          onSuccess={() => {
-            toast.success("Cobrança criada com sucesso.");
-            void refreshAll();
-          }}
-        />
-
-        <QuickActionModal
-          open={Boolean(openPayModalFor)}
-          onOpenChange={open => {
-            if (!open) setOpenPayModalFor(null);
-          }}
-          title="Marcar como pago"
-          description="Registrar recebimento real da cobrança."
-          size="md"
-          closeBlocked={markPaidMutation.isPending}
-          footer={
-            <div className="flex w-full items-center justify-between gap-3">
-              <p className="text-xs text-[var(--text-muted)]">
-                Resumo:{" "}
-                {openPayModalFor
-                  ? formatCurrency(Number(openPayModalFor?.amountCents ?? 0))
-                  : "—"}
-              </p>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setOpenPayModalFor(null)}
-                  disabled={markPaidMutation.isPending}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() => void submitMarkAsPaid()}
-                  disabled={markPaidMutation.isPending}
-                >
-                  {markPaidMutation.isPending
-                    ? "Salvando..."
-                    : "Confirmar pagamento"}
-                </Button>
-              </div>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOpenPayModalFor(null)}
+                disabled={markPaidMutation.isPending}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                onClick={() => void submitMarkAsPaid()}
+                disabled={markPaidMutation.isPending}
+              >
+                {markPaidMutation.isPending
+                  ? "Salvando..."
+                  : "Confirmar pagamento"}
+              </Button>
             </div>
-          }
+          </div>
+        }
+      >
+        <AppFormSection
+          title="Recebimento"
+          subtitle="Campos preservam o payload atual de pagamento."
         >
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="space-y-1 text-sm">
-              <span className="text-xs text-[var(--text-muted)]">Valor</span>
-              <input
-                className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3"
+          <AppFieldGroup>
+            <AppField label="Valor">
+              <AppInput
                 value={payAmount}
                 onChange={event => setPayAmount(event.target.value)}
               />
-            </label>
-            <label className="space-y-1 text-sm">
-              <span className="text-xs text-[var(--text-muted)]">Método</span>
-              <select
-                className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3"
+            </AppField>
+            <AppField label="Método">
+              <AppSelect
                 value={payMethod}
-                onChange={event =>
-                  setPayMethod(event.target.value as PaymentMethod)
-                }
-              >
-                {PAYMENT_METHOD_OPTIONS.map(option => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="space-y-1 text-sm">
-              <span className="text-xs text-[var(--text-muted)]">
-                Data de pagamento
-              </span>
-              <input
-                className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3"
+                onValueChange={value => setPayMethod(value as PaymentMethod)}
+                options={PAYMENT_METHOD_OPTIONS}
+              />
+            </AppField>
+            <AppField
+              label="Data de pagamento"
+              hint="A data selecionada será registrada no pagamento."
+            >
+              <AppInput
                 value={payDate}
                 onChange={event => setPayDate(event.target.value)}
                 type="date"
                 max={new Date().toISOString().slice(0, 10)}
               />
-              <span className="text-[11px] text-[var(--text-muted)]">
-                A data selecionada será registrada no pagamento.
-              </span>
-            </label>
-            <label className="space-y-1 text-sm">
-              <span className="text-xs text-[var(--text-muted)]">
-                Observação
-              </span>
-              <textarea
-                className="min-h-[80px] w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2"
+            </AppField>
+            <AppField
+              label="Observação"
+              hint="A observação será salva no histórico do pagamento."
+            >
+              <AppTextarea
+                className="min-h-[80px]"
                 value={payNotes}
                 onChange={event => setPayNotes(event.target.value)}
                 placeholder="Observação operacional"
               />
-              <span className="text-[11px] text-[var(--text-muted)]">
-                A observação será salva no histórico do pagamento.
-              </span>
-            </label>
-          </div>
-        </QuickActionModal>
+            </AppField>
+          </AppFieldGroup>
+        </AppFormSection>
+      </FormModal>
 
-        <QuickActionModal
-          open={Boolean(openEditModalFor)}
-          onOpenChange={open => {
-            if (!open) setOpenEditModalFor(null);
-          }}
-          title="Editar cobrança"
-          description="Atualize valor, vencimento e observações com persistência no backend."
-          size="md"
-          closeBlocked={editMutation.isPending}
-          footer={
-            <div className="flex w-full items-center justify-between gap-3">
-              <p className="text-xs text-[var(--text-muted)]">
-                Resumo atualizado no backend em tempo real.
-              </p>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setOpenEditModalFor(null)}
-                  disabled={editMutation.isPending}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() => void submitEditCharge()}
-                  disabled={editMutation.isPending}
-                >
-                  {editMutation.isPending ? "Salvando..." : "Salvar edição"}
-                </Button>
-              </div>
+      <FormModal
+        open={Boolean(openEditModalFor)}
+        onOpenChange={open => {
+          if (!open) setOpenEditModalFor(null);
+        }}
+        title="Editar cobrança"
+        description="Atualize valor, vencimento e observações com persistência no backend."
+        size="md"
+        closeBlocked={editMutation.isPending}
+        footer={
+          <div className="flex w-full items-center justify-between gap-3">
+            <p className="text-xs text-[var(--text-muted)]">
+              Resumo atualizado no backend em tempo real.
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOpenEditModalFor(null)}
+                disabled={editMutation.isPending}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                onClick={() => void submitEditCharge()}
+                disabled={editMutation.isPending}
+              >
+                {editMutation.isPending ? "Salvando..." : "Salvar edição"}
+              </Button>
             </div>
-          }
+          </div>
+        }
+      >
+        <AppFormSection
+          title="Dados da cobrança"
+          subtitle="Edição curta preservando valor, vencimento e observações atuais."
         >
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="space-y-1 text-sm">
-              <span className="text-xs text-[var(--text-muted)]">Valor</span>
-              <input
-                className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3"
+          <AppFieldGroup>
+            <AppField label="Valor">
+              <AppInput
                 value={editAmount}
                 onChange={event => setEditAmount(event.target.value)}
               />
-            </label>
-            <label className="space-y-1 text-sm">
-              <span className="text-xs text-[var(--text-muted)]">
-                Vencimento
-              </span>
-              <input
-                className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3"
+            </AppField>
+            <AppField label="Vencimento">
+              <AppInput
                 value={editDueDate}
                 onChange={event => setEditDueDate(event.target.value)}
                 type="date"
               />
-            </label>
-            <label className="space-y-1 text-sm sm:col-span-2">
-              <span className="text-xs text-[var(--text-muted)]">
-                Observações
-              </span>
-              <textarea
-                className="min-h-[110px] w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2"
-                value={editNotes}
-                onChange={event => setEditNotes(event.target.value)}
-              />
-            </label>
-          </div>
-        </QuickActionModal>
-      </AppPageShell>
-    </PageWrapper>
+            </AppField>
+            <div className="sm:col-span-2">
+              <AppField label="Observações">
+                <AppTextarea
+                  className="min-h-[110px]"
+                  value={editNotes}
+                  onChange={event => setEditNotes(event.target.value)}
+                />
+              </AppField>
+            </div>
+          </AppFieldGroup>
+        </AppFormSection>
+      </FormModal>
+    </AppPageShell>
   );
 }
