@@ -678,7 +678,7 @@ export default function ExecutiveDashboard() {
       ? "Operação normal"
       : "Atenção / Aguardando ação";
   return (
-    <AppPageShell className="space-y-5 bg-[#061224] bg-[radial-gradient(circle_at_16%_0%,rgba(59,130,246,0.13),transparent_28%),radial-gradient(circle_at_92%_12%,rgba(249,115,22,0.10),transparent_24%),linear-gradient(145deg,#061224,#07192E_48%,#081D34)] text-[#F3F6FB] sm:space-y-6">
+    <AppPageShell className="space-y-5 border-0 !rounded-none !bg-[#07182b] text-[#F3F6FB] sm:space-y-6">
       <AppOperationalHeader
         className="rounded-none border-transparent bg-transparent px-0 !py-1"
         density="compact"
@@ -733,7 +733,7 @@ export default function ExecutiveDashboard() {
         <div className="space-y-5 sm:space-y-6">
           <AppSectionBlock
             title="Atenção imediata"
-            className="border-[#EF4444]/25 bg-[linear-gradient(135deg,rgba(239,68,68,0.13),rgba(6,18,36,0.70)_45%,rgba(9,30,56,0.58))]"
+            className="border-[#EF4444]/25 bg-[#0b1f35]"
             subtitle="Comece aqui: riscos que interrompem execução, recebimento ou atendimento, em ordem de severidade."
           >
             {attention.length > 0 ? (
@@ -752,7 +752,7 @@ export default function ExecutiveDashboard() {
 
           <AppSectionBlock
             title="Próxima melhor ação"
-            className="border-[#F97316]/30 bg-[linear-gradient(135deg,rgba(249,115,22,0.14),rgba(6,18,36,0.68)_48%,rgba(9,30,56,0.60))]"
+            className="border-[#F97316]/30 bg-[#0b1f35]"
             subtitle="Uma decisão principal para converter a leitura operacional em avanço imediato."
           >
             {recommendedAction ? (
