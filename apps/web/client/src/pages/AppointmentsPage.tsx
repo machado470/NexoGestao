@@ -53,11 +53,6 @@ type FilterKey =
   | "overdue"
   | "canceled";
 
-// Source contract anchors:
-// personId={form.assignedToPersonId === "unassigned" ? null : form.assignedToPersonId}
-// assigneeWarningTelemetry.trackConfirmed(assignedToPersonId
-// responsibleFilter === "all" ? { limit: 100 } : { assignedToPersonId: responsibleFilter, limit: 100 }
-// assignedToPersonId: form.assignedToPersonId === "unassigned" ? null : form.assignedToPersonId
 type AppointmentRow = {
   id?: string;
   customerId?: string;

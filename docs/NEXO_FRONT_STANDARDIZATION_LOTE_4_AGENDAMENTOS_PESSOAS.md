@@ -365,3 +365,41 @@ Não iniciado nesta rodada.
 - Não foi feito redesign amplo.
 - Não foram criados dados fake.
 - Não foram criados botões sem ação real.
+
+## 24. Correção pós-testes
+
+Após a padronização visual do Lote 4, os testes web quebrados foram executados isoladamente com `pnpm --dir apps/web exec vitest run client/src/components/PersonAssignmentWarning.test.tsx client/src/pages/PeoplePage.operational-summary.test.ts client/src/pages/AppointmentAssignee.contract.test.ts`.
+
+### Testes quebrados analisados
+
+- `client/src/components/PersonAssignmentWarning.test.tsx`
+  - Assert afetado: contrato textual do aviso em `AppointmentsPage.tsx`, que esperava a prop `personId` em uma única linha e dependia de âncoras em comentário.
+  - Causa raiz: estrutura DOM/JSX alterada pela nova UI com `AppPageShell`, `AppDataTable` e formatação multilinha do JSX; o comportamento real do aviso permaneceu observacional.
+- `client/src/pages/PeoplePage.operational-summary.test.ts`
+  - Assert afetado: contrato administrativo de Pessoas acoplado ao bloco anterior de sinais de atribuição.
+  - Causa raiz: troca de estrutura visual para o shell padronizado e cards oficiais, sem alteração da procedure `trpc.analytics.assigneeWarningSummary` nem da regra `role === "ADMIN"`.
+- `client/src/pages/AppointmentAssignee.contract.test.ts`
+  - Assert afetado: contrato de filtro/remoção de responsável em Agendamentos acoplado a strings exatas.
+  - Causa raiz: a página passou para a tabela e ações oficiais do padrão Nexo; as chamadas, payloads e opção `Sem responsável` permaneceram os mesmos.
+
+### Arquivos alterados na correção
+
+- `apps/web/client/src/pages/AppointmentsPage.tsx`
+  - Removidas âncoras de contrato em comentário para evitar teste baseado em texto artificial.
+  - Mantidos os handlers reais, payloads de criação/edição e telemetria observacional de aviso de responsável.
+- `apps/web/client/src/components/PersonAssignmentWarning.test.tsx`
+  - Ajustado para validar o JSX real padronizado de Agendamentos com normalização de whitespace, sem depender de comentários.
+  - Reforçado que `assignment-warning` continua passivo, observacional e sem bloqueio automático.
+- `apps/web/client/src/pages/PeoplePage.operational-summary.test.ts`
+  - Ajustado para validar `AppPageShell`, `AppSectionCard`, `AppNextBestActionBlock`, `AppDataTable`, `AppOperationalStatusBadge`, `AppPriorityBadge` e `AppRowActionsDropdown`.
+  - Mantido o contrato tenant/admin de `assigneeWarningSummary` e a linguagem observacional.
+- `apps/web/client/src/pages/AppointmentAssignee.contract.test.ts`
+  - Ajustado para validar a página padronizada e preservar o contrato real de filtro, edição e remoção de responsável.
+
+### Por que não houve regressão funcional
+
+- A falha foi de contrato textual/estrutura DOM após a troca para componentes oficiais, não de comportamento.
+- `assignment-warning` segue lendo `people.operationalSummary`, exibindo aviso passivo e registrando telemetria apenas quando o usuário confirma manualmente.
+- Os payloads de `appointments.create`/`appointments.update` continuam preservando `assignedToPersonId`, incluindo remoção explícita com `null` na edição e ausência de responsável sem bloqueio automático.
+- Os sinais administrativos de Pessoas continuam restritos a administradores, continuam tenant-scoped e continuam declarados como observacionais.
+- Não houve alteração de backend, banco, migration, API/tRPC, WhatsApp, Dashboard ou rollback do padrão Nexo.
