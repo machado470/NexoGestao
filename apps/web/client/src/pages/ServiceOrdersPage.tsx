@@ -10,10 +10,19 @@ import {
 } from "@/lib/query-helpers";
 import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
-import { PageWrapper } from "@/components/operating-system/Wrappers";
-import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import { Button } from "@/components/design-system";
-import { AppRowActionsDropdown, AppStatCard } from "@/components/app-system";
+import {
+  AppDataTable,
+  AppOperationalStatusBadge,
+  AppPageShell,
+  AppPriorityBadge,
+  AppRowActionsDropdown,
+  AppSectionCard,
+  AppStatCard,
+  AppStatusBadge,
+  type AppOperationalStatus,
+  type AppPriorityLevel,
+} from "@/components/app-system";
 import {
   AppFiltersBar,
   AppOperationalHeader,
@@ -22,7 +31,6 @@ import {
   AppPageEmptyState,
   AppPagination,
   AppSectionBlock,
-  AppStatusBadge,
 } from "@/components/internal-page-system";
 import CreateServiceOrderModal from "@/components/CreateServiceOrderModal";
 import EditServiceOrderModal from "@/components/EditServiceOrderModal";
@@ -135,6 +143,46 @@ function getRiskLabel(item: {
 function safeText(value: unknown, fallback = "—") {
   const text = String(value ?? "").trim();
   return text.length > 0 ? text : fallback;
+}
+
+function getServiceOrderOperationalStatus(item: {
+  status: string;
+  isOverdue: boolean;
+  hasCharge: boolean;
+  assignedToPersonId: string;
+  dueDate: Date | null;
+}): AppOperationalStatus {
+  if (item.status === "DONE" && !item.hasCharge) return "RISCO";
+  if (item.isOverdue) return "RISCO";
+  if (!item.assignedToPersonId && item.status !== "DONE" && item.status !== "CANCELED") return "ATENÇÃO";
+  if (item.status === "IN_PROGRESS" && !item.dueDate) return "ATENÇÃO";
+  return "NORMAL";
+}
+
+function getServiceOrdersOperationalStatus(counts: {
+  overdue: number;
+  doneWithoutCharge: number;
+  unassigned: number;
+}): AppOperationalStatus {
+  if (counts.overdue + counts.doneWithoutCharge >= 5) return "CRÍTICO";
+  if (counts.overdue > 0 || counts.doneWithoutCharge > 0) return "RISCO";
+  if (counts.unassigned > 0) return "ATENÇÃO";
+  return "NORMAL";
+}
+
+function getServiceOrderPriority(item: {
+  status: string;
+  isOverdue: boolean;
+  hasCharge: boolean;
+  assignedToPersonId: string;
+  dueDate: Date | null;
+}): AppPriorityLevel {
+  if (item.status === "DONE" && !item.hasCharge) return "P0";
+  if (item.isOverdue) return "P0";
+  if (!item.assignedToPersonId && item.status !== "DONE" && item.status !== "CANCELED") return "P1";
+  if (item.status === "IN_PROGRESS" && !item.dueDate) return "P1";
+  if (["OPEN", "ASSIGNED", "IN_PROGRESS"].includes(item.status)) return "P2";
+  return "P3";
 }
 
 export default function ServiceOrdersPage() {
@@ -613,9 +661,10 @@ export default function ServiceOrdersPage() {
     }
     navigate(`/whatsapp?customerId=${customerId}&serviceOrderId=${serviceOrderId}&template=SERVICE_UPDATE`);
   }
+  const serviceOrdersOperationalStatus = getServiceOrdersOperationalStatus(counts);
+
   return (
-    <PageWrapper title="Ordens de Serviço" showOperationalHeader={false}>
-      <div className="flex flex-col gap-4">
+    <AppPageShell className="space-y-4">
           <AppOperationalHeader
             title="Ordens de Serviço"
             description="Centro de execução: priorize atrasos, responsáveis, conclusão e cobrança antes de navegar."
@@ -627,15 +676,13 @@ export default function ServiceOrdersPage() {
             }
             contextChips={
               <>
-                <span className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-2 py-1 text-xs text-[var(--text-secondary)]">
-                  {counts.all} O.S. retornadas
-                </span>
-                <span className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-2 py-1 text-xs text-[var(--text-secondary)]">
-                  {counts.overdue} atrasada(s)
-                </span>
-                <span className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-2 py-1 text-xs text-[var(--text-secondary)]">
-                  {counts.doneWithoutCharge} concluída(s) sem cobrança
-                </span>
+                <AppOperationalStatusBadge status={serviceOrdersOperationalStatus} />
+                <AppStatusBadge label={`${counts.all} O.S. retornadas`} tone="neutral" />
+                <AppStatusBadge label={`${counts.overdue} atrasada(s)`} tone="warning" />
+                <AppStatusBadge
+                  label={`${counts.doneWithoutCharge} concluída(s) sem cobrança`}
+                  tone="danger"
+                />
               </>
             }
           >
@@ -652,27 +699,48 @@ export default function ServiceOrdersPage() {
             </div>
           </AppOperationalHeader>
 
-          <OperationalTopCard
-            title={nextExecution ? `Próxima execução: #${nextExecution.code}` : "Próxima execução"}
-            description={
-              nextExecution
-                ? `${nextExecution.customerName} · ${nextExecution.nextAction.reason} · ${nextExecution.dueDateLabel}`
-                : "Nenhuma O.S. retornada pelo backend para priorização operacional."
-            }
-            primaryAction={
-              nextExecution ? (
-                <Button size="sm" onClick={() => runPrimaryAction(nextExecution)}>
-                  {nextExecution.nextAction.label}
-                </Button>
-              ) : (
-                <Button size="sm" variant="outline" onClick={() => setOpenCreate(true)}>
-                  Criar O.S.
-                </Button>
-              )
-            }
-          />
+          <AppSectionCard className="space-y-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="nexo-overline">Próxima melhor ação</p>
+                <h2 className="mt-1 text-lg font-semibold text-[var(--text-primary)]">
+                  {nextExecution ? `Próxima execução: #${nextExecution.code}` : "Próxima execução"}
+                </h2>
+                <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                  {nextExecution
+                    ? `${nextExecution.customerName} · ${nextExecution.nextAction.reason} · ${nextExecution.dueDateLabel}`
+                    : "Nenhuma O.S. retornada pelo backend para priorização operacional."}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <AppOperationalStatusBadge status={serviceOrdersOperationalStatus} />
+                {nextExecution ? <AppPriorityBadge priority={getServiceOrderPriority(nextExecution)} /> : null}
+                {nextExecution ? (
+                  <Button size="sm" onClick={() => runPrimaryAction(nextExecution)}>
+                    {nextExecution.nextAction.label}
+                  </Button>
+                ) : (
+                  <Button size="sm" variant="outline" onClick={() => setOpenCreate(true)}>
+                    Criar O.S.
+                  </Button>
+                )}
+              </div>
+            </div>
+            {nextExecution ? (
+              <div className="grid gap-2 md:grid-cols-3">
+                <AppStatusBadge label={`Ação: ${nextExecution.nextAction.label}`} tone="info" />
+                <AppStatusBadge label={`Motivo: ${nextExecution.nextAction.reason}`} tone="warning" />
+                <AppStatusBadge label={`Impacto: ${nextExecution.riskLabel}`} tone="accent" />
+              </div>
+            ) : null}
+          </AppSectionCard>
 
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <AppSectionCard className="space-y-3">
+            <div>
+              <p className="nexo-overline">Saúde operacional</p>
+              <p className="mt-1 text-sm text-[var(--text-secondary)]">Volume, execução e cobrança derivados dos dados existentes.</p>
+            </div>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
             {operationalKpis.map(kpi => (
               <AppStatCard
                 key={kpi.label}
@@ -686,7 +754,8 @@ export default function ServiceOrdersPage() {
                 }
               />
             ))}
-          </div>
+            </div>
+          </AppSectionCard>
 
           <AppFiltersBar className="shrink-0 gap-2 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-3">
             {[
@@ -790,6 +859,38 @@ export default function ServiceOrdersPage() {
                 />
               ) : (
                 <>
+                  <div className="overflow-x-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]">
+                    <AppDataTable>
+                      <thead>
+                        <tr>
+                          <th>O.S.</th>
+                          <th>Cliente</th>
+                          <th>Status</th>
+                          <th>Prioridade</th>
+                          <th>Responsável</th>
+                          <th>Ação</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {paginatedOrders.map(item => (
+                          <tr key={`table-${item.id}`}>
+                            <td>#{item.code}</td>
+                            <td>{item.customerName}</td>
+                            <td>
+                              <AppOperationalStatusBadge
+                                status={getServiceOrderOperationalStatus(item)}
+                                label={getStatusTone(item.status, item.isOverdue)}
+                              />
+                            </td>
+                            <td><AppPriorityBadge priority={getServiceOrderPriority(item)} /></td>
+                            <td>{item.responsibleName}</td>
+                            <td>{item.nextAction.label}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </AppDataTable>
+                  </div>
+
                   <div className="grid grid-cols-1 gap-2 lg:grid-cols-2 2xl:grid-cols-2">
                     {paginatedOrders.map(item => {
                     const canStart = capabilities.start && ["OPEN", "ASSIGNED"].includes(item.status);
@@ -829,7 +930,7 @@ export default function ServiceOrdersPage() {
                                 </p>
                               </div>
                               <span className="shrink-0 whitespace-nowrap pt-0.5">
-                                <AppStatusBadge label={getStatusTone(item.status, item.isOverdue)} />
+                                <AppOperationalStatusBadge status={getServiceOrderOperationalStatus(item)} label={getStatusTone(item.status, item.isOverdue)} />
                               </span>
                             </div>
 
@@ -963,7 +1064,8 @@ export default function ServiceOrdersPage() {
                       {selectedOrder.description}
                     </p>
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
-                      <AppStatusBadge
+                      <AppOperationalStatusBadge
+                        status={getServiceOrderOperationalStatus(selectedOrder)}
                         label={getStatusTone(selectedOrder.status, selectedOrder.isOverdue)}
                       />
                       <span>Responsável: {selectedOrder.responsibleName}</span>
@@ -1128,7 +1230,6 @@ export default function ServiceOrdersPage() {
             </AppSectionBlock>
           </div>
         </div>
-      </div>
 
         <CreateServiceOrderModal
           open={openCreate}
@@ -1159,6 +1260,6 @@ export default function ServiceOrdersPage() {
             name: safeText(item?.name, "Pessoa"),
           }))}
         />
-    </PageWrapper>
+    </AppPageShell>
   );
 }
