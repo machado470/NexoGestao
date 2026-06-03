@@ -681,7 +681,10 @@ export default function ExecutiveDashboard() {
       ? "Operação normal"
       : "Atenção / Aguardando ação";
   return (
-    <AppPageShell className="-mx-3 w-full max-w-none min-w-0 space-y-5 border-0 !rounded-none !bg-[#07182b] !px-3 !py-3 text-[#F3F6FB] sm:!px-4 sm:space-y-6 md:-mx-4 lg:!px-5 xl:!px-6">
+    <AppPageShell
+      className="-mx-3 -mb-4 min-h-full w-full max-w-none min-w-0 space-y-5 overflow-x-clip border-0 !rounded-none !bg-[#07182b] !px-3 !pb-4 !pt-3 text-[#F3F6FB] sm:space-y-6 md:-mx-4 md:-mb-5 md:!px-4 md:!pb-5 lg:!px-5 xl:!px-6"
+      style={{ boxShadow: "none" }}
+    >
       <AppOperationalHeader
         className="w-full max-w-none min-w-0 rounded-none border-transparent bg-transparent px-0 !py-1"
         density="compact"
