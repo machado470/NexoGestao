@@ -5,7 +5,17 @@ const source = readFileSync(new URL("./PeoplePage.tsx", import.meta.url), "utf8"
 const editModal = readFileSync(new URL("../components/EditPersonModal.tsx", import.meta.url), "utf8");
 
 describe("PeoplePage operational workload contract", () => {
-  it("renderiza o header operacional real", () => {
+  it("renderiza o shell e o header operacional padronizados", () => {
+    expect(source).toContain("<AppPageShell>");
+    expect(source).toContain("<AppOperationalHeader");
+    expect(source).toContain("<AppSectionCard");
+    expect(source).toContain("<AppNextBestActionBlock");
+    expect(source).toContain("<AppDataTable");
+    expect(source).toContain("<AppOperationalStatusBadge");
+    expect(source).toContain("<AppPriorityBadge");
+    expect(source).toContain("<AppRowActionsDropdown");
+    expect(source).not.toContain("PageWrapper");
+    expect(source).not.toContain("OperationalTopCard");
     expect(source).toContain('data-testid="people-operational-header"');
     expect(source).toContain('label="Pessoas ativas"');
     expect(source).toContain('label="Sobrecarregados"');
@@ -64,7 +74,8 @@ describe("PeoplePage temporary availability contract", () => {
 describe("PeoplePage assignee warning summary", () => {
   it("renderiza a leitura agregada administrativa com linguagem observacional", () => {
     expect(source).toContain("trpc.analytics.assigneeWarningSummary.useQuery");
-    expect(source).toContain('{isAdmin ? <AppSectionBlock title="Sinais de atribuição"');
+    expect(source).toContain('title="Sinais de atribuição"');
+    expect(source).toContain('<AppSectionCard className="p-4 text-sm">');
     expect(source).toContain('enabled: isAuthenticated && role === "ADMIN"');
     expect(source).toContain('data-testid="assignee-warning-summary"');
     expect(source).toContain('label="Alertas exibidos"');
