@@ -23,9 +23,18 @@ import {
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
 import { Button } from "@/components/design-system";
-import { PageWrapper } from "@/components/operating-system/Wrappers";
-import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
-import { AppRowActionsDropdown, AppStatCard } from "@/components/app-system";
+import {
+  AppDataTable,
+  AppOperationalStatusBadge,
+  AppPageShell,
+  AppPriorityBadge,
+  AppRowActionsDropdown,
+  AppSectionCard,
+  AppStatCard,
+  AppStatusBadge,
+  type AppOperationalStatus,
+  type AppPriorityLevel,
+} from "@/components/app-system";
 import {
   AppFiltersBar,
   AppActionBar,
@@ -39,7 +48,6 @@ import {
   AppPageLoadingState,
   AppPagination,
   AppSectionBlock,
-  AppStatusBadge,
   AppNextBestActionBlock,
 } from "@/components/internal-page-system";
 import { cn } from "@/lib/utils";
@@ -377,12 +385,26 @@ function buildCustomerProfiles(input: {
   });
 }
 
-function ActionCue({ children }: { children: string }) {
-  return (
-    <span className="inline-flex rounded-md border border-[var(--border-subtle)] px-2 py-1 text-[11px] font-medium text-[var(--text-secondary)]">
-      {children}
-    </span>
-  );
+function getCustomerOperationalStatus(profile: CustomerProfile): AppOperationalStatus {
+  if (profile.overdue > 0 || profile.daysWithoutContact >= 30) return "RISCO";
+  if (profile.pending > 0 || profile.hasOpenServiceOrder || profile.daysWithoutContact >= 15) return "ATENÇÃO";
+  return "NORMAL";
+}
+
+function getCustomersOperationalStatus(profiles: CustomerProfile[]): AppOperationalStatus {
+  const risk = profiles.filter(profile => getCustomerOperationalStatus(profile) === "RISCO").length;
+  const attention = profiles.filter(profile => getCustomerOperationalStatus(profile) === "ATENÇÃO").length;
+  if (risk >= 5) return "CRÍTICO";
+  if (risk > 0) return "RISCO";
+  if (attention > 0) return "ATENÇÃO";
+  return "NORMAL";
+}
+
+function getCustomerPriority(profile: CustomerProfile): AppPriorityLevel {
+  if (profile.overdue > 0 || profile.daysWithoutContact >= 30) return "P0";
+  if (profile.hasOpenServiceOrder || profile.pending > 0) return "P1";
+  if (profile.nextAppointment || profile.daysWithoutContact >= 15) return "P2";
+  return "P3";
 }
 
 export default function CustomersPage() {
@@ -843,9 +865,10 @@ export default function CustomersPage() {
     }
   }, [activeCustomerId, filteredProfiles, location, setActiveCustomerId]);
 
+  const customersOperationalStatus = getCustomersOperationalStatus(profiles);
+
   return (
-    <PageWrapper title="Clientes" showOperationalHeader={false}>
-      <div className="flex flex-col gap-4">
+    <AppPageShell className="space-y-4">
         <AppOperationalHeader
           title="Clientes"
           description="Centro de contexto operacional, financeiro e comunicação de cada relacionamento ativo."
@@ -855,20 +878,16 @@ export default function CustomersPage() {
           }
           contextChips={
             <>
-              <span className="rounded-md border border-[var(--border-subtle)] px-2 py-1 text-xs text-[var(--text-muted)]">
-                {customers.length} clientes na carteira
-              </span>
-              <span className="rounded-md border border-[var(--border-subtle)] px-2 py-1 text-xs text-[var(--text-muted)]">
-                {
-                  profiles.filter(profile => profile.status === "Em risco")
-                    .length
-                }{" "}
-                em risco
-              </span>
-              <span className="rounded-md border border-[var(--border-subtle)] px-2 py-1 text-xs text-[var(--text-muted)]">
-                {profiles.filter(profile => profile.hasOpenServiceOrder).length}{" "}
-                com O.S. aberta
-              </span>
+              <AppOperationalStatusBadge status={customersOperationalStatus} />
+              <AppStatusBadge label={`${customers.length} clientes na carteira`} tone="neutral" />
+              <AppStatusBadge
+                label={`${profiles.filter(profile => profile.status === "Em risco").length} em risco`}
+                tone="warning"
+              />
+              <AppStatusBadge
+                label={`${profiles.filter(profile => profile.hasOpenServiceOrder).length} com O.S. aberta`}
+                tone="info"
+              />
             </>
           }
         >
@@ -888,46 +907,48 @@ export default function CustomersPage() {
           </div>
         </AppOperationalHeader>
 
-        <OperationalTopCard
-          contextLabel="Próxima decisão da carteira"
-          title={
-            attentionItems[0]
-              ? attentionItems[0].title
-              : "Carteira sem bloqueio imediato"
-          }
-          description={
-            attentionItems[0]
-              ? attentionItems[0].context
-              : "Os dados retornados não apontam dívida vencida, O.S. aberta ou silêncio prolongado."
-          }
-          chips={
-            <>
-              <ActionCue>Financeiro</ActionCue>
-              <ActionCue>Execução</ActionCue>
-              <ActionCue>Comunicação</ActionCue>
-            </>
-          }
-          primaryAction={
-            attentionItems[0] ? (
-              <Button
-                size="sm"
-                onClick={() => runAttentionAction(attentionItems[0])}
-              >
-                {attentionItems[0].actionLabel}
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setCreateOpen(true)}
-              >
-                Novo cliente
-              </Button>
-            )
-          }
-        />
+        <AppSectionCard className="space-y-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="nexo-overline">Próxima decisão da carteira</p>
+              <h2 className="mt-1 text-lg font-semibold text-[var(--text-primary)]">
+                {attentionItems[0] ? attentionItems[0].title : "Carteira sem bloqueio imediato"}
+              </h2>
+              <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                {attentionItems[0]
+                  ? attentionItems[0].context
+                  : "Os dados retornados não apontam dívida vencida, O.S. aberta ou silêncio prolongado."}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <AppOperationalStatusBadge status={customersOperationalStatus} />
+              {attentionItems[0] ? (
+                <AppPriorityBadge priority="P0" />
+              ) : null}
+              {attentionItems[0] ? (
+                <Button size="sm" onClick={() => runAttentionAction(attentionItems[0])}>
+                  {attentionItems[0].actionLabel}
+                </Button>
+              ) : (
+                <Button size="sm" variant="outline" onClick={() => setCreateOpen(true)}>
+                  Novo cliente
+                </Button>
+              )}
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <AppStatusBadge label="Financeiro" tone="info" />
+            <AppStatusBadge label="Execução" tone="accent" />
+            <AppStatusBadge label="Comunicação" tone="neutral" />
+          </div>
+        </AppSectionCard>
 
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <AppSectionCard className="space-y-3">
+          <div>
+            <p className="nexo-overline">Resumo do cliente</p>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">Memória operacional consolidada da carteira.</p>
+          </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           <AppStatCard
             label="Saldo em atenção"
             value={formatCurrency(
@@ -979,7 +1000,8 @@ export default function CustomersPage() {
               </Button>
             }
           />
-        </div>
+          </div>
+        </AppSectionCard>
 
 
         <AppNextBestActionBlock
@@ -1109,6 +1131,35 @@ export default function CustomersPage() {
               />
             ) : (
               <div className="space-y-2.5">
+                <div className="overflow-x-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]">
+                  <AppDataTable>
+                    <thead>
+                      <tr>
+                        <th>Cliente</th>
+                        <th>Status</th>
+                        <th>Prioridade</th>
+                        <th>Financeiro</th>
+                        <th>Próxima ação</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paginatedProfiles.map(profile => (
+                        <tr key={`table-${profile.customerId}`}>
+                          <td>{String(profile.customer.name ?? "Sem nome")}</td>
+                          <td>
+                            <AppOperationalStatusBadge
+                              status={getCustomerOperationalStatus(profile)}
+                              label={profile.status}
+                            />
+                          </td>
+                          <td><AppPriorityBadge priority={getCustomerPriority(profile)} /></td>
+                          <td>{formatCurrency(profile.pendingCents)}</td>
+                          <td>{profile.nextActionLabel}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </AppDataTable>
+                </div>
                 {paginatedProfiles.map(profile => (
                   <article
                     key={profile.customerId}
@@ -1134,7 +1185,7 @@ export default function CustomersPage() {
                           <p className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--text-primary)]">
                             {String(profile.customer.name ?? "Sem nome")}
                           </p>
-                          <AppStatusBadge label={profile.status} />
+                          <AppOperationalStatusBadge status={getCustomerOperationalStatus(profile)} label={profile.status} />
                         </div>
                         <p className="mt-1 truncate text-xs text-[var(--text-secondary)]">
                           {profile.contact}
@@ -1159,11 +1210,9 @@ export default function CustomersPage() {
                           <span>Sinal: {profile.riskSignal}</span>
                         </div>
                         <div className="mt-3 flex flex-wrap items-center gap-2">
-                          <ActionCue>{profile.nextActionLabel}</ActionCue>
+                          <AppPriorityBadge priority={getCustomerPriority(profile)} label={profile.nextActionLabel} />
                           {profile.pendingCents === 0 ? (
-                            <ActionCue>
-                              Financeiro sem pendência retornada
-                            </ActionCue>
+                            <AppStatusBadge label="Financeiro sem pendência retornada" tone="neutral" />
                           ) : null}
                         </div>
                       </div>
@@ -1643,7 +1692,6 @@ export default function CustomersPage() {
           people={people}
           initialCustomerId={activeCustomerId}
         />
-      </div>
-    </PageWrapper>
+    </AppPageShell>
   );
 }

@@ -158,7 +158,7 @@ for (const page of pages) {
     /\bOperationalTopCard\b/.test(source) ||
     /\bNexoActionGroup\b/.test(source) ||
     (/\bAppSectionCard\b/.test(source) &&
-      /Próxima decisão financeira/.test(source));
+      /Próxima decisão financeira|Próxima decisão da carteira|Próxima melhor ação/.test(source));
   if (!hasLegacyActionBar && !hasNexoActionContract) {
     errors.push(
       `${page}: contrato de ações ausente (esperado ActionBarWrapper legado, OperationalTopCard/NexoActionGroup ou bloco oficial AppSectionCard do Nexo).`
