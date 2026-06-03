@@ -113,6 +113,9 @@ type DashboardAlerts = {
   operationalQueue?: QueueRecord[];
 };
 
+const fullWidthLayoutClass = "w-full max-w-none min-w-0";
+const dashboardSectionClass = `${fullWidthLayoutClass} border-transparent bg-transparent py-0`;
+
 const severityWeight: Record<Severity, number> = {
   critical: 3,
   high: 2,
@@ -324,7 +327,7 @@ function AttentionRow({
   navigate: (path: string) => void;
 }) {
   return (
-    <article className="relative py-2.5 pl-6 first:pt-0 last:pb-0">
+    <article className="relative w-full max-w-none min-w-0 py-2.5 pl-6 first:pt-0 last:pb-0">
       <ShieldAlert className="absolute left-0 top-3 h-4 w-4 text-[#EF4444] first:top-0" />
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0 flex-1">
@@ -678,9 +681,9 @@ export default function ExecutiveDashboard() {
       ? "Operação normal"
       : "Atenção / Aguardando ação";
   return (
-    <AppPageShell className="space-y-5 border-0 !rounded-none !bg-[#07182b] text-[#F3F6FB] sm:space-y-6">
+    <AppPageShell className="-mx-3 w-full max-w-none min-w-0 space-y-5 border-0 !rounded-none !bg-[#07182b] !px-3 !py-3 text-[#F3F6FB] sm:!px-4 sm:space-y-6 md:-mx-4 lg:!px-5 xl:!px-6">
       <AppOperationalHeader
-        className="rounded-none border-transparent bg-transparent px-0 !py-1"
+        className="w-full max-w-none min-w-0 rounded-none border-transparent bg-transparent px-0 !py-1"
         density="compact"
         title="Operação hoje"
         description="Decida primeiro o que destrava execução e caixa."
@@ -730,14 +733,14 @@ export default function ExecutiveDashboard() {
       ) : null}
 
       {!pageLoading && !pageError && hasOperationalData ? (
-        <div className="space-y-5 sm:space-y-6">
+        <div className="w-full max-w-none min-w-0 space-y-5 sm:space-y-6">
           <AppSectionBlock
             title="Atenção imediata"
-            className="border-[#EF4444]/25 bg-[#0b1f35]"
+            className={`${fullWidthLayoutClass} border-[#EF4444]/25 bg-[#0b1f35]`}
             subtitle="Comece aqui: riscos que interrompem execução, recebimento ou atendimento, em ordem de severidade."
           >
             {attention.length > 0 ? (
-              <div className="divide-y divide-white/[0.06]">
+              <div className="w-full max-w-none min-w-0 divide-y divide-white/[0.06]">
                 {attention.map(item => (
                   <AttentionRow key={item.id} item={item} navigate={navigate} />
                 ))}
@@ -752,11 +755,11 @@ export default function ExecutiveDashboard() {
 
           <AppSectionBlock
             title="Próxima melhor ação"
-            className="border-[#F97316]/30 bg-[#0b1f35]"
+            className={`${fullWidthLayoutClass} border-[#F97316]/30 bg-[#0b1f35]`}
             subtitle="Uma decisão principal para converter a leitura operacional em avanço imediato."
           >
             {recommendedAction ? (
-              <div className="flex flex-col gap-3 py-0.5 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex w-full max-w-none min-w-0 flex-col gap-3 py-0.5 lg:flex-row lg:items-center lg:justify-between">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="rounded-full border border-[#F97316]/25 bg-[#F97316]/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#FDBA74]">
@@ -810,14 +813,14 @@ export default function ExecutiveDashboard() {
           <AppSectionBlock
             title="KPIs operacionais"
             compact
-            className="border-transparent bg-transparent py-0"
+            className={dashboardSectionClass}
             subtitle="Indicadores de apoio para decidir rápido."
           >
-            <div className="flex flex-col divide-y divide-white/[0.06] lg:flex-row lg:divide-x lg:divide-y-0">
+            <div className="flex w-full max-w-none min-w-0 flex-col divide-y divide-white/[0.06] lg:flex-row lg:divide-x lg:divide-y-0">
               {kpiCards.map(({ label, value, context, cta, path, Icon }) => (
                 <article
                   key={label}
-                  className="min-w-0 px-3 py-3 first:pt-0 lg:flex-1 lg:first:pt-3"
+                  className="w-full max-w-none min-w-0 px-3 py-3 first:pt-0 lg:flex-1 lg:first:pt-3"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#8DA4C4]">
@@ -847,11 +850,11 @@ export default function ExecutiveDashboard() {
 
           <AppSectionBlock
             title="Fluxo operacional"
-            className="border-transparent bg-transparent py-0"
+            className={dashboardSectionClass}
             subtitle="Cliente → Agendamento → O.S. → Cobrança → Pagamento"
           >
             <div
-              className={`mb-3 flex flex-col gap-2 rounded-xl px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between ${
+              className={`mb-3 flex w-full max-w-none min-w-0 flex-col gap-2 rounded-xl px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between ${
                 bottleneck
                   ? "border border-[#F97316]/35 bg-[#F97316]/10 text-[#8DA4C4]"
                   : "border border-transparent bg-white/[0.02] text-[#8DA4C4]"
@@ -884,7 +887,7 @@ export default function ExecutiveDashboard() {
                 </span>
               )}
             </div>
-            <div className="flex min-w-0 flex-col divide-y divide-white/[0.06] 2xl:flex-row 2xl:divide-x 2xl:divide-y-0">
+            <div className="flex w-full max-w-none min-w-0 flex-col divide-y divide-white/[0.06] 2xl:flex-row 2xl:divide-x 2xl:divide-y-0">
               {flow.map((stage, index) => {
                 const isBreak = bottleneck?.label.startsWith(stage.label);
                 const StageIcon = [
@@ -897,7 +900,7 @@ export default function ExecutiveDashboard() {
                 return (
                   <article
                     key={stage.label}
-                    className={`relative min-w-0 rounded-xl border px-3 py-3 2xl:flex-1 ${
+                    className={`relative w-full max-w-none min-w-0 rounded-xl border px-3 py-3 2xl:flex-1 ${
                       isBreak
                         ? "rounded-xl border border-[#F97316]/45 bg-[#F97316]/10"
                         : "border border-transparent bg-transparent"
@@ -950,16 +953,16 @@ export default function ExecutiveDashboard() {
           <AppSectionBlock
             title="Fila operacional"
             compact
-            className="border-transparent bg-transparent py-0"
+            className={dashboardSectionClass}
             subtitle="Pendências curtas para destravar agora."
           >
             {queue.length > 0 ? (
-              <div>
-                <div className="flex flex-col divide-y divide-white/[0.06]">
+              <div className="w-full max-w-none min-w-0">
+                <div className="flex w-full max-w-none min-w-0 flex-col divide-y divide-white/[0.06]">
                   {queue.map(item => (
                     <article
                       key={`${item.type}-${item.id}`}
-                      className="min-w-0 px-3 py-3 first:pt-0 md:first:pt-3"
+                      className="w-full max-w-none min-w-0 px-3 py-3 first:pt-0 md:first:pt-3"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
@@ -1006,14 +1009,14 @@ export default function ExecutiveDashboard() {
           <AppSectionBlock
             title="Pulso da operação"
             compact
-            className="border-transparent bg-transparent py-0"
+            className={dashboardSectionClass}
             subtitle="Interpretação dos sinais para orientar a decisão."
           >
-            <div className="flex flex-col divide-y divide-white/[0.06] lg:flex-row lg:divide-x lg:divide-y-0">
+            <div className="flex w-full max-w-none min-w-0 flex-col divide-y divide-white/[0.06] lg:flex-row lg:divide-x lg:divide-y-0">
               {pulseInsights.map(({ label, Icon, iconClass, text }) => (
                 <article
                   key={label}
-                  className="px-3 py-3 text-sm leading-5 text-[#8DA4C4] first:pt-0 lg:flex-1 lg:first:pt-3"
+                  className="w-full max-w-none min-w-0 px-3 py-3 text-sm leading-5 text-[#8DA4C4] first:pt-0 lg:flex-1 lg:first:pt-3"
                 >
                   <div className="mb-2 flex items-center gap-2">
                     <span className="flex h-7 w-7 items-center justify-center rounded-full border border-white/[0.06] bg-[rgba(6,18,36,0.55)]">
@@ -1047,10 +1050,10 @@ export default function ExecutiveDashboard() {
           <AppSectionBlock
             title="Acessos rápidos contextuais"
             compact
-            className="border-transparent bg-transparent pb-1 pt-0"
+            className={`${fullWidthLayoutClass} border-transparent bg-transparent pb-1 pt-0`}
             subtitle="Atalhos secundários da operação."
           >
-            <div className="flex flex-wrap gap-2">
+            <div className="flex w-full max-w-none min-w-0 flex-wrap gap-2">
               {quickAccesses.map(({ label, path, Icon }) => (
                 <button
                   type="button"
@@ -1066,7 +1069,7 @@ export default function ExecutiveDashboard() {
                 </button>
               ))}
             </div>
-            <div className="mt-3 border-t border-white/[0.06] pt-3">
+            <div className="mt-3 w-full max-w-none min-w-0 border-t border-white/[0.06] pt-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs font-semibold text-[#F3F6FB]">
                   Aprovações WhatsApp · {pendingWhatsAppApprovals.length}
