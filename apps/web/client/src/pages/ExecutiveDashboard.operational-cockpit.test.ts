@@ -44,9 +44,7 @@ describe("ExecutiveDashboard decision center", () => {
   });
 
   it("gives every KPI context and CTA routes to its owning module", () => {
-    expect(source).toContain(
-      "Suporte rápido para a decisão, sem virar vitrine de números."
-    );
+    expect(source).toContain("Indicadores de apoio para decidir rápido.");
     expect(source).toContain("/finances?view=paid");
     expect(source).toContain("/service-orders?status=open");
     expect(source).toContain("/finances?view=charges&status=overdue");

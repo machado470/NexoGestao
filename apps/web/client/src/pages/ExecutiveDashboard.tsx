@@ -260,14 +260,23 @@ function buildQueue(alerts: DashboardAlerts): QueueItem[] {
     if (type === "OVERDUE_CHARGE") {
       const amount =
         typeof item.amountCents === "number" ? item.amountCents : 0;
+      const amountLabel = formatCurrencyFromCents(amount);
       const context = formatCurrencyMentions(
         String(item.context ?? "Prazo financeiro vencido")
-      );
+      )
+        .replace(
+          new RegExp(
+            `${amountLabel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*(?:-|·)?\\s*`,
+            "i"
+          ),
+          ""
+        )
+        .replace(/^\s*(?:-|·)\s*/, "");
       return {
         id: String(item.id),
         type: "Cobrança vencida",
         entity: String(item.title ?? "Cliente"),
-        context: `${formatCurrencyFromCents(amount)} pendentes · ${context}`,
+        context: `${amountLabel} pendentes${context ? ` · ${context}` : ""}`,
         ctaLabel: "Cobrar",
         path: "/finances?view=charges&status=overdue",
       };
@@ -329,9 +338,7 @@ function AttentionRow({
                     : "Monitorar"
               }
             />
-            <p className="text-sm font-semibold text-[#F3F6FB]">
-              {item.title}
-            </p>
+            <p className="text-sm font-semibold text-[#F3F6FB]">{item.title}</p>
           </div>
           <p className="mt-1 text-xs leading-5 text-[#8DA4C4]">
             <strong className="text-[#F3F6FB]">Motivo:</strong> {item.reason}
@@ -671,20 +678,19 @@ export default function ExecutiveDashboard() {
       ? "Operação normal"
       : "Atenção / Aguardando ação";
   const cockpitSurface =
-    "rounded-2xl border border-white/[0.06] bg-[linear-gradient(180deg,rgba(6,18,36,0.72),rgba(9,30,56,0.58))] p-2.5 sm:p-3 lg:p-4";
-  const sectionSurface =
-    "border-white/[0.06] bg-[rgba(6,18,36,0.42)]";
+    "rounded-2xl border border-white/[0.05] bg-[linear-gradient(180deg,rgba(6,18,36,0.66),rgba(9,30,56,0.50))] p-2.5 sm:p-3 lg:p-4";
+  const quietSectionSurface = "border-transparent bg-transparent";
 
   return (
     <AppPageShell className="space-y-3 bg-[#061224] bg-[radial-gradient(circle_at_16%_0%,rgba(59,130,246,0.13),transparent_28%),radial-gradient(circle_at_92%_12%,rgba(249,115,22,0.10),transparent_24%),linear-gradient(145deg,#061224,#07192E_48%,#081D34)] text-[#F3F6FB]">
       <AppOperationalHeader
-        className="border-white/[0.06] bg-[rgba(6,18,36,0.65)] px-4 !py-2"
+        className="border-transparent bg-transparent px-4 !py-2"
         density="compact"
         title="Operação hoje"
         description="Decida primeiro o que destrava execução e caixa."
         contextChips={
           <>
-            <span className="rounded-full border border-white/[0.06] bg-[rgba(9,30,56,0.72)] px-2 py-0.5 text-xs text-[#8DA4C4]">
+            <span className="rounded-full border border-white/[0.05] bg-white/[0.03] px-2 py-0.5 text-xs text-[#8DA4C4]">
               {formatPeriod()}
             </span>
             <span className="rounded-full border border-[#F97316]/25 bg-[#F97316]/10 px-2 py-0.5 text-xs font-medium text-[#FDBA74]">
@@ -694,10 +700,10 @@ export default function ExecutiveDashboard() {
               {criticalCount}{" "}
               {criticalCount === 1 ? "risco crítico" : "riscos críticos"}
             </span>
-            <span className="rounded-full border border-white/[0.06] bg-[rgba(9,30,56,0.72)] px-2 py-0.5 text-xs text-[#8DA4C4]">
+            <span className="rounded-full border border-white/[0.05] bg-white/[0.03] px-2 py-0.5 text-xs text-[#8DA4C4]">
               {overdueCharges} cobranças vencidas
             </span>
-            <span className="rounded-full border border-white/[0.06] bg-[rgba(9,30,56,0.72)] px-2 py-0.5 text-xs text-[#8DA4C4]">
+            <span className="rounded-full border border-white/[0.05] bg-white/[0.03] px-2 py-0.5 text-xs text-[#8DA4C4]">
               {overdueOrders} O.S. atrasadas
             </span>
           </>
@@ -729,16 +735,20 @@ export default function ExecutiveDashboard() {
 
       {!pageLoading && !pageError && hasOperationalData ? (
         <div className={cockpitSurface}>
-          <div className="space-y-3">
+          <div className="divide-y divide-white/[0.06]">
             <AppSectionBlock
               title="Atenção imediata"
-              className="border-[#EF4444]/25 bg-[linear-gradient(135deg,rgba(239,68,68,0.13),rgba(6,18,36,0.70)_45%,rgba(9,30,56,0.58))]"
+              className="mb-3 border-[#EF4444]/25 bg-[linear-gradient(135deg,rgba(239,68,68,0.13),rgba(6,18,36,0.70)_45%,rgba(9,30,56,0.58))]"
               subtitle="Comece aqui: riscos que interrompem execução, recebimento ou atendimento, em ordem de severidade."
             >
               {attention.length > 0 ? (
                 <div className="divide-y divide-white/[0.06]">
                   {attention.map(item => (
-                    <AttentionRow key={item.id} item={item} navigate={navigate} />
+                    <AttentionRow
+                      key={item.id}
+                      item={item}
+                      navigate={navigate}
+                    />
                   ))}
                 </div>
               ) : (
@@ -751,7 +761,7 @@ export default function ExecutiveDashboard() {
 
             <AppSectionBlock
               title="Próxima melhor ação"
-              className="border-[#F97316]/30 bg-[linear-gradient(135deg,rgba(249,115,22,0.14),rgba(6,18,36,0.68)_48%,rgba(9,30,56,0.60))]"
+              className="my-3 border-[#F97316]/30 bg-[linear-gradient(135deg,rgba(249,115,22,0.14),rgba(6,18,36,0.68)_48%,rgba(9,30,56,0.60))]"
               subtitle="Uma decisão principal para converter a leitura operacional em avanço imediato."
             >
               {recommendedAction ? (
@@ -768,10 +778,16 @@ export default function ExecutiveDashboard() {
                     </div>
                     <div className="mt-2 grid gap-1.5 text-sm leading-5 text-[#8DA4C4] md:grid-cols-2">
                       <p>
-                        <strong className="text-[#F3F6FB]">Por que agora:</strong> {recommendedAction.reason}
+                        <strong className="text-[#F3F6FB]">
+                          Por que agora:
+                        </strong>{" "}
+                        {recommendedAction.reason}
                       </p>
                       <p>
-                        <strong className="text-[#F3F6FB]">Efeito esperado:</strong> {recommendedAction.impact}
+                        <strong className="text-[#F3F6FB]">
+                          Efeito esperado:
+                        </strong>{" "}
+                        {recommendedAction.impact}
                       </p>
                     </div>
                   </div>
@@ -805,14 +821,14 @@ export default function ExecutiveDashboard() {
             <AppSectionBlock
               title="KPIs operacionais"
               compact
-              className={sectionSurface}
-              subtitle="Suporte rápido para a decisão, sem virar vitrine de números."
+              className={`${quietSectionSurface} py-4`}
+              subtitle="Indicadores de apoio para decidir rápido."
             >
-              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+              <div className="flex flex-col divide-y divide-white/[0.06] lg:flex-row lg:divide-x lg:divide-y-0">
                 {kpiCards.map(({ label, value, context, cta, path, Icon }) => (
                   <article
                     key={label}
-                    className="min-w-0 rounded-xl border border-white/[0.06] bg-[rgba(9,30,56,0.46)] px-3 py-2.5"
+                    className="min-w-0 px-3 py-3 first:pt-0 lg:flex-1 lg:first:pt-3"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#8DA4C4]">
@@ -842,14 +858,14 @@ export default function ExecutiveDashboard() {
 
             <AppSectionBlock
               title="Fluxo operacional"
-              className="border-white/[0.10] bg-[linear-gradient(180deg,rgba(9,30,56,0.74),rgba(6,18,36,0.66))]"
+              className={`${quietSectionSurface} py-4`}
               subtitle="Cliente → Agendamento → O.S. → Cobrança → Pagamento"
             >
               <div
                 className={`mb-3 flex flex-col gap-2 rounded-xl px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between ${
                   bottleneck
                     ? "border border-[#F97316]/35 bg-[#F97316]/10 text-[#8DA4C4]"
-                    : "border border-white/[0.06] bg-[rgba(9,30,56,0.42)] text-[#8DA4C4]"
+                    : "border border-transparent bg-white/[0.02] text-[#8DA4C4]"
                 }`}
               >
                 {bottleneck ? (
@@ -859,7 +875,8 @@ export default function ExecutiveDashboard() {
                         Gargalo principal: {bottleneck.label}
                       </strong>
                       <p className="text-xs text-[#8DA4C4]">
-                        {bottleneckStage} concentra a quebra do fluxo até recebimento.
+                        {bottleneckStage} concentra a quebra do fluxo até
+                        recebimento.
                       </p>
                     </div>
                     <Button
@@ -878,7 +895,7 @@ export default function ExecutiveDashboard() {
                   </span>
                 )}
               </div>
-              <div className="grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+              <div className="flex min-w-0 flex-col divide-y divide-white/[0.06] 2xl:flex-row 2xl:divide-x 2xl:divide-y-0">
                 {flow.map((stage, index) => {
                   const isBreak = bottleneck?.label.startsWith(stage.label);
                   const StageIcon = [
@@ -891,10 +908,10 @@ export default function ExecutiveDashboard() {
                   return (
                     <article
                       key={stage.label}
-                      className={`relative min-w-0 rounded-xl border px-3 py-3 ${
+                      className={`relative min-w-0 rounded-xl border px-3 py-3 2xl:flex-1 ${
                         isBreak
-                          ? "border-[#F97316]/60 bg-[#F97316]/12"
-                          : "border-white/[0.06] bg-[rgba(6,18,36,0.46)]"
+                          ? "rounded-xl border border-[#F97316]/45 bg-[#F97316]/10"
+                          : "border border-transparent bg-transparent"
                       }`}
                     >
                       {index < flow.length - 1 ? (
@@ -944,16 +961,16 @@ export default function ExecutiveDashboard() {
             <AppSectionBlock
               title="Fila operacional"
               compact
-              className={sectionSurface}
-              subtitle="Consequência direta do fluxo: itens curtos para destravar agora."
+              className={`${quietSectionSurface} py-4`}
+              subtitle="Pendências curtas para destravar agora."
             >
               {queue.length > 0 ? (
                 <div>
-                  <div className="grid gap-2 md:grid-cols-2">
+                  <div className="flex flex-col divide-y divide-white/[0.06]">
                     {queue.map(item => (
                       <article
                         key={`${item.type}-${item.id}`}
-                        className="min-w-0 rounded-xl border border-white/[0.06] bg-[rgba(9,30,56,0.44)] p-3"
+                        className="min-w-0 px-3 py-3 first:pt-0 md:first:pt-3"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
@@ -1000,14 +1017,14 @@ export default function ExecutiveDashboard() {
             <AppSectionBlock
               title="Pulso da operação"
               compact
-              className={sectionSurface}
+              className={`${quietSectionSurface} py-4`}
               subtitle="Interpretação dos sinais para orientar a decisão."
             >
-              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+              <div className="flex flex-col divide-y divide-white/[0.06] lg:flex-row lg:divide-x lg:divide-y-0">
                 {pulseInsights.map(({ label, Icon, iconClass, text }) => (
                   <article
                     key={label}
-                    className="rounded-xl bg-[rgba(9,30,56,0.34)] p-3 text-sm leading-5 text-[#8DA4C4]"
+                    className="px-3 py-3 text-sm leading-5 text-[#8DA4C4] first:pt-0 lg:flex-1 lg:first:pt-3"
                   >
                     <div className="mb-2 flex items-center gap-2">
                       <span className="flex h-7 w-7 items-center justify-center rounded-full border border-white/[0.06] bg-[rgba(6,18,36,0.55)]">
@@ -1029,7 +1046,7 @@ export default function ExecutiveDashboard() {
                   ))}
                   {missingComparisonCount > 0 ? (
                     <p className="mt-1">
-                      Histórico em formação: sem base histórica suficiente para {" "}
+                      Histórico em formação: sem base histórica suficiente para{" "}
                       {missingComparisonCount} de {pulseComparisons.length}{" "}
                       indicador(es).
                     </p>
@@ -1041,15 +1058,15 @@ export default function ExecutiveDashboard() {
             <AppSectionBlock
               title="Acessos rápidos contextuais"
               compact
-              className="border-white/[0.06] bg-[rgba(6,18,36,0.34)]"
-              subtitle="Rodapé operacional secundário."
+              className={`${quietSectionSurface} pt-4 pb-1`}
+              subtitle="Atalhos secundários da operação."
             >
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="flex flex-wrap gap-2">
                 {quickAccesses.map(({ label, path, Icon }) => (
                   <button
                     type="button"
                     key={path}
-                    className="flex w-full items-center justify-between gap-3 rounded-lg border border-white/[0.06] bg-[rgba(9,30,56,0.38)] px-3 py-2 text-left text-xs font-medium text-[#8DA4C4] transition-colors hover:text-[#F3F6FB] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F97316]"
+                    className="flex items-center gap-2 rounded-full border border-white/[0.05] bg-white/[0.03] px-3 py-2 text-left text-xs font-medium text-[#8DA4C4] transition-colors hover:border-[#F97316]/30 hover:text-[#F3F6FB] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F97316]"
                     onClick={() => navigate(path)}
                   >
                     <span className="flex min-w-0 items-center gap-2">
@@ -1060,7 +1077,7 @@ export default function ExecutiveDashboard() {
                   </button>
                 ))}
               </div>
-              <div className="mt-3 rounded-lg border border-white/[0.06] bg-[rgba(9,30,56,0.34)] p-3">
+              <div className="mt-3 border-t border-white/[0.06] pt-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-xs font-semibold text-[#F3F6FB]">
                     Aprovações WhatsApp · {pendingWhatsAppApprovals.length}
@@ -1093,7 +1110,7 @@ export default function ExecutiveDashboard() {
                         }
                       >
                         <span>
-                          {whatsappActionLabel(execution.suggestedAction)} · {" "}
+                          {whatsappActionLabel(execution.suggestedAction)} ·{" "}
                           {formatWhatsAppExecutionDate(execution.createdAt)}
                         </span>
                         <ArrowRight className="h-3.5 w-3.5 shrink-0" />
