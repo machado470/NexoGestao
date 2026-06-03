@@ -15,6 +15,7 @@ const pages = [
 ];
 
 const errors = [];
+const warnings = [];
 
 const modalContrastForbiddenPatterns = [
   /(?:^|\s)bg-slate-9\S*/,
@@ -52,10 +53,9 @@ const modalContrastScopeFiles = [
 function stripDarkScopedClassTokens(line) {
   return line
     .split(/\s+/)
-    .filter((token) => !token.includes("dark:"))
+    .filter(token => !token.includes("dark:"))
     .join(" ");
 }
-
 
 const forbiddenClasses = [
   "bg-zinc-900",
@@ -65,6 +65,35 @@ const forbiddenClasses = [
   "dark:bg-zinc-900",
   "dark:bg-slate-900",
 ];
+
+const suspiciousVisualTokens = [
+  "bg-gray-950",
+  "border-white",
+  "border-zinc",
+  "border-slate",
+  "text-white",
+  "dark:bg",
+  "dark:text",
+  "dark:border",
+  "rounded-2xl",
+  "p-6",
+  "p-8",
+];
+
+const foundationScopeFiles = [
+  "client/src/components/app-system.tsx",
+  "client/src/components/app-modal-system.tsx",
+  "client/src/components/internal-page-system.tsx",
+  "client/src/components/design-system.tsx",
+  "client/src/components/PagePattern.tsx",
+  "client/src/index.css",
+];
+
+const temporaryLegacyVisualAllowlist = new Set([
+  "client/src/components/PagePattern.tsx",
+  "client/src/components/design-system.tsx",
+  "client/src/index.css",
+]);
 
 const styleScopeFiles = [
   ...pages,
@@ -93,7 +122,12 @@ const statusScopePages = [
   "client/src/pages/ServiceOrdersPage.tsx",
   "client/src/pages/FinancesPage.tsx",
 ];
-const forbiddenOperationalVisualPatterns = ["shadow-", "ring-", "backdrop-", "blur-"];
+const forbiddenOperationalVisualPatterns = [
+  "shadow-",
+  "ring-",
+  "backdrop-",
+  "blur-",
+];
 const operationalVisualScopeFiles = [
   "client/src/pages/ExecutiveDashboard.tsx",
   "client/src/pages/CustomersPage.tsx",
@@ -195,6 +229,20 @@ for (const file of designSystemScope) {
   }
 }
 
+for (const file of foundationScopeFiles) {
+  const source = readFileSync(join(root, file), "utf8");
+  for (const token of suspiciousVisualTokens) {
+    if (source.includes(token)) {
+      const disposition = temporaryLegacyVisualAllowlist.has(file)
+        ? "legado permitido temporariamente"
+        : "revisar antes de novas telas";
+      warnings.push(
+        `${file}: token visual suspeito (${token}) detectado — ${disposition}.`
+      );
+    }
+  }
+}
+
 for (const file of modalContrastScopeFiles) {
   const source = readFileSync(join(root, file), "utf8");
   source.split(/\r?\n/).forEach((line, index) => {
@@ -210,10 +258,17 @@ for (const file of modalContrastScopeFiles) {
   });
 }
 
+if (warnings.length > 0) {
+  console.warn("\n⚠️ Avisos de padronização visual (não bloqueantes):\n");
+  for (const warning of warnings) console.warn(`- ${warning}`);
+}
+
 if (errors.length > 0) {
   console.error("\n❌ Validação Operating System falhou:\n");
   for (const err of errors) console.error(`- ${err}`);
   process.exit(1);
 }
 
-console.log("✅ Validação Operating System concluída sem inconsistências.");
+console.log(
+  "✅ Validação Operating System concluída sem inconsistências bloqueantes."
+);

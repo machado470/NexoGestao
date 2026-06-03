@@ -52,7 +52,10 @@ export function AppPageShell({
 }: ComponentProps<"section">) {
   return (
     <section
-      className={cn("nexo-page-shell w-full min-w-0 max-w-none flex flex-col gap-4", className)}
+      className={cn(
+        "nexo-page-shell w-full min-w-0 max-w-none flex flex-col gap-4",
+        className
+      )}
       {...props}
     />
   );
@@ -144,7 +147,9 @@ export function AppEmptyState({
       <p className="text-base font-semibold leading-tight text-[var(--text-primary)]">
         {title}
       </p>
-      <p className="max-w-xl text-sm leading-6 text-[var(--text-muted)]">{description}</p>
+      <p className="max-w-xl text-sm leading-6 text-[var(--text-muted)]">
+        {description}
+      </p>
       {action ? <div className="pt-1">{action}</div> : null}
     </section>
   );
@@ -152,6 +157,73 @@ export function AppEmptyState({
 
 export const AppDataTable = DataTable;
 export const AppStatusBadge = NexoStatusBadge;
+
+export type AppOperationalStatus = "NORMAL" | "ATENÇÃO" | "RISCO" | "CRÍTICO";
+
+const appOperationalStatusTone: Record<
+  AppOperationalStatus,
+  ComponentProps<typeof AppStatusBadge>["tone"]
+> = {
+  NORMAL: "success",
+  ATENÇÃO: "warning",
+  RISCO: "accent",
+  CRÍTICO: "danger",
+};
+
+export function AppOperationalStatusBadge({
+  status,
+  label = status,
+  className,
+}: {
+  status: AppOperationalStatus;
+  label?: string;
+  className?: string;
+}) {
+  return (
+    <AppStatusBadge
+      label={label}
+      tone={appOperationalStatusTone[status]}
+      className={className}
+    />
+  );
+}
+
+export type AppPriorityLevel = "P0" | "P1" | "P2" | "P3";
+
+const appPriorityTone: Record<
+  AppPriorityLevel,
+  ComponentProps<typeof AppStatusBadge>["tone"]
+> = {
+  P0: "danger",
+  P1: "warning",
+  P2: "info",
+  P3: "neutral",
+};
+
+const appPriorityLabel: Record<AppPriorityLevel, string> = {
+  P0: "P0 · agir agora",
+  P1: "P1 · resolver hoje",
+  P2: "P2 · acompanhar",
+  P3: "P3 · informativo",
+};
+
+export function AppPriorityBadge({
+  priority,
+  label = appPriorityLabel[priority],
+  className,
+}: {
+  priority: AppPriorityLevel;
+  label?: string;
+  className?: string;
+}) {
+  return (
+    <AppStatusBadge
+      label={label}
+      tone={appPriorityTone[priority]}
+      className={className}
+    />
+  );
+}
 
 export function AppRowActionsDropdown({
   triggerLabel = "Ações",
@@ -253,14 +325,21 @@ export function AppFormSection({
   children: ReactNode;
 }) {
   return (
-    <section className={cn("nexo-form-section space-y-3 rounded-xl border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] p-4", className)}>
+    <section
+      className={cn(
+        "nexo-form-section space-y-3 rounded-xl border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] p-4",
+        className
+      )}
+    >
       {title ? (
         <h3 className="text-sm font-semibold text-[var(--modal-section-text)]">
           {title}
         </h3>
       ) : null}
       {subtitle ? (
-        <p className="nexo-helper-text text-xs text-[var(--modal-section-muted)]">{subtitle}</p>
+        <p className="nexo-helper-text text-xs text-[var(--modal-section-muted)]">
+          {subtitle}
+        </p>
       ) : null}
       {children}
     </section>
@@ -436,7 +515,11 @@ export function AppTimelineItem({ className, ...props }: ComponentProps<"li">) {
 
 export const AppActivityFeed = AppTimeline;
 
-type AppOperationalState = "NORMAL" | "ATENÇÃO" | "CRÍTICO" | "WARNING" | "RESTRICTED" | "SUSPENDED";
+type AppOperationalState =
+  | AppOperationalStatus
+  | "WARNING"
+  | "RESTRICTED"
+  | "SUSPENDED";
 
 const operationalStateTone: Record<
   AppOperationalState,
@@ -447,6 +530,7 @@ const operationalStateTone: Record<
 > = {
   NORMAL: { badgeTone: "success", borderClass: "border-[var(--success)]/30" },
   ATENÇÃO: { badgeTone: "warning", borderClass: "border-[var(--warning)]/30" },
+  RISCO: { badgeTone: "accent", borderClass: "border-[var(--accent)]/35" },
   CRÍTICO: { badgeTone: "danger", borderClass: "border-[var(--danger)]/35" },
   WARNING: { badgeTone: "warning", borderClass: "border-[var(--warning)]/30" },
   RESTRICTED: { badgeTone: "accent", borderClass: "border-[var(--accent)]/35" },
@@ -643,9 +727,9 @@ export function AppEntityContextPanel({
           <div key={link.id} className="inline-flex items-center gap-2">
             <a
               className={cn(
-                "rounded-full border border-[var(--border-soft)] bg-[var(--surface-primary)]/35 px-3 py-1 text-white/72",
+                "rounded-full border border-[var(--border-soft)] bg-[var(--nexo-card-muted)] px-3 py-1 text-[var(--text-secondary)]",
                 link.active &&
-                  "border-[color-mix(in_srgb,var(--accent-primary)_72%,black)] bg-[var(--accent-primary)] text-white shadow-[0_8px_18px_-16px_var(--accent-primary)]"
+                  "border-[color-mix(in_srgb,var(--accent-primary)_72%,var(--nexo-border-strong))] bg-[var(--accent-primary)] text-[var(--primary-foreground)] shadow-[0_8px_18px_-16px_var(--accent-primary)]"
               )}
               href={link.href}
             >
