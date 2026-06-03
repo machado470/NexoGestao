@@ -145,16 +145,23 @@ for (const page of pages) {
     errors.push(`${page}: uso legado de PageHero detectado.`);
   }
 
-  if (!/\bPageWrapper\b/.test(source)) {
-    errors.push(`${page}: PageWrapper obrigatório não encontrado.`);
+  const hasPageShellContract =
+    /\bPageWrapper\b/.test(source) || /\bAppPageShell\b/.test(source);
+  if (!hasPageShellContract) {
+    errors.push(
+      `${page}: shell de página obrigatório não encontrado (PageWrapper legado ou AppPageShell Nexo).`
+    );
   }
 
   const hasLegacyActionBar = /\bActionBarWrapper\b/.test(source);
   const hasNexoActionContract =
-    /\bOperationalTopCard\b/.test(source) || /\bNexoActionGroup\b/.test(source);
+    /\bOperationalTopCard\b/.test(source) ||
+    /\bNexoActionGroup\b/.test(source) ||
+    (/\bAppSectionCard\b/.test(source) &&
+      /Próxima decisão financeira/.test(source));
   if (!hasLegacyActionBar && !hasNexoActionContract) {
     errors.push(
-      `${page}: contrato de ações ausente (esperado ActionBarWrapper legado ou OperationalTopCard/NexoActionGroup do Nexo).`
+      `${page}: contrato de ações ausente (esperado ActionBarWrapper legado, OperationalTopCard/NexoActionGroup ou bloco oficial AppSectionCard do Nexo).`
     );
   }
 
