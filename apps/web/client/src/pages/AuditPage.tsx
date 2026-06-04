@@ -14,6 +14,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/contexts/AuthContext";
 
 export const AUDIT_PAGE_SIZE = 25;
 
@@ -147,10 +148,21 @@ export default function AuditPage() {
   const [filters, setFilters] = useState<AuditFilters>({});
   const [selectedEvent, setSelectedEvent] = useState<AuditEvent | null>(null);
   const [last24HoursFrom] = useState(() => new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+  const { isAuthenticated, role } = useAuth();
+  const canLoadAudit = isAuthenticated && role === "ADMIN";
 
-  const listQuery = trpc.nexo.audit.listEvents.useQuery({ page, limit: AUDIT_PAGE_SIZE, ...filters });
-  const summaryQuery = trpc.nexo.audit.getSummary.useQuery({ from: filters.from, to: filters.to });
-  const last24HoursQuery = trpc.nexo.audit.getSummary.useQuery({ from: last24HoursFrom });
+  const listQuery = trpc.nexo.audit.listEvents.useQuery(
+    { page, limit: AUDIT_PAGE_SIZE, ...filters },
+    { enabled: canLoadAudit, retry: false }
+  );
+  const summaryQuery = trpc.nexo.audit.getSummary.useQuery(
+    { from: filters.from, to: filters.to },
+    { enabled: canLoadAudit, retry: false }
+  );
+  const last24HoursQuery = trpc.nexo.audit.getSummary.useQuery(
+    { from: last24HoursFrom },
+    { enabled: canLoadAudit, retry: false }
+  );
 
   const { events, pagination } = useMemo(() => normalizeAuditList(listQuery.data), [listQuery.data]);
   const summary = useMemo(() => normalizeAuditSummary(summaryQuery.data), [summaryQuery.data]);

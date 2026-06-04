@@ -523,6 +523,7 @@ const CalendarRoute = lazyProtectedPage(CalendarPage, {
 });
 
 const SettingsRoute = lazyProtectedPage(SettingsPage, {
+  requiredRoles: ["ADMIN"],
   requireCompletedOnboarding: true,
 });
 const ProfileRoute = lazyProtectedPage(ProfilePage, {

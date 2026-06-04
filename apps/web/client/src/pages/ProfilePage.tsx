@@ -17,6 +17,7 @@ import {
 import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload, normalizeObjectPayload } from "@/lib/query-helpers";
 import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
+import { useAuth } from "@/contexts/AuthContext";
 
 function currencyBRL(value: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value / 100);
@@ -53,13 +54,14 @@ function formatDuration(start: unknown, end: unknown) {
 
 export default function ProfilePage() {
   const [, navigate] = useLocation();
+  const { isAuthenticated } = useAuth();
   const [availability, setAvailability] = useOperationalMemoryState("nexo.profile.availability.v3", "Disponível");
 
-  const meQuery = trpc.nexo.me.useQuery(undefined, { retry: false });
-  const appointmentsQuery = trpc.nexo.appointments.list.useQuery(undefined, { retry: false });
-  const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery({ page: 1, limit: 120 }, { retry: false });
-  const chargesQuery = trpc.finance.charges.list.useQuery({ page: 1, limit: 120 }, { retry: false });
-  const timelineQuery = trpc.nexo.timeline.listByOrg.useQuery({ limit: 80 }, { retry: false });
+  const meQuery = trpc.nexo.me.useQuery(undefined, { enabled: isAuthenticated, retry: false });
+  const appointmentsQuery = trpc.nexo.appointments.list.useQuery(undefined, { enabled: isAuthenticated, retry: false });
+  const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery({ page: 1, limit: 120 }, { enabled: isAuthenticated, retry: false });
+  const chargesQuery = trpc.finance.charges.list.useQuery({ page: 1, limit: 120 }, { enabled: isAuthenticated, retry: false });
+  const timelineQuery = trpc.nexo.timeline.listByOrg.useQuery({ limit: 80 }, { enabled: isAuthenticated, retry: false });
 
   const me = useMemo(() => normalizeObjectPayload<any>(meQuery.data) ?? {}, [meQuery.data]);
   const appointments = useMemo(() => normalizeArrayPayload<any>(appointmentsQuery.data), [appointmentsQuery.data]);

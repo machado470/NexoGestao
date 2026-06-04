@@ -16,6 +16,7 @@ import {
 import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload, normalizeObjectPayload } from "@/lib/query-helpers";
 import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
+import { useAuth } from "@/contexts/AuthContext";
 
 type SettingsSectionKey = "empresa" | "usuarios" | "operacao" | "financeiro" | "whatsapp" | "automacoes" | "governanca" | "integracoes" | "sistema";
 
@@ -40,9 +41,10 @@ const SECTION_ORDER: Array<{
 
 export default function SettingsPage() {
   const [, navigate] = useLocation();
-  const settingsQuery = trpc.nexo.settings.get.useQuery(undefined, { retry: false });
-  const membersQuery = trpc.nexo.invites.members.useQuery(undefined, { retry: false });
-  const readinessQuery = trpc.integrations.readiness.useQuery(undefined, { retry: false });
+  const { isAuthenticated } = useAuth();
+  const settingsQuery = trpc.nexo.settings.get.useQuery(undefined, { enabled: isAuthenticated, retry: false });
+  const membersQuery = trpc.nexo.invites.members.useQuery(undefined, { enabled: isAuthenticated, retry: false });
+  const readinessQuery = trpc.integrations.readiness.useQuery(undefined, { enabled: isAuthenticated, retry: false });
   const utils = trpc.useUtils();
 
   const settings = useMemo(() => normalizeObjectPayload<any>(settingsQuery.data) ?? {}, [settingsQuery.data]);
@@ -70,8 +72,8 @@ export default function SettingsPage() {
     onError: error => toast.error(error.message || "Não foi possível salvar agora."),
   });
 
-  const isLoading = settingsQuery.isLoading || membersQuery.isLoading || readinessQuery.isLoading;
-  const hasError = settingsQuery.isError || membersQuery.isError || readinessQuery.isError;
+  const isLoading = settingsQuery.isLoading || membersQuery.isLoading;
+  const hasError = settingsQuery.isError || membersQuery.isError;
   const hasUnsavedChanges =
     name !== String(settings.name ?? "") ||
     timezone !== String(settings.timezone ?? "America/Sao_Paulo");

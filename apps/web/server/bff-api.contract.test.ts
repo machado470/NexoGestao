@@ -59,6 +59,34 @@ describe("BFF↔API contract: critical frontend consumers", () => {
     );
   });
 
+  it("nexo.me -> normaliza payload operacional envelopado para o perfil", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({
+        success: true,
+        data: {
+          success: true,
+          data: {
+            user: { id: "u1", email: "paula@nexo.dev", role: "ADMIN", personId: "p1", person: { id: "p1", name: "Paula Almeida", active: true } },
+            organization: { id: "org-1", name: "Oficina" },
+            operational: { state: "NORMAL" },
+            assignments: [],
+          },
+        },
+      }), { status: 200 }),
+    );
+
+    const result = await makeAuthedCaller().nexo.me();
+
+    expect(result).toEqual(expect.objectContaining({
+      id: "u1",
+      personId: "p1",
+      name: "Paula Almeida",
+      role: "ADMIN",
+      organization: { id: "org-1", name: "Oficina" },
+      operational: { state: "NORMAL" },
+    }));
+  });
+
   it("settings.get -> chama endpoint correto e propaga formato", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
       new Response(JSON.stringify({ timezone: "America/Sao_Paulo", currency: "BRL" }), { status: 200 }),
@@ -81,6 +109,18 @@ describe("BFF↔API contract: critical frontend consumers", () => {
     const body = JSON.parse(String((init as RequestInit).body));
     expect(body).toEqual({ name: "Nexo Oficina", timezone: "UTC" });
     expect(body.orgId).toBeUndefined();
+  });
+
+  it("audit.listEvents -> chama endpoint administrativo tenant-scoped e normaliza envelope", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true, data: { data: [], pagination: { page: 1, limit: 25, total: 0, pages: 0 } } }), { status: 200 }),
+    );
+
+    const result = await makeAuthedCaller().nexo.audit.listEvents({ page: 1, limit: 25, orgId: "forged" } as any);
+
+    expect(result).toEqual({ data: [], pagination: { page: 1, limit: 25, total: 0, pages: 0 } });
+    expect(globalThis.fetch).toHaveBeenCalledWith(expect.stringContaining("/audit/events?page=1&limit=25"), expect.any(Object));
+    expect(String(vi.mocked(globalThis.fetch).mock.calls[0]?.[0])).not.toContain("orgId");
   });
 
   it("people.list e people.statsLinked -> normalizam envelopes compatíveis com frontend", async () => {

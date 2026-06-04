@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import { nexoFetch } from "../_core/nexoClient";
+import { unwrapNexoApiResponse } from "../_core/nexoEnvelope";
 
 const conversionEventName = z.enum([
   "cta_click",
@@ -42,7 +43,8 @@ export const analyticsRouter = router({
       if (input?.from) search.set("from", input.from);
       if (input?.to) search.set("to", input.to);
       const query = search.toString();
-      return await nexoFetch(ctx.req, `/analytics/assignee-warning-summary${query ? `?${query}` : ""}`);
+      const raw = await nexoFetch(ctx.req, `/analytics/assignee-warning-summary${query ? `?${query}` : ""}`);
+      return unwrapNexoApiResponse(raw);
     }),
   track: protectedProcedure
     .input(

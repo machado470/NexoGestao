@@ -260,6 +260,27 @@ async function authedPatch(ctx: CtxLike, path: string, body?: unknown) {
   });
 }
 
+function normalizeMeForProfile(raw: any) {
+  const user = raw && typeof raw === "object" && raw.user && typeof raw.user === "object" ? raw.user : null;
+  if (!user) return raw;
+
+  const person = user.person && typeof user.person === "object" ? user.person : null;
+
+  return {
+    ...raw,
+    ...user,
+    name: user.name ?? person?.name ?? user.email ?? null,
+    personId: user.personId ?? person?.id ?? null,
+    person: person ?? null,
+    organization: raw.organization ?? null,
+    operational: raw.operational ?? null,
+    pending: raw.pending ?? null,
+    assignments: Array.isArray(raw.assignments) ? raw.assignments : [],
+    requiresOnboarding: raw.requiresOnboarding ?? raw.organization?.requiresOnboarding ?? false,
+    redirect: raw.redirect ?? null,
+  };
+}
+
 const anyInput = z.any().optional();
 
 const customerCreateInput = z.object({
@@ -541,7 +562,8 @@ export const nexoProxyRouter = router({
   }),
 
   me: protectedProcedure.query(async ({ ctx }) => {
-    return authedGet(ctx as CtxLike, "/me");
+    const raw = await authedGet(ctx as CtxLike, "/me");
+    return normalizeMeForProfile(raw);
   }),
 
   customers: router({
