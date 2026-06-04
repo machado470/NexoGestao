@@ -86,6 +86,19 @@ describe("BFF↔API contract - lote 1", () => {
     await expect(caller.analytics.assigneeWarningSummary({ orgId: "forged" } as any)).rejects.toBeDefined();
   });
 
+  it("analytics.assigneeWarningSummary normaliza envelope duplo da API", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true, data: { ok: true, data: { totals: { shown: 0, confirmed: 0, confirmationRatePct: null }, byContext: [], byWarningType: [] } } }), { status: 200 }),
+    );
+    const caller = appRouter.createCaller({ req: makeReq(), res: makeRes(), user: { token: "t1", validated: true, organizationId: "org-trusted" } } as any);
+
+    await expect(caller.analytics.assigneeWarningSummary()).resolves.toEqual({
+      totals: { shown: 0, confirmed: 0, confirmationRatePct: null },
+      byContext: [],
+      byWarningType: [],
+    });
+  });
+
   it("people.operationalSummary usa endpoint tenant-scoped sem aceitar orgId do client", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(JSON.stringify({ people: [] }), { status: 200 }),

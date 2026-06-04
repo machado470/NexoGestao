@@ -71,3 +71,26 @@ com suporte adicional a envelopes explícitos `{ success: true, data }` e `{ ok:
 
 - Validação manual completa em navegador com sessão piloto/admin depende de ambiente local com API, DB e usuários seedados disponíveis.
 - Se `/settings` ainda for acessada por papel não-admin, a API continuará retornando `403` conforme o contrato atual documentado; isso é uma decisão de produto/autorização separada e não foi relaxada neste lote.
+
+## Correções finais das páginas internas remanescentes
+
+Data: 2026-06-04.
+
+Este complemento fecha os problemas restantes observados em `/audit`, `/profile`, `/settings` e nos blocos operacionais de `/people`.
+
+### O que foi corrigido
+
+- `/audit`: as queries administrativas agora dependem explicitamente de sessão autenticada e role `ADMIN` antes de disparar. A proteção visual e o `@Roles('ADMIN')` da API foram preservados.
+- `/profile`: `nexo.me` no BFF normaliza o payload real de `/me` para expor dados reais de `user/person` no nível que a página consome, mantendo também `organization`, `operational`, `pending` e `assignments`. As queries protegidas da página passaram a usar `enabled: isAuthenticated`.
+- `/settings`: a rota frontend foi alinhada à exigência real de `ADMIN`; settings/members continuam bloqueantes, mas readiness deixou de bloquear renderização porque é health ambiental informativo. As queries usam `enabled: isAuthenticated` e mantêm `retry: false`.
+- `/people`: `analytics.assigneeWarningSummary` passou a remover envelopes globais/duplos da API no BFF antes de entregar o contrato operacional ao frontend. O endpoint segue tenant-scoped e sem aceitar `orgId` do client.
+
+### Garantias mantidas
+
+- Nenhum mock ou dado falso foi criado para esconder falha.
+- `orgId` continua derivado da sessão/token.
+- Guards e roles administrativos foram mantidos.
+- `retry: false` foi preservado nas queries alteradas.
+- Não houve alteração visual, de tema, shell, sidebar ou design system.
+
+Relatório detalhado: `docs/NEXO_FINAL_INTERNAL_PAGES_FIXES.md`.
