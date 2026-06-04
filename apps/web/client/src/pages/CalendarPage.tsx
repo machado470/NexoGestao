@@ -6,6 +6,7 @@ import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import { AlertTriangle, CheckCircle2, Clock3, MessageSquare, Plus, RefreshCcw } from "lucide-react";
 import { useLocation } from "wouter";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/design-system";
 import { AppToolbar, AppTimeline, AppTimelineItem } from "@/components/app-system";
 import { CreateAppointmentModal } from "@/components/CreateAppointmentModal";
@@ -64,6 +65,7 @@ function normalizeEventStatus(status: string) {
 
 export default function CalendarPage() {
   const [, navigate] = useLocation();
+  const { isAuthenticated } = useAuth();
   const [viewMode, setViewMode] = useOperationalMemoryState<ViewMode>("nexo.calendar.view.v1", "timeGridWeek");
   const [selectedId, setSelectedId] = useOperationalMemoryState<string | null>("nexo.calendar.selected-id.v1", null);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -75,10 +77,16 @@ export default function CalendarPage() {
 
   const appointmentsQuery = trpc.nexo.appointments.list.useQuery(
     teamFilter === "all" ? { limit: 1000 } : { assignedToPersonId: teamFilter, limit: 1000 },
-    { retry: false }
+    { enabled: isAuthenticated, retry: false }
   );
-  const customersQuery = trpc.nexo.customers.list.useQuery(undefined, { retry: false });
-  const peopleQuery = trpc.people.list.useQuery(undefined, { retry: false });
+  const customersQuery = trpc.nexo.customers.list.useQuery(undefined, {
+    enabled: isAuthenticated,
+    retry: false,
+  });
+  const peopleQuery = trpc.people.list.useQuery(undefined, {
+    enabled: isAuthenticated,
+    retry: false,
+  });
   const updateAppointment = trpc.nexo.appointments.update.useMutation();
 
   const appointments = useMemo(

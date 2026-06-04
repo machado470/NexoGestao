@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 import { trpc } from "@/lib/trpc";
 import CreateCustomerModal from "@/components/CreateCustomerModal";
 import EditCustomerModal from "@/components/EditCustomerModal";
@@ -409,6 +410,7 @@ function getCustomerPriority(profile: CustomerProfile): AppPriorityLevel {
 
 export default function CustomersPage() {
   const [location, navigate] = useLocation();
+  const { isAuthenticated } = useAuth();
   const [searchTerm, setSearchTerm] = useOperationalMemoryState(
     "nexo.customers.search.v2",
     ""
@@ -437,21 +439,24 @@ export default function CustomersPage() {
 
   const customersQuery = trpc.nexo.customers.list.useQuery(
     { page: 1, limit: 300 },
-    { retry: false }
+    { enabled: isAuthenticated, retry: false }
   );
   const appointmentsQuery = trpc.nexo.appointments.list.useQuery(
     { page: 1, limit: 500 },
-    { retry: false }
+    { enabled: isAuthenticated, retry: false }
   );
   const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery(
     { page: 1, limit: 500 },
-    { retry: false }
+    { enabled: isAuthenticated, retry: false }
   );
   const chargesQuery = trpc.finance.charges.list.useQuery(
     { page: 1, limit: 500 },
-    { retry: false }
+    { enabled: isAuthenticated, retry: false }
   );
-  const peopleQuery = trpc.people.list.useQuery(undefined, { retry: false });
+  const peopleQuery = trpc.people.list.useQuery(undefined, {
+    enabled: isAuthenticated,
+    retry: false,
+  });
   const trpcUtils = trpc.useUtils();
   const sendInlineWhatsApp = trpc.nexo.whatsapp.send.useMutation();
   const [isRefreshingWorkspace, setIsRefreshingWorkspace] = useState(false);
@@ -490,7 +495,7 @@ export default function CustomersPage() {
 
   const workspaceQuery = trpc.nexo.customers.workspace.useQuery(
     { id: activeCustomerId ?? "" },
-    { enabled: Boolean(activeCustomerId), retry: false }
+    { enabled: isAuthenticated && Boolean(activeCustomerId), retry: false }
   );
 
   const workspace = useMemo(

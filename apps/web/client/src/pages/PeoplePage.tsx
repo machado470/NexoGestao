@@ -34,6 +34,10 @@ import {
   AppSectionBlock,
 } from "@/components/internal-page-system";
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  normalizeArrayPayload,
+  normalizeObjectPayload,
+} from "@/lib/query-helpers";
 import { trpc } from "@/lib/trpc";
 
 // Source contract anchors used by static operational guardrails:
@@ -231,7 +235,7 @@ export default function PeoplePage() {
   );
   const exceptionsQuery = trpc.people.listAvailabilityExceptions.useQuery(
     { personId: selectedPersonId ?? "" },
-    { enabled: Boolean(selectedPersonId), retry: false }
+    { enabled: isAuthenticated && Boolean(selectedPersonId), retry: false }
   );
   const createAvailabilityException =
     trpc.people.createAvailabilityException.useMutation({
@@ -254,22 +258,47 @@ export default function PeoplePage() {
         ]);
       },
     });
-  const people =
-    ((summaryQuery.data ?? { people: [] }) as { people: OperationalPerson[] })
-      .people ?? [];
+  const summaryPayload = normalizeObjectPayload<{ people?: OperationalPerson[] }>(
+    summaryQuery.data
+  );
+  const people = normalizeArrayPayload<OperationalPerson>(
+    summaryPayload?.people
+  );
   const selectedPerson =
     people.find(person => person.personId === selectedPersonId) ?? null;
-  const exceptions = (exceptionsQuery.data ?? []) as AvailabilityException[];
+  const exceptions = normalizeArrayPayload<AvailabilityException>(
+    exceptionsQuery.data
+  );
   const isAdmin = role === "ADMIN";
-  const warningSummary = warningSummaryQuery.data as
-    | AssigneeWarningSummary
-    | null
-    | undefined;
-  const mostFrequentWarningType = warningSummary?.byWarningType.length
-    ? warningSummary.byWarningType.reduce(
+  const rawWarningSummary = normalizeObjectPayload<Partial<AssigneeWarningSummary>>(
+    warningSummaryQuery.data
+  );
+  const warningTypes = normalizeArrayPayload<
+    AssigneeWarningSummary["byWarningType"][number]
+  >(rawWarningSummary?.byWarningType);
+  const warningContexts = normalizeArrayPayload<
+    AssigneeWarningSummary["byContext"][number]
+  >(rawWarningSummary?.byContext);
+  const warningTotals = rawWarningSummary?.totals ?? null;
+  const warningSummary = rawWarningSummary
+    ? {
+        totals: {
+          shown: Number(warningTotals?.shown ?? 0),
+          confirmed: Number(warningTotals?.confirmed ?? 0),
+          confirmationRatePct:
+            warningTotals?.confirmationRatePct == null
+              ? null
+              : Number(warningTotals.confirmationRatePct),
+        },
+        byContext: warningContexts,
+        byWarningType: warningTypes,
+      } satisfies AssigneeWarningSummary
+    : null;
+  const mostFrequentWarningType = warningTypes.length
+    ? warningTypes.reduce(
         (current, warningType) =>
           warningType.shown > current.shown ? warningType : current,
-        warningSummary.byWarningType[0]
+        warningTypes[0]
       )
     : null;
   const header = useMemo(
