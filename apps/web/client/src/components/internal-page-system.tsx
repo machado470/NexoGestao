@@ -139,6 +139,38 @@ export function AppFiltersBar({
   return <BaseFiltersBar className={className}>{children}</BaseFiltersBar>;
 }
 
+
+export function AppContextChip({
+  children,
+  tone = "neutral",
+  className,
+}: {
+  children: ReactNode;
+  tone?: "neutral" | "accent" | "danger" | "success" | "warning";
+  className?: string;
+}) {
+  return (
+    <span
+      className={cn(
+        "inline-flex min-h-6 items-center rounded-full border px-2.5 py-0.5 text-xs font-medium leading-5",
+        tone === "neutral" &&
+          "border-[var(--border-subtle)] bg-[var(--surface-primary)]/45 text-[var(--text-secondary)]",
+        tone === "accent" &&
+          "border-[var(--accent-primary)]/30 bg-[var(--accent-soft)] text-[var(--accent-primary)]",
+        tone === "danger" &&
+          "border-[var(--danger)]/30 bg-[var(--danger)]/10 text-[var(--danger)]",
+        tone === "success" &&
+          "border-emerald-500/30 bg-emerald-500/10 text-emerald-600",
+        tone === "warning" &&
+          "border-amber-500/30 bg-amber-500/10 text-amber-700",
+        className
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
 export function AppSecondaryTabs<T extends string>({
   items,
   value,
