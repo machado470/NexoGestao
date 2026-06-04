@@ -21,6 +21,8 @@ import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { useRenderWatchdog } from "@/hooks/useRenderWatchdog";
 import {
+  AppContextChip,
+  AppMetricCard,
   AppOperationalHeader,
   AppPageEmptyState,
   AppPageErrorState,
@@ -113,8 +115,8 @@ type DashboardAlerts = {
   operationalQueue?: QueueRecord[];
 };
 
-const fullWidthLayoutClass = "w-full max-w-none min-w-0";
-const dashboardSectionClass = `${fullWidthLayoutClass} border-transparent bg-transparent py-0`;
+const fullWidthLayoutClass = "w-full min-w-0";
+const dashboardSectionClass = fullWidthLayoutClass;
 
 const severityWeight: Record<Severity, number> = {
   critical: 3,
@@ -327,8 +329,8 @@ function AttentionRow({
   navigate: (path: string) => void;
 }) {
   return (
-    <article className="relative w-full max-w-none min-w-0 py-2.5 pl-6 first:pt-0 last:pb-0">
-      <ShieldAlert className="absolute left-0 top-3 h-4 w-4 text-[#EF4444] first:top-0" />
+    <article className="relative w-full min-w-0 py-3 pl-6 first:pt-0 last:pb-0">
+      <ShieldAlert className="absolute left-0 top-3 h-4 w-4 text-[var(--danger)] first:top-0" />
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -341,17 +343,17 @@ function AttentionRow({
                     : "Monitorar"
               }
             />
-            <p className="text-sm font-semibold text-[#F3F6FB]">{item.title}</p>
+            <p className="text-sm font-semibold text-[var(--text-primary)]">{item.title}</p>
           </div>
-          <p className="mt-1 text-xs leading-5 text-[#8DA4C4]">
-            <strong className="text-[#F3F6FB]">Motivo:</strong> {item.reason}
+          <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
+            <strong className="text-[var(--text-primary)]">Motivo:</strong> {item.reason}
           </p>
-          <p className="text-xs leading-5 text-[#8DA4C4]">
-            <strong className="text-[#F3F6FB]">Impacto:</strong> {item.impact}
+          <p className="text-xs leading-5 text-[var(--text-secondary)]">
+            <strong className="text-[var(--text-primary)]">Impacto:</strong> {item.impact}
           </p>
         </div>
         <Button
-          className="w-full shrink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F97316] md:w-auto"
+          className="w-full shrink-0 md:w-auto"
           size="sm"
           onClick={() => navigate(item.path)}
         >
@@ -681,33 +683,27 @@ export default function ExecutiveDashboard() {
       ? "Operação normal"
       : "Atenção / Aguardando ação";
   return (
-    <AppPageShell
-      className="-mx-3 -mb-4 min-h-full w-full max-w-none min-w-0 space-y-5 overflow-x-clip border-0 !rounded-none !bg-[#07182b] !px-3 !pb-4 !pt-3 text-[#F3F6FB] sm:space-y-6 md:-mx-4 md:-mb-5 md:!px-4 md:!pb-5 lg:!px-5 xl:!px-6"
-      style={{ boxShadow: "none" }}
-    >
+    <AppPageShell className="space-y-5 sm:space-y-6">
       <AppOperationalHeader
-        className="w-full max-w-none min-w-0 rounded-none border-transparent bg-transparent px-0 !py-1"
         density="compact"
         title="Operação hoje"
         description="Decida primeiro o que destrava execução e caixa."
         contextChips={
           <>
-            <span className="rounded-full border border-white/[0.05] bg-white/[0.03] px-2 py-0.5 text-xs text-[#8DA4C4]">
-              {formatPeriod()}
-            </span>
-            <span className="rounded-full border border-[#F97316]/25 bg-[#F97316]/10 px-2 py-0.5 text-xs font-medium text-[#FDBA74]">
+            <AppContextChip>{formatPeriod()}</AppContextChip>
+            <AppContextChip tone={operationState === "Normal" ? "success" : "accent"}>
               Estado: {statusLabel}
-            </span>
-            <span className="rounded-full border border-[#EF4444]/25 bg-[#EF4444]/10 px-2 py-0.5 text-xs font-medium text-[#FCA5A5]">
+            </AppContextChip>
+            <AppContextChip tone={criticalCount > 0 ? "danger" : "neutral"}>
               {criticalCount}{" "}
               {criticalCount === 1 ? "risco crítico" : "riscos críticos"}
-            </span>
-            <span className="rounded-full border border-white/[0.05] bg-white/[0.03] px-2 py-0.5 text-xs text-[#8DA4C4]">
+            </AppContextChip>
+            <AppContextChip tone={overdueCharges > 0 ? "warning" : "neutral"}>
               {overdueCharges} cobranças vencidas
-            </span>
-            <span className="rounded-full border border-white/[0.05] bg-white/[0.03] px-2 py-0.5 text-xs text-[#8DA4C4]">
+            </AppContextChip>
+            <AppContextChip tone={overdueOrders > 0 ? "warning" : "neutral"}>
               {overdueOrders} O.S. atrasadas
-            </span>
+            </AppContextChip>
           </>
         }
       />
@@ -736,14 +732,14 @@ export default function ExecutiveDashboard() {
       ) : null}
 
       {!pageLoading && !pageError && hasOperationalData ? (
-        <div className="w-full max-w-none min-w-0 space-y-5 sm:space-y-6">
+        <div className="w-full min-w-0 space-y-5 sm:space-y-6">
           <AppSectionBlock
             title="Atenção imediata"
-            className={`${fullWidthLayoutClass} border-[#EF4444]/25 bg-[#0b1f35]`}
+            className={`${fullWidthLayoutClass} border-[var(--danger)]/30 bg-[var(--surface-base)]`}
             subtitle="Comece aqui: riscos que interrompem execução, recebimento ou atendimento, em ordem de severidade."
           >
             {attention.length > 0 ? (
-              <div className="w-full max-w-none min-w-0 divide-y divide-white/[0.06]">
+              <div className="w-full min-w-0 divide-y divide-[var(--border-subtle)]/70">
                 {attention.map(item => (
                   <AttentionRow key={item.id} item={item} navigate={navigate} />
                 ))}
@@ -758,28 +754,28 @@ export default function ExecutiveDashboard() {
 
           <AppSectionBlock
             title="Próxima melhor ação"
-            className={`${fullWidthLayoutClass} border-[#F97316]/30 bg-[#0b1f35]`}
+            className={`${fullWidthLayoutClass} border-[var(--accent-primary)]/30 bg-[var(--surface-base)]`}
             subtitle="Uma decisão principal para converter a leitura operacional em avanço imediato."
           >
             {recommendedAction ? (
-              <div className="flex w-full max-w-none min-w-0 flex-col gap-3 py-0.5 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex w-full min-w-0 flex-col gap-3 py-0.5 lg:flex-row lg:items-center lg:justify-between">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full border border-[#F97316]/25 bg-[#F97316]/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#FDBA74]">
+                    <AppContextChip tone="accent" className="text-[11px] font-semibold uppercase tracking-[0.08em]">
                       Aguardando ação
-                    </span>
-                    <Zap className="h-4 w-4 text-[#F97316]" />
-                    <p className="text-lg font-semibold leading-tight text-[#F3F6FB]">
+                    </AppContextChip>
+                    <Zap className="h-4 w-4 text-[var(--accent-primary)]" />
+                    <p className="text-lg font-semibold leading-tight text-[var(--text-primary)]">
                       {recommendedAction.title}
                     </p>
                   </div>
-                  <div className="mt-2 grid gap-1.5 text-sm leading-5 text-[#8DA4C4] md:grid-cols-2">
+                  <div className="mt-2 grid gap-1.5 text-sm leading-5 text-[var(--text-secondary)] md:grid-cols-2">
                     <p>
-                      <strong className="text-[#F3F6FB]">Por que agora:</strong>{" "}
+                      <strong className="text-[var(--text-primary)]">Por que agora:</strong>{" "}
                       {recommendedAction.reason}
                     </p>
                     <p>
-                      <strong className="text-[#F3F6FB]">
+                      <strong className="text-[var(--text-primary)]">
                         Efeito esperado:
                       </strong>{" "}
                       {recommendedAction.impact}
@@ -797,7 +793,7 @@ export default function ExecutiveDashboard() {
                     </Button>
                   ) : null}
                   <Button
-                    className="w-full bg-[#F97316] text-white hover:bg-[#EA580C] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#FDBA74] sm:w-auto"
+                    className="w-full bg-[var(--accent-primary)] text-white hover:bg-[color-mix(in_srgb,var(--accent-primary)_86%,black)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] sm:w-auto"
                     onClick={() => navigate(recommendedAction.path)}
                   >
                     {recommendedAction.ctaLabel}
@@ -819,34 +815,17 @@ export default function ExecutiveDashboard() {
             className={dashboardSectionClass}
             subtitle="Indicadores de apoio para decidir rápido."
           >
-            <div className="flex w-full max-w-none min-w-0 flex-col divide-y divide-white/[0.06] lg:flex-row lg:divide-x lg:divide-y-0">
+            <div className="grid w-full min-w-0 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
               {kpiCards.map(({ label, value, context, cta, path, Icon }) => (
-                <article
+                <AppMetricCard
                   key={label}
-                  className="w-full max-w-none min-w-0 px-3 py-3 first:pt-0 lg:flex-1 lg:first:pt-3"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#8DA4C4]">
-                      {label}
-                    </p>
-                    <Icon className="h-4 w-4 shrink-0 text-[#8DA4C4]" />
-                  </div>
-                  <p className="mt-1 text-xl font-semibold leading-tight text-[#F3F6FB]">
-                    {value}
-                  </p>
-                  <p className="mt-1 text-xs leading-5 text-[#8DA4C4]">
-                    {context}
-                  </p>
-                  <Button
-                    className="mt-1 h-auto px-0 py-0 text-[#F97316]"
-                    variant="link"
-                    size="sm"
-                    onClick={() => navigate(path)}
-                  >
-                    {cta}
-                    <ArrowRight className="ml-1 h-3.5 w-3.5" />
-                  </Button>
-                </article>
+                  title={label}
+                  value={value}
+                  hint={context}
+                  icon={<Icon className="h-4 w-4" />}
+                  ctaLabel={cta}
+                  onClick={() => navigate(path)}
+                />
               ))}
             </div>
           </AppSectionBlock>
@@ -857,25 +836,25 @@ export default function ExecutiveDashboard() {
             subtitle="Cliente → Agendamento → O.S. → Cobrança → Pagamento"
           >
             <div
-              className={`mb-3 flex w-full max-w-none min-w-0 flex-col gap-2 rounded-xl px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between ${
+              className={`mb-3 flex w-full min-w-0 flex-col gap-2 rounded-xl px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between ${
                 bottleneck
-                  ? "border border-[#F97316]/35 bg-[#F97316]/10 text-[#8DA4C4]"
-                  : "border border-transparent bg-white/[0.02] text-[#8DA4C4]"
+                  ? "border border-[var(--accent-primary)]/35 bg-[var(--accent-soft)] text-[var(--text-secondary)]"
+                  : "border border-[var(--border-subtle)]/70 bg-[var(--surface-primary)]/45 text-[var(--text-secondary)]"
               }`}
             >
               {bottleneck ? (
                 <>
                   <div className="min-w-0">
-                    <strong className="text-[#F97316]">
+                    <strong className="text-[var(--accent-primary)]">
                       Gargalo principal: {bottleneck.label}
                     </strong>
-                    <p className="text-xs text-[#8DA4C4]">
+                    <p className="text-xs text-[var(--text-secondary)]">
                       {bottleneckStage} concentra a quebra do fluxo até
                       recebimento.
                     </p>
                   </div>
                   <Button
-                    className="h-auto px-0 py-0 text-[#F97316] sm:shrink-0"
+                    className="h-auto px-0 py-0 text-[var(--accent-primary)] sm:shrink-0"
                     variant="link"
                     size="sm"
                     onClick={() => navigate(bottleneck.path)}
@@ -885,12 +864,12 @@ export default function ExecutiveDashboard() {
                 </>
               ) : (
                 <span>
-                  <CheckCircle2 className="mr-2 inline h-4 w-4 text-[#10B981]" />
+                  <CheckCircle2 className="mr-2 inline h-4 w-4 text-emerald-500" />
                   Nenhum gargalo foi identificado com os dados disponíveis.
                 </span>
               )}
             </div>
-            <div className="flex w-full max-w-none min-w-0 flex-col divide-y divide-white/[0.06] 2xl:flex-row 2xl:divide-x 2xl:divide-y-0">
+            <div className="flex w-full min-w-0 flex-col divide-y divide-[var(--border-subtle)]/70 2xl:flex-row 2xl:divide-x 2xl:divide-y-0">
               {flow.map((stage, index) => {
                 const isBreak = bottleneck?.label.startsWith(stage.label);
                 const StageIcon = [
@@ -903,44 +882,44 @@ export default function ExecutiveDashboard() {
                 return (
                   <article
                     key={stage.label}
-                    className={`relative w-full max-w-none min-w-0 rounded-xl border px-3 py-3 2xl:flex-1 ${
+                    className={`relative w-full min-w-0 rounded-xl border px-3 py-3 2xl:flex-1 ${
                       isBreak
-                        ? "rounded-xl border border-[#F97316]/45 bg-[#F97316]/10"
-                        : "border border-transparent bg-transparent"
+                        ? "rounded-xl border border-[var(--accent-primary)]/45 bg-[var(--accent-soft)]"
+                        : "border border-[var(--border-subtle)]/70 bg-[var(--surface-primary)]/25"
                     }`}
                   >
                     {index < flow.length - 1 ? (
                       <ChevronRight
                         className={`absolute right-2 top-3 hidden h-4 w-4 lg:block ${
-                          isBreak ? "text-[#F97316]" : "text-[#8DA4C4]/70"
+                          isBreak ? "text-[var(--accent-primary)]" : "text-[var(--text-secondary)]/70"
                         }`}
                       />
                     ) : null}
                     <div className="flex min-w-0 items-center gap-2 pr-4">
                       <StageIcon
-                        className={`h-4 w-4 shrink-0 ${isBreak ? "text-[#F97316]" : "text-[#8DA4C4]"}`}
+                        className={`h-4 w-4 shrink-0 ${isBreak ? "text-[var(--accent-primary)]" : "text-[var(--text-secondary)]"}`}
                       />
                       <p
                         className={`text-[11px] font-semibold uppercase tracking-[0.08em] ${
-                          isBreak ? "text-[#FDBA74]" : "text-[#8DA4C4]"
+                          isBreak ? "text-[var(--accent-primary)]" : "text-[var(--text-secondary)]"
                         }`}
                       >
                         {stage.label}
                       </p>
                     </div>
                     {isBreak ? (
-                      <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#F97316]">
+                      <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--accent-primary)]">
                         Gargalo principal
                       </p>
                     ) : null}
-                    <p className="mt-1.5 text-2xl font-semibold leading-tight text-[#F3F6FB]">
+                    <p className="mt-1.5 text-2xl font-semibold leading-tight text-[var(--text-primary)]">
                       {stage.value}
                     </p>
-                    <p className="mt-1 text-xs leading-5 text-[#8DA4C4]">
+                    <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
                       {stage.context}
                     </p>
                     <Button
-                      className="mt-1 h-auto px-0 py-0 text-[#F97316]"
+                      className="mt-1 h-auto px-0 py-0 text-[var(--accent-primary)]"
                       variant="link"
                       size="sm"
                       onClick={() => navigate(stage.path)}
@@ -960,24 +939,24 @@ export default function ExecutiveDashboard() {
             subtitle="Pendências curtas para destravar agora."
           >
             {queue.length > 0 ? (
-              <div className="w-full max-w-none min-w-0">
-                <div className="flex w-full max-w-none min-w-0 flex-col divide-y divide-white/[0.06]">
+              <div className="w-full min-w-0">
+                <div className="flex w-full min-w-0 flex-col divide-y divide-[var(--border-subtle)]/70">
                   {queue.map(item => (
                     <article
                       key={`${item.type}-${item.id}`}
-                      className="w-full max-w-none min-w-0 px-3 py-3 first:pt-0 md:first:pt-3"
+                      className="w-full min-w-0 px-3 py-3 first:pt-0 md:first:pt-3"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#8DA4C4]">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--text-secondary)]">
                             {item.type}
                           </p>
-                          <p className="mt-1 text-sm font-semibold text-[#F3F6FB]">
+                          <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
                             {item.entity}
                           </p>
                         </div>
                         <Button
-                          className="h-auto shrink-0 px-0 py-0 text-[#F97316]"
+                          className="h-auto shrink-0 px-0 py-0 text-[var(--accent-primary)]"
                           variant="link"
                           size="sm"
                           onClick={() => navigate(item.path)}
@@ -985,14 +964,14 @@ export default function ExecutiveDashboard() {
                           {item.ctaLabel}
                         </Button>
                       </div>
-                      <p className="mt-1 text-xs leading-5 text-[#8DA4C4]">
+                      <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
                         {item.context}
                       </p>
                     </article>
                   ))}
                 </div>
                 <Button
-                  className="mt-2 h-auto px-0 py-0 text-[#F97316]"
+                  className="mt-2 h-auto px-0 py-0 text-[var(--accent-primary)]"
                   variant="link"
                   size="sm"
                   onClick={() => navigate("/timeline")}
@@ -1015,24 +994,24 @@ export default function ExecutiveDashboard() {
             className={dashboardSectionClass}
             subtitle="Interpretação dos sinais para orientar a decisão."
           >
-            <div className="flex w-full max-w-none min-w-0 flex-col divide-y divide-white/[0.06] lg:flex-row lg:divide-x lg:divide-y-0">
+            <div className="flex w-full min-w-0 flex-col divide-y divide-[var(--border-subtle)]/70 lg:flex-row lg:divide-x lg:divide-y-0">
               {pulseInsights.map(({ label, Icon, iconClass, text }) => (
                 <article
                   key={label}
-                  className="w-full max-w-none min-w-0 px-3 py-3 text-sm leading-5 text-[#8DA4C4] first:pt-0 lg:flex-1 lg:first:pt-3"
+                  className="w-full min-w-0 px-3 py-3 text-sm leading-5 text-[var(--text-secondary)] first:pt-0 lg:flex-1 lg:first:pt-3"
                 >
                   <div className="mb-2 flex items-center gap-2">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full border border-white/[0.06] bg-[rgba(6,18,36,0.55)]">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full border border-[var(--border-subtle)]/70 bg-[var(--surface-elevated)]/65">
                       <Icon className={`h-4 w-4 ${iconClass}`} />
                     </span>
-                    <strong className="text-[#F3F6FB]">{label}</strong>
+                    <strong className="text-[var(--text-primary)]">{label}</strong>
                   </div>
                   <p>{text}</p>
                 </article>
               ))}
             </div>
             {availableComparisons.length > 0 || missingComparisonCount > 0 ? (
-              <div className="mt-3 border-t border-white/[0.06] pt-2 text-xs leading-5 text-[#8DA4C4]">
+              <div className="mt-3 border-t border-[var(--border-subtle)]/70 pt-2 text-xs leading-5 text-[var(--text-secondary)]">
                 {availableComparisons.map(item => (
                   <p key={item}>
                     <TrendingDown className="mr-1.5 inline h-3.5 w-3.5" />
@@ -1053,33 +1032,33 @@ export default function ExecutiveDashboard() {
           <AppSectionBlock
             title="Acessos rápidos contextuais"
             compact
-            className={`${fullWidthLayoutClass} border-transparent bg-transparent pb-1 pt-0`}
+            className={fullWidthLayoutClass}
             subtitle="Atalhos secundários da operação."
           >
-            <div className="flex w-full max-w-none min-w-0 flex-wrap gap-2">
+            <div className="flex w-full min-w-0 flex-wrap gap-2">
               {quickAccesses.map(({ label, path, Icon }) => (
                 <button
                   type="button"
                   key={path}
-                  className="flex items-center gap-2 rounded-full border border-white/[0.05] bg-white/[0.03] px-3 py-2 text-left text-xs font-medium text-[#8DA4C4] transition-colors hover:border-[#F97316]/30 hover:text-[#F3F6FB] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F97316]"
+                  className="flex items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-primary)]/45 px-3 py-2 text-left text-xs font-medium text-[var(--text-secondary)] transition-colors hover:border-[var(--accent-primary)]/30 hover:text-[var(--text-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"
                   onClick={() => navigate(path)}
                 >
                   <span className="flex min-w-0 items-center gap-2">
-                    <Icon className="h-3.5 w-3.5 shrink-0 text-[#8DA4C4]" />
+                    <Icon className="h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)]" />
                     <span>{label}</span>
                   </span>
-                  <ArrowRight className="h-3.5 w-3.5 shrink-0 text-[#8DA4C4]" />
+                  <ArrowRight className="h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)]" />
                 </button>
               ))}
             </div>
-            <div className="mt-3 w-full max-w-none min-w-0 border-t border-white/[0.06] pt-3">
+            <div className="mt-3 w-full min-w-0 border-t border-[var(--border-subtle)]/70 pt-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs font-semibold text-[#F3F6FB]">
+                <p className="text-xs font-semibold text-[var(--text-primary)]">
                   Aprovações WhatsApp · {pendingWhatsAppApprovals.length}
                 </p>
                 {pendingWhatsAppApprovals.length > 0 ? (
                   <Button
-                    className="h-auto px-0 py-0 text-[#F97316]"
+                    className="h-auto px-0 py-0 text-[var(--accent-primary)]"
                     variant="link"
                     size="sm"
                     onClick={() => navigate("/whatsapp")}
@@ -1090,16 +1069,16 @@ export default function ExecutiveDashboard() {
                 ) : null}
               </div>
               {pendingWhatsAppApprovalsQuery.isError ? (
-                <p className="mt-2 text-xs text-[#FCA5A5]">
+                <p className="mt-2 text-xs text-[var(--danger)]">
                   Não foi possível carregar aprovações WhatsApp nesta leitura.
                 </p>
               ) : pendingWhatsAppApprovals.length > 0 ? (
-                <div className="mt-1 divide-y divide-white/[0.06]">
+                <div className="mt-1 divide-y divide-[var(--border-subtle)]/70">
                   {pendingWhatsAppApprovals.slice(0, 2).map(execution => (
                     <button
                       type="button"
                       key={execution.id}
-                      className="flex w-full items-center justify-between gap-3 py-2 text-left text-xs text-[#8DA4C4] transition-colors hover:text-[#F3F6FB] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F97316]"
+                      className="flex w-full items-center justify-between gap-3 py-2 text-left text-xs text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"
                       onClick={() =>
                         navigate(buildWhatsAppExecutionPath(execution))
                       }
@@ -1113,7 +1092,7 @@ export default function ExecutiveDashboard() {
                   ))}
                 </div>
               ) : (
-                <p className="mt-2 text-xs text-[#8DA4C4]">
+                <p className="mt-2 text-xs text-[var(--text-secondary)]">
                   Nenhuma aprovação pendente retornada.
                 </p>
               )}
