@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import { nexoFetch } from "../_core/nexoClient";
+import { unwrapNexoApiResponse } from "../_core/nexoEnvelope";
 
 export const billingRouter = router({
   plans: protectedProcedure.query(async ({ ctx }) => {
@@ -8,7 +9,7 @@ export const billingRouter = router({
       method: "GET",
     });
 
-    return raw?.data ?? raw ?? [];
+    return unwrapNexoApiResponse(raw) ?? [];
   }),
 
   status: protectedProcedure.query(async ({ ctx }) => {
@@ -16,7 +17,7 @@ export const billingRouter = router({
       method: "GET",
     });
 
-    return raw?.data ?? raw ?? null;
+    return unwrapNexoApiResponse(raw) ?? null;
   }),
 
   limits: protectedProcedure.query(async ({ ctx }) => {
@@ -24,7 +25,7 @@ export const billingRouter = router({
       method: "GET",
     });
 
-    return raw?.data ?? raw ?? null;
+    return unwrapNexoApiResponse(raw) ?? null;
   }),
 
   checkout: protectedProcedure
@@ -41,7 +42,7 @@ export const billingRouter = router({
         body: JSON.stringify(input),
       });
 
-      return raw?.data ?? raw;
+      return unwrapNexoApiResponse(raw);
     }),
 
   cancel: protectedProcedure.mutation(async ({ ctx }) => {
@@ -49,6 +50,6 @@ export const billingRouter = router({
       method: "POST",
     });
 
-    return raw?.data ?? raw;
+    return unwrapNexoApiResponse(raw);
   }),
 });

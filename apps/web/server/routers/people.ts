@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
 import { nexoFetch } from "../_core/nexoClient";
+import { unwrapNexoApiResponse } from "../_core/nexoEnvelope";
 
 export const peopleRouter = router({
   /**
@@ -10,7 +11,17 @@ export const peopleRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
     const raw = await nexoFetch<any>(ctx, `/people`, { method: "GET" });
     // Nest retorna array direto ou { ok, data: [] }
-    return Array.isArray(raw) ? raw : (raw?.data ?? raw ?? []);
+    return Array.isArray(raw) ? raw : (unwrapNexoApiResponse(raw) ?? []);
+  }),
+
+
+  /**
+   * Listar responsáveis para filtros operacionais de agenda.
+   * Nest: GET /people/assignees
+   */
+  assignees: protectedProcedure.query(async ({ ctx }) => {
+    const raw = await nexoFetch<any>(ctx, `/people/assignees`, { method: "GET" });
+    return Array.isArray(raw) ? raw : (unwrapNexoApiResponse(raw) ?? []);
   }),
 
   /**
@@ -19,7 +30,7 @@ export const peopleRouter = router({
    */
   operationalSummary: protectedProcedure.query(async ({ ctx }) => {
     const raw = await nexoFetch<any>(ctx, `/people/operational-summary`, { method: "GET" });
-    return raw?.data ?? raw;
+    return unwrapNexoApiResponse(raw);
   }),
 
   /**
@@ -30,7 +41,7 @@ export const peopleRouter = router({
     .input(z.object({ id: z.string() }))
     .query(async ({ input, ctx }) => {
       const raw = await nexoFetch<any>(ctx, `/people/${input.id}`, { method: "GET" });
-      return raw?.data ?? raw;
+      return unwrapNexoApiResponse(raw);
     }),
 
   /**
@@ -50,7 +61,7 @@ export const peopleRouter = router({
         method: "POST",
         body: JSON.stringify(input),
       });
-      return raw?.data ?? raw;
+      return unwrapNexoApiResponse(raw);
     }),
 
   /**
@@ -77,7 +88,7 @@ export const peopleRouter = router({
         method: "PATCH",
         body: JSON.stringify(data),
       });
-      return raw?.data ?? raw;
+      return unwrapNexoApiResponse(raw);
     }),
 
 
@@ -86,7 +97,7 @@ export const peopleRouter = router({
     .input(z.object({ personId: z.string().min(1) }).strict())
     .query(async ({ input, ctx }) => {
       const raw = await nexoFetch<any>(ctx, `/people/${input.personId}/availability-exceptions`, { method: "GET" });
-      return raw?.data ?? raw;
+      return unwrapNexoApiResponse(raw);
     }),
 
   /** Criar indisponibilidade temporária sem aceitar orgId do client. */
@@ -100,7 +111,7 @@ export const peopleRouter = router({
     .mutation(async ({ input, ctx }) => {
       const { personId, ...data } = input;
       const raw = await nexoFetch<any>(ctx, `/people/${personId}/availability-exceptions`, { method: "POST", body: JSON.stringify(data) });
-      return raw?.data ?? raw;
+      return unwrapNexoApiResponse(raw);
     }),
 
   /** Remover indisponibilidade temporária tenant-scoped. */
@@ -108,7 +119,7 @@ export const peopleRouter = router({
     .input(z.object({ personId: z.string().min(1), exceptionId: z.string().min(1) }).strict())
     .mutation(async ({ input, ctx }) => {
       const raw = await nexoFetch<any>(ctx, `/people/${input.personId}/availability-exceptions/${input.exceptionId}`, { method: "DELETE" });
-      return raw?.data ?? raw;
+      return unwrapNexoApiResponse(raw);
     }),
 
   /**
@@ -117,7 +128,7 @@ export const peopleRouter = router({
    */
   statsLinked: protectedProcedure.query(async ({ ctx }) => {
     const raw = await nexoFetch<any>(ctx, `/people/stats/linked`, { method: "GET" });
-    return raw?.data ?? raw;
+    return unwrapNexoApiResponse(raw);
   }),
 
   /**
@@ -131,6 +142,6 @@ export const peopleRouter = router({
       const raw = await nexoFetch<any>(ctx, `/people/${input.id}`, {
         method: "DELETE",
       });
-      return raw?.data ?? raw;
+      return unwrapNexoApiResponse(raw);
     }),
 });
