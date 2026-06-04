@@ -42,6 +42,18 @@ export class PeopleController {
     return this.people.listActiveByOrg(orgId)
   }
 
+
+  /**
+   * Leitura operacional tenant-scoped de responsáveis para telas com appointments:read.
+   * Não expõe orgId do client e mantém o CRUD completo de /people restrito a ADMIN.
+   * GET /people/assignees
+   */
+  @Get('assignees')
+  @Roles('ADMIN', 'MANAGER', 'STAFF', 'VIEWER')
+  async listAssignees(@Org() orgId: string) {
+    return this.people.listActiveByOrg(orgId)
+  }
+
   /**
    * 👑 ADMIN — métrica institucional
    * GET /people/stats/linked

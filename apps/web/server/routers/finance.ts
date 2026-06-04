@@ -1,24 +1,26 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import { nexoFetch } from "../_core/nexoClient";
+import { unwrapNexoApiResponse } from "../_core/nexoEnvelope";
 
 const paginationInput = z.object({
   page: z.number().int().positive().default(1),
   limit: z.number().int().positive().default(20),
 });
 
-const wrappedDataSchema = z.object({ data: z.unknown() });
-const wrappedListSchema = z.object({
-  data: z.object({
-    items: z.array(z.unknown()),
-    meta: z.object({
-      page: z.number(),
-      limit: z.number(),
-      total: z.number(),
-      pages: z.number(),
-    }),
+const listPayloadSchema = z.object({
+  items: z.array(z.unknown()),
+  meta: z.object({
+    page: z.number(),
+    limit: z.number(),
+    total: z.number(),
+    pages: z.number(),
   }),
 });
+
+function unwrapData(raw: unknown) {
+  return unwrapNexoApiResponse(raw);
+}
 
 export const financeRouter = router({
   payments: router({
@@ -33,7 +35,7 @@ export const financeRouter = router({
           method: "GET",
         });
 
-        return wrappedDataSchema.parse(raw).data;
+        return unwrapData(raw);
       }),
   }),
 
@@ -74,7 +76,7 @@ export const financeRouter = router({
             : undefined,
         });
 
-        return wrappedDataSchema.parse(raw).data;
+        return unwrapData(raw);
       }),
 
     list: protectedProcedure
@@ -104,7 +106,7 @@ export const financeRouter = router({
           { method: "GET" }
         );
 
-        const payload = wrappedListSchema.parse(raw).data;
+        const payload = listPayloadSchema.parse(unwrapNexoApiResponse(raw));
 
         return {
           data: payload.items,
@@ -123,7 +125,7 @@ export const financeRouter = router({
           method: "GET",
         });
 
-        return wrappedDataSchema.parse(raw).data;
+        return unwrapData(raw);
       }),
 
     update: protectedProcedure
@@ -155,7 +157,7 @@ export const financeRouter = router({
           }),
         });
 
-        return wrappedDataSchema.parse(raw).data;
+        return unwrapData(raw);
       }),
 
     delete: protectedProcedure
@@ -169,7 +171,7 @@ export const financeRouter = router({
           method: "DELETE",
         });
 
-        return wrappedDataSchema.parse(raw).data;
+        return unwrapData(raw);
       }),
 
     stats: protectedProcedure
@@ -179,7 +181,7 @@ export const financeRouter = router({
           method: "GET",
         });
 
-        return wrappedDataSchema.parse(raw).data;
+        return unwrapData(raw);
       }),
 
     revenueByMonth: protectedProcedure.query(async ({ ctx }) => {
@@ -187,7 +189,7 @@ export const financeRouter = router({
         method: "GET",
       });
 
-      return wrappedDataSchema.parse(raw).data ?? [];
+      return unwrapData(raw) ?? [];
     }),
 
     pay: protectedProcedure
@@ -223,7 +225,7 @@ export const financeRouter = router({
           }
         );
 
-        return wrappedDataSchema.parse(raw).data;
+        return unwrapData(raw);
       }),
   }),
 });

@@ -18,13 +18,13 @@ import {
 import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
 
-type PlanName = "FREE" | "STARTER" | "PRO" | "SCALE";
+type PlanName = "FREE" | "STARTER" | "PRO" | "BUSINESS";
 
 const PLAN_PRICE_ID: Record<PlanName, string | null> = {
   FREE: null,
   STARTER: "price_starter",
   PRO: "price_pro",
-  SCALE: "price_scale",
+  BUSINESS: "price_business",
 };
 
 const PLAN_META: Record<PlanName, { title: string; priceCents: number; description: string; benefits: string[] }> = {
@@ -46,7 +46,7 @@ const PLAN_META: Record<PlanName, { title: string; priceCents: number; descripti
     description: "Escala com governança e leitura por exceção no dia a dia.",
     benefits: ["Até 20 usuários", "Risco e governança", "Automação de cobrança", "Relatórios executivos", "Suporte prioritário"],
   },
-  SCALE: {
+  BUSINESS: {
     title: "Scale",
     priceCents: 99900,
     description: "Operação multi-equipe com controle fino, contexto e performance.",
@@ -68,7 +68,19 @@ function statusText(status: string) {
 
 function safePlanName(value: unknown): PlanName {
   const candidate = String(value ?? "FREE").toUpperCase();
-  return ["FREE", "STARTER", "PRO", "SCALE"].includes(candidate) ? (candidate as PlanName) : "FREE";
+  const normalized = candidate === "SCALE" ? "BUSINESS" : candidate;
+  return ["FREE", "STARTER", "PRO", "BUSINESS"].includes(normalized) ? (normalized as PlanName) : "FREE";
+}
+
+function normalizeBillingPlans(plans: any[]) {
+  const seen = new Set<PlanName>();
+  return plans
+    .map(plan => ({ ...plan, name: safePlanName(plan?.name) }))
+    .filter(plan => {
+      if (seen.has(plan.name)) return false;
+      seen.add(plan.name);
+      return true;
+    });
 }
 
 export default function BillingPage() {
@@ -79,7 +91,7 @@ export default function BillingPage() {
   const readinessQuery = trpc.integrations.readiness.useQuery(undefined, { retry: false });
   const utils = trpc.useUtils();
 
-  const plans = useMemo(() => normalizeArrayPayload<any>(plansQuery.data), [plansQuery.data]);
+  const plans = useMemo(() => normalizeBillingPlans(normalizeArrayPayload<any>(plansQuery.data)), [plansQuery.data]);
   const currentPlan = safePlanName(statusQuery.data?.plan ?? limitsQuery.data?.plan);
   const currentStatus = String(statusQuery.data?.status ?? "ACTIVE").toUpperCase();
   const stripeConfigured = readinessQuery.data?.integrations?.stripe === "configured";
@@ -109,8 +121,8 @@ export default function BillingPage() {
   const nextChargeAt = statusQuery.data?.nextBillingAt ?? statusQuery.data?.currentPeriodEnd ?? limitsQuery.data?.trial?.endsAt ?? null;
   const paymentMethodLabel = String(statusQuery.data?.paymentMethodBrand ?? statusQuery.data?.paymentMethod ?? "Não informado");
   const statusReason = String(statusQuery.data?.reason ?? statusQuery.data?.statusReason ?? "Sem bloqueio informado.");
-  const isLoading = [plansQuery, statusQuery, limitsQuery, readinessQuery].some(query => query.isLoading);
-  const hasError = [plansQuery, statusQuery, limitsQuery, readinessQuery].some(query => query.isError);
+  const isLoading = [plansQuery, statusQuery, limitsQuery].some(query => query.isLoading);
+  const hasError = [plansQuery, statusQuery, limitsQuery].some(query => query.isError);
 
   const refetchAll = () => {
     void Promise.all([plansQuery.refetch(), statusQuery.refetch(), limitsQuery.refetch(), readinessQuery.refetch()]);
@@ -206,7 +218,7 @@ export default function BillingPage() {
                   const name = safePlanName(plan?.name);
                   const meta = PLAN_META[name];
                   const isCurrent = name === currentPlan;
-                  const badge = isCurrent ? "Plano atual" : name === "PRO" ? "Mais escolhido" : name === "SCALE" ? "Recomendado" : "Disponível";
+                  const badge = isCurrent ? "Plano atual" : name === "PRO" ? "Mais escolhido" : name === "BUSINESS" ? "Recomendado" : "Disponível";
                   return (
                     <article key={name} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4">
                       <div className="flex items-start justify-between gap-2">

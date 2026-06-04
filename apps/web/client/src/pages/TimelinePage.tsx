@@ -14,6 +14,7 @@ import {
   Siren,
 } from "lucide-react";
 import { useLocation } from "wouter";
+import { useAuth } from "@/contexts/AuthContext";
 import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
@@ -276,6 +277,7 @@ export default function TimelinePage() {
   setBootPhase("PAGE:Timeline");
   useRenderWatchdog("TimelinePage");
   const [, navigate] = useLocation();
+  const { isAuthenticated } = useAuth();
 
   const urlParams = useMemo(
     () => new URLSearchParams(window.location.search),
@@ -304,7 +306,7 @@ export default function TimelinePage() {
 
   const timelineQuery = trpc.nexo.timeline.listByOrg.useQuery(
     { limit: PAGE_SIZE, cursor },
-    { retry: false }
+    { enabled: isAuthenticated, retry: false }
   );
 
   useEffect(() => {

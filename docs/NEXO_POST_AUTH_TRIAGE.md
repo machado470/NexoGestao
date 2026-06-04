@@ -190,3 +190,15 @@ Causa raiz:
 5. **Settings**: alinhar papéis da rota com `organization-settings` e `auth/organization/members`, ou criar endpoints operacionais separados.
 6. **Billing**: separar readiness de Stripe do readiness crítico e alinhar enum `BUSINESS/SCALE`.
 7. **Normalização transversal**: criar helper único no BFF para unwrap de API Nest: `raw.data.data ?? raw.data ?? raw`, com tratamento para `{ ok, data }` e `{ success, data }`.
+
+## Correções aplicadas no lote seguinte
+
+Aplicadas em 2026-06-04 no lote `fix(app): resolve post-auth contract and protected page failures`:
+
+1. Criado helper BFF `unwrapNexoApiResponse` para normalizar envelopes diretos, simples e duplos da API Nest sem mascarar erros HTTP.
+2. `finance.charges.list` passou a validar `{ items, meta }` após unwrap, cobrindo `raw.data.items/meta` e `raw.data.data.items/meta`.
+3. `AuditModule` passou a registrar `AuditAdminController` e `AuditAdminService`, mantendo as regras `ADMIN` existentes.
+4. `TimelinePage` passou a usar `useAuth()` e `enabled: isAuthenticated` na query protegida.
+5. `CalendarPage` deixou de depender de `people.list` admin-only e passou a usar `people.assignees`, endpoint operacional tenant-scoped.
+6. `BillingPage` passou a tratar readiness crítica como informação de integração, não como erro bloqueante da tela, e normaliza o plano persistido `BUSINESS` para o plano comercial exibido como Scale.
+7. Settings/Profile foram revalidados por meio da normalização transversal de rotas `nexo.*` e da correção de `finance.charges.list`.

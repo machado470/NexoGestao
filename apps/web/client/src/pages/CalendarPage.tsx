@@ -83,7 +83,7 @@ export default function CalendarPage() {
     enabled: isAuthenticated,
     retry: false,
   });
-  const peopleQuery = trpc.people.list.useQuery(undefined, {
+  const peopleQuery = trpc.people.assignees.useQuery(undefined, {
     enabled: isAuthenticated,
     retry: false,
   });

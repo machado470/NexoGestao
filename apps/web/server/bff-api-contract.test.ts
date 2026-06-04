@@ -114,6 +114,22 @@ describe("BFF↔API contract - lote 1", () => {
     await expect(caller.people.createAvailabilityException({ personId: "person-1", startsAt: "2026-05-30T12:00:00.000Z", endsAt: "2026-05-30T14:00:00.000Z", orgId: "forged" } as any)).rejects.toBeDefined();
   });
 
+
+  it("people.assignees usa endpoint operacional tenant-scoped do calendário", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ success: true, data: [{ id: "p1", name: "Ana" }] }), { status: 200 }),
+    );
+    const caller = appRouter.createCaller({ req: makeReq(), res: makeRes(), user: { token: "t1", validated: true, organizationId: "org-trusted" } } as any);
+
+    const result = await caller.people.assignees();
+
+    expect(result).toEqual([{ id: "p1", name: "Ana" }]);
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(String(url)).toMatch(/\/people\/assignees$/);
+    expect(String(url)).not.toContain("orgId");
+    expect((options as RequestInit).headers).toEqual(expect.objectContaining({ Authorization: "Bearer t1" }));
+  });
+
   it("people.list e people.statsLinked usam endpoints corretos e não aceitam orgId do client", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ id: "p1" }] }), { status: 200 }))
@@ -135,6 +151,38 @@ describe("BFF↔API contract - lote 1", () => {
     for (const [, options] of fetchMock.mock.calls) {
       expect((options as RequestInit).headers).toEqual(expect.objectContaining({ Authorization: "Bearer trusted-user-token" }));
     }
+  });
+
+
+  it("finance.charges.list normaliza envelope simples data.items/meta", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ data: { items: [{ id: "ch-1" }], meta: { page: 1, limit: 20, total: 1, pages: 1 } } }), { status: 200 }),
+    );
+
+    const caller = appRouter.createCaller({ req: makeReq(), res: makeRes(), user: { token: "t1", validated: true } } as any);
+    const result = await caller.finance.charges.list({ page: 1, limit: 20 });
+
+    expect(result).toEqual({ data: [{ id: "ch-1" }], pagination: { page: 1, limit: 20, total: 1, pages: 1 } });
+  });
+
+  it("finance.charges.list normaliza envelope duplo data.data.items/meta", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ success: true, data: { ok: true, data: { items: [{ id: "ch-2" }], meta: { page: 1, limit: 20, total: 1, pages: 1 } } } }), { status: 200 }),
+    );
+
+    const caller = appRouter.createCaller({ req: makeReq(), res: makeRes(), user: { token: "t1", validated: true } } as any);
+    const result = await caller.finance.charges.list({ page: 1, limit: 20 });
+
+    expect(result).toEqual({ data: [{ id: "ch-2" }], pagination: { page: 1, limit: 20, total: 1, pages: 1 } });
+  });
+
+  it("finance.charges.list mantém falha clara para payload inválido", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ success: true, data: { ok: true, data: { items: null, meta: null } } }), { status: 200 }),
+    );
+
+    const caller = appRouter.createCaller({ req: makeReq(), res: makeRes(), user: { token: "t1", validated: true } } as any);
+    await expect(caller.finance.charges.list({ page: 1, limit: 20 })).rejects.toBeDefined();
   });
 
   it("propaga erro de autenticação da API como UNAUTHORIZED", async () => {

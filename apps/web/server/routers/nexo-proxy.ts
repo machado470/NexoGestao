@@ -4,6 +4,7 @@ import { z } from "zod";
 import cookie from "cookie";
 import { getSessionCookieOptions } from "../_core/cookies";
 import { resolveNexoApiUrl } from "../_core/nexoApiUrl";
+import { unwrapNexoApiResponse } from "../_core/nexoEnvelope";
 
 const NEXO_API_URL = resolveNexoApiUrl();
 const NEXO_TOKEN_COOKIE = "nexo_token";
@@ -220,13 +221,15 @@ async function authedFetch(
 ) {
   const authHeader = getAuthHeader(ctx);
 
-  return nexoFetch(path, {
+  const raw = await nexoFetch(path, {
     ...options,
     headers: {
       ...(options.headers || {}),
       Authorization: authHeader,
     },
   });
+
+  return unwrapNexoApiResponse<any>(raw);
 }
 
 async function authedGet(
