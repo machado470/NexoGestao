@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 import { trpc } from "@/lib/trpc";
 import type { OperationalSeverity } from "@/lib/operations/operational-intelligence";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
@@ -157,6 +158,7 @@ function appointmentPriorityLabel(priority: AppPriorityLevel) {
 
 export default function AppointmentsPage() {
   const [location, navigate] = useLocation();
+  const { isAuthenticated } = useAuth();
   const [selectedFilter, setSelectedFilter] = useState<FilterKey>("today");
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<
     string | null
@@ -186,19 +188,26 @@ export default function AppointmentsPage() {
     responsibleFilter === "all"
       ? { limit: 100 }
       : { assignedToPersonId: responsibleFilter, limit: 100 },
-    { retry: false }
+    { enabled: isAuthenticated, retry: false }
   );
   const customersQuery = trpc.nexo.customers.list.useQuery(undefined, {
+    enabled: isAuthenticated,
     retry: false,
   });
-  const peopleQuery = trpc.people.list.useQuery(undefined, { retry: false });
+  const peopleQuery = trpc.people.list.useQuery(undefined, {
+    enabled: isAuthenticated,
+    retry: false,
+  });
   const serviceOrdersQuery = trpc.nexo.serviceOrders.list.useQuery(
     { page: 1, limit: 100 },
-    { retry: false }
+    { enabled: isAuthenticated, retry: false }
   );
   const timelineQuery = trpc.nexo.timeline.listByCustomer.useQuery(
     { customerId: queryParams.customerId ?? "", limit: 25 },
-    { enabled: Boolean(queryParams.customerId), retry: false }
+    {
+      enabled: isAuthenticated && Boolean(queryParams.customerId),
+      retry: false,
+    }
   );
 
   const createMutation = trpc.nexo.appointments.create.useMutation();

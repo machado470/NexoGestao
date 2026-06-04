@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { useRenderWatchdog } from "@/hooks/useRenderWatchdog";
@@ -367,14 +368,19 @@ function AttentionRow({
 export default function ExecutiveDashboard() {
   useRenderWatchdog("ExecutiveDashboard");
   const [, navigate] = useLocation();
-  const kpisQuery = trpc.dashboard.kpis.useQuery(undefined, { retry: false });
+  const { isAuthenticated } = useAuth();
+  const kpisQuery = trpc.dashboard.kpis.useQuery(undefined, {
+    enabled: isAuthenticated,
+    retry: false,
+  });
   const alertsQuery = trpc.dashboard.alerts.useQuery(undefined, {
+    enabled: isAuthenticated,
     retry: false,
   });
   const pendingWhatsAppApprovalsQuery =
     trpc.nexo.whatsapp.listPendingApprovals.useQuery(
       { limit: 10 },
-      { retry: false }
+      { enabled: isAuthenticated, retry: false }
     );
   const operationalSignalsQuery = useQuery({
     queryKey: ["internal-operational-signals"],
@@ -385,6 +391,7 @@ export default function ExecutiveDashboard() {
       if (!response.ok) throw new Error("signals fetch failed");
       return (await response.json()) as { signals?: OperationalSignal[] };
     },
+    enabled: isAuthenticated,
     retry: false,
   });
   const nextBestActionQuery = useQuery({
@@ -397,6 +404,7 @@ export default function ExecutiveDashboard() {
       if (!response.ok) throw new Error("next best action fetch failed");
       return (await response.json()) as NextBestActionSignal | null;
     },
+    enabled: isAuthenticated,
     retry: false,
   });
 
