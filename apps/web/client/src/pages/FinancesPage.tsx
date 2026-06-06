@@ -17,11 +17,12 @@ import { Button } from "@/components/design-system";
 import { CreateChargeModal } from "@/components/CreateChargeModal";
 import { FormModal } from "@/components/app-modal-system";
 import {
+  AppActionBar,
   AppDataTable,
+  AppFiltersBar,
   AppPageEmptyState,
   AppPageErrorState,
   AppOperationalHeader,
-  AppOperationalBar,
   AppPageLoadingState,
   AppPagination,
   AppSectionBlock,
@@ -45,6 +46,7 @@ import {
   type AppPriorityLevel,
 } from "@/components/app-system";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
+import { cn } from "@/lib/utils";
 import { safeDate } from "@/lib/operational/kpi";
 import { trpc } from "@/lib/trpc";
 import type { OperationalSeverity } from "@/lib/operations/operational-intelligence";
@@ -661,6 +663,40 @@ export default function FinancesPage() {
     cashHealth.pendingCount
   );
 
+  const filterTabs = useMemo(
+    () => [
+      {
+        key: "all" as const,
+        label: `Todas (${scopedCharges.length})`,
+      },
+      {
+        key: "pending" as const,
+        label: `Pendentes (${
+          scopedCharges.filter(item => item.status === "PENDING").length
+        })`,
+      },
+      {
+        key: "overdue" as const,
+        label: `Vencidas (${
+          scopedCharges.filter(item => item.status === "OVERDUE").length
+        })`,
+      },
+      {
+        key: "paid" as const,
+        label: `Pagas (${
+          scopedCharges.filter(item => item.status === "PAID").length
+        })`,
+      },
+      {
+        key: "canceled" as const,
+        label: `Canceladas (${
+          scopedCharges.filter(item => item.status === "CANCELED").length
+        })`,
+      },
+    ],
+    [scopedCharges]
+  );
+
   const immediateAttentionItems = useMemo(() => {
     const overdueCharges = enrichedCharges.filter(
       item => item.status === "OVERDUE"
@@ -948,7 +984,16 @@ export default function FinancesPage() {
         </p>
       </AppOperationalHeader>
 
-      <AppSectionCard className="space-y-4 border-[var(--nexo-border-strong)] bg-[var(--nexo-card-surface)]">
+      <AppSectionCard className="space-y-4">
+        <div className="border-b border-[var(--border-subtle)]/60 pb-3.5">
+          <h3 className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">
+            Próxima decisão financeira
+          </h3>
+          <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
+            A melhor ação de cobrança aparece antes da carteira para reduzir
+            risco financeiro.
+          </p>
+        </div>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 flex-1 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
@@ -1149,39 +1194,52 @@ export default function FinancesPage() {
         title="Carteira operacional"
         subtitle="Cobranças reais com risco, origem e ação primária antes da navegação."
       >
-        <AppOperationalBar
-          tabs={[
-            { value: "all", label: "Todas" },
-            { value: "pending", label: "Pendentes" },
-            { value: "overdue", label: "Vencidas" },
-            { value: "paid", label: "Pagas" },
-            { value: "canceled", label: "Canceladas" },
-          ]}
-          activeTab={statusFilter}
-          onTabChange={setStatusFilter}
-          searchValue={searchTerm}
-          onSearchChange={setSearchTerm}
-          searchPlaceholder="Buscar cliente, O.S., status ou ID"
-          quickFilters={
-            <>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setStatusFilter("overdue")}
+        <AppFiltersBar className="shrink-0 gap-3 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-3">
+          <div className="min-w-[220px] flex-1">
+            <input
+              value={searchTerm}
+              onChange={event => setSearchTerm(event.target.value)}
+              placeholder="Buscar cliente, O.S., status ou ID"
+              className="h-9 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)]"
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {filterTabs.map(filter => (
+              <button
+                key={filter.key}
+                type="button"
+                className={cn(
+                  "h-8 rounded-md border px-3 text-xs font-medium transition-colors",
+                  statusFilter === filter.key
+                    ? "border-[var(--accent-primary)] bg-[var(--accent-soft)] text-[var(--accent-primary)]"
+                    : "border-[var(--border-subtle)] bg-[var(--surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                )}
+                onClick={() => setStatusFilter(filter.key)}
               >
-                Priorizar atraso
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setStatusFilter("pending")}
-              >
-                Cobrar pendências
-              </Button>
-            </>
-          }
-          variant="embedded"
-        />
+                {filter.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setStatusFilter("overdue")}
+            >
+              Priorizar atraso
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setStatusFilter("pending")}
+            >
+              Cobrar pendências
+            </Button>
+          </div>
+          <span className="rounded-md border border-[var(--border-subtle)] px-2 py-1 text-xs text-[var(--text-muted)]">
+            {filteredCharges.length} / {scopedCharges.length} cobrança(s)
+          </span>
+        </AppFiltersBar>
 
         {hasFiltersContext ? (
           <p className="text-xs text-[var(--text-muted)]">
@@ -1320,6 +1378,11 @@ export default function FinancesPage() {
                           <AppRowActionsDropdown
                             items={[
                               {
+                                label: "Ver detalhe",
+                                onSelect: () =>
+                                  setSelectedChargeId(String(row?.id ?? "")),
+                              },
+                              {
                                 label: "Marcar como pago",
                                 onSelect: () => void openMarkAsPaid(row),
                                 disabled:
@@ -1335,6 +1398,14 @@ export default function FinancesPage() {
                                 onSelect: () => goToWhatsApp(row),
                                 disabled: !row.customerId,
                                 tone: "primary",
+                              },
+                              {
+                                label: "Enviar link",
+                                onSelect: () => goToWhatsApp(row),
+                                disabled:
+                                  !row.customerId ||
+                                  row.status === "PAID" ||
+                                  row.status === "CANCELED",
                               },
                               {
                                 label: "Editar cobrança",
@@ -1443,7 +1514,7 @@ export default function FinancesPage() {
               </AppInfoCard>
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <AppActionBar className="gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2 py-2">
               <Button
                 onClick={() => goToWhatsApp(selectedFinancialRecord)}
                 disabled={selectedFinancialRecord.status === "CANCELED"}
@@ -1499,7 +1570,7 @@ export default function FinancesPage() {
               >
                 Abrir O.S.
               </Button>
-            </div>
+            </AppActionBar>
 
             <div className="grid gap-3 lg:grid-cols-3">
               <AppInfoCard className="lg:col-span-2">
