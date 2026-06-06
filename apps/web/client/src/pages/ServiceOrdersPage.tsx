@@ -25,6 +25,7 @@ import {
 } from "@/components/app-system";
 import {
   AppFiltersBar,
+  AppActionBar,
   AppOperationalHeader,
   AppPageLoadingState,
   AppPageErrorState,
@@ -686,16 +687,10 @@ export default function ServiceOrdersPage() {
               </>
             }
           >
-            <div className="grid gap-2 md:grid-cols-[1fr_auto]">
-              <input
-                value={searchTerm}
-                onChange={event => setSearchTerm(event.target.value)}
-                placeholder="Buscar por código, cliente ou descrição"
-                className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm text-[var(--text-primary)]"
-              />
-              <div className="flex h-9 items-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 text-xs text-[var(--text-secondary)]">
-                {filteredOrders.length} / {counts.all} O.S. na carteira
-              </div>
+            <div className="grid gap-2 text-xs text-[var(--text-secondary)] md:grid-cols-3">
+              <span>Execução real antes de cadastro.</span>
+              <span>Atraso, responsável e cobrança ficam visíveis.</span>
+              <span>Cliente, agenda, financeiro e WhatsApp seguem conectados.</span>
             </div>
           </AppOperationalHeader>
 
@@ -735,51 +730,64 @@ export default function ServiceOrdersPage() {
             ) : null}
           </AppSectionCard>
 
-          <AppSectionCard className="space-y-3">
-            <div>
-              <p className="nexo-overline">Saúde operacional</p>
-              <p className="mt-1 text-sm text-[var(--text-secondary)]">Volume, execução e cobrança derivados dos dados existentes.</p>
-            </div>
+          <AppSectionBlock
+            title="Saúde operacional"
+            subtitle="Volume, execução e cobrança derivados dos dados existentes."
+            compact
+          >
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-            {operationalKpis.map(kpi => (
-              <AppStatCard
-                key={kpi.label}
-                label={kpi.label}
-                value={kpi.value}
-                helper={kpi.helper}
-                delta={
-                  <Button size="sm" variant="ghost" onClick={() => setActiveFilter(kpi.filter)}>
-                    Ver carteira
-                  </Button>
-                }
-              />
-            ))}
+              {operationalKpis.map(kpi => (
+                <AppStatCard
+                  key={kpi.label}
+                  label={kpi.label}
+                  value={kpi.value}
+                  helper={kpi.helper}
+                  delta={
+                    <Button size="sm" variant="ghost" onClick={() => setActiveFilter(kpi.filter)}>
+                      Ver carteira
+                    </Button>
+                  }
+                />
+              ))}
             </div>
-          </AppSectionCard>
+          </AppSectionBlock>
 
-          <AppFiltersBar className="shrink-0 gap-2 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-3">
-            {[
-              { key: "all", label: `Todas (${counts.all})` },
-              { key: "open", label: `Abertas (${counts.open})` },
-              { key: "in_progress", label: `Em andamento (${counts.progress})` },
-              { key: "overdue", label: `Atrasadas (${counts.overdue})` },
-              { key: "done", label: `Concluídas (${counts.done})` },
-              { key: "without_charge", label: `Concluídas sem cobrança (${counts.doneWithoutCharge})` },
-            ].map(filter => (
-              <button
-                key={filter.key}
-                type="button"
-                className={cn(
-                  "h-8 rounded-md border px-3 text-xs font-medium transition-colors",
-                  activeFilter === filter.key
-                    ? "border-[var(--accent-primary)] bg-[var(--accent-soft)] text-[var(--accent-primary)]"
-                    : "border-[var(--border-subtle)] bg-[var(--surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                )}
-                onClick={() => setActiveFilter(filter.key as ServiceOrdersFilter)}
-              >
-                {filter.label}
-              </button>
-            ))}
+          <AppFiltersBar className="shrink-0 gap-3 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-3">
+            <div className="min-w-[220px] flex-1">
+              <input
+                value={searchTerm}
+                onChange={event => setSearchTerm(event.target.value)}
+                placeholder="Buscar por código, cliente ou descrição"
+                className="h-9 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)]"
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {[
+                { key: "all", label: `Todas (${counts.all})` },
+                { key: "open", label: `Abertas (${counts.open})` },
+                { key: "in_progress", label: `Em andamento (${counts.progress})` },
+                { key: "overdue", label: `Atrasadas (${counts.overdue})` },
+                { key: "done", label: `Concluídas (${counts.done})` },
+                { key: "without_charge", label: `Concluídas sem cobrança (${counts.doneWithoutCharge})` },
+              ].map(filter => (
+                <button
+                  key={filter.key}
+                  type="button"
+                  className={cn(
+                    "h-8 rounded-md border px-3 text-xs font-medium transition-colors",
+                    activeFilter === filter.key
+                      ? "border-[var(--accent-primary)] bg-[var(--accent-soft)] text-[var(--accent-primary)]"
+                      : "border-[var(--border-subtle)] bg-[var(--surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                  )}
+                  onClick={() => setActiveFilter(filter.key as ServiceOrdersFilter)}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+            <span className="rounded-md border border-[var(--border-subtle)] px-2 py-1 text-xs text-[var(--text-muted)]">
+              {filteredOrders.length} / {counts.all} O.S.
+            </span>
           </AppFiltersBar>
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
@@ -803,9 +811,9 @@ export default function ServiceOrdersPage() {
                       className={cn(
                         "rounded-lg border p-3",
                         item.status === "DONE" && !item.hasCharge
-                          ? "border-[var(--dashboard-danger)] bg-[color-mix(in_srgb,var(--dashboard-danger)_8%,var(--surface-subtle))]"
+                          ? "border-[var(--danger)] bg-[color-mix(in_srgb,var(--danger)_8%,var(--surface-subtle))]"
                           : item.isOverdue
-                            ? "border-[var(--status-danger)] bg-[color-mix(in_srgb,var(--status-danger)_8%,var(--surface-subtle))]"
+                            ? "border-[var(--danger)] bg-[color-mix(in_srgb,var(--danger)_8%,var(--surface-subtle))]"
                             : "border-[var(--border-subtle)] bg-[var(--surface-subtle)]"
                       )}
                     >
@@ -858,180 +866,159 @@ export default function ServiceOrdersPage() {
                   }
                 />
               ) : (
-                <>
-                  <div className="overflow-x-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]">
-                    <AppDataTable>
+                <div className="space-y-3">
+                  <div className="overflow-x-auto">
+                    <AppDataTable className="min-w-[980px]">
                       <thead>
                         <tr>
-                          <th>O.S.</th>
-                          <th>Cliente</th>
-                          <th>Status</th>
-                          <th>Prioridade</th>
-                          <th>Responsável</th>
-                          <th>Ação</th>
+                          <th>O.S. / cliente</th>
+                          <th>Estado e prioridade</th>
+                          <th>Responsável e prazo</th>
+                          <th>Financeiro</th>
+                          <th className="text-right">Ações</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {paginatedOrders.map(item => (
-                          <tr key={`table-${item.id}`}>
-                            <td>#{item.code}</td>
-                            <td>{item.customerName}</td>
-                            <td>
-                              <AppOperationalStatusBadge
-                                status={getServiceOrderOperationalStatus(item)}
-                                label={getStatusTone(item.status, item.isOverdue)}
-                              />
-                            </td>
-                            <td><AppPriorityBadge priority={getServiceOrderPriority(item)} /></td>
-                            <td>{item.responsibleName}</td>
-                            <td>{item.nextAction.label}</td>
-                          </tr>
-                        ))}
+                        {paginatedOrders.map(item => {
+                          const canStart = capabilities.start && ["OPEN", "ASSIGNED"].includes(item.status);
+                          const canComplete = capabilities.complete && item.status === "IN_PROGRESS";
+                          const canGenerateCharge =
+                            capabilities.generateCharge && item.status === "DONE" && !item.hasCharge;
+
+                          return (
+                            <tr
+                              key={item.id}
+                              role="button"
+                              tabIndex={0}
+                              className={cn(
+                                "cursor-pointer align-top transition-colors hover:bg-[var(--surface-subtle)]/60",
+                                selectedOrder?.id === item.id
+                                  ? "bg-[var(--accent-soft)]/35"
+                                  : undefined
+                              )}
+                              onClick={() => setSelectedOrderId(item.id)}
+                              onKeyDown={event => {
+                                if (event.key === "Enter" || event.key === " ") {
+                                  event.preventDefault();
+                                  setSelectedOrderId(item.id);
+                                }
+                              }}
+                            >
+                              <td>
+                                <div className="min-w-[240px] space-y-1">
+                                  <p className="font-semibold text-[var(--text-primary)]">
+                                    #{item.code} · {item.title}
+                                  </p>
+                                  <p className="max-w-[300px] truncate text-xs text-[var(--text-secondary)]">
+                                    {item.customerName}
+                                  </p>
+                                  <p className="max-w-[300px] truncate text-xs text-[var(--text-muted)]">
+                                    {item.description}
+                                  </p>
+                                </div>
+                              </td>
+                              <td>
+                                <div className="flex min-w-[190px] flex-col items-start gap-2">
+                                  <AppOperationalStatusBadge
+                                    status={getServiceOrderOperationalStatus(item)}
+                                    label={getStatusTone(item.status, item.isOverdue)}
+                                  />
+                                  <AppPriorityBadge
+                                    priority={getServiceOrderPriority(item)}
+                                    label={item.riskLabel}
+                                  />
+                                  <span className="text-xs text-[var(--text-muted)]">
+                                    Execução: {item.statusLabel}
+                                  </span>
+                                </div>
+                              </td>
+                              <td>
+                                <div className="min-w-[190px] space-y-1 text-xs text-[var(--text-secondary)]">
+                                  <p className="font-medium text-[var(--text-primary)]">
+                                    {item.responsibleName}
+                                  </p>
+                                  <p>Prazo: {item.dueDateLabel}</p>
+                                  <p>
+                                    Agenda: {item.linkedAppointment
+                                      ? formatDate(item.linkedAppointment?.startsAt)
+                                      : "Sem agendamento vinculado"}
+                                  </p>
+                                </div>
+                              </td>
+                              <td>
+                                <div className="min-w-[180px] space-y-2">
+                                  <p className="font-medium text-[var(--text-primary)]">
+                                    {formatCurrency(item.amountCents)}
+                                  </p>
+                                  <AppStatusBadge
+                                    label={item.financialStatusLabel}
+                                    tone={item.status === "DONE" && !item.hasCharge ? "danger" : "neutral"}
+                                  />
+                                </div>
+                              </td>
+                              <td onClick={event => event.stopPropagation()}>
+                                <div className="flex min-w-[170px] items-center justify-end gap-2">
+                                  <Button
+                                    size="sm"
+                                    onClick={() => runPrimaryAction(item)}
+                                  >
+                                    {item.nextAction.label}
+                                  </Button>
+                                  <AppRowActionsDropdown
+                                    triggerLabel="Ações da O.S."
+                                    items={[
+                                      {
+                                        label: capabilities.start ? "Iniciar" : "Iniciar (indisponível)",
+                                        tone: "primary",
+                                        onSelect: () => void handleStart(item.id),
+                                        disabled: !canStart || anyActionPending,
+                                      },
+                                      {
+                                        label: capabilities.complete ? "Concluir" : "Concluir (indisponível)",
+                                        tone: "primary",
+                                        onSelect: () => void handleComplete(item.id),
+                                        disabled: !canComplete || anyActionPending,
+                                      },
+                                      {
+                                        label: capabilities.generateCharge
+                                          ? "Gerar cobrança"
+                                          : "Gerar cobrança (indisponível)",
+                                        tone: "primary",
+                                        onSelect: () => void handleGenerateCharge(item.id),
+                                        disabled: !canGenerateCharge || anyActionPending,
+                                      },
+                                      {
+                                        label: capabilities.edit ? "Editar" : "Editar (indisponível)",
+                                        tone: "primary",
+                                        onSelect: () => setEditingId(item.id),
+                                        disabled: !capabilities.edit,
+                                      },
+                                      {
+                                        type: "separator",
+                                        label: "Navegação",
+                                      },
+                                      {
+                                        label: "Abrir O.S.",
+                                        onSelect: () => setSelectedOrderId(item.id),
+                                      },
+                                      {
+                                        label: "Enviar WhatsApp",
+                                        onSelect: () =>
+                                          goToWhatsAppServiceOrder(String(item.customerId ?? ""), String(item.id ?? "")),
+                                      },
+                                      {
+                                        label: "Ver cliente",
+                                        onSelect: () => navigate(`/customers?customerId=${item.customerId}`),
+                                      },
+                                    ]}
+                                  />
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </AppDataTable>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-2 lg:grid-cols-2 2xl:grid-cols-2">
-                    {paginatedOrders.map(item => {
-                    const canStart = capabilities.start && ["OPEN", "ASSIGNED"].includes(item.status);
-                    const canComplete = capabilities.complete && item.status === "IN_PROGRESS";
-                    const canGenerateCharge =
-                      capabilities.generateCharge && item.status === "DONE" && !item.hasCharge;
-
-                    return (
-                      <article
-                        key={item.id}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => setSelectedOrderId(item.id)}
-                        onKeyDown={event => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault();
-                            setSelectedOrderId(item.id);
-                          }
-                        }}
-                        className={cn(
-                          "rounded-lg border p-3 text-left transition-colors",
-                          selectedOrder?.id === item.id
-                            ? "border-[var(--accent-primary)] bg-[var(--accent-soft)]"
-                            : "border-[var(--border-subtle)] bg-[var(--surface-base)] hover:bg-[var(--surface-subtle)]/70",
-                          item.isOverdue ? "border-[var(--status-danger)]" : null
-                        )}
-                      >
-                        <div className="flex min-w-0 items-start gap-2">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex min-w-0 items-start justify-between gap-2">
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
-                                  #{item.code} · {item.title}
-                                </p>
-                                <p className="mt-0.5 truncate text-[11px] text-[var(--text-secondary)]">
-                                  {item.customerName}
-                                </p>
-                              </div>
-                              <span className="shrink-0 whitespace-nowrap pt-0.5">
-                                <AppOperationalStatusBadge status={getServiceOrderOperationalStatus(item)} label={getStatusTone(item.status, item.isOverdue)} />
-                              </span>
-                            </div>
-
-                            <p className="mt-1 truncate text-xs text-[var(--text-secondary)]">
-                              {item.description}
-                            </p>
-
-                            <div className="mt-2 grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] text-[var(--text-muted)]">
-                              <span className="truncate">Prazo: {item.dueDateLabel}</span>
-                              <span className="truncate">Valor: {formatCurrency(item.amountCents)}</span>
-                              <span className="truncate">Execução: {item.statusLabel}</span>
-                              <span
-                                className={cn(
-                                  "truncate",
-                                  item.status === "DONE" && !item.hasCharge
-                                    ? "text-[var(--status-danger)]"
-                                    : "text-[var(--text-muted)]"
-                                )}
-                              >
-                                {item.financialStatusLabel}
-                              </span>
-                            </div>
-
-                            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border-subtle)] pt-2">
-                              <div className="min-w-0 text-[11px] text-[var(--text-muted)]">
-                                <span className="block truncate">Responsável: {item.responsibleName}</span>
-                                <span className={cn(
-                                  "block truncate",
-                                  item.riskLabel === "Sem bloqueio crítico"
-                                    ? "text-[var(--text-muted)]"
-                                    : "text-[var(--status-danger)]"
-                                )}>
-                                  Pendência: {item.riskLabel}
-                                </span>
-                              </div>
-                              <Button
-                                size="sm"
-                                onClick={event => {
-                                  event.stopPropagation();
-                                  runPrimaryAction(item);
-                                }}
-                              >
-                                {item.nextAction.label}
-                              </Button>
-                            </div>
-                          </div>
-
-                          <div
-                            className="shrink-0 pt-0.5"
-                            onClick={event => event.stopPropagation()}
-                          >
-                            <AppRowActionsDropdown
-                              triggerLabel="Ações da O.S."
-                              items={[
-                                {
-                                  label: capabilities.start ? "Iniciar" : "Iniciar (indisponível)",
-                                  tone: "primary",
-                                  onSelect: () => void handleStart(item.id),
-                                  disabled: !canStart || anyActionPending,
-                                },
-                                {
-                                  label: capabilities.complete ? "Concluir" : "Concluir (indisponível)",
-                                  tone: "primary",
-                                  onSelect: () => void handleComplete(item.id),
-                                  disabled: !canComplete || anyActionPending,
-                                },
-                                {
-                                  label: capabilities.generateCharge
-                                    ? "Gerar cobrança"
-                                    : "Gerar cobrança (indisponível)",
-                                  tone: "primary",
-                                  onSelect: () => void handleGenerateCharge(item.id),
-                                  disabled: !canGenerateCharge || anyActionPending,
-                                },
-                                {
-                                  label: capabilities.edit ? "Editar" : "Editar (indisponível)",
-                                  tone: "primary",
-                                  onSelect: () => setEditingId(item.id),
-                                  disabled: !capabilities.edit,
-                                },
-                                {
-                                  type: "separator",
-                                  label: "Navegação",
-                                },
-                                { label: "Abrir O.S.", onSelect: () => setSelectedOrderId(item.id) },
-                                {
-                                  label: "Enviar WhatsApp",
-                                  onSelect: () =>
-                                    goToWhatsAppServiceOrder(String(item.customerId ?? ""), String(item.id ?? "")),
-                                },
-                                {
-                                  label: "Ver cliente",
-                                  onSelect: () => navigate(`/customers?customerId=${item.customerId}`),
-                                },
-                              ]}
-                            />
-                          </div>
-                        </div>
-                      </article>
-                    );
-                    })}
                   </div>
                   <AppPagination
                     currentPage={currentPage}
@@ -1039,7 +1026,7 @@ export default function ServiceOrdersPage() {
                     pageSize={pageSize}
                     onPageChange={setCurrentPage}
                   />
-                </>
+                </div>
               )}
             </AppSectionBlock>
 
@@ -1159,7 +1146,7 @@ export default function ServiceOrdersPage() {
                     )}
                   </article>
 
-                  <div className="flex flex-wrap gap-2 pt-1">
+                  <AppActionBar className="gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2 py-2">
                     <Button
                       type="button"
                       onClick={() => void handleStart(selectedOrder.id)}
@@ -1218,7 +1205,7 @@ export default function ServiceOrdersPage() {
                     >
                       Abrir cliente
                     </Button>
-                  </div>
+                  </AppActionBar>
 
                   {actionFeedback ? (
                     <p className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-2 text-xs text-[var(--text-secondary)]">

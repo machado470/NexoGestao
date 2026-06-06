@@ -914,7 +914,7 @@ export default function CustomersPage() {
 
         <AppSectionCard className="space-y-3">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="nexo-overline">Próxima decisão da carteira</p>
               <h2 className="mt-1 text-lg font-semibold text-[var(--text-primary)]">
                 {attentionItems[0] ? attentionItems[0].title : "Carteira sem bloqueio imediato"}
@@ -924,12 +924,15 @@ export default function CustomersPage() {
                   ? attentionItems[0].context
                   : "Os dados retornados não apontam dívida vencida, O.S. aberta ou silêncio prolongado."}
               </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <AppStatusBadge label="Financeiro" tone="info" />
+                <AppStatusBadge label="Execução" tone="accent" />
+                <AppStatusBadge label="Comunicação" tone="neutral" />
+              </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <AppOperationalStatusBadge status={customersOperationalStatus} />
-              {attentionItems[0] ? (
-                <AppPriorityBadge priority="P0" />
-              ) : null}
+              {attentionItems[0] ? <AppPriorityBadge priority="P0" /> : null}
               {attentionItems[0] ? (
                 <Button size="sm" onClick={() => runAttentionAction(attentionItems[0])}>
                   {attentionItems[0].actionLabel}
@@ -941,72 +944,67 @@ export default function CustomersPage() {
               )}
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <AppStatusBadge label="Financeiro" tone="info" />
-            <AppStatusBadge label="Execução" tone="accent" />
-            <AppStatusBadge label="Comunicação" tone="neutral" />
-          </div>
         </AppSectionCard>
 
-        <AppSectionCard className="space-y-3">
-          <div>
-            <p className="nexo-overline">Resumo do cliente</p>
-            <p className="mt-1 text-sm text-[var(--text-secondary)]">Memória operacional consolidada da carteira.</p>
-          </div>
+        <AppSectionBlock
+          title="Resumo do cliente"
+          subtitle="Memória operacional consolidada da carteira."
+          compact
+        >
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          <AppStatCard
-            label="Saldo em atenção"
-            value={formatCurrency(
-              profiles.reduce(
-                (total, profile) => total + profile.pendingCents,
-                0
-              )
-            )}
-            helper="Soma segura das cobranças pendentes/vencidas retornadas."
-            delta={
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setActiveFilter("pending")}
-              >
-                Filtrar pendências
-              </Button>
-            }
-          />
-          <AppStatCard
-            label="Risco de relacionamento"
-            value={
-              profiles.filter(profile => profile.status === "Em risco").length
-            }
-            helper="Clientes com dívida vencida ou longo período sem contato."
-            delta={
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setActiveFilter("risk")}
-              >
-                Ver risco
-              </Button>
-            }
-          />
-          <AppStatCard
-            label="Execução aberta"
-            value={
-              profiles.filter(profile => profile.hasOpenServiceOrder).length
-            }
-            helper="Clientes com O.S. aberta que ainda pede acompanhamento."
-            delta={
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setActiveFilter("open_os")}
-              >
-                Ver O.S.
-              </Button>
-            }
-          />
+            <AppStatCard
+              label="Saldo em atenção"
+              value={formatCurrency(
+                profiles.reduce(
+                  (total, profile) => total + profile.pendingCents,
+                  0
+                )
+              )}
+              helper="Soma segura das cobranças pendentes/vencidas retornadas."
+              delta={
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setActiveFilter("pending")}
+                >
+                  Filtrar pendências
+                </Button>
+              }
+            />
+            <AppStatCard
+              label="Risco de relacionamento"
+              value={
+                profiles.filter(profile => profile.status === "Em risco").length
+              }
+              helper="Clientes com dívida vencida ou longo período sem contato."
+              delta={
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setActiveFilter("risk")}
+                >
+                  Ver risco
+                </Button>
+              }
+            />
+            <AppStatCard
+              label="Execução aberta"
+              value={
+                profiles.filter(profile => profile.hasOpenServiceOrder).length
+              }
+              helper="Clientes com O.S. aberta que ainda pede acompanhamento."
+              delta={
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setActiveFilter("open_os")}
+                >
+                  Ver O.S.
+                </Button>
+              }
+            />
           </div>
-        </AppSectionCard>
+        </AppSectionBlock>
 
 
         <AppNextBestActionBlock
@@ -1135,174 +1133,167 @@ export default function CustomersPage() {
                 description="Nenhum cliente corresponde aos filtros ativos e termo pesquisado."
               />
             ) : (
-              <div className="space-y-2.5">
-                <div className="overflow-x-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]">
-                  <AppDataTable>
+              <div className="space-y-3">
+                <div className="overflow-x-auto">
+                  <AppDataTable className="min-w-[860px]">
                     <thead>
                       <tr>
                         <th>Cliente</th>
-                        <th>Status</th>
-                        <th>Prioridade</th>
+                        <th>Saúde e prioridade</th>
+                        <th>Contexto operacional</th>
                         <th>Financeiro</th>
-                        <th>Próxima ação</th>
+                        <th className="text-right">Ações</th>
                       </tr>
                     </thead>
                     <tbody>
                       {paginatedProfiles.map(profile => (
-                        <tr key={`table-${profile.customerId}`}>
-                          <td>{String(profile.customer.name ?? "Sem nome")}</td>
+                        <tr
+                          key={profile.customerId}
+                          className={cn(
+                            "cursor-pointer align-top transition-colors hover:bg-[var(--surface-subtle)]/60",
+                            profile.customerId === activeCustomerId
+                              ? "bg-[var(--accent-soft)]/35"
+                              : undefined
+                          )}
+                          onClick={() => setActiveCustomerId(profile.customerId)}
+                        >
                           <td>
-                            <AppOperationalStatusBadge
-                              status={getCustomerOperationalStatus(profile)}
-                              label={profile.status}
-                            />
+                            <div className="min-w-[220px] space-y-1">
+                              <p className="font-semibold text-[var(--text-primary)]">
+                                {String(profile.customer.name ?? "Sem nome")}
+                              </p>
+                              <p className="max-w-[280px] truncate text-xs text-[var(--text-secondary)]">
+                                {profile.contact}
+                              </p>
+                              <p className="text-xs text-[var(--text-muted)]">
+                                Última interação: {formatDateTime(profile.lastInteractionAt)}
+                              </p>
+                            </div>
                           </td>
-                          <td><AppPriorityBadge priority={getCustomerPriority(profile)} /></td>
-                          <td>{formatCurrency(profile.pendingCents)}</td>
-                          <td>{profile.nextActionLabel}</td>
+                          <td>
+                            <div className="flex min-w-[170px] flex-col items-start gap-2">
+                              <AppOperationalStatusBadge
+                                status={getCustomerOperationalStatus(profile)}
+                                label={profile.status}
+                              />
+                              <AppPriorityBadge
+                                priority={getCustomerPriority(profile)}
+                                label={profile.nextActionLabel}
+                              />
+                            </div>
+                          </td>
+                          <td>
+                            <div className="min-w-[250px] space-y-1 text-xs text-[var(--text-secondary)]">
+                              <p>{profile.riskSignal}</p>
+                              <p>
+                                Última O.S.: {profile.lastService
+                                  ? `${String(profile.lastService.title ?? "O.S.")} · ${String(profile.lastService.status ?? "-")}`
+                                  : "Sem O.S. registrada"}
+                              </p>
+                              <p>
+                                Próximo agendamento: {profile.nextAppointment
+                                  ? formatDateTime(profile.nextAppointment.startsAt)
+                                  : "Sem agenda futura"}
+                              </p>
+                            </div>
+                          </td>
+                          <td>
+                            <div className="min-w-[150px] space-y-2">
+                              <p className="font-medium text-[var(--text-primary)]">
+                                {formatCurrency(profile.pendingCents)}
+                              </p>
+                              {profile.pendingCents === 0 ? (
+                                <AppStatusBadge
+                                  label="Sem pendência retornada"
+                                  tone="neutral"
+                                />
+                              ) : (
+                                <AppStatusBadge label="Saldo em atenção" tone="warning" />
+                              )}
+                            </div>
+                          </td>
+                          <td onClick={event => event.stopPropagation()}>
+                            <div className="flex min-w-[150px] items-center justify-end gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  if (profile.nextActionLabel.includes("Cobrar")) {
+                                    openCustomerWhatsApp(
+                                      profile.customer,
+                                      profile.pendingChargeId
+                                    );
+                                    return;
+                                  }
+                                  navigate(profile.nextActionPath);
+                                }}
+                              >
+                                {profile.nextActionLabel}
+                              </Button>
+                              <AppRowActionsDropdown
+                                triggerLabel="Mais ações"
+                                contentClassName="min-w-[220px]"
+                                items={[
+                                  {
+                                    label: "Abrir cliente",
+                                    tone: "primary",
+                                    onSelect: () =>
+                                      setActiveCustomerId(profile.customerId),
+                                  },
+                                  {
+                                    label: "Agendar",
+                                    onSelect: () =>
+                                      navigate(
+                                        `/appointments?customerId=${profile.customerId}`
+                                      ),
+                                  },
+                                  {
+                                    label: "Nova O.S.",
+                                    onSelect: () =>
+                                      navigate(
+                                        `/service-orders?customerId=${profile.customerId}`
+                                      ),
+                                  },
+                                  {
+                                    label: "Cobrar",
+                                    onSelect: () =>
+                                      navigate(
+                                        `/finances?customerId=${profile.customerId}`
+                                      ),
+                                  },
+                                  {
+                                    label: "WhatsApp",
+                                    onSelect: () =>
+                                      openCustomerWhatsApp(
+                                        profile.customer,
+                                        profile.pendingChargeId
+                                      ),
+                                  },
+                                  {
+                                    type: "separator",
+                                    label: "Cadastro",
+                                  },
+                                  {
+                                    label:
+                                      pendingEditCustomerId === profile.customerId
+                                        ? "Editando..."
+                                        : "Editar dados",
+                                    onSelect: () => {
+                                      setPendingEditCustomerId(profile.customerId);
+                                      setEditingCustomerId(profile.customerId);
+                                      toast.success("Editor de cliente aberto.");
+                                    },
+                                    disabled:
+                                      pendingEditCustomerId === profile.customerId,
+                                  },
+                                ]}
+                              />
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </AppDataTable>
                 </div>
-                {paginatedProfiles.map(profile => (
-                  <article
-                    key={profile.customerId}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => setActiveCustomerId(profile.customerId)}
-                    onKeyDown={event => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        setActiveCustomerId(profile.customerId);
-                      }
-                    }}
-                    className={cn(
-                      "rounded-lg border p-3.5 transition-colors",
-                      profile.customerId === activeCustomerId
-                        ? "border-[var(--accent-primary)] bg-[var(--accent-soft)]/35"
-                        : "border-[var(--border-subtle)] bg-[var(--surface-base)] hover:bg-[var(--surface-subtle)]/60"
-                    )}
-                  >
-                    <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex min-w-0 flex-wrap items-center gap-2">
-                          <p className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--text-primary)]">
-                            {String(profile.customer.name ?? "Sem nome")}
-                          </p>
-                          <AppOperationalStatusBadge status={getCustomerOperationalStatus(profile)} label={profile.status} />
-                        </div>
-                        <p className="mt-1 truncate text-xs text-[var(--text-secondary)]">
-                          {profile.contact}
-                        </p>
-                        <div className="mt-3 grid gap-2 text-xs text-[var(--text-secondary)] md:grid-cols-2">
-                          <span>
-                            Saldo pendente:{" "}
-                            {formatCurrency(profile.pendingCents)}
-                          </span>
-                          <span>
-                            Última O.S.:{" "}
-                            {profile.lastService
-                              ? `${String(profile.lastService.title ?? "O.S.")} · ${String(profile.lastService.status ?? "-")}`
-                              : "Sem O.S. registrada"}
-                          </span>
-                          <span>
-                            Próximo agendamento:{" "}
-                            {profile.nextAppointment
-                              ? formatDateTime(profile.nextAppointment.startsAt)
-                              : "Sem agenda futura"}
-                          </span>
-                          <span>Sinal: {profile.riskSignal}</span>
-                        </div>
-                        <div className="mt-3 flex flex-wrap items-center gap-2">
-                          <AppPriorityBadge priority={getCustomerPriority(profile)} label={profile.nextActionLabel} />
-                          {profile.pendingCents === 0 ? (
-                            <AppStatusBadge label="Financeiro sem pendência retornada" tone="neutral" />
-                          ) : null}
-                        </div>
-                      </div>
-
-                      <div
-                        className="flex shrink-0 flex-wrap items-center gap-2"
-                        onClick={event => event.stopPropagation()}
-                      >
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            if (profile.nextActionLabel.includes("Cobrar")) {
-                              openCustomerWhatsApp(
-                                profile.customer,
-                                profile.pendingChargeId
-                              );
-                              return;
-                            }
-                            navigate(profile.nextActionPath);
-                          }}
-                        >
-                          {profile.nextActionLabel}
-                        </Button>
-                        <AppRowActionsDropdown
-                          triggerLabel="Mais ações"
-                          contentClassName="min-w-[220px]"
-                          items={[
-                            {
-                              label: "Abrir cliente",
-                              tone: "primary",
-                              onSelect: () =>
-                                setActiveCustomerId(profile.customerId),
-                            },
-                            {
-                              label: "Agendar",
-                              onSelect: () =>
-                                navigate(
-                                  `/appointments?customerId=${profile.customerId}`
-                                ),
-                            },
-                            {
-                              label: "Nova O.S.",
-                              onSelect: () =>
-                                navigate(
-                                  `/service-orders?customerId=${profile.customerId}`
-                                ),
-                            },
-                            {
-                              label: "Cobrar",
-                              onSelect: () =>
-                                navigate(
-                                  `/finances?customerId=${profile.customerId}`
-                                ),
-                            },
-                            {
-                              label: "WhatsApp",
-                              onSelect: () =>
-                                openCustomerWhatsApp(
-                                  profile.customer,
-                                  profile.pendingChargeId
-                                ),
-                            },
-                            {
-                              type: "separator",
-                              label: "Cadastro",
-                            },
-                            {
-                              label:
-                                pendingEditCustomerId === profile.customerId
-                                  ? "Editando..."
-                                  : "Editar dados",
-                              onSelect: () => {
-                                setPendingEditCustomerId(profile.customerId);
-                                setEditingCustomerId(profile.customerId);
-                                toast.success("Editor de cliente aberto.");
-                              },
-                              disabled:
-                                pendingEditCustomerId === profile.customerId,
-                            },
-                          ]}
-                        />
-                      </div>
-                    </div>
-                  </article>
-                ))}
                 <AppPagination
                   currentPage={currentPage}
                   totalItems={filteredProfiles.length}
