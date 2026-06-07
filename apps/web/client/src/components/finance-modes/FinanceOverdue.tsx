@@ -52,7 +52,10 @@ export function FinanceOverdue({
   const maxDaysOverdue = sorted[0] ? getDaysOverdue(sorted[0]?.dueDate) : 0;
   const averageOverdue =
     sorted.length > 0
-      ? Math.round(sorted.reduce((acc, item) => acc + getDaysOverdue(item?.dueDate), 0) / sorted.length)
+      ? Math.round(
+          sorted.reduce((acc, item) => acc + getDaysOverdue(item?.dueDate), 0) /
+            sorted.length
+        )
       : 0;
 
   const bucketData = useMemo(() => {
@@ -65,11 +68,13 @@ export function FinanceOverdue({
         totalCents: previous.totalCents + Number(item?.amountCents ?? 0),
       });
     });
-    return ["Até 3 dias", "4 a 7 dias", "8 a 15 dias", "+ de 15 dias"].map(label => ({
-      label,
-      count: map.get(label)?.count ?? 0,
-      totalCents: map.get(label)?.totalCents ?? 0,
-    }));
+    return ["Até 3 dias", "4 a 7 dias", "8 a 15 dias", "+ de 15 dias"].map(
+      label => ({
+        label,
+        count: map.get(label)?.count ?? 0,
+        totalCents: map.get(label)?.totalCents ?? 0,
+      })
+    );
   }, [sorted]);
 
   const topImpact = useMemo(() => {
@@ -78,7 +83,9 @@ export function FinanceOverdue({
       { customerName: string; totalCents: number; chargesCount: number }
     >();
     sorted.forEach(item => {
-      const customerId = String(item?.customer?.id ?? item?.customer?.name ?? "sem-cliente");
+      const customerId = String(
+        item?.customer?.id ?? item?.customer?.name ?? "sem-cliente"
+      );
       const customerName = String(item?.customer?.name ?? "Sem cliente");
       const current = customerTotals.get(customerId) ?? {
         customerName,
@@ -98,14 +105,21 @@ export function FinanceOverdue({
   }, [sorted]);
 
   const maxBandCount = Math.max(...bucketData.map(item => item.count), 1);
-  const topImpactTotal = topImpact.reduce((acc, item) => acc + item.totalCents, 0);
+  const topImpactTotal = topImpact.reduce(
+    (acc, item) => acc + item.totalCents,
+    0
+  );
 
   const filtered = useMemo(
     () =>
       sorted.filter(charge => {
-        const inBand = selectedBand ? getBand(getDaysOverdue(charge?.dueDate)) === selectedBand : true;
+        const inBand = selectedBand
+          ? getBand(getDaysOverdue(charge?.dueDate)) === selectedBand
+          : true;
         const inCustomer = selectedCustomer
-          ? String(charge?.customer?.id ?? charge?.customer?.name ?? "sem-cliente") === selectedCustomer
+          ? String(
+              charge?.customer?.id ?? charge?.customer?.name ?? "sem-cliente"
+            ) === selectedCustomer
           : true;
         return inBand && inCustomer;
       }),
@@ -146,7 +160,9 @@ export function FinanceOverdue({
               </p>
             </div>
             <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/45 p-4">
-              <p className="text-xs text-[var(--text-muted)]">Quantidade vencida</p>
+              <p className="text-xs text-[var(--text-muted)]">
+                Quantidade vencida
+              </p>
               <p className="mt-1 truncate text-xl font-semibold leading-tight text-[var(--text-primary)] md:text-2xl">
                 {sorted.length}
               </p>
@@ -158,24 +174,37 @@ export function FinanceOverdue({
               </p>
             </div>
             <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/45 p-4">
-              <p className="text-xs text-[var(--text-muted)]">Impacto no caixa</p>
+              <p className="text-xs text-[var(--text-muted)]">
+                Impacto no caixa
+              </p>
               <p className="mt-1 truncate text-xl font-semibold leading-tight text-[var(--text-primary)] md:text-2xl">
-                {riskTotal > 0 ? `${Math.min(Math.round((riskTotal / 5000000) * 100), 100)}%` : "0%"}
+                {riskTotal > 0
+                  ? `${Math.min(Math.round((riskTotal / 5000000) * 100), 100)}%`
+                  : "0%"}
               </p>
             </div>
           </div>
 
           <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 p-4">
-            <p className="text-sm font-semibold text-[var(--text-primary)]">O que cobrar primeiro</p>
+            <p className="text-sm font-semibold text-[var(--text-primary)]">
+              O que cobrar primeiro
+            </p>
             <p className="mt-1 text-xs text-[var(--text-secondary)]">
-              Comece por cobranças acima da média de atraso ({averageOverdue} dias) e maior valor.
+              Comece por cobranças acima da média de atraso ({averageOverdue}{" "}
+              dias) e maior valor.
             </p>
             {focusDescription ? (
-              <p className="mt-2 text-xs font-medium text-[var(--text-primary)]">{focusDescription}</p>
+              <p className="mt-2 text-xs font-medium text-[var(--text-primary)]">
+                {focusDescription}
+              </p>
             ) : null}
             <ActionFeedbackButton
               state="idle"
-              idleLabel={focusDescription ? "Cobrar foco selecionado" : "Cobrar prioridade agora"}
+              idleLabel={
+                focusDescription
+                  ? "Cobrar foco selecionado"
+                  : "Cobrar prioridade agora"
+              }
               onClick={() => onCharge(filtered[0] ?? sorted[0])}
             />
           </div>
@@ -200,17 +229,23 @@ export function FinanceOverdue({
                   onClick={() => onBandChange(isActive ? null : item.label)}
                   className={cn(
                     "w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 p-3 text-left transition hover:border-[var(--border-emphasis)] hover:bg-[var(--surface-base)]/55",
-                    isActive && "border-[var(--border-emphasis)] bg-[var(--surface-base)]/55"
+                    isActive &&
+                      "border-[var(--border-emphasis)] bg-[var(--surface-base)]/55"
                   )}
                 >
                   <div className="flex min-w-0 items-center justify-between gap-3">
-                    <span className="truncate text-sm font-medium text-[var(--text-primary)]">{item.label}</span>
+                    <span className="truncate text-sm font-medium text-[var(--text-primary)]">
+                      {item.label}
+                    </span>
                     <span className="shrink-0 text-xs text-[var(--text-secondary)]">
                       {item.count} cobrança(s)
                     </span>
                   </div>
                   <div className="mt-2 h-2 rounded-full bg-[var(--surface-elevated)]">
-                    <div className="h-2 rounded-full bg-[var(--accent-primary)]/80" style={{ width }} />
+                    <div
+                      className="h-2 rounded-full bg-[var(--accent-primary)]/80"
+                      style={{ width }}
+                    />
                   </div>
                   <p className="mt-1 text-xs text-[var(--text-muted)]">
                     {item.count > 0
@@ -241,24 +276,39 @@ export function FinanceOverdue({
           <div className="space-y-3">
             {topImpact.map(item => {
               const isActive = selectedCustomer === item.customerId;
-              const ratio = topImpactTotal > 0 ? (item.totalCents / topImpactTotal) * 100 : 0;
+              const ratio =
+                topImpactTotal > 0
+                  ? (item.totalCents / topImpactTotal) * 100
+                  : 0;
               return (
                 <button
                   key={item.customerId}
                   type="button"
-                  onClick={() => onCustomerChange(isActive ? null : item.customerId)}
+                  onClick={() =>
+                    onCustomerChange(isActive ? null : item.customerId)
+                  }
                   className={cn(
                     "w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 p-3 text-left transition hover:border-[var(--border-emphasis)] hover:bg-[var(--surface-base)]/55",
-                    isActive && "border-[var(--border-emphasis)] bg-[var(--surface-base)]/55"
+                    isActive &&
+                      "border-[var(--border-emphasis)] bg-[var(--surface-base)]/55"
                   )}
                 >
                   <div className="flex min-w-0 items-center justify-between gap-2 text-sm">
-                    <p className="truncate font-medium text-[var(--text-primary)]">{item.customerName}</p>
-                    <p className="shrink-0 font-semibold text-[var(--text-primary)]">{formatCurrency(item.totalCents)}</p>
+                    <p className="truncate font-medium text-[var(--text-primary)]">
+                      {item.customerName}
+                    </p>
+                    <p className="shrink-0 font-semibold text-[var(--text-primary)]">
+                      {formatCurrency(item.totalCents)}
+                    </p>
                   </div>
-                  <p className="mt-1 text-xs text-[var(--text-muted)]">{item.chargesCount} título(s) vencido(s)</p>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">
+                    {item.chargesCount} título(s) vencido(s)
+                  </p>
                   <div className="mt-2 h-1.5 rounded-full bg-[var(--surface-elevated)]">
-                    <div className="h-1.5 rounded-full bg-[var(--accent-primary)]/80" style={{ width: `${Math.max(ratio, 8)}%` }} />
+                    <div
+                      className="h-1.5 rounded-full bg-[var(--accent-primary)]/80"
+                      style={{ width: `${Math.max(ratio, 8)}%` }}
+                    />
                   </div>
                 </button>
               );
@@ -279,60 +329,72 @@ export function FinanceOverdue({
         className="border-[var(--border-subtle)]"
       >
         {focusDescription ? (
-          <p className="mb-3 text-xs text-[var(--text-secondary)]">Filtro ativo: {focusDescription}.</p>
+          <p className="mb-3 text-xs text-[var(--text-secondary)]">
+            Filtro ativo: {focusDescription}.
+          </p>
         ) : null}
         <AppDataTable>
-          <table className="w-full text-sm">
-            <thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]">
-              <tr>
-                <th className="p-2.5 text-left">Cliente</th>
-                <th className="text-left">Dias em atraso</th>
-                <th className="text-left">Valor</th>
-                <th className="text-left">Vencimento</th>
-                <th className="text-left">Prioridade</th>
-                <th className="p-2.5 text-left">Ação principal</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(charge => {
-                const days = getDaysOverdue(charge?.dueDate);
-                const priority = days > 15 ? "Máxima" : days > 7 ? "Alta" : "Média";
-                return (
-                  <tr
-                    key={String(charge?.id)}
-                    className="border-t border-[var(--border-subtle)] bg-[var(--surface-base)]/20"
-                  >
-                    <td className="min-w-0 p-2.5">
-                      <span className="block truncate">{String(charge?.customer?.name ?? "—")}</span>
-                    </td>
-                    <td className="font-semibold text-[var(--text-primary)]">{days} dias</td>
-                    <td>{formatCurrency(Number(charge?.amountCents ?? 0))}</td>
-                    <td>
-                      {charge?.dueDate
-                        ? new Date(String(charge.dueDate)).toLocaleDateString("pt-BR")
-                        : "—"}
-                    </td>
-                    <td className="text-xs text-[var(--text-secondary)]">{priority}</td>
-                    <td className="space-y-1.5 p-2.5">
-                      <AppStatusBadge label="Vencida" />
-                      <ActionFeedbackButton
-                        state="idle"
-                        idleLabel="Cobrar agora"
-                        onClick={() => onCharge(charge)}
-                      />
-                    </td>
-                  </tr>
-                );
-              })}
-              {filtered.length === 0 ? (
-                <tr className="border-t border-[var(--border-subtle)]">
-                  <td colSpan={6} className="p-4 text-center text-xs text-[var(--text-muted)]">
-                    Nenhuma cobrança para os filtros selecionados.
+          <thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]">
+            <tr>
+              <th className="p-2.5 text-left">Cliente</th>
+              <th className="text-left">Dias em atraso</th>
+              <th className="text-left">Valor</th>
+              <th className="text-left">Vencimento</th>
+              <th className="text-left">Prioridade</th>
+              <th className="p-2.5 text-left">Ação principal</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map(charge => {
+              const days = getDaysOverdue(charge?.dueDate);
+              const priority =
+                days > 15 ? "Máxima" : days > 7 ? "Alta" : "Média";
+              return (
+                <tr
+                  key={String(charge?.id)}
+                  className="border-t border-[var(--border-subtle)] bg-[var(--surface-base)]/20"
+                >
+                  <td className="min-w-0 p-2.5">
+                    <span className="block truncate">
+                      {String(charge?.customer?.name ?? "—")}
+                    </span>
+                  </td>
+                  <td className="font-semibold text-[var(--text-primary)]">
+                    {days} dias
+                  </td>
+                  <td>{formatCurrency(Number(charge?.amountCents ?? 0))}</td>
+                  <td>
+                    {charge?.dueDate
+                      ? new Date(String(charge.dueDate)).toLocaleDateString(
+                          "pt-BR"
+                        )
+                      : "—"}
+                  </td>
+                  <td className="text-xs text-[var(--text-secondary)]">
+                    {priority}
+                  </td>
+                  <td className="space-y-1.5 p-2.5">
+                    <AppStatusBadge label="Vencida" />
+                    <ActionFeedbackButton
+                      state="idle"
+                      idleLabel="Cobrar agora"
+                      onClick={() => onCharge(charge)}
+                    />
                   </td>
                 </tr>
-              ) : null}
-            </tbody>
-          </table>
+              );
+            })}
+            {filtered.length === 0 ? (
+              <tr className="border-t border-[var(--border-subtle)]">
+                <td
+                  colSpan={6}
+                  className="p-4 text-center text-xs text-[var(--text-muted)]"
+                >
+                  Nenhuma cobrança para os filtros selecionados.
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
         </AppDataTable>
       </AppSectionBlock>
     </div>

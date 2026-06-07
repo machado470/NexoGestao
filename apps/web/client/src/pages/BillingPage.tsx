@@ -27,35 +27,65 @@ const PLAN_PRICE_ID: Record<PlanName, string | null> = {
   BUSINESS: "price_business",
 };
 
-const PLAN_META: Record<PlanName, { title: string; priceCents: number; description: string; benefits: string[] }> = {
+const PLAN_META: Record<
+  PlanName,
+  { title: string; priceCents: number; description: string; benefits: string[] }
+> = {
   FREE: {
     title: "Essencial",
     priceCents: 0,
-    description: "Base para iniciar operação auditável sem perder rastreabilidade.",
-    benefits: ["1 usuário", "Clientes e agenda", "Timeline básica", "Suporte padrão"],
+    description:
+      "Base para iniciar operação auditável sem perder rastreabilidade.",
+    benefits: [
+      "1 usuário",
+      "Clientes e agenda",
+      "Timeline básica",
+      "Suporte padrão",
+    ],
   },
   STARTER: {
     title: "Starter",
     priceCents: 19900,
     description: "Para times em estruturação com foco em execução previsível.",
-    benefits: ["Até 5 usuários", "Fluxo Cliente → O.S.", "Financeiro operacional", "WhatsApp contextual"],
+    benefits: [
+      "Até 5 usuários",
+      "Fluxo Cliente → O.S.",
+      "Financeiro operacional",
+      "WhatsApp contextual",
+    ],
   },
   PRO: {
     title: "Pro",
     priceCents: 49900,
     description: "Escala com governança e leitura por exceção no dia a dia.",
-    benefits: ["Até 20 usuários", "Risco e governança", "Automação de cobrança", "Relatórios executivos", "Suporte prioritário"],
+    benefits: [
+      "Até 20 usuários",
+      "Risco e governança",
+      "Automação de cobrança",
+      "Relatórios executivos",
+      "Suporte prioritário",
+    ],
   },
   BUSINESS: {
     title: "Scale",
     priceCents: 99900,
-    description: "Operação multi-equipe com controle fino, contexto e performance.",
-    benefits: ["Usuários ilimitados", "SLA avançado", "Integrações ampliadas", "Playbooks operacionais", "Acompanhamento dedicado"],
+    description:
+      "Operação multi-equipe com controle fino, contexto e performance.",
+    benefits: [
+      "Usuários ilimitados",
+      "SLA avançado",
+      "Integrações ampliadas",
+      "Playbooks operacionais",
+      "Acompanhamento dedicado",
+    ],
   },
 };
 
 function brl(valueCents: number) {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(valueCents / 100);
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(valueCents / 100);
 }
 
 function statusText(status: string) {
@@ -69,7 +99,9 @@ function statusText(status: string) {
 function safePlanName(value: unknown): PlanName {
   const candidate = String(value ?? "FREE").toUpperCase();
   const normalized = candidate === "SCALE" ? "BUSINESS" : candidate;
-  return ["FREE", "STARTER", "PRO", "BUSINESS"].includes(normalized) ? (normalized as PlanName) : "FREE";
+  return ["FREE", "STARTER", "PRO", "BUSINESS"].includes(normalized)
+    ? (normalized as PlanName)
+    : "FREE";
 }
 
 function normalizeBillingPlans(plans: any[]) {
@@ -88,13 +120,23 @@ export default function BillingPage() {
   const plansQuery = trpc.billing.plans.useQuery(undefined, { retry: false });
   const statusQuery = trpc.billing.status.useQuery(undefined, { retry: false });
   const limitsQuery = trpc.billing.limits.useQuery(undefined, { retry: false });
-  const readinessQuery = trpc.integrations.readiness.useQuery(undefined, { retry: false });
+  const readinessQuery = trpc.integrations.readiness.useQuery(undefined, {
+    retry: false,
+  });
   const utils = trpc.useUtils();
 
-  const plans = useMemo(() => normalizeBillingPlans(normalizeArrayPayload<any>(plansQuery.data)), [plansQuery.data]);
-  const currentPlan = safePlanName(statusQuery.data?.plan ?? limitsQuery.data?.plan);
-  const currentStatus = String(statusQuery.data?.status ?? "ACTIVE").toUpperCase();
-  const stripeConfigured = readinessQuery.data?.integrations?.stripe === "configured";
+  const plans = useMemo(
+    () => normalizeBillingPlans(normalizeArrayPayload<any>(plansQuery.data)),
+    [plansQuery.data]
+  );
+  const currentPlan = safePlanName(
+    statusQuery.data?.plan ?? limitsQuery.data?.plan
+  );
+  const currentStatus = String(
+    statusQuery.data?.status ?? "ACTIVE"
+  ).toUpperCase();
+  const stripeConfigured =
+    readinessQuery.data?.integrations?.stripe === "configured";
 
   const checkoutMutation = trpc.billing.checkout.useMutation({
     onSuccess: payload => {
@@ -104,28 +146,59 @@ export default function BillingPage() {
         return;
       }
       toast.success("Plano atualizado.");
-      void Promise.all([utils.billing.status.invalidate(), utils.billing.limits.invalidate()]);
+      void Promise.all([
+        utils.billing.status.invalidate(),
+        utils.billing.limits.invalidate(),
+      ]);
     },
-    onError: error => toast.error(error.message || "Falha ao iniciar checkout."),
+    onError: error =>
+      toast.error(error.message || "Falha ao iniciar checkout."),
   });
 
   const cancelMutation = trpc.billing.cancel.useMutation({
     onSuccess: async () => {
       toast.success("Assinatura cancelada para o próximo ciclo.");
-      await Promise.all([utils.billing.status.invalidate(), utils.billing.limits.invalidate()]);
+      await Promise.all([
+        utils.billing.status.invalidate(),
+        utils.billing.limits.invalidate(),
+      ]);
     },
-    onError: error => toast.error(error.message || "Não foi possível cancelar."),
+    onError: error =>
+      toast.error(error.message || "Não foi possível cancelar."),
   });
 
-  const invoices = Array.isArray(statusQuery.data?.events) ? statusQuery.data?.events : [];
-  const nextChargeAt = statusQuery.data?.nextBillingAt ?? statusQuery.data?.currentPeriodEnd ?? limitsQuery.data?.trial?.endsAt ?? null;
-  const paymentMethodLabel = String(statusQuery.data?.paymentMethodBrand ?? statusQuery.data?.paymentMethod ?? "Não informado");
-  const statusReason = String(statusQuery.data?.reason ?? statusQuery.data?.statusReason ?? "Sem bloqueio informado.");
-  const isLoading = [plansQuery, statusQuery, limitsQuery].some(query => query.isLoading);
-  const hasError = [plansQuery, statusQuery, limitsQuery].some(query => query.isError);
+  const invoices = Array.isArray(statusQuery.data?.events)
+    ? statusQuery.data?.events
+    : [];
+  const nextChargeAt =
+    statusQuery.data?.nextBillingAt ??
+    statusQuery.data?.currentPeriodEnd ??
+    limitsQuery.data?.trial?.endsAt ??
+    null;
+  const paymentMethodLabel = String(
+    statusQuery.data?.paymentMethodBrand ??
+      statusQuery.data?.paymentMethod ??
+      "Não informado"
+  );
+  const statusReason = String(
+    statusQuery.data?.reason ??
+      statusQuery.data?.statusReason ??
+      "Sem bloqueio informado."
+  );
+  const isLoading = [plansQuery, statusQuery, limitsQuery].some(
+    query => query.isLoading
+  );
+  const hasError = [plansQuery, statusQuery, limitsQuery].some(
+    query => query.isError
+  );
 
   const refetchAll = () => {
-    void Promise.all([plansQuery.refetch(), statusQuery.refetch(), limitsQuery.refetch(), readinessQuery.refetch()]);
+    void Promise.all([
+      plansQuery.refetch(),
+      statusQuery.refetch(),
+      limitsQuery.refetch(),
+      readinessQuery.refetch(),
+    ]);
   };
 
   const upgrade = (plan: PlanName) => {
@@ -143,93 +216,223 @@ export default function BillingPage() {
   };
 
   return (
-    <PageWrapper title="Planos" subtitle="Assinatura da sua empresa no Nexo: plano, recorrência, cobrança e acesso.">
+    <PageWrapper
+      title="Planos"
+      subtitle="Assinatura da sua empresa no Nexo: plano, recorrência, cobrança e acesso."
+    >
       <AppPageShell>
         <AppOperationalHeader
           title="Planos"
           description="Gerencie assinatura, limites e acesso da plataforma sem misturar com o financeiro operacional."
           primaryAction={
-            <Button onClick={() => upgrade(currentPlan === "STARTER" ? "PRO" : "STARTER")} disabled={checkoutMutation.isPending || !stripeConfigured}>
+            <Button
+              onClick={() =>
+                upgrade(currentPlan === "STARTER" ? "PRO" : "STARTER")
+              }
+              disabled={checkoutMutation.isPending || !stripeConfigured}
+            >
               <CreditCard className="mr-1.5 h-4 w-4" /> Trocar plano
             </Button>
           }
-          secondaryActions={<Button variant="outline" onClick={() => navigate("/settings?section=integracoes")}>Gerenciar pagamento</Button>}
+          secondaryActions={
+            <Button
+              variant="outline"
+              onClick={() => navigate("/settings?section=integracoes")}
+            >
+              Gerenciar pagamento
+            </Button>
+          }
           contextChips={
             <>
               <AppStatusBadge label={`Plano ${PLAN_META[currentPlan].title}`} />
-              <AppStatusBadge label={`Assinatura ${statusText(currentStatus)}`} />
-              <AppStatusBadge label={`Plano atual: ${PLAN_META[currentPlan].title}`} />
+              <AppStatusBadge
+                label={`Assinatura ${statusText(currentStatus)}`}
+              />
+              <AppStatusBadge
+                label={`Plano atual: ${PLAN_META[currentPlan].title}`}
+              />
               <AppStatusBadge label={`Status: ${statusText(currentStatus)}`} />
-              <AppStatusBadge label={nextChargeAt ? `Próxima cobrança ${new Date(nextChargeAt).toLocaleDateString("pt-BR")}` : "Próxima cobrança não informada"} />
-              <AppStatusBadge label={stripeConfigured ? "Pagamento automático ativo" : "Pagamento automático pendente"} />
+              <AppStatusBadge
+                label={
+                  nextChargeAt
+                    ? `Próxima cobrança ${new Date(nextChargeAt).toLocaleDateString("pt-BR")}`
+                    : "Próxima cobrança não informada"
+                }
+              />
+              <AppStatusBadge
+                label={
+                  stripeConfigured
+                    ? "Pagamento automático ativo"
+                    : "Pagamento automático pendente"
+                }
+              />
             </>
           }
         />
-        <OperationalTopCard className="hidden" title="Gestão de assinatura consolidada" description="Compatibilidade estrutural do sistema." />
+        <OperationalTopCard
+          className="hidden"
+          title="Gestão de assinatura consolidada"
+          description="Compatibilidade estrutural do sistema."
+        />
 
-        {isLoading ? <AppPageLoadingState description="Montando visão de planos, assinatura e recorrência..." /> : null}
-        {hasError ? <AppPageErrorState description="Não foi possível carregar Planos neste momento." onAction={refetchAll} /> : null}
+        {isLoading ? (
+          <AppPageLoadingState description="Montando visão de planos, assinatura e recorrência..." />
+        ) : null}
+        {hasError ? (
+          <AppPageErrorState
+            description="Não foi possível carregar Planos neste momento."
+            onAction={refetchAll}
+          />
+        ) : null}
 
         {!isLoading && !hasError ? (
           <>
-            {plans.length === 0 ? <AppPageEmptyState title="Sem catálogo de planos" description="Nenhum plano disponível para este ambiente. Verifique a configuração de cobrança." /> : null}
+            {plans.length === 0 ? (
+              <AppPageEmptyState
+                title="Sem catálogo de planos"
+                description="Nenhum plano disponível para este ambiente. Verifique a configuração de cobrança."
+              />
+            ) : null}
 
             <div className="grid gap-4 xl:grid-cols-3">
-              <AppSectionBlock title="Plano atual" subtitle="Valor, status e impacto imediato no acesso da operação." className="xl:col-span-2">
+              <AppSectionBlock
+                title="Plano atual"
+                subtitle="Valor, status e impacto imediato no acesso da operação."
+                className="xl:col-span-2"
+              >
                 <div className="grid gap-3 md:grid-cols-2">
                   <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3 text-sm text-[var(--text-secondary)]">
                     <p>
-                      Plano ativo: <strong className="text-[var(--text-primary)]">{PLAN_META[currentPlan].title}</strong>
+                      Plano ativo:{" "}
+                      <strong className="text-[var(--text-primary)]">
+                        {PLAN_META[currentPlan].title}
+                      </strong>
                     </p>
                     <p className="mt-1">
-                      Valor base: <strong className="text-[var(--text-primary)]">{brl(PLAN_META[currentPlan].priceCents)}/mês</strong>
+                      Valor base:{" "}
+                      <strong className="text-[var(--text-primary)]">
+                        {brl(PLAN_META[currentPlan].priceCents)}/mês
+                      </strong>
                     </p>
-                    <p className="mt-1">Descrição: {PLAN_META[currentPlan].description}</p>
+                    <p className="mt-1">
+                      Descrição: {PLAN_META[currentPlan].description}
+                    </p>
                   </div>
                   <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3 text-sm text-[var(--text-secondary)]">
                     <p>
-                      Status da assinatura: <AppStatusBadge label={statusText(currentStatus)} />
+                      Status da assinatura:{" "}
+                      <AppStatusBadge label={statusText(currentStatus)} />
                     </p>
                     <p className="mt-1">
-                      Próxima cobrança: <strong className="text-[var(--text-primary)]">{nextChargeAt ? new Date(nextChargeAt).toLocaleDateString("pt-BR") : "Ciclo não informado"}</strong>
+                      Próxima cobrança:{" "}
+                      <strong className="text-[var(--text-primary)]">
+                        {nextChargeAt
+                          ? new Date(nextChargeAt).toLocaleDateString("pt-BR")
+                          : "Ciclo não informado"}
+                      </strong>
                     </p>
-                    <p className="mt-1">Método de pagamento: <strong className="text-[var(--text-primary)]">{paymentMethodLabel}</strong></p>
+                    <p className="mt-1">
+                      Método de pagamento:{" "}
+                      <strong className="text-[var(--text-primary)]">
+                        {paymentMethodLabel}
+                      </strong>
+                    </p>
                     <p className="mt-1">Motivo/status: {statusReason}</p>
-                    <p className="mt-1">Impacto: atrasos de pagamento podem restringir acesso operacional.</p>
+                    <p className="mt-1">
+                      Impacto: atrasos de pagamento podem restringir acesso
+                      operacional.
+                    </p>
                   </div>
                 </div>
               </AppSectionBlock>
 
-              <AppSectionBlock title="Ações da assinatura" subtitle="Operações críticas para manter acesso e previsibilidade.">
+              <AppSectionBlock
+                title="Ações da assinatura"
+                subtitle="Operações críticas para manter acesso e previsibilidade."
+              >
                 <div className="space-y-2">
-                  <Button size="sm" className="w-full" onClick={() => upgrade("PRO")} disabled={!stripeConfigured || checkoutMutation.isPending}>Trocar para Pro</Button>
-                  <Button size="sm" variant="outline" className="w-full" onClick={() => navigate("/settings?section=integracoes")}>Atualizar método de pagamento</Button>
-                  <Button size="sm" variant="outline" className="w-full" onClick={() => navigate("/billing?tab=history")}>Ver histórico/faturas</Button>
-                  <Button size="sm" variant="outline" className="w-full" disabled={cancelMutation.isPending || currentPlan === "FREE"} onClick={() => cancelMutation.mutate()}>
-                    {cancelMutation.isPending ? "Cancelando..." : "Cancelar assinatura"}
+                  <Button
+                    size="sm"
+                    className="w-full"
+                    onClick={() => upgrade("PRO")}
+                    disabled={!stripeConfigured || checkoutMutation.isPending}
+                  >
+                    Trocar para Pro
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => navigate("/settings?section=integracoes")}
+                  >
+                    Atualizar método de pagamento
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => navigate("/billing?tab=history")}
+                  >
+                    Ver histórico/faturas
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full"
+                    disabled={
+                      cancelMutation.isPending || currentPlan === "FREE"
+                    }
+                    onClick={() => cancelMutation.mutate()}
+                  >
+                    {cancelMutation.isPending
+                      ? "Cancelando..."
+                      : "Cancelar assinatura"}
                   </Button>
                 </div>
               </AppSectionBlock>
             </div>
 
-            <AppSectionBlock title="Planos disponíveis" subtitle="Comparativo claro para upgrade/downgrade com posicionamento premium.">
+            <AppSectionBlock
+              title="Planos disponíveis"
+              subtitle="Comparativo claro para upgrade/downgrade com posicionamento premium."
+            >
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                {(plans.length > 0 ? plans : Object.keys(PLAN_META).map(name => ({ name }))).map((plan: any) => {
+                {(plans.length > 0
+                  ? plans
+                  : Object.keys(PLAN_META).map(name => ({ name }))
+                ).map((plan: any) => {
                   const name = safePlanName(plan?.name);
                   const meta = PLAN_META[name];
                   const isCurrent = name === currentPlan;
-                  const badge = isCurrent ? "Plano atual" : name === "PRO" ? "Mais escolhido" : name === "BUSINESS" ? "Recomendado" : "Disponível";
+                  const badge = isCurrent
+                    ? "Plano atual"
+                    : name === "PRO"
+                      ? "Mais escolhido"
+                      : name === "BUSINESS"
+                        ? "Recomendado"
+                        : "Disponível";
                   return (
-                    <article key={name} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4">
+                    <article
+                      key={name}
+                      className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4"
+                    >
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <p className="text-base font-semibold text-[var(--text-primary)]">{meta.title}</p>
-                          <p className="text-xs text-[var(--text-muted)]">{meta.description}</p>
+                          <p className="text-base font-semibold text-[var(--text-primary)]">
+                            {meta.title}
+                          </p>
+                          <p className="text-xs text-[var(--text-muted)]">
+                            {meta.description}
+                          </p>
                         </div>
                         <AppStatusBadge label={badge} />
                       </div>
-                      <p className="mt-3 text-2xl font-semibold text-[var(--text-primary)]">{brl(meta.priceCents)}</p>
-                      <p className="text-xs text-[var(--text-muted)]">por mês</p>
+                      <p className="mt-3 text-2xl font-semibold text-[var(--text-primary)]">
+                        {brl(meta.priceCents)}
+                      </p>
+                      <p className="text-xs text-[var(--text-muted)]">
+                        por mês
+                      </p>
 
                       <ul className="mt-3 space-y-1.5 text-xs text-[var(--text-secondary)]">
                         {meta.benefits.slice(0, 6).map(item => (
@@ -255,31 +458,62 @@ export default function BillingPage() {
               </div>
             </AppSectionBlock>
 
-            <AppSectionBlock title="Histórico de cobrança da plataforma" subtitle="Faturas e eventos da assinatura com status rastreável.">
-              <AppDataTable>
-                <table className="w-full min-w-[720px] text-sm">
-                  <thead>
-                    <tr className="border-b border-[var(--border-subtle)] text-left text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                      <th className="px-3 py-2">Período/Data</th>
-                      <th className="px-3 py-2">Descrição</th>
-                      <th className="px-3 py-2">Valor</th>
-                      <th className="px-3 py-2">Status</th>
+            <AppSectionBlock
+              title="Histórico de cobrança da plataforma"
+              subtitle="Faturas e eventos da assinatura com status rastreável."
+            >
+              <AppDataTable className="min-w-[720px]">
+                <thead>
+                  <tr className="border-b border-[var(--border-subtle)] text-left text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                    <th className="px-3 py-2">Período/Data</th>
+                    <th className="px-3 py-2">Descrição</th>
+                    <th className="px-3 py-2">Valor</th>
+                    <th className="px-3 py-2">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {invoices.slice(0, 8).map((event: any, index: number) => (
+                    <tr
+                      key={`${String(event?.id ?? "invoice")}-${index}`}
+                      className="border-b border-[var(--border-subtle)]/60"
+                    >
+                      <td className="px-3 py-2">
+                        {event?.createdAt
+                          ? new Date(event.createdAt).toLocaleDateString(
+                              "pt-BR"
+                            )
+                          : "—"}
+                      </td>
+                      <td className="px-3 py-2 text-[var(--text-primary)]">
+                        {String(
+                          event?.description ??
+                            event?.type ??
+                            "Cobrança da plataforma"
+                        )}
+                      </td>
+                      <td className="px-3 py-2">
+                        {event?.amountCents
+                          ? brl(Number(event.amountCents))
+                          : "—"}
+                      </td>
+                      <td className="px-3 py-2">
+                        <AppStatusBadge
+                          label={String(event?.status ?? "Registrado")}
+                        />
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {invoices.slice(0, 8).map((event: any, index: number) => (
-                      <tr key={`${String(event?.id ?? "invoice")}-${index}`} className="border-b border-[var(--border-subtle)]/60">
-                        <td className="px-3 py-2">{event?.createdAt ? new Date(event.createdAt).toLocaleDateString("pt-BR") : "—"}</td>
-                        <td className="px-3 py-2 text-[var(--text-primary)]">{String(event?.description ?? event?.type ?? "Cobrança da plataforma")}</td>
-                        <td className="px-3 py-2">{event?.amountCents ? brl(Number(event.amountCents)) : "—"}</td>
-                        <td className="px-3 py-2"><AppStatusBadge label={String(event?.status ?? "Registrado")} /></td>
-                      </tr>
-                    ))}
-                    {invoices.length === 0 ? (
-                      <tr><td className="px-3 py-3 text-[var(--text-muted)]" colSpan={4}>Sem histórico de faturas para este ambiente.</td></tr>
-                    ) : null}
-                  </tbody>
-                </table>
+                  ))}
+                  {invoices.length === 0 ? (
+                    <tr>
+                      <td
+                        className="px-3 py-3 text-[var(--text-muted)]"
+                        colSpan={4}
+                      >
+                        Sem histórico de faturas para este ambiente.
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
               </AppDataTable>
             </AppSectionBlock>
           </>

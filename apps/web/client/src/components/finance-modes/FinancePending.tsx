@@ -8,7 +8,11 @@ import {
   appSelectionPillClasses,
 } from "@/components/internal-page-system";
 import { ActionFeedbackButton } from "@/components/operating-system/ActionFeedbackButton";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
 
 interface FinancePendingProps {
   charges: any[];
@@ -80,11 +84,17 @@ export function FinancePending({
   const distributionByCustomer = useMemo(() => {
     const map = new Map<string, { value: number; id: string }>();
     charges.forEach(charge => {
-      const customerId = String(charge?.customerId ?? charge?.customer?.id ?? "sem-cliente");
+      const customerId = String(
+        charge?.customerId ?? charge?.customer?.id ?? "sem-cliente"
+      );
       const customerName = String(charge?.customer?.name ?? "Sem cliente");
       const current = map.get(customerId) ?? { value: 0, id: customerId };
-      map.set(customerId, { ...current, value: current.value + Number(charge?.amountCents ?? 0) });
-      if (customerName !== customerId) map.set(`${customerId}::name`, { id: customerName, value: 0 });
+      map.set(customerId, {
+        ...current,
+        value: current.value + Number(charge?.amountCents ?? 0),
+      });
+      if (customerName !== customerId)
+        map.set(`${customerId}::name`, { id: customerName, value: 0 });
     });
     return [...map.entries()]
       .filter(([key]) => !key.endsWith("::name"))
@@ -114,37 +124,87 @@ export function FinancePending({
       >
         <div className="grid min-w-0 gap-3 sm:grid-cols-2 2xl:grid-cols-4">
           <div className="min-w-0 overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/45 p-4">
-            <p className="text-xs text-[var(--text-muted)]">Valor em acompanhamento</p>
-            <p className="mt-1 truncate text-xl font-semibold leading-tight text-[var(--text-primary)] md:text-2xl">{formatCurrency(pendingTotal)}</p>
-            <p className="mt-1 text-xs text-[var(--text-secondary)]">{charges.length} cobrança(s) no período/filtro atual.</p>
+            <p className="text-xs text-[var(--text-muted)]">
+              Valor em acompanhamento
+            </p>
+            <p className="mt-1 truncate text-xl font-semibold leading-tight text-[var(--text-primary)] md:text-2xl">
+              {formatCurrency(pendingTotal)}
+            </p>
+            <p className="mt-1 text-xs text-[var(--text-secondary)]">
+              {charges.length} cobrança(s) no período/filtro atual.
+            </p>
           </div>
 
           <div className="min-w-0 overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/45 p-4">
-            <p className="text-xs text-[var(--text-muted)]">Janela crítica 72h</p>
-            <p className="mt-1 truncate text-xl font-semibold leading-tight text-[var(--text-primary)] md:text-2xl">{dueSoon72h.length}</p>
-            <p className="mt-1 text-xs text-[var(--text-secondary)]">Risco de virada: {formatCurrency(dueSoon72h.reduce((acc, item) => acc + Number(item?.amountCents ?? 0), 0))}.</p>
+            <p className="text-xs text-[var(--text-muted)]">
+              Janela crítica 72h
+            </p>
+            <p className="mt-1 truncate text-xl font-semibold leading-tight text-[var(--text-primary)] md:text-2xl">
+              {dueSoon72h.length}
+            </p>
+            <p className="mt-1 text-xs text-[var(--text-secondary)]">
+              Risco de virada:{" "}
+              {formatCurrency(
+                dueSoon72h.reduce(
+                  (acc, item) => acc + Number(item?.amountCents ?? 0),
+                  0
+                )
+              )}
+              .
+            </p>
           </div>
 
           <div className="min-w-0 overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/45 p-4">
-            <p className="text-xs text-[var(--text-muted)]">Cobrança prioritária</p>
-            <p className="mt-1 truncate text-sm font-semibold text-[var(--text-primary)]">{priorityCharge ? String(priorityCharge?.customer?.name ?? "Cliente") : "Sem prioridade"}</p>
-            <p className="mt-1 text-xs text-[var(--text-secondary)]">{priorityCharge ? `${formatCurrency(Number(priorityCharge?.amountCents ?? 0))} · ${priorityCharge?.dueDate ? new Date(String(priorityCharge?.dueDate)).toLocaleDateString("pt-BR") : "sem prazo"}` : "Nenhum item com criticidade."}</p>
+            <p className="text-xs text-[var(--text-muted)]">
+              Cobrança prioritária
+            </p>
+            <p className="mt-1 truncate text-sm font-semibold text-[var(--text-primary)]">
+              {priorityCharge
+                ? String(priorityCharge?.customer?.name ?? "Cliente")
+                : "Sem prioridade"}
+            </p>
+            <p className="mt-1 text-xs text-[var(--text-secondary)]">
+              {priorityCharge
+                ? `${formatCurrency(Number(priorityCharge?.amountCents ?? 0))} · ${priorityCharge?.dueDate ? new Date(String(priorityCharge?.dueDate)).toLocaleDateString("pt-BR") : "sem prazo"}`
+                : "Nenhum item com criticidade."}
+            </p>
             <div className="mt-2">
               <ActionFeedbackButton
                 state="idle"
                 idleLabel="Focar cobrança"
-                onClick={() => onFocusCustomer(String(priorityCharge?.customerId ?? priorityCharge?.customer?.id ?? ""))}
+                onClick={() =>
+                  onFocusCustomer(
+                    String(
+                      priorityCharge?.customerId ??
+                        priorityCharge?.customer?.id ??
+                        ""
+                    )
+                  )
+                }
               />
             </div>
           </div>
 
           <div className="min-w-0 overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/45 p-4">
-            <p className="text-xs text-[var(--text-muted)]">Motor de lembretes</p>
-            <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">{reminderStats.automationStatus}</p>
-            <p className="mt-1 text-xs text-[var(--text-secondary)]">Elegíveis: {reminderStats.queue} · Próxima execução: {reminderStats.nextExecution}</p>
-            <p className="mt-1 text-xs text-[var(--text-muted)]">Último resultado: {reminderStats.lastExecution}</p>
+            <p className="text-xs text-[var(--text-muted)]">
+              Motor de lembretes
+            </p>
+            <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+              {reminderStats.automationStatus}
+            </p>
+            <p className="mt-1 text-xs text-[var(--text-secondary)]">
+              Elegíveis: {reminderStats.queue} · Próxima execução:{" "}
+              {reminderStats.nextExecution}
+            </p>
+            <p className="mt-1 text-xs text-[var(--text-muted)]">
+              Último resultado: {reminderStats.lastExecution}
+            </p>
             <div className="mt-2">
-              <ActionFeedbackButton state="idle" idleLabel="Executar agora" onClick={() => onRemind()} />
+              <ActionFeedbackButton
+                state="idle"
+                idleLabel="Executar agora"
+                onClick={() => onRemind()}
+              />
             </div>
           </div>
         </div>
@@ -158,18 +218,32 @@ export function FinancePending({
         >
           <div className="mb-3 flex flex-wrap gap-2">
             {activeWindow ? (
-              <button type="button" className={appSelectionPillClasses(false)} onClick={() => onWindowChange(null)}>
+              <button
+                type="button"
+                className={appSelectionPillClasses(false)}
+                onClick={() => onWindowChange(null)}
+              >
                 Limpar faixa: {activeWindow}
               </button>
             ) : null}
           </div>
-          <ChartContainer className="h-[220px] w-full" config={{ value: { label: "Cobranças" } }}>
+          <ChartContainer
+            className="h-[220px] w-full"
+            config={{ value: { label: "Cobranças" } }}
+          >
             <BarChart data={distributionByWindow}>
               <CartesianGrid vertical={false} strokeDasharray="3 6" />
               <XAxis dataKey="label" tickLine={false} axisLine={false} />
               <YAxis tickLine={false} axisLine={false} allowDecimals={false} />
               <ChartTooltip content={<ChartTooltipContent />} />
-              <Bar dataKey="value" radius={[8, 8, 4, 4]} fill="hsl(var(--accent))" onClick={data => onWindowChange(String((data as any)?.label ?? null))} />
+              <Bar
+                dataKey="value"
+                radius={[8, 8, 4, 4]}
+                fill="hsl(var(--accent))"
+                onClick={data =>
+                  onWindowChange(String((data as any)?.label ?? null))
+                }
+              />
             </BarChart>
           </ChartContainer>
         </AppSectionBlock>
@@ -181,7 +255,8 @@ export function FinancePending({
         >
           <div className="space-y-2">
             {distributionByCustomer.map(item => {
-              const ratio = pendingTotal > 0 ? (item.value / pendingTotal) * 100 : 0;
+              const ratio =
+                pendingTotal > 0 ? (item.value / pendingTotal) * 100 : 0;
               const active = focusedCustomerId === item.id;
               return (
                 <button
@@ -191,13 +266,18 @@ export function FinancePending({
                   className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 p-3 text-left"
                 >
                   <div className="flex min-w-0 items-center justify-between gap-2">
-                    <p className="truncate text-sm font-medium text-[var(--text-primary)]">{item.label}</p>
+                    <p className="truncate text-sm font-medium text-[var(--text-primary)]">
+                      {item.label}
+                    </p>
                     <p className="shrink-0 text-xs font-semibold text-[var(--text-primary)]">
                       {formatCurrency(item.value)}
                     </p>
                   </div>
                   <div className="mt-2 h-1.5 rounded-full bg-[var(--surface-elevated)]">
-                    <div className="h-1.5 rounded-full bg-[var(--accent-primary)]/80" style={{ width: `${Math.max(ratio, 8)}%` }} />
+                    <div
+                      className="h-1.5 rounded-full bg-[var(--accent-primary)]/80"
+                      style={{ width: `${Math.max(ratio, 8)}%` }}
+                    />
                   </div>
                 </button>
               );
@@ -214,57 +294,67 @@ export function FinancePending({
         <div className="mb-3 flex flex-wrap gap-2 text-xs text-[var(--text-secondary)]">
           {focusedCustomerId ? <span>Cliente em foco ativo.</span> : null}
           {activeWindow ? <span>Faixa ativa: {activeWindow}.</span> : null}
-          {!focusedCustomerId && !activeWindow ? <span>Sem filtros ativos.</span> : null}
+          {!focusedCustomerId && !activeWindow ? (
+            <span>Sem filtros ativos.</span>
+          ) : null}
         </div>
         <AppDataTable>
-          <table className="w-full text-sm">
-            <thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]">
-              <tr>
-                <th className="p-2.5 text-left">Cliente</th>
-                <th className="text-left">Valor</th>
-                <th className="text-left">Vencimento</th>
-                <th className="text-left">Janela</th>
-                <th className="text-left">Status</th>
-                <th className="p-2.5 text-left">Ação</th>
-              </tr>
-            </thead>
-            <tbody>
-              {charges.map(charge => {
-                const days = daysUntil(charge?.dueDate);
-                const windowLabel =
-                  days === null
-                    ? "Sem data"
-                    : days === 0
-                      ? "Vence hoje"
-                      : `${days} dia(s)`;
-                return (
-                  <tr
-                    key={String(charge?.id)}
-                    className="border-t border-[var(--border-subtle)]"
-                  >
-                    <td className="p-2.5">{String(charge?.customer?.name ?? "—")}</td>
-                    <td>{formatCurrency(Number(charge?.amountCents ?? 0))}</td>
-                    <td>
-                      {charge?.dueDate
-                        ? new Date(String(charge.dueDate)).toLocaleDateString("pt-BR")
-                        : "—"}
-                    </td>
-                    <td className="text-xs text-[var(--text-secondary)]">{windowLabel}</td>
-                    <td>
-                      <AppStatusBadge label={days !== null && days <= 2 ? "Atenção" : "Pendente"} />
-                    </td>
-                    <td className="p-2.5">
-                      <ActionFeedbackButton
-                        state="idle"
-                        idleLabel="Lembrar"
-                        onClick={() => onRemind(charge)}
-                      />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]">
+            <tr>
+              <th className="p-2.5 text-left">Cliente</th>
+              <th className="text-left">Valor</th>
+              <th className="text-left">Vencimento</th>
+              <th className="text-left">Janela</th>
+              <th className="text-left">Status</th>
+              <th className="p-2.5 text-left">Ação</th>
+            </tr>
+          </thead>
+          <tbody>
+            {charges.map(charge => {
+              const days = daysUntil(charge?.dueDate);
+              const windowLabel =
+                days === null
+                  ? "Sem data"
+                  : days === 0
+                    ? "Vence hoje"
+                    : `${days} dia(s)`;
+              return (
+                <tr
+                  key={String(charge?.id)}
+                  className="border-t border-[var(--border-subtle)]"
+                >
+                  <td className="p-2.5">
+                    {String(charge?.customer?.name ?? "—")}
+                  </td>
+                  <td>{formatCurrency(Number(charge?.amountCents ?? 0))}</td>
+                  <td>
+                    {charge?.dueDate
+                      ? new Date(String(charge.dueDate)).toLocaleDateString(
+                          "pt-BR"
+                        )
+                      : "—"}
+                  </td>
+                  <td className="text-xs text-[var(--text-secondary)]">
+                    {windowLabel}
+                  </td>
+                  <td>
+                    <AppStatusBadge
+                      label={
+                        days !== null && days <= 2 ? "Atenção" : "Pendente"
+                      }
+                    />
+                  </td>
+                  <td className="p-2.5">
+                    <ActionFeedbackButton
+                      state="idle"
+                      idleLabel="Lembrar"
+                      onClick={() => onRemind(charge)}
+                    />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
         </AppDataTable>
       </AppSectionBlock>
 
@@ -280,9 +370,14 @@ export function FinancePending({
             { label: "delivered", value: reminderStats.delivered },
             { label: "failed", value: reminderStats.failed },
           ].map(item => (
-            <div key={item.label} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 p-3">
+            <div
+              key={item.label}
+              className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 p-3"
+            >
               <p className="text-xs text-[var(--text-muted)]">{item.label}</p>
-              <p className="mt-1 text-lg font-semibold leading-tight">{item.value}</p>
+              <p className="mt-1 text-lg font-semibold leading-tight">
+                {item.value}
+              </p>
             </div>
           ))}
         </div>
