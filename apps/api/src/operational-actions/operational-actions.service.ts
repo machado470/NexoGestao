@@ -107,7 +107,7 @@ export class OperationalActionsService {
         const risk = await this.risk.recalculatePersonRisk(p.id, 'OPERATIONAL_ACTION_ASSISTED_RECALCULATE_RISK', orgId)
         result = { personId: p.id, riskScore: risk.score, state: risk.state }
       } else {
-        this.governanceRun.startRun(orgId)
+        await this.governanceRun.startRun(orgId)
         const governance = await this.governanceRun.finish(orgId)
         result = { governanceScore: governance.institutionalRiskScore }
       }

@@ -903,6 +903,24 @@ export class FinanceService {
           dueDate: input.dueDate ?? new Date(),
         },
       })
+      const timelineMetadata = {
+        actorUserId: input.actorUserId ?? null,
+        serviceOrderId: created.serviceOrderId,
+        chargeId: created.id,
+        customerId: created.customerId,
+        amountCents: created.amountCents,
+      }
+
+      await this.safeTimelineLog({
+        orgId: input.orgId,
+        action: 'CHARGE_CREATED',
+        description: `Cobrança ${created.id} gerada para O.S. ${input.serviceOrderId}`,
+        customerId: created.customerId,
+        serviceOrderId: created.serviceOrderId,
+        chargeId: created.id,
+        metadata: timelineMetadata,
+      })
+
       await this.safeTimelineLog({
         orgId: input.orgId,
         action: 'SERVICE_ORDER_CHARGE_CREATED',
@@ -910,13 +928,7 @@ export class FinanceService {
         customerId: created.customerId,
         serviceOrderId: created.serviceOrderId,
         chargeId: created.id,
-        metadata: {
-          actorUserId: input.actorUserId ?? null,
-          serviceOrderId: created.serviceOrderId,
-          chargeId: created.id,
-          customerId: created.customerId,
-          amountCents: created.amountCents,
-        },
+        metadata: timelineMetadata,
       })
 
       const result = { created: true, chargeId: created.id }

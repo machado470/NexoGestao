@@ -25,7 +25,7 @@ export class GovernanceRunService {
     private readonly timeline: TimelineService,
   ) {}
 
-  startRun(orgId: string) {
+  async startRun(orgId: string) {
     this.currentOrgId = orgId
 
     this.evaluated = 0
@@ -37,6 +37,18 @@ export class GovernanceRunService {
     this.suspendedCount = 0
 
     this.startedAt = new Date()
+
+    await this.timeline.log({
+      orgId,
+      action: 'GOVERNANCE_RUN_STARTED',
+      description: 'Ciclo de governança iniciado',
+      metadata: {
+        actorType: 'SYSTEM',
+        actor: 'GOVERNANCE_RUN',
+        orgId,
+        startedAt: this.startedAt,
+      },
+    })
   }
 
   personEvaluated() {

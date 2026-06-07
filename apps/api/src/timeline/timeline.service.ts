@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { TimelineQueryDto } from './dto/timeline-query.dto'
 import { WebhookDispatcher } from '../webhooks/webhook.dispatcher'
 import { Prisma } from '@prisma/client'
+import { timelineEventFilterValues } from './timeline-events'
 
 type TimelineLogInput = {
   orgId: string
@@ -245,6 +246,7 @@ export class TimelineService {
         : 50
 
     const action = query?.action
+    const actionValues = action ? timelineEventFilterValues(String(action)) : []
     const personId = query?.personId
     const cursorRaw = String(query?.cursor ?? '').trim()
     let cursorId: string | null = null
@@ -258,7 +260,7 @@ export class TimelineService {
     return this.prisma.timelineEvent.findMany({
       where: {
         orgId,
-        ...(action ? { action: String(action) } : {}),
+        ...(actionValues.length > 0 ? { action: { in: actionValues } } : {}),
         ...(personId ? { personId: String(personId) } : {}),
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],

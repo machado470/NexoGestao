@@ -186,24 +186,38 @@ export class ExecutionService {
     const actorPersonId =
       input.executorPersonId ?? updated.assignedToPersonId ?? null
 
+    const startedMetadata = {
+      executionId: updated.id,
+      serviceOrderId: updated.id,
+      customerId: updated.customerId,
+      executorPersonId: actorPersonId,
+      notes: normalizeText(input.notes),
+      checklist: input.checklist ?? [],
+      attachments: input.attachments ?? [],
+      amountCents: updated.amountCents ?? null,
+      dueDate: updated.dueDate ?? null,
+      actorPersonId,
+      fallbackMode: true,
+    }
+
+    await this.timeline.log({
+      orgId: input.orgId,
+      personId: actorPersonId,
+      action: 'SERVICE_ORDER_STARTED',
+      description: 'Ordem de serviço iniciada por execução fallback',
+      customerId: updated.customerId,
+      serviceOrderId: updated.id,
+      metadata: startedMetadata,
+    })
+
     await this.timeline.log({
       orgId: input.orgId,
       personId: actorPersonId,
       action: 'EXECUTION_STARTED',
       description: 'Execução iniciada em modo fallback por ServiceOrder',
-      metadata: {
-        executionId: updated.id,
-        serviceOrderId: updated.id,
-        customerId: updated.customerId,
-        executorPersonId: actorPersonId,
-        notes: normalizeText(input.notes),
-        checklist: input.checklist ?? [],
-        attachments: input.attachments ?? [],
-        amountCents: updated.amountCents ?? null,
-        dueDate: updated.dueDate ?? null,
-        actorPersonId,
-        fallbackMode: true,
-      },
+      customerId: updated.customerId,
+      serviceOrderId: updated.id,
+      metadata: startedMetadata,
     })
 
     await this.audit.log({
@@ -341,25 +355,39 @@ export class ExecutionService {
       const userId = this.requestContext.userId
       const actorPersonId = updated.assignedToPersonId ?? null
 
+      const completedMetadata = {
+        executionId: updated.id,
+        serviceOrderId: updated.id,
+        customerId: updated.customerId,
+        requestId,
+        notes: normalizedNotes,
+        checklist: input.checklist ?? [],
+        attachments: input.attachments ?? [],
+        amountCents: updated.amountCents ?? null,
+        dueDate: updated.dueDate ?? null,
+        actorUserId: userId ?? null,
+        actorPersonId,
+        fallbackMode: true,
+      }
+
+      await this.timeline.log({
+        orgId: input.orgId,
+        personId: actorPersonId,
+        action: 'SERVICE_ORDER_COMPLETED',
+        description: 'Ordem de serviço concluída por execução fallback',
+        customerId: updated.customerId,
+        serviceOrderId: updated.id,
+        metadata: completedMetadata,
+      })
+
       await this.timeline.log({
         orgId: input.orgId,
         personId: actorPersonId,
         action: 'EXECUTION_DONE',
         description: 'Execução concluída em modo fallback por ServiceOrder',
-        metadata: {
-          executionId: updated.id,
-          serviceOrderId: updated.id,
-          customerId: updated.customerId,
-          requestId,
-          notes: normalizedNotes,
-          checklist: input.checklist ?? [],
-          attachments: input.attachments ?? [],
-          amountCents: updated.amountCents ?? null,
-          dueDate: updated.dueDate ?? null,
-          actorUserId: userId ?? null,
-          actorPersonId,
-          fallbackMode: true,
-        },
+        customerId: updated.customerId,
+        serviceOrderId: updated.id,
+        metadata: completedMetadata,
       })
 
       await this.audit.log({

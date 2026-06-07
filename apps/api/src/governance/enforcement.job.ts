@@ -67,7 +67,7 @@ export class EnforcementJob {
         }
 
         // marca início (só pra bucket/duration serem coerentes)
-        this.runService.startRun(org.id)
+        await this.runService.startRun(org.id)
 
         // executa engine e pega resumo
         const engineResult = await this.engine.runForOrg(org.id)

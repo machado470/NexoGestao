@@ -143,4 +143,49 @@ describe('AppointmentsService assignee persistence', () => {
       }),
     ).rejects.toBeInstanceOf(BadRequestException)
   })
+  it('emite APPOINTMENT_CANCELLED ao cancelar agendamento', async () => {
+    const updated = { ...baseAppointment, status: 'CANCELED' }
+    const timeline = { log: jest.fn() }
+    const prisma: any = {
+      appointment: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValueOnce(baseAppointment)
+          .mockResolvedValueOnce(updated),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      customer: { findFirst: jest.fn().mockResolvedValue({ id: 'c-1', phone: null }) },
+    }
+    const service = new AppointmentsService(
+      prisma,
+      timeline as any,
+      { log: jest.fn() } as any,
+      { queueMessage: jest.fn() } as any,
+      {} as any,
+      { executeTrigger: jest.fn() } as any,
+      {
+        begin: jest.fn().mockResolvedValue({ mode: 'execute', recordId: 'idem-1' }),
+        complete: jest.fn(),
+        fail: jest.fn(),
+      } as any,
+    )
+
+    await service.update({
+      orgId: 'org-1',
+      updatedBy: 'u-1',
+      personId: 'p-1',
+      id: 'apt-1',
+      data: { status: 'CANCELED', expectedUpdatedAt: baseAppointment.updatedAt.toISOString() },
+    })
+
+    expect(timeline.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orgId: 'org-1',
+        action: 'APPOINTMENT_CANCELLED',
+        appointmentId: 'apt-1',
+        customerId: 'c-1',
+      }),
+    )
+  })
+
 })

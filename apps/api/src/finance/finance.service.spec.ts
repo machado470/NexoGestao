@@ -340,7 +340,7 @@ describe('FinanceService hardening', () => {
     expect(service.sendPaymentReminderWhatsApp).toHaveBeenCalledWith('ch-1')
   })
 
-  it('emite SERVICE_ORDER_CHARGE_CREATED ao vincular cobrança com O.S.', async () => {
+  it('emite CHARGE_CREATED e mantém SERVICE_ORDER_CHARGE_CREATED ao vincular cobrança com O.S.', async () => {
     const { service, prisma, idempotency } = buildService()
     idempotency.begin.mockResolvedValue({ mode: 'execute', recordId: 'idem-1' })
     prisma.serviceOrder.findFirst.mockResolvedValue({
@@ -363,6 +363,13 @@ describe('FinanceService hardening', () => {
       amountCents: 1000,
     })
 
+    expect((service as any).timeline.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'CHARGE_CREATED',
+        serviceOrderId: 'so-1',
+        chargeId: 'ch-1',
+      }),
+    )
     expect((service as any).timeline.log).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'SERVICE_ORDER_CHARGE_CREATED',

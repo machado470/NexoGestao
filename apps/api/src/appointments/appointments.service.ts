@@ -67,11 +67,11 @@ function statusToAction(status: AppointmentStatus): string {
     case 'CONFIRMED':
       return 'APPOINTMENT_CONFIRMED'
     case 'CANCELED':
-      return 'APPOINTMENT_CANCELED'
+      return 'APPOINTMENT_CANCELLED'
     case 'DONE':
       return 'APPOINTMENT_COMPLETED'
     case 'NO_SHOW':
-      return 'APPOINTMENT_CANCELED'
+      return 'APPOINTMENT_CANCELLED'
     case 'SCHEDULED':
     default:
       return 'APPOINTMENT_UPDATED'
