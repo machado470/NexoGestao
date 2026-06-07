@@ -6,7 +6,11 @@ import {
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
 
 interface FinancePaidProps {
   charges: any[];
@@ -16,7 +20,8 @@ interface FinancePaidProps {
 function delayInDays(charge: any) {
   if (!charge?.paidAt || !charge?.dueDate) return 0;
   const delta =
-    new Date(String(charge.paidAt)).getTime() - new Date(String(charge.dueDate)).getTime();
+    new Date(String(charge.paidAt)).getTime() -
+    new Date(String(charge.dueDate)).getTime();
   return Math.max(Math.floor(delta / (1000 * 60 * 60 * 24)), 0);
 }
 
@@ -30,9 +35,15 @@ export function FinancePaid({ charges, formatCurrency }: FinancePaidProps) {
   const onTimeCount = sorted.filter(charge => delayInDays(charge) === 0).length;
   const delayedCount = sorted.length - onTimeCount;
   const avgDaysToPay = sorted.length
-    ? Math.round(sorted.reduce((acc, charge) => acc + delayInDays(charge), 0) / sorted.length)
+    ? Math.round(
+        sorted.reduce((acc, charge) => acc + delayInDays(charge), 0) /
+          sorted.length
+      )
     : 0;
-  const receivedTotal = sorted.reduce((acc, charge) => acc + Number(charge?.amountCents ?? 0), 0);
+  const receivedTotal = sorted.reduce(
+    (acc, charge) => acc + Number(charge?.amountCents ?? 0),
+    0
+  );
 
   const paymentsByMonth = useMemo(() => {
     const map = new Map<string, number>();
@@ -49,7 +60,9 @@ export function FinancePaid({ charges, formatCurrency }: FinancePaidProps) {
   const methodData = useMemo(() => {
     const map = new Map<string, number>();
     sorted.forEach(charge => {
-      const method = String(charge?.paymentMethod ?? "Não informado · dado pendente");
+      const method = String(
+        charge?.paymentMethod ?? "Não informado · dado pendente"
+      );
       map.set(method, (map.get(method) ?? 0) + 1);
     });
     return [...map.entries()].map(([label, value]) => ({ label, value }));
@@ -74,60 +87,107 @@ export function FinancePaid({ charges, formatCurrency }: FinancePaidProps) {
         <div className="grid min-w-0 gap-3 grid-cols-2 xl:grid-cols-4">
           <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/45 p-4">
             <p className="text-xs text-[var(--text-muted)]">Total recebido</p>
-            <p className="mt-1 truncate text-xl font-semibold leading-tight text-[var(--text-primary)] md:text-2xl">{formatCurrency(receivedTotal)}</p>
+            <p className="mt-1 truncate text-xl font-semibold leading-tight text-[var(--text-primary)] md:text-2xl">
+              {formatCurrency(receivedTotal)}
+            </p>
           </div>
           <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/45 p-4">
             <p className="text-xs text-[var(--text-muted)]">Quantidade paga</p>
-            <p className="mt-1 truncate text-xl font-semibold leading-tight text-[var(--text-primary)] md:text-2xl">{sorted.length}</p>
+            <p className="mt-1 truncate text-xl font-semibold leading-tight text-[var(--text-primary)] md:text-2xl">
+              {sorted.length}
+            </p>
           </div>
           <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/45 p-4">
             <p className="text-xs text-[var(--text-muted)]">Média de atraso</p>
-            <p className="mt-1 truncate text-xl font-semibold leading-tight text-[var(--text-primary)] md:text-2xl">{avgDaysToPay} dia(s)</p>
+            <p className="mt-1 truncate text-xl font-semibold leading-tight text-[var(--text-primary)] md:text-2xl">
+              {avgDaysToPay} dia(s)
+            </p>
           </div>
           <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/45 p-4">
-            <p className="text-xs text-[var(--text-muted)]">Métodos de pagamento</p>
+            <p className="text-xs text-[var(--text-muted)]">
+              Métodos de pagamento
+            </p>
             <p className="mt-1 line-clamp-2 text-sm font-semibold leading-tight text-[var(--text-primary)]">
-              {methodData.length > 0 ? methodData.map(item => item.label).slice(0, 3).join(", ") : "Sem dados"}
+              {methodData.length > 0
+                ? methodData
+                    .map(item => item.label)
+                    .slice(0, 3)
+                    .join(", ")
+                : "Sem dados"}
             </p>
           </div>
         </div>
       </AppSectionBlock>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <AppSectionBlock title="Histórico de recebimentos" subtitle="Valor recebido por período." compact>
-          <ChartContainer className="h-[220px] w-full" config={{ value: { label: "Recebido" } }}>
+        <AppSectionBlock
+          title="Histórico de recebimentos"
+          subtitle="Valor recebido por período."
+          compact
+        >
+          <ChartContainer
+            className="h-[220px] w-full"
+            config={{ value: { label: "Recebido" } }}
+          >
             <BarChart data={paymentsByMonth}>
               <CartesianGrid vertical={false} strokeDasharray="3 6" />
               <XAxis dataKey="label" tickLine={false} axisLine={false} />
-              <YAxis tickLine={false} axisLine={false} tickFormatter={value => `R$ ${Math.round(Number(value) / 1000)}k`} />
-              <ChartTooltip
-                content={
-                  <ChartTooltipContent formatter={value => [formatCurrency(Number(value)), "Recebido"]} />
+              <YAxis
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={value =>
+                  `R$ ${Math.round(Number(value) / 1000)}k`
                 }
               />
-              <Bar dataKey="value" radius={[8, 8, 4, 4]} fill="hsl(152 62% 46%)" />
+              <ChartTooltip
+                content={
+                  <ChartTooltipContent
+                    formatter={value => [
+                      formatCurrency(Number(value)),
+                      "Recebido",
+                    ]}
+                  />
+                }
+              />
+              <Bar
+                dataKey="value"
+                radius={[8, 8, 4, 4]}
+                fill="hsl(152 62% 46%)"
+              />
             </BarChart>
           </ChartContainer>
         </AppSectionBlock>
 
-        <AppSectionBlock title="Distribuição por método" subtitle="Métodos com maior recorrência de recebimento." compact>
+        <AppSectionBlock
+          title="Distribuição por método"
+          subtitle="Métodos com maior recorrência de recebimento."
+          compact
+        >
           <div className="space-y-2">
             {methodData
               .sort((a, b) => b.value - a.value)
               .slice(0, 5)
               .map(item => {
-                const ratio = sorted.length > 0 ? (item.value / sorted.length) * 100 : 0;
+                const ratio =
+                  sorted.length > 0 ? (item.value / sorted.length) * 100 : 0;
                 return (
                   <div
                     key={item.label}
                     className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 p-3"
                   >
                     <div className="flex min-w-0 items-center justify-between gap-2">
-                      <p className="truncate text-sm font-medium text-[var(--text-primary)]">{item.label}</p>
-                      <p className="shrink-0 text-xs text-[var(--text-secondary)]">{item.value} pagamento(s)</p>
+                      <p className="truncate text-sm font-medium text-[var(--text-primary)]">
+                        {item.label}
+                      </p>
+                      <p className="shrink-0 text-xs text-[var(--text-secondary)]">
+                        {item.value} pagamento(s)
+                      </p>
                     </div>
                     <div className="mt-2 h-1.5 rounded-full bg-[var(--surface-elevated)]">
-                      <div className="h-1.5 rounded-full bg-emerald-400/80" style={{ width: `${Math.max(ratio, 8)}%` }} />
+                      <div
+                        className="h-1.5 rounded-full bg-emerald-400/80"
+                        style={{ width: `${Math.max(ratio, 8)}%` }}
+                      />
                     </div>
                   </div>
                 );
@@ -148,49 +208,62 @@ export function FinancePaid({ charges, formatCurrency }: FinancePaidProps) {
       >
         <div className="mb-3 grid gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/35 p-3 sm:grid-cols-3">
           <p className="text-sm text-[var(--text-secondary)]">
-            Pagas em dia: <strong className="text-[var(--text-primary)]">{onTimeCount}</strong>
+            Pagas em dia:{" "}
+            <strong className="text-[var(--text-primary)]">
+              {onTimeCount}
+            </strong>
           </p>
           <p className="text-sm text-[var(--text-secondary)]">
-            Pagas com atraso: <strong className="text-[var(--text-primary)]">{delayedCount}</strong>
+            Pagas com atraso:{" "}
+            <strong className="text-[var(--text-primary)]">
+              {delayedCount}
+            </strong>
           </p>
           <p className="text-sm text-[var(--text-secondary)]">
             Boa performance: manter mais de 80% das cobranças em dia.
           </p>
         </div>
         <AppDataTable>
-          <table className="w-full text-sm">
-            <thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]">
-              <tr>
-                <th className="p-2.5 text-left">Cliente</th>
-                <th className="text-left">Valor</th>
-                <th className="text-left">Pago em</th>
-                <th className="text-left">Pontualidade</th>
-                <th className="p-2.5 text-left">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.map(charge => {
-                const delay = delayInDays(charge);
-                return (
-                  <tr key={String(charge?.id)} className="border-t border-[var(--border-subtle)]">
-                    <td className="p-2.5">{String(charge?.customer?.name ?? "—")}</td>
-                    <td>{formatCurrency(Number(charge?.amountCents ?? 0))}</td>
-                    <td>
-                      {charge?.paidAt
-                        ? new Date(String(charge.paidAt)).toLocaleDateString("pt-BR")
-                        : "—"}
-                    </td>
-                    <td className="text-xs text-[var(--text-secondary)]">
-                      {delay === 0 ? "Pago em dia" : `Pago com ${delay} dia(s) de atraso`}
-                    </td>
-                    <td className="p-2.5">
-                      <AppStatusBadge label="Pago" />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]">
+            <tr>
+              <th className="p-2.5 text-left">Cliente</th>
+              <th className="text-left">Valor</th>
+              <th className="text-left">Pago em</th>
+              <th className="text-left">Pontualidade</th>
+              <th className="p-2.5 text-left">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map(charge => {
+              const delay = delayInDays(charge);
+              return (
+                <tr
+                  key={String(charge?.id)}
+                  className="border-t border-[var(--border-subtle)]"
+                >
+                  <td className="p-2.5">
+                    {String(charge?.customer?.name ?? "—")}
+                  </td>
+                  <td>{formatCurrency(Number(charge?.amountCents ?? 0))}</td>
+                  <td>
+                    {charge?.paidAt
+                      ? new Date(String(charge.paidAt)).toLocaleDateString(
+                          "pt-BR"
+                        )
+                      : "—"}
+                  </td>
+                  <td className="text-xs text-[var(--text-secondary)]">
+                    {delay === 0
+                      ? "Pago em dia"
+                      : `Pago com ${delay} dia(s) de atraso`}
+                  </td>
+                  <td className="p-2.5">
+                    <AppStatusBadge label="Pago" />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
         </AppDataTable>
       </AppSectionBlock>
     </div>

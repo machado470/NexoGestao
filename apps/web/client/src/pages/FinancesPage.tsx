@@ -1295,158 +1295,154 @@ export default function FinancesPage() {
         !allQueriesErrored &&
         filteredCharges.length > 0 ? (
           <>
-            <AppDataTable>
-              <table className="w-full min-w-[1120px] text-sm">
-                <thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]">
-                  <tr>
-                    <th className="p-2.5 text-left">Cliente</th>
-                    <th className="text-left">Valor</th>
-                    <th className="text-left">Status</th>
-                    <th className="text-left">Prioridade</th>
-                    <th className="text-left">Vencimento</th>
-                    <th className="text-left">Atraso</th>
-                    <th className="text-left">Origem/O.S.</th>
-                    <th className="text-left">Risco/pendência</th>
-                    <th className="text-left">Ação primária</th>
-                    <th className="p-2.5 text-left">Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginatedCharges.map(row => {
-                    const primaryAction = getChargePrimaryAction(row);
-                    return (
-                      <tr
-                        key={String(row?.id ?? "")}
-                        className="cursor-pointer border-t border-[var(--border-subtle)] hover:bg-[var(--surface-subtle)]/60"
-                        onClick={() =>
-                          setSelectedChargeId(String(row?.id ?? ""))
-                        }
-                      >
-                        <td className="p-2.5">
-                          <div>
-                            <p className="font-medium text-[var(--text-primary)]">
-                              {row.customerName}
-                            </p>
-                            <p className="text-xs text-[var(--text-muted)]">
-                              {safeText(
-                                row?.customer?.phone,
-                                "Telefone não retornado"
-                              )}
-                            </p>
-                          </div>
-                        </td>
-                        <td>{formatCurrency(Number(row?.amountCents ?? 0))}</td>
-                        <td>
-                          <AppStatusBadge
-                            label={chargeStatusLabel(row.status)}
-                            tone={getChargeStatusTone(row.status)}
-                          />
-                        </td>
-                        <td>
-                          <AppPriorityBadge priority={getChargePriority(row)} />
-                        </td>
-                        <td>{formatDate(row?.dueDate)}</td>
-                        <td>
-                          {row.status === "OVERDUE"
-                            ? `${row.overdueDays} dia(s)`
-                            : "—"}
-                        </td>
-                        <td>{safeText(row.serviceOrderLabel, "Sem O.S.")}</td>
-                        <td>
-                          <p className="max-w-[220px] text-xs leading-5 text-[var(--text-secondary)]">
-                            {getChargeRisk(row)}
+            <AppDataTable className="min-w-[1120px]">
+              <thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]">
+                <tr>
+                  <th className="p-2.5 text-left">Cliente</th>
+                  <th className="text-left">Valor</th>
+                  <th className="text-left">Status</th>
+                  <th className="text-left">Prioridade</th>
+                  <th className="text-left">Vencimento</th>
+                  <th className="text-left">Atraso</th>
+                  <th className="text-left">Origem/O.S.</th>
+                  <th className="text-left">Risco/pendência</th>
+                  <th className="text-left">Ação primária</th>
+                  <th className="p-2.5 text-left">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedCharges.map(row => {
+                  const primaryAction = getChargePrimaryAction(row);
+                  return (
+                    <tr
+                      key={String(row?.id ?? "")}
+                      className="cursor-pointer border-t border-[var(--border-subtle)] hover:bg-[var(--surface-subtle)]/60"
+                      onClick={() => setSelectedChargeId(String(row?.id ?? ""))}
+                    >
+                      <td className="p-2.5">
+                        <div>
+                          <p className="font-medium text-[var(--text-primary)]">
+                            {row.customerName}
                           </p>
-                        </td>
-                        <td onClick={event => event.stopPropagation()}>
-                          <Button
-                            size="sm"
-                            variant={
-                              primaryAction.kind === "collect"
-                                ? "default"
-                                : "outline"
-                            }
-                            onClick={() => {
-                              setSelectedChargeId(String(row?.id ?? ""));
-                              if (primaryAction.kind === "collect")
-                                goToWhatsApp(row);
-                            }}
-                            disabled={row.status === "CANCELED"}
-                          >
-                            {primaryAction.label}
-                          </Button>
-                          <p className="mt-1 max-w-[180px] text-[11px] text-[var(--text-muted)]">
-                            {primaryAction.reason}
+                          <p className="text-xs text-[var(--text-muted)]">
+                            {safeText(
+                              row?.customer?.phone,
+                              "Telefone não retornado"
+                            )}
                           </p>
-                        </td>
-                        <td
-                          className="p-2.5"
-                          onClick={event => event.stopPropagation()}
+                        </div>
+                      </td>
+                      <td>{formatCurrency(Number(row?.amountCents ?? 0))}</td>
+                      <td>
+                        <AppStatusBadge
+                          label={chargeStatusLabel(row.status)}
+                          tone={getChargeStatusTone(row.status)}
+                        />
+                      </td>
+                      <td>
+                        <AppPriorityBadge priority={getChargePriority(row)} />
+                      </td>
+                      <td>{formatDate(row?.dueDate)}</td>
+                      <td>
+                        {row.status === "OVERDUE"
+                          ? `${row.overdueDays} dia(s)`
+                          : "—"}
+                      </td>
+                      <td>{safeText(row.serviceOrderLabel, "Sem O.S.")}</td>
+                      <td>
+                        <p className="max-w-[220px] text-xs leading-5 text-[var(--text-secondary)]">
+                          {getChargeRisk(row)}
+                        </p>
+                      </td>
+                      <td onClick={event => event.stopPropagation()}>
+                        <Button
+                          size="sm"
+                          variant={
+                            primaryAction.kind === "collect"
+                              ? "default"
+                              : "outline"
+                          }
+                          onClick={() => {
+                            setSelectedChargeId(String(row?.id ?? ""));
+                            if (primaryAction.kind === "collect")
+                              goToWhatsApp(row);
+                          }}
+                          disabled={row.status === "CANCELED"}
                         >
-                          <AppRowActionsDropdown
-                            items={[
-                              {
-                                label: "Ver histórico",
-                                onSelect: () =>
-                                  setSelectedChargeId(String(row?.id ?? "")),
-                              },
-                              {
-                                label: "Marcar como pago",
-                                onSelect: () => void openMarkAsPaid(row),
-                                disabled:
-                                  row.status === "PAID" ||
-                                  row.status === "CANCELED",
-                                tone: "primary",
-                              },
-                              {
-                                label:
-                                  normalizeStatus(row?.status) === "PAID"
-                                    ? "WhatsApp pós-pagamento"
-                                    : "Cobrar via WhatsApp",
-                                onSelect: () => goToWhatsApp(row),
-                                disabled: !row.customerId,
-                                tone: "primary",
-                              },
-                              {
-                                label: "Enviar link",
-                                onSelect: () => goToWhatsApp(row),
-                                disabled:
-                                  !row.customerId ||
-                                  row.status === "PAID" ||
-                                  row.status === "CANCELED",
-                              },
-                              {
-                                label: "Editar cobrança",
-                                onSelect: () => openEditCharge(row),
-                                disabled:
-                                  row.status === "PAID" ||
-                                  row.status === "CANCELED",
-                              },
-                              {
-                                label: "Cancelar cobrança",
-                                onSelect: () => void handleCancelCharge(row),
-                                disabled:
-                                  row.status === "PAID" ||
-                                  row.status === "CANCELED",
-                              },
-                              { type: "separator", label: "Navegação" },
-                              {
-                                label: "Abrir cliente",
-                                onSelect: () => goToCustomer(row),
-                                disabled: !row.customerId,
-                              },
-                              {
-                                label: "Abrir O.S.",
-                                onSelect: () => goToServiceOrder(row),
-                                disabled: !row.serviceOrderId,
-                              },
-                            ]}
-                          />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                          {primaryAction.label}
+                        </Button>
+                        <p className="mt-1 max-w-[180px] text-[11px] text-[var(--text-muted)]">
+                          {primaryAction.reason}
+                        </p>
+                      </td>
+                      <td
+                        className="p-2.5"
+                        onClick={event => event.stopPropagation()}
+                      >
+                        <AppRowActionsDropdown
+                          items={[
+                            {
+                              label: "Ver histórico",
+                              onSelect: () =>
+                                setSelectedChargeId(String(row?.id ?? "")),
+                            },
+                            {
+                              label: "Marcar como pago",
+                              onSelect: () => void openMarkAsPaid(row),
+                              disabled:
+                                row.status === "PAID" ||
+                                row.status === "CANCELED",
+                              tone: "primary",
+                            },
+                            {
+                              label:
+                                normalizeStatus(row?.status) === "PAID"
+                                  ? "WhatsApp pós-pagamento"
+                                  : "Cobrar via WhatsApp",
+                              onSelect: () => goToWhatsApp(row),
+                              disabled: !row.customerId,
+                              tone: "primary",
+                            },
+                            {
+                              label: "Enviar link",
+                              onSelect: () => goToWhatsApp(row),
+                              disabled:
+                                !row.customerId ||
+                                row.status === "PAID" ||
+                                row.status === "CANCELED",
+                            },
+                            {
+                              label: "Editar cobrança",
+                              onSelect: () => openEditCharge(row),
+                              disabled:
+                                row.status === "PAID" ||
+                                row.status === "CANCELED",
+                            },
+                            {
+                              label: "Cancelar cobrança",
+                              onSelect: () => void handleCancelCharge(row),
+                              disabled:
+                                row.status === "PAID" ||
+                                row.status === "CANCELED",
+                            },
+                            { type: "separator", label: "Navegação" },
+                            {
+                              label: "Abrir cliente",
+                              onSelect: () => goToCustomer(row),
+                              disabled: !row.customerId,
+                            },
+                            {
+                              label: "Abrir O.S.",
+                              onSelect: () => goToServiceOrder(row),
+                              disabled: !row.serviceOrderId,
+                            },
+                          ]}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
             </AppDataTable>
             <AppPagination
               currentPage={currentPage}

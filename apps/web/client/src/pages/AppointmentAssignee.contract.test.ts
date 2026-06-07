@@ -7,11 +7,13 @@ describe("appointment assignee UI contract", () => {
   it("envia filtro de equipe do calendário ao servidor e não cria conflito artificial para agenda sem responsável", () => {
     const calendar = readFileSync("client/src/pages/CalendarPage.tsx", "utf8");
 
-    expect(calendar).toContain(
+    const normalizedCalendar = compact(calendar);
+
+    expect(normalizedCalendar).toContain(
       'teamFilter === "all" ? { limit: 1000 } : { assignedToPersonId: teamFilter, limit: 1000 }'
     );
     expect(calendar).toContain("if (!item.assignedToPersonId) return;");
-    expect(calendar).toContain(
+    expect(normalizedCalendar).toContain(
       'Boolean(item.assignedToPersonId) && !["CANCELED", "DONE", "NO_SHOW"].includes(item.status)'
     );
   });

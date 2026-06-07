@@ -1,5 +1,9 @@
+import { isValidElement } from "react";
 import type { ComponentProps, ReactNode } from "react";
-import { operationalSeverityLabel, operationalSeverityTone } from "@/lib/operational-semantics";
+import {
+  operationalSeverityLabel,
+  operationalSeverityTone,
+} from "@/lib/operational-semantics";
 import {
   ArrowDownRight,
   ArrowRight,
@@ -18,7 +22,11 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   AppPageShell,
   AppPageHeader as BasePageHeader,
@@ -105,11 +113,23 @@ export function AppOperationalHeader({
         className
       )}
     >
-      <div className={cn("flex flex-wrap items-start justify-between", isCompact ? "gap-2.5" : "gap-3")}>
+      <div
+        className={cn(
+          "flex flex-wrap items-start justify-between",
+          isCompact ? "gap-2.5" : "gap-3"
+        )}
+      >
         <div className="min-w-0 flex-1">
           <h1 className="nexo-page-header-title">{title}</h1>
           {description ? (
-            <p className={cn("nexo-page-header-description", isCompact ? "mt-0.5" : "mt-1")}>{description}</p>
+            <p
+              className={cn(
+                "nexo-page-header-description",
+                isCompact ? "mt-0.5" : "mt-1"
+              )}
+            >
+              {description}
+            </p>
           ) : null}
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
@@ -119,11 +139,25 @@ export function AppOperationalHeader({
       </div>
 
       {contextChips ? (
-        <div className={cn("flex flex-wrap items-center gap-2", isCompact ? "mt-2.5" : "mt-3")}>{contextChips}</div>
+        <div
+          className={cn(
+            "flex flex-wrap items-center gap-2",
+            isCompact ? "mt-2.5" : "mt-3"
+          )}
+        >
+          {contextChips}
+        </div>
       ) : null}
 
       {children ? (
-        <div className={cn("border-t border-[var(--border-subtle)]", isCompact ? "mt-2.5 pt-2.5" : "mt-3 pt-3")}>{children}</div>
+        <div
+          className={cn(
+            "border-t border-[var(--border-subtle)]",
+            isCompact ? "mt-2.5 pt-2.5" : "mt-3 pt-3"
+          )}
+        >
+          {children}
+        </div>
       ) : null}
     </section>
   );
@@ -138,7 +172,6 @@ export function AppFiltersBar({
 }) {
   return <BaseFiltersBar className={className}>{children}</BaseFiltersBar>;
 }
-
 
 export function AppContextChip({
   children,
@@ -246,7 +279,15 @@ function buildPagination(currentPage: number, totalPages: number) {
     ] as const;
   }
 
-  return [1, "...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages] as const;
+  return [
+    1,
+    "...",
+    currentPage - 1,
+    currentPage,
+    currentPage + 1,
+    "...",
+    totalPages,
+  ] as const;
 }
 
 export function AppPagination({
@@ -259,7 +300,8 @@ export function AppPagination({
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const safePage = Math.min(Math.max(currentPage, 1), totalPages);
   const startItem = totalItems === 0 ? 0 : (safePage - 1) * pageSize + 1;
-  const endItem = totalItems === 0 ? 0 : Math.min(safePage * pageSize, totalItems);
+  const endItem =
+    totalItems === 0 ? 0 : Math.min(safePage * pageSize, totalItems);
   const pages = buildPagination(safePage, totalPages);
 
   const baseButtonClass =
@@ -288,7 +330,10 @@ export function AppPagination({
         </button>
         {pages.map((item, index) =>
           item === "..." ? (
-            <span key={`ellipsis-${index}`} className="px-1 text-xs text-[var(--text-muted)]">
+            <span
+              key={`ellipsis-${index}`}
+              className="px-1 text-xs text-[var(--text-muted)]"
+            >
               ...
             </span>
           ) : (
@@ -428,7 +473,9 @@ export function AppOperationalBar<T extends string>({
               />
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">{quickFilters}</div>
+            <div className="flex flex-wrap items-center gap-2">
+              {quickFilters}
+            </div>
 
             {hasAdvancedFilters ? (
               <Popover>
@@ -793,9 +840,7 @@ export function AppSectionBlock({
   return (
     <AppSectionCard
       className={cn(
-        compact
-          ? "min-h-0 rounded-2xl p-4"
-          : "min-h-0 rounded-2xl p-4 md:p-5",
+        compact ? "min-h-0 rounded-2xl p-4" : "min-h-0 rounded-2xl p-4 md:p-5",
         className
       )}
     >
@@ -831,10 +876,26 @@ export function AppSectionBlock({
   );
 }
 
-export function AppDataTable({ children }: { children: ReactNode }) {
+export function AppDataTable({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  const shouldWrapInTable = !(
+    isValidElement(children) &&
+    typeof children.type === "string" &&
+    children.type === "table"
+  );
+
   return (
     <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)]/85 bg-[var(--surface-primary)] shadow-[0_8px_20px_-18px_rgba(15,23,42,0.45)]">
-      {children}
+      {shouldWrapInTable ? (
+        <table className={cn("w-full text-sm", className)}>{children}</table>
+      ) : (
+        children
+      )}
     </div>
   );
 }
@@ -862,11 +923,11 @@ export function AppListBlock({
   const normalizedItems = items.slice(0, maxItems).map((item, index) => ({
     ...item,
     subtitle: item.subtitle ?? "Ação operacional disponível para execução.",
-      action: item.action ?? (
-        <Button size="sm" variant="outline">
-          Executar
-        </Button>
-      ),
+    action: item.action ?? (
+      <Button size="sm" variant="outline">
+        Executar
+      </Button>
+    ),
     __key: `${item.title}-${index}`,
   }));
   while (showPlaceholders && normalizedItems.length < minItems) {
@@ -875,7 +936,11 @@ export function AppListBlock({
       title: `Ação complementar ${idx}`,
       subtitle:
         "Preencha este espaço com uma ação direta do fluxo operacional.",
-      action: <Button size="sm" variant="outline">Configurar</Button>,
+      action: (
+        <Button size="sm" variant="outline">
+          Configurar
+        </Button>
+      ),
       __key: `placeholder-${idx}`,
     });
   }
@@ -883,9 +948,7 @@ export function AppListBlock({
   return (
     <div
       className={cn(
-        compact
-          ? "min-h-0 space-y-2"
-          : "min-h-[220px] space-y-2.5",
+        compact ? "min-h-0 space-y-2" : "min-h-[220px] space-y-2.5",
         className
       )}
     >
@@ -968,7 +1031,10 @@ export function AppStatusBadge({ label }: { label: string }) {
     typeof label === "string" && label.trim().length > 0
       ? operationalSeverityLabel(label)
       : operationalSeverityLabel("pending");
-  const safeLabel = normalizedLabel.trim().length > 0 ? normalizedLabel : operationalSeverityLabel("pending");
+  const safeLabel =
+    normalizedLabel.trim().length > 0
+      ? normalizedLabel
+      : operationalSeverityLabel("pending");
 
   return (
     <NexoStatusBadge
@@ -1107,7 +1173,9 @@ export function AppPageLoadingState({
       <p className="text-sm font-semibold text-[var(--text-primary)]">
         {title}
       </p>
-      <p className="text-sm leading-6 text-[var(--text-secondary)]">{description}</p>
+      <p className="text-sm leading-6 text-[var(--text-secondary)]">
+        {description}
+      </p>
       <BaseLoadingState rows={4} />
     </AppSectionCard>
   );
@@ -1132,7 +1200,9 @@ export function AppPageErrorState({
       <p className="text-sm font-semibold text-[var(--text-primary)]">
         {title}
       </p>
-      <p className="text-sm leading-6 text-[var(--text-secondary)]">{description}</p>
+      <p className="text-sm leading-6 text-[var(--text-secondary)]">
+        {description}
+      </p>
       <Button variant="outline" onClick={onAction}>
         {actionLabel}
       </Button>
@@ -1152,8 +1222,12 @@ export function AppPageEmptyState({
       <div className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)]/65">
         <Inbox className="h-4 w-4 text-[var(--text-secondary)]" />
       </div>
-      <p className="text-sm font-semibold text-[var(--text-primary)]">{title}</p>
-      <p className="max-w-xl text-sm leading-6 text-[var(--text-secondary)]">{description}</p>
+      <p className="text-sm font-semibold text-[var(--text-primary)]">
+        {title}
+      </p>
+      <p className="max-w-xl text-sm leading-6 text-[var(--text-secondary)]">
+        {description}
+      </p>
     </AppSectionCard>
   );
 }
@@ -1175,7 +1249,11 @@ export function AppOperationalKpiGrid({
   children: ReactNode;
   className?: string;
 }) {
-  return <div className={cn("grid gap-3 sm:grid-cols-2 xl:grid-cols-4", className)}>{children}</div>;
+  return (
+    <div className={cn("grid gap-3 sm:grid-cols-2 xl:grid-cols-4", className)}>
+      {children}
+    </div>
+  );
 }
 
 export function AppOperationalStatusSummary({
@@ -1188,10 +1266,19 @@ export function AppOperationalStatusSummary({
   return (
     <div className={cn("grid gap-2 sm:grid-cols-2 xl:grid-cols-4", className)}>
       {items.map(item => (
-        <div key={item.label} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3">
+        <div
+          key={item.label}
+          className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3"
+        >
           <p className="text-xs text-[var(--text-muted)]">{item.label}</p>
-          <p className="mt-1 text-lg font-semibold text-[var(--text-primary)]">{item.value}</p>
-          {item.helper ? <p className="mt-1 text-xs text-[var(--text-secondary)]">{item.helper}</p> : null}
+          <p className="mt-1 text-lg font-semibold text-[var(--text-primary)]">
+            {item.value}
+          </p>
+          {item.helper ? (
+            <p className="mt-1 text-xs text-[var(--text-secondary)]">
+              {item.helper}
+            </p>
+          ) : null}
         </div>
       ))}
     </div>
@@ -1219,11 +1306,19 @@ export function AppEmbeddedTimeline({
   return (
     <ul className="space-y-2">
       {items.map(item => (
-        <li key={item.id} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-2.5">
-          <p className="text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">{item.type}</p>
-          <p className="text-xs font-medium text-[var(--text-primary)]">{item.summary}</p>
+        <li
+          key={item.id}
+          className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-2.5"
+        >
+          <p className="text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">
+            {item.type}
+          </p>
+          <p className="text-xs font-medium text-[var(--text-primary)]">
+            {item.summary}
+          </p>
           <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
-            {item.entity ?? "Entidade não informada"} · {item.actor ?? "Sistema"} · {item.happenedAt ?? "Data indisponível"}
+            {item.entity ?? "Entidade não informada"} ·{" "}
+            {item.actor ?? "Sistema"} · {item.happenedAt ?? "Data indisponível"}
           </p>
           {item.action ? <div className="mt-1.5">{item.action}</div> : null}
         </li>

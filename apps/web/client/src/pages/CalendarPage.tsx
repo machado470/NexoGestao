@@ -4,14 +4,23 @@ import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
-import { AlertTriangle, CheckCircle2, Clock3, MessageSquare, Plus, RefreshCcw } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Clock3,
+  MessageSquare,
+  Plus,
+  RefreshCcw,
+} from "lucide-react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/design-system";
-import { AppToolbar, AppTimeline, AppTimelineItem } from "@/components/app-system";
+import { AppTimeline, AppTimelineItem } from "@/components/app-system";
 import { CreateAppointmentModal } from "@/components/CreateAppointmentModal";
 import {
   AppOperationalHeader,
+  AppFiltersBar,
+  AppKpiRow,
   AppPageEmptyState,
   AppPageErrorState,
   AppPageLoadingState,
@@ -66,17 +75,37 @@ function normalizeEventStatus(status: string) {
 export default function CalendarPage() {
   const [, navigate] = useLocation();
   const { isAuthenticated } = useAuth();
-  const [viewMode, setViewMode] = useOperationalMemoryState<ViewMode>("nexo.calendar.view.v1", "timeGridWeek");
-  const [selectedId, setSelectedId] = useOperationalMemoryState<string | null>("nexo.calendar.selected-id.v1", null);
+  const [viewMode, setViewMode] = useOperationalMemoryState<ViewMode>(
+    "nexo.calendar.view.v1",
+    "timeGridWeek"
+  );
+  const [selectedId, setSelectedId] = useOperationalMemoryState<string | null>(
+    "nexo.calendar.selected-id.v1",
+    null
+  );
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  const [teamFilter, setTeamFilter] = useOperationalMemoryState("nexo.calendar.team-filter.v1", "all");
-  const [serviceFilter, setServiceFilter] = useOperationalMemoryState("nexo.calendar.service-filter.v1", "all");
-  const [statusFilter, setStatusFilter] = useOperationalMemoryState("nexo.calendar.status-filter.v1", "all");
-  const [customerFilter, setCustomerFilter] = useOperationalMemoryState("nexo.calendar.customer-filter.v1", "all");
+  const [teamFilter, setTeamFilter] = useOperationalMemoryState(
+    "nexo.calendar.team-filter.v1",
+    "all"
+  );
+  const [serviceFilter, setServiceFilter] = useOperationalMemoryState(
+    "nexo.calendar.service-filter.v1",
+    "all"
+  );
+  const [statusFilter, setStatusFilter] = useOperationalMemoryState(
+    "nexo.calendar.status-filter.v1",
+    "all"
+  );
+  const [customerFilter, setCustomerFilter] = useOperationalMemoryState(
+    "nexo.calendar.customer-filter.v1",
+    "all"
+  );
 
   const appointmentsQuery = trpc.nexo.appointments.list.useQuery(
-    teamFilter === "all" ? { limit: 1000 } : { assignedToPersonId: teamFilter, limit: 1000 },
+    teamFilter === "all"
+      ? { limit: 1000 }
+      : { assignedToPersonId: teamFilter, limit: 1000 },
     { enabled: isAuthenticated, retry: false }
   );
   const customersQuery = trpc.nexo.customers.list.useQuery(undefined, {
@@ -94,17 +123,28 @@ export default function CalendarPage() {
     [appointmentsQuery.data]
   );
   const customers = useMemo(
-    () => normalizeArrayPayload<{ id: string; name: string }>(customersQuery.data),
+    () =>
+      normalizeArrayPayload<{ id: string; name: string }>(customersQuery.data),
     [customersQuery.data]
   );
-  const people = useMemo(() => normalizeArrayPayload<any>(peopleQuery.data), [peopleQuery.data]);
+  const people = useMemo(
+    () => normalizeArrayPayload<any>(peopleQuery.data),
+    [peopleQuery.data]
+  );
 
   const filteredAppointments = useMemo(() => {
     return appointments.filter(item => {
-      const teamOk = teamFilter === "all" || String(item.assignedToPersonId ?? "") === teamFilter;
-      const serviceOk = serviceFilter === "all" || String(item.title ?? "").toLowerCase().includes(serviceFilter.toLowerCase());
+      const teamOk =
+        teamFilter === "all" ||
+        String(item.assignedToPersonId ?? "") === teamFilter;
+      const serviceOk =
+        serviceFilter === "all" ||
+        String(item.title ?? "")
+          .toLowerCase()
+          .includes(serviceFilter.toLowerCase());
       const statusOk = statusFilter === "all" || item.status === statusFilter;
-      const customerOk = customerFilter === "all" || item.customerId === customerFilter;
+      const customerOk =
+        customerFilter === "all" || item.customerId === customerFilter;
       return teamOk && serviceOk && statusOk && customerOk;
     });
   }, [appointments, customerFilter, serviceFilter, statusFilter, teamFilter]);
@@ -124,12 +164,15 @@ export default function CalendarPage() {
     const ids = new Set<string>();
     byOwner.forEach(group => {
       const sorted = [...group].sort(
-        (a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()
+        (a, b) =>
+          new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()
       );
       for (let index = 1; index < sorted.length; index++) {
         const previous = sorted[index - 1];
         const current = sorted[index];
-        const previousEnd = new Date(previous.endsAt ?? previous.startsAt).getTime();
+        const previousEnd = new Date(
+          previous.endsAt ?? previous.startsAt
+        ).getTime();
         const currentStart = new Date(current.startsAt).getTime();
         if (currentStart < previousEnd) {
           ids.add(previous.id);
@@ -145,7 +188,10 @@ export default function CalendarPage() {
       filteredAppointments
         .filter(item => {
           const status = String(item.status).toUpperCase();
-          return new Date(item.startsAt).getTime() < now && ["SCHEDULED", "CONFIRMED"].includes(status);
+          return (
+            new Date(item.startsAt).getTime() < now &&
+            ["SCHEDULED", "CONFIRMED"].includes(status)
+          );
         })
         .map(item => item.id)
     );
@@ -155,14 +201,26 @@ export default function CalendarPage() {
     return filteredAppointments.map(item => {
       const hasConflict = conflictIds.has(item.id);
       const isDelayed = delayedIds.has(item.id);
-      const signal = hasConflict ? "Conflito" : isDelayed ? "Atraso" : STATUS_LABEL[item.status];
+      const signal = hasConflict
+        ? "Conflito"
+        : isDelayed
+          ? "Atraso"
+          : STATUS_LABEL[item.status];
       return {
         id: item.id,
         title: `${item.customer?.name ?? "Cliente"} • ${item.title ?? "Serviço"}`,
         start: item.startsAt,
         end: item.endsAt ?? undefined,
-        backgroundColor: hasConflict ? "#ef4444" : isDelayed ? "#ea580c" : STATUS_COLOR[item.status],
-        borderColor: hasConflict ? "#b91c1c" : isDelayed ? "#c2410c" : STATUS_COLOR[item.status],
+        backgroundColor: hasConflict
+          ? "#ef4444"
+          : isDelayed
+            ? "#ea580c"
+            : STATUS_COLOR[item.status],
+        borderColor: hasConflict
+          ? "#b91c1c"
+          : isDelayed
+            ? "#c2410c"
+            : STATUS_COLOR[item.status],
         textColor: "#ffffff",
         extendedProps: {
           status: item.status,
@@ -178,7 +236,8 @@ export default function CalendarPage() {
     });
   }, [filteredAppointments, conflictIds, delayedIds]);
 
-  const selected = filteredAppointments.find(item => item.id === selectedId) ?? null;
+  const selected =
+    filteredAppointments.find(item => item.id === selectedId) ?? null;
 
   const executiveRead = useMemo(() => {
     const oneHour = 60 * 60 * 1000;
@@ -187,13 +246,20 @@ export default function CalendarPage() {
       const start = new Date(item.startsAt).getTime();
       return start - now <= oneHour && start - now > 0;
     }).length;
-    const confirmed = filteredAppointments.filter(item => item.status === "CONFIRMED").length;
+    const confirmed = filteredAppointments.filter(
+      item => item.status === "CONFIRMED"
+    ).length;
     const inProgress = 0;
     const activePeople = teamFilter === "all" ? Math.max(people.length, 1) : 1;
-    const assignedActiveAppointments = filteredAppointments.filter(item =>
-      Boolean(item.assignedToPersonId) && !["CANCELED", "DONE", "NO_SHOW"].includes(item.status)
+    const assignedActiveAppointments = filteredAppointments.filter(
+      item =>
+        Boolean(item.assignedToPersonId) &&
+        !["CANCELED", "DONE", "NO_SHOW"].includes(item.status)
     ).length;
-    const possibleFits = Math.max(0, activePeople * 12 - assignedActiveAppointments);
+    const possibleFits = Math.max(
+      0,
+      activePeople * 12 - assignedActiveAppointments
+    );
 
     return { conflicts, overload, confirmed, inProgress, possibleFits };
   }, [filteredAppointments, conflictIds, now, people.length, teamFilter]);
@@ -211,11 +277,17 @@ export default function CalendarPage() {
         };
       })
       .filter(Boolean)
-      .slice(0, 4) as Array<{ item: Appointment; tone: "critical" | "warning"; label: string }>;
+      .slice(0, 4) as Array<{
+      item: Appointment;
+      tone: "critical" | "warning";
+      label: string;
+    }>;
   }, [filteredAppointments, conflictIds, delayedIds]);
 
   const nextBestAction = useMemo(() => {
-    const dueToConfirm = filteredAppointments.find(item => item.status === "SCHEDULED");
+    const dueToConfirm = filteredAppointments.find(
+      item => item.status === "SCHEDULED"
+    );
     if (dueToConfirm) {
       return {
         title: "Confirmar agendamento pendente",
@@ -236,11 +308,19 @@ export default function CalendarPage() {
     return null;
   }, [filteredAppointments, delayedIds]);
 
-  const isLoading = appointmentsQuery.isLoading || customersQuery.isLoading || peopleQuery.isLoading;
-  const hasError = appointmentsQuery.isError || customersQuery.isError || peopleQuery.isError;
+  const isLoading =
+    appointmentsQuery.isLoading ||
+    customersQuery.isLoading ||
+    peopleQuery.isLoading;
+  const hasError =
+    appointmentsQuery.isError || customersQuery.isError || peopleQuery.isError;
 
   const refetchAll = () => {
-    void Promise.all([appointmentsQuery.refetch(), customersQuery.refetch(), peopleQuery.refetch()]);
+    void Promise.all([
+      appointmentsQuery.refetch(),
+      customersQuery.refetch(),
+      peopleQuery.refetch(),
+    ]);
   };
 
   const handleConfirm = async (appointmentId: string) => {
@@ -257,132 +337,276 @@ export default function CalendarPage() {
     <AppPageShell>
       <AppOperationalHeader
         title="Calendário operacional"
-        description="Leitura rápida da distribuição do tempo para enxergar conflito, atraso e capacidade sem virar tela de execução."
+        description="Visualização estratégica do tempo para enxergar conflito, atraso e capacidade sem virar tela de execução."
         primaryAction={
           <Button type="button" onClick={() => setShowCreateModal(true)}>
             <Plus className="mr-1.5 h-4 w-4" /> Novo agendamento
           </Button>
         }
-        secondaryActions={<Button variant="outline" size="sm" onClick={refetchAll}>Atualizar leitura</Button>}
+        secondaryActions={
+          <Button variant="outline" size="sm" onClick={refetchAll}>
+            Atualizar leitura
+          </Button>
+        }
         contextChips={
           <>
             <AppStatusBadge label={`${executiveRead.conflicts} conflitos`} />
             <AppStatusBadge label={`${executiveRead.overload} próximos (1h)`} />
-            <AppPriorityBadge label={executiveRead.inProgress > 0 ? `${executiveRead.inProgress} em andamento` : "Sem execução ativa"} />
+            <AppPriorityBadge
+              label={
+                executiveRead.inProgress > 0
+                  ? `${executiveRead.inProgress} em andamento`
+                  : "Sem execução ativa"
+              }
+            />
           </>
         }
       >
         {nextBestAction ? (
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <p className="text-sm font-semibold text-[var(--modal-section-text)]">Próxima melhor ação: {nextBestAction.title}</p>
-              <p className="text-xs text-[var(--modal-section-muted)]">{nextBestAction.description}</p>
+              <p className="text-sm font-semibold text-[var(--text-primary)]">
+                Próxima melhor ação: {nextBestAction.title}
+              </p>
+              <p className="text-xs text-[var(--text-muted)]">
+                {nextBestAction.description}
+              </p>
             </div>
             {nextBestAction.intent === "confirm" ? (
-              <Button size="sm" onClick={() => void handleConfirm(nextBestAction.appointmentId)}>
+              <Button
+                size="sm"
+                onClick={() => void handleConfirm(nextBestAction.appointmentId)}
+              >
                 Confirmar sem sair
               </Button>
             ) : (
-              <Button size="sm" variant="outline" onClick={() => navigate(`/appointments?id=${nextBestAction.appointmentId}&action=reschedule&source=calendar`)}>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  navigate(
+                    `/appointments?id=${nextBestAction.appointmentId}&action=reschedule&source=calendar`
+                  )
+                }
+              >
                 Remarcar no fluxo
               </Button>
             )}
           </div>
         ) : (
-          <p className="text-sm text-[var(--modal-section-muted)]">Sem ação crítica imediata. Calendário saudável para o recorte selecionado.</p>
+          <p className="text-sm text-[var(--text-muted)]">
+            Sem ação crítica imediata. Calendário saudável para o recorte
+            selecionado.
+          </p>
         )}
       </AppOperationalHeader>
 
-      <AppToolbar className="mt-4">
+      <AppFiltersBar className="mt-4 gap-2 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2">
         <div className="flex flex-wrap items-center gap-2">
-          <select className="h-9 rounded-md nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] px-3 text-sm" value={viewMode} onChange={event => setViewMode(event.target.value as ViewMode)}>
+          <select
+            className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm text-[var(--text-primary)]"
+            value={viewMode}
+            onChange={event => setViewMode(event.target.value as ViewMode)}
+          >
             <option value="timeGridDay">Dia</option>
             <option value="timeGridWeek">Semana</option>
             <option value="dayGridMonth">Mês</option>
           </select>
-          <select className="h-9 rounded-md nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] px-3 text-sm" value={teamFilter} onChange={event => setTeamFilter(event.target.value)}>
+          <select
+            className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm text-[var(--text-primary)]"
+            value={teamFilter}
+            onChange={event => setTeamFilter(event.target.value)}
+          >
             <option value="all">Equipe: todas</option>
-            {people.map((person: any) => <option key={String(person.id)} value={String(person.id)}>{String(person.name ?? "Colaborador")}</option>)}
+            {people.map((person: any) => (
+              <option key={String(person.id)} value={String(person.id)}>
+                {String(person.name ?? "Colaborador")}
+              </option>
+            ))}
           </select>
-          <select className="h-9 rounded-md nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] px-3 text-sm" value={serviceFilter} onChange={event => setServiceFilter(event.target.value)}>
+          <select
+            className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm text-[var(--text-primary)]"
+            value={serviceFilter}
+            onChange={event => setServiceFilter(event.target.value)}
+          >
             <option value="all">Serviço: todos</option>
             <option value="instalação">Instalação</option>
             <option value="manutenção">Manutenção</option>
             <option value="vistoria">Vistoria</option>
           </select>
-          <select className="h-9 rounded-md nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] px-3 text-sm" value={statusFilter} onChange={event => setStatusFilter(event.target.value)}>
+          <select
+            className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm text-[var(--text-primary)]"
+            value={statusFilter}
+            onChange={event => setStatusFilter(event.target.value)}
+          >
             <option value="all">Status: todos</option>
             <option value="SCHEDULED">Agendado</option>
             <option value="CONFIRMED">Confirmado</option>
             <option value="DONE">Concluído</option>
             <option value="CANCELED">Cancelado</option>
           </select>
-          <select className="h-9 rounded-md nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] px-3 text-sm" value={customerFilter} onChange={event => setCustomerFilter(event.target.value)}>
+          <select
+            className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm text-[var(--text-primary)]"
+            value={customerFilter}
+            onChange={event => setCustomerFilter(event.target.value)}
+          >
             <option value="all">Cliente: todos</option>
-            {customers.map(customer => <option key={customer.id} value={customer.id}>{customer.name}</option>)}
+            {customers.map(customer => (
+              <option key={customer.id} value={customer.id}>
+                {customer.name}
+              </option>
+            ))}
           </select>
         </div>
-      </AppToolbar>
+      </AppFiltersBar>
 
-      {isLoading ? <AppPageLoadingState description="Consolidando leitura macro do tempo da operação..." /> : null}
-      {hasError ? <AppPageErrorState description="Não foi possível carregar o calendário da operação." onAction={refetchAll} /> : null}
+      {isLoading ? (
+        <AppPageLoadingState description="Consolidando leitura macro do tempo da operação..." />
+      ) : null}
+      {hasError ? (
+        <AppPageErrorState
+          description="Não foi possível carregar o calendário da operação."
+          onAction={refetchAll}
+        />
+      ) : null}
 
       {!isLoading && !hasError ? (
         <>
           {filteredAppointments.length === 0 ? (
-            <AppPageEmptyState title="Sem eventos para este recorte" description="Ajuste filtros ou crie um novo agendamento para preencher vazios operacionais." />
+            <AppPageEmptyState
+              title="Sem eventos para este recorte"
+              description="Ajuste filtros ou crie um novo agendamento para preencher vazios operacionais."
+            />
           ) : (
             <>
-              <AppSectionBlock title="1) Atenção imediata" subtitle="Sinais operacionais que pedem decisão agora.">
+              <AppSectionBlock
+                title="1) Atenção imediata"
+                subtitle="Sinais operacionais que pedem decisão agora."
+              >
                 {immediateAttention.length > 0 ? (
                   <div className="grid gap-3 md:grid-cols-2">
                     {immediateAttention.map(({ item, tone, label }) => (
-                      <div key={item.id} className="rounded-lg nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] p-3">
+                      <div
+                        key={item.id}
+                        className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3"
+                      >
                         <div className="flex items-center justify-between gap-2">
-                          <p className="text-sm font-semibold text-[var(--modal-section-text)]">{item.customer?.name ?? "Cliente"}</p>
+                          <p className="text-sm font-semibold text-[var(--text-primary)]">
+                            {item.customer?.name ?? "Cliente"}
+                          </p>
                           <AppStatusBadge label={label} />
                         </div>
-                        <p className="mt-1 text-xs text-[var(--modal-section-muted)]">{item.title ?? "Serviço não informado"} · {new Date(item.startsAt).toLocaleString("pt-BR")}</p>
+                        <p className="mt-1 text-xs text-[var(--text-muted)]">
+                          {item.title ?? "Serviço não informado"} ·{" "}
+                          {new Date(item.startsAt).toLocaleString("pt-BR")}
+                        </p>
                         <div className="mt-2 flex flex-wrap gap-2">
-                          <Button size="sm" variant="outline" onClick={() => void handleConfirm(item.id)}>Confirmar</Button>
-                          <Button size="sm" variant="outline" onClick={() => navigate(`/appointments?id=${item.id}&action=reschedule&source=calendar`)}>Remarcar</Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => void handleConfirm(item.id)}
+                          >
+                            Confirmar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              navigate(
+                                `/appointments?id=${item.id}&action=reschedule&source=calendar`
+                              )
+                            }
+                          >
+                            Remarcar
+                          </Button>
                         </div>
-                        <div className="mt-2 flex items-center gap-1 text-xs text-[var(--modal-section-muted)]">
-                          {tone === "critical" ? <AlertTriangle className="h-3.5 w-3.5 text-red-500" /> : <Clock3 className="h-3.5 w-3.5 text-amber-500" />}
-                          <span>{tone === "critical" ? "Conflito visível para a equipe." : "Atraso detectado no horário planejado."}</span>
+                        <div className="mt-2 flex items-center gap-1 text-xs text-[var(--text-muted)]">
+                          {tone === "critical" ? (
+                            <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
+                          ) : (
+                            <Clock3 className="h-3.5 w-3.5 text-amber-500" />
+                          )}
+                          <span>
+                            {tone === "critical"
+                              ? "Conflito visível para a equipe."
+                              : "Atraso detectado no horário planejado."}
+                          </span>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <AppPageEmptyState title="Sem pontos críticos" description="Nenhum conflito ou atraso no recorte atual do calendário." />
+                  <AppPageEmptyState
+                    title="Sem pontos críticos"
+                    description="Nenhum conflito ou atraso no recorte atual do calendário."
+                  />
                 )}
               </AppSectionBlock>
 
-              <AppSectionBlock title="2) KPIs leves" subtitle="Pulso rápido da distribuição de carga.">
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  <div className="rounded-lg nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] p-3"><p className="text-xs text-[var(--modal-section-muted)]">Conflitos detectados</p><p className="text-lg font-semibold text-[var(--modal-section-text)]">{executiveRead.conflicts}</p></div>
-                  <div className="rounded-lg nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] p-3"><p className="text-xs text-[var(--modal-section-muted)]">Sobrecarga próxima (1h)</p><p className="text-lg font-semibold text-[var(--modal-section-text)]">{executiveRead.overload}</p></div>
-                  <div className="rounded-lg nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] p-3"><p className="text-xs text-[var(--modal-section-muted)]">Confirmados</p><p className="text-lg font-semibold text-[var(--modal-section-text)]">{executiveRead.confirmed}</p></div>
-                  <div className="rounded-lg nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] p-3"><p className="text-xs text-[var(--modal-section-muted)]">Capacidade de encaixe</p><p className="text-lg font-semibold text-[var(--modal-section-text)]">{executiveRead.possibleFits}</p></div>
-                </div>
+              <AppSectionBlock
+                title="2) KPIs leves"
+                subtitle="Pulso rápido da distribuição de carga."
+              >
+                <AppKpiRow
+                  items={[
+                    {
+                      title: "Conflitos detectados",
+                      value: String(executiveRead.conflicts),
+                      hint: "Choques de agenda no recorte.",
+                    },
+                    {
+                      title: "Sobrecarga próxima (1h)",
+                      value: String(executiveRead.overload),
+                      hint: "Capacidade pressionada no curto prazo.",
+                    },
+                    {
+                      title: "Confirmados",
+                      value: String(executiveRead.confirmed),
+                      hint: "Eventos preparados para execução.",
+                    },
+                    {
+                      title: "Capacidade de encaixe",
+                      value: String(executiveRead.possibleFits),
+                      hint: "Janelas úteis para reorganização.",
+                    },
+                  ]}
+                />
               </AppSectionBlock>
 
               <div className="grid gap-4 xl:grid-cols-12">
-                <AppSectionBlock title="3) Calendário visual" subtitle="Grade de leitura com evento legível: cliente, horário, serviço e status." className="xl:col-span-8">
-                  <div className="rounded-lg nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] p-2">
+                <AppSectionBlock
+                  title="3) Calendário visual"
+                  subtitle="Grade de leitura com evento legível: cliente, horário, serviço e status."
+                  className="xl:col-span-8"
+                >
+                  <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-2">
                     <FullCalendar
-                      plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+                      plugins={[
+                        dayGridPlugin,
+                        timeGridPlugin,
+                        interactionPlugin,
+                      ]}
                       initialView={viewMode}
-                      viewDidMount={view => setViewMode(view.view.type as ViewMode)}
+                      viewDidMount={view =>
+                        setViewMode(view.view.type as ViewMode)
+                      }
                       headerToolbar={false}
                       events={events}
-                      eventClick={(arg: EventClickArg) => setSelectedId(arg.event.id)}
-                      eventContent={(eventInfo) => (
+                      eventClick={(arg: EventClickArg) =>
+                        setSelectedId(arg.event.id)
+                      }
+                      eventContent={eventInfo => (
                         <div className="space-y-0.5 p-0.5 text-[11px] leading-tight">
-                          <p className="truncate font-semibold">{eventInfo.event.extendedProps.timeLabel} · {eventInfo.event.extendedProps.customerName}</p>
-                          <p className="truncate">{eventInfo.event.extendedProps.serviceName}</p>
-                          <p className="truncate opacity-90">{eventInfo.event.extendedProps.signal}</p>
+                          <p className="truncate font-semibold">
+                            {eventInfo.event.extendedProps.timeLabel} ·{" "}
+                            {eventInfo.event.extendedProps.customerName}
+                          </p>
+                          <p className="truncate">
+                            {eventInfo.event.extendedProps.serviceName}
+                          </p>
+                          <p className="truncate opacity-90">
+                            {eventInfo.event.extendedProps.signal}
+                          </p>
                         </div>
                       )}
                       height={640}
@@ -393,47 +617,140 @@ export default function CalendarPage() {
                   </div>
                 </AppSectionBlock>
 
-                <AppSectionBlock title="4) Ação sem troca de tela" subtitle="Contexto mínimo para decidir e acionar rápido." className="xl:col-span-4">
+                <AppSectionBlock
+                  title="4) Ação sem troca de tela"
+                  subtitle="Contexto mínimo para decidir e acionar rápido."
+                  className="xl:col-span-4"
+                >
                   {selected ? (
                     <div className="space-y-3">
-                      <div className="rounded-lg nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] p-3">
-                        <p className="text-sm font-semibold text-[var(--modal-section-text)]">{selected.customer?.name ?? "Cliente não identificado"}</p>
-                        <p className="text-xs text-[var(--modal-section-muted)]">{selected.title ?? "Serviço não informado"}</p>
-                        <p className="mt-2 text-xs text-[var(--modal-section-muted)]">{new Date(selected.startsAt).toLocaleString("pt-BR")}</p>
+                      <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
+                        <p className="text-sm font-semibold text-[var(--text-primary)]">
+                          {selected.customer?.name ??
+                            "Cliente não identificado"}
+                        </p>
+                        <p className="text-xs text-[var(--text-muted)]">
+                          {selected.title ?? "Serviço não informado"}
+                        </p>
+                        <p className="mt-2 text-xs text-[var(--text-muted)]">
+                          {new Date(selected.startsAt).toLocaleString("pt-BR")}
+                        </p>
                         <div className="mt-2 flex flex-wrap gap-2">
-                          <AppStatusBadge label={STATUS_LABEL[selected.status]} />
-                          <AppPriorityBadge label={new Date(selected.startsAt).getTime() - Date.now() < 45 * 60 * 1000 ? "Alta" : "Média"} />
-                          <AppStatusBadge label={conflictIds.has(selected.id) ? "Conflito" : delayedIds.has(selected.id) ? "Atraso" : "Programado"} />
+                          <AppStatusBadge
+                            label={STATUS_LABEL[selected.status]}
+                          />
+                          <AppPriorityBadge
+                            label={
+                              new Date(selected.startsAt).getTime() -
+                                Date.now() <
+                              45 * 60 * 1000
+                                ? "Alta"
+                                : "Média"
+                            }
+                          />
+                          <AppStatusBadge
+                            label={
+                              conflictIds.has(selected.id)
+                                ? "Conflito"
+                                : delayedIds.has(selected.id)
+                                  ? "Atraso"
+                                  : "Programado"
+                            }
+                          />
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        <Button size="sm" onClick={() => void handleConfirm(selected.id)}>
-                          <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Confirmar
+                        <Button
+                          size="sm"
+                          onClick={() => void handleConfirm(selected.id)}
+                        >
+                          <CheckCircle2 className="mr-1 h-3.5 w-3.5" />{" "}
+                          Confirmar
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => navigate(`/appointments?id=${selected.id}&action=reschedule&source=calendar`)}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            navigate(
+                              `/appointments?id=${selected.id}&action=reschedule&source=calendar`
+                            )
+                          }
+                        >
                           <RefreshCcw className="mr-1 h-3.5 w-3.5" /> Remarcar
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => navigate(`/appointments?id=${selected.id}&source=calendar&mode=operational_list`)}>Abrir agendamento</Button>
-                        <Button size="sm" variant="outline" onClick={() => navigate(`/service-orders?appointmentId=${selected.id}`)}>Abrir O.S.</Button>
-                        <Button size="sm" variant="outline" onClick={() => selected.customerId && navigate(`/customers?id=${selected.customerId}&source=calendar`)}>Abrir cliente</Button>
-                        <Button size="sm" variant="outline" onClick={() => navigate(`/whatsapp?customerId=${selected.customerId}&appointmentId=${selected.id}&source=calendar`)}>
-                          <MessageSquare className="mr-1 h-3.5 w-3.5" /> Mensagem
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            navigate(
+                              `/appointments?id=${selected.id}&source=calendar&mode=operational_list`
+                            )
+                          }
+                        >
+                          Abrir agendamento
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            navigate(
+                              `/service-orders?appointmentId=${selected.id}`
+                            )
+                          }
+                        >
+                          Abrir O.S.
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            selected.customerId &&
+                            navigate(
+                              `/customers?id=${selected.customerId}&source=calendar`
+                            )
+                          }
+                        >
+                          Abrir cliente
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            navigate(
+                              `/whatsapp?customerId=${selected.customerId}&appointmentId=${selected.id}&source=calendar`
+                            )
+                          }
+                        >
+                          <MessageSquare className="mr-1 h-3.5 w-3.5" />{" "}
+                          Mensagem
                         </Button>
                       </div>
                       <AppTimeline>
                         <AppTimelineItem>
-                          <p className="text-sm text-[var(--modal-section-text)]">Status atual: {normalizeEventStatus(selected.status)}</p>
+                          <p className="text-sm text-[var(--text-primary)]">
+                            Status atual:{" "}
+                            {normalizeEventStatus(selected.status)}
+                          </p>
                         </AppTimelineItem>
                         <AppTimelineItem>
-                          <p className="text-sm text-[var(--modal-section-text)]">Conexão direta com Agendamentos para execução detalhada.</p>
+                          <p className="text-sm text-[var(--text-primary)]">
+                            Conexão direta com Agendamentos para execução
+                            detalhada.
+                          </p>
                         </AppTimelineItem>
                         <AppTimelineItem>
-                          <p className="text-sm text-[var(--modal-section-text)]">Calendário mantém leitura de distribuição e não substitui a fila operacional.</p>
+                          <p className="text-sm text-[var(--text-primary)]">
+                            Calendário mantém leitura de distribuição e não
+                            substitui a fila operacional.
+                          </p>
                         </AppTimelineItem>
                       </AppTimeline>
                     </div>
                   ) : (
-                    <AppPageEmptyState title="Selecione um evento" description="Clique em um agendamento na grade para abrir contexto, ação rápida e links de execução." />
+                    <AppPageEmptyState
+                      title="Selecione um evento"
+                      description="Clique em um agendamento na grade para abrir contexto, ação rápida e links de execução."
+                    />
                   )}
                 </AppSectionBlock>
               </div>
