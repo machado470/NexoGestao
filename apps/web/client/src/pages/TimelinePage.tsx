@@ -961,10 +961,10 @@ export default function TimelinePage() {
   }
 
   return (
-    <AppPageShell className="space-y-4">
+    <AppPageShell className="gap-3">
       <AppOperationalHeader
         title="Timeline"
-        description="Prova oficial da operação: se não está aqui, não aconteceu."
+        description="Prova oficial da operação, com contexto e ação."
         density="compact"
         primaryAction={
           <Button type="button" variant="outline" size="sm" onClick={exportCsv}>
@@ -1043,7 +1043,7 @@ export default function TimelinePage() {
           )}
         </AppSectionBlock>
 
-        <AppSectionCard className="space-y-3">
+        <AppSectionCard className="space-y-2.5">
           <div>
             <p className="nexo-overline">Próxima melhor ação</p>
             <h2 className="mt-1 text-base font-semibold text-[var(--text-primary)]">
@@ -1081,8 +1081,8 @@ export default function TimelinePage() {
       </div>
 
       <AppSectionBlock
-        title="Resumo auditável"
-        subtitle="Indicadores do recorte atual para volume, criticidade, financeiro e governança."
+        title="Pulso auditável"
+        subtitle="Volume, criticidade, financeiro e governança do recorte."
       >
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <AppStatCard
@@ -1117,10 +1117,10 @@ export default function TimelinePage() {
       </AppSectionBlock>
 
       <AppSectionBlock
-        title="Filtros de auditoria"
-        subtitle="Refine por tipo, cliente, módulo, criticidade e ator."
+        title="Filtros"
+        subtitle="Tipo, cliente, módulo, entidade, criticidade e ator."
       >
-        <AppFiltersBar className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-4">
+        <AppFiltersBar className="grid grid-cols-1 gap-2 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2 md:grid-cols-2 xl:grid-cols-4">
           <input
             value={searchValue}
             onChange={event => setSearchValue(event.target.value)}
@@ -1225,7 +1225,7 @@ export default function TimelinePage() {
               description="Ajuste os filtros para investigar outra janela operacional."
             />
           ) : (
-            <div className="space-y-4">
+            <div className="max-h-[620px] space-y-3 overflow-y-auto pr-1">
               {groupedEvents.map(([dateLabel, dayEvents]) => (
                 <section key={dateLabel} className="space-y-2">
                   <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
@@ -1327,7 +1327,7 @@ export default function TimelinePage() {
 
         <AppSectionBlock
           title="Contexto do evento"
-          subtitle="Estrutura pronta para expansão do detalhe com links e próximos passos."
+          subtitle="Metadados, vínculo e próximos passos do evento selecionado."
           className="xl:col-span-4"
         >
           {!selectedEvent ? (
@@ -1487,8 +1487,7 @@ export default function TimelinePage() {
                   variant="outline"
                   onClick={() => navigate(eventRoute(selectedEvent))}
                 >
-                  Abrir contexto principal{" "}
-                  <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                  Abrir contexto <ArrowRight className="ml-1 h-3.5 w-3.5" />
                 </Button>
               </div>
             </div>

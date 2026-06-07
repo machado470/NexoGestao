@@ -236,7 +236,7 @@ export function SmartPage({
             dominantCta.onClick();
           }}
         >
-          {primaryAction ? "Executar ação principal" : dominantCta.label}
+          {primaryAction ? "Abrir próximo passo" : dominantCta.label}
           <ArrowRight className="h-4 w-4" />
         </PrimaryButton>
       </NexoActionGroup>

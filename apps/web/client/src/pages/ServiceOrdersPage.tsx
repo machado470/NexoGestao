@@ -804,7 +804,7 @@ export default function ServiceOrdersPage() {
     getServiceOrdersOperationalStatus(counts);
 
   return (
-    <AppPageShell className="space-y-4">
+    <AppPageShell className="gap-3">
       <AppOperationalHeader
         title="Ordens de Serviço"
         description="Centro de execução: priorize atrasos, responsáveis, conclusão e cobrança antes de navegar."
@@ -841,7 +841,7 @@ export default function ServiceOrdersPage() {
         </div>
       </AppOperationalHeader>
 
-      <AppSectionCard className="space-y-3">
+      <AppSectionCard className="space-y-2.5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="nexo-overline">Próxima melhor ação</p>
@@ -903,7 +903,7 @@ export default function ServiceOrdersPage() {
         subtitle="Volume, execução e cobrança derivados dos dados existentes."
         compact
       >
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2 xl:grid-cols-4">
           {operationalKpis.map(kpi => (
             <AppStatCard
               key={kpi.label}
@@ -924,7 +924,7 @@ export default function ServiceOrdersPage() {
         </div>
       </AppSectionBlock>
 
-      <AppFiltersBar className="shrink-0 gap-3 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-3">
+      <AppFiltersBar className="shrink-0 gap-2 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2">
         <div className="min-w-[220px] flex-1">
           <input
             value={searchTerm}
@@ -965,10 +965,10 @@ export default function ServiceOrdersPage() {
         </span>
       </AppFiltersBar>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+      <div className="grid grid-cols-1 gap-3 xl:grid-cols-12">
         <AppSectionBlock
           title="Alertas operacionais"
-          subtitle="O.S. atrasadas, paradas, sem responsável ou sem cobrança."
+          subtitle="Alertas compactos: atraso, parada, responsável e cobrança."
           className="xl:col-span-4"
           compact
         >
@@ -1049,7 +1049,7 @@ export default function ServiceOrdersPage() {
               />
             ) : (
               <div className="space-y-3">
-                <div className="overflow-x-auto">
+                <div className="max-h-[560px] overflow-auto">
                   <AppDataTable className="min-w-[980px]">
                     <thead>
                       <tr>

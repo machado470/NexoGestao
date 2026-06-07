@@ -942,7 +942,7 @@ export default function FinancesPage() {
   }
 
   return (
-    <AppPageShell className="space-y-4">
+    <AppPageShell className="gap-3">
       <AppOperationalHeader
         title="Financeiro"
         description={`Centro operacional de cobrança e receita · ${enrichedCharges.length} cobrança(s), ${cashHealth.overdueCount} vencida(s) e ${completedOrdersWithoutCharge.length} O.S. concluída(s) sem cobrança.`}
@@ -984,7 +984,7 @@ export default function FinancesPage() {
         </p>
       </AppOperationalHeader>
 
-      <AppSectionCard className="space-y-4">
+      <AppSectionCard className="space-y-3">
         <div className="border-b border-[var(--border-subtle)]/60 pb-3.5">
           <h3 className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">
             Próxima decisão financeira · cobrança recomendada
@@ -1201,7 +1201,7 @@ export default function FinancesPage() {
         title="Carteira operacional"
         subtitle="Cobranças reais com risco, origem e ação primária antes da navegação."
       >
-        <AppFiltersBar className="shrink-0 gap-3 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-3">
+        <AppFiltersBar className="shrink-0 gap-2 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2">
           <div className="min-w-[220px] flex-1">
             <input
               value={searchTerm}
@@ -1308,7 +1308,7 @@ export default function FinancesPage() {
                     <th className="text-left">Origem/O.S.</th>
                     <th className="text-left">Risco/pendência</th>
                     <th className="text-left">Ação primária</th>
-                    <th className="p-2.5 text-left">Menu</th>
+                    <th className="p-2.5 text-left">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1385,7 +1385,7 @@ export default function FinancesPage() {
                           <AppRowActionsDropdown
                             items={[
                               {
-                                label: "Ver detalhe",
+                                label: "Ver histórico",
                                 onSelect: () =>
                                   setSelectedChargeId(String(row?.id ?? "")),
                               },
