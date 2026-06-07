@@ -72,6 +72,65 @@ function text(value: unknown, fallback = "—") {
   return normalized.length > 0 ? normalized : fallback;
 }
 
+function metadataRecord(event: TimelineEvent): Record<string, unknown> {
+  const metadata = event?.metadata;
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata))
+    return {};
+  return metadata as Record<string, unknown>;
+}
+
+function normalizedMetadataValue(event: TimelineEvent, keys: string[]) {
+  const metadata = metadataRecord(event);
+  return (
+    keys
+      .map(key => text(metadata[key], ""))
+      .find(value => value.length > 0)
+      ?.toUpperCase() ?? ""
+  );
+}
+
+function hasCriticalOperationalMetadata(event: TimelineEvent) {
+  const value = normalizedMetadataValue(event, [
+    "operationalState",
+    "nextState",
+    "result",
+    "severity",
+    "riskLevel",
+  ]);
+  return value.includes("SUSPENDED") || value.includes("RESTRICTED");
+}
+
+function hasWarningOperationalMetadata(event: TimelineEvent) {
+  const value = normalizedMetadataValue(event, [
+    "operationalState",
+    "previousState",
+    "nextState",
+    "result",
+    "severity",
+    "riskLevel",
+  ]);
+  return value.includes("WARNING");
+}
+
+function metadataSearchBucket(event: TimelineEvent) {
+  const metadata = metadataRecord(event);
+  return [
+    metadata.module,
+    metadata.entityType,
+    metadata.operationalState,
+    metadata.previousState,
+    metadata.nextState,
+    metadata.riskLevel,
+    metadata.result,
+    metadata.severity,
+    metadata.reason,
+    metadata.messageStatus,
+  ]
+    .map(value => text(value, "").toLowerCase())
+    .filter(Boolean)
+    .join(" ");
+}
+
 function eventAction(event: TimelineEvent) {
   return text(event?.action ?? event?.type, "EVENTO").toUpperCase();
 }
@@ -104,12 +163,12 @@ function eventEntityLabel(event: TimelineEvent) {
   if (event?.serviceOrderId) return "Ordem de serviço";
   if (event?.appointmentId) return "Agendamento";
   if (event?.chargeId) return "Cobrança";
-  const metadata = (event?.metadata ?? {}) as Record<string, unknown>;
+  const metadata = metadataRecord(event);
   return text(metadata.entityType, "Operação");
 }
 
 function eventEntityId(event: TimelineEvent) {
-  const metadata = (event?.metadata ?? {}) as Record<string, unknown>;
+  const metadata = metadataRecord(event);
   return (
     text(event?.customerId, "") ||
     text(event?.serviceOrderId, "") ||
@@ -121,19 +180,32 @@ function eventEntityId(event: TimelineEvent) {
 }
 
 function eventCustomerId(event: TimelineEvent) {
-  const metadata = (event?.metadata ?? {}) as Record<string, unknown>;
+  const metadata = metadataRecord(event);
   return text(event?.customerId ?? metadata.customerId, "");
 }
 
 function eventModule(event: TimelineEvent): ModuleFilter {
+  const action = eventAction(event);
   const bucket = [
-    text(event?.action, "").toLowerCase(),
+    action.toLowerCase(),
     text(event?.description, "").toLowerCase(),
     text(event?.serviceOrderId, "").toLowerCase(),
     text(event?.appointmentId, "").toLowerCase(),
     text(event?.chargeId, "").toLowerCase(),
-    text((event?.metadata ?? {})?.module, "").toLowerCase(),
+    metadataSearchBucket(event),
   ].join(" ");
+
+  if (
+    action === "RISK_UPDATED" ||
+    action === "GOVERNANCE_RUN_STARTED" ||
+    action === "GOVERNANCE_RUN_COMPLETED" ||
+    action === "OPERATIONAL_STATE_CHANGED" ||
+    bucket.includes("govern") ||
+    bucket.includes("operational_state") ||
+    bucket.includes("operationalstate") ||
+    bucket.includes("risklevel")
+  )
+    return "governance";
 
   if (
     event?.chargeId ||
@@ -161,8 +233,6 @@ function eventModule(event: TimelineEvent): ModuleFilter {
     bucket.includes("comunica")
   )
     return "whatsapp";
-  if (bucket.includes("govern") || bucket.includes("operational_state"))
-    return "governance";
   if (
     event?.customerId ||
     bucket.includes("customer") ||
@@ -173,15 +243,35 @@ function eventModule(event: TimelineEvent): ModuleFilter {
 }
 
 function eventSeverity(event: TimelineEvent): Exclude<SeverityFilter, "all"> {
+  const action = eventAction(event);
   const bucket = [
-    text(event?.action, "").toLowerCase(),
+    action.toLowerCase(),
     text(event?.description, "").toLowerCase(),
     text(event?.status, "").toLowerCase(),
+    metadataSearchBucket(event),
   ].join(" ");
-  if (
-    isWhatsAppExecutionEvent(eventAction(event)) &&
-    eventAction(event).includes("EXECUTED")
-  )
+
+  if (hasCriticalOperationalMetadata(event)) return "critical";
+  if (action === "RISK_UPDATED" || action === "OPERATIONAL_STATE_CHANGED")
+    return "high";
+  if (action === "GOVERNANCE_RUN_COMPLETED") {
+    if (
+      bucket.includes("critical") ||
+      bucket.includes("crítico") ||
+      bucket.includes("restricted") ||
+      bucket.includes("suspended") ||
+      bucket.includes("failed") ||
+      bucket.includes("error")
+    )
+      return "critical";
+    if (bucket.includes("warning") || bucket.includes("risk")) return "high";
+    return "medium";
+  }
+  if (action === "GOVERNANCE_RUN_STARTED") {
+    if (hasWarningOperationalMetadata(event)) return "high";
+    return "medium";
+  }
+  if (isWhatsAppExecutionEvent(action) && action.includes("EXECUTED"))
     return "medium";
   if (
     bucket.includes("failed") ||
@@ -244,6 +334,35 @@ function eventRoute(event: TimelineEvent) {
   return "/dashboard";
 }
 
+function severityColorClass(severity: Exclude<SeverityFilter, "all">) {
+  if (severity === "critical") return "text-[var(--danger)]";
+  if (severity === "high") return "text-[var(--warning)]";
+  if (severity === "medium") return "text-[var(--accent-primary)]";
+  return "text-[var(--text-muted)]";
+}
+
+function timelineItemClass({
+  isSelected,
+  severity,
+  module,
+}: {
+  isSelected: boolean;
+  severity: Exclude<SeverityFilter, "all">;
+  module: ModuleFilter;
+}) {
+  if (isSelected)
+    return "cursor-pointer border border-l-4 border-[var(--accent-primary)] bg-[var(--accent-soft)]";
+
+  const governanceEmphasis = module === "governance" ? " border-dashed" : "";
+  if (severity === "critical")
+    return `cursor-pointer border border-l-4 border-[var(--danger)] bg-[var(--surface-base)]${governanceEmphasis}`;
+  if (severity === "high")
+    return `cursor-pointer border border-l-4 border-[var(--warning)] bg-[var(--surface-base)]${governanceEmphasis}`;
+  if (severity === "medium")
+    return `cursor-pointer border border-l-4 border-[var(--accent-primary)] bg-[var(--surface-base)]/80${governanceEmphasis}`;
+  return "cursor-pointer border border-l-4 border-[var(--border-subtle)] bg-[var(--surface-base)]/70";
+}
+
 function EventIcon({
   module,
   severity,
@@ -251,19 +370,22 @@ function EventIcon({
   module: ModuleFilter;
   severity: Exclude<SeverityFilter, "all">;
 }) {
+  const colorClass = severityColorClass(severity);
   if (severity === "critical")
-    return <Siren className="h-4 w-4 text-[var(--danger)]" />;
+    return <Siren className={`h-4 w-4 ${colorClass}`} />;
+  if (module === "governance") {
+    const Icon = severity === "high" ? ShieldAlert : ShieldCheck;
+    return <Icon className={`h-4 w-4 ${colorClass}`} />;
+  }
   if (module === "finance")
-    return <BadgeDollarSign className="h-4 w-4 text-[var(--success)]" />;
+    return <BadgeDollarSign className={`h-4 w-4 ${colorClass}`} />;
   if (module === "appointment")
-    return <CalendarClock className="h-4 w-4 text-[var(--accent-primary)]" />;
+    return <CalendarClock className={`h-4 w-4 ${colorClass}`} />;
   if (module === "whatsapp")
-    return <MessageSquare className="h-4 w-4 text-[var(--accent-primary)]" />;
-  if (module === "governance")
-    return <ShieldCheck className="h-4 w-4 text-[var(--accent-primary)]" />;
+    return <MessageSquare className={`h-4 w-4 ${colorClass}`} />;
   if (module === "service_order")
-    return <FileClock className="h-4 w-4 text-[var(--warning)]" />;
-  return <CheckCircle2 className="h-4 w-4 text-[var(--text-muted)]" />;
+    return <FileClock className={`h-4 w-4 ${colorClass}`} />;
+  return <CheckCircle2 className={`h-4 w-4 ${colorClass}`} />;
 }
 
 function eventModuleLabel(module: ModuleFilter) {
@@ -274,9 +396,47 @@ function eventModuleLabel(module: ModuleFilter) {
 
 function eventSeverityLabel(severity: Exclude<SeverityFilter, "all">) {
   if (severity === "critical") return "Crítico";
-  if (severity === "high") return "Risco";
-  if (severity === "medium") return "Atenção";
-  return "Normal";
+  if (severity === "high") return "Alta";
+  if (severity === "medium") return "Média";
+  return "Baixa";
+}
+
+const METADATA_PRIORITY_FIELDS = [
+  "amount",
+  "previousState",
+  "nextState",
+  "riskLevel",
+  "operationalState",
+  "result",
+  "reason",
+  "messageStatus",
+  "chargeId",
+  "serviceOrderId",
+  "appointmentId",
+  "customerId",
+];
+
+function formatMetadataValue(value: unknown) {
+  if (value === null || value === undefined) return "";
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return String(value).trim();
+  }
+  if (value instanceof Date) return formatDateTime(value);
+  return "";
+}
+
+function usefulMetadataPairs(event: TimelineEvent) {
+  const metadata = metadataRecord(event);
+  const pairs = METADATA_PRIORITY_FIELDS.map(key => ({
+    key,
+    value: formatMetadataValue(metadata[key]),
+  })).filter(pair => pair.value.length > 0 && pair.value.length <= 140);
+
+  return pairs.slice(0, 6);
 }
 
 function formatDateTime(input: unknown) {
@@ -441,6 +601,7 @@ export default function TimelinePage() {
         customerId,
         responsible,
         module,
+        metadataSearchBucket(event),
       ]
         .join(" ")
         .toLowerCase();
@@ -563,7 +724,9 @@ export default function TimelinePage() {
     const groupedByCustomer = new Map<
       string,
       {
-        customerId: string;
+        targetId: string;
+        targetLabel: string;
+        route: string;
         score: number;
         reasons: string[];
         lastEvent: TimelineEvent;
@@ -572,15 +735,52 @@ export default function TimelinePage() {
 
     filteredEvents.forEach(event => {
       const customerId = eventCustomerId(event);
-      if (!customerId) return;
+      const entityId = eventEntityId(event);
+      const targetId = customerId || (entityId !== "—" ? entityId : "operação");
+      const targetLabel = customerId
+        ? `cliente #${customerId}`
+        : `${eventEntityLabel(event).toLowerCase()} #${targetId}`;
       const action = eventAction(event);
       const detail = text(event?.description, "").toLowerCase();
+      const metadataSignal = normalizedMetadataValue(event, [
+        "riskLevel",
+        "operationalState",
+        "previousState",
+        "nextState",
+        "result",
+        "severity",
+      ]);
       let score = 0;
       const reasons: string[] = [];
 
+      if (metadataSignal.includes("SUSPENDED")) {
+        score += 6;
+        reasons.push("estado suspenso");
+      } else if (metadataSignal.includes("RESTRICTED")) {
+        score += 5;
+        reasons.push("estado restrito");
+      } else if (metadataSignal.includes("WARNING")) {
+        score += 3;
+        reasons.push("estado em alerta");
+      }
+      if (action === "OPERATIONAL_STATE_CHANGED") {
+        score += 5;
+        reasons.push("mudança de estado operacional");
+      }
+      if (action === "RISK_UPDATED") {
+        score += 4;
+        reasons.push("risco atualizado");
+      }
+      if (action === "GOVERNANCE_RUN_COMPLETED") {
+        score += 3;
+        reasons.push("governança concluída");
+      }
       if (eventSeverity(event) === "critical") {
         score += 4;
         reasons.push("evento crítico");
+      } else if (eventSeverity(event) === "high") {
+        score += 2;
+        reasons.push("evento de alta criticidade");
       }
       if (
         action.includes("PAYMENT") ||
@@ -604,10 +804,12 @@ export default function TimelinePage() {
       }
 
       if (score <= 0) return;
-      const existing = groupedByCustomer.get(customerId);
+      const existing = groupedByCustomer.get(targetId);
       if (!existing) {
-        groupedByCustomer.set(customerId, {
-          customerId,
+        groupedByCustomer.set(targetId, {
+          targetId,
+          targetLabel,
+          route: customerId ? "/customers" : eventRoute(event),
           score,
           reasons,
           lastEvent: event,
@@ -631,12 +833,12 @@ export default function TimelinePage() {
     if (!candidate) return null;
 
     return {
-      customerId: candidate.customerId,
-      title: `Investigar cliente #${candidate.customerId}`,
+      targetId: candidate.targetId,
+      title: `Investigar ${candidate.targetLabel}`,
       description: `Motivo: ${Array.from(new Set(candidate.reasons)).slice(0, 3).join(" + ")}. Evento mais recente em ${formatDateTime(candidate.lastEvent?.createdAt)}.`,
       impact:
         "Impacto: risco operacional crescente com possível efeito em receita, execução e governança.",
-      route: "/customers",
+      route: candidate.route,
       score: candidate.score,
     };
   }, [filteredEvents]);
@@ -980,13 +1182,11 @@ export default function TimelinePage() {
                             event?.id ??
                               `${eventEntityId(event)}-${event?.createdAt}`
                           )}
-                          className={`cursor-pointer border ${
-                            isSelected
-                              ? "border-[var(--accent-primary)] bg-[var(--accent-soft)]"
-                              : severity === "critical"
-                                ? "border-[var(--danger)] bg-[var(--surface-base)]"
-                                : "border-[var(--border-subtle)] bg-[var(--surface-base)]/70"
-                          }`}
+                          className={timelineItemClass({
+                            isSelected,
+                            severity,
+                            module,
+                          })}
                           onClick={() => setSelectedEventId(String(event?.id))}
                         >
                           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1114,6 +1314,28 @@ export default function TimelinePage() {
                       : "Não vinculado"}
                   </li>
                 </ul>
+                {usefulMetadataPairs(selectedEvent).length > 0 ? (
+                  <div className="mt-3 border-t border-[var(--border-subtle)] pt-3">
+                    <p className="text-xs font-semibold text-[var(--text-primary)]">
+                      Metadados relevantes
+                    </p>
+                    <dl className="mt-2 grid gap-1 text-xs text-[var(--text-secondary)]">
+                      {usefulMetadataPairs(selectedEvent).map(pair => (
+                        <div
+                          key={pair.key}
+                          className="grid grid-cols-[minmax(0,0.45fr)_minmax(0,0.55fr)] gap-2"
+                        >
+                          <dt className="truncate text-[var(--text-muted)]">
+                            {pair.key}
+                          </dt>
+                          <dd className="break-words font-medium text-[var(--text-secondary)]">
+                            {pair.value}
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
+                ) : null}
               </div>
 
               <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/60 p-3">
@@ -1141,34 +1363,63 @@ export default function TimelinePage() {
               </div>
 
               <div className="grid grid-cols-1 gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => navigate("/customers")}
-                >
-                  Abrir cliente
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => navigate("/service-orders")}
-                >
-                  Abrir O.S.
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => navigate("/appointments")}
-                >
-                  Abrir agendamento
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => navigate("/finances")}
-                >
-                  Abrir cobrança/financeiro
-                </Button>
+                {eventModule(selectedEvent) === "governance" ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => navigate("/governance")}
+                  >
+                    Abrir governança
+                  </Button>
+                ) : null}
+                {eventModule(selectedEvent) === "whatsapp" ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => navigate("/whatsapp")}
+                  >
+                    Abrir WhatsApp
+                  </Button>
+                ) : null}
+                {eventModule(selectedEvent) === "finance" ||
+                selectedEvent?.chargeId ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => navigate("/finances")}
+                  >
+                    Abrir financeiro
+                  </Button>
+                ) : null}
+                {eventModule(selectedEvent) === "service_order" ||
+                selectedEvent?.serviceOrderId ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => navigate("/service-orders")}
+                  >
+                    Abrir O.S.
+                  </Button>
+                ) : null}
+                {eventModule(selectedEvent) === "appointment" ||
+                selectedEvent?.appointmentId ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => navigate("/appointments")}
+                  >
+                    Abrir agendamento
+                  </Button>
+                ) : null}
+                {eventCustomerId(selectedEvent) ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => navigate("/customers")}
+                  >
+                    Abrir cliente
+                  </Button>
+                ) : null}
                 <Button
                   type="button"
                   variant="outline"
