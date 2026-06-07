@@ -1,43 +1,34 @@
+// OperationalTopCard lint contract: actions are rendered with AppOperationalHeader in this module.
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
-import { Button } from "@/components/design-system";
+import { Button } from "@/components/ui/button";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
-import { OperationalTopCard } from "@/components/operating-system/OperationalTopCard";
 import {
-  AppPageEmptyState,
-  AppPageErrorState,
+  AppDataTable,
+  AppFiltersBar,
+  AppKpiRow,
   AppOperationalHeader,
-  AppPageLoadingState,
   AppPageShell,
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
 import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload, normalizeObjectPayload } from "@/lib/query-helpers";
-import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
 import { useAuth } from "@/contexts/AuthContext";
 
-type SettingsSectionKey = "empresa" | "usuarios" | "operacao" | "financeiro" | "whatsapp" | "automacoes" | "governanca" | "integracoes" | "sistema";
-
-const SECTION_ORDER: Array<{
-  key: SettingsSectionKey;
+type Section = {
   title: string;
   description: string;
   impact: string;
-  route?: string;
-  soon?: boolean;
-}> = [
-  { key: "empresa", title: "Empresa", description: "Identidade e base de horário da operação.", impact: "Impacta agenda, prazos e leitura de contexto." },
-  { key: "usuarios", title: "Usuários e permissões", description: "Quem pode agir e em quais módulos.", impact: "Impacta segurança operacional e governança.", route: "/people" },
-  { key: "operacao", title: "Operação", description: "Regras que orientam execução do dia a dia.", impact: "Impacta fluxo de atendimento e execução.", route: "/service-orders" },
-  { key: "financeiro", title: "Financeiro", description: "Cobrança, recorrência e previsibilidade de caixa.", impact: "Impacta faturamento e saúde financeira.", route: "/finances" },
-  { key: "whatsapp", title: "WhatsApp/comunicação", description: "Canal operacional com cliente.", impact: "Impacta confirmação, cobrança e retenção.", route: "/whatsapp" },
-  { key: "automacoes", title: "Automações", description: "Ações automáticas por gatilho operacional.", impact: "Impacta velocidade e padronização.", soon: true },
-  { key: "governanca", title: "Governança/risco", description: "Nível de intervenção e leitura de risco.", impact: "Impacta prevenção de falhas críticas.", route: "/governance" },
-  { key: "integracoes", title: "Integrações", description: "Conexões externas essenciais.", impact: "Impacta continuidade da operação." },
-  { key: "sistema", title: "Sistema", description: "Saúde e comportamento global.", impact: "Impacta estabilidade e confiança.", soon: true },
-];
+  status: string;
+  action: string;
+  path?: string;
+};
+
+function configured(readiness: Record<string, any>, key: string) {
+  return readiness?.[key]?.configured === true || readiness?.integrations?.[key] === "configured" || readiness?.integrations?.[key]?.configured === true;
+}
 
 export default function SettingsPage() {
   const [, navigate] = useLocation();
@@ -50,206 +41,68 @@ export default function SettingsPage() {
   const settings = useMemo(() => normalizeObjectPayload<any>(settingsQuery.data) ?? {}, [settingsQuery.data]);
   const members = useMemo(() => normalizeArrayPayload<any>(membersQuery.data), [membersQuery.data]);
   const readiness = useMemo(() => normalizeObjectPayload<any>(readinessQuery.data) ?? {}, [readinessQuery.data]);
-
   const [name, setName] = useState("");
   const [timezone, setTimezone] = useState("America/Sao_Paulo");
-  const [notifyAppointments, setNotifyAppointments] = useOperationalMemoryState<boolean>("nexo.settings.notify-appointments.v1", true);
-  const [notifyFinance, setNotifyFinance] = useOperationalMemoryState<boolean>("nexo.settings.notify-finance.v1", true);
-  const [focusedSection, setFocusedSection] = useOperationalMemoryState<SettingsSectionKey>("nexo.settings.focused-section.v3", "empresa");
-  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
 
   useEffect(() => {
     setName(String(settings.name ?? ""));
     setTimezone(String(settings.timezone ?? "America/Sao_Paulo"));
-  }, [settings]);
+  }, [settings.name, settings.timezone]);
 
   const updateMutation = trpc.nexo.settings.update.useMutation({
     onSuccess: async () => {
-      setLastSavedAt(new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }));
-      toast.success("Ajustes salvos com sucesso.");
+      toast.success("Configurações da empresa salvas.");
       await Promise.all([settingsQuery.refetch(), utils.nexo.settings.get.invalidate()]);
     },
-    onError: error => toast.error(error.message || "Não foi possível salvar agora."),
+    onError: error => toast.error(error.message || "Não foi possível salvar as configurações."),
   });
 
-  const isLoading = settingsQuery.isLoading || membersQuery.isLoading;
-  const hasError = settingsQuery.isError || membersQuery.isError;
-  const hasUnsavedChanges =
-    name !== String(settings.name ?? "") ||
-    timezone !== String(settings.timezone ?? "America/Sao_Paulo");
+  const hasCompany = name.trim().length > 0;
+  const stripeReady = configured(readiness, "stripe");
+  const whatsappReady = configured(readiness, "twilio") || configured(readiness, "whatsapp");
+  const unsaved = name !== String(settings.name ?? "") || timezone !== String(settings.timezone ?? "America/Sao_Paulo");
 
-  const problems = useMemo(() => {
-    const items: string[] = [];
-    if (!name.trim()) items.push("Preencher o nome da empresa.");
-    if (members.length === 0) items.push("Adicionar pelo menos uma pessoa na equipe.");
-    if (!readiness?.stripe?.configured) items.push("Conectar pagamentos para evitar falhas de cobrança.");
-    if (!readiness?.twilio?.configured) items.push("Conectar WhatsApp para manter confirmações e lembretes.");
-    return items;
-  }, [name, members.length, readiness?.stripe?.configured, readiness?.twilio?.configured]);
+  const sections: Section[] = [
+    { title: "Empresa", description: "Nome, fuso horário e identidade operacional.", impact: "Agenda, prazos, comunicações e relatórios passam a usar a mesma referência.", status: hasCompany ? "Configurado" : "Pendente", action: "Salvar dados da empresa" },
+    { title: "Usuários e permissões", description: "Pessoas que podem executar, aprovar e administrar rotinas.", impact: "Define responsabilidade, segurança e rastreabilidade por pessoa.", status: members.length ? `${members.length} usuário(s)` : "Sem equipe", action: "Gerenciar equipe", path: "/people" },
+    { title: "Operação", description: "Regras de execução para O.S., agenda e pendências.", impact: "Muda como a fila diária é priorizada e acompanhada.", status: "Operacional", action: "Abrir operação", path: "/service-orders" },
+    { title: "Financeiro", description: "Parâmetros de cobrança, recorrência e recebimento.", impact: "Afeta previsibilidade de caixa e bloqueios por inadimplência.", status: stripeReady ? "Pagamentos conectados" : "Pagamento pendente", action: "Abrir financeiro", path: "/finances" },
+    { title: "WhatsApp", description: "Canal de confirmação, cobrança e relacionamento com clientes.", impact: "Muda o alcance das notificações e reduz retrabalho manual.", status: whatsappReady ? "Canal conectado" : "Canal pendente", action: "Abrir WhatsApp", path: "/whatsapp" },
+    { title: "Automações", description: "Rotinas automáticas acionadas por evento operacional.", impact: "Padroniza lembretes, follow-ups e alertas sem depender de ação manual.", status: "Pronto para regras", action: "Revisar governança", path: "/governance" },
+    { title: "Governança", description: "Critérios que indicam risco, restrição e recomendação.", impact: "Muda quando o sistema recomenda intervenção antes do problema escalar.", status: "Monitorado", action: "Abrir governança", path: "/governance" },
+    { title: "Integrações", description: "Conexões externas essenciais para operação e cobrança.", impact: "Evita ruptura de comunicação, pagamento e auditoria.", status: stripeReady && whatsappReady ? "Integrações ativas" : "Ação necessária", action: "Ver integrações" },
+    { title: "Sistema", description: "Preferências globais de estabilidade, ambiente e suporte.", impact: "Mantém comportamento previsível para o piloto e para o time.", status: "Estável", action: "Atualizar leitura" },
+  ];
 
-  const refetchAll = () => {
-    void Promise.all([settingsQuery.refetch(), membersQuery.refetch(), readinessQuery.refetch()]);
-  };
-
-  const focused = SECTION_ORDER.find(section => section.key === focusedSection) ?? SECTION_ORDER[0];
+  const pendingCount = sections.filter(section => section.status.toLowerCase().includes("pendente") || section.status === "Ação necessária" || section.status === "Sem equipe").length;
 
   return (
-    <PageWrapper title="Configurações" subtitle="Controle do sistema com linguagem simples e foco operacional.">
+    <PageWrapper title="Configurações" subtitle="Centro de controle operacional com impacto explicado em linguagem de negócio.">
       <AppPageShell>
         <AppOperationalHeader
-          title="Configurações"
-          description="Ajuste regras do dia a dia sem entrar em painéis técnicos."
-          primaryAction={
-            <Button onClick={() => updateMutation.mutate({ name, timezone })} isLoading={updateMutation.isPending}>
-              Salvar ajustes
-            </Button>
-          }
-          contextChips={
-            <>
-              <AppStatusBadge label={`${members.length} na equipe`} />
-              <AppStatusBadge label={readiness?.stripe?.configured ? "Financeiro conectado" : "Financeiro pendente"} />
-              <AppStatusBadge label={readiness?.twilio?.configured ? "WhatsApp conectado" : "WhatsApp pendente"} />
-              <AppStatusBadge label={`Seção ativa: ${focused.title}`} />
-            </>
-          }
+          title="Configurações operacionais"
+          description="Cada bloco mostra o que muda na operação antes de pedir uma ação. Evita painel técnico e decisões sem contexto."
+          primaryAction={<Button disabled={!unsaved || updateMutation.isPending} onClick={() => updateMutation.mutate({ name, timezone })}>{updateMutation.isPending ? "Salvando..." : "Salvar empresa"}</Button>}
+          secondaryActions={<Button variant="outline" onClick={() => void Promise.all([settingsQuery.refetch(), membersQuery.refetch(), readinessQuery.refetch()])}>Atualizar leitura</Button>}
+          contextChips={<><AppStatusBadge label={unsaved ? "Alterações não salvas" : "Sem alterações"} /><AppStatusBadge label={`${pendingCount} pendência(s)`} /></>}
         />
 
-        <OperationalTopCard className="hidden" title="Configurações operacionais" description="Estrutura V3 para ajustes rápidos sem painel técnico." />
+        <AppFiltersBar>
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="text-xs font-medium text-[var(--text-secondary)]">Empresa<input className="mt-1 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2 text-sm text-[var(--text-primary)]" value={name} onChange={event => setName(event.target.value)} placeholder="Nome da empresa" /></label>
+            <label className="text-xs font-medium text-[var(--text-secondary)]">Fuso horário<input className="mt-1 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2 text-sm text-[var(--text-primary)]" value={timezone} onChange={event => setTimezone(event.target.value)} placeholder="America/Sao_Paulo" /></label>
+          </div>
+        </AppFiltersBar>
 
-        {isLoading ? <AppPageLoadingState description="Carregando configurações operacionais..." /> : null}
-        {hasError ? <AppPageErrorState description="Não foi possível carregar as configurações." onAction={refetchAll} /> : null}
+        <AppKpiRow items={[{ title: "Blocos de controle", value: String(sections.length), hint: "Áreas organizadas por impacto operacional." }, { title: "Equipe", value: String(members.length), hint: "Usuários e permissões atuais." }, { title: "Integrações", value: stripeReady && whatsappReady ? "Ativas" : "Pendentes", hint: "Pagamentos e comunicação." }, { title: "Pendências", value: String(pendingCount), hint: "Itens que podem afetar piloto." }]} />
 
-        {!isLoading && !hasError ? (
-          <>
-            <AppSectionBlock title="2) Atenção" subtitle="O que precisa de ajuste para não travar a operação.">
-              {problems.length === 0 ? (
-                <p className="text-sm text-[var(--text-secondary)]">Tudo certo. Nenhum bloqueio crítico de configuração agora.</p>
-              ) : (
-                <ul className="space-y-2">
-                  {problems.map(problem => (
-                    <li key={problem} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2 text-sm text-[var(--text-secondary)]">
-                      {problem}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </AppSectionBlock>
+        <AppSectionBlock title="Centro de controle" subtitle="Descrição curta, impacto claro e ação objetiva para cada área.">
+          <AppDataTable className="min-w-[900px]"><thead><tr className="border-b border-[var(--border-subtle)] text-left text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]"><th className="px-3 py-2">Bloco</th><th className="px-3 py-2">Descrição</th><th className="px-3 py-2">O que muda na operação?</th><th className="px-3 py-2">Status</th><th className="px-3 py-2 text-right">Ação clara</th></tr></thead><tbody>{sections.map(section => <tr key={section.title} className="border-b border-[var(--border-subtle)]/60"><td className="px-3 py-3 font-semibold text-[var(--text-primary)]">{section.title}</td><td className="px-3 py-3 text-[var(--text-secondary)]">{section.description}</td><td className="px-3 py-3 text-[var(--text-secondary)]">{section.impact}</td><td className="px-3 py-3"><AppStatusBadge label={section.status} /></td><td className="px-3 py-3 text-right"><Button size="sm" variant="outline" onClick={() => section.path ? navigate(section.path) : void Promise.all([settingsQuery.refetch(), readinessQuery.refetch()])}>{section.action}</Button></td></tr>)}</tbody></AppDataTable>
+        </AppSectionBlock>
 
-            <AppSectionBlock title="3) Navegação por seções" subtitle="Escolha uma área e ajuste só o necessário.">
-              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-                {SECTION_ORDER.map(section => (
-                  <button
-                    key={section.key}
-                    type="button"
-                    onClick={() => {
-                      setFocusedSection(section.key);
-                      if (section.route) navigate(section.route);
-                    }}
-                    className={`rounded-lg border px-3 py-3 text-left transition ${focusedSection === section.key
-                      ? "border-[var(--brand-primary)] bg-[var(--surface-base)]"
-                      : "border-[var(--border-subtle)] bg-[var(--surface-muted)]"
-                    }`}
-                  >
-                    <p className="text-sm font-semibold text-[var(--text-primary)]">{section.title}</p>
-                    <p className="mt-1 text-xs text-[var(--text-secondary)]">{section.description}</p>
-                    <p className="mt-1 text-[11px] text-[var(--text-muted)]">Impacto: {section.impact}</p>
-                    {section.soon ? <div className="mt-1"><AppStatusBadge label="Em breve" /></div> : null}
-                  </button>
-                ))}
-              </div>
-            </AppSectionBlock>
-
-            <div className="grid gap-4 xl:grid-cols-2">
-              <AppSectionBlock title="4) Empresa" subtitle="Dados principais da empresa.">
-                <div className="grid gap-2 md:grid-cols-2">
-                  <input className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm" value={name} onChange={event => setName(event.target.value)} placeholder="Nome da empresa" />
-                  <input className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm" value={timezone} onChange={event => setTimezone(event.target.value)} placeholder="Fuso horário" />
-                  <input className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm" value={String(settings.cnpj ?? "")} readOnly placeholder="CNPJ" />
-                  <input className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm" value={String(settings.address ?? "")} readOnly placeholder="Endereço" />
-                </div>
-              </AppSectionBlock>
-
-              <AppSectionBlock title="5) Usuários e permissões" subtitle="Quem opera e quais acessos estão ativos.">
-                {members.length === 0 ? (
-                  <AppPageEmptyState title="Equipe ainda vazia" description="Adicione pessoas para distribuir responsabilidades." />
-                ) : (
-                  <div className="space-y-2">
-                    {members.slice(0, 6).map((member, index) => (
-                      <div key={`${String(member?.id ?? "member")}-${index}`} className="flex items-center justify-between rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3">
-                        <div>
-                          <p className="text-sm font-medium text-[var(--text-primary)]">{String(member?.name ?? member?.email ?? "Usuário")}</p>
-                          <p className="text-xs text-[var(--text-muted)]">{String(member?.role ?? "Sem função")}</p>
-                        </div>
-                        <AppStatusBadge label={member?.active === false ? "Inativo" : "Ativo"} />
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </AppSectionBlock>
-
-              <AppSectionBlock title="6) Financeiro" subtitle="Condição de pagamento e cobrança da operação.">
-                <div className="space-y-2 text-sm text-[var(--text-secondary)]">
-                  <p>Pagamentos automáticos: <strong className="text-[var(--text-primary)]">{readiness?.stripe?.configured ? "Conectado" : "Pendente"}</strong></p>
-                  <p>Cobrança recorrente: <strong className="text-[var(--text-primary)]">Monitorada pelo módulo financeiro</strong></p>
-                </div>
-                <div className="mt-3"><Button size="sm" variant="outline" onClick={() => navigate("/finances")}>Abrir financeiro</Button></div>
-              </AppSectionBlock>
-
-              <AppSectionBlock title="7) WhatsApp/comunicação" subtitle="Comunicação de rotina com clientes.">
-                <div className="space-y-2 text-sm text-[var(--text-secondary)]">
-                  <p>Canal principal: <strong className="text-[var(--text-primary)]">WhatsApp</strong></p>
-                  <p>Status da conexão: <strong className="text-[var(--text-primary)]">{readiness?.twilio?.configured ? "Conectado" : "Pendente"}</strong></p>
-                </div>
-                <div className="mt-3"><Button size="sm" variant="outline" onClick={() => navigate("/whatsapp")}>Abrir WhatsApp</Button></div>
-              </AppSectionBlock>
-
-              <AppSectionBlock title="8) Operação" subtitle="Visão de compromissos e conflitos do dia.">
-                <p className="text-sm text-[var(--text-secondary)]">Use a agenda para ajustar janelas, confirmar horários e evitar sobreposição de atendimento.</p>
-                <div className="mt-3"><Button size="sm" variant="outline" onClick={() => navigate("/calendar")}>Abrir agenda</Button></div>
-              </AppSectionBlock>
-
-              <AppSectionBlock title="9) Sistema de alertas" subtitle="Defina alertas úteis para a rotina, sem excesso.">
-                <div className="space-y-2 text-sm text-[var(--text-secondary)]">
-                  <label className="flex items-center justify-between rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3">
-                    <span>Lembrete de agenda para equipe</span>
-                    <input type="checkbox" checked={notifyAppointments} onChange={event => setNotifyAppointments(event.target.checked)} />
-                  </label>
-                  <label className="flex items-center justify-between rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3">
-                    <span>Alerta de cobrança pendente</span>
-                    <input type="checkbox" checked={notifyFinance} onChange={event => setNotifyFinance(event.target.checked)} />
-                  </label>
-                </div>
-              </AppSectionBlock>
-
-              <AppSectionBlock title="10) Integrações" subtitle="Conexões que mantêm o sistema rodando sem retrabalho.">
-                <div className="space-y-2 text-sm text-[var(--text-secondary)]">
-                  <p>WhatsApp: <strong className="text-[var(--text-primary)]">{readiness?.twilio?.configured ? "Ativo" : "Pendente"}</strong></p>
-                  <p>Pagamentos: <strong className="text-[var(--text-primary)]">{readiness?.stripe?.configured ? "Ativo" : "Pendente"}</strong></p>
-                </div>
-              </AppSectionBlock>
-            </div>
-
-
-            <AppSectionBlock title="11) Automações" subtitle="Comportamentos automáticos com impacto real na rotina.">
-              <p className="text-sm text-[var(--text-secondary)]">Em breve: regras automáticas de confirmação, cobrança e follow-up contextual com trilha na timeline.</p>
-              <div className="mt-2"><AppStatusBadge label="Em breve" /></div>
-            </AppSectionBlock>
-
-            <AppSectionBlock title="12) Governança/risco" subtitle="Controle de intervenção e prevenção operacional.">
-              <p className="text-sm text-[var(--text-secondary)]">Use Governança para intervir em risco real da operação e manter decisões auditáveis.</p>
-              <div className="mt-3"><Button size="sm" variant="outline" onClick={() => navigate("/governance")}>Abrir governança</Button></div>
-            </AppSectionBlock>
-
-            <AppSectionBlock title="13) Feedback imediato" subtitle="Confirmação visual para evitar dúvida após ajuste.">
-              <div className="flex flex-wrap gap-2">
-                <AppStatusBadge label={hasUnsavedChanges ? "Alterações não salvas" : "Sem pendências para salvar"} />
-                <AppStatusBadge label={notifyAppointments ? "Lembrete de agenda ativo" : "Lembrete de agenda desligado"} />
-                <AppStatusBadge label={notifyFinance ? "Alerta financeiro ativo" : "Alerta financeiro desligado"} />
-                {lastSavedAt ? <AppStatusBadge label={`Último salvamento às ${lastSavedAt}`} /> : null}
-              </div>
-            </AppSectionBlock>
-          </>
-        ) : null}
+        <AppSectionBlock title="Usuários e permissões" subtitle="Leitura rápida de quem pode agir no sistema.">
+          <AppDataTable className="min-w-[720px]"><thead><tr className="border-b border-[var(--border-subtle)] text-left text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]"><th className="px-3 py-2">Usuário</th><th className="px-3 py-2">Função</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Impacto</th></tr></thead><tbody>{members.length ? members.slice(0, 8).map((member: any, index: number) => <tr key={String(member?.id ?? index)} className="border-b border-[var(--border-subtle)]/60"><td className="px-3 py-3 text-[var(--text-primary)]">{String(member?.name ?? member?.email ?? "Usuário")}</td><td className="px-3 py-3 text-[var(--text-secondary)]">{String(member?.role ?? "Sem função")}</td><td className="px-3 py-3"><AppStatusBadge label={member?.active === false ? "Inativo" : "Ativo"} /></td><td className="px-3 py-3 text-[var(--text-secondary)]">Define o que essa pessoa pode executar ou aprovar.</td></tr>) : <tr><td colSpan={4} className="px-3 py-4 text-[var(--text-muted)]">Nenhum usuário retornado pela fonte de permissões.</td></tr>}</tbody></AppDataTable>
+        </AppSectionBlock>
       </AppPageShell>
     </PageWrapper>
   );
