@@ -73,7 +73,9 @@ const LEGACY_TIMELINE_EVENT_ALIASES: Record<string, string> = {
 };
 
 function normalizeTimelineEventType(eventType: string) {
-  const normalized = String(eventType ?? "").trim().toUpperCase();
+  const normalized = String(eventType ?? "")
+    .trim()
+    .toUpperCase();
   return LEGACY_TIMELINE_EVENT_ALIASES[normalized] ?? normalized;
 }
 
@@ -152,7 +154,9 @@ function metadataSearchBucket(event: TimelineEvent) {
 }
 
 function eventAction(event: TimelineEvent) {
-  return normalizeTimelineEventType(text(event?.action ?? event?.type, "EVENTO"));
+  return normalizeTimelineEventType(
+    text(event?.action ?? event?.type, "EVENTO")
+  );
 }
 
 function whatsappExecutionEventLabel(action: string) {
@@ -165,8 +169,44 @@ function whatsappExecutionEventLabel(action: string) {
   return labels[action] ?? action.replace(/_/g, " ");
 }
 
+function humanizeTimelineAction(action: string) {
+  return action
+    .replace(/_/g, " ")
+    .toLowerCase()
+    .replace(/^./, first => first.toUpperCase());
+}
+
+function eventHumanFallback(event: TimelineEvent) {
+  const action = eventAction(event);
+  const entity = eventEntityLabel(event);
+  const entityId = eventEntityId(event);
+  const when = formatDateTime(event?.createdAt);
+
+  if (event?.chargeId || eventModule(event) === "finance") {
+    return `${humanizeTimelineAction(action)} registrado para ${entity} #${entityId} em ${when}`;
+  }
+  if (event?.serviceOrderId || eventModule(event) === "service_order") {
+    return `${humanizeTimelineAction(action)} vinculado à O.S. #${entityId} em ${when}`;
+  }
+  if (event?.appointmentId || eventModule(event) === "appointment") {
+    return `${humanizeTimelineAction(action)} vinculado ao agendamento #${entityId} em ${when}`;
+  }
+  if (event?.customerId || eventModule(event) === "customer") {
+    return `${humanizeTimelineAction(action)} vinculado ao cliente #${entityId} em ${when}`;
+  }
+  return `${humanizeTimelineAction(action)} registrado para ${entity} #${entityId} em ${when}`;
+}
+
 function eventDisplayTitle(event: TimelineEvent) {
-  return whatsappExecutionEventLabel(eventAction(event));
+  const explicit = text(
+    event?.summary ?? event?.title ?? event?.description,
+    ""
+  );
+  if (explicit) return explicit;
+  const whatsappLabel = whatsappExecutionEventLabel(eventAction(event));
+  return whatsappLabel === eventAction(event).replace(/_/g, " ")
+    ? eventHumanFallback(event)
+    : whatsappLabel;
 }
 
 function isWhatsAppExecutionEvent(action: string) {
@@ -336,7 +376,7 @@ function eventReason(event: TimelineEvent) {
     return "Ruptura operacional registrada para análise imediata de risco.";
   if (action.includes("OPERATIONAL_STATE_CHANGED"))
     return "Mudança de estado operacional registrada em governança.";
-  return "Evento registrado na memória oficial da operação.";
+  return eventHumanFallback(event);
 }
 
 function eventRoute(event: TimelineEvent) {
@@ -924,7 +964,8 @@ export default function TimelinePage() {
     <AppPageShell className="space-y-4">
       <AppOperationalHeader
         title="Timeline"
-        description="Histórico oficial para auditoria, memória operacional, diagnóstico e governança."
+        description="Prova oficial da operação: se não está aqui, não aconteceu."
+        density="compact"
         primaryAction={
           <Button type="button" variant="outline" size="sm" onClick={exportCsv}>
             <Download className="mr-1 h-3.5 w-3.5" /> Exportar
@@ -1157,8 +1198,9 @@ export default function TimelinePage() {
       <div className="grid gap-3 xl:grid-cols-12">
         <AppSectionBlock
           title="Timeline oficial da operação"
-          subtitle="Eventos curtos, auditáveis e com prioridade visual por criticidade."
+          subtitle="Feed auditável com tipo, descrição humana, entidade, responsável e horário."
           className="xl:col-span-8"
+          compact
         >
           {isInitialLoading ? (
             <div className="space-y-2">

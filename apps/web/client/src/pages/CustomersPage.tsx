@@ -54,7 +54,12 @@ import {
 import { cn } from "@/lib/utils";
 import { operationalCopy } from "@/lib/operational-semantics";
 import { aggregateOperationalHealth } from "@/lib/operational-health";
-import { detectOperationalInterventions, getPrimaryOperationalIntervention, getOperationalInterventionImpact, getOperationalInterventionReason } from "@/lib/operational-interventions";
+import {
+  detectOperationalInterventions,
+  getPrimaryOperationalIntervention,
+  getOperationalInterventionImpact,
+  getOperationalInterventionReason,
+} from "@/lib/operational-interventions";
 import {
   compareOperationalPriority,
   getDominantOperationalAction,
@@ -65,6 +70,28 @@ import {
   getVisibleAttentionItems,
   type OperationalAttentionItem,
 } from "@/lib/operational-attention";
+
+function buildCustomerTimelineSummary(event: Record<string, any>) {
+  const explicit = String(
+    event.summary ?? event.description ?? event.title ?? ""
+  ).trim();
+  if (explicit) return explicit;
+
+  const eventType = String(
+    event.eventType ?? event.type ?? event.action ?? "Evento"
+  ).replace(/_/g, " ");
+  const entityType = String(
+    event.entityType ?? event.entity ?? event.target ?? "operação"
+  );
+  const entityId =
+    event.entityId ??
+    event.customerId ??
+    event.serviceOrderId ??
+    event.chargeId ??
+    event.appointmentId;
+  const when = formatDateTime(event.occurredAt ?? event.createdAt);
+  return `${eventType} registrado para ${entityType}${entityId ? ` #${String(entityId)}` : ""} em ${when}.`;
+}
 
 type Customer = Record<string, any>;
 type Appointment = Record<string, any>;
@@ -386,15 +413,28 @@ function buildCustomerProfiles(input: {
   });
 }
 
-function getCustomerOperationalStatus(profile: CustomerProfile): AppOperationalStatus {
+function getCustomerOperationalStatus(
+  profile: CustomerProfile
+): AppOperationalStatus {
   if (profile.overdue > 0 || profile.daysWithoutContact >= 30) return "RISCO";
-  if (profile.pending > 0 || profile.hasOpenServiceOrder || profile.daysWithoutContact >= 15) return "ATENÇÃO";
+  if (
+    profile.pending > 0 ||
+    profile.hasOpenServiceOrder ||
+    profile.daysWithoutContact >= 15
+  )
+    return "ATENÇÃO";
   return "NORMAL";
 }
 
-function getCustomersOperationalStatus(profiles: CustomerProfile[]): AppOperationalStatus {
-  const risk = profiles.filter(profile => getCustomerOperationalStatus(profile) === "RISCO").length;
-  const attention = profiles.filter(profile => getCustomerOperationalStatus(profile) === "ATENÇÃO").length;
+function getCustomersOperationalStatus(
+  profiles: CustomerProfile[]
+): AppOperationalStatus {
+  const risk = profiles.filter(
+    profile => getCustomerOperationalStatus(profile) === "RISCO"
+  ).length;
+  const attention = profiles.filter(
+    profile => getCustomerOperationalStatus(profile) === "ATENÇÃO"
+  ).length;
   if (risk >= 5) return "CRÍTICO";
   if (risk > 0) return "RISCO";
   if (attention > 0) return "ATENÇÃO";
@@ -503,14 +543,19 @@ export default function CustomersPage() {
     [workspaceQuery.data]
   );
 
-
-  const primaryIntervention = useMemo(() => getPrimaryOperationalIntervention(detectOperationalInterventions({
-    customers: workspace.customer ? [workspace.customer] : [],
-    appointments: workspace.appointments,
-    serviceOrders: workspace.serviceOrders,
-    charges: workspace.charges,
-    people: normalizeArrayPayload(peopleQuery.data),
-  })), [workspace, peopleQuery.data]);
+  const primaryIntervention = useMemo(
+    () =>
+      getPrimaryOperationalIntervention(
+        detectOperationalInterventions({
+          customers: workspace.customer ? [workspace.customer] : [],
+          appointments: workspace.appointments,
+          serviceOrders: workspace.serviceOrders,
+          charges: workspace.charges,
+          people: normalizeArrayPayload(peopleQuery.data),
+        })
+      ),
+    [workspace, peopleQuery.data]
+  );
   const filteredProfiles = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
 
@@ -562,7 +607,9 @@ export default function CustomersPage() {
           severity: "WARNING",
           domain: "finances",
           type: "overdue_charge",
-          dueDate: profile.charges.find(charge => String(charge.status ?? "").toUpperCase() === "OVERDUE")?.dueDate,
+          dueDate: profile.charges.find(
+            charge => String(charge.status ?? "").toUpperCase() === "OVERDUE"
+          )?.dueDate,
           amountCents: profile.pendingCents,
           key: `${profile.customerId}-overdue`,
           title: String(profile.customer.name ?? "Cliente sem nome"),
@@ -611,14 +658,29 @@ export default function CustomersPage() {
     return [...items]
       .sort((a, b) =>
         compareOperationalPriority(
-          { severity: a.severity, dueDate: a.dueDate, amountCents: a.amountCents, isBlocked: a.isBlocked, customerNoResponse: a.customerNoResponse },
-          { severity: b.severity, dueDate: b.dueDate, amountCents: b.amountCents, isBlocked: b.isBlocked, customerNoResponse: b.customerNoResponse }
+          {
+            severity: a.severity,
+            dueDate: a.dueDate,
+            amountCents: a.amountCents,
+            isBlocked: a.isBlocked,
+            customerNoResponse: a.customerNoResponse,
+          },
+          {
+            severity: b.severity,
+            dueDate: b.dueDate,
+            amountCents: b.amountCents,
+            isBlocked: b.isBlocked,
+            customerNoResponse: b.customerNoResponse,
+          }
         )
       )
-      .map(item => ({
-        ...item,
-        context: `${String(item.context ?? "")} · ${getOperationalAttentionReason({ severity: item.severity, dueDate: item.dueDate, amountCents: item.amountCents, isBlocked: item.isBlocked, customerNoResponse: item.customerNoResponse })}`,
-      }) as AttentionItem)
+      .map(
+        item =>
+          ({
+            ...item,
+            context: `${String(item.context ?? "")} · ${getOperationalAttentionReason({ severity: item.severity, dueDate: item.dueDate, amountCents: item.amountCents, isBlocked: item.isBlocked, customerNoResponse: item.customerNoResponse })}`,
+          }) as AttentionItem
+      );
   }, [profiles]);
 
   const attentionItems = useMemo<AttentionItem[]>(
@@ -638,10 +700,41 @@ export default function CustomersPage() {
   const selectedDominantAction = useMemo(() => {
     if (!selectedProfile) return null;
     const candidates = [
-      ...(selectedProfile.overdue > 0 ? [{ severity: "WARNING", dueDate: selectedProfile.charges.find(c => String(c.status ?? "").toUpperCase() === "OVERDUE")?.dueDate, amountCents: selectedProfile.pendingCents }] : []),
-      ...(selectedProfile.nextAppointment ? [{ severity: "ATTENTION", scheduledAt: selectedProfile.nextAppointment.startsAt ?? selectedProfile.nextAppointment.scheduledAt }] : []),
-      ...(selectedProfile.hasOpenServiceOrder ? [{ severity: "ATTENTION", isBlocked: true }] : []),
-      ...(selectedProfile.daysWithoutContact >= 15 ? [{ severity: selectedProfile.daysWithoutContact >= 30 ? "CRITICAL" : "ATTENTION", customerNoResponse: true }] : []),
+      ...(selectedProfile.overdue > 0
+        ? [
+            {
+              severity: "WARNING",
+              dueDate: selectedProfile.charges.find(
+                c => String(c.status ?? "").toUpperCase() === "OVERDUE"
+              )?.dueDate,
+              amountCents: selectedProfile.pendingCents,
+            },
+          ]
+        : []),
+      ...(selectedProfile.nextAppointment
+        ? [
+            {
+              severity: "ATTENTION",
+              scheduledAt:
+                selectedProfile.nextAppointment.startsAt ??
+                selectedProfile.nextAppointment.scheduledAt,
+            },
+          ]
+        : []),
+      ...(selectedProfile.hasOpenServiceOrder
+        ? [{ severity: "ATTENTION", isBlocked: true }]
+        : []),
+      ...(selectedProfile.daysWithoutContact >= 15
+        ? [
+            {
+              severity:
+                selectedProfile.daysWithoutContact >= 30
+                  ? "CRITICAL"
+                  : "ATTENTION",
+              customerNoResponse: true,
+            },
+          ]
+        : []),
     ];
     return getDominantOperationalAction(candidates);
   }, [selectedProfile]);
@@ -675,7 +768,13 @@ export default function CustomersPage() {
         charges: workspaceCharges,
         timelineEvents: workspace.timeline ?? [],
       }),
-    [selectedCustomer, workspaceAppointments, workspaceServiceOrders, workspaceCharges, workspace.timeline]
+    [
+      selectedCustomer,
+      workspaceAppointments,
+      workspaceServiceOrders,
+      workspaceCharges,
+      workspace.timeline,
+    ]
   );
 
   const workspacePendingCents = workspaceCharges.reduce((total, charge) => {
@@ -691,7 +790,9 @@ export default function CustomersPage() {
     )
     .sort(
       (a, b) =>
-        new Date(String(b.paidAt ?? b.updatedAt ?? b.createdAt ?? 0)).getTime() -
+        new Date(
+          String(b.paidAt ?? b.updatedAt ?? b.createdAt ?? 0)
+        ).getTime() -
         new Date(String(a.paidAt ?? a.updatedAt ?? a.createdAt ?? 0)).getTime()
     )[0];
   const workspaceNextAppointment = workspaceAppointments
@@ -701,8 +802,12 @@ export default function CustomersPage() {
     })
     .sort(
       (a, b) =>
-        new Date(String(a.startsAt ?? a.scheduledAt ?? a.createdAt ?? 0)).getTime() -
-        new Date(String(b.startsAt ?? b.scheduledAt ?? b.createdAt ?? 0)).getTime()
+        new Date(
+          String(a.startsAt ?? a.scheduledAt ?? a.createdAt ?? 0)
+        ).getTime() -
+        new Date(
+          String(b.startsAt ?? b.scheduledAt ?? b.createdAt ?? 0)
+        ).getTime()
     )[0];
   const workspaceOpenServiceOrder = workspaceServiceOrders
     .filter(isServiceOrderOpen)
@@ -735,7 +840,9 @@ export default function CustomersPage() {
         trpcUtils.finance.charges.list.invalidate(),
       ];
       if (includeTimeline) {
-        operations.push(trpcUtils.nexo.customers.workspace.refetch({ id: customerId }));
+        operations.push(
+          trpcUtils.nexo.customers.workspace.refetch({ id: customerId })
+        );
       }
       await Promise.all(operations);
     } finally {
@@ -767,7 +874,9 @@ export default function CustomersPage() {
       };
 
       safePush(trpcUtils.nexo.customers.list.invalidate());
-      safePush(trpcUtils.nexo.customers.workspace.invalidate({ id: customerId }));
+      safePush(
+        trpcUtils.nexo.customers.workspace.invalidate({ id: customerId })
+      );
 
       switch (eventType) {
         case "CUSTOMER_APPOINTMENT_CREATED":
@@ -802,7 +911,9 @@ export default function CustomersPage() {
       }
 
       if (includeTimeline) {
-        safePush(trpcUtils.nexo.customers.workspace.refetch({ id: customerId }));
+        safePush(
+          trpcUtils.nexo.customers.workspace.refetch({ id: customerId })
+        );
       }
       await Promise.all(operations);
     } finally {
@@ -874,820 +985,1040 @@ export default function CustomersPage() {
 
   return (
     <AppPageShell className="space-y-4">
-        <AppOperationalHeader
-          title="Clientes"
-          description="Centro de contexto operacional, financeiro e comunicação de cada relacionamento ativo."
-          density="compact"
-          primaryAction={
-            <Button onClick={() => setCreateOpen(true)}>Novo cliente</Button>
-          }
-          contextChips={
-            <>
-              <AppOperationalStatusBadge status={customersOperationalStatus} />
-              <AppStatusBadge label={`${customers.length} clientes na carteira`} tone="neutral" />
-              <AppStatusBadge
-                label={`${profiles.filter(profile => profile.status === "Em risco").length} em risco`}
-                tone="warning"
-              />
-              <AppStatusBadge
-                label={`${profiles.filter(profile => profile.hasOpenServiceOrder).length} com O.S. aberta`}
-                tone="info"
-              />
-            </>
-          }
-        >
-          <div className="grid gap-2 text-xs text-[var(--text-secondary)] md:grid-cols-3">
-            <span className="flex items-center gap-2">
-              <CheckCircle2 className="h-3.5 w-3.5 text-[var(--dashboard-success)]" />
-              Cada cliente mostra contexto e próxima ação.
-            </span>
-            <span className="flex items-center gap-2">
-              <ShieldAlert className="h-3.5 w-3.5 text-[var(--dashboard-warning)]" />
-              Prioridade combina financeiro, O.S. e contato.
-            </span>
-            <span className="flex items-center gap-2">
-              <ArrowRight className="h-3.5 w-3.5 text-[var(--dashboard-info)]" />
-              Ações reais vêm antes da navegação.
-            </span>
-          </div>
-        </AppOperationalHeader>
+      <AppOperationalHeader
+        title="Clientes"
+        description="Centro de contexto operacional, financeiro e comunicação de cada relacionamento ativo."
+        density="compact"
+        primaryAction={
+          <Button onClick={() => setCreateOpen(true)}>Novo cliente</Button>
+        }
+        contextChips={
+          <>
+            <AppOperationalStatusBadge status={customersOperationalStatus} />
+            <AppStatusBadge
+              label={`${customers.length} clientes na carteira`}
+              tone="neutral"
+            />
+            <AppStatusBadge
+              label={`${profiles.filter(profile => profile.status === "Em risco").length} em risco`}
+              tone="warning"
+            />
+            <AppStatusBadge
+              label={`${profiles.filter(profile => profile.hasOpenServiceOrder).length} com O.S. aberta`}
+              tone="info"
+            />
+          </>
+        }
+      >
+        <div className="grid gap-2 text-xs text-[var(--text-secondary)] md:grid-cols-3">
+          <span className="flex items-center gap-2">
+            <CheckCircle2 className="h-3.5 w-3.5 text-[var(--dashboard-success)]" />
+            Cada cliente mostra contexto e próxima ação.
+          </span>
+          <span className="flex items-center gap-2">
+            <ShieldAlert className="h-3.5 w-3.5 text-[var(--dashboard-warning)]" />
+            Prioridade combina financeiro, O.S. e contato.
+          </span>
+          <span className="flex items-center gap-2">
+            <ArrowRight className="h-3.5 w-3.5 text-[var(--dashboard-info)]" />
+            Ações reais vêm antes da navegação.
+          </span>
+        </div>
+      </AppOperationalHeader>
 
-        <AppSectionCard className="space-y-3">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="nexo-overline">Próxima decisão da carteira</p>
-              <h2 className="mt-1 text-lg font-semibold text-[var(--text-primary)]">
-                {attentionItems[0] ? attentionItems[0].title : "Carteira sem bloqueio imediato"}
-              </h2>
-              <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                {attentionItems[0]
-                  ? attentionItems[0].context
-                  : "Os dados retornados não apontam dívida vencida, O.S. aberta ou silêncio prolongado."}
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <AppStatusBadge label="Financeiro" tone="info" />
-                <AppStatusBadge label="Execução" tone="accent" />
-                <AppStatusBadge label="Comunicação" tone="neutral" />
-              </div>
+      <AppSectionCard className="space-y-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="nexo-overline">Próxima decisão da carteira</p>
+            <h2 className="mt-1 text-lg font-semibold text-[var(--text-primary)]">
+              {attentionItems[0]
+                ? attentionItems[0].title
+                : "Carteira sem bloqueio imediato"}
+            </h2>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">
+              {attentionItems[0]
+                ? attentionItems[0].context
+                : "Os dados retornados não apontam dívida vencida, O.S. aberta ou silêncio prolongado."}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <AppStatusBadge label="Financeiro" tone="info" />
+              <AppStatusBadge label="Execução" tone="accent" />
+              <AppStatusBadge label="Comunicação" tone="neutral" />
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <AppOperationalStatusBadge status={customersOperationalStatus} />
-              {attentionItems[0] ? <AppPriorityBadge priority="P0" /> : null}
-              {attentionItems[0] ? (
-                <Button size="sm" onClick={() => runAttentionAction(attentionItems[0])}>
-                  {attentionItems[0].actionLabel}
-                </Button>
-              ) : (
-                <Button size="sm" variant="outline" onClick={() => setCreateOpen(true)}>
-                  Novo cliente
-                </Button>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <AppOperationalStatusBadge status={customersOperationalStatus} />
+            {attentionItems[0] ? <AppPriorityBadge priority="P0" /> : null}
+            {attentionItems[0] ? (
+              <Button
+                size="sm"
+                onClick={() => runAttentionAction(attentionItems[0])}
+              >
+                {attentionItems[0].actionLabel}
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setCreateOpen(true)}
+              >
+                Novo cliente
+              </Button>
+            )}
+          </div>
+        </div>
+      </AppSectionCard>
+
+      <AppSectionBlock
+        title="Resumo do cliente"
+        subtitle="Memória operacional consolidada da carteira."
+        compact
+        className="hidden"
+      >
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <AppStatCard
+            label="Saldo em atenção"
+            value={formatCurrency(
+              profiles.reduce(
+                (total, profile) => total + profile.pendingCents,
+                0
+              )
+            )}
+            helper="Soma segura das cobranças pendentes/vencidas retornadas."
+            delta={
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setActiveFilter("pending")}
+              >
+                Filtrar pendências
+              </Button>
+            }
+          />
+          <AppStatCard
+            label="Risco de relacionamento"
+            value={
+              profiles.filter(profile => profile.status === "Em risco").length
+            }
+            helper="Clientes com dívida vencida ou longo período sem contato."
+            delta={
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setActiveFilter("risk")}
+              >
+                Ver risco
+              </Button>
+            }
+          />
+          <AppStatCard
+            label="Execução aberta"
+            value={
+              profiles.filter(profile => profile.hasOpenServiceOrder).length
+            }
+            helper="Clientes com O.S. aberta que ainda pede acompanhamento."
+            delta={
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setActiveFilter("open_os")}
+              >
+                Ver O.S.
+              </Button>
+            }
+          />
+        </div>
+      </AppSectionBlock>
+
+      <AppNextBestActionBlock
+        title="Intervenção operacional recomendada"
+        subtitle="Sugestão contextual para destravar fluxo sem execução automática."
+        compact
+        className="hidden"
+      >
+        {primaryIntervention ? (
+          <div className="space-y-2">
+            <p className="text-sm font-semibold text-[var(--text-primary)]">
+              {primaryIntervention.label}
+            </p>
+            <p className="text-xs text-[var(--text-secondary)]">
+              Motivo: {getOperationalInterventionReason(primaryIntervention)}
+            </p>
+            <p className="text-xs text-[var(--text-secondary)]">
+              Impacto: {getOperationalInterventionImpact(primaryIntervention)}
+            </p>
+            <p className="text-xs text-[var(--text-secondary)]">
+              Responsável sugerido: {primaryIntervention.recommendedOwner}
+            </p>
+          </div>
+        ) : (
+          <AppPageEmptyState
+            title="Sem intervenção dominante"
+            description="Contexto insuficiente para recomendar intervenção segura."
+          />
+        )}
+      </AppNextBestActionBlock>
+      <AppSectionBlock
+        title={operationalCopy.immediateAttention}
+        subtitle={`Clientes que podem travar caixa, execução ou resposta no turno. ${attentionSummary.hidden > 0 ? attentionSummary.hiddenMessage : ""}`}
+        compact
+      >
+        {isLoading ? (
+          <AppPageLoadingState description="Carregando sinais dos clientes..." />
+        ) : attentionItems.length === 0 ? (
+          <AppPageEmptyState
+            title="Nenhum cliente em atenção imediata"
+            description="A carteira não retornou dívida, O.S. aberta ou longo silêncio nos dados disponíveis."
+          />
+        ) : (
+          <div className="grid gap-2 lg:grid-cols-3">
+            {attentionItems.slice(0, 3).map(item => (
+              <article
+                key={item.key}
+                className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <AppStatusBadge label={item.status} />
+                      <p className="text-sm font-semibold text-[var(--text-primary)]">
+                        {item.title}
+                      </p>
+                    </div>
+                    <p className="mt-2 text-xs leading-5 text-[var(--text-secondary)]">
+                      {item.context}
+                    </p>
+                  </div>
+                  <Button size="sm" onClick={() => runAttentionAction(item)}>
+                    {item.actionLabel}
+                  </Button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </AppSectionBlock>
+
+      <AppFiltersBar className="shrink-0 gap-2 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2">
+        <div className="min-w-[220px] flex-1">
+          <input
+            value={searchTerm}
+            onChange={event => setSearchTerm(event.target.value)}
+            placeholder="Buscar por nome, telefone ou e-mail"
+            className="h-9 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)]"
+          />
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {[
+            { key: "all", label: "Todos" },
+            { key: "pending", label: "Com pendência" },
+            { key: "open_os", label: "Com O.S. aberta" },
+            { key: "no_recent_contact", label: "Sem contato recente" },
+            { key: "risk", label: "Em risco" },
+          ].map(item => (
+            <button
+              key={item.key}
+              type="button"
+              className={cn(
+                "h-8 rounded-md border px-3 text-xs font-medium transition-colors",
+                activeFilter === item.key
+                  ? "border-[var(--accent-primary)] bg-[var(--accent-soft)] text-[var(--accent-primary)]"
+                  : "border-[var(--border-subtle)] bg-[var(--surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
               )}
-            </div>
-          </div>
-        </AppSectionCard>
+              onClick={() => setActiveFilter(item.key as CustomerFilter)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+        <span className="rounded-md border border-[var(--border-subtle)] px-2 py-1 text-xs text-[var(--text-muted)]">
+          {filteredProfiles.length} resultado(s)
+        </span>
+      </AppFiltersBar>
 
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         <AppSectionBlock
-          title="Resumo do cliente"
-          subtitle="Memória operacional consolidada da carteira."
-          compact
-        >
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-            <AppStatCard
-              label="Saldo em atenção"
-              value={formatCurrency(
-                profiles.reduce(
-                  (total, profile) => total + profile.pendingCents,
-                  0
-                )
-              )}
-              helper="Soma segura das cobranças pendentes/vencidas retornadas."
-              delta={
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setActiveFilter("pending")}
-                >
-                  Filtrar pendências
-                </Button>
-              }
-            />
-            <AppStatCard
-              label="Risco de relacionamento"
-              value={
-                profiles.filter(profile => profile.status === "Em risco").length
-              }
-              helper="Clientes com dívida vencida ou longo período sem contato."
-              delta={
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setActiveFilter("risk")}
-                >
-                  Ver risco
-                </Button>
-              }
-            />
-            <AppStatCard
-              label="Execução aberta"
-              value={
-                profiles.filter(profile => profile.hasOpenServiceOrder).length
-              }
-              helper="Clientes com O.S. aberta que ainda pede acompanhamento."
-              delta={
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setActiveFilter("open_os")}
-                >
-                  Ver O.S.
-                </Button>
-              }
-            />
-          </div>
-        </AppSectionBlock>
-
-
-        <AppNextBestActionBlock
-          title="Intervenção operacional recomendada"
-          subtitle="Sugestão contextual para destravar fluxo sem execução automática."
-          compact
-        >
-          {primaryIntervention ? (
-            <div className="space-y-2">
-              <p className="text-sm font-semibold text-[var(--text-primary)]">{primaryIntervention.label}</p>
-              <p className="text-xs text-[var(--text-secondary)]">Motivo: {getOperationalInterventionReason(primaryIntervention)}</p>
-              <p className="text-xs text-[var(--text-secondary)]">Impacto: {getOperationalInterventionImpact(primaryIntervention)}</p>
-              <p className="text-xs text-[var(--text-secondary)]">Responsável sugerido: {primaryIntervention.recommendedOwner}</p>
-            </div>
-          ) : <AppPageEmptyState title="Sem intervenção dominante" description="Contexto insuficiente para recomendar intervenção segura." />}
-        </AppNextBestActionBlock>
-        <AppSectionBlock
-          title={operationalCopy.immediateAttention}
-          subtitle={`Clientes que podem travar caixa, execução ou resposta no turno. ${attentionSummary.hidden > 0 ? attentionSummary.hiddenMessage : ""}`}
+          title="Carteira operacional"
+          subtitle="Lista priorizada por contexto, pendência e próxima ação possível."
+          className="xl:col-span-7"
           compact
         >
           {isLoading ? (
-            <AppPageLoadingState description="Carregando sinais dos clientes..." />
-          ) : attentionItems.length === 0 ? (
+            <AppPageLoadingState description="Carregando clientes..." />
+          ) : hasBlockingError ? (
+            <AppPageErrorState
+              description={
+                customersQuery.error?.message ?? "Falha ao carregar clientes."
+              }
+              actionLabel="Tentar novamente"
+              onAction={() => void customersQuery.refetch()}
+            />
+          ) : customers.length === 0 ? (
+            <div className="space-y-3">
+              <AppPageEmptyState
+                title="Nenhum cliente cadastrado"
+                description="Cadastre o primeiro cliente para iniciar a memória operacional de relacionamento."
+              />
+              <div className="flex justify-center">
+                <Button onClick={() => setCreateOpen(true)}>
+                  Criar primeiro cliente
+                </Button>
+              </div>
+            </div>
+          ) : filteredProfiles.length === 0 ? (
             <AppPageEmptyState
-              title="Nenhum cliente em atenção imediata"
-              description="A carteira não retornou dívida, O.S. aberta ou longo silêncio nos dados disponíveis."
+              title="Busca sem resultado"
+              description="Nenhum cliente corresponde aos filtros ativos e termo pesquisado."
             />
           ) : (
-            <div className="grid gap-2 lg:grid-cols-2">
-              {attentionItems.map(item => (
-                <article
-                  key={item.key}
-                  className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3.5"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <AppStatusBadge label={item.status} />
-                        <p className="text-sm font-semibold text-[var(--text-primary)]">
-                          {item.title}
-                        </p>
-                      </div>
-                      <p className="mt-2 text-xs leading-5 text-[var(--text-secondary)]">
-                        {item.context}
-                      </p>
-                    </div>
-                    <Button size="sm" onClick={() => runAttentionAction(item)}>
-                      {item.actionLabel}
-                    </Button>
-                  </div>
-                </article>
-              ))}
+            <div className="space-y-3">
+              <div className="overflow-x-auto">
+                <AppDataTable className="min-w-[860px]">
+                  <thead>
+                    <tr>
+                      <th>Cliente</th>
+                      <th>Saúde e prioridade</th>
+                      <th>Contexto operacional</th>
+                      <th>Financeiro</th>
+                      <th className="text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedProfiles.map(profile => (
+                      <tr
+                        key={profile.customerId}
+                        className={cn(
+                          "cursor-pointer align-top transition-colors hover:bg-[var(--surface-subtle)]/60",
+                          profile.customerId === activeCustomerId
+                            ? "bg-[var(--accent-soft)]/35"
+                            : undefined
+                        )}
+                        onClick={() => setActiveCustomerId(profile.customerId)}
+                      >
+                        <td>
+                          <div className="min-w-[220px] space-y-1">
+                            <p className="font-semibold text-[var(--text-primary)]">
+                              {String(profile.customer.name ?? "Sem nome")}
+                            </p>
+                            <p className="max-w-[280px] truncate text-xs text-[var(--text-secondary)]">
+                              {profile.contact}
+                            </p>
+                            <p className="text-xs text-[var(--text-muted)]">
+                              Última interação:{" "}
+                              {formatDateTime(profile.lastInteractionAt)}
+                            </p>
+                          </div>
+                        </td>
+                        <td>
+                          <div className="flex min-w-[170px] flex-col items-start gap-2">
+                            <AppOperationalStatusBadge
+                              status={getCustomerOperationalStatus(profile)}
+                              label={profile.status}
+                            />
+                            <AppPriorityBadge
+                              priority={getCustomerPriority(profile)}
+                              label={profile.nextActionLabel}
+                            />
+                          </div>
+                        </td>
+                        <td>
+                          <div className="min-w-[250px] space-y-1 text-xs text-[var(--text-secondary)]">
+                            <p>{profile.riskSignal}</p>
+                            <p>
+                              Última O.S.:{" "}
+                              {profile.lastService
+                                ? `${String(profile.lastService.title ?? "O.S.")} · ${String(profile.lastService.status ?? "-")}`
+                                : "Sem O.S. registrada"}
+                            </p>
+                            <p>
+                              Próximo agendamento:{" "}
+                              {profile.nextAppointment
+                                ? formatDateTime(
+                                    profile.nextAppointment.startsAt
+                                  )
+                                : "Sem agenda futura"}
+                            </p>
+                          </div>
+                        </td>
+                        <td>
+                          <div className="min-w-[150px] space-y-2">
+                            <p className="font-medium text-[var(--text-primary)]">
+                              {formatCurrency(profile.pendingCents)}
+                            </p>
+                            {profile.pendingCents === 0 ? (
+                              <AppStatusBadge
+                                label="Sem pendência retornada"
+                                tone="neutral"
+                              />
+                            ) : (
+                              <AppStatusBadge
+                                label="Saldo em atenção"
+                                tone="warning"
+                              />
+                            )}
+                          </div>
+                        </td>
+                        <td onClick={event => event.stopPropagation()}>
+                          <div className="flex min-w-[150px] items-center justify-end gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                if (
+                                  profile.nextActionLabel.includes("Cobrar")
+                                ) {
+                                  openCustomerWhatsApp(
+                                    profile.customer,
+                                    profile.pendingChargeId
+                                  );
+                                  return;
+                                }
+                                navigate(profile.nextActionPath);
+                              }}
+                            >
+                              {profile.nextActionLabel}
+                            </Button>
+                            <AppRowActionsDropdown
+                              triggerLabel="Mais ações"
+                              contentClassName="min-w-[220px]"
+                              items={[
+                                {
+                                  label: "Abrir cliente",
+                                  tone: "primary",
+                                  onSelect: () =>
+                                    setActiveCustomerId(profile.customerId),
+                                },
+                                {
+                                  label: "Agendar",
+                                  onSelect: () =>
+                                    navigate(
+                                      `/appointments?customerId=${profile.customerId}`
+                                    ),
+                                },
+                                {
+                                  label: "Nova O.S.",
+                                  onSelect: () =>
+                                    navigate(
+                                      `/service-orders?customerId=${profile.customerId}`
+                                    ),
+                                },
+                                {
+                                  label: "Cobrar",
+                                  onSelect: () =>
+                                    navigate(
+                                      `/finances?customerId=${profile.customerId}`
+                                    ),
+                                },
+                                {
+                                  label: "WhatsApp",
+                                  onSelect: () =>
+                                    openCustomerWhatsApp(
+                                      profile.customer,
+                                      profile.pendingChargeId
+                                    ),
+                                },
+                                {
+                                  type: "separator",
+                                  label: "Cadastro",
+                                },
+                                {
+                                  label:
+                                    pendingEditCustomerId === profile.customerId
+                                      ? "Editando..."
+                                      : "Editar dados",
+                                  onSelect: () => {
+                                    setPendingEditCustomerId(
+                                      profile.customerId
+                                    );
+                                    setEditingCustomerId(profile.customerId);
+                                    toast.success("Editor de cliente aberto.");
+                                  },
+                                  disabled:
+                                    pendingEditCustomerId ===
+                                    profile.customerId,
+                                },
+                              ]}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </AppDataTable>
+              </div>
+              <AppPagination
+                currentPage={currentPage}
+                totalItems={filteredProfiles.length}
+                pageSize={pageSize}
+                onPageChange={setCurrentPage}
+              />
             </div>
           )}
         </AppSectionBlock>
 
-        <AppFiltersBar className="shrink-0 gap-3 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-3">
-          <div className="min-w-[220px] flex-1">
-            <input
-              value={searchTerm}
-              onChange={event => setSearchTerm(event.target.value)}
-              placeholder="Buscar por nome, telefone ou e-mail"
-              className="h-9 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)]"
+        <AppContextWorkspace
+          title="Detalhe do cliente"
+          subtitle="Resumo, ações principais, financeiro, O.S., agenda, comunicação e histórico disponível."
+          className="xl:col-span-5"
+        >
+          {!activeCustomerId || !selectedCustomer || !selectedProfile ? (
+            <AppPageEmptyState
+              title="Selecione um cliente"
+              description="Escolha um cliente na carteira para abrir o centro contextual."
             />
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {[
-              { key: "all", label: "Todos" },
-              { key: "pending", label: "Com pendência" },
-              { key: "open_os", label: "Com O.S. aberta" },
-              { key: "no_recent_contact", label: "Sem contato recente" },
-              { key: "risk", label: "Em risco" },
-            ].map(item => (
-              <button
-                key={item.key}
-                type="button"
-                className={cn(
-                  "h-8 rounded-md border px-3 text-xs font-medium transition-colors",
-                  activeFilter === item.key
-                    ? "border-[var(--accent-primary)] bg-[var(--accent-soft)] text-[var(--accent-primary)]"
-                    : "border-[var(--border-subtle)] bg-[var(--surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                )}
-                onClick={() => setActiveFilter(item.key as CustomerFilter)}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-          <span className="rounded-md border border-[var(--border-subtle)] px-2 py-1 text-xs text-[var(--text-muted)]">
-            {filteredProfiles.length} resultado(s)
-          </span>
-        </AppFiltersBar>
-
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-          <AppSectionBlock
-            title="Carteira operacional"
-            subtitle="Lista priorizada por contexto, pendência e próxima ação possível."
-            className="xl:col-span-7"
-          >
-            {isLoading ? (
-              <AppPageLoadingState description="Carregando clientes..." />
-            ) : hasBlockingError ? (
-              <AppPageErrorState
-                description={
-                  customersQuery.error?.message ?? "Falha ao carregar clientes."
-                }
-                actionLabel="Tentar novamente"
-                onAction={() => void customersQuery.refetch()}
-              />
-            ) : customers.length === 0 ? (
-              <div className="space-y-3">
-                <AppPageEmptyState
-                  title="Nenhum cliente cadastrado"
-                  description="Cadastre o primeiro cliente para iniciar a memória operacional de relacionamento."
-                />
-                <div className="flex justify-center">
-                  <Button onClick={() => setCreateOpen(true)}>
-                    Criar primeiro cliente
-                  </Button>
-                </div>
-              </div>
-            ) : filteredProfiles.length === 0 ? (
-              <AppPageEmptyState
-                title="Busca sem resultado"
-                description="Nenhum cliente corresponde aos filtros ativos e termo pesquisado."
-              />
-            ) : (
-              <div className="space-y-3">
-                <div className="overflow-x-auto">
-                  <AppDataTable className="min-w-[860px]">
-                    <thead>
-                      <tr>
-                        <th>Cliente</th>
-                        <th>Saúde e prioridade</th>
-                        <th>Contexto operacional</th>
-                        <th>Financeiro</th>
-                        <th className="text-right">Ações</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {paginatedProfiles.map(profile => (
-                        <tr
-                          key={profile.customerId}
-                          className={cn(
-                            "cursor-pointer align-top transition-colors hover:bg-[var(--surface-subtle)]/60",
-                            profile.customerId === activeCustomerId
-                              ? "bg-[var(--accent-soft)]/35"
-                              : undefined
-                          )}
-                          onClick={() => setActiveCustomerId(profile.customerId)}
-                        >
-                          <td>
-                            <div className="min-w-[220px] space-y-1">
-                              <p className="font-semibold text-[var(--text-primary)]">
-                                {String(profile.customer.name ?? "Sem nome")}
-                              </p>
-                              <p className="max-w-[280px] truncate text-xs text-[var(--text-secondary)]">
-                                {profile.contact}
-                              </p>
-                              <p className="text-xs text-[var(--text-muted)]">
-                                Última interação: {formatDateTime(profile.lastInteractionAt)}
-                              </p>
-                            </div>
-                          </td>
-                          <td>
-                            <div className="flex min-w-[170px] flex-col items-start gap-2">
-                              <AppOperationalStatusBadge
-                                status={getCustomerOperationalStatus(profile)}
-                                label={profile.status}
-                              />
-                              <AppPriorityBadge
-                                priority={getCustomerPriority(profile)}
-                                label={profile.nextActionLabel}
-                              />
-                            </div>
-                          </td>
-                          <td>
-                            <div className="min-w-[250px] space-y-1 text-xs text-[var(--text-secondary)]">
-                              <p>{profile.riskSignal}</p>
-                              <p>
-                                Última O.S.: {profile.lastService
-                                  ? `${String(profile.lastService.title ?? "O.S.")} · ${String(profile.lastService.status ?? "-")}`
-                                  : "Sem O.S. registrada"}
-                              </p>
-                              <p>
-                                Próximo agendamento: {profile.nextAppointment
-                                  ? formatDateTime(profile.nextAppointment.startsAt)
-                                  : "Sem agenda futura"}
-                              </p>
-                            </div>
-                          </td>
-                          <td>
-                            <div className="min-w-[150px] space-y-2">
-                              <p className="font-medium text-[var(--text-primary)]">
-                                {formatCurrency(profile.pendingCents)}
-                              </p>
-                              {profile.pendingCents === 0 ? (
-                                <AppStatusBadge
-                                  label="Sem pendência retornada"
-                                  tone="neutral"
-                                />
-                              ) : (
-                                <AppStatusBadge label="Saldo em atenção" tone="warning" />
-                              )}
-                            </div>
-                          </td>
-                          <td onClick={event => event.stopPropagation()}>
-                            <div className="flex min-w-[150px] items-center justify-end gap-2">
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  if (profile.nextActionLabel.includes("Cobrar")) {
-                                    openCustomerWhatsApp(
-                                      profile.customer,
-                                      profile.pendingChargeId
-                                    );
-                                    return;
-                                  }
-                                  navigate(profile.nextActionPath);
-                                }}
-                              >
-                                {profile.nextActionLabel}
-                              </Button>
-                              <AppRowActionsDropdown
-                                triggerLabel="Mais ações"
-                                contentClassName="min-w-[220px]"
-                                items={[
-                                  {
-                                    label: "Abrir cliente",
-                                    tone: "primary",
-                                    onSelect: () =>
-                                      setActiveCustomerId(profile.customerId),
-                                  },
-                                  {
-                                    label: "Agendar",
-                                    onSelect: () =>
-                                      navigate(
-                                        `/appointments?customerId=${profile.customerId}`
-                                      ),
-                                  },
-                                  {
-                                    label: "Nova O.S.",
-                                    onSelect: () =>
-                                      navigate(
-                                        `/service-orders?customerId=${profile.customerId}`
-                                      ),
-                                  },
-                                  {
-                                    label: "Cobrar",
-                                    onSelect: () =>
-                                      navigate(
-                                        `/finances?customerId=${profile.customerId}`
-                                      ),
-                                  },
-                                  {
-                                    label: "WhatsApp",
-                                    onSelect: () =>
-                                      openCustomerWhatsApp(
-                                        profile.customer,
-                                        profile.pendingChargeId
-                                      ),
-                                  },
-                                  {
-                                    type: "separator",
-                                    label: "Cadastro",
-                                  },
-                                  {
-                                    label:
-                                      pendingEditCustomerId === profile.customerId
-                                        ? "Editando..."
-                                        : "Editar dados",
-                                    onSelect: () => {
-                                      setPendingEditCustomerId(profile.customerId);
-                                      setEditingCustomerId(profile.customerId);
-                                      toast.success("Editor de cliente aberto.");
-                                    },
-                                    disabled:
-                                      pendingEditCustomerId === profile.customerId,
-                                  },
-                                ]}
-                              />
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </AppDataTable>
-                </div>
-                <AppPagination
-                  currentPage={currentPage}
-                  totalItems={filteredProfiles.length}
-                  pageSize={pageSize}
-                  onPageChange={setCurrentPage}
-                />
-              </div>
-            )}
-          </AppSectionBlock>
-
-          <AppContextWorkspace
-            title="Detalhe do cliente"
-            subtitle="Resumo, ações principais, financeiro, O.S., agenda, comunicação e histórico disponível."
-            className="xl:col-span-5"
-          >
-            {!activeCustomerId || !selectedCustomer || !selectedProfile ? (
-              <AppPageEmptyState
-                title="Selecione um cliente"
-                description="Escolha um cliente na carteira para abrir o centro contextual."
-              />
-            ) : workspaceQuery.isLoading && !workspaceQuery.data ? (
-              <AppPageLoadingState description="Carregando detalhe do cliente..." />
-            ) : workspaceQuery.error ? (
-              <AppPageErrorState
-                description={workspaceQuery.error.message}
-                actionLabel="Tentar novamente"
-                onAction={() => void workspaceQuery.refetch()}
-              />
-            ) : (
-              <div className="space-y-3">
-                <article className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/35 p-3.5">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-[var(--text-primary)]">
-                        {String(selectedCustomer.name ?? "Cliente")}
-                      </p>
-                      <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                        {selectedProfile.contact}
-                      </p>
-                    </div>
-                    <AppStatusBadge label={selectedProfile.status} />
+          ) : workspaceQuery.isLoading && !workspaceQuery.data ? (
+            <AppPageLoadingState description="Carregando detalhe do cliente..." />
+          ) : workspaceQuery.error ? (
+            <AppPageErrorState
+              description={workspaceQuery.error.message}
+              actionLabel="Tentar novamente"
+              onAction={() => void workspaceQuery.refetch()}
+            />
+          ) : (
+            <div className="space-y-3">
+              <article className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/35 p-3.5">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">
+                      {String(selectedCustomer.name ?? "Cliente")}
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                      {selectedProfile.contact}
+                    </p>
                   </div>
-                  <p className="mt-3 text-xs leading-5 text-[var(--text-secondary)]">
-                    {selectedProfile.riskSignal}. Próxima ação sugerida: {selectedDominantAction?.label ?? selectedProfile.nextActionLabel}.
-                  </p>
-                  <p className="mt-2 text-xs text-[var(--text-secondary)]">
-                    Saúde operacional: <span className="font-medium">{customerOperationalHealth.label}</span> · {customerOperationalHealth.summary}
-                  </p>
-                  <p className="mt-1 text-xs text-[var(--text-muted)]">
-                    Foco: {customerOperationalHealth.recommendedFocus}
-                  </p>
-                  <p className="mt-2 text-xs text-[var(--text-muted)]">
-                    Observações:{" "}
-                    {String(
-                      selectedCustomer.notes ?? "Sem observações registradas"
-                    )}
-                  </p>
-                </article>
+                  <AppStatusBadge label={selectedProfile.status} />
+                </div>
+                <p className="mt-3 text-xs leading-5 text-[var(--text-secondary)]">
+                  {selectedProfile.riskSignal}. Próxima ação sugerida:{" "}
+                  {selectedDominantAction?.label ??
+                    selectedProfile.nextActionLabel}
+                  .
+                </p>
+                <p className="mt-2 text-xs text-[var(--text-secondary)]">
+                  Saúde operacional:{" "}
+                  <span className="font-medium">
+                    {customerOperationalHealth.label}
+                  </span>{" "}
+                  · {customerOperationalHealth.summary}
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  Foco: {customerOperationalHealth.recommendedFocus}
+                </p>
+                <p className="mt-2 text-xs text-[var(--text-muted)]">
+                  Observações:{" "}
+                  {String(
+                    selectedCustomer.notes ?? "Sem observações registradas"
+                  )}
+                </p>
+              </article>
 
-                <AppActionBar className="gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2 py-2">
-                  <Button size="sm" variant="outline" onClick={() => setCreateServiceOrderOpen(true)}>
-                    <Wrench className="mr-1.5 h-3.5 w-3.5" />
-                    Abrir O.S.
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => setCreateAppointmentOpen(true)}>
-                    <CalendarClock className="mr-1.5 h-3.5 w-3.5" />
-                    Agendar
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => setShowInlineCharges(value => !value)}>
-                    <CreditCard className="mr-1.5 h-3.5 w-3.5" />
-                    {showInlineCharges ? "Ocultar cobranças" : "Cobrar"}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={!String(selectedCustomer.phone ?? "").trim()}
-                    title={!String(selectedCustomer.phone ?? "").trim() ? "Cliente sem telefone/WhatsApp cadastrado." : undefined}
-                    onClick={() =>
-                      openCustomerWhatsApp(
-                        selectedCustomer,
-                        String(workspaceCharges.find(isChargePending)?.id ?? "") || null
-                      )
-                    }
-                  >
-                    <MessageCircle className="mr-1.5 h-3.5 w-3.5" />
-                    WhatsApp rápido
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => navigate(`/finances?customerId=${activeCustomerId}`)}>
-                    Ver financeiro
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => navigate(`/governance?customerId=${activeCustomerId}&source=customers`)}>
-                    <ShieldAlert className="mr-1.5 h-3.5 w-3.5" />
-                    Ver risco
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={(workspace.timeline ?? []).length === 0}
-                    title={(workspace.timeline ?? []).length === 0 ? "Sem eventos de timeline disponíveis para este cliente." : undefined}
-                    onClick={() =>
-                      timelineAnchorRef.current?.scrollIntoView({
-                        behavior: "smooth",
-                        block: "start",
-                      })
-                    }
-                  >
-                    Ver timeline
-                  </Button>
-                </AppActionBar>
-                {isRefreshingWorkspace ? (
-                  <p className="text-xs text-[var(--text-muted)]">Atualizando dados do cliente...</p>
-                ) : null}
-                {showInlineCharges ? (
-                  <article className="rounded-xl border border-[var(--border-subtle)] p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-                        Cobranças pendentes/vencidas
-                      </p>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          if (activeCustomerId) {
-                            void propagateCustomerOperationalChange(
-                              activeCustomerId,
-                              "CUSTOMER_CHARGE_CONTEXT_UPDATED"
-                            );
-                          }
-                          navigate(`/finances?customerId=${activeCustomerId}`);
-                        }}
-                      >
-                        Abrir financeiro
-                      </Button>
-                    </div>
-                    <div className="mt-2 space-y-1.5">
-                      {workspaceCharges.filter(isChargePending).slice(0, 5).map((charge, index) => (
-                        <div key={`${String(charge.id ?? "charge")}-${index}`} className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/30 p-2">
-                          <p className="text-xs font-medium text-[var(--text-primary)]">
-                            {formatCurrency(Number(charge.amountCents ?? charge.amount ?? 0))} · {String(charge.status ?? "PENDING")}
-                          </p>
-                          <p className="text-[11px] text-[var(--text-muted)]">
-                            Vencimento: {formatDateTime(charge.dueDate, "Não informado")}
-                          </p>
-                        </div>
-                      ))}
-                      {workspaceCharges.filter(isChargePending).length === 0 ? (
-                        <p className="text-xs text-[var(--text-muted)]">Nenhuma cobrança pendente/vencida retornada para este cliente.</p>
-                      ) : null}
-                    </div>
-                  </article>
-                ) : null}
+              <AppActionBar className="gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2 py-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setCreateServiceOrderOpen(true)}
+                >
+                  <Wrench className="mr-1.5 h-3.5 w-3.5" />
+                  Abrir O.S.
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setCreateAppointmentOpen(true)}
+                >
+                  <CalendarClock className="mr-1.5 h-3.5 w-3.5" />
+                  Agendar
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setShowInlineCharges(value => !value)}
+                >
+                  <CreditCard className="mr-1.5 h-3.5 w-3.5" />
+                  {showInlineCharges ? "Ocultar cobranças" : "Cobrar"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!String(selectedCustomer.phone ?? "").trim()}
+                  title={
+                    !String(selectedCustomer.phone ?? "").trim()
+                      ? "Cliente sem telefone/WhatsApp cadastrado."
+                      : undefined
+                  }
+                  onClick={() =>
+                    openCustomerWhatsApp(
+                      selectedCustomer,
+                      String(
+                        workspaceCharges.find(isChargePending)?.id ?? ""
+                      ) || null
+                    )
+                  }
+                >
+                  <MessageCircle className="mr-1.5 h-3.5 w-3.5" />
+                  WhatsApp rápido
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    navigate(`/finances?customerId=${activeCustomerId}`)
+                  }
+                >
+                  Ver financeiro
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    navigate(
+                      `/governance?customerId=${activeCustomerId}&source=customers`
+                    )
+                  }
+                >
+                  <ShieldAlert className="mr-1.5 h-3.5 w-3.5" />
+                  Ver risco
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={(workspace.timeline ?? []).length === 0}
+                  title={
+                    (workspace.timeline ?? []).length === 0
+                      ? "Sem eventos de timeline disponíveis para este cliente."
+                      : undefined
+                  }
+                  onClick={() =>
+                    timelineAnchorRef.current?.scrollIntoView({
+                      behavior: "smooth",
+                      block: "start",
+                    })
+                  }
+                >
+                  Ver timeline
+                </Button>
+              </AppActionBar>
+              {isRefreshingWorkspace ? (
+                <p className="text-xs text-[var(--text-muted)]">
+                  Atualizando dados do cliente...
+                </p>
+              ) : null}
+              {showInlineCharges ? (
                 <article className="rounded-xl border border-[var(--border-subtle)] p-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">WhatsApp inline</p>
-                  <textarea
-                    value={whatsAppQuickMessage}
-                    onChange={event => setWhatsAppQuickMessage(event.target.value)}
-                    placeholder="Mensagem rápida para este cliente"
-                    className="mt-2 min-h-[70px] w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
-                  />
-                  <div className="mt-2 flex flex-wrap gap-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                      Cobranças pendentes/vencidas
+                    </p>
                     <Button
                       size="sm"
-                      disabled={
-                        !String(selectedCustomer.phone ?? "").trim() ||
-                        whatsAppQuickMessage.trim().length === 0 ||
-                        sendInlineWhatsApp.isPending
-                      }
-                      title={!String(selectedCustomer.phone ?? "").trim() ? "Cliente sem telefone/WhatsApp cadastrado." : undefined}
-                      onClick={async () => {
-                        if (!activeCustomerId || !whatsAppQuickMessage.trim()) return;
-                        try {
-                          const content = whatsAppQuickMessage.trim();
-                          await sendInlineWhatsApp.mutateAsync({
-                            customerId: activeCustomerId,
-                            content,
-                            entityType: "CUSTOMER",
-                            entityId: activeCustomerId,
-                            messageType: "MANUAL",
-                          });
-                          setWhatsAppQuickMessage("");
-                          toast.success("Mensagem enviada.");
-                          await propagateCustomerOperationalChange(
+                      variant="outline"
+                      onClick={() => {
+                        if (activeCustomerId) {
+                          void propagateCustomerOperationalChange(
                             activeCustomerId,
-                            "CUSTOMER_WHATSAPP_MESSAGE_SENT",
-                            {
-                            includeTimeline: true,
-                            }
+                            "CUSTOMER_CHARGE_CONTEXT_UPDATED"
                           );
-                        } catch (error) {
-                          toast.error("Não foi possível enviar a mensagem. Tente novamente.");
                         }
+                        navigate(`/finances?customerId=${activeCustomerId}`);
                       }}
                     >
-                      {sendInlineWhatsApp.isPending ? "Enviando..." : "Enviar inline"}
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => openCustomerWhatsApp(selectedCustomer, String(workspaceCharges.find(isChargePending)?.id ?? "") || null)}>
-                      Abrir WhatsApp completo
+                      Abrir financeiro
                     </Button>
                   </div>
-                </article>
-
-                <AppOperationalKpiGrid className="xl:grid-cols-2">
-                  <AppStatCard label="Saldo em aberto" value={formatCurrency(workspacePendingCents || selectedProfile.pendingCents)} helper="Somatório real de cobranças pendentes/vencidas." />
-                  <AppStatCard label="Cobranças vencidas" value={workspaceOverdueCharges.length} helper={workspaceOverdueCharges.length > 0 ? "Priorizar ação de cobrança." : "Sem cobrança vencida retornada."} />
-                  <AppStatCard label="Próximo agendamento" value={workspaceNextAppointment ? formatDateTime(workspaceNextAppointment.startsAt ?? workspaceNextAppointment.scheduledAt) : "Sem agenda futura"} helper={workspaceNextAppointment ? String(workspaceNextAppointment.status ?? "Status não informado") : "Nenhum agendamento futuro disponível."} />
-                  <AppStatCard label="Comunicação" value={String(selectedCustomer.phone ?? "Sem telefone")} helper={selectedProfile.lastInteractionAt ? `Última interação em ${formatDateTime(selectedProfile.lastInteractionAt)}` : "Sem interação registrada."} />
-                </AppOperationalKpiGrid>
-
-                <AppOperationalStatusSummary
-                  items={[
-                    {
-                      label: "O.S. aberta mais relevante",
-                      value: workspaceOpenServiceOrder ? String(workspaceOpenServiceOrder.title ?? workspaceOpenServiceOrder.id ?? "O.S.") : "Sem O.S. aberta",
-                      helper: workspaceOpenServiceOrder ? `${String(workspaceOpenServiceOrder.status ?? "-")} · ${formatDateTime(workspaceOpenServiceOrder.updatedAt ?? workspaceOpenServiceOrder.createdAt)}` : "Nada em execução no momento.",
-                    },
-                    {
-                      label: "Última O.S. concluída",
-                      value: workspaceLastCompletedServiceOrder ? String(workspaceLastCompletedServiceOrder.title ?? workspaceLastCompletedServiceOrder.id ?? "O.S.") : "Sem O.S. concluída",
-                      helper: workspaceLastCompletedServiceOrder ? formatDateTime(workspaceLastCompletedServiceOrder.updatedAt ?? workspaceLastCompletedServiceOrder.createdAt) : "Histórico sem conclusão retornada.",
-                    },
-                    {
-                      label: "Último pagamento",
-                      value: workspaceLastPayment ? formatCurrency(Number(workspaceLastPayment.amountCents ?? workspaceLastPayment.amount ?? 0)) : "Não encontrado",
-                      helper: workspaceLastPayment ? formatDateTime(workspaceLastPayment.paidAt ?? workspaceLastPayment.updatedAt ?? workspaceLastPayment.createdAt) : "Sem pagamento nos dados disponíveis.",
-                    },
-                    {
-                      label: "Governança/Risco",
-                      value: selectedProfile.status,
-                      helper: "Detalhe completo disponível em Governança.",
-                    },
-                  ]}
-                />
-
-                <article ref={timelineAnchorRef} className="rounded-xl border border-[var(--border-subtle)] p-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-                    O.S. relacionadas
-                  </p>
                   <div className="mt-2 space-y-1.5">
-                    {workspaceServiceOrders.slice(0, 3).map((order, index) => (
-                      <div
-                        key={`${String(order.id ?? "order")}-${index}`}
-                        className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/30 p-2"
-                      >
-                        <p className="text-xs font-medium text-[var(--text-primary)]">
-                          {String(order.title ?? order.description ?? "O.S.")}
-                        </p>
-                        <p className="text-[11px] text-[var(--text-muted)]">
-                          {String(order.status ?? "Status não informado")} ·{" "}
-                          {formatDateTime(order.updatedAt ?? order.createdAt)}
-                        </p>
-                      </div>
-                    ))}
-                    {workspaceServiceOrders.length === 0 ? (
-                      <p className="text-xs text-[var(--text-muted)]">
-                        Nenhuma O.S. relacionada retornada.
-                      </p>
-                    ) : null}
-                  </div>
-                </article>
-
-                <article className="rounded-xl border border-[var(--border-subtle)] p-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-                    Agendamentos relacionados
-                  </p>
-                  <div className="mt-2 space-y-1.5">
-                    {workspaceAppointments
-                      .slice(0, 3)
-                      .map((appointment, index) => (
+                    {workspaceCharges
+                      .filter(isChargePending)
+                      .slice(0, 5)
+                      .map((charge, index) => (
                         <div
-                          key={`${String(appointment.id ?? "appointment")}-${index}`}
+                          key={`${String(charge.id ?? "charge")}-${index}`}
                           className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/30 p-2"
                         >
                           <p className="text-xs font-medium text-[var(--text-primary)]">
-                            {String(
-                              appointment.title ??
-                                appointment.description ??
-                                "Agendamento"
-                            )}
+                            {formatCurrency(
+                              Number(charge.amountCents ?? charge.amount ?? 0)
+                            )}{" "}
+                            · {String(charge.status ?? "PENDING")}
                           </p>
                           <p className="text-[11px] text-[var(--text-muted)]">
-                            {formatDateTime(
-                              appointment.startsAt ?? appointment.createdAt
-                            )}{" "}
-                            ·{" "}
-                            {String(
-                              appointment.status ?? "Status não informado"
-                            )}
+                            Vencimento:{" "}
+                            {formatDateTime(charge.dueDate, "Não informado")}
                           </p>
                         </div>
                       ))}
-                    {workspaceAppointments.length === 0 ? (
+                    {workspaceCharges.filter(isChargePending).length === 0 ? (
                       <p className="text-xs text-[var(--text-muted)]">
-                        Nenhum agendamento relacionado retornado.
+                        Nenhuma cobrança pendente/vencida retornada para este
+                        cliente.
                       </p>
                     ) : null}
                   </div>
                 </article>
+              ) : null}
+              <article className="rounded-xl border border-[var(--border-subtle)] p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                  WhatsApp inline
+                </p>
+                <textarea
+                  value={whatsAppQuickMessage}
+                  onChange={event =>
+                    setWhatsAppQuickMessage(event.target.value)
+                  }
+                  placeholder="Mensagem rápida para este cliente"
+                  className="mt-2 min-h-[70px] w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+                />
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    disabled={
+                      !String(selectedCustomer.phone ?? "").trim() ||
+                      whatsAppQuickMessage.trim().length === 0 ||
+                      sendInlineWhatsApp.isPending
+                    }
+                    title={
+                      !String(selectedCustomer.phone ?? "").trim()
+                        ? "Cliente sem telefone/WhatsApp cadastrado."
+                        : undefined
+                    }
+                    onClick={async () => {
+                      if (!activeCustomerId || !whatsAppQuickMessage.trim())
+                        return;
+                      try {
+                        const content = whatsAppQuickMessage.trim();
+                        await sendInlineWhatsApp.mutateAsync({
+                          customerId: activeCustomerId,
+                          content,
+                          entityType: "CUSTOMER",
+                          entityId: activeCustomerId,
+                          messageType: "MANUAL",
+                        });
+                        setWhatsAppQuickMessage("");
+                        toast.success("Mensagem enviada.");
+                        await propagateCustomerOperationalChange(
+                          activeCustomerId,
+                          "CUSTOMER_WHATSAPP_MESSAGE_SENT",
+                          {
+                            includeTimeline: true,
+                          }
+                        );
+                      } catch (error) {
+                        toast.error(
+                          "Não foi possível enviar a mensagem. Tente novamente."
+                        );
+                      }
+                    }}
+                  >
+                    {sendInlineWhatsApp.isPending
+                      ? "Enviando..."
+                      : "Enviar inline"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      openCustomerWhatsApp(
+                        selectedCustomer,
+                        String(
+                          workspaceCharges.find(isChargePending)?.id ?? ""
+                        ) || null
+                      )
+                    }
+                  >
+                    Abrir WhatsApp completo
+                  </Button>
+                </div>
+              </article>
 
-                <article className="rounded-xl border border-[var(--border-subtle)] p-3">
-                  <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-                    <AlertTriangle className="h-3.5 w-3.5" /> Timeline recente
-                  </p>
-                  <div className="mt-2">
-                    <AppEmbeddedTimeline
-                      items={(workspace.timeline ?? []).slice(0, 5).map((event, index) => ({
+              <AppOperationalKpiGrid className="xl:grid-cols-2">
+                <AppStatCard
+                  label="Saldo em aberto"
+                  value={formatCurrency(
+                    workspacePendingCents || selectedProfile.pendingCents
+                  )}
+                  helper="Somatório real de cobranças pendentes/vencidas."
+                />
+                <AppStatCard
+                  label="Cobranças vencidas"
+                  value={workspaceOverdueCharges.length}
+                  helper={
+                    workspaceOverdueCharges.length > 0
+                      ? "Priorizar ação de cobrança."
+                      : "Sem cobrança vencida retornada."
+                  }
+                />
+                <AppStatCard
+                  label="Próximo agendamento"
+                  value={
+                    workspaceNextAppointment
+                      ? formatDateTime(
+                          workspaceNextAppointment.startsAt ??
+                            workspaceNextAppointment.scheduledAt
+                        )
+                      : "Sem agenda futura"
+                  }
+                  helper={
+                    workspaceNextAppointment
+                      ? String(
+                          workspaceNextAppointment.status ??
+                            "Status não informado"
+                        )
+                      : "Nenhum agendamento futuro disponível."
+                  }
+                />
+                <AppStatCard
+                  label="Comunicação"
+                  value={String(selectedCustomer.phone ?? "Sem telefone")}
+                  helper={
+                    selectedProfile.lastInteractionAt
+                      ? `Última interação em ${formatDateTime(selectedProfile.lastInteractionAt)}`
+                      : "Sem interação registrada."
+                  }
+                />
+              </AppOperationalKpiGrid>
+
+              <AppOperationalStatusSummary
+                items={[
+                  {
+                    label: "O.S. aberta mais relevante",
+                    value: workspaceOpenServiceOrder
+                      ? String(
+                          workspaceOpenServiceOrder.title ??
+                            workspaceOpenServiceOrder.id ??
+                            "O.S."
+                        )
+                      : "Sem O.S. aberta",
+                    helper: workspaceOpenServiceOrder
+                      ? `${String(workspaceOpenServiceOrder.status ?? "-")} · ${formatDateTime(workspaceOpenServiceOrder.updatedAt ?? workspaceOpenServiceOrder.createdAt)}`
+                      : "Nada em execução no momento.",
+                  },
+                  {
+                    label: "Última O.S. concluída",
+                    value: workspaceLastCompletedServiceOrder
+                      ? String(
+                          workspaceLastCompletedServiceOrder.title ??
+                            workspaceLastCompletedServiceOrder.id ??
+                            "O.S."
+                        )
+                      : "Sem O.S. concluída",
+                    helper: workspaceLastCompletedServiceOrder
+                      ? formatDateTime(
+                          workspaceLastCompletedServiceOrder.updatedAt ??
+                            workspaceLastCompletedServiceOrder.createdAt
+                        )
+                      : "Histórico sem conclusão retornada.",
+                  },
+                  {
+                    label: "Último pagamento",
+                    value: workspaceLastPayment
+                      ? formatCurrency(
+                          Number(
+                            workspaceLastPayment.amountCents ??
+                              workspaceLastPayment.amount ??
+                              0
+                          )
+                        )
+                      : "Não encontrado",
+                    helper: workspaceLastPayment
+                      ? formatDateTime(
+                          workspaceLastPayment.paidAt ??
+                            workspaceLastPayment.updatedAt ??
+                            workspaceLastPayment.createdAt
+                        )
+                      : "Sem pagamento nos dados disponíveis.",
+                  },
+                  {
+                    label: "Governança/Risco",
+                    value: selectedProfile.status,
+                    helper: "Detalhe completo disponível em Governança.",
+                  },
+                ]}
+              />
+
+              <article
+                ref={timelineAnchorRef}
+                className="rounded-xl border border-[var(--border-subtle)] p-3"
+              >
+                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                  O.S. relacionadas
+                </p>
+                <div className="mt-2 space-y-1.5">
+                  {workspaceServiceOrders.slice(0, 3).map((order, index) => (
+                    <div
+                      key={`${String(order.id ?? "order")}-${index}`}
+                      className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/30 p-2"
+                    >
+                      <p className="text-xs font-medium text-[var(--text-primary)]">
+                        {String(order.title ?? order.description ?? "O.S.")}
+                      </p>
+                      <p className="text-[11px] text-[var(--text-muted)]">
+                        {String(order.status ?? "Status não informado")} ·{" "}
+                        {formatDateTime(order.updatedAt ?? order.createdAt)}
+                      </p>
+                    </div>
+                  ))}
+                  {workspaceServiceOrders.length === 0 ? (
+                    <p className="text-xs text-[var(--text-muted)]">
+                      Nenhuma O.S. relacionada retornada.
+                    </p>
+                  ) : null}
+                </div>
+              </article>
+
+              <article className="rounded-xl border border-[var(--border-subtle)] p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                  Agendamentos relacionados
+                </p>
+                <div className="mt-2 space-y-1.5">
+                  {workspaceAppointments
+                    .slice(0, 3)
+                    .map((appointment, index) => (
+                      <div
+                        key={`${String(appointment.id ?? "appointment")}-${index}`}
+                        className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/30 p-2"
+                      >
+                        <p className="text-xs font-medium text-[var(--text-primary)]">
+                          {String(
+                            appointment.title ??
+                              appointment.description ??
+                              "Agendamento"
+                          )}
+                        </p>
+                        <p className="text-[11px] text-[var(--text-muted)]">
+                          {formatDateTime(
+                            appointment.startsAt ?? appointment.createdAt
+                          )}{" "}
+                          ·{" "}
+                          {String(appointment.status ?? "Status não informado")}
+                        </p>
+                      </div>
+                    ))}
+                  {workspaceAppointments.length === 0 ? (
+                    <p className="text-xs text-[var(--text-muted)]">
+                      Nenhum agendamento relacionado retornado.
+                    </p>
+                  ) : null}
+                </div>
+              </article>
+
+              <article className="rounded-xl border border-[var(--border-subtle)] p-3">
+                <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                  <AlertTriangle className="h-3.5 w-3.5" /> Timeline recente
+                </p>
+                <div className="mt-2">
+                  <AppEmbeddedTimeline
+                    items={(workspace.timeline ?? [])
+                      .slice(0, 5)
+                      .map((event, index) => ({
                         id: String(event.id ?? `event-${index}`),
                         type: String(event.type ?? event.category ?? "Evento"),
-                        summary: String(event.summary ?? event.description ?? event.title ?? "Evento sem resumo"),
-                        entity: String(event.entity ?? event.entityType ?? event.target ?? "Cliente"),
-                        actor: String(event.actor ?? event.author ?? event.createdBy ?? "Sistema"),
-                        happenedAt: formatDateTime(event.occurredAt ?? event.createdAt),
+                        summary: buildCustomerTimelineSummary(event),
+                        entity: String(
+                          event.entity ??
+                            event.entityType ??
+                            event.target ??
+                            "Cliente"
+                        ),
+                        actor: String(
+                          event.actor ??
+                            event.author ??
+                            event.createdBy ??
+                            "Sistema"
+                        ),
+                        happenedAt: formatDateTime(
+                          event.occurredAt ?? event.createdAt
+                        ),
                         action: event.link ? (
-                          <Button size="sm" variant="ghost" onClick={() => navigate(String(event.link))}>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => navigate(String(event.link))}
+                          >
                             Ver detalhe
                           </Button>
                         ) : null,
                       }))}
-                      emptyMessage="Sem timeline retornada para este cliente."
-                    />
-                  </div>
-                </article>
-              </div>
-            )}
-          </AppContextWorkspace>
-        </div>
+                    emptyMessage="Sem timeline retornada para este cliente."
+                  />
+                </div>
+              </article>
+            </div>
+          )}
+        </AppContextWorkspace>
+      </div>
 
-        <CreateCustomerModal
-          open={createOpen}
-          onOpenChange={setCreateOpen}
-          onCreated={async created => {
-            setCreateOpen(false);
-            await customersQuery.refetch();
-            await appointmentsQuery.refetch();
-            await serviceOrdersQuery.refetch();
-            await chargesQuery.refetch();
-            if (created?.id) {
-              setActiveCustomerId(created.id);
-              await refreshCustomerWorkspace(String(created.id));
+      <CreateCustomerModal
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreated={async created => {
+          setCreateOpen(false);
+          await customersQuery.refetch();
+          await appointmentsQuery.refetch();
+          await serviceOrdersQuery.refetch();
+          await chargesQuery.refetch();
+          if (created?.id) {
+            setActiveCustomerId(created.id);
+            await refreshCustomerWorkspace(String(created.id));
+          }
+        }}
+      />
+
+      <EditCustomerModal
+        open={Boolean(editingCustomerId)}
+        customerId={editingCustomerId}
+        onClose={() => {
+          setEditingCustomerId(null);
+          setPendingEditCustomerId(null);
+        }}
+        onSaved={async saved => {
+          setEditingCustomerId(null);
+          setPendingEditCustomerId(null);
+          await customersQuery.refetch();
+          if (saved?.id) setActiveCustomerId(String(saved.id));
+          toast.success("Cliente atualizado com sucesso.");
+        }}
+      />
+      <CreateAppointmentModal
+        isOpen={createAppointmentOpen}
+        onClose={() => setCreateAppointmentOpen(false)}
+        onSuccess={async () => {
+          setCreateAppointmentOpen(false);
+          if (!activeCustomerId) return;
+          await propagateCustomerOperationalChange(
+            activeCustomerId,
+            "CUSTOMER_APPOINTMENT_CREATED",
+            {
+              includeTimeline: true,
             }
-          }}
-        />
-
-        <EditCustomerModal
-          open={Boolean(editingCustomerId)}
-          customerId={editingCustomerId}
-          onClose={() => {
-            setEditingCustomerId(null);
-            setPendingEditCustomerId(null);
-          }}
-          onSaved={async saved => {
-            setEditingCustomerId(null);
-            setPendingEditCustomerId(null);
-            await customersQuery.refetch();
-            if (saved?.id) setActiveCustomerId(String(saved.id));
-            toast.success("Cliente atualizado com sucesso.");
-          }}
-        />
-        <CreateAppointmentModal
-          isOpen={createAppointmentOpen}
-          onClose={() => setCreateAppointmentOpen(false)}
-          onSuccess={async () => {
-            setCreateAppointmentOpen(false);
-            if (!activeCustomerId) return;
-            await propagateCustomerOperationalChange(
-              activeCustomerId,
-              "CUSTOMER_APPOINTMENT_CREATED",
-              {
+          );
+          toast.success("Agendamento criado.");
+        }}
+        customers={customers.map(customer => ({
+          id: String(customer.id ?? ""),
+          name: String(customer.name ?? "Cliente"),
+        }))}
+        initialCustomerId={activeCustomerId}
+      />
+      <CreateServiceOrderModal
+        isOpen={createServiceOrderOpen}
+        onClose={() => setCreateServiceOrderOpen(false)}
+        onSuccess={async () => {
+          setCreateServiceOrderOpen(false);
+          if (!activeCustomerId) return;
+          await propagateCustomerOperationalChange(
+            activeCustomerId,
+            "CUSTOMER_SERVICE_ORDER_CREATED",
+            {
               includeTimeline: true,
-              }
-            );
-            toast.success("Agendamento criado.");
-          }}
-          customers={customers.map(customer => ({ id: String(customer.id ?? ""), name: String(customer.name ?? "Cliente") }))}
-          initialCustomerId={activeCustomerId}
-        />
-        <CreateServiceOrderModal
-          isOpen={createServiceOrderOpen}
-          onClose={() => setCreateServiceOrderOpen(false)}
-          onSuccess={async () => {
-            setCreateServiceOrderOpen(false);
-            if (!activeCustomerId) return;
-            await propagateCustomerOperationalChange(
-              activeCustomerId,
-              "CUSTOMER_SERVICE_ORDER_CREATED",
-              {
-              includeTimeline: true,
-              }
-            );
-            toast.success("O.S. criada.");
-          }}
-          customers={customers.map(customer => ({ id: String(customer.id ?? ""), name: String(customer.name ?? "Cliente") }))}
-          people={people}
-          initialCustomerId={activeCustomerId}
-        />
+            }
+          );
+          toast.success("O.S. criada.");
+        }}
+        customers={customers.map(customer => ({
+          id: String(customer.id ?? ""),
+          name: String(customer.name ?? "Cliente"),
+        }))}
+        people={people}
+        initialCustomerId={activeCustomerId}
+      />
     </AppPageShell>
   );
 }

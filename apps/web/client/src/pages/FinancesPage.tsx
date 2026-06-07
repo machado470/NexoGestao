@@ -952,7 +952,7 @@ export default function FinancesPage() {
           </Button>
         }
         primaryAction={
-          <Button onClick={() => setOpenCreate(true)}>Nova cobrança</Button>
+          <Button onClick={() => setOpenCreate(true)}>Novo recebimento</Button>
         }
         contextChips={
           <>
@@ -987,7 +987,7 @@ export default function FinancesPage() {
       <AppSectionCard className="space-y-4">
         <div className="border-b border-[var(--border-subtle)]/60 pb-3.5">
           <h3 className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">
-            Próxima decisão financeira
+            Próxima decisão financeira · cobrança recomendada
           </h3>
           <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
             A melhor ação de cobrança aparece antes da carteira para reduzir
@@ -997,7 +997,10 @@ export default function FinancesPage() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 flex-1 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
-              <AppStatusBadge label="Próxima decisão financeira" tone="info" />
+              <AppStatusBadge
+                label="Próxima cobrança recomendada"
+                tone="info"
+              />
               {nextBestAction ? (
                 <>
                   <AppPriorityBadge
@@ -1088,6 +1091,7 @@ export default function FinancesPage() {
       <AppSectionBlock
         title="Saúde do caixa"
         subtitle="Leitura operacional do dinheiro e do gargalo cobrança → pagamento."
+        compact
       >
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <AppInfoCard>
@@ -1141,6 +1145,8 @@ export default function FinancesPage() {
       <AppSectionBlock
         title="Intervenção financeira dominante"
         subtitle="Recomendação contextual para destravar cobrança → pagamento."
+        compact
+        className="hidden"
       >
         {financeIntervention ? (
           <AppInfoCard>
@@ -1164,9 +1170,10 @@ export default function FinancesPage() {
       <AppSectionBlock
         title={operationalCopy.immediateAttention}
         subtitle={`Pendências que afetam cobrança, comunicação e registro de pagamento. ${highlightedFinancialSummary.hidden > 0 ? highlightedFinancialSummary.hiddenMessage : ""}`}
+        compact
       >
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          {immediateAttentionItems.map(item => (
+          {immediateAttentionItems.slice(0, 5).map(item => (
             <AppInfoCard key={item.key}>
               <div className="flex items-start justify-between gap-2">
                 <p className="text-sm font-semibold text-[var(--text-primary)]">
@@ -1452,8 +1459,8 @@ export default function FinancesPage() {
       </AppSectionBlock>
 
       <AppSectionBlock
-        title="Detalhe financeiro"
-        subtitle="Resumo, cliente, origem operacional, histórico e comunicação quando disponíveis."
+        title="Painel financeiro secundário"
+        subtitle="Resumo, cliente, origem operacional, pagamentos recentes, falhas e risco financeiro."
       >
         {selectedCharge ? (
           <div className="space-y-4">
