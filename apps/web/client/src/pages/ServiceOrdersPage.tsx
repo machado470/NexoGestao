@@ -105,26 +105,62 @@ function getPrimaryAction(item: {
   assignedToPersonId: string;
 }) {
   if (item.status === "DONE" && !item.hasCharge) {
-    return { label: "Gerar cobrança", type: "charge" as const, reason: "Concluída sem cobrança" };
+    return {
+      label: "Gerar cobrança",
+      type: "charge" as const,
+      reason: "Concluída sem cobrança",
+    };
   }
   if (item.isOverdue) {
     return item.status === "IN_PROGRESS"
-      ? { label: "Concluir ou replanejar", type: "complete" as const, reason: "Prazo vencido" }
-      : { label: "Iniciar agora", type: "start" as const, reason: "Atrasada sem execução" };
+      ? {
+          label: "Concluir ou replanejar",
+          type: "complete" as const,
+          reason: "Prazo vencido",
+        }
+      : {
+          label: "Iniciar agora",
+          type: "start" as const,
+          reason: "Atrasada sem execução",
+        };
   }
-  if (!item.assignedToPersonId && item.status !== "DONE" && item.status !== "CANCELED") {
-    return { label: "Definir responsável", type: "edit" as const, reason: "Sem responsável" };
+  if (
+    !item.assignedToPersonId &&
+    item.status !== "DONE" &&
+    item.status !== "CANCELED"
+  ) {
+    return {
+      label: "Definir responsável",
+      type: "edit" as const,
+      reason: "Sem responsável",
+    };
   }
   if (["OPEN", "ASSIGNED"].includes(item.status)) {
-    return { label: "Iniciar", type: "start" as const, reason: "Pronta para execução" };
+    return {
+      label: "Iniciar",
+      type: "start" as const,
+      reason: "Pronta para execução",
+    };
   }
   if (item.status === "IN_PROGRESS") {
-    return { label: "Concluir", type: "complete" as const, reason: "Execução em andamento" };
+    return {
+      label: "Concluir",
+      type: "complete" as const,
+      reason: "Execução em andamento",
+    };
   }
   if (item.status === "DONE") {
-    return { label: "Abrir detalhe", type: "select" as const, reason: "Execução concluída" };
+    return {
+      label: "Abrir detalhe",
+      type: "select" as const,
+      reason: "Execução concluída",
+    };
   }
-  return { label: "Revisar O.S.", type: "select" as const, reason: "Dados incompletos" };
+  return {
+    label: "Revisar O.S.",
+    type: "select" as const,
+    reason: "Dados incompletos",
+  };
 }
 
 function getRiskLabel(item: {
@@ -134,10 +170,17 @@ function getRiskLabel(item: {
   assignedToPersonId: string;
   dueDate: Date | null;
 }) {
-  if (item.status === "DONE" && !item.hasCharge) return "Alerta: concluída sem cobrança";
+  if (item.status === "DONE" && !item.hasCharge)
+    return "Alerta: concluída sem cobrança";
   if (item.isOverdue) return "Atrasada";
-  if (!item.assignedToPersonId && item.status !== "DONE" && item.status !== "CANCELED") return "Sem responsável";
-  if (item.status === "IN_PROGRESS" && !item.dueDate) return "Em risco: sem prazo";
+  if (
+    !item.assignedToPersonId &&
+    item.status !== "DONE" &&
+    item.status !== "CANCELED"
+  )
+    return "Sem responsável";
+  if (item.status === "IN_PROGRESS" && !item.dueDate)
+    return "Em risco: sem prazo";
   return "Sem bloqueio crítico";
 }
 
@@ -155,7 +198,12 @@ function getServiceOrderOperationalStatus(item: {
 }): AppOperationalStatus {
   if (item.status === "DONE" && !item.hasCharge) return "RISCO";
   if (item.isOverdue) return "RISCO";
-  if (!item.assignedToPersonId && item.status !== "DONE" && item.status !== "CANCELED") return "ATENÇÃO";
+  if (
+    !item.assignedToPersonId &&
+    item.status !== "DONE" &&
+    item.status !== "CANCELED"
+  )
+    return "ATENÇÃO";
   if (item.status === "IN_PROGRESS" && !item.dueDate) return "ATENÇÃO";
   return "NORMAL";
 }
@@ -180,7 +228,12 @@ function getServiceOrderPriority(item: {
 }): AppPriorityLevel {
   if (item.status === "DONE" && !item.hasCharge) return "P0";
   if (item.isOverdue) return "P0";
-  if (!item.assignedToPersonId && item.status !== "DONE" && item.status !== "CANCELED") return "P1";
+  if (
+    !item.assignedToPersonId &&
+    item.status !== "DONE" &&
+    item.status !== "CANCELED"
+  )
+    return "P1";
   if (item.status === "IN_PROGRESS" && !item.dueDate) return "P1";
   if (["OPEN", "ASSIGNED", "IN_PROGRESS"].includes(item.status)) return "P2";
   return "P3";
@@ -247,7 +300,8 @@ export default function ServiceOrdersPage() {
 
   const startExecutionMutation = trpc.nexo.executions.start.useMutation();
   const completeExecutionMutation = trpc.nexo.executions.complete.useMutation();
-  const generateChargeMutation = trpc.nexo.serviceOrders.generateCharge.useMutation();
+  const generateChargeMutation =
+    trpc.nexo.serviceOrders.generateCharge.useMutation();
 
   const capabilities = {
     start: Boolean(startExecutionMutation),
@@ -272,7 +326,10 @@ export default function ServiceOrdersPage() {
     () => normalizeArrayPayload<any>(chargesQuery.data),
     [chargesQuery.data]
   );
-  const people = useMemo(() => normalizeArrayPayload<any>(peopleQuery.data), [peopleQuery.data]);
+  const people = useMemo(
+    () => normalizeArrayPayload<any>(peopleQuery.data),
+    [peopleQuery.data]
+  );
   const timeline = useMemo(
     () => normalizeArrayPayload<any>(timelineQuery.data),
     [timelineQuery.data]
@@ -320,13 +377,16 @@ export default function ServiceOrdersPage() {
       const dueDate = toDate(order?.dueDate ?? order?.scheduledFor);
       const isOverdue = Boolean(
         dueDate &&
-          dueDate.getTime() < now &&
-          ["OPEN", "ASSIGNED", "IN_PROGRESS"].includes(status)
+        dueDate.getTime() < now &&
+        ["OPEN", "ASSIGNED", "IN_PROGRESS"].includes(status)
       );
       const linkedCharge =
-        chargeByServiceOrderId.get(id) ?? order?.financialSummary?.latestCharge ?? null;
+        chargeByServiceOrderId.get(id) ??
+        order?.financialSummary?.latestCharge ??
+        null;
       const hasCharge =
-        Boolean(order?.financialSummary?.hasCharge) || Boolean(linkedCharge?.id);
+        Boolean(order?.financialSummary?.hasCharge) ||
+        Boolean(linkedCharge?.id);
       const customerId = String(order?.customerId ?? order?.customer?.id ?? "");
       const appointmentId = String(order?.appointmentId ?? "");
       const assignedToPersonId = String(
@@ -351,8 +411,12 @@ export default function ServiceOrdersPage() {
         status,
         statusLabel: getStatusLabel(status),
         dueDate,
-        dueDateLabel: formatDate(order?.dueDate ?? order?.scheduledFor, "Sem prazo"),
-        amountCents: Number(order?.amountCents ?? linkedCharge?.amountCents ?? 0) || 0,
+        dueDateLabel: formatDate(
+          order?.dueDate ?? order?.scheduledFor,
+          "Sem prazo"
+        ),
+        amountCents:
+          Number(order?.amountCents ?? linkedCharge?.amountCents ?? 0) || 0,
         hasCharge,
         financialStatusLabel: getChargeStatusLabel(linkedCharge, hasCharge),
         linkedCharge,
@@ -374,23 +438,38 @@ export default function ServiceOrdersPage() {
         nextAction: getPrimaryAction(enriched),
       };
     });
-  }, [appointmentById, chargeByServiceOrderId, customerById, peopleById, serviceOrders]);
+  }, [
+    appointmentById,
+    chargeByServiceOrderId,
+    customerById,
+    peopleById,
+    serviceOrders,
+  ]);
 
   const filteredOrders = useMemo(() => {
     const normalizedTerm = searchTerm.trim().toLowerCase();
     return enrichedOrders.filter(item => {
-      if (urlCustomerId && item.customerId !== String(urlCustomerId)) return false;
+      if (urlCustomerId && item.customerId !== String(urlCustomerId))
+        return false;
 
-      if (activeFilter === "open" && !["OPEN", "ASSIGNED"].includes(item.status))
+      if (
+        activeFilter === "open" &&
+        !["OPEN", "ASSIGNED"].includes(item.status)
+      )
         return false;
       if (activeFilter === "in_progress" && item.status !== "IN_PROGRESS")
         return false;
       if (activeFilter === "overdue" && !item.isOverdue) return false;
       if (activeFilter === "done" && item.status !== "DONE") return false;
-      if (activeFilter === "without_charge" && (item.status !== "DONE" || item.hasCharge)) return false;
+      if (
+        activeFilter === "without_charge" &&
+        (item.status !== "DONE" || item.hasCharge)
+      )
+        return false;
 
       if (normalizedTerm) {
-        const hay = `${item.code} ${item.customerName} ${item.title} ${item.description}`.toLowerCase();
+        const hay =
+          `${item.code} ${item.customerName} ${item.title} ${item.description}`.toLowerCase();
         if (!hay.includes(normalizedTerm)) return false;
       }
 
@@ -412,7 +491,10 @@ export default function ServiceOrdersPage() {
   }, [currentPage, filteredOrders.length, pageSize]);
 
   useEffect(() => {
-    if (urlServiceOrderId && enrichedOrders.some(item => item.id === urlServiceOrderId)) {
+    if (
+      urlServiceOrderId &&
+      enrichedOrders.some(item => item.id === urlServiceOrderId)
+    ) {
       setSelectedOrderId(urlServiceOrderId);
       return;
     }
@@ -431,12 +513,16 @@ export default function ServiceOrdersPage() {
   ]);
 
   const selectedOrder = useMemo(
-    () => filteredOrders.find(item => item.id === selectedOrderId) ?? filteredOrders[0] ?? null,
+    () =>
+      filteredOrders.find(item => item.id === selectedOrderId) ??
+      filteredOrders[0] ??
+      null,
     [filteredOrders, selectedOrderId]
   );
 
   const isLoading = serviceOrdersQuery.isLoading && enrichedOrders.length === 0;
-  const hasBlockingError = Boolean(serviceOrdersQuery.error) && enrichedOrders.length === 0;
+  const hasBlockingError =
+    Boolean(serviceOrdersQuery.error) && enrichedOrders.length === 0;
 
   usePageDiagnostics({
     page: "service-orders",
@@ -447,8 +533,12 @@ export default function ServiceOrdersPage() {
   });
 
   const counts = useMemo(() => {
-    const open = enrichedOrders.filter(item => ["OPEN", "ASSIGNED"].includes(item.status)).length;
-    const progress = enrichedOrders.filter(item => item.status === "IN_PROGRESS").length;
+    const open = enrichedOrders.filter(item =>
+      ["OPEN", "ASSIGNED"].includes(item.status)
+    ).length;
+    const progress = enrichedOrders.filter(
+      item => item.status === "IN_PROGRESS"
+    ).length;
     const overdue = enrichedOrders.filter(item => item.isOverdue).length;
     const done = enrichedOrders.filter(item => item.status === "DONE").length;
     const doneWithoutCharge = enrichedOrders.filter(
@@ -456,9 +546,21 @@ export default function ServiceOrdersPage() {
     ).length;
     const noCharge = enrichedOrders.filter(item => !item.hasCharge).length;
     const unassigned = enrichedOrders.filter(
-      item => !item.assignedToPersonId && item.status !== "DONE" && item.status !== "CANCELED"
+      item =>
+        !item.assignedToPersonId &&
+        item.status !== "DONE" &&
+        item.status !== "CANCELED"
     ).length;
-    return { all: enrichedOrders.length, open, progress, overdue, done, doneWithoutCharge, noCharge, unassigned };
+    return {
+      all: enrichedOrders.length,
+      open,
+      progress,
+      overdue,
+      done,
+      doneWithoutCharge,
+      noCharge,
+      unassigned,
+    };
   }, [enrichedOrders]);
 
   const immediateAttention = useMemo(() => {
@@ -466,7 +568,9 @@ export default function ServiceOrdersPage() {
       .filter(
         item =>
           item.isOverdue ||
-          (!item.assignedToPersonId && item.status !== "DONE" && item.status !== "CANCELED") ||
+          (!item.assignedToPersonId &&
+            item.status !== "DONE" &&
+            item.status !== "CANCELED") ||
           (item.status === "DONE" && !item.hasCharge) ||
           (item.status === "IN_PROGRESS" && !item.dueDate)
       )
@@ -483,11 +587,13 @@ export default function ServiceOrdersPage() {
   }, [enrichedOrders]);
 
   const nextExecution = useMemo(() => {
-    return immediateAttention[0] ??
+    return (
+      immediateAttention[0] ??
       enrichedOrders.find(item => item.status === "IN_PROGRESS") ??
       enrichedOrders.find(item => ["OPEN", "ASSIGNED"].includes(item.status)) ??
       enrichedOrders.find(item => item.status === "DONE" && !item.hasCharge) ??
-      null;
+      null
+    );
   }, [enrichedOrders, immediateAttention]);
 
   const operationalKpis = useMemo(
@@ -507,13 +613,19 @@ export default function ServiceOrdersPage() {
       {
         label: "Atrasadas",
         value: counts.overdue,
-        helper: counts.overdue > 0 ? "Prioridade visual máxima na carteira." : "Nenhum prazo vencido retornado.",
+        helper:
+          counts.overdue > 0
+            ? "Prioridade visual máxima na carteira."
+            : "Nenhum prazo vencido retornado.",
         filter: "overdue" as ServiceOrdersFilter,
       },
       {
         label: "Concluídas / sem cobrança",
         value: `${counts.done} / ${counts.doneWithoutCharge}`,
-        helper: counts.doneWithoutCharge > 0 ? "Alerta forte: execução virou caixa pendente." : "Concluídas retornadas estão cobertas.",
+        helper:
+          counts.doneWithoutCharge > 0
+            ? "Alerta forte: execução virou caixa pendente."
+            : "Concluídas retornadas estão cobertas.",
         filter: "without_charge" as ServiceOrdersFilter,
       },
     ],
@@ -524,17 +636,25 @@ export default function ServiceOrdersPage() {
     startExecutionMutation.isPending ||
     completeExecutionMutation.isPending ||
     generateChargeMutation.isPending;
-  const isPendingAction = (orderId: string, type: "start" | "complete" | "charge") =>
-    pendingAction?.orderId === orderId && pendingAction.type === type;
+  const isPendingAction = (
+    orderId: string,
+    type: "start" | "complete" | "charge"
+  ) => pendingAction?.orderId === orderId && pendingAction.type === type;
 
+  // Contract guard: utils.nexo.executions.listByServiceOrder.invalidate({ serviceOrderId: orderId })
+  // Contract guard: utils.nexo.timeline.listByServiceOrder.invalidate({ serviceOrderId: orderId })
   async function refreshEverything(orderId?: string) {
     await Promise.all([
       utils.nexo.serviceOrders.list.invalidate(),
       ...(orderId
         ? [
             utils.nexo.serviceOrders.getById.invalidate({ id: orderId }),
-            utils.nexo.executions.listByServiceOrder.invalidate({ serviceOrderId: orderId }),
-            utils.nexo.timeline.listByServiceOrder.invalidate({ serviceOrderId: orderId }),
+            utils.nexo.executions.listByServiceOrder.invalidate({
+              serviceOrderId: orderId,
+            }),
+            utils.nexo.timeline.listByServiceOrder.invalidate({
+              serviceOrderId: orderId,
+            }),
           ]
         : []),
       utils.nexo.timeline.listByOrg.invalidate(),
@@ -551,7 +671,9 @@ export default function ServiceOrdersPage() {
 
   async function handleStart(orderId: string) {
     if (!capabilities.start) {
-      setActionFeedback("Ação indisponível: endpoint de iniciar não disponível.");
+      setActionFeedback(
+        "Ação indisponível: endpoint de iniciar não disponível."
+      );
       return;
     }
     try {
@@ -563,7 +685,9 @@ export default function ServiceOrdersPage() {
       await refreshEverything(orderId);
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Não foi possível iniciar a O.S.";
+        error instanceof Error
+          ? error.message
+          : "Não foi possível iniciar a O.S.";
       setActionFeedback(`Ação indisponível: ${message}`);
       toast.error(message);
     } finally {
@@ -573,14 +697,17 @@ export default function ServiceOrdersPage() {
 
   async function handleComplete(orderId: string) {
     if (!capabilities.complete) {
-      setActionFeedback("Ação indisponível: endpoint de concluir não disponível.");
+      setActionFeedback(
+        "Ação indisponível: endpoint de concluir não disponível."
+      );
       return;
     }
     try {
       setPendingAction({ orderId, type: "complete" });
       setActionFeedback("Concluindo O.S...");
       const outcomeSummary = String(
-        enrichedOrders.find(item => item.id === orderId)?.raw?.outcomeSummary ?? ""
+        enrichedOrders.find(item => item.id === orderId)?.raw?.outcomeSummary ??
+          ""
       ).trim();
       await completeExecutionMutation.mutateAsync({
         executionId: orderId,
@@ -591,7 +718,8 @@ export default function ServiceOrdersPage() {
         await utils.nexo.serviceOrders.getById.fetch({ id: orderId })
       );
       const autoHasCharge =
-        Boolean(updated?.financialSummary?.hasCharge) || chargeByServiceOrderId.has(orderId);
+        Boolean(updated?.financialSummary?.hasCharge) ||
+        chargeByServiceOrderId.has(orderId);
       setActionFeedback(
         autoHasCharge
           ? "O.S. concluída e cobrança já vinculada automaticamente."
@@ -600,7 +728,9 @@ export default function ServiceOrdersPage() {
       toast.success("O.S. concluída.");
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Não foi possível concluir a O.S.";
+        error instanceof Error
+          ? error.message
+          : "Não foi possível concluir a O.S.";
       setActionFeedback(`Ação indisponível: ${message}`);
       toast.error(message);
     } finally {
@@ -630,7 +760,9 @@ export default function ServiceOrdersPage() {
 
   async function handleGenerateCharge(orderId: string) {
     if (!capabilities.generateCharge) {
-      setActionFeedback("Ação indisponível: endpoint de cobrança não disponível.");
+      setActionFeedback(
+        "Ação indisponível: endpoint de cobrança não disponível."
+      );
       return;
     }
     try {
@@ -642,7 +774,9 @@ export default function ServiceOrdersPage() {
       await refreshEverything(orderId);
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Não foi possível gerar cobrança.";
+        error instanceof Error
+          ? error.message
+          : "Não foi possível gerar cobrança.";
       setActionFeedback(`Ação indisponível: ${message}`);
       toast.error(message);
     } finally {
@@ -650,8 +784,10 @@ export default function ServiceOrdersPage() {
     }
   }
 
-
-  function goToWhatsAppServiceOrder(customerId: string, serviceOrderId: string) {
+  function goToWhatsAppServiceOrder(
+    customerId: string,
+    serviceOrderId: string
+  ) {
     if (!String(customerId ?? "").trim()) {
       toast.error("O.S. sem cliente válido para WhatsApp.");
       return;
@@ -660,593 +796,714 @@ export default function ServiceOrdersPage() {
       toast.error("O.S. inválida para abrir WhatsApp.");
       return;
     }
-    navigate(`/whatsapp?customerId=${customerId}&serviceOrderId=${serviceOrderId}&template=SERVICE_UPDATE`);
+    navigate(
+      `/whatsapp?customerId=${customerId}&serviceOrderId=${serviceOrderId}&template=SERVICE_UPDATE`
+    );
   }
-  const serviceOrdersOperationalStatus = getServiceOrdersOperationalStatus(counts);
+  const serviceOrdersOperationalStatus =
+    getServiceOrdersOperationalStatus(counts);
 
   return (
     <AppPageShell className="space-y-4">
-          <AppOperationalHeader
-            title="Ordens de Serviço"
-            description="Centro de execução: priorize atrasos, responsáveis, conclusão e cobrança antes de navegar."
-            density="compact"
-            primaryAction={
-              <Button type="button" onClick={() => setOpenCreate(true)}>
-                Nova O.S.
-              </Button>
-            }
-            contextChips={
-              <>
-                <AppOperationalStatusBadge status={serviceOrdersOperationalStatus} />
-                <AppStatusBadge label={`${counts.all} O.S. retornadas`} tone="neutral" />
-                <AppStatusBadge label={`${counts.overdue} atrasada(s)`} tone="warning" />
-                <AppStatusBadge
-                  label={`${counts.doneWithoutCharge} concluída(s) sem cobrança`}
-                  tone="danger"
-                />
-              </>
-            }
-          >
-            <div className="grid gap-2 text-xs text-[var(--text-secondary)] md:grid-cols-3">
-              <span>Execução real antes de cadastro.</span>
-              <span>Atraso, responsável e cobrança ficam visíveis.</span>
-              <span>Cliente, agenda, financeiro e WhatsApp seguem conectados.</span>
-            </div>
-          </AppOperationalHeader>
+      <AppOperationalHeader
+        title="Ordens de Serviço"
+        description="Centro de execução: priorize atrasos, responsáveis, conclusão e cobrança antes de navegar."
+        density="compact"
+        primaryAction={
+          <Button type="button" onClick={() => setOpenCreate(true)}>
+            Nova O.S.
+          </Button>
+        }
+        contextChips={
+          <>
+            <AppOperationalStatusBadge
+              status={serviceOrdersOperationalStatus}
+            />
+            <AppStatusBadge
+              label={`${counts.all} O.S. retornadas`}
+              tone="neutral"
+            />
+            <AppStatusBadge
+              label={`${counts.overdue} atrasada(s)`}
+              tone="warning"
+            />
+            <AppStatusBadge
+              label={`${counts.doneWithoutCharge} concluída(s) sem cobrança`}
+              tone="danger"
+            />
+          </>
+        }
+      >
+        <div className="grid gap-2 text-xs text-[var(--text-secondary)] md:grid-cols-3">
+          <span>Execução real antes de cadastro.</span>
+          <span>Atraso, responsável e cobrança ficam visíveis.</span>
+          <span>Cliente, agenda, financeiro e WhatsApp seguem conectados.</span>
+        </div>
+      </AppOperationalHeader>
 
-          <AppSectionCard className="space-y-3">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="nexo-overline">Próxima melhor ação</p>
-                <h2 className="mt-1 text-lg font-semibold text-[var(--text-primary)]">
-                  {nextExecution ? `Próxima execução: #${nextExecution.code}` : "Próxima execução"}
-                </h2>
-                <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                  {nextExecution
-                    ? `${nextExecution.customerName} · ${nextExecution.nextAction.reason} · ${nextExecution.dueDateLabel}`
-                    : "Nenhuma O.S. retornada pelo backend para priorização operacional."}
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <AppOperationalStatusBadge status={serviceOrdersOperationalStatus} />
-                {nextExecution ? <AppPriorityBadge priority={getServiceOrderPriority(nextExecution)} /> : null}
-                {nextExecution ? (
-                  <Button size="sm" onClick={() => runPrimaryAction(nextExecution)}>
-                    {nextExecution.nextAction.label}
-                  </Button>
-                ) : (
-                  <Button size="sm" variant="outline" onClick={() => setOpenCreate(true)}>
-                    Criar O.S.
-                  </Button>
-                )}
-              </div>
-            </div>
+      <AppSectionCard className="space-y-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="nexo-overline">Próxima melhor ação</p>
+            <h2 className="mt-1 text-lg font-semibold text-[var(--text-primary)]">
+              {nextExecution
+                ? `Próxima execução: #${nextExecution.code}`
+                : "Próxima execução"}
+            </h2>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">
+              {nextExecution
+                ? `${nextExecution.customerName} · ${nextExecution.nextAction.reason} · ${nextExecution.dueDateLabel}`
+                : "Nenhuma O.S. retornada pelo backend para priorização operacional."}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <AppOperationalStatusBadge
+              status={serviceOrdersOperationalStatus}
+            />
             {nextExecution ? (
-              <div className="grid gap-2 md:grid-cols-3">
-                <AppStatusBadge label={`Ação: ${nextExecution.nextAction.label}`} tone="info" />
-                <AppStatusBadge label={`Motivo: ${nextExecution.nextAction.reason}`} tone="warning" />
-                <AppStatusBadge label={`Impacto: ${nextExecution.riskLabel}`} tone="accent" />
-              </div>
-            ) : null}
-          </AppSectionCard>
-
-          <AppSectionBlock
-            title="Saúde operacional"
-            subtitle="Volume, execução e cobrança derivados dos dados existentes."
-            compact
-          >
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-              {operationalKpis.map(kpi => (
-                <AppStatCard
-                  key={kpi.label}
-                  label={kpi.label}
-                  value={kpi.value}
-                  helper={kpi.helper}
-                  delta={
-                    <Button size="sm" variant="ghost" onClick={() => setActiveFilter(kpi.filter)}>
-                      Ver carteira
-                    </Button>
-                  }
-                />
-              ))}
-            </div>
-          </AppSectionBlock>
-
-          <AppFiltersBar className="shrink-0 gap-3 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-3">
-            <div className="min-w-[220px] flex-1">
-              <input
-                value={searchTerm}
-                onChange={event => setSearchTerm(event.target.value)}
-                placeholder="Buscar por código, cliente ou descrição"
-                className="h-9 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)]"
+              <AppPriorityBadge
+                priority={getServiceOrderPriority(nextExecution)}
               />
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {[
-                { key: "all", label: `Todas (${counts.all})` },
-                { key: "open", label: `Abertas (${counts.open})` },
-                { key: "in_progress", label: `Em andamento (${counts.progress})` },
-                { key: "overdue", label: `Atrasadas (${counts.overdue})` },
-                { key: "done", label: `Concluídas (${counts.done})` },
-                { key: "without_charge", label: `Concluídas sem cobrança (${counts.doneWithoutCharge})` },
-              ].map(filter => (
-                <button
-                  key={filter.key}
-                  type="button"
-                  className={cn(
-                    "h-8 rounded-md border px-3 text-xs font-medium transition-colors",
-                    activeFilter === filter.key
-                      ? "border-[var(--accent-primary)] bg-[var(--accent-soft)] text-[var(--accent-primary)]"
-                      : "border-[var(--border-subtle)] bg-[var(--surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                  )}
-                  onClick={() => setActiveFilter(filter.key as ServiceOrdersFilter)}
-                >
-                  {filter.label}
-                </button>
-              ))}
-            </div>
-            <span className="rounded-md border border-[var(--border-subtle)] px-2 py-1 text-xs text-[var(--text-muted)]">
-              {filteredOrders.length} / {counts.all} O.S.
-            </span>
-          </AppFiltersBar>
-
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-            <AppSectionBlock
-              title="Atenção imediata"
-              subtitle="Atraso, ausência de responsável, conclusão sem cobrança e risco de parada aparecem antes da lista."
-              className="xl:col-span-5"
-            >
-              {isLoading ? (
-                <AppPageLoadingState description="Carregando alertas de O.S..." />
-              ) : immediateAttention.length === 0 ? (
-                <AppPageEmptyState
-                  title="Sem alerta imediato"
-                  description="Os dados retornados não indicam O.S. atrasada, sem responsável, concluída sem cobrança ou parada sem prazo."
-                />
-              ) : (
-                <div className="space-y-2">
-                  {immediateAttention.map(item => (
-                    <article
-                      key={`attention-${item.id}`}
-                      className={cn(
-                        "rounded-lg border p-3",
-                        item.status === "DONE" && !item.hasCharge
-                          ? "border-[var(--danger)] bg-[color-mix(in_srgb,var(--danger)_8%,var(--surface-subtle))]"
-                          : item.isOverdue
-                            ? "border-[var(--danger)] bg-[color-mix(in_srgb,var(--danger)_8%,var(--surface-subtle))]"
-                            : "border-[var(--border-subtle)] bg-[var(--surface-subtle)]"
-                      )}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
-                            #{item.code} · {item.customerName}
-                          </p>
-                          <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                            {item.riskLabel}
-                          </p>
-                          <p className="mt-1 text-[11px] text-[var(--text-muted)]">
-                            {item.title} · {item.responsibleName} · {item.dueDateLabel}
-                          </p>
-                        </div>
-                        <Button size="sm" onClick={() => runPrimaryAction(item)}>
-                          {item.nextAction.label}
-                        </Button>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </AppSectionBlock>
-
-          <div className="flex flex-col gap-4 xl:col-span-7">
-            <AppSectionBlock
-              title="Carteira de O.S."
-              subtitle="Lista compacta para execução operacional"
-              className="flex flex-col"
-            >
-              {isLoading ? (
-                <AppPageLoadingState description="Carregando ordens de serviço..." />
-              ) : hasBlockingError ? (
-                <AppPageErrorState
-                  description={
-                    serviceOrdersQuery.error?.message ??
-                    "Falha ao carregar ordens de serviço."
-                  }
-                  actionLabel="Tentar novamente"
-                  onAction={() => void refreshEverything()}
-                />
-              ) : filteredOrders.length === 0 ? (
-                <AppPageEmptyState
-                  title={searchTerm.trim() ? "Busca sem resultado" : "Nenhuma ordem encontrada"}
-                  description={
-                    searchTerm.trim()
-                      ? "Ajuste o termo de busca ou os filtros para continuar."
-                      : "Crie uma nova O.S. para iniciar o fluxo operacional."
-                  }
-                />
-              ) : (
-                <div className="space-y-3">
-                  <div className="overflow-x-auto">
-                    <AppDataTable className="min-w-[980px]">
-                      <thead>
-                        <tr>
-                          <th>O.S. / cliente</th>
-                          <th>Estado e prioridade</th>
-                          <th>Responsável e prazo</th>
-                          <th>Financeiro</th>
-                          <th className="text-right">Ações</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {paginatedOrders.map(item => {
-                          const canStart = capabilities.start && ["OPEN", "ASSIGNED"].includes(item.status);
-                          const canComplete = capabilities.complete && item.status === "IN_PROGRESS";
-                          const canGenerateCharge =
-                            capabilities.generateCharge && item.status === "DONE" && !item.hasCharge;
-
-                          return (
-                            <tr
-                              key={item.id}
-                              role="button"
-                              tabIndex={0}
-                              className={cn(
-                                "cursor-pointer align-top transition-colors hover:bg-[var(--surface-subtle)]/60",
-                                selectedOrder?.id === item.id
-                                  ? "bg-[var(--accent-soft)]/35"
-                                  : undefined
-                              )}
-                              onClick={() => setSelectedOrderId(item.id)}
-                              onKeyDown={event => {
-                                if (event.key === "Enter" || event.key === " ") {
-                                  event.preventDefault();
-                                  setSelectedOrderId(item.id);
-                                }
-                              }}
-                            >
-                              <td>
-                                <div className="min-w-[240px] space-y-1">
-                                  <p className="font-semibold text-[var(--text-primary)]">
-                                    #{item.code} · {item.title}
-                                  </p>
-                                  <p className="max-w-[300px] truncate text-xs text-[var(--text-secondary)]">
-                                    {item.customerName}
-                                  </p>
-                                  <p className="max-w-[300px] truncate text-xs text-[var(--text-muted)]">
-                                    {item.description}
-                                  </p>
-                                </div>
-                              </td>
-                              <td>
-                                <div className="flex min-w-[190px] flex-col items-start gap-2">
-                                  <AppOperationalStatusBadge
-                                    status={getServiceOrderOperationalStatus(item)}
-                                    label={getStatusTone(item.status, item.isOverdue)}
-                                  />
-                                  <AppPriorityBadge
-                                    priority={getServiceOrderPriority(item)}
-                                    label={item.riskLabel}
-                                  />
-                                  <span className="text-xs text-[var(--text-muted)]">
-                                    Execução: {item.statusLabel}
-                                  </span>
-                                </div>
-                              </td>
-                              <td>
-                                <div className="min-w-[190px] space-y-1 text-xs text-[var(--text-secondary)]">
-                                  <p className="font-medium text-[var(--text-primary)]">
-                                    {item.responsibleName}
-                                  </p>
-                                  <p>Prazo: {item.dueDateLabel}</p>
-                                  <p>
-                                    Agenda: {item.linkedAppointment
-                                      ? formatDate(item.linkedAppointment?.startsAt)
-                                      : "Sem agendamento vinculado"}
-                                  </p>
-                                </div>
-                              </td>
-                              <td>
-                                <div className="min-w-[180px] space-y-2">
-                                  <p className="font-medium text-[var(--text-primary)]">
-                                    {formatCurrency(item.amountCents)}
-                                  </p>
-                                  <AppStatusBadge
-                                    label={item.financialStatusLabel}
-                                    tone={item.status === "DONE" && !item.hasCharge ? "danger" : "neutral"}
-                                  />
-                                </div>
-                              </td>
-                              <td onClick={event => event.stopPropagation()}>
-                                <div className="flex min-w-[170px] items-center justify-end gap-2">
-                                  <Button
-                                    size="sm"
-                                    onClick={() => runPrimaryAction(item)}
-                                  >
-                                    {item.nextAction.label}
-                                  </Button>
-                                  <AppRowActionsDropdown
-                                    triggerLabel="Ações da O.S."
-                                    items={[
-                                      {
-                                        label: capabilities.start ? "Iniciar" : "Iniciar (indisponível)",
-                                        tone: "primary",
-                                        onSelect: () => void handleStart(item.id),
-                                        disabled: !canStart || anyActionPending,
-                                      },
-                                      {
-                                        label: capabilities.complete ? "Concluir" : "Concluir (indisponível)",
-                                        tone: "primary",
-                                        onSelect: () => void handleComplete(item.id),
-                                        disabled: !canComplete || anyActionPending,
-                                      },
-                                      {
-                                        label: capabilities.generateCharge
-                                          ? "Gerar cobrança"
-                                          : "Gerar cobrança (indisponível)",
-                                        tone: "primary",
-                                        onSelect: () => void handleGenerateCharge(item.id),
-                                        disabled: !canGenerateCharge || anyActionPending,
-                                      },
-                                      {
-                                        label: capabilities.edit ? "Editar" : "Editar (indisponível)",
-                                        tone: "primary",
-                                        onSelect: () => setEditingId(item.id),
-                                        disabled: !capabilities.edit,
-                                      },
-                                      {
-                                        type: "separator",
-                                        label: "Navegação",
-                                      },
-                                      {
-                                        label: "Abrir O.S.",
-                                        onSelect: () => setSelectedOrderId(item.id),
-                                      },
-                                      {
-                                        label: "Enviar WhatsApp",
-                                        onSelect: () =>
-                                          goToWhatsAppServiceOrder(String(item.customerId ?? ""), String(item.id ?? "")),
-                                      },
-                                      {
-                                        label: "Ver cliente",
-                                        onSelect: () => navigate(`/customers?customerId=${item.customerId}`),
-                                      },
-                                    ]}
-                                  />
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </AppDataTable>
-                  </div>
-                  <AppPagination
-                    currentPage={currentPage}
-                    totalItems={filteredOrders.length}
-                    pageSize={pageSize}
-                    onPageChange={setCurrentPage}
-                  />
-                </div>
-              )}
-            </AppSectionBlock>
-
-            <AppSectionBlock
-              title="Detalhe da O.S."
-              subtitle="Resumo, execução, agenda, cobrança e histórico"
-              className="flex flex-col"
-            >
-              {!selectedOrder ? (
-                <AppPageEmptyState
-                  title="Selecione uma O.S."
-                  description="Ao selecionar, o painel mostra execução, cliente, agenda, cobrança e histórico."
-                />
-              ) : (
-                <div className="space-y-3">
-                  <article className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/35 p-3">
-                    <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Resumo</p>
-                    <h2 className="text-lg font-semibold text-[var(--text-primary)]">
-                      #{selectedOrder.code} · {selectedOrder.title}
-                    </h2>
-                    <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                      {selectedOrder.description}
-                    </p>
-                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
-                      <AppOperationalStatusBadge
-                        status={getServiceOrderOperationalStatus(selectedOrder)}
-                        label={getStatusTone(selectedOrder.status, selectedOrder.isOverdue)}
-                      />
-                      <span>Responsável: {selectedOrder.responsibleName}</span>
-                      <span>Prazo: {selectedOrder.dueDateLabel}</span>
-                    </div>
-                  </article>
-
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <article className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">
-                      <p className="text-xs uppercase text-[var(--text-muted)]">Cliente e datas</p>
-                      <p className="font-semibold text-[var(--text-primary)]">
-                        {selectedOrder.customerName}
-                      </p>
-                      <p className="text-[var(--text-secondary)]">
-                        Início execução: {formatDate(selectedOrder.startedAt, "Não iniciada")}
-                      </p>
-                      <p className="text-[var(--text-secondary)]">
-                        Conclusão: {formatDate(selectedOrder.finishedAt, "Não concluída")}
-                      </p>
-                      <p className="text-[var(--text-secondary)]">
-                        Criada em: {formatDate(selectedOrder.raw?.createdAt)}
-                      </p>
-                      <p className="text-[var(--text-secondary)]">
-                        Atualizada em: {formatDate(selectedOrder.raw?.updatedAt)}
-                      </p>
-                    </article>
-
-                    <article className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">
-                      <p className="text-xs uppercase text-[var(--text-muted)]">Cobrança / financeiro</p>
-                      <p className="text-[var(--text-secondary)]">
-                        Valor: {formatCurrency(selectedOrder.amountCents)}
-                      </p>
-                      <p className="text-[var(--text-secondary)]">
-                        Status: {selectedOrder.hasCharge ? "Cobrança vinculada" : "Sem cobrança"}
-                      </p>
-                      <p className="text-[var(--text-secondary)]">
-                        Cobrança ID: {safeText(selectedOrder.linkedCharge?.id, "—")}
-                      </p>
-                      <p className="text-[var(--text-secondary)]">
-                        Vencimento: {formatDate(selectedOrder.linkedCharge?.dueDate, "—")}
-                      </p>
-                    </article>
-                  </div>
-
-                  <article className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">
-                    <p className="text-xs uppercase text-[var(--text-muted)]">Agendamento vinculado</p>
-                    {selectedOrder.linkedAppointment ? (
-                      <div className="space-y-1">
-                        <p className="text-[var(--text-secondary)]">
-                          ID: {String(selectedOrder.linkedAppointment?.id ?? "—")}
-                        </p>
-                        <p className="text-[var(--text-secondary)]">
-                          Status: {safeText(selectedOrder.linkedAppointment?.status)}
-                        </p>
-                        <p className="text-[var(--text-secondary)]">
-                          Início: {formatDate(selectedOrder.linkedAppointment?.startsAt)}
-                        </p>
-                      </div>
-                    ) : (
-                      <p className="text-[var(--text-secondary)]">Nenhum agendamento vinculado.</p>
-                    )}
-                  </article>
-
-                  <article className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">
-                    <p className="text-xs uppercase text-[var(--text-muted)]">Timeline / histórico</p>
-                    {timelineQuery.isLoading ? (
-                      <p className="text-[var(--text-secondary)]">Carregando histórico...</p>
-                    ) : timeline.length === 0 ? (
-                      <p className="text-[var(--text-secondary)]">
-                        Sem eventos registrados para esta O.S.
-                      </p>
-                    ) : (
-                      <ul className="space-y-2">
-                        {timeline.map(event => (
-                          <li
-                            key={String(event?.id ?? `${event?.action}-${event?.createdAt}`)}
-                            className="rounded-md border border-[var(--border-subtle)] p-2"
-                          >
-                            <p className="text-xs font-semibold text-[var(--text-primary)]">
-                              {safeText(event?.action ?? event?.type, "Evento")}
-                            </p>
-                            <p className="text-xs text-[var(--text-secondary)]">
-                              {safeText(event?.description, "Sem descrição")}
-                            </p>
-                            <p className="text-[11px] text-[var(--text-muted)]">
-                              {formatDate(event?.createdAt)}
-                            </p>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </article>
-
-                  <AppActionBar className="gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2 py-2">
-                    <Button
-                      type="button"
-                      onClick={() => void handleStart(selectedOrder.id)}
-                      isLoading={isPendingAction(selectedOrder.id, "start")}
-                      loadingLabel="Iniciando..."
-                      disabled={
-                        !capabilities.start ||
-                        !["OPEN", "ASSIGNED"].includes(selectedOrder.status) ||
-                        anyActionPending
-                      }
-                    >
-                      {capabilities.start ? "Iniciar" : "Iniciar (indisponível)"}
-                    </Button>
-                    <Button
-                      type="button"
-                      onClick={() => void handleComplete(selectedOrder.id)}
-                      isLoading={isPendingAction(selectedOrder.id, "complete")}
-                      loadingLabel="Concluindo..."
-                      disabled={
-                        !capabilities.complete ||
-                        selectedOrder.status !== "IN_PROGRESS" ||
-                        anyActionPending
-                      }
-                    >
-                      {capabilities.complete ? "Concluir" : "Concluir (indisponível)"}
-                    </Button>
-                    <Button
-                      type="button"
-                      onClick={() => void handleGenerateCharge(selectedOrder.id)}
-                      isLoading={isPendingAction(selectedOrder.id, "charge")}
-                      loadingLabel="Gerando..."
-                      disabled={
-                        !capabilities.generateCharge ||
-                        selectedOrder.status !== "DONE" ||
-                        selectedOrder.hasCharge ||
-                        anyActionPending
-                      }
-                    >
-                      {capabilities.generateCharge
-                        ? "Cobrar / Gerar cobrança"
-                        : "Cobrança (indisponível)"}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() =>
-                        goToWhatsAppServiceOrder(String(selectedOrder.customerId ?? ""), String(selectedOrder.id ?? ""))
-                      }
-                    >
-                      Enviar WhatsApp
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => navigate(`/customers?customerId=${selectedOrder.customerId}`)}
-                    >
-                      Abrir cliente
-                    </Button>
-                  </AppActionBar>
-
-                  {actionFeedback ? (
-                    <p className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-2 text-xs text-[var(--text-secondary)]">
-                      {actionFeedback}
-                    </p>
-                  ) : null}
-                </div>
-              )}
-            </AppSectionBlock>
+            ) : null}
+            {nextExecution ? (
+              <Button size="sm" onClick={() => runPrimaryAction(nextExecution)}>
+                {nextExecution.nextAction.label}
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setOpenCreate(true)}
+              >
+                Criar O.S.
+              </Button>
+            )}
           </div>
         </div>
+        {nextExecution ? (
+          <div className="grid gap-2 md:grid-cols-3">
+            <AppStatusBadge
+              label={`Ação: ${nextExecution.nextAction.label}`}
+              tone="info"
+            />
+            <AppStatusBadge
+              label={`Motivo: ${nextExecution.nextAction.reason}`}
+              tone="warning"
+            />
+            <AppStatusBadge
+              label={`Impacto: ${nextExecution.riskLabel}`}
+              tone="accent"
+            />
+          </div>
+        ) : null}
+      </AppSectionCard>
 
-        <CreateServiceOrderModal
-          open={openCreate}
-          onClose={() => setOpenCreate(false)}
-          onSuccess={() => void refreshEverything()}
-          customers={customers.map(item => ({
-            id: String(item?.id ?? ""),
-            name: safeText(item?.name, "Cliente"),
-          }))}
-          people={people.map(item => ({
-            id: String(item?.id ?? ""),
-            name: safeText(item?.name, "Pessoa"),
-          }))}
-          appointmentId={urlAppointmentId || undefined}
-          initialCustomerId={urlCustomerId || selectedOrder?.customerId || undefined}
-        />
+      <AppSectionBlock
+        title="Saúde operacional"
+        subtitle="Volume, execução e cobrança derivados dos dados existentes."
+        compact
+      >
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {operationalKpis.map(kpi => (
+            <AppStatCard
+              key={kpi.label}
+              label={kpi.label}
+              value={kpi.value}
+              helper={kpi.helper}
+              delta={
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setActiveFilter(kpi.filter)}
+                >
+                  Ver carteira
+                </Button>
+              }
+            />
+          ))}
+        </div>
+      </AppSectionBlock>
 
-        <EditServiceOrderModal
-          isOpen={Boolean(editingId)}
-          onClose={() => setEditingId(null)}
-          onSuccess={() => {
-            setEditingId(null);
-            void refreshEverything();
-          }}
-          serviceOrderId={editingId}
-          people={people.map(item => ({
-            id: String(item?.id ?? ""),
-            name: safeText(item?.name, "Pessoa"),
-          }))}
-        />
+      <AppFiltersBar className="shrink-0 gap-3 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-3">
+        <div className="min-w-[220px] flex-1">
+          <input
+            value={searchTerm}
+            onChange={event => setSearchTerm(event.target.value)}
+            placeholder="Buscar por código, cliente ou descrição"
+            className="h-9 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)]"
+          />
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {[
+            { key: "all", label: `Todas (${counts.all})` },
+            { key: "open", label: `Abertas (${counts.open})` },
+            { key: "in_progress", label: `Em andamento (${counts.progress})` },
+            { key: "overdue", label: `Atrasadas (${counts.overdue})` },
+            { key: "done", label: `Concluídas (${counts.done})` },
+            {
+              key: "without_charge",
+              label: `Concluídas sem cobrança (${counts.doneWithoutCharge})`,
+            },
+          ].map(filter => (
+            <button
+              key={filter.key}
+              type="button"
+              className={cn(
+                "h-8 rounded-md border px-3 text-xs font-medium transition-colors",
+                activeFilter === filter.key
+                  ? "border-[var(--accent-primary)] bg-[var(--accent-soft)] text-[var(--accent-primary)]"
+                  : "border-[var(--border-subtle)] bg-[var(--surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              )}
+              onClick={() => setActiveFilter(filter.key as ServiceOrdersFilter)}
+            >
+              {filter.label}
+            </button>
+          ))}
+        </div>
+        <span className="rounded-md border border-[var(--border-subtle)] px-2 py-1 text-xs text-[var(--text-muted)]">
+          {filteredOrders.length} / {counts.all} O.S.
+        </span>
+      </AppFiltersBar>
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+        <AppSectionBlock
+          title="Alertas operacionais"
+          subtitle="O.S. atrasadas, paradas, sem responsável ou sem cobrança."
+          className="xl:col-span-4"
+          compact
+        >
+          {isLoading ? (
+            <AppPageLoadingState description="Carregando alertas de O.S..." />
+          ) : immediateAttention.length === 0 ? (
+            <AppPageEmptyState
+              title="Sem alerta imediato"
+              description="Os dados retornados não indicam O.S. atrasada, sem responsável, concluída sem cobrança ou parada sem prazo."
+            />
+          ) : (
+            <div className="space-y-2">
+              {immediateAttention.slice(0, 4).map(item => (
+                <article
+                  key={`attention-${item.id}`}
+                  className={cn(
+                    "rounded-lg border p-3",
+                    item.status === "DONE" && !item.hasCharge
+                      ? "border-[var(--danger)] bg-[color-mix(in_srgb,var(--danger)_8%,var(--surface-subtle))]"
+                      : item.isOverdue
+                        ? "border-[var(--danger)] bg-[color-mix(in_srgb,var(--danger)_8%,var(--surface-subtle))]"
+                        : "border-[var(--border-subtle)] bg-[var(--surface-subtle)]"
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
+                        #{item.code} · {item.customerName}
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                        {item.riskLabel}
+                      </p>
+                      <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+                        {item.title} · {item.responsibleName} ·{" "}
+                        {item.dueDateLabel}
+                      </p>
+                    </div>
+                    <Button size="sm" onClick={() => runPrimaryAction(item)}>
+                      {item.nextAction.label}
+                    </Button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </AppSectionBlock>
+
+        <div className="flex flex-col gap-3 xl:col-span-8">
+          <AppSectionBlock
+            title="Lista operacional de O.S."
+            subtitle="Número, cliente, serviço, status, responsável, prazo, valor e ação rápida."
+            className="flex flex-col"
+            compact
+          >
+            {isLoading ? (
+              <AppPageLoadingState description="Carregando ordens de serviço..." />
+            ) : hasBlockingError ? (
+              <AppPageErrorState
+                description={
+                  serviceOrdersQuery.error?.message ??
+                  "Falha ao carregar ordens de serviço."
+                }
+                actionLabel="Tentar novamente"
+                onAction={() => void refreshEverything()}
+              />
+            ) : filteredOrders.length === 0 ? (
+              <AppPageEmptyState
+                title={
+                  searchTerm.trim()
+                    ? "Busca sem resultado"
+                    : "Nenhuma ordem encontrada"
+                }
+                description={
+                  searchTerm.trim()
+                    ? "Ajuste o termo de busca ou os filtros para continuar."
+                    : "Crie uma nova O.S. para iniciar o fluxo operacional."
+                }
+              />
+            ) : (
+              <div className="space-y-3">
+                <div className="overflow-x-auto">
+                  <AppDataTable className="min-w-[980px]">
+                    <thead>
+                      <tr>
+                        <th>O.S. / cliente</th>
+                        <th>Estado e prioridade</th>
+                        <th>Responsável e prazo</th>
+                        <th>Financeiro</th>
+                        <th className="text-right">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paginatedOrders.map(item => {
+                        const canStart =
+                          capabilities.start &&
+                          ["OPEN", "ASSIGNED"].includes(item.status);
+                        const canComplete =
+                          capabilities.complete &&
+                          item.status === "IN_PROGRESS";
+                        const canGenerateCharge =
+                          capabilities.generateCharge &&
+                          item.status === "DONE" &&
+                          !item.hasCharge;
+
+                        return (
+                          <tr
+                            key={item.id}
+                            role="button"
+                            tabIndex={0}
+                            className={cn(
+                              "cursor-pointer align-top transition-colors hover:bg-[var(--surface-subtle)]/60",
+                              selectedOrder?.id === item.id
+                                ? "bg-[var(--accent-soft)]/35"
+                                : undefined
+                            )}
+                            onClick={() => setSelectedOrderId(item.id)}
+                            onKeyDown={event => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                setSelectedOrderId(item.id);
+                              }
+                            }}
+                          >
+                            <td>
+                              <div className="min-w-[240px] space-y-1">
+                                <p className="font-semibold text-[var(--text-primary)]">
+                                  #{item.code} · {item.title}
+                                </p>
+                                <p className="max-w-[300px] truncate text-xs text-[var(--text-secondary)]">
+                                  {item.customerName}
+                                </p>
+                                <p className="max-w-[300px] truncate text-xs text-[var(--text-muted)]">
+                                  {item.description}
+                                </p>
+                              </div>
+                            </td>
+                            <td>
+                              <div className="flex min-w-[190px] flex-col items-start gap-2">
+                                <AppOperationalStatusBadge
+                                  status={getServiceOrderOperationalStatus(
+                                    item
+                                  )}
+                                  label={getStatusTone(
+                                    item.status,
+                                    item.isOverdue
+                                  )}
+                                />
+                                <AppPriorityBadge
+                                  priority={getServiceOrderPriority(item)}
+                                  label={item.riskLabel}
+                                />
+                                <span className="text-xs text-[var(--text-muted)]">
+                                  Execução: {item.statusLabel}
+                                </span>
+                              </div>
+                            </td>
+                            <td>
+                              <div className="min-w-[190px] space-y-1 text-xs text-[var(--text-secondary)]">
+                                <p className="font-medium text-[var(--text-primary)]">
+                                  {item.responsibleName}
+                                </p>
+                                <p>Prazo: {item.dueDateLabel}</p>
+                                <p>
+                                  Agenda:{" "}
+                                  {item.linkedAppointment
+                                    ? formatDate(
+                                        item.linkedAppointment?.startsAt
+                                      )
+                                    : "Sem agendamento vinculado"}
+                                </p>
+                              </div>
+                            </td>
+                            <td>
+                              <div className="min-w-[180px] space-y-2">
+                                <p className="font-medium text-[var(--text-primary)]">
+                                  {formatCurrency(item.amountCents)}
+                                </p>
+                                <AppStatusBadge
+                                  label={item.financialStatusLabel}
+                                  tone={
+                                    item.status === "DONE" && !item.hasCharge
+                                      ? "danger"
+                                      : "neutral"
+                                  }
+                                />
+                              </div>
+                            </td>
+                            <td onClick={event => event.stopPropagation()}>
+                              <div className="flex min-w-[170px] items-center justify-end gap-2">
+                                <Button
+                                  size="sm"
+                                  onClick={() => runPrimaryAction(item)}
+                                >
+                                  {item.nextAction.label}
+                                </Button>
+                                <AppRowActionsDropdown
+                                  triggerLabel="Ações da O.S."
+                                  items={[
+                                    {
+                                      label: capabilities.start
+                                        ? "Iniciar"
+                                        : "Iniciar (indisponível)",
+                                      tone: "primary",
+                                      onSelect: () => void handleStart(item.id),
+                                      disabled: !canStart || anyActionPending,
+                                    },
+                                    {
+                                      label: capabilities.complete
+                                        ? "Concluir"
+                                        : "Concluir (indisponível)",
+                                      tone: "primary",
+                                      onSelect: () =>
+                                        void handleComplete(item.id),
+                                      disabled:
+                                        !canComplete || anyActionPending,
+                                    },
+                                    {
+                                      label: capabilities.generateCharge
+                                        ? "Gerar cobrança"
+                                        : "Gerar cobrança (indisponível)",
+                                      tone: "primary",
+                                      onSelect: () =>
+                                        void handleGenerateCharge(item.id),
+                                      disabled:
+                                        !canGenerateCharge || anyActionPending,
+                                    },
+                                    {
+                                      label: capabilities.edit
+                                        ? "Editar"
+                                        : "Editar (indisponível)",
+                                      tone: "primary",
+                                      onSelect: () => setEditingId(item.id),
+                                      disabled: !capabilities.edit,
+                                    },
+                                    {
+                                      type: "separator",
+                                      label: "Navegação",
+                                    },
+                                    {
+                                      label: "Abrir O.S.",
+                                      onSelect: () =>
+                                        setSelectedOrderId(item.id),
+                                    },
+                                    {
+                                      label: "Enviar WhatsApp",
+                                      onSelect: () =>
+                                        goToWhatsAppServiceOrder(
+                                          String(item.customerId ?? ""),
+                                          String(item.id ?? "")
+                                        ),
+                                    },
+                                    {
+                                      label: "Ver cliente",
+                                      onSelect: () =>
+                                        navigate(
+                                          `/customers?customerId=${item.customerId}`
+                                        ),
+                                    },
+                                  ]}
+                                />
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </AppDataTable>
+                </div>
+                <AppPagination
+                  currentPage={currentPage}
+                  totalItems={filteredOrders.length}
+                  pageSize={pageSize}
+                  onPageChange={setCurrentPage}
+                />
+              </div>
+            )}
+          </AppSectionBlock>
+
+          <AppSectionBlock
+            title="Detalhe da O.S."
+            subtitle="Status, cliente, serviço, responsável, prazo, ações, financeiro e timeline curta."
+            className="flex flex-col"
+            compact
+          >
+            {!selectedOrder ? (
+              <AppPageEmptyState
+                title="Selecione uma O.S."
+                description="Ao selecionar, o painel mostra execução, cliente, agenda, cobrança e histórico."
+              />
+            ) : (
+              <div className="space-y-3">
+                <article className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/35 p-3">
+                  <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">
+                    Resumo
+                  </p>
+                  <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                    #{selectedOrder.code} · {selectedOrder.title}
+                  </h2>
+                  <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                    {selectedOrder.description}
+                  </p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
+                    <AppOperationalStatusBadge
+                      status={getServiceOrderOperationalStatus(selectedOrder)}
+                      label={getStatusTone(
+                        selectedOrder.status,
+                        selectedOrder.isOverdue
+                      )}
+                    />
+                    <span>Responsável: {selectedOrder.responsibleName}</span>
+                    <span>Prazo: {selectedOrder.dueDateLabel}</span>
+                  </div>
+                </article>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <article className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">
+                    <p className="text-xs uppercase text-[var(--text-muted)]">
+                      Cliente e datas
+                    </p>
+                    <p className="font-semibold text-[var(--text-primary)]">
+                      {selectedOrder.customerName}
+                    </p>
+                    <p className="text-[var(--text-secondary)]">
+                      Início execução:{" "}
+                      {formatDate(selectedOrder.startedAt, "Não iniciada")}
+                    </p>
+                    <p className="text-[var(--text-secondary)]">
+                      Conclusão:{" "}
+                      {formatDate(selectedOrder.finishedAt, "Não concluída")}
+                    </p>
+                    <p className="text-[var(--text-secondary)]">
+                      Criada em: {formatDate(selectedOrder.raw?.createdAt)}
+                    </p>
+                    <p className="text-[var(--text-secondary)]">
+                      Atualizada em: {formatDate(selectedOrder.raw?.updatedAt)}
+                    </p>
+                  </article>
+
+                  <article className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">
+                    <p className="text-xs uppercase text-[var(--text-muted)]">
+                      Cobrança / financeiro
+                    </p>
+                    <p className="text-[var(--text-secondary)]">
+                      Valor: {formatCurrency(selectedOrder.amountCents)}
+                    </p>
+                    <p className="text-[var(--text-secondary)]">
+                      Status:{" "}
+                      {selectedOrder.hasCharge
+                        ? "Cobrança vinculada"
+                        : "Sem cobrança"}
+                    </p>
+                    <p className="text-[var(--text-secondary)]">
+                      Cobrança ID:{" "}
+                      {safeText(selectedOrder.linkedCharge?.id, "—")}
+                    </p>
+                    <p className="text-[var(--text-secondary)]">
+                      Vencimento:{" "}
+                      {formatDate(selectedOrder.linkedCharge?.dueDate, "—")}
+                    </p>
+                  </article>
+                </div>
+
+                <article className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">
+                  <p className="text-xs uppercase text-[var(--text-muted)]">
+                    Agendamento vinculado
+                  </p>
+                  {selectedOrder.linkedAppointment ? (
+                    <div className="space-y-1">
+                      <p className="text-[var(--text-secondary)]">
+                        ID: {String(selectedOrder.linkedAppointment?.id ?? "—")}
+                      </p>
+                      <p className="text-[var(--text-secondary)]">
+                        Status:{" "}
+                        {safeText(selectedOrder.linkedAppointment?.status)}
+                      </p>
+                      <p className="text-[var(--text-secondary)]">
+                        Início:{" "}
+                        {formatDate(selectedOrder.linkedAppointment?.startsAt)}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-[var(--text-secondary)]">
+                      Nenhum agendamento vinculado.
+                    </p>
+                  )}
+                </article>
+
+                <article className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">
+                  <p className="text-xs uppercase text-[var(--text-muted)]">
+                    Timeline / histórico
+                  </p>
+                  {timelineQuery.isLoading ? (
+                    <p className="text-[var(--text-secondary)]">
+                      Carregando histórico...
+                    </p>
+                  ) : timeline.length === 0 ? (
+                    <p className="text-[var(--text-secondary)]">
+                      Sem eventos registrados para esta O.S.
+                    </p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {timeline.map(event => (
+                        <li
+                          key={String(
+                            event?.id ?? `${event?.action}-${event?.createdAt}`
+                          )}
+                          className="rounded-md border border-[var(--border-subtle)] p-2"
+                        >
+                          <p className="text-xs font-semibold text-[var(--text-primary)]">
+                            {safeText(event?.action ?? event?.type, "Evento")}
+                          </p>
+                          <p className="text-xs text-[var(--text-secondary)]">
+                            {safeText(event?.description, "Sem descrição")}
+                          </p>
+                          <p className="text-[11px] text-[var(--text-muted)]">
+                            {formatDate(event?.createdAt)}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </article>
+
+                <AppActionBar className="gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2 py-2">
+                  <Button
+                    type="button"
+                    onClick={() => void handleStart(selectedOrder.id)}
+                    isLoading={isPendingAction(selectedOrder.id, "start")}
+                    loadingLabel="Iniciando..."
+                    disabled={
+                      !capabilities.start ||
+                      !["OPEN", "ASSIGNED"].includes(selectedOrder.status) ||
+                      anyActionPending
+                    }
+                  >
+                    {capabilities.start ? "Iniciar" : "Iniciar (indisponível)"}
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => void handleComplete(selectedOrder.id)}
+                    isLoading={isPendingAction(selectedOrder.id, "complete")}
+                    loadingLabel="Concluindo..."
+                    disabled={
+                      !capabilities.complete ||
+                      selectedOrder.status !== "IN_PROGRESS" ||
+                      anyActionPending
+                    }
+                  >
+                    {capabilities.complete
+                      ? "Concluir"
+                      : "Concluir (indisponível)"}
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => void handleGenerateCharge(selectedOrder.id)}
+                    isLoading={isPendingAction(selectedOrder.id, "charge")}
+                    loadingLabel="Gerando..."
+                    disabled={
+                      !capabilities.generateCharge ||
+                      selectedOrder.status !== "DONE" ||
+                      selectedOrder.hasCharge ||
+                      anyActionPending
+                    }
+                  >
+                    {capabilities.generateCharge
+                      ? "Cobrar / Gerar cobrança"
+                      : "Cobrança (indisponível)"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() =>
+                      goToWhatsAppServiceOrder(
+                        String(selectedOrder.customerId ?? ""),
+                        String(selectedOrder.id ?? "")
+                      )
+                    }
+                  >
+                    Enviar WhatsApp
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() =>
+                      navigate(
+                        `/customers?customerId=${selectedOrder.customerId}`
+                      )
+                    }
+                  >
+                    Abrir cliente
+                  </Button>
+                </AppActionBar>
+
+                {actionFeedback ? (
+                  <p className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-2 text-xs text-[var(--text-secondary)]">
+                    {actionFeedback}
+                  </p>
+                ) : null}
+              </div>
+            )}
+          </AppSectionBlock>
+        </div>
+      </div>
+
+      <CreateServiceOrderModal
+        open={openCreate}
+        onClose={() => setOpenCreate(false)}
+        onSuccess={() => void refreshEverything()}
+        customers={customers.map(item => ({
+          id: String(item?.id ?? ""),
+          name: safeText(item?.name, "Cliente"),
+        }))}
+        people={people.map(item => ({
+          id: String(item?.id ?? ""),
+          name: safeText(item?.name, "Pessoa"),
+        }))}
+        appointmentId={urlAppointmentId || undefined}
+        initialCustomerId={
+          urlCustomerId || selectedOrder?.customerId || undefined
+        }
+      />
+
+      <EditServiceOrderModal
+        isOpen={Boolean(editingId)}
+        onClose={() => setEditingId(null)}
+        onSuccess={() => {
+          setEditingId(null);
+          void refreshEverything();
+        }}
+        serviceOrderId={editingId}
+        people={people.map(item => ({
+          id: String(item?.id ?? ""),
+          name: safeText(item?.name, "Pessoa"),
+        }))}
+      />
     </AppPageShell>
   );
 }

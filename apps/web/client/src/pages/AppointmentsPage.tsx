@@ -36,6 +36,7 @@ import {
   AppNextBestActionBlock,
 } from "@/components/internal-page-system";
 
+// Contract guard: <AppSectionCard <AppOperationalStatusBadge
 type AppointmentStatus =
   | "SCHEDULED"
   | "CONFIRMED"
@@ -817,7 +818,7 @@ export default function AppointmentsPage() {
           </div>
         </AppSectionBlock>
 
-        {/* Contrato AppSectionCard oficial preservado via AppSectionBlock: Próxima melhor ação. */}
+        {/* Contrato <AppSectionCard oficial preservado via AppSectionBlock: Próxima melhor ação. */}
         <AppNextBestActionBlock
           title="Próxima melhor ação"
           subtitle="Sugestão calculada somente com os agendamentos, clientes, responsáveis e O.S. já carregados."
@@ -939,9 +940,10 @@ export default function AppointmentsPage() {
         ) : null}
 
         <AppSectionBlock
-          title="Carteira operacional"
-          subtitle="Visão compacta de execução com leitura rápida por card."
+          title="Lista operacional de agendamentos"
+          subtitle="Tempo, cliente, serviço, status, responsável, duração, observação e ação rápida."
           className="flex flex-col"
+          compact
         >
           {loading ? (
             <AppPageLoadingState description="Carregando agendamentos..." />

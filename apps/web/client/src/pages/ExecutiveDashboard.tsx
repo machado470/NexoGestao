@@ -908,87 +908,95 @@ export default function ExecutiveDashboard() {
       ) : null}
 
       {!pageLoading && !pageError && hasOperationalData ? (
-        <div className="w-full min-w-0 space-y-5 sm:space-y-6">
-          <AppSectionBlock
-            title="Atenção imediata"
-            className={`${fullWidthLayoutClass} border-[var(--danger)]/30 bg-[var(--surface-base)]`}
-            subtitle="Comece aqui: riscos que interrompem execução, recebimento ou atendimento, em ordem de severidade."
-          >
-            {attention.length > 0 ? (
-              <div className="w-full min-w-0 divide-y divide-[var(--border-subtle)]/70">
-                {attention.map(item => (
-                  <AttentionRow key={item.id} item={item} navigate={navigate} />
-                ))}
-              </div>
-            ) : (
-              <AppPageEmptyState
-                title="Nenhum alerta operacional retornado"
-                description="A leitura foi concluída sem riscos ativos. Continue acompanhando a fila operacional."
-              />
-            )}
-          </AppSectionBlock>
+        <div className="w-full min-w-0 space-y-4 sm:space-y-5">
+          <div className="grid w-full min-w-0 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.82fr)]">
+            <AppSectionBlock
+              title="Atenção imediata"
+              compact
+              className="border-[var(--danger)]/30 bg-[var(--surface-base)]"
+              subtitle="Riscos que interrompem execução, recebimento ou atendimento."
+            >
+              {attention.length > 0 ? (
+                <div className="w-full min-w-0 divide-y divide-[var(--border-subtle)]/70">
+                  {attention.map(item => (
+                    <AttentionRow
+                      key={item.id}
+                      item={item}
+                      navigate={navigate}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <AppPageEmptyState
+                  title="Nenhum alerta operacional retornado"
+                  description="A leitura foi concluída sem riscos ativos. Continue acompanhando a fila operacional."
+                />
+              )}
+            </AppSectionBlock>
 
-          <AppSectionBlock
-            title="Próxima melhor ação"
-            className={`${fullWidthLayoutClass} border-[var(--accent-primary)]/30 bg-[var(--surface-base)]`}
-            subtitle="Uma decisão principal para converter a leitura operacional em avanço imediato."
-          >
-            {recommendedAction ? (
-              <div className="flex w-full min-w-0 flex-col gap-3 py-0.5 lg:flex-row lg:items-center lg:justify-between">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <AppContextChip
-                      tone="accent"
-                      className="text-[11px] font-semibold uppercase tracking-[0.08em]"
-                    >
-                      Aguardando ação
-                    </AppContextChip>
-                    <Zap className="h-4 w-4 text-[var(--accent-primary)]" />
-                    <p className="text-lg font-semibold leading-tight text-[var(--text-primary)]">
-                      {recommendedAction.title}
-                    </p>
+            <AppSectionBlock
+              title="Próxima melhor ação"
+              compact
+              className="border-[var(--accent-primary)]/30 bg-[var(--surface-base)]"
+              subtitle="Decisão principal para converter leitura em avanço imediato."
+            >
+              {recommendedAction ? (
+                <div className="flex w-full min-w-0 flex-col gap-3 py-0.5 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <AppContextChip
+                        tone="accent"
+                        className="text-[11px] font-semibold uppercase tracking-[0.08em]"
+                      >
+                        Aguardando ação
+                      </AppContextChip>
+                      <Zap className="h-4 w-4 text-[var(--accent-primary)]" />
+                      <p className="text-lg font-semibold leading-tight text-[var(--text-primary)]">
+                        {recommendedAction.title}
+                      </p>
+                    </div>
+                    <div className="mt-2 grid gap-1.5 text-sm leading-5 text-[var(--text-secondary)] md:grid-cols-2">
+                      <p>
+                        <strong className="text-[var(--text-primary)]">
+                          Por que agora:
+                        </strong>{" "}
+                        {recommendedAction.reason}
+                      </p>
+                      <p>
+                        <strong className="text-[var(--text-primary)]">
+                          Efeito esperado:
+                        </strong>{" "}
+                        {recommendedAction.impact}
+                      </p>
+                    </div>
                   </div>
-                  <div className="mt-2 grid gap-1.5 text-sm leading-5 text-[var(--text-secondary)] md:grid-cols-2">
-                    <p>
-                      <strong className="text-[var(--text-primary)]">
-                        Por que agora:
-                      </strong>{" "}
-                      {recommendedAction.reason}
-                    </p>
-                    <p>
-                      <strong className="text-[var(--text-primary)]">
-                        Efeito esperado:
-                      </strong>{" "}
-                      {recommendedAction.impact}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex w-full flex-wrap gap-2 lg:w-auto lg:shrink-0 lg:justify-end">
-                  {nextBestActionQuery.isError ? (
+                  <div className="flex w-full flex-wrap gap-2 lg:w-auto lg:shrink-0 lg:justify-end">
+                    {nextBestActionQuery.isError ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => void nextBestActionQuery.refetch()}
+                      >
+                        Tentar novamente
+                      </Button>
+                    ) : null}
                     <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => void nextBestActionQuery.refetch()}
+                      className="w-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] sm:w-auto"
+                      onClick={() => navigate(recommendedAction.path)}
                     >
-                      Tentar novamente
+                      {recommendedAction.ctaLabel}
+                      <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>
-                  ) : null}
-                  <Button
-                    className="w-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] sm:w-auto"
-                    onClick={() => navigate(recommendedAction.path)}
-                  >
-                    {recommendedAction.ctaLabel}
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <AppPageEmptyState
-                title="Nenhuma Próxima Melhor Ação disponível"
-                description="A leitura atual não identificou urgências acionáveis; nenhuma ação artificial foi criada."
-              />
-            )}
-          </AppSectionBlock>
+              ) : (
+                <AppPageEmptyState
+                  title="Nenhuma Próxima Melhor Ação disponível"
+                  description="A leitura atual não identificou urgências acionáveis; nenhuma ação artificial foi criada."
+                />
+              )}
+            </AppSectionBlock>
+          </div>
 
           <AppSectionBlock
             title="KPIs operacionais"
@@ -1050,7 +1058,7 @@ export default function ExecutiveDashboard() {
                 </span>
               )}
             </div>
-            <div className="flex w-full min-w-0 flex-col divide-y divide-[var(--border-subtle)]/70 2xl:flex-row 2xl:divide-x 2xl:divide-y-0">
+            <div className="grid w-full min-w-0 gap-2 md:grid-cols-5">
               {flow.map((stage, index) => {
                 const isBreak = bottleneck?.label.startsWith(stage.label);
                 const StageIcon = [
@@ -1063,7 +1071,7 @@ export default function ExecutiveDashboard() {
                 return (
                   <article
                     key={stage.label}
-                    className={`relative w-full min-w-0 rounded-xl border px-3 py-3 2xl:flex-1 ${
+                    className={`relative w-full min-w-0 rounded-xl border px-3 py-2.5 ${
                       isBreak
                         ? "rounded-xl border border-[var(--accent-primary)]/45 bg-[var(--accent-soft)]"
                         : "border border-[var(--border-subtle)]/70 bg-[var(--surface-primary)]/25"
@@ -1097,7 +1105,7 @@ export default function ExecutiveDashboard() {
                         Gargalo principal
                       </p>
                     ) : null}
-                    <p className="mt-1.5 text-2xl font-semibold leading-tight text-[var(--text-primary)]">
+                    <p className="mt-1 text-xl font-semibold leading-tight text-[var(--text-primary)]">
                       {stage.value}
                     </p>
                     <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
@@ -1125,43 +1133,46 @@ export default function ExecutiveDashboard() {
           >
             {queue.length > 0 ? (
               <div className="w-full min-w-0">
-                <div className="flex w-full min-w-0 flex-col divide-y divide-[var(--border-subtle)]/70">
-                  {queue.map(item => (
-                    <article
-                      key={`${item.type}-${item.id}`}
-                      className="w-full min-w-0 px-3 py-3 first:pt-0 md:first:pt-3"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--text-secondary)]">
-                              {item.type}
-                            </p>
-                            <AppPriorityBadge label={item.priority} />
-                          </div>
-                          <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+                <div className="w-full min-w-0 overflow-x-auto rounded-xl border border-[var(--border-subtle)]/70">
+                  <div className="min-w-[760px] divide-y divide-[var(--border-subtle)]/70 text-xs">
+                    <div className="grid grid-cols-[0.8fr_1.5fr_1fr_1fr_1fr_0.8fr] gap-3 bg-[var(--surface-primary)]/35 px-3 py-2 font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                      <span>Tipo</span>
+                      <span>Entidade</span>
+                      <span>Status</span>
+                      <span>Prazo</span>
+                      <span>Responsável</span>
+                      <span className="text-right">Ação</span>
+                    </div>
+                    {queue.slice(0, 5).map(item => (
+                      <article
+                        key={`${item.type}-${item.id}`}
+                        className="grid grid-cols-[0.8fr_1.5fr_1fr_1fr_1fr_0.8fr] items-center gap-3 px-3 py-2.5 text-[var(--text-secondary)]"
+                      >
+                        <span className="flex items-center gap-2">
+                          <AppPriorityBadge label={item.priority} /> {item.type}
+                        </span>
+                        <span className="min-w-0">
+                          <strong className="block truncate text-sm text-[var(--text-primary)]">
                             {item.entity}
-                          </p>
-                        </div>
+                          </strong>
+                          <span className="block truncate">{item.context}</span>
+                        </span>
+                        <span className="font-medium text-[var(--text-primary)]">
+                          {item.status}
+                        </span>
+                        <span>{item.dueLabel}</span>
+                        <span>{item.responsible}</span>
                         <Button
-                          className="h-auto shrink-0 px-0 py-0 text-[var(--accent-primary)]"
+                          className="h-auto justify-self-end px-0 py-0 text-[var(--accent-primary)]"
                           variant="link"
                           size="sm"
                           onClick={() => navigate(item.path)}
                         >
                           {item.ctaLabel}
                         </Button>
-                      </div>
-                      <div className="mt-1 grid gap-1 text-xs leading-5 text-[var(--text-secondary)] md:grid-cols-3">
-                        <p>{item.context}</p>
-                        <p>Prazo/horário: {item.dueLabel}</p>
-                        <p>Responsável: {item.responsible}</p>
-                      </div>
-                      <p className="mt-1 text-xs font-medium text-[var(--text-primary)]">
-                        Status: {item.status}
-                      </p>
-                    </article>
-                  ))}
+                      </article>
+                    ))}
+                  </div>
                 </div>
                 <Button
                   className="mt-2 h-auto px-0 py-0 text-[var(--accent-primary)]"
