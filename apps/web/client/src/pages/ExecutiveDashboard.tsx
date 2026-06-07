@@ -10,6 +10,7 @@ import {
   CreditCard,
   MessageSquareWarning,
   ShieldAlert,
+  ShieldCheck,
   TrendingDown,
   Zap,
   UserRound,
@@ -30,6 +31,7 @@ import {
   AppPageLoadingState,
   AppPageShell,
   AppSectionBlock,
+  AppPriorityBadge,
   AppStatusBadge,
 } from "@/components/internal-page-system";
 import {
@@ -69,6 +71,10 @@ type QueueItem = {
   type: string;
   entity: string;
   context: string;
+  status: string;
+  dueLabel: string;
+  responsible: string;
+  priority: Severity;
   ctaLabel: string;
   path: string;
 };
@@ -97,6 +103,12 @@ type QueueRecord = DashboardRecord & {
   title?: unknown;
   context?: unknown;
   amountCents?: unknown;
+  startsAt?: unknown;
+  lastMessageAt?: unknown;
+  serviceOrderId?: unknown;
+  chargeId?: unknown;
+  appointmentId?: unknown;
+  messageId?: unknown;
 };
 
 type DashboardAlerts = {
@@ -145,6 +157,29 @@ function readNullableNumber(record: DashboardRecord, key: string) {
   return typeof record[key] === "number" && Number.isFinite(record[key])
     ? (record[key] as number)
     : null;
+}
+function readString(record: DashboardRecord, key: string) {
+  return typeof record[key] === "string" ? (record[key] as string) : "";
+}
+
+function formatShortDateTime(value: unknown) {
+  if (typeof value !== "string" && !(value instanceof Date))
+    return "Prazo não informado";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "Prazo não informado";
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function isGovernanceAttention(level: string) {
+  return ["WARNING", "RESTRICTED", "SUSPENDED", "HIGH", "CRITICAL"].includes(
+    level.toUpperCase()
+  );
 }
 
 function describeComparison(
@@ -212,7 +247,11 @@ function fromSignal(signal: OperationalSignal): AttentionItem {
   };
 }
 
-function buildAttention(alerts: DashboardAlerts, signals: OperationalSignal[]) {
+function buildAttention(
+  alerts: DashboardAlerts,
+  signals: OperationalSignal[],
+  metrics: DashboardRecord
+) {
   const items = signals.map(fromSignal);
   const add = (condition: number, item: Omit<AttentionItem, "id">) => {
     if (condition > 0)
@@ -244,6 +283,70 @@ function buildAttention(alerts: DashboardAlerts, signals: OperationalSignal[]) {
     ctaLabel: "Fechar serviços concluídos",
     path: "/service-orders?status=done",
   });
+  add(alerts.customersWithPending?.count ?? 0, {
+    severity: "high",
+    title: "Clientes com pendência financeira ativa",
+    reason: `${alerts.customersWithPending?.count} cliente(s) possuem cobranças pendentes ou vencidas.`,
+    impact: "Carteira sem contato aumenta risco de inadimplência e retrabalho.",
+    ctaLabel: "Abrir carteira financeira",
+    path: "/finances?view=charges",
+  });
+
+  const unconfirmedAppointments = (alerts.operationalQueue ?? []).filter(
+    item => item.type === "UNCONFIRMED_APPOINTMENT"
+  ).length;
+  add(unconfirmedAppointments, {
+    severity: "high",
+    title: "Agendamentos sem confirmação",
+    reason: `${unconfirmedAppointments} agendamento(s) nas próximas 48 horas ainda precisam confirmação.`,
+    impact:
+      "Agenda sem confirmação aumenta o risco de deslocamento perdido e O.S. parada.",
+    ctaLabel: "Confirmar agenda",
+    path: "/appointments?status=pending-confirmation",
+  });
+
+  const whatsappSignals = asRecord(metrics.whatsappSignals);
+  const failedMessages = readNumber(whatsappSignals, "failedMessages");
+  const customersNoResponse = readNumber(
+    whatsappSignals,
+    "customersNoResponse"
+  );
+  add(failedMessages, {
+    severity: "high",
+    title: "Mensagens WhatsApp com falha",
+    reason: `${failedMessages} mensagem(ns) falharam no canal operacional.`,
+    impact: "Confirmações, cobranças e retornos podem não chegar ao cliente.",
+    ctaLabel: "Revisar WhatsApp",
+    path: "/whatsapp",
+  });
+  add(customersNoResponse, {
+    severity: "medium",
+    title: "Clientes aguardando resposta",
+    reason: `${customersNoResponse} conversa(s) estão aguardando operador.`,
+    impact:
+      "Tempo de resposta alto trava confirmação e continuidade do atendimento.",
+    ctaLabel: "Responder conversas",
+    path: "/whatsapp",
+  });
+
+  const governance = asRecord(metrics.governance);
+  const governanceLevel = readString(governance, "level").toUpperCase();
+  if (governanceLevel && isGovernanceAttention(governanceLevel)) {
+    items.push({
+      id: `governance-${governanceLevel}`,
+      severity:
+        governanceLevel === "SUSPENDED" || governanceLevel === "CRITICAL"
+          ? "critical"
+          : "high",
+      title: `Governança em ${governanceLevel}`,
+      reason: "O serviço de governança retornou sinal fora do nível normal.",
+      impact:
+        "Regras, limites ou restrições podem afetar ações assistidas e operação.",
+      ctaLabel: "Ver governança",
+      path: "/governance",
+    });
+  }
+
   return items
     .sort((a, b) => severityWeight[b.severity] - severityWeight[a.severity])
     .slice(0, 5);
@@ -260,8 +363,12 @@ function buildQueue(alerts: DashboardAlerts): QueueItem[] {
         context: formatCurrencyMentions(
           String(item.context ?? "Prazo operacional vencido")
         ),
+        status: "Prazo vencido",
+        dueLabel: "Vencida",
+        responsible: "Operação / O.S.",
+        priority: "critical",
         ctaLabel: "Destravar",
-        path: `/service-orders?id=${String(item.id)}`,
+        path: `/service-orders?id=${String(item.serviceOrderId ?? item.id)}`,
       };
     if (type === "OVERDUE_CHARGE") {
       const amount =
@@ -283,6 +390,10 @@ function buildQueue(alerts: DashboardAlerts): QueueItem[] {
         type: "Cobrança vencida",
         entity: String(item.title ?? "Cliente"),
         context: `${amountLabel} pendentes${context ? ` · ${context}` : ""}`,
+        status: "Vencida",
+        dueLabel: "Financeiro vencido",
+        responsible: "Financeiro",
+        priority: "critical",
         ctaLabel: "Cobrar",
         path: "/finances?view=charges&status=overdue",
       };
@@ -295,6 +406,10 @@ function buildQueue(alerts: DashboardAlerts): QueueItem[] {
         context: formatCurrencyMentions(
           String(item.context ?? "Conversa aguardando resposta da operação")
         ),
+        status: "Aguardando operador",
+        dueLabel: formatShortDateTime(item.lastMessageAt),
+        responsible: "Atendimento",
+        priority: "high",
         ctaLabel: "Responder cliente",
         path: "/whatsapp",
       };
@@ -306,6 +421,10 @@ function buildQueue(alerts: DashboardAlerts): QueueItem[] {
         context: formatCurrencyMentions(
           String(item.context ?? "Confirmação pendente")
         ),
+        status: "Sem confirmação",
+        dueLabel: formatShortDateTime(item.startsAt),
+        responsible: "Agenda",
+        priority: "high",
         ctaLabel: "Confirmar agenda",
         path: "/appointments",
       };
@@ -316,6 +435,10 @@ function buildQueue(alerts: DashboardAlerts): QueueItem[] {
       context: formatCurrencyMentions(
         String(item.context ?? "Falha retornada pelo backend")
       ),
+      status: "Falha de envio",
+      dueLabel: "Falha recente",
+      responsible: "WhatsApp",
+      priority: "high",
       ctaLabel: "Resolver mensagem",
       path: "/whatsapp",
     };
@@ -344,13 +467,17 @@ function AttentionRow({
                     : "Monitorar"
               }
             />
-            <p className="text-sm font-semibold text-[var(--text-primary)]">{item.title}</p>
+            <p className="text-sm font-semibold text-[var(--text-primary)]">
+              {item.title}
+            </p>
           </div>
           <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
-            <strong className="text-[var(--text-primary)]">Motivo:</strong> {item.reason}
+            <strong className="text-[var(--text-primary)]">Motivo:</strong>{" "}
+            {item.reason}
           </p>
           <p className="text-xs leading-5 text-[var(--text-secondary)]">
-            <strong className="text-[var(--text-primary)]">Impacto:</strong> {item.impact}
+            <strong className="text-[var(--text-primary)]">Impacto:</strong>{" "}
+            {item.impact}
           </p>
         </div>
         <Button
@@ -412,8 +539,8 @@ export default function ExecutiveDashboard() {
   const alerts = useMemo(() => asAlerts(alertsQuery.data), [alertsQuery.data]);
   const signals = operationalSignalsQuery.data?.signals ?? [];
   const attention = useMemo(
-    () => buildAttention(alerts, signals),
-    [alerts, signals]
+    () => buildAttention(alerts, signals, metrics),
+    [alerts, signals, metrics]
   );
   const queue = useMemo(() => buildQueue(alerts), [alerts]);
   const pendingWhatsAppApprovals = Array.isArray(
@@ -514,24 +641,51 @@ export default function ExecutiveDashboard() {
     "failedMessages"
   );
   const nextBestAction = nextBestActionQuery.data;
-  const fallbackAction: RecommendedAction | null =
-    overdueCharges > 0
+  const highestValueOverdueCharge = (alerts.overdueCharges?.items ?? [])
+    .slice()
+    .sort(
+      (a, b) =>
+        readNumber(asRecord(b), "amountCents") -
+        readNumber(asRecord(a), "amountCents")
+    )[0];
+  const highestValueChargeRecord = asRecord(highestValueOverdueCharge);
+  const highestValueChargeCustomer = readString(
+    asRecord(highestValueChargeRecord.customer),
+    "name"
+  );
+  const firstQueueItem = queue[0];
+  const fallbackAction: RecommendedAction | null = highestValueOverdueCharge
+    ? {
+        title: `Cobrar ${highestValueChargeCustomer || "cliente em atraso"} — ${formatCurrencyFromCents(readNumber(highestValueChargeRecord, "amountCents"))}`,
+        reason:
+          "Maior cobrança vencida retornada pela leitura financeira atual.",
+        impact:
+          "Ação direta sobre o maior valor parado reduz pressão imediata no caixa.",
+        path: "/finances?view=charges&status=overdue",
+        ctaLabel: "Enviar cobrança",
+      }
+    : overdueOrders > 0
       ? {
-          title: "Cobrar carteira vencida",
-          reason: `${overdueCharges} cobrança(s) vencida(s) aguardam tratamento.`,
+          title:
+            firstQueueItem?.type === "O.S. atrasada"
+              ? `Destravar ${firstQueueItem.entity}`
+              : "Revisar O.S. atrasadas",
+          reason: `${overdueOrders} O.S. atrasada(s) precisam avançar antes de novas janelas.`,
           impact:
-            "A recuperação da carteira reduz pressão imediata sobre o caixa.",
-          path: "/finances?view=charges&status=overdue",
-          ctaLabel: "Cobrar carteira vencida",
+            "Destravar a execução protege agenda, cliente e faturamento do serviço.",
+          path:
+            firstQueueItem?.type === "O.S. atrasada"
+              ? firstQueueItem.path
+              : "/service-orders?status=attention",
+          ctaLabel: "Revisar O.S. atrasadas",
         }
-      : overdueOrders > 0
+      : firstQueueItem
         ? {
-            title: "Revisar O.S. atrasadas",
-            reason: `${overdueOrders} O.S. atrasada(s) precisam avançar.`,
-            impact:
-              "Destravar a execução protege as próximas janelas de atendimento.",
-            path: "/service-orders?status=attention",
-            ctaLabel: "Revisar O.S. atrasadas",
+            title: `${firstQueueItem.ctaLabel} — ${firstQueueItem.entity}`,
+            reason: `${firstQueueItem.type}: ${firstQueueItem.context}`,
+            impact: `Responsável: ${firstQueueItem.responsible}. Status atual: ${firstQueueItem.status}.`,
+            path: firstQueueItem.path,
+            ctaLabel: firstQueueItem.ctaLabel,
           }
         : failedMessages > 0
           ? {
@@ -574,9 +728,11 @@ export default function ExecutiveDashboard() {
   const bottleneckStage = bottleneck?.label.split(" → ")[0] ?? "Fluxo";
   const kpiCards = [
     {
-      label: "Caixa recebido",
-      value: formatCurrencyFromCents(readNumber(metrics, "paidRevenueInCents")),
-      context: "Entrada financeira registrada.",
+      label: "Receita da semana",
+      value: formatCurrencyFromCents(
+        readNumber(metrics, "weeklyRevenueInCents")
+      ),
+      context: "Pagamentos registrados no período atual.",
       cta: "Ver pagamentos",
       path: "/finances?view=paid",
       Icon: WalletCards,
@@ -620,24 +776,34 @@ export default function ExecutiveDashboard() {
 
   const quickAccesses = [
     {
-      label: "Financeiro em atraso",
+      label: "Ver financeiro",
       path: "/finances?view=charges&status=overdue",
       Icon: CircleDollarSign,
     },
     {
-      label: "O.S. com atenção",
+      label: "Ver O.S.",
       path: "/service-orders?status=attention",
       Icon: ClipboardList,
     },
     {
-      label: "Agenda sem confirmação",
+      label: "Ver agendamentos",
       path: "/appointments?status=pending-confirmation",
       Icon: CalendarClock,
     },
     {
-      label: "WhatsApp operacional",
+      label: "Ver WhatsApp",
       path: "/whatsapp",
       Icon: MessageSquareWarning,
+    },
+    {
+      label: "Ver timeline",
+      path: "/timeline",
+      Icon: Clock3,
+    },
+    {
+      label: "Ver governança",
+      path: "/governance",
+      Icon: ShieldCheck,
     },
   ];
   const pulseInsights = [
@@ -699,7 +865,9 @@ export default function ExecutiveDashboard() {
         contextChips={
           <>
             <AppContextChip>{formatPeriod()}</AppContextChip>
-            <AppContextChip tone={operationState === "Normal" ? "success" : "accent"}>
+            <AppContextChip
+              tone={operationState === "Normal" ? "success" : "accent"}
+            >
               Estado: {statusLabel}
             </AppContextChip>
             <AppContextChip tone={criticalCount > 0 ? "danger" : "neutral"}>
@@ -769,7 +937,10 @@ export default function ExecutiveDashboard() {
               <div className="flex w-full min-w-0 flex-col gap-3 py-0.5 lg:flex-row lg:items-center lg:justify-between">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <AppContextChip tone="accent" className="text-[11px] font-semibold uppercase tracking-[0.08em]">
+                    <AppContextChip
+                      tone="accent"
+                      className="text-[11px] font-semibold uppercase tracking-[0.08em]"
+                    >
                       Aguardando ação
                     </AppContextChip>
                     <Zap className="h-4 w-4 text-[var(--accent-primary)]" />
@@ -779,7 +950,9 @@ export default function ExecutiveDashboard() {
                   </div>
                   <div className="mt-2 grid gap-1.5 text-sm leading-5 text-[var(--text-secondary)] md:grid-cols-2">
                     <p>
-                      <strong className="text-[var(--text-primary)]">Por que agora:</strong>{" "}
+                      <strong className="text-[var(--text-primary)]">
+                        Por que agora:
+                      </strong>{" "}
                       {recommendedAction.reason}
                     </p>
                     <p>
@@ -801,7 +974,7 @@ export default function ExecutiveDashboard() {
                     </Button>
                   ) : null}
                   <Button
-                    className="w-full bg-[var(--accent-primary)] text-white hover:bg-[color-mix(in_srgb,var(--accent-primary)_86%,black)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] sm:w-auto"
+                    className="w-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] sm:w-auto"
                     onClick={() => navigate(recommendedAction.path)}
                   >
                     {recommendedAction.ctaLabel}
@@ -872,7 +1045,7 @@ export default function ExecutiveDashboard() {
                 </>
               ) : (
                 <span>
-                  <CheckCircle2 className="mr-2 inline h-4 w-4 text-emerald-500" />
+                  <CheckCircle2 className="mr-2 inline h-4 w-4 text-[var(--success)]" />
                   Nenhum gargalo foi identificado com os dados disponíveis.
                 </span>
               )}
@@ -899,7 +1072,9 @@ export default function ExecutiveDashboard() {
                     {index < flow.length - 1 ? (
                       <ChevronRight
                         className={`absolute right-2 top-3 hidden h-4 w-4 lg:block ${
-                          isBreak ? "text-[var(--accent-primary)]" : "text-[var(--text-secondary)]/70"
+                          isBreak
+                            ? "text-[var(--accent-primary)]"
+                            : "text-[var(--text-secondary)]/70"
                         }`}
                       />
                     ) : null}
@@ -909,7 +1084,9 @@ export default function ExecutiveDashboard() {
                       />
                       <p
                         className={`text-[11px] font-semibold uppercase tracking-[0.08em] ${
-                          isBreak ? "text-[var(--accent-primary)]" : "text-[var(--text-secondary)]"
+                          isBreak
+                            ? "text-[var(--accent-primary)]"
+                            : "text-[var(--text-secondary)]"
                         }`}
                       >
                         {stage.label}
@@ -956,9 +1133,12 @@ export default function ExecutiveDashboard() {
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--text-secondary)]">
-                            {item.type}
-                          </p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--text-secondary)]">
+                              {item.type}
+                            </p>
+                            <AppPriorityBadge label={item.priority} />
+                          </div>
                           <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
                             {item.entity}
                           </p>
@@ -972,8 +1152,13 @@ export default function ExecutiveDashboard() {
                           {item.ctaLabel}
                         </Button>
                       </div>
-                      <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
-                        {item.context}
+                      <div className="mt-1 grid gap-1 text-xs leading-5 text-[var(--text-secondary)] md:grid-cols-3">
+                        <p>{item.context}</p>
+                        <p>Prazo/horário: {item.dueLabel}</p>
+                        <p>Responsável: {item.responsible}</p>
+                      </div>
+                      <p className="mt-1 text-xs font-medium text-[var(--text-primary)]">
+                        Status: {item.status}
                       </p>
                     </article>
                   ))}
@@ -1012,7 +1197,9 @@ export default function ExecutiveDashboard() {
                     <span className="flex h-7 w-7 items-center justify-center rounded-full border border-[var(--border-subtle)]/70 bg-[var(--surface-elevated)]/65">
                       <Icon className={`h-4 w-4 ${iconClass}`} />
                     </span>
-                    <strong className="text-[var(--text-primary)]">{label}</strong>
+                    <strong className="text-[var(--text-primary)]">
+                      {label}
+                    </strong>
                   </div>
                   <p>{text}</p>
                 </article>
