@@ -653,7 +653,7 @@ export default function AppointmentsPage() {
         reason: `${overdue.customerName} ficou com horário vencido em ${formatDateTime(overdue.item.startsAt)}.`,
         impact:
           "Evita quebra do fluxo Cliente → Agendamento → O.S. → Financeiro.",
-        ctaLabel: "Ver detalhe",
+        ctaLabel: "Abrir agendamento",
         onClick: () => setSelectedAppointmentId(String(overdue.item.id)),
       };
     }
@@ -715,7 +715,7 @@ export default function AppointmentsPage() {
   }
   return (
     <AppPageShell>
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
         <AppOperationalHeader
           title="Agendamentos"
           description="Controle do tempo, confirmação e preparação da execução"
@@ -747,10 +747,10 @@ export default function AppointmentsPage() {
 
         <AppSectionBlock
           title="Resumo operacional"
-          subtitle="KPIs da agenda para confirmar, prevenir atraso e preparar execução."
+          subtitle="Confirmação, atraso e preparo de execução."
           compact
         >
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs text-[var(--text-muted)]">
               Saúde calculada com a carteira carregada, sem mudar filtros ou
               regras de status.
@@ -776,7 +776,7 @@ export default function AppointmentsPage() {
               }
             />
           </div>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-5">
             {[
               ["Hoje", agendaHealth.today, "Entradas previstas para o dia."],
               [
@@ -906,7 +906,7 @@ export default function AppointmentsPage() {
           )}
         </AppSectionBlock>
 
-        <AppFiltersBar className="shrink-0 gap-2 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-3">
+        <AppFiltersBar className="shrink-0 gap-2 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2">
           {FILTERS.map(filter => (
             <button
               key={filter.key}

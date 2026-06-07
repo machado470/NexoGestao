@@ -984,7 +984,7 @@ export default function CustomersPage() {
   const customersOperationalStatus = getCustomersOperationalStatus(profiles);
 
   return (
-    <AppPageShell className="space-y-4">
+    <AppPageShell className="gap-3">
       <AppOperationalHeader
         title="Clientes"
         description="Centro de contexto operacional, financeiro e comunicação de cada relacionamento ativo."
@@ -1026,7 +1026,7 @@ export default function CustomersPage() {
         </div>
       </AppOperationalHeader>
 
-      <AppSectionCard className="space-y-3">
+      <AppSectionCard className="space-y-2.5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <p className="nexo-overline">Próxima decisão da carteira</p>
@@ -1272,7 +1272,7 @@ export default function CustomersPage() {
             />
           ) : (
             <div className="space-y-3">
-              <div className="overflow-x-auto">
+              <div className="max-h-[560px] overflow-auto">
                 <AppDataTable className="min-w-[860px]">
                   <thead>
                     <tr>
@@ -1475,7 +1475,7 @@ export default function CustomersPage() {
             />
           ) : (
             <div className="space-y-3">
-              <article className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/35 p-3.5">
+              <article className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/35 p-3">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-[var(--text-primary)]">
@@ -1932,7 +1932,7 @@ export default function CustomersPage() {
                             variant="ghost"
                             onClick={() => navigate(String(event.link))}
                           >
-                            Ver detalhe
+                            Ver histórico
                           </Button>
                         ) : null,
                       }))}

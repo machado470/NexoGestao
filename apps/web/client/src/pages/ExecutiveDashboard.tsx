@@ -857,7 +857,7 @@ export default function ExecutiveDashboard() {
       ? "Operação normal"
       : "Atenção / Aguardando ação";
   return (
-    <AppPageShell className="space-y-5 sm:space-y-6">
+    <AppPageShell className="gap-3 sm:gap-4">
       <AppOperationalHeader
         density="compact"
         title="Operação hoje"
@@ -908,7 +908,7 @@ export default function ExecutiveDashboard() {
       ) : null}
 
       {!pageLoading && !pageError && hasOperationalData ? (
-        <div className="w-full min-w-0 space-y-4 sm:space-y-5">
+        <div className="w-full min-w-0 space-y-3 sm:space-y-4">
           <div className="grid w-full min-w-0 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.82fr)]">
             <AppSectionBlock
               title="Atenção imediata"
@@ -941,7 +941,7 @@ export default function ExecutiveDashboard() {
               subtitle="Decisão principal para converter leitura em avanço imediato."
             >
               {recommendedAction ? (
-                <div className="flex w-full min-w-0 flex-col gap-3 py-0.5 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex w-full min-w-0 flex-col gap-2 py-0.5 lg:flex-row lg:items-center lg:justify-between">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <AppContextChip
@@ -955,7 +955,7 @@ export default function ExecutiveDashboard() {
                         {recommendedAction.title}
                       </p>
                     </div>
-                    <div className="mt-2 grid gap-1.5 text-sm leading-5 text-[var(--text-secondary)] md:grid-cols-2">
+                    <div className="mt-1.5 grid gap-1.5 text-sm leading-5 text-[var(--text-secondary)] md:grid-cols-2">
                       <p>
                         <strong className="text-[var(--text-primary)]">
                           Por que agora:
@@ -1133,7 +1133,7 @@ export default function ExecutiveDashboard() {
           >
             {queue.length > 0 ? (
               <div className="w-full min-w-0">
-                <div className="w-full min-w-0 overflow-x-auto rounded-xl border border-[var(--border-subtle)]/70">
+                <div className="max-h-[360px] w-full min-w-0 overflow-auto rounded-xl border border-[var(--border-subtle)]/70">
                   <div className="min-w-[760px] divide-y divide-[var(--border-subtle)]/70 text-xs">
                     <div className="grid grid-cols-[0.8fr_1.5fr_1fr_1fr_1fr_0.8fr] gap-3 bg-[var(--surface-primary)]/35 px-3 py-2 font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
                       <span>Tipo</span>
