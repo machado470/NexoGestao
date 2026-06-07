@@ -1227,22 +1227,15 @@ export default function FinancesPage() {
               </button>
             ))}
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setStatusFilter("overdue")}
-            >
-              Priorizar atraso
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setStatusFilter("pending")}
-            >
-              Cobrar pendências
-            </Button>
-          </div>
+          <details className="relative">
+            <summary className="flex h-8 cursor-pointer list-none items-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 text-xs font-medium text-[var(--text-secondary)]">
+              Mais filtros
+            </summary>
+            <div className="absolute right-0 z-20 mt-2 grid min-w-[190px] gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-2">
+              <Button size="sm" variant="outline" onClick={() => setStatusFilter("overdue")}>Priorizar atraso</Button>
+              <Button size="sm" variant="outline" onClick={() => setStatusFilter("pending")}>Cobrar pendências</Button>
+            </div>
+          </details>
           <span className="rounded-md border border-[var(--border-subtle)] px-2 py-1 text-xs text-[var(--text-muted)]">
             {filteredCharges.length} / {scopedCharges.length} cobrança(s)
           </span>
@@ -1295,19 +1288,14 @@ export default function FinancesPage() {
         !allQueriesErrored &&
         filteredCharges.length > 0 ? (
           <>
-            <AppDataTable className="min-w-[1120px]">
+            <AppDataTable className="min-w-[760px]">
               <thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]">
                 <tr>
                   <th className="p-2.5 text-left">Cliente</th>
-                  <th className="text-left">Valor</th>
-                  <th className="text-left">Status</th>
+                  <th className="text-left">Valor / status</th>
+                  <th className="text-left">Vencimento / atraso</th>
                   <th className="text-left">Prioridade</th>
-                  <th className="text-left">Vencimento</th>
-                  <th className="text-left">Atraso</th>
-                  <th className="text-left">Origem/O.S.</th>
-                  <th className="text-left">Risco/pendência</th>
-                  <th className="text-left">Ação primária</th>
-                  <th className="p-2.5 text-left">Ações</th>
+                  <th className="p-2.5 text-left">Ação</th>
                 </tr>
               </thead>
               <tbody>
@@ -1332,53 +1320,37 @@ export default function FinancesPage() {
                           </p>
                         </div>
                       </td>
-                      <td>{formatCurrency(Number(row?.amountCents ?? 0))}</td>
                       <td>
-                        <AppStatusBadge
-                          label={chargeStatusLabel(row.status)}
-                          tone={getChargeStatusTone(row.status)}
-                        />
+                        <div className="space-y-2">
+                          <p className="font-medium text-[var(--text-primary)]">{formatCurrency(Number(row?.amountCents ?? 0))}</p>
+                          <AppStatusBadge label={chargeStatusLabel(row.status)} tone={getChargeStatusTone(row.status)} />
+                        </div>
                       </td>
                       <td>
-                        <AppPriorityBadge priority={getChargePriority(row)} />
+                        <div className="space-y-1 text-xs text-[var(--text-secondary)]">
+                          <p className="font-medium text-[var(--text-primary)]">{formatDate(row?.dueDate)}</p>
+                          <p>{row.status === "OVERDUE" ? `${row.overdueDays} dia(s)` : "Sem atraso"}</p>
+                        </div>
                       </td>
-                      <td>{formatDate(row?.dueDate)}</td>
                       <td>
-                        {row.status === "OVERDUE"
-                          ? `${row.overdueDays} dia(s)`
-                          : "—"}
+                        <div className="space-y-1">
+                          <AppPriorityBadge priority={getChargePriority(row)} />
+                          <p className="max-w-[180px] truncate text-xs text-[var(--text-muted)]">{safeText(row.serviceOrderLabel, "Sem O.S.")}</p>
+                        </div>
                       </td>
-                      <td>{safeText(row.serviceOrderLabel, "Sem O.S.")}</td>
-                      <td>
-                        <p className="max-w-[220px] text-xs leading-5 text-[var(--text-secondary)]">
-                          {getChargeRisk(row)}
-                        </p>
-                      </td>
-                      <td onClick={event => event.stopPropagation()}>
-                        <Button
-                          size="sm"
-                          variant={
-                            primaryAction.kind === "collect"
-                              ? "default"
-                              : "outline"
-                          }
-                          onClick={() => {
-                            setSelectedChargeId(String(row?.id ?? ""));
-                            if (primaryAction.kind === "collect")
-                              goToWhatsApp(row);
-                          }}
-                          disabled={row.status === "CANCELED"}
-                        >
-                          {primaryAction.label}
-                        </Button>
-                        <p className="mt-1 max-w-[180px] text-[11px] text-[var(--text-muted)]">
-                          {primaryAction.reason}
-                        </p>
-                      </td>
-                      <td
-                        className="p-2.5"
-                        onClick={event => event.stopPropagation()}
-                      >
+                      <td className="p-2.5" onClick={event => event.stopPropagation()}>
+                        <div className="flex min-w-[160px] items-center justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant={primaryAction.kind === "collect" ? "default" : "outline"}
+                            onClick={() => {
+                              setSelectedChargeId(String(row?.id ?? ""));
+                              if (primaryAction.kind === "collect") goToWhatsApp(row);
+                            }}
+                            disabled={row.status === "CANCELED"}
+                          >
+                            {primaryAction.label}
+                          </Button>
                         <AppRowActionsDropdown
                           items={[
                             {
@@ -1438,6 +1410,7 @@ export default function FinancesPage() {
                             },
                           ]}
                         />
+                        </div>
                       </td>
                     </tr>
                   );
@@ -1456,10 +1429,11 @@ export default function FinancesPage() {
 
       <AppSectionBlock
         title="Painel financeiro secundário"
-        subtitle="Resumo, cliente, origem operacional, pagamentos recentes, falhas e risco financeiro."
+        subtitle="Resumo compacto com origem, risco e histórico quando uma cobrança está selecionada."
+        compact
       >
         {selectedCharge ? (
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <AppInfoCard>
                 <p className="text-xs text-[var(--text-muted)]">

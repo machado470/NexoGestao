@@ -907,7 +907,7 @@ export default function AppointmentsPage() {
         </AppSectionBlock>
 
         <AppFiltersBar className="shrink-0 gap-2 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2">
-          {FILTERS.map(filter => (
+          {FILTERS.slice(0, 3).map(filter => (
             <button
               key={filter.key}
               type="button"
@@ -921,18 +921,39 @@ export default function AppointmentsPage() {
               {filter.label}
             </button>
           ))}
-          <select
-            className="h-8 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 text-xs text-[var(--text-muted)]"
-            value={responsibleFilter}
-            onChange={event => setResponsibleFilter(event.target.value)}
-          >
-            <option value="all">Responsável: todos</option>
-            {people.map((person: any) => (
-              <option key={String(person.id)} value={String(person.id)}>
-                {String(person.name ?? "Colaborador")}
-              </option>
-            ))}
-          </select>
+          <details className="relative">
+            <summary className="flex h-8 cursor-pointer list-none items-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 text-xs font-medium text-[var(--text-secondary)]">
+              Mais filtros
+            </summary>
+            <div className="absolute right-0 z-20 mt-2 grid min-w-[220px] gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-2">
+              {FILTERS.slice(3).map(filter => (
+                <button
+                  key={filter.key}
+                  type="button"
+                  onClick={() => setSelectedFilter(filter.key)}
+                  className={`h-8 rounded-md px-3 text-left text-xs font-medium transition-colors ${
+                    selectedFilter === filter.key
+                      ? "bg-[var(--accent-soft)] text-[var(--accent-primary)]"
+                      : "bg-[var(--surface-subtle)] text-[var(--text-muted)]"
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              ))}
+              <select
+                className="h-8 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 text-xs text-[var(--text-muted)]"
+                value={responsibleFilter}
+                onChange={event => setResponsibleFilter(event.target.value)}
+              >
+                <option value="all">Responsável: todos</option>
+                {people.map((person: any) => (
+                  <option key={String(person.id)} value={String(person.id)}>
+                    {String(person.name ?? "Colaborador")}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </details>
         </AppFiltersBar>
 
         {successMessage ? (
@@ -941,7 +962,7 @@ export default function AppointmentsPage() {
 
         <AppSectionBlock
           title="Lista operacional de agendamentos"
-          subtitle="Tempo, cliente, serviço, status, responsável, duração, observação e ação rápida."
+          subtitle="Tempo, cliente/serviço, status, responsável e ação rápida."
           className="flex flex-col"
           compact
         >
@@ -972,17 +993,43 @@ export default function AppointmentsPage() {
             />
           ) : (
             <>
-              <AppDataTable className="min-w-[1180px]">
+              <div className="grid gap-2 md:hidden">
+                {paginatedAppointments.map(row => {
+                  const status = mapStatus(row.item.status);
+                  const priority = deriveAppointmentPriority(row);
+                  const appointmentId = String(row.item.id ?? "");
+                  return (
+                    <article
+                      key={`card-${appointmentId}`}
+                      className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3"
+                      onClick={() => setSelectedAppointmentId(appointmentId)}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-[var(--text-primary)]">{formatDateTime(row.item.startsAt)}</p>
+                          <p className="mt-1 truncate text-sm text-[var(--text-secondary)]">{row.customerName}</p>
+                          <p className="mt-1 line-clamp-2 text-xs text-[var(--text-muted)]">{row.item.title || row.item.notes || "Sem observação"}</p>
+                        </div>
+                        <AppStatusBadge label={status.label} tone={status.tone} />
+                      </div>
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        {priority ? <AppPriorityBadge priority={priority} label={appointmentPriorityLabel(priority)} /> : null}
+                        <span className="text-xs text-[var(--text-muted)]">{row.ownerName}</span>
+                      </div>
+                      <Button className="mt-3 w-full" size="sm" onClick={() => setSelectedAppointmentId(appointmentId)}>{nextActionLabel(row)}</Button>
+                    </article>
+                  );
+                })}
+              </div>
+              <div className="hidden md:block">
+              <AppDataTable className="min-w-[760px]">
                 <thead>
                   <tr>
                     <th>Horário</th>
-                    <th>Cliente</th>
-                    <th>Observação curta</th>
-                    <th>Status</th>
+                    <th>Cliente / serviço</th>
+                    <th>Status / prioridade</th>
                     <th>Responsável</th>
-                    <th>Duração</th>
-                    <th>Próxima ação</th>
-                    <th>Ações</th>
+                    <th>Ação</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -991,8 +1038,6 @@ export default function AppointmentsPage() {
                     const orderId = row.order?.id ? String(row.order.id) : null;
                     const appointmentId = String(row.item.id ?? "");
                     const isSelected = selectedAppointmentId === appointmentId;
-                    const operationalStatus =
-                      deriveAppointmentOperationalStatus(row);
                     const priority = deriveAppointmentPriority(row);
                     const operationalBadge = mapOperationalStatusBadge(row);
                     return (
@@ -1006,44 +1051,27 @@ export default function AppointmentsPage() {
                         onClick={() => setSelectedAppointmentId(appointmentId)}
                       >
                         <td>{formatDateTime(row.item.startsAt)}</td>
-                        <td className="font-semibold text-[var(--text-primary)]">
-                          {row.customerName}
-                        </td>
-                        <td className="max-w-[220px] truncate">
-                          {row.item.title || row.item.notes || "Sem observação"}
+                        <td>
+                          <div className="min-w-[220px] space-y-1">
+                            <p className="font-semibold text-[var(--text-primary)]">{row.customerName}</p>
+                            <p className="max-w-[260px] truncate text-xs text-[var(--text-secondary)]">
+                              {row.item.title || row.item.notes || "Sem observação"}
+                            </p>
+                            <p className="text-xs text-[var(--text-muted)]">
+                              {durationLabel(row.item.startsAt, row.item.endsAt)} {orderId ? `· O.S. #${orderId}` : "· sem O.S."}
+                            </p>
+                          </div>
                         </td>
                         <td>
-                          <div className="flex flex-wrap gap-2">
-                            <AppStatusBadge
-                              label={status.label}
-                              tone={status.tone}
-                            />
-                            <AppStatusBadge {...operationalBadge} />
-                            <AppStatusBadge
-                              label={operationalStatus}
-                              tone={mapOperationalStatus(row).tone}
-                            />
+                          <div className="flex min-w-[170px] flex-col items-start gap-2">
+                            <AppStatusBadge label={status.label} tone={status.tone} />
+                            {priority ? <AppPriorityBadge priority={priority} label={appointmentPriorityLabel(priority)} /> : <AppStatusBadge {...operationalBadge} />}
                           </div>
                         </td>
                         <td>{row.ownerName}</td>
-                        <td>
-                          {durationLabel(row.item.startsAt, row.item.endsAt)}
-                        </td>
-                        <td>
-                          <div className="flex flex-wrap items-center gap-2">
-                            {priority ? (
-                              <AppPriorityBadge
-                                priority={priority}
-                                label={appointmentPriorityLabel(priority)}
-                              />
-                            ) : null}
-                            <span>{nextActionLabel(row)}</span>
-                            <span className="text-[var(--text-muted)]">
-                              {orderId ? `· O.S. #${orderId}` : "· sem O.S."}
-                            </span>
-                          </div>
-                        </td>
                         <td onClick={event => event.stopPropagation()}>
+                          <div className="flex min-w-[140px] items-center justify-end gap-2">
+                            <Button size="sm" onClick={() => setSelectedAppointmentId(String(row.item.id))}>{nextActionLabel(row)}</Button>
                           <AppRowActionsDropdown
                             triggerLabel="Ações do agendamento"
                             items={[
@@ -1132,12 +1160,14 @@ export default function AppointmentsPage() {
                               },
                             ]}
                           />
+                          </div>
                         </td>
                       </tr>
                     );
                   })}
                 </tbody>
               </AppDataTable>
+              </div>
               <AppPagination
                 currentPage={currentPage}
                 totalItems={filtered.length}

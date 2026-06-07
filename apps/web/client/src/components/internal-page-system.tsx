@@ -890,9 +890,9 @@ export function AppDataTable({
   );
 
   return (
-    <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)]/85 bg-[var(--surface-primary)] shadow-[0_8px_20px_-18px_rgba(15,23,42,0.45)]">
+    <div className="overflow-x-auto rounded-xl border border-[var(--border-subtle)]/85 bg-[var(--surface-primary)] shadow-[0_8px_20px_-18px_rgba(15,23,42,0.45)]">
       {shouldWrapInTable ? (
-        <table className={cn("w-full text-sm", className)}>{children}</table>
+        <table className={cn("w-full min-w-full text-sm", className)}>{children}</table>
       ) : (
         children
       )}

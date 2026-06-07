@@ -1213,8 +1213,6 @@ export default function CustomersPage() {
             { key: "all", label: "Todos" },
             { key: "pending", label: "Com pendência" },
             { key: "open_os", label: "Com O.S. aberta" },
-            { key: "no_recent_contact", label: "Sem contato recente" },
-            { key: "risk", label: "Em risco" },
           ].map(item => (
             <button
               key={item.key}
@@ -1230,17 +1228,42 @@ export default function CustomersPage() {
               {item.label}
             </button>
           ))}
+          <details className="relative">
+            <summary className="flex h-8 cursor-pointer list-none items-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+              Mais filtros
+            </summary>
+            <div className="absolute right-0 z-20 mt-2 grid min-w-[190px] gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-2">
+              {[
+                { key: "no_recent_contact", label: "Sem contato recente" },
+                { key: "risk", label: "Em risco" },
+              ].map(item => (
+                <button
+                  key={item.key}
+                  type="button"
+                  className={cn(
+                    "h-8 rounded-md border px-3 text-left text-xs font-medium transition-colors",
+                    activeFilter === item.key
+                      ? "border-[var(--accent-primary)] bg-[var(--accent-soft)] text-[var(--accent-primary)]"
+                      : "border-[var(--border-subtle)] bg-[var(--surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                  )}
+                  onClick={() => setActiveFilter(item.key as CustomerFilter)}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </details>
         </div>
         <span className="rounded-md border border-[var(--border-subtle)] px-2 py-1 text-xs text-[var(--text-muted)]">
           {filteredProfiles.length} resultado(s)
         </span>
       </AppFiltersBar>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+      <div className="grid grid-cols-1 gap-4 2xl:grid-cols-12">
         <AppSectionBlock
           title="Carteira operacional"
           subtitle="Lista priorizada por contexto, pendência e próxima ação possível."
-          className="xl:col-span-7"
+          className="2xl:col-span-9"
           compact
         >
           {isLoading ? (
@@ -1272,13 +1295,38 @@ export default function CustomersPage() {
             />
           ) : (
             <div className="space-y-3">
-              <div className="max-h-[560px] overflow-auto">
-                <AppDataTable className="min-w-[860px]">
+              <div className="grid gap-2 md:hidden">
+                {paginatedProfiles.map(profile => (
+                  <article
+                    key={`card-${profile.customerId}`}
+                    className={cn(
+                      "rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3",
+                      profile.customerId === activeCustomerId ? "bg-[var(--accent-soft)]/35" : undefined
+                    )}
+                    onClick={() => setActiveCustomerId(profile.customerId)}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-[var(--text-primary)]">{String(profile.customer.name ?? "Sem nome")}</p>
+                        <p className="mt-1 truncate text-xs text-[var(--text-secondary)]">{profile.contact}</p>
+                      </div>
+                      <AppOperationalStatusBadge status={getCustomerOperationalStatus(profile)} label={profile.status} />
+                    </div>
+                    <p className="mt-2 line-clamp-2 text-xs text-[var(--text-muted)]">{profile.riskSignal}</p>
+                    <div className="mt-3 flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium text-[var(--text-primary)]">{formatCurrency(profile.pendingCents)}</span>
+                      <Button size="sm" onClick={() => setActiveCustomerId(profile.customerId)}>{profile.nextActionLabel}</Button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+              <div className="hidden max-h-[560px] overflow-y-auto md:block">
+                <AppDataTable className="min-w-[760px]">
                   <thead>
                     <tr>
                       <th>Cliente</th>
-                      <th>Saúde e prioridade</th>
-                      <th>Contexto operacional</th>
+                      <th>Contexto / status</th>
+                      <th>Próxima ação</th>
                       <th>Financeiro</th>
                       <th className="text-right">Ações</th>
                     </tr>
@@ -1310,33 +1358,26 @@ export default function CustomersPage() {
                           </div>
                         </td>
                         <td>
-                          <div className="flex min-w-[170px] flex-col items-start gap-2">
-                            <AppOperationalStatusBadge
-                              status={getCustomerOperationalStatus(profile)}
-                              label={profile.status}
-                            />
-                            <AppPriorityBadge
-                              priority={getCustomerPriority(profile)}
-                              label={profile.nextActionLabel}
-                            />
+                          <div className="min-w-[170px] space-y-2 text-xs text-[var(--text-secondary)]">
+                            <div className="flex flex-wrap gap-2">
+                              <AppOperationalStatusBadge
+                                status={getCustomerOperationalStatus(profile)}
+                                label={profile.status}
+                              />
+                              <AppPriorityBadge priority={getCustomerPriority(profile)} />
+                            </div>
+                            <p className="line-clamp-2">{profile.riskSignal}</p>
                           </div>
                         </td>
                         <td>
-                          <div className="min-w-[250px] space-y-1 text-xs text-[var(--text-secondary)]">
-                            <p>{profile.riskSignal}</p>
+                          <div className="min-w-[180px] space-y-1 text-xs text-[var(--text-secondary)]">
+                            <p className="font-medium text-[var(--text-primary)]">{profile.nextActionLabel}</p>
                             <p>
-                              Última O.S.:{" "}
-                              {profile.lastService
-                                ? `${String(profile.lastService.title ?? "O.S.")} · ${String(profile.lastService.status ?? "-")}`
-                                : "Sem O.S. registrada"}
-                            </p>
-                            <p>
-                              Próximo agendamento:{" "}
                               {profile.nextAppointment
-                                ? formatDateTime(
-                                    profile.nextAppointment.startsAt
-                                  )
-                                : "Sem agenda futura"}
+                                ? formatDateTime(profile.nextAppointment.startsAt)
+                                : profile.lastService
+                                  ? `Última O.S.: ${String(profile.lastService.status ?? "-")}`
+                                  : "Sem agenda futura"}
                             </p>
                           </div>
                         </td>
@@ -1458,7 +1499,7 @@ export default function CustomersPage() {
         <AppContextWorkspace
           title="Detalhe do cliente"
           subtitle="Resumo, ações principais, financeiro, O.S., agenda, comunicação e histórico disponível."
-          className="xl:col-span-5"
+          className="2xl:col-span-3"
         >
           {!activeCustomerId || !selectedCustomer || !selectedProfile ? (
             <AppPageEmptyState
