@@ -155,7 +155,13 @@ export function AppEmptyState({
   );
 }
 
-export const AppDataTable = DataTable;
+export function AppDataTable({ className, ...props }: ComponentProps<"table">) {
+  return (
+    <div className="overflow-x-auto rounded-xl border border-[var(--border-subtle)]/85 bg-[var(--surface-primary)] shadow-[0_8px_20px_-18px_rgba(15,23,42,0.45)]">
+      <DataTable className={cn("min-w-full", className)} {...props} />
+    </div>
+  );
+}
 export const AppStatusBadge = NexoStatusBadge;
 
 export type AppOperationalStatus = "NORMAL" | "ATENÇÃO" | "RISCO" | "CRÍTICO";

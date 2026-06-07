@@ -940,10 +940,6 @@ export default function ServiceOrdersPage() {
             { key: "in_progress", label: `Em andamento (${counts.progress})` },
             { key: "overdue", label: `Atrasadas (${counts.overdue})` },
             { key: "done", label: `Concluídas (${counts.done})` },
-            {
-              key: "without_charge",
-              label: `Concluídas sem cobrança (${counts.doneWithoutCharge})`,
-            },
           ].map(filter => (
             <button
               key={filter.key}
@@ -959,17 +955,36 @@ export default function ServiceOrdersPage() {
               {filter.label}
             </button>
           ))}
+          <details className="relative">
+            <summary className="flex h-8 cursor-pointer list-none items-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+              Mais filtros
+            </summary>
+            <div className="absolute right-0 z-20 mt-2 grid min-w-[240px] gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-2">
+              <button
+                type="button"
+                className={cn(
+                  "h-8 rounded-md border px-3 text-left text-xs font-medium transition-colors",
+                  activeFilter === "without_charge"
+                    ? "border-[var(--accent-primary)] bg-[var(--accent-soft)] text-[var(--accent-primary)]"
+                    : "border-[var(--border-subtle)] bg-[var(--surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                )}
+                onClick={() => setActiveFilter("without_charge")}
+              >
+                Concluídas sem cobrança ({counts.doneWithoutCharge})
+              </button>
+            </div>
+          </details>
         </div>
         <span className="rounded-md border border-[var(--border-subtle)] px-2 py-1 text-xs text-[var(--text-muted)]">
           {filteredOrders.length} / {counts.all} O.S.
         </span>
       </AppFiltersBar>
 
-      <div className="grid grid-cols-1 gap-3 xl:grid-cols-12">
+      <div className="space-y-3">
         <AppSectionBlock
           title="Alertas operacionais"
           subtitle="Alertas compactos: atraso, parada, responsável e cobrança."
-          className="xl:col-span-4"
+
           compact
         >
           {isLoading ? (
@@ -980,7 +995,7 @@ export default function ServiceOrdersPage() {
               description="Os dados retornados não indicam O.S. atrasada, sem responsável, concluída sem cobrança ou parada sem prazo."
             />
           ) : (
-            <div className="space-y-2">
+            <div className="grid gap-2 md:grid-cols-2 2xl:grid-cols-4">
               {immediateAttention.slice(0, 4).map(item => (
                 <article
                   key={`attention-${item.id}`}
@@ -1016,10 +1031,10 @@ export default function ServiceOrdersPage() {
           )}
         </AppSectionBlock>
 
-        <div className="flex flex-col gap-3 xl:col-span-8">
+        <div className="flex flex-col gap-3">
           <AppSectionBlock
             title="Lista operacional de O.S."
-            subtitle="Número, cliente, serviço, status, responsável, prazo, valor e ação rápida."
+            subtitle="Número, cliente, estado, prazo, responsável e ação rápida."
             className="flex flex-col"
             compact
           >
@@ -1050,13 +1065,12 @@ export default function ServiceOrdersPage() {
             ) : (
               <div className="space-y-3">
                 <div className="max-h-[560px] overflow-auto">
-                  <AppDataTable className="min-w-[980px]">
+                  <AppDataTable className="min-w-[760px]">
                     <thead>
                       <tr>
                         <th>O.S. / cliente</th>
-                        <th>Estado e prioridade</th>
-                        <th>Responsável e prazo</th>
-                        <th>Financeiro</th>
+                        <th>Estado</th>
+                        <th>Prazo / responsável</th>
                         <th className="text-right">Ações</th>
                       </tr>
                     </thead>
@@ -1093,15 +1107,15 @@ export default function ServiceOrdersPage() {
                             }}
                           >
                             <td>
-                              <div className="min-w-[240px] space-y-1">
+                              <div className="min-w-[220px] space-y-1">
                                 <p className="font-semibold text-[var(--text-primary)]">
                                   #{item.code} · {item.title}
                                 </p>
                                 <p className="max-w-[300px] truncate text-xs text-[var(--text-secondary)]">
                                   {item.customerName}
                                 </p>
-                                <p className="max-w-[300px] truncate text-xs text-[var(--text-muted)]">
-                                  {item.description}
+                                <p className="text-xs text-[var(--text-muted)]">
+                                  {formatCurrency(item.amountCents)} · {item.financialStatusLabel}
                                 </p>
                               </div>
                             </td>
@@ -1139,21 +1153,6 @@ export default function ServiceOrdersPage() {
                                       )
                                     : "Sem agendamento vinculado"}
                                 </p>
-                              </div>
-                            </td>
-                            <td>
-                              <div className="min-w-[180px] space-y-2">
-                                <p className="font-medium text-[var(--text-primary)]">
-                                  {formatCurrency(item.amountCents)}
-                                </p>
-                                <AppStatusBadge
-                                  label={item.financialStatusLabel}
-                                  tone={
-                                    item.status === "DONE" && !item.hasCharge
-                                      ? "danger"
-                                      : "neutral"
-                                  }
-                                />
                               </div>
                             </td>
                             <td onClick={event => event.stopPropagation()}>

@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import {
   AppDataTable,
-  AppFiltersBar,
   AppKpiRow,
   AppOperationalHeader,
   AppPageShell,
@@ -87,17 +86,31 @@ export default function SettingsPage() {
           contextChips={<><AppStatusBadge label={unsaved ? "Alterações não salvas" : "Sem alterações"} /><AppStatusBadge label={`${pendingCount} pendência(s)`} /></>}
         />
 
-        <AppFiltersBar>
+        <AppSectionBlock title="Empresa" subtitle="Dados base usados por agenda, prazos e relatórios." compact>
           <div className="grid gap-3 md:grid-cols-2">
             <label className="text-xs font-medium text-[var(--text-secondary)]">Empresa<input className="mt-1 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2 text-sm text-[var(--text-primary)]" value={name} onChange={event => setName(event.target.value)} placeholder="Nome da empresa" /></label>
             <label className="text-xs font-medium text-[var(--text-secondary)]">Fuso horário<input className="mt-1 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2 text-sm text-[var(--text-primary)]" value={timezone} onChange={event => setTimezone(event.target.value)} placeholder="America/Sao_Paulo" /></label>
           </div>
-        </AppFiltersBar>
+        </AppSectionBlock>
 
         <AppKpiRow items={[{ title: "Blocos de controle", value: String(sections.length), hint: "Áreas organizadas por impacto operacional." }, { title: "Equipe", value: String(members.length), hint: "Usuários e permissões atuais." }, { title: "Integrações", value: stripeReady && whatsappReady ? "Ativas" : "Pendentes", hint: "Pagamentos e comunicação." }, { title: "Pendências", value: String(pendingCount), hint: "Itens que podem afetar piloto." }]} />
 
-        <AppSectionBlock title="Centro de controle" subtitle="Descrição curta, impacto claro e ação objetiva para cada área.">
-          <AppDataTable className="min-w-[900px]"><thead><tr className="border-b border-[var(--border-subtle)] text-left text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]"><th className="px-3 py-2">Bloco</th><th className="px-3 py-2">Descrição</th><th className="px-3 py-2">O que muda na operação?</th><th className="px-3 py-2">Status</th><th className="px-3 py-2 text-right">Ação clara</th></tr></thead><tbody>{sections.map(section => <tr key={section.title} className="border-b border-[var(--border-subtle)]/60"><td className="px-3 py-3 font-semibold text-[var(--text-primary)]">{section.title}</td><td className="px-3 py-3 text-[var(--text-secondary)]">{section.description}</td><td className="px-3 py-3 text-[var(--text-secondary)]">{section.impact}</td><td className="px-3 py-3"><AppStatusBadge label={section.status} /></td><td className="px-3 py-3 text-right"><Button size="sm" variant="outline" onClick={() => section.path ? navigate(section.path) : void Promise.all([settingsQuery.refetch(), readinessQuery.refetch()])}>{section.action}</Button></td></tr>)}</tbody></AppDataTable>
+        <AppSectionBlock title="Centro de controle" subtitle="Áreas em cards: impacto visível antes da ação." compact>
+          <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+            {sections.map(section => (
+              <article key={section.title} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">{section.title}</p>
+                    <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--text-secondary)]">{section.description}</p>
+                  </div>
+                  <AppStatusBadge label={section.status} />
+                </div>
+                <p className="mt-3 text-xs leading-5 text-[var(--text-muted)]">{section.impact}</p>
+                <Button className="mt-3" size="sm" variant="outline" onClick={() => section.path ? navigate(section.path) : void Promise.all([settingsQuery.refetch(), readinessQuery.refetch()])}>{section.action}</Button>
+              </article>
+            ))}
+          </div>
         </AppSectionBlock>
 
         <AppSectionBlock title="Usuários e permissões" subtitle="Leitura rápida de quem pode agir no sistema.">
