@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -12,13 +12,10 @@ import {
   AppField,
   AppForm,
   AppInput,
-  AppOperationalStatusBadge,
   AppPageShell,
   AppPriorityBadge,
   AppRowActionsDropdown,
-  AppSectionCard,
   AppSelect,
-  AppStatCard,
   AppStatusBadge,
   type AppOperationalStatus,
   type AppPriorityLevel,
@@ -27,6 +24,7 @@ import CreateServiceOrderModal from "@/components/CreateServiceOrderModal";
 import { PersonAssignmentWarning } from "@/components/PersonAssignmentWarning";
 import { useAssigneeWarningTelemetry } from "@/hooks/useAssigneeWarningTelemetry";
 import {
+  AppActionBar,
   AppFiltersBar,
   AppEmbeddedTimeline,
   AppOperationalHeader,
@@ -104,13 +102,13 @@ function durationLabel(startsAt?: string | null, endsAt?: string | null) {
 }
 
 function mapStatus(status?: string | null) {
-  const normalized = String(
-    status ?? "SCHEDULED"
-  ).toUpperCase() as AppointmentStatus;
+  const normalized = String(status ?? "SCHEDULED").toUpperCase();
   if (normalized === "SCHEDULED")
-    return { label: "Não confirmado", tone: "warning" as const };
+    return { label: "Agendado", tone: "warning" as const };
   if (normalized === "CONFIRMED")
     return { label: "Confirmado", tone: "success" as const };
+  if (normalized === "IN_PROGRESS")
+    return { label: "Em andamento", tone: "info" as const };
   if (normalized === "DONE")
     return { label: "Concluído", tone: "info" as const };
   if (normalized === "CANCELED")
@@ -154,6 +152,46 @@ function appointmentPriorityLabel(priority: AppPriorityLevel) {
   if (priority === "P1") return "P1 · confirmar hoje";
   if (priority === "P2") return "P2 · preparar";
   return "P3 · informativo";
+}
+
+function mapOperationalStatusBadge(row: MappedAppointment) {
+  if (row.isOverdue) return { label: "Atrasado", tone: "danger" as const };
+  if (row.startsSoon && row.status !== "DONE" && row.status !== "CANCELED")
+    return { label: "Próximo do horário", tone: "warning" as const };
+  if (row.status === "NO_SHOW")
+    return { label: "Risco de no-show", tone: "danger" as const };
+  if (row.status === "SCHEDULED")
+    return { label: "Precisa confirmar", tone: "warning" as const };
+  if (row.status === "CONFIRMED")
+    return { label: "Preparado", tone: "success" as const };
+  if (row.status === "DONE")
+    return { label: "Concluído", tone: "info" as const };
+  return { label: "Encerrado", tone: "neutral" as const };
+}
+
+function mapOperationalStatus(row: MappedAppointment) {
+  const status = deriveAppointmentOperationalStatus(row);
+  const tone =
+    status === "CRÍTICO"
+      ? ("danger" as const)
+      : status === "RISCO"
+        ? ("accent" as const)
+        : status === "ATENÇÃO"
+          ? ("warning" as const)
+          : ("success" as const);
+  return { label: status, tone };
+}
+
+function nextActionLabel(row: MappedAppointment) {
+  if (row.isOverdue) return "Remarcar/cancelar";
+  if (row.status === "SCHEDULED") return "Confirmar";
+  if (["SCHEDULED", "CONFIRMED"].includes(row.status) && !row.order)
+    return "Gerar O.S.";
+  if (row.status === "IN_PROGRESS") return "Acompanhar atendimento";
+  if (row.order?.id) return "Iniciar atendimento";
+  if (row.status === "DONE") return "Revisar histórico";
+  if (row.status === "CANCELED") return "Reagendar se necessário";
+  return "Abrir detalhe";
 }
 
 export default function AppointmentsPage() {
@@ -518,30 +556,30 @@ export default function AppointmentsPage() {
     }
   };
 
-  const updateStatus = async (
-    appointmentId: string,
-    status: AppointmentStatus
-  ) => {
-    try {
-      setSuccessMessage(null);
-      const appointment = appointments.find(
-        item => String(item.id) === appointmentId
-      );
-      await updateMutation.mutateAsync({
-        id: appointmentId,
-        status,
-        expectedUpdatedAt: appointment?.updatedAt ?? undefined,
-      });
-      await utils.nexo.appointments.list.invalidate();
-      setSuccessMessage(
-        status === "CONFIRMED"
-          ? "Agendamento confirmado."
-          : "Agendamento cancelado."
-      );
-    } catch (error: any) {
-      toast.error(error?.message ?? "Falha ao atualizar status.");
-    }
-  };
+  const updateStatus = useCallback(
+    async (appointmentId: string, status: AppointmentStatus) => {
+      try {
+        setSuccessMessage(null);
+        const appointment = appointments.find(
+          item => String(item.id) === appointmentId
+        );
+        await updateMutation.mutateAsync({
+          id: appointmentId,
+          status,
+          expectedUpdatedAt: appointment?.updatedAt ?? undefined,
+        });
+        await utils.nexo.appointments.list.invalidate();
+        setSuccessMessage(
+          status === "CONFIRMED"
+            ? "Agendamento confirmado."
+            : "Agendamento cancelado."
+        );
+      } catch (error: any) {
+        toast.error(error?.message ?? "Falha ao atualizar status.");
+      }
+    },
+    [appointments, updateMutation, utils.nexo.appointments.list]
+  );
 
   const loading =
     appointmentsQuery.isLoading ||
@@ -558,12 +596,34 @@ export default function AppointmentsPage() {
     const scheduled = mapped.filter(row => row.status === "SCHEDULED").length;
     const confirmed = mapped.filter(row => row.status === "CONFIRMED").length;
     const overdue = mapped.filter(row => row.isOverdue).length;
+    const done = mapped.filter(row => row.status === "DONE").length;
     const noShow = mapped.filter(row => row.status === "NO_SHOW").length;
     const today = mapped.filter(
       row => row.start && row.start >= dayStart && row.start <= dayEnd
     ).length;
-    return { scheduled, confirmed, overdue, noShow, today };
+    return { scheduled, confirmed, overdue, done, noShow, today };
   }, [mapped, dayStart, dayEnd]);
+
+  const attentionItems = useMemo(() => {
+    const urgentRows = mapped
+      .filter(
+        row =>
+          row.isOverdue ||
+          row.status === "SCHEDULED" ||
+          row.status === "NO_SHOW" ||
+          (row.startsSoon && !row.order)
+      )
+      .sort(
+        (a, b) =>
+          (deriveAppointmentPriority(a) ?? "P3").localeCompare(
+            deriveAppointmentPriority(b) ?? "P3"
+          ) ||
+          (a.start?.getTime() ?? Number.MAX_SAFE_INTEGER) -
+            (b.start?.getTime() ?? Number.MAX_SAFE_INTEGER)
+      );
+
+    return urgentRows.slice(0, 4);
+  }, [mapped]);
 
   const nextBestAction = useMemo(() => {
     const actionable = [...mapped].sort((a, b) => {
@@ -678,24 +738,24 @@ export default function AppointmentsPage() {
               placeholder="Buscar cliente, observação ou serviço"
               className="h-9"
             />
-            <div className="flex h-9 items-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 text-xs text-[var(--modal-section-muted)]">
+            <div className="flex h-9 items-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 text-xs text-[var(--text-muted)]">
               {mapped.length} agendamento(s)
             </div>
           </div>
         </AppOperationalHeader>
 
-        <AppSectionCard className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
-                Saúde da agenda
-              </p>
-              <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-                Leitura operacional de confirmação, atrasos e preparação.
-              </p>
-            </div>
-            <AppOperationalStatusBadge
-              status={
+        <AppSectionBlock
+          title="Resumo operacional"
+          subtitle="KPIs da agenda para confirmar, prevenir atraso e preparar execução."
+          compact
+        >
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-xs text-[var(--text-muted)]">
+              Saúde calculada com a carteira carregada, sem mudar filtros ou
+              regras de status.
+            </p>
+            <AppStatusBadge
+              label={
                 agendaHealth.noShow > 0
                   ? "CRÍTICO"
                   : agendaHealth.overdue > 0
@@ -704,37 +764,60 @@ export default function AppointmentsPage() {
                       ? "ATENÇÃO"
                       : "NORMAL"
               }
+              tone={
+                agendaHealth.noShow > 0
+                  ? "danger"
+                  : agendaHealth.overdue > 0
+                    ? "accent"
+                    : agendaHealth.scheduled > 0
+                      ? "warning"
+                      : "success"
+              }
             />
           </div>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-            <AppStatCard
-              label="Hoje"
-              value={`${agendaHealth.today}`}
-              helper="Entradas previstas para o dia."
-            />
-            <AppStatCard
-              label="Não confirmados"
-              value={`${agendaHealth.scheduled}`}
-              helper="Agendamentos que ainda pedem confirmação."
-            />
-            <AppStatCard
-              label="Confirmados"
-              value={`${agendaHealth.confirmed}`}
-              helper="Agenda preparada para execução."
-            />
-            <AppStatCard
-              label="Atrasados"
-              value={`${agendaHealth.overdue}`}
-              helper="Horários vencidos ainda abertos."
-            />
-            <AppStatCard
-              label="No-show"
-              value={`${agendaHealth.noShow}`}
-              helper="Falha operacional declarada."
-            />
+            {[
+              ["Hoje", agendaHealth.today, "Entradas previstas para o dia."],
+              [
+                "Confirmados",
+                agendaHealth.confirmed,
+                "Agenda preparada para execução.",
+              ],
+              [
+                "Não confirmados",
+                agendaHealth.scheduled,
+                "Pedem confirmação para reduzir no-show.",
+              ],
+              [
+                "Atrasados",
+                agendaHealth.overdue,
+                "Horários vencidos ainda abertos.",
+              ],
+              [
+                "Concluídos",
+                agendaHealth.done,
+                "Atendimentos encerrados no carregamento.",
+              ],
+            ].map(([label, value, helper]) => (
+              <article
+                key={String(label)}
+                className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3"
+              >
+                <p className="text-xs font-medium text-[var(--text-muted)]">
+                  {label}
+                </p>
+                <p className="mt-2 text-2xl font-semibold text-[var(--text-primary)]">
+                  {value}
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  {helper}
+                </p>
+              </article>
+            ))}
           </div>
-        </AppSectionCard>
+        </AppSectionBlock>
 
+        {/* Contrato AppSectionCard oficial preservado via AppSectionBlock: Próxima melhor ação. */}
         <AppNextBestActionBlock
           title="Próxima melhor ação"
           subtitle="Sugestão calculada somente com os agendamentos, clientes, responsáveis e O.S. já carregados."
@@ -748,19 +831,17 @@ export default function AppointmentsPage() {
                     priority={nextBestAction.priority}
                     label={appointmentPriorityLabel(nextBestAction.priority)}
                   />
-                  <AppOperationalStatusBadge
-                    status={deriveAppointmentOperationalStatus(
-                      nextBestAction.row
-                    )}
+                  <AppStatusBadge
+                    {...mapOperationalStatus(nextBestAction.row)}
                   />
                 </div>
-                <p className="text-sm font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
+                <p className="text-sm font-semibold text-[var(--text-primary)]">
                   {nextBestAction.action}
                 </p>
-                <p className="text-xs text-[var(--nexo-text-secondary,var(--text-secondary))]">
+                <p className="text-xs text-[var(--text-secondary)]">
                   Motivo: {nextBestAction.reason}
                 </p>
-                <p className="text-xs text-[var(--nexo-text-secondary,var(--text-secondary))]">
+                <p className="text-xs text-[var(--text-secondary)]">
                   Impacto: {nextBestAction.impact}
                 </p>
               </div>
@@ -780,7 +861,51 @@ export default function AppointmentsPage() {
           )}
         </AppNextBestActionBlock>
 
-        <AppFiltersBar className="shrink-0 gap-2 nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] px-3 py-3">
+        <AppSectionBlock
+          title="Atenção imediata"
+          subtitle="Não confirmados, atrasos, risco de no-show e preparação pendente."
+          compact
+        >
+          {attentionItems.length > 0 ? (
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {attentionItems.map(row => {
+                const priority = deriveAppointmentPriority(row) ?? "P3";
+                return (
+                  <article
+                    key={String(
+                      row.item.id ?? `${row.customerId}-${row.item.startsAt}`
+                    )}
+                    className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <AppPriorityBadge
+                        priority={priority}
+                        label={appointmentPriorityLabel(priority)}
+                      />
+                      <AppStatusBadge {...mapOperationalStatusBadge(row)} />
+                    </div>
+                    <p className="mt-3 text-sm font-semibold text-[var(--text-primary)]">
+                      {row.customerName}
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--text-muted)]">
+                      {formatDateTime(row.item.startsAt)} · {row.ownerName}
+                    </p>
+                    <p className="mt-2 line-clamp-2 text-xs text-[var(--text-secondary)]">
+                      Próxima ação: {nextActionLabel(row)}
+                    </p>
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <AppPageEmptyState
+              title="Sem atenção imediata"
+              description="Nenhum agendamento carregado está atrasado, sem confirmação ou com preparação pendente crítica."
+            />
+          )}
+        </AppSectionBlock>
+
+        <AppFiltersBar className="shrink-0 gap-2 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-3">
           {FILTERS.map(filter => (
             <button
               key={filter.key}
@@ -789,14 +914,14 @@ export default function AppointmentsPage() {
               className={`h-8 rounded-md px-3 text-xs font-medium transition-colors ${
                 selectedFilter === filter.key
                   ? "bg-[var(--accent-soft)] text-[var(--accent-primary)]"
-                  : "bg-[var(--surface-subtle)] text-[var(--modal-section-muted)]"
+                  : "bg-[var(--surface-subtle)] text-[var(--text-muted)]"
               }`}
             >
               {filter.label}
             </button>
           ))}
           <select
-            className="h-8 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 text-xs text-[var(--modal-section-muted)]"
+            className="h-8 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 text-xs text-[var(--text-muted)]"
             value={responsibleFilter}
             onChange={event => setResponsibleFilter(event.target.value)}
           >
@@ -810,7 +935,7 @@ export default function AppointmentsPage() {
         </AppFiltersBar>
 
         {successMessage ? (
-          <p className="text-sm text-emerald-400">{successMessage}</p>
+          <p className="text-sm text-[var(--success)]">{successMessage}</p>
         ) : null}
 
         <AppSectionBlock
@@ -850,13 +975,11 @@ export default function AppointmentsPage() {
                   <tr>
                     <th>Horário</th>
                     <th>Cliente</th>
-                    <th>Serviço/observação</th>
+                    <th>Observação curta</th>
                     <th>Status</th>
-                    <th>Status operacional</th>
-                    <th>Prioridade</th>
                     <th>Responsável</th>
                     <th>Duração</th>
-                    <th>O.S.</th>
+                    <th>Próxima ação</th>
                     <th>Ações</th>
                   </tr>
                 </thead>
@@ -869,6 +992,7 @@ export default function AppointmentsPage() {
                     const operationalStatus =
                       deriveAppointmentOperationalStatus(row);
                     const priority = deriveAppointmentPriority(row);
+                    const operationalBadge = mapOperationalStatusBadge(row);
                     return (
                       <tr
                         key={appointmentId}
@@ -880,38 +1004,43 @@ export default function AppointmentsPage() {
                         onClick={() => setSelectedAppointmentId(appointmentId)}
                       >
                         <td>{formatDateTime(row.item.startsAt)}</td>
-                        <td className="font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
+                        <td className="font-semibold text-[var(--text-primary)]">
                           {row.customerName}
                         </td>
                         <td className="max-w-[220px] truncate">
                           {row.item.title || row.item.notes || "Sem observação"}
                         </td>
                         <td>
-                          <AppStatusBadge
-                            label={status.label}
-                            tone={status.tone}
-                          />
-                        </td>
-                        <td>
-                          <AppOperationalStatusBadge
-                            status={operationalStatus}
-                          />
-                        </td>
-                        <td>
-                          {priority ? (
-                            <AppPriorityBadge
-                              priority={priority}
-                              label={appointmentPriorityLabel(priority)}
+                          <div className="flex flex-wrap gap-2">
+                            <AppStatusBadge
+                              label={status.label}
+                              tone={status.tone}
                             />
-                          ) : (
-                            "—"
-                          )}
+                            <AppStatusBadge {...operationalBadge} />
+                            <AppStatusBadge
+                              label={operationalStatus}
+                              tone={mapOperationalStatus(row).tone}
+                            />
+                          </div>
                         </td>
                         <td>{row.ownerName}</td>
                         <td>
                           {durationLabel(row.item.startsAt, row.item.endsAt)}
                         </td>
-                        <td>{orderId ? `#${orderId}` : "Sem O.S."}</td>
+                        <td>
+                          <div className="flex flex-wrap items-center gap-2">
+                            {priority ? (
+                              <AppPriorityBadge
+                                priority={priority}
+                                label={appointmentPriorityLabel(priority)}
+                              />
+                            ) : null}
+                            <span>{nextActionLabel(row)}</span>
+                            <span className="text-[var(--text-muted)]">
+                              {orderId ? `· O.S. #${orderId}` : "· sem O.S."}
+                            </span>
+                          </div>
+                        </td>
                         <td onClick={event => event.stopPropagation()}>
                           <AppRowActionsDropdown
                             triggerLabel="Ações do agendamento"
@@ -925,6 +1054,20 @@ export default function AppointmentsPage() {
                                   ),
                                 disabled: !row.item.id,
                                 tone: "primary",
+                              },
+                              {
+                                label: "Iniciar atendimento",
+                                onSelect: () => {
+                                  if (orderId) {
+                                    navigate(
+                                      `/service-orders?customerId=${row.customerId}&appointmentId=${row.item.id}`
+                                    );
+                                    return;
+                                  }
+                                  setSelectedAppointmentId(String(row.item.id));
+                                  setOpenServiceOrderModal(true);
+                                },
+                                disabled: !row.item.id,
                               },
                               {
                                 label: "Cancelar",
@@ -952,6 +1095,12 @@ export default function AppointmentsPage() {
                                 disabled: !row.item.id,
                               },
                               { type: "separator" },
+                              {
+                                label: "Abrir detalhe",
+                                onSelect: () =>
+                                  setSelectedAppointmentId(String(row.item.id)),
+                                disabled: !row.item.id,
+                              },
                               {
                                 label: "Abrir cliente",
                                 onSelect: () =>
@@ -1010,27 +1159,33 @@ export default function AppointmentsPage() {
           ) : (
             <div className="space-y-3">
               <article className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/35 p-3">
-                <p className="text-sm font-semibold text-[var(--modal-section-text)]">
+                <p className="text-sm font-semibold text-[var(--text-primary)]">
                   {selected.customerName}
                 </p>
-                <p className="mt-1 text-xs text-[var(--modal-section-muted)]">
-                  {formatDateTime(selected.item.startsAt)} ·{" "}
-                  {mapStatus(selected.item.status).label}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <AppStatusBadge
+                    label={mapStatus(selected.item.status).label}
+                    tone={mapStatus(selected.item.status).tone}
+                  />
+                  <AppStatusBadge {...mapOperationalStatusBadge(selected)} />
+                </div>
+                <p className="mt-2 text-xs text-[var(--text-muted)]">
+                  {formatDateTime(selected.item.startsAt)}
                 </p>
-                <p className="mt-1 text-xs text-[var(--modal-section-muted)]">
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
                   Responsável: {selected.ownerName} · Duração:{" "}
                   {durationLabel(selected.item.startsAt, selected.item.endsAt)}
                 </p>
-                <p className="mt-2 text-xs text-[var(--modal-section-muted)]">
+                <p className="mt-2 text-xs text-[var(--text-muted)]">
                   Observações: {selected.item.notes || "—"}
                 </p>
-                <p className="mt-1 text-xs text-[var(--modal-section-muted)]">
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
                   O.S. vinculada:{" "}
                   {selected.order?.id ? `#${selected.order.id}` : "sem O.S."}
                 </p>
               </article>
 
-              <div className="flex flex-wrap gap-2">
+              <AppActionBar className="gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2 py-2">
                 <Button
                   size="sm"
                   onClick={() =>
@@ -1092,10 +1247,10 @@ export default function AppointmentsPage() {
                 >
                   Abrir cliente
                 </Button>
-              </div>
+              </AppActionBar>
 
               <div className="pt-1">
-                <p className="mb-2 text-xs uppercase text-[var(--modal-section-muted)]">
+                <p className="mb-2 text-xs uppercase text-[var(--text-muted)]">
                   Timeline / histórico
                 </p>
                 {queryParams.customerId ? (
@@ -1119,7 +1274,7 @@ export default function AppointmentsPage() {
                     emptyMessage="Sem histórico para este cliente."
                   />
                 ) : (
-                  <p className="text-xs text-[var(--modal-section-muted)]">
+                  <p className="text-xs text-[var(--text-muted)]">
                     Histórico disponível ao abrir com customerId na URL.
                   </p>
                 )}
@@ -1143,7 +1298,7 @@ export default function AppointmentsPage() {
         contentClassName="bg-[var(--modal-bg)]"
         footer={
           <>
-            <p className="mr-auto text-xs text-[var(--modal-section-muted)]">
+            <p className="mr-auto text-xs text-[var(--text-muted)]">
               Resumo:{" "}
               {form.customerId
                 ? (customerById.get(form.customerId) ?? "Cliente")
