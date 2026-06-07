@@ -30,7 +30,7 @@ export class GovernanceRunJob {
   }
 
   async runForOrg(orgId: string) {
-    this.run.startRun(orgId)
+    await this.run.startRun(orgId)
 
     const evaluated = await this.prisma.person.count({
       where: { orgId, active: true },

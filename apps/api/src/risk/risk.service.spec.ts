@@ -35,7 +35,7 @@ describe('RiskService org hardening', () => {
   })
 
   it('writes risk snapshot timeline with org-scoped person', async () => {
-    prisma.person.findFirst.mockResolvedValue({ orgId: 'org-a' })
+    prisma.person.findFirst.mockResolvedValue({ orgId: 'org-a', riskScore: 40, operationalState: 'NORMAL' })
 
     await service.snapshot('p1', 77, 'manual', 'org-a')
 
@@ -44,6 +44,20 @@ describe('RiskService org hardening', () => {
     )
     expect(timeline.log).toHaveBeenCalledWith(
       expect.objectContaining({ orgId: 'org-a', action: 'RISK_SNAPSHOT_CREATED' }),
+    )
+    expect(timeline.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orgId: 'org-a',
+        action: 'RISK_UPDATED',
+        metadata: expect.objectContaining({
+          previousRisk: 40,
+          nextRisk: 77,
+          score: 77,
+          reason: 'manual',
+          entityType: 'Person',
+          entityId: 'p1',
+        }),
+      }),
     )
   })
 })

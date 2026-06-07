@@ -1,4 +1,5 @@
 import { AuditEvent, Person } from '@prisma/client'
+import { normalizeTimelineEventType } from './timeline-events'
 
 export type TimelineItem = {
   id: string
@@ -17,7 +18,7 @@ export function presentAuditEvent(
 
   return {
     id: event.id,
-    action: event.action,
+    action: normalizeTimelineEventType(event.action),
     title: humanizeAction(event.action),
     description: text,
     context: text,
@@ -27,7 +28,8 @@ export function presentAuditEvent(
 }
 
 function humanizeAction(action: string): string {
-  switch (action) {
+  const normalizedAction = normalizeTimelineEventType(action)
+  switch (normalizedAction) {
     case 'ASSIGNMENT_STARTED':
       return 'Trilha iniciada'
     case 'ASSIGNMENT_COMPLETED':
@@ -50,7 +52,7 @@ function humanizeAction(action: string): string {
       return 'Agendamento atualizado'
     case 'APPOINTMENT_CONFIRMED':
       return 'Agendamento confirmado'
-    case 'APPOINTMENT_CANCELED':
+    case 'APPOINTMENT_CANCELLED':
       return 'Agendamento cancelado'
     case 'APPOINTMENT_DONE':
       return 'Agendamento concluído'

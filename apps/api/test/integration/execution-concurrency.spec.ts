@@ -54,6 +54,11 @@ describe('ExecutionService concurrency hardening', () => {
     }))
     expect(timeline.log).toHaveBeenCalledWith(expect.objectContaining({
       orgId: 'org-1',
+      action: 'SERVICE_ORDER_STARTED',
+      metadata: expect.objectContaining({ notes: 'Iniciado' }),
+    }))
+    expect(timeline.log).toHaveBeenCalledWith(expect.objectContaining({
+      orgId: 'org-1',
       action: 'EXECUTION_STARTED',
       metadata: expect.objectContaining({ notes: 'Iniciado' }),
     }))
@@ -130,7 +135,12 @@ describe('ExecutionService concurrency hardening', () => {
     ])
 
     expect([first, second].filter((r: any) => r.idempotent).length).toBe(1)
-    expect(timeline.log).toHaveBeenCalledTimes(1)
+    expect(timeline.log).toHaveBeenCalledTimes(2)
+    expect(timeline.log).toHaveBeenCalledWith(expect.objectContaining({
+      orgId: 'org-1',
+      action: 'SERVICE_ORDER_COMPLETED',
+      serviceOrderId: 'exec-1',
+    }))
     expect(audit.log).toHaveBeenCalledTimes(1)
     expect(finance.ensureChargeForServiceOrderDone).toHaveBeenCalledTimes(1)
     expect(metrics.increment).toHaveBeenCalledTimes(1)

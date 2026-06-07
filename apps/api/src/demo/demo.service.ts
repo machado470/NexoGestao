@@ -202,7 +202,7 @@ export class DemoService {
       'DEMO_BOOTSTRAP_OFFICIAL',
     )
 
-    this.governanceRun.startRun(params.orgId)
+    await this.governanceRun.startRun(params.orgId)
     const engineResult = await this.enforcementEngine.runForOrg(params.orgId)
 
     const agg = await this.prisma.person.aggregate({

@@ -411,8 +411,29 @@ export function buildWhatsAppUrlFromCharge(charge: any) {
   return buildWhatsAppUrlFromContext(buildOperationalContextFromCharge(charge));
 }
 
+
+const LEGACY_TIMELINE_EVENT_ALIASES: Record<string, string> = {
+  APPOINTMENT_CANCELED: "APPOINTMENT_CANCELLED",
+  EXECUTION_STARTED: "SERVICE_ORDER_STARTED",
+  EXECUTION_DONE: "SERVICE_ORDER_COMPLETED",
+  EXECUTION_COMPLETED: "SERVICE_ORDER_COMPLETED",
+  SERVICE_ORDER_DONE: "SERVICE_ORDER_COMPLETED",
+  SERVICE_ORDER_CHARGE_CREATED: "CHARGE_CREATED",
+  WHATSAPP_MESSAGE_SENT: "MESSAGE_SENT",
+  WHATSAPP_MESSAGE_FAILED: "MESSAGE_FAILED",
+  CUSTOMER_OPERATIONAL_RISK_UPDATED: "RISK_UPDATED",
+  RISK_SNAPSHOT_CREATED: "RISK_UPDATED",
+  OPERATIONAL_STATE_ENFORCED: "OPERATIONAL_STATE_CHANGED",
+  OPERATIONAL_WARNING_RAISED: "OPERATIONAL_STATE_CHANGED",
+};
+
+export function normalizeTimelineEventType(eventType?: string | null) {
+  const normalized = normalizeStatus(eventType);
+  return LEGACY_TIMELINE_EVENT_ALIASES[normalized] ?? normalized;
+}
+
 export function getTimelineEventKey(event: TimelineEventLike) {
-  return normalizeStatus(event.eventType ?? event.action ?? event.type);
+  return normalizeTimelineEventType(event.eventType ?? event.action ?? event.type);
 }
 
 export function getTimelineEventLabel(event: TimelineEventLike) {

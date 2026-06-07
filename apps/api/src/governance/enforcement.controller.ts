@@ -39,7 +39,7 @@ export class EnforcementController {
 
     const orgId = req.user.orgId
 
-    this.runService.startRun(orgId)
+    await this.runService.startRun(orgId)
 
     const engineResult = await this.engine.runForOrg(orgId)
 

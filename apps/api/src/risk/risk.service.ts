@@ -82,7 +82,7 @@ export class RiskService {
 
     const person = await this.prisma.person.findFirst({
       where: { id: personId, ...(orgId ? { orgId } : {}) },
-      select: { orgId: true },
+      select: { orgId: true, riskScore: true, operationalState: true },
     })
 
     if (!person) {
@@ -97,11 +97,29 @@ export class RiskService {
       },
     })
 
+    const metadata = {
+      previousRisk: person.riskScore ?? null,
+      nextRisk: score,
+      riskLevel: person.operationalState ?? null,
+      score,
+      reason: finalReason,
+      entityType: 'Person',
+      entityId: personId,
+    }
+
     await this.timeline.log({
       orgId: person.orgId,
       personId,
       action: 'RISK_SNAPSHOT_CREATED',
-      metadata: { score, reason: finalReason },
+      metadata,
+    })
+
+    await this.timeline.log({
+      orgId: person.orgId,
+      personId,
+      action: 'RISK_UPDATED',
+      description: `Risco operacional recalculado (${score})`,
+      metadata,
     })
   }
 
@@ -154,15 +172,31 @@ export class RiskService {
   ) {
     const result = await this.getCustomerOperationalRisk(orgId, customerId)
 
+    const metadata = {
+      customerId,
+      reason: reason ?? 'OPERATIONAL_EVENT',
+      nextRisk: result.score,
+      riskLevel: result.score,
+      score: result.score,
+      entityType: 'Customer',
+      entityId: customerId,
+      ...result,
+    }
+
     await this.timeline.log({
       orgId,
       action: 'CUSTOMER_OPERATIONAL_RISK_UPDATED',
       description: `Risco operacional do cliente recalculado (${result.score})`,
-      metadata: {
-        customerId,
-        reason: reason ?? 'OPERATIONAL_EVENT',
-        ...result,
-      },
+      customerId,
+      metadata,
+    })
+
+    await this.timeline.log({
+      orgId,
+      action: 'RISK_UPDATED',
+      description: `Risco operacional do cliente recalculado (${result.score})`,
+      customerId,
+      metadata,
     })
 
     return result

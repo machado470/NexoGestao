@@ -75,18 +75,24 @@ export class EnforcementEngineService {
       if (decision.action === 'RAISE_WARNING') {
         result.warnings++
 
+        const warningMetadata = {
+          actorType: 'SYSTEM',
+          actor: 'ENFORCEMENT_ENGINE',
+          riskScore,
+          previousState: p.operationalState ?? null,
+          nextState: decision.nextState,
+          reason: decision.reason,
+          result: decision.action,
+          severity: 'WARNING',
+          hasActiveException,
+        }
+
         await this.timeline.log({
           orgId: p.orgId,
           action: 'OPERATIONAL_WARNING_RAISED',
           personId: p.id,
           description: decision.reason,
-          metadata: {
-            actorType: 'SYSTEM',
-            actor: 'ENFORCEMENT_ENGINE',
-            riskScore,
-            nextState: decision.nextState,
-            hasActiveException,
-          },
+          metadata: warningMetadata,
         })
 
         // aplica estado/score se mudou
@@ -94,6 +100,14 @@ export class EnforcementEngineService {
           personId: p.id,
           nextState: decision.nextState as any,
           riskScore,
+        })
+
+        await this.timeline.log({
+          orgId: p.orgId,
+          action: 'OPERATIONAL_STATE_CHANGED',
+          personId: p.id,
+          description: decision.reason,
+          metadata: warningMetadata,
         })
 
         continue
@@ -109,6 +123,19 @@ export class EnforcementEngineService {
 
         if (created) result.correctivesCreated++
 
+        const enforcedMetadata = {
+          actorType: 'SYSTEM',
+          actor: 'ENFORCEMENT_ENGINE',
+          riskScore,
+          previousState: p.operationalState ?? null,
+          nextState: decision.nextState,
+          reason: decision.reason,
+          result: decision.action,
+          severity: 'CRITICAL',
+          hasActiveException,
+          correctiveCreated: created,
+        }
+
         // aplica estado/score se mudou (independente de já ter corrective aberto)
         await this.setPersonStateIfChanged({
           personId: p.id,
@@ -118,17 +145,18 @@ export class EnforcementEngineService {
 
         await this.timeline.log({
           orgId: p.orgId,
+          action: 'OPERATIONAL_STATE_CHANGED',
+          personId: p.id,
+          description: decision.reason,
+          metadata: enforcedMetadata,
+        })
+
+        await this.timeline.log({
+          orgId: p.orgId,
           action: 'OPERATIONAL_STATE_ENFORCED',
           personId: p.id,
           description: decision.reason,
-          metadata: {
-            actorType: 'SYSTEM',
-            actor: 'ENFORCEMENT_ENGINE',
-            riskScore,
-            nextState: decision.nextState,
-            hasActiveException,
-            correctiveCreated: created,
-          },
+          metadata: enforcedMetadata,
         })
       }
     }

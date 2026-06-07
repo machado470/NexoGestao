@@ -71,8 +71,21 @@ function getFlowStepClasses(done: boolean, active: boolean) {
   };
 }
 
+const LEGACY_TIMELINE_EVENT_ALIASES: Record<string, string> = {
+  EXECUTION_STARTED: "SERVICE_ORDER_STARTED",
+  EXECUTION_DONE: "SERVICE_ORDER_COMPLETED",
+  EXECUTION_COMPLETED: "SERVICE_ORDER_COMPLETED",
+  SERVICE_ORDER_DONE: "SERVICE_ORDER_COMPLETED",
+  SERVICE_ORDER_CHARGE_CREATED: "CHARGE_CREATED",
+};
+
+function normalizeTimelineEventType(eventType: string) {
+  const normalized = String(eventType ?? "").trim().toUpperCase();
+  return LEGACY_TIMELINE_EVENT_ALIASES[normalized] ?? normalized;
+}
+
 function getTimelineLabel(event: TimelineEvent) {
-  const action = String(event.action ?? event.type ?? "").trim().toUpperCase();
+  const action = normalizeTimelineEventType(String(event.action ?? event.type ?? ""));
 
   if (action === "CHARGE_CREATED") return "Cobrança gerada";
   if (action === "CHARGE_PAID" || action === "PAYMENT_RECEIVED") {
@@ -81,8 +94,8 @@ function getTimelineLabel(event: TimelineEvent) {
   if (action === "CHARGE_OVERDUE") return "Cobrança vencida";
   if (action === "SERVICE_ORDER_CREATED") return "O.S. criada";
   if (action === "SERVICE_ORDER_UPDATED") return "O.S. atualizada";
-  if (action === "EXECUTION_STARTED") return "Execução iniciada";
-  if (action === "EXECUTION_COMPLETED" || action === "EXECUTION_DONE") {
+  if (action === "SERVICE_ORDER_STARTED") return "Execução iniciada";
+  if (action === "SERVICE_ORDER_COMPLETED") {
     return "Execução concluída";
   }
 
