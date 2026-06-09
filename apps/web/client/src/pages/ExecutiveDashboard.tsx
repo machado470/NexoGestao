@@ -2,18 +2,13 @@ import { useMemo } from "react";
 import {
   ArrowRight,
   CalendarClock,
-  CheckCircle2,
-  ChevronRight,
   CircleDollarSign,
   ClipboardList,
   Clock3,
-  CreditCard,
   MessageSquareWarning,
   ShieldAlert,
   ShieldCheck,
   TrendingDown,
-  Zap,
-  UserRound,
   WalletCards,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -34,6 +29,15 @@ import {
   AppPriorityBadge,
   AppStatusBadge,
 } from "@/components/internal-page-system";
+import {
+  EntityTimelineCard,
+  NextBestActionCard,
+  OperationalFlowCard,
+  OperationalRiskCard,
+  OperationalStateCard,
+  type OperationalFlowStageState,
+  type OperationalStateLevel,
+} from "@/components/app";
 import {
   buildWhatsAppExecutionPath,
   formatWhatsAppExecutionDate,
@@ -79,18 +83,37 @@ type QueueItem = {
   path: string;
 };
 type FlowStage = {
+  id: string;
   label: string;
   value: string;
   context: string;
   path: string;
   action: string;
+  state: OperationalFlowStageState;
 };
 type RecommendedAction = {
   title: string;
+  entity: string;
   reason: string;
   impact: string;
   path: string;
   ctaLabel: string;
+  safetyNote?: string;
+};
+type DashboardTimelineEvent = DashboardRecord & {
+  id?: unknown;
+  eventType?: unknown;
+  type?: unknown;
+  action?: unknown;
+  createdAt?: unknown;
+  occurredAt?: unknown;
+  entityType?: unknown;
+  entityId?: unknown;
+  actorName?: unknown;
+  responsibleName?: unknown;
+  summary?: unknown;
+  description?: unknown;
+  title?: unknown;
 };
 type ComparisonKey =
   | "revenueReceivedPct"
@@ -208,6 +231,62 @@ function formatCurrencyMentions(value: string) {
 
 function formatPeriod() {
   return `Hoje · ${new Intl.DateTimeFormat("pt-BR", { dateStyle: "long" }).format(new Date())}`;
+}
+
+function formatEventDateTime(value: unknown) {
+  if (typeof value !== "string" && !(value instanceof Date))
+    return "Data não informada";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "Data não informada";
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function normalizeTimelineEvents(payload: unknown) {
+  const source = Array.isArray(payload)
+    ? payload
+    : Array.isArray(asRecord(payload).items)
+      ? (asRecord(payload).items as unknown[])
+      : Array.isArray(asRecord(payload).events)
+        ? (asRecord(payload).events as unknown[])
+        : [];
+
+  return source.slice(0, 4).map((raw, index) => {
+    const event = asRecord(raw) as DashboardTimelineEvent;
+    const type = String(
+      event.eventType ?? event.type ?? event.action ?? "Evento oficial"
+    ).replace(/_/g, " ");
+    const entityType = String(event.entityType ?? "Entidade").replace(
+      /_/g,
+      " "
+    );
+    const entityId = event.entityId ? ` #${String(event.entityId)}` : "";
+    return {
+      id: String(event.id ?? `${type}-${index}`),
+      type,
+      occurredAt: formatEventDateTime(event.occurredAt ?? event.createdAt),
+      entity: `${entityType}${entityId}`,
+      actor:
+        typeof event.actorName === "string"
+          ? event.actorName
+          : typeof event.responsibleName === "string"
+            ? event.responsibleName
+            : undefined,
+      summary: formatCurrencyMentions(
+        String(
+          event.summary ??
+            event.description ??
+            event.title ??
+            "Evento oficial registrado na Timeline."
+        )
+      ),
+    };
+  });
 }
 
 function buildSignalPath(
@@ -534,6 +613,10 @@ export default function ExecutiveDashboard() {
     enabled: isAuthenticated,
     retry: false,
   });
+  const timelineQuery = trpc.nexo.timeline.listByOrg.useQuery(
+    { limit: 4 },
+    { enabled: isAuthenticated, retry: false }
+  );
 
   const metrics = useMemo(() => asRecord(kpisQuery.data), [kpisQuery.data]);
   const alerts = useMemo(() => asAlerts(alertsQuery.data), [alertsQuery.data]);
@@ -560,44 +643,81 @@ export default function ExecutiveDashboard() {
   const criticalCount = attention.filter(
     item => item.severity === "critical"
   ).length;
-  const operationState = pageError
-    ? "Crítico"
+  const overdueOrders = alerts.overdueOrders?.count ?? 0;
+  const overdueCharges = alerts.overdueCharges?.count ?? 0;
+  const missingCharges = alerts.doneOrdersWithoutCharge?.count ?? 0;
+  const timelineEvents = normalizeTimelineEvents(timelineQuery.data);
+  const operationLevel: OperationalStateLevel = pageError
+    ? "SUSPENDED"
     : criticalCount > 0
-      ? "Crítico"
+      ? "SUSPENDED"
       : attention.length > 0
+        ? "WARNING"
+        : "NORMAL";
+  const operationState =
+    operationLevel === "SUSPENDED"
+      ? "Crítico"
+      : operationLevel === "WARNING"
         ? "Atenção"
         : "Normal";
 
   const flow: FlowStage[] = [
     {
+      id: "customers",
       label: "Cliente",
       value: String(readNumber(metrics, "totalCustomers")),
       context: "clientes ativos",
       path: "/customers",
       action: "Ver clientes",
+      state: readNumber(metrics, "totalCustomers") > 0 ? "done" : "idle",
     },
     {
+      id: "appointments",
       label: "Agendamento",
       value: String(alerts.todayServices?.count ?? 0),
       context: "agendamentos hoje",
       path: "/appointments",
       action: "Ver agenda",
+      state: (alerts.todayServices?.count ?? 0) > 0 ? "active" : "idle",
     },
     {
+      id: "service-orders",
       label: "O.S.",
       value: String(readNumber(metrics, "openServiceOrders")),
-      context: "ordens abertas",
+      context:
+        overdueOrders > 0
+          ? `${overdueOrders} atrasada(s) dentro das ordens abertas`
+          : "ordens abertas",
       path: "/service-orders",
       action: "Ver execução",
+      state:
+        overdueOrders > 0
+          ? "blocked"
+          : readNumber(metrics, "openServiceOrders") > 0
+            ? "active"
+            : "idle",
     },
     {
+      id: "charges",
       label: "Cobrança",
       value: String(readNumber(metrics, "chargesGenerated")),
-      context: "cobranças geradas",
+      context:
+        overdueCharges > 0
+          ? `${overdueCharges} vencida(s) travando recebimento`
+          : "cobranças geradas",
       path: "/finances?view=charges",
       action: "Ver cobranças",
+      state:
+        overdueCharges > 0
+          ? "blocked"
+          : missingCharges > 0
+            ? "warning"
+            : readNumber(metrics, "chargesGenerated") > 0
+              ? "done"
+              : "idle",
     },
     {
+      id: "payments",
       label: "Pagamento",
       value:
         readNullableNumber(metrics, "paymentsReceivedCount") === null
@@ -609,11 +729,44 @@ export default function ExecutiveDashboard() {
           : "pagamentos recebidos nesta semana",
       path: "/finances?view=paid",
       action: "Ver pagamentos",
+      state:
+        readNullableNumber(metrics, "paymentsReceivedCount") === null
+          ? "idle"
+          : "done",
+    },
+    {
+      id: "timeline",
+      label: "Timeline",
+      value: timelineQuery.isError ? "!" : String(timelineEvents.length),
+      context: timelineQuery.isError
+        ? "leitura indisponível"
+        : "eventos oficiais recentes",
+      path: "/timeline",
+      action: "Ver prova",
+      state: timelineQuery.isError
+        ? "warning"
+        : timelineEvents.length > 0
+          ? "done"
+          : "idle",
+    },
+    {
+      id: "governance",
+      label: "Risco/Governança",
+      value: operationState,
+      context:
+        criticalCount > 0
+          ? `${criticalCount} risco(s) crítico(s)`
+          : "sinal transversal consolidado",
+      path: "/governance",
+      action: "Ver governança",
+      state:
+        operationLevel === "SUSPENDED"
+          ? "blocked"
+          : operationLevel === "WARNING"
+            ? "warning"
+            : "done",
     },
   ];
-  const overdueOrders = alerts.overdueOrders?.count ?? 0;
-  const overdueCharges = alerts.overdueCharges?.count ?? 0;
-  const missingCharges = alerts.doneOrdersWithoutCharge?.count ?? 0;
   const bottleneck =
     overdueCharges >= overdueOrders &&
     overdueCharges >= missingCharges &&
@@ -657,12 +810,15 @@ export default function ExecutiveDashboard() {
   const fallbackAction: RecommendedAction | null = highestValueOverdueCharge
     ? {
         title: `Cobrar ${highestValueChargeCustomer || "cliente em atraso"} — ${formatCurrencyFromCents(readNumber(highestValueChargeRecord, "amountCents"))}`,
+        entity: highestValueChargeCustomer || "Cobrança vencida",
         reason:
           "Maior cobrança vencida retornada pela leitura financeira atual.",
         impact:
           "Ação direta sobre o maior valor parado reduz pressão imediata no caixa.",
         path: "/finances?view=charges&status=overdue",
         ctaLabel: "Enviar cobrança",
+        safetyNote:
+          "Fallback local baseado em alertas financeiros já carregados; não executa cobrança automática.",
       }
     : overdueOrders > 0
       ? {
@@ -670,6 +826,7 @@ export default function ExecutiveDashboard() {
             firstQueueItem?.type === "O.S. atrasada"
               ? `Destravar ${firstQueueItem.entity}`
               : "Revisar O.S. atrasadas",
+          entity: firstQueueItem?.entity ?? "Ordens de serviço",
           reason: `${overdueOrders} O.S. atrasada(s) precisam avançar antes de novas janelas.`,
           impact:
             "Destravar a execução protege agenda, cliente e faturamento do serviço.",
@@ -678,28 +835,43 @@ export default function ExecutiveDashboard() {
               ? firstQueueItem.path
               : "/service-orders?status=attention",
           ctaLabel: "Revisar O.S. atrasadas",
+          safetyNote:
+            "Fallback local baseado na fila operacional; não altera status sem ação do usuário.",
         }
       : firstQueueItem
         ? {
             title: `${firstQueueItem.ctaLabel} — ${firstQueueItem.entity}`,
+            entity: firstQueueItem.entity,
             reason: `${firstQueueItem.type}: ${firstQueueItem.context}`,
             impact: `Responsável: ${firstQueueItem.responsible}. Status atual: ${firstQueueItem.status}.`,
             path: firstQueueItem.path,
             ctaLabel: firstQueueItem.ctaLabel,
+            safetyNote:
+              "Fallback local da fila operacional; abre o módulo responsável para validação.",
           }
         : failedMessages > 0
           ? {
               title: "Revisar WhatsApp",
+              entity: "Canal WhatsApp",
               reason: `${failedMessages} mensagem(ns) com falha podem interromper o contato com clientes.`,
               impact:
                 "Restabelecer a comunicação evita perda de confirmações e retornos.",
               path: "/whatsapp",
               ctaLabel: "Revisar WhatsApp",
+              safetyNote:
+                "Fallback local baseado em métricas de comunicação; abre WhatsApp sem enviar mensagens automaticamente.",
             }
           : null;
   const recommendedAction: RecommendedAction | null = nextBestAction
     ? {
         title: formatCurrencyMentions(nextBestAction.title),
+        entity: nextBestAction.serviceOrderId
+          ? `O.S. #${nextBestAction.serviceOrderId}`
+          : nextBestAction.chargeId
+            ? `Cobrança #${nextBestAction.chargeId}`
+            : nextBestAction.messageId
+              ? `Mensagem #${nextBestAction.messageId}`
+              : nextBestAction.area || "Operação",
         reason: formatCurrencyMentions(
           nextBestAction.reason ??
             nextBestAction.summary ??
@@ -711,6 +883,8 @@ export default function ExecutiveDashboard() {
         ),
         path: buildSignalPath(nextBestAction),
         ctaLabel: nextBestAction.suggestedAction ?? "Abrir ação prioritária",
+        safetyNote:
+          "Sinal retornado pelo motor operacional; execução permanece no módulo de origem.",
       }
     : fallbackAction;
   const availableComparisons = pulseComparisons.flatMap(
@@ -725,7 +899,6 @@ export default function ExecutiveDashboard() {
     pulseComparisons.length - availableComparisons.length;
   const hasOperationalData =
     Object.keys(metrics).length > 0 || attention.length > 0 || queue.length > 0;
-  const bottleneckStage = bottleneck?.label.split(" → ")[0] ?? "Fluxo";
   const kpiCards = [
     {
       label: "Receita da semana",
@@ -909,7 +1082,83 @@ export default function ExecutiveDashboard() {
 
       {!pageLoading && !pageError && hasOperationalData ? (
         <div className="w-full min-w-0 space-y-3 sm:space-y-4">
-          <div className="grid w-full min-w-0 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.82fr)]">
+          <div className="grid w-full min-w-0 gap-3 xl:grid-cols-3">
+            <OperationalStateCard
+              level={operationLevel}
+              reason={
+                attention[0]?.reason ??
+                "Nenhum risco ativo foi retornado pelas leituras de alertas, sinais e governança."
+              }
+              impact={
+                attention[0]?.impact ??
+                "A operação pode seguir o fluxo normal; mantenha acompanhamento da fila e da Timeline."
+              }
+              detailsLabel="Abrir governança"
+              onDetails={() => navigate("/governance")}
+            />
+
+            {attention[0] ? (
+              <OperationalRiskCard
+                title={attention[0].title}
+                reason={attention[0].reason}
+                impact={attention[0].impact}
+                ctaLabel={attention[0].ctaLabel}
+                onClick={() => navigate(attention[0].path)}
+              />
+            ) : (
+              <OperationalRiskCard
+                title="Nenhum risco imediato retornado"
+                reason="Alertas, sinais operacionais e governança não indicaram bloqueio ativo nesta leitura."
+                impact="A decisão principal passa a ser preservar o fluxo e monitorar a prova operacional."
+                ctaLabel="Abrir Timeline"
+                onClick={() => navigate("/timeline")}
+              />
+            )}
+
+            {recommendedAction ? (
+              <NextBestActionCard
+                title={recommendedAction.title}
+                entity={recommendedAction.entity}
+                reason={recommendedAction.reason}
+                impact={recommendedAction.impact}
+                safetyNote={recommendedAction.safetyNote}
+                primaryActionLabel={recommendedAction.ctaLabel}
+                onPrimaryAction={() => navigate(recommendedAction.path)}
+                secondaryActionLabel={
+                  nextBestActionQuery.isError ? "Tentar novamente" : undefined
+                }
+                onSecondaryAction={
+                  nextBestActionQuery.isError
+                    ? () => void nextBestActionQuery.refetch()
+                    : undefined
+                }
+              />
+            ) : (
+              <AppPageEmptyState
+                title="Nenhuma Próxima Melhor Ação disponível"
+                description="A leitura atual não identificou urgências acionáveis; nenhuma ação artificial foi criada."
+              />
+            )}
+          </div>
+
+          <OperationalFlowCard
+            stages={flow.map(stage => ({
+              id: stage.id,
+              label: stage.label,
+              summary: stage.context,
+              state: stage.state,
+              countOrValue: stage.value,
+              hrefLabel: stage.action,
+              onClick: () => navigate(stage.path),
+            }))}
+          />
+
+          <div className="grid w-full min-w-0 gap-3 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+            <EntityTimelineCard
+              events={timelineEvents}
+              onFullTimeline={() => navigate("/timeline")}
+            />
+
             <AppSectionBlock
               title="Atenção imediata"
               compact
@@ -933,197 +1182,7 @@ export default function ExecutiveDashboard() {
                 />
               )}
             </AppSectionBlock>
-
-            <AppSectionBlock
-              title="Próxima melhor ação"
-              compact
-              className="border-[var(--accent-primary)]/30 bg-[var(--surface-base)]"
-              subtitle="Decisão principal para converter leitura em avanço imediato."
-            >
-              {recommendedAction ? (
-                <div className="flex w-full min-w-0 flex-col gap-2 py-0.5 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <AppContextChip
-                        tone="accent"
-                        className="text-[11px] font-semibold uppercase tracking-[0.08em]"
-                      >
-                        Aguardando ação
-                      </AppContextChip>
-                      <Zap className="h-4 w-4 text-[var(--accent-primary)]" />
-                      <p className="text-lg font-semibold leading-tight text-[var(--text-primary)]">
-                        {recommendedAction.title}
-                      </p>
-                    </div>
-                    <div className="mt-1.5 grid gap-1.5 text-sm leading-5 text-[var(--text-secondary)] md:grid-cols-2">
-                      <p>
-                        <strong className="text-[var(--text-primary)]">
-                          Por que agora:
-                        </strong>{" "}
-                        {recommendedAction.reason}
-                      </p>
-                      <p>
-                        <strong className="text-[var(--text-primary)]">
-                          Efeito esperado:
-                        </strong>{" "}
-                        {recommendedAction.impact}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex w-full flex-wrap gap-2 lg:w-auto lg:shrink-0 lg:justify-end">
-                    {nextBestActionQuery.isError ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => void nextBestActionQuery.refetch()}
-                      >
-                        Tentar novamente
-                      </Button>
-                    ) : null}
-                    <Button
-                      className="w-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] sm:w-auto"
-                      onClick={() => navigate(recommendedAction.path)}
-                    >
-                      {recommendedAction.ctaLabel}
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <AppPageEmptyState
-                  title="Nenhuma Próxima Melhor Ação disponível"
-                  description="A leitura atual não identificou urgências acionáveis; nenhuma ação artificial foi criada."
-                />
-              )}
-            </AppSectionBlock>
           </div>
-
-          <AppSectionBlock
-            title="KPIs operacionais"
-            compact
-            className={dashboardSectionClass}
-            subtitle="Indicadores de apoio para decidir rápido."
-          >
-            <div className="grid w-full min-w-0 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-              {kpiCards.map(({ label, value, context, cta, path, Icon }) => (
-                <AppMetricCard
-                  key={label}
-                  title={label}
-                  value={value}
-                  hint={context}
-                  icon={<Icon className="h-4 w-4" />}
-                  ctaLabel={cta}
-                  onClick={() => navigate(path)}
-                />
-              ))}
-            </div>
-          </AppSectionBlock>
-
-          <AppSectionBlock
-            title="Fluxo operacional"
-            className={dashboardSectionClass}
-            subtitle="Cliente → Agendamento → O.S. → Cobrança → Pagamento"
-          >
-            <div
-              className={`mb-3 flex w-full min-w-0 flex-col gap-2 rounded-xl px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between ${
-                bottleneck
-                  ? "border border-[var(--accent-primary)]/35 bg-[var(--accent-soft)] text-[var(--text-secondary)]"
-                  : "border border-[var(--border-subtle)]/70 bg-[var(--surface-primary)]/45 text-[var(--text-secondary)]"
-              }`}
-            >
-              {bottleneck ? (
-                <>
-                  <div className="min-w-0">
-                    <strong className="text-[var(--accent-primary)]">
-                      Gargalo principal: {bottleneck.label}
-                    </strong>
-                    <p className="text-xs text-[var(--text-secondary)]">
-                      {bottleneckStage} concentra a quebra do fluxo até
-                      recebimento.
-                    </p>
-                  </div>
-                  <Button
-                    className="h-auto px-0 py-0 text-[var(--accent-primary)] sm:shrink-0"
-                    variant="link"
-                    size="sm"
-                    onClick={() => navigate(bottleneck.path)}
-                  >
-                    {bottleneck.action}
-                  </Button>
-                </>
-              ) : (
-                <span>
-                  <CheckCircle2 className="mr-2 inline h-4 w-4 text-[var(--success)]" />
-                  Nenhum gargalo foi identificado com os dados disponíveis.
-                </span>
-              )}
-            </div>
-            <div className="grid w-full min-w-0 gap-2 md:grid-cols-5">
-              {flow.map((stage, index) => {
-                const isBreak = bottleneck?.label.startsWith(stage.label);
-                const StageIcon = [
-                  UserRound,
-                  CalendarClock,
-                  ClipboardList,
-                  CircleDollarSign,
-                  CreditCard,
-                ][index];
-                return (
-                  <article
-                    key={stage.label}
-                    className={`relative w-full min-w-0 rounded-xl border px-3 py-2.5 ${
-                      isBreak
-                        ? "rounded-xl border border-[var(--accent-primary)]/45 bg-[var(--accent-soft)]"
-                        : "border border-[var(--border-subtle)]/70 bg-[var(--surface-primary)]/25"
-                    }`}
-                  >
-                    {index < flow.length - 1 ? (
-                      <ChevronRight
-                        className={`absolute right-2 top-3 hidden h-4 w-4 lg:block ${
-                          isBreak
-                            ? "text-[var(--accent-primary)]"
-                            : "text-[var(--text-secondary)]/70"
-                        }`}
-                      />
-                    ) : null}
-                    <div className="flex min-w-0 items-center gap-2 pr-4">
-                      <StageIcon
-                        className={`h-4 w-4 shrink-0 ${isBreak ? "text-[var(--accent-primary)]" : "text-[var(--text-secondary)]"}`}
-                      />
-                      <p
-                        className={`text-[11px] font-semibold uppercase tracking-[0.08em] ${
-                          isBreak
-                            ? "text-[var(--accent-primary)]"
-                            : "text-[var(--text-secondary)]"
-                        }`}
-                      >
-                        {stage.label}
-                      </p>
-                    </div>
-                    {isBreak ? (
-                      <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--accent-primary)]">
-                        Gargalo principal
-                      </p>
-                    ) : null}
-                    <p className="mt-1 text-xl font-semibold leading-tight text-[var(--text-primary)]">
-                      {stage.value}
-                    </p>
-                    <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
-                      {stage.context}
-                    </p>
-                    <Button
-                      className="mt-1 h-auto px-0 py-0 text-[var(--accent-primary)]"
-                      variant="link"
-                      size="sm"
-                      onClick={() => navigate(stage.path)}
-                    >
-                      {stage.action}
-                    </Button>
-                  </article>
-                );
-              })}
-            </div>
-          </AppSectionBlock>
 
           <AppSectionBlock
             title="Fila operacional"
@@ -1190,6 +1249,27 @@ export default function ExecutiveDashboard() {
                 description="Não há itens acionáveis na leitura atual. A operação não preenche a fila com exemplos."
               />
             )}
+          </AppSectionBlock>
+
+          <AppSectionBlock
+            title="KPIs operacionais"
+            compact
+            className={dashboardSectionClass}
+            subtitle="Indicadores de apoio; a decisão principal fica acima."
+          >
+            <div className="grid w-full min-w-0 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {kpiCards.map(({ label, value, context, cta, path, Icon }) => (
+                <AppMetricCard
+                  key={label}
+                  title={label}
+                  value={value}
+                  hint={context}
+                  icon={<Icon className="h-4 w-4" />}
+                  ctaLabel={cta}
+                  onClick={() => navigate(path)}
+                />
+              ))}
+            </div>
           </AppSectionBlock>
 
           <AppSectionBlock
