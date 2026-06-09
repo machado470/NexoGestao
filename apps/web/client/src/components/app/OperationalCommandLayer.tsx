@@ -386,9 +386,8 @@ export function EntityTimelineCard({
         </ol>
       ) : (
         <div className="rounded-xl border border-[var(--border-subtle)]/70 bg-[var(--surface-primary)]/45 p-4 text-sm leading-6 text-[var(--text-secondary)]">
-          Nenhum evento oficial foi retornado nesta leitura. O Dashboard não
-          cria histórico fictício; abra a Timeline para investigar a trilha
-          completa.
+          Nenhum evento oficial foi retornado nesta leitura. O Nexo não cria
+          histórico fictício; abra a Timeline para investigar a trilha completa.
         </div>
       )}
       {onFullTimeline ? (
