@@ -188,3 +188,50 @@ Financeiro trata cobrança como ponte entre operação concluída e caixa. Cobra
 ### Congelamento de WhatsApp e próximas páginas
 
 WhatsApp permanece congelado nesta adoção: `WhatsAppPage.tsx` não deve ser alterado, não há novo fluxo de comunicação e os CTAs continuam apenas navegando para o contexto já existente. Depois de Financeiro, as próximas páginas candidatas para adoção da Operational Command Layer são O.S. e Agendamentos.
+
+## Adoção em Ordens de Serviço
+
+A página de Ordens de Serviço (`ServiceOrdersPage`) adota a camada operacional transversal para transformar a O.S. em centro de execução operacional. A primeira leitura deixa de ser apenas lista, filtro e ação rápida: ao selecionar uma O.S., a página passa a responder o que está sendo executado, em que estado está, quem é responsável, qual risco existe, qual ação deve acontecer agora e como isso impacta cobrança, pagamento, Timeline e Governança.
+
+### Como O.S. usa a camada operacional
+
+- `OperationalStateCard` calcula o estado da O.S. (`NORMAL`, `WARNING` ou `RESTRICTED`) a partir de status, atraso, responsável, conclusão sem cobrança e cobrança vinculada vencida. `SUSPENDED` continua reservado para dado real de suspensão.
+- `OperationalRiskCard` explica o risco dominante com motivo operacional: atraso, ausência de responsável, execução sem prazo, receita não capturada ou cobrança vencida vinculada. Quando não há bloqueio crítico, o card declara essa condição sem criar risco genérico.
+- `NextBestActionCard` concentra a Próxima Melhor Ação da execução, sem execução automática: destravar execução atrasada, atribuir responsável, atualizar andamento/concluir serviço, gerar cobrança, cobrar cliente, revisar histórico de cancelada ou revisar detalhes.
+- `OperationalFlowCard` mostra a cadeia `Cliente → Agendamento → O.S. → Cobrança → Pagamento → Timeline → Risco/Governança` com estados `done`, `active`, `warning`, `blocked` ou `idle` por etapa.
+- `EntityTimelineCard` substitui a timeline local solta por prova operacional da execução: usa eventos oficiais da Timeline quando retornados e, quando não há eventos, mostra fallback contextual derivado apenas de datas reais da própria O.S. ou da cobrança vinculada.
+
+### Dados reaproveitados
+
+Ordens de Serviço reaproveita somente dados já carregados pela página:
+
+- lista de O.S. retornada por `nexo.serviceOrders.list`;
+- cliente vinculado carregado por `nexo.customers.list` ou embutido no payload da O.S.;
+- agendamento vinculado carregado por `nexo.appointments.list`;
+- cobrança vinculada carregada por `finance.charges.list` ou pelo `financialSummary.latestCharge` da O.S.;
+- evidência de pagamento inferida do status `PAID` ou de pagamentos embutidos na cobrança quando retornados;
+- responsável/assignee carregado pela própria O.S. ou por `people.list`;
+- status, criação, início, prazo, conclusão, valor e descrição já existentes na O.S.;
+- eventos oficiais da Timeline retornados por `nexo.timeline.listByServiceOrder`.
+
+### Fallbacks seguros
+
+- Se não houver O.S. selecionada, a camada mostra leitura agregada da carteira e orienta selecionar ou criar O.S.
+- Se não houver Timeline oficial, `EntityTimelineCard` declara explicitamente que os eventos contextuais vêm de datas reais da O.S. e não substituem a Timeline oficial.
+- Se não houver datas reais suficientes, a prova operacional informa ausência de histórico em vez de fabricar evento.
+- Se não houver cobrança vinculada, a etapa de cobrança fica `idle` ou `blocked` apenas quando a O.S. já está concluída.
+- Se não houver pagamento exposto, a etapa de pagamento depende da cobrança e usa apenas status `PAID` ou pagamentos embutidos quando existirem.
+- `SUSPENDED` não é usado em O.S. sem dado real de suspensão.
+- A Próxima Melhor Ação apenas orienta; iniciar, concluir, editar, gerar cobrança ou navegar continuam usando ações já existentes.
+
+### Relação Cliente → Agendamento → O.S. → Cobrança → Pagamento
+
+A O.S. passa a ser a ponte entre execução e dinheiro. Cliente confirma o contexto operacional; agendamento indica origem ou ausência de agenda; O.S. concentra status, responsável, prazo e conclusão; cobrança mostra se a execução já virou receita; pagamento indica se a cobrança fechou o ciclo financeiro. Quando alguma etapa falha, o fluxo sinaliza `warning` ou `blocked` para que o operador entenda onde a execução deixou de avançar.
+
+### Timeline, Risco e Governança
+
+A Timeline é tratada como prova oficial da execução. Atraso, ausência de responsável, conclusão sem cobrança e cobrança vencida elevam o risco operacional e alimentam a leitura de Governança. Quando a Timeline não retorna eventos, a página pode exibir até quatro eventos contextuais derivados de datas reais — criação, início, conclusão e cobrança gerada — sempre com aviso de que isso não substitui a Timeline oficial.
+
+### Congelamento de WhatsApp e próxima página candidata
+
+WhatsApp permanece congelado nesta adoção: `WhatsAppPage.tsx` não deve ser alterado, não há novo fluxo de comunicação e os CTAs continuam apenas navegando para contextos já existentes. Depois de O.S., a próxima página candidata para adoção da Operational Command Layer é Agendamentos.
