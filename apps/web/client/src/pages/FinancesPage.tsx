@@ -49,6 +49,15 @@ import { normalizeArrayPayload } from "@/lib/query-helpers";
 import { cn } from "@/lib/utils";
 import { safeDate } from "@/lib/operational/kpi";
 import { trpc } from "@/lib/trpc";
+import {
+  EntityTimelineCard,
+  NextBestActionCard,
+  OperationalFlowCard,
+  OperationalRiskCard,
+  OperationalStateCard,
+  type OperationalFlowStageState,
+  type OperationalStateLevel,
+} from "@/components/app/OperationalCommandLayer";
 import type { OperationalSeverity } from "@/lib/operations/operational-intelligence";
 
 type ChargeRecord = Record<string, any>;
@@ -93,6 +102,16 @@ function computeDaysOverdue(value: unknown) {
     (start.getTime() - due.getTime()) / (1000 * 60 * 60 * 24)
   );
   return Math.max(diff, 0);
+}
+
+function computeDaysUntilDue(value: unknown) {
+  const dueDate = safeDate(value);
+  if (!dueDate) return null;
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const due = new Date(dueDate);
+  due.setHours(0, 0, 0, 0);
+  return Math.ceil((due.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
 }
 
 function latestPaymentMethod(charge: ChargeRecord): string {
@@ -485,27 +504,6 @@ export default function FinancesPage() {
       ),
     [enrichedCharges, serviceOrders]
   );
-  const nextBestAction = useMemo(() => {
-    const pendingOrOverdue = getVisibleAttentionItems(
-      [...enrichedCharges]
-        .filter(item => ["PENDING", "OVERDUE"].includes(item.status))
-        .map(
-          item =>
-            ({
-              ...item,
-              key: String(item.id ?? ""),
-              domain: "finances",
-              type:
-                item.status === "OVERDUE" ? "overdue_charge" : "pending_charge",
-              severity: item.status === "OVERDUE" ? "WARNING" : "ATTENTION",
-              amountCents: Number(item.amountCents ?? 0),
-            }) as OperationalAttentionItem
-        ),
-      1
-    );
-    return (pendingOrOverdue[0] as ChargeRecord | null) ?? null;
-  }, [enrichedCharges]);
-
   const highlightedFinancialAttention = useMemo(
     () =>
       getVisibleAttentionItems(
@@ -663,6 +661,396 @@ export default function FinancesPage() {
     cashHealth.pendingCount
   );
 
+  const paidWithoutRegisteredPayment = useMemo(
+    () => enrichedCharges.filter(item => !hasRegisteredPayment(item)),
+    [enrichedCharges]
+  );
+
+  const mostCriticalCharge = useMemo(() => {
+    const candidates = enrichedCharges.filter(item =>
+      ["PENDING", "OVERDUE"].includes(item.status)
+    );
+    if (candidates.length === 0) return null;
+
+    return [...candidates].sort((a, b) => {
+      if (a.status !== b.status) return a.status === "OVERDUE" ? -1 : 1;
+      const overdueDiff =
+        Number(b.overdueDays ?? 0) - Number(a.overdueDays ?? 0);
+      if (overdueDiff !== 0) return overdueDiff;
+      return Number(b.amountCents ?? 0) - Number(a.amountCents ?? 0);
+    })[0];
+  }, [enrichedCharges]);
+
+  const financeCommandState = useMemo(() => {
+    const overdueCharges = enrichedCharges.filter(
+      item => item.status === "OVERDUE"
+    );
+    const pendingCharges = enrichedCharges.filter(
+      item => item.status === "PENDING"
+    );
+    const dueSoonCount = pendingCharges.filter(item => {
+      const daysUntilDue = computeDaysUntilDue(item.dueDate);
+      return daysUntilDue !== null && daysUntilDue >= 0 && daysUntilDue <= 3;
+    }).length;
+    const largestOverdueDays = overdueCharges.reduce(
+      (max, item) => Math.max(max, Number(item.overdueDays ?? 0)),
+      0
+    );
+    const averageOverdueDays = overdueCharges.length
+      ? Math.round(
+          overdueCharges.reduce(
+            (sum, item) => sum + Number(item.overdueDays ?? 0),
+            0
+          ) / overdueCharges.length
+        )
+      : 0;
+    const hasMaterialOverdue =
+      health.overdue >= 100000 || overdueCharges.length >= 2;
+    const level: OperationalStateLevel =
+      overdueCharges.length > 0 &&
+      (hasMaterialOverdue || pendingCharges.length > 1)
+        ? "RESTRICTED"
+        : overdueCharges.length > 0 ||
+            dueSoonCount > 0 ||
+            pendingCharges.length > 0
+          ? "WARNING"
+          : "NORMAL";
+    const reason = (() => {
+      if (overdueCharges.length > 0) {
+        return `${overdueCharges.length} cobrança(s) vencida(s) somando ${formatCurrency(health.overdue)}; maior atraso de ${largestOverdueDays} dia(s).`;
+      }
+      if (dueSoonCount > 0)
+        return `${dueSoonCount} cobrança(s) pendente(s) vencem em até 3 dias.`;
+      if (pendingCharges.length > 0)
+        return `${pendingCharges.length} cobrança(s) pendente(s) ainda precisam virar pagamento.`;
+      if (paidWithoutRegisteredPayment.length > 0)
+        return `${paidWithoutRegisteredPayment.length} cobrança(s) paga(s) sem pagamento vinculado na lista carregada.`;
+      return "Sem vencidas ou pendências relevantes nos dados financeiros carregados.";
+    })();
+    const impact = (() => {
+      if (overdueCharges.length > 0)
+        return "Dinheiro travado impacta caixa, priorização da Timeline e leitura de Risco/Governança.";
+      if (pendingCharges.length > 0)
+        return "A cobrança preventiva evita atraso e mantém o fluxo Cobrança → Pagamento com prova operacional.";
+      return "Operação pode manter rotina preventiva e revisar carteira sem bloqueio financeiro imediato.";
+    })();
+
+    return {
+      level,
+      reason,
+      impact,
+      overdueCharges,
+      pendingCharges,
+      dueSoonCount,
+      largestOverdueDays,
+      averageOverdueDays,
+    };
+  }, [enrichedCharges, health.overdue, paidWithoutRegisteredPayment.length]);
+
+  const financeRisk = useMemo(() => {
+    const critical = mostCriticalCharge;
+    if (!critical) {
+      return {
+        title: "Sem risco financeiro dominante",
+        reason:
+          "Não há cobrança vencida ou pendente crítica nos dados carregados.",
+        impact:
+          "Caixa sem bloqueio imediato; mantenha revisão preventiva da carteira e da Timeline.",
+      };
+    }
+
+    if (critical.status === "OVERDUE") {
+      return {
+        title: `${formatCurrency(Number(critical.amountCents ?? 0))} travados em ${critical.customerName}`,
+        reason: `${financeCommandState.overdueCharges.length} cobrança(s) vencida(s), ${formatCurrency(health.overdue)} em atraso, média de ${financeCommandState.averageOverdueDays} dia(s) e maior atraso de ${financeCommandState.largestOverdueDays} dia(s).`,
+        impact: `Priorizar ${critical.customerName} reduz risco de caixa e alimenta Timeline/Risco/Governança com ação comprovável.`,
+      };
+    }
+
+    return {
+      title: `Pendência próxima: ${critical.customerName}`,
+      reason: `${formatCurrency(Number(critical.amountCents ?? 0))} ainda pendente para ${formatDate(critical.dueDate)}; ${financeCommandState.dueSoonCount} vencimento(s) próximo(s).`,
+      impact:
+        "Enviar link/lembrar antes do vencimento reduz chance de dinheiro ficar travado.",
+    };
+  }, [financeCommandState, health.overdue, mostCriticalCharge]);
+
+  const financeNextBestAction = useMemo(() => {
+    const overdue = enrichedCharges.filter(item => item.status === "OVERDUE");
+    const pendingDueSoon = enrichedCharges.filter(item => {
+      if (item.status !== "PENDING") return false;
+      const daysUntilDue = computeDaysUntilDue(item.dueDate);
+      return daysUntilDue !== null && daysUntilDue >= 0 && daysUntilDue <= 3;
+    });
+
+    const target =
+      [...overdue].sort((a, b) => {
+        const amountDiff =
+          Number(b.amountCents ?? 0) - Number(a.amountCents ?? 0);
+        if (amountDiff !== 0) return amountDiff;
+        return Number(b.overdueDays ?? 0) - Number(a.overdueDays ?? 0);
+      })[0] ??
+      [...pendingDueSoon].sort((a, b) => {
+        const aDue = safeDate(a.dueDate)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+        const bDue = safeDate(b.dueDate)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+        return aDue - bDue;
+      })[0] ??
+      paidWithoutRegisteredPayment[0] ??
+      null;
+
+    if (target?.status === "OVERDUE") {
+      return {
+        target,
+        title: "Cobrar cliente",
+        entity: `${target.customerName} · ${formatCurrency(Number(target.amountCents ?? 0))}`,
+        reason: `Cobrança vencida há ${target.overdueDays} dia(s), vinculada à O.S. ${target.serviceOrderLabel}.`,
+        impact:
+          "Destravar recebimento e registrar ação que sustenta caixa, Timeline e Governança.",
+        safetyNote:
+          "Orientação apenas: não envia mensagem nem registra pagamento automaticamente.",
+        primaryActionLabel: "Cobrar no WhatsApp contextual",
+        secondaryActionLabel: "Filtrar vencidas",
+      };
+    }
+
+    if (target?.status === "PENDING") {
+      return {
+        target,
+        title: "Enviar link de pagamento",
+        entity: `${target.customerName} · vence ${formatDate(target.dueDate)}`,
+        reason: `${formatCurrency(Number(target.amountCents ?? 0))} pendente antes de virar atraso.`,
+        impact:
+          "Aumenta previsibilidade de caixa e evita entrada no fluxo restrito.",
+        safetyNote:
+          "Use apenas os CTAs existentes; nenhum fluxo novo de WhatsApp foi criado.",
+        primaryActionLabel: "Abrir WhatsApp contextual",
+        secondaryActionLabel: "Filtrar pendentes",
+      };
+    }
+
+    if (target) {
+      return {
+        target,
+        title: "Revisar recebimento",
+        entity: `${target.customerName} · cobrança paga`,
+        reason: "Status pago sem pagamento vinculado na lista carregada.",
+        impact:
+          "Evita divergência entre cobrança, pagamento e prova operacional.",
+        safetyNote:
+          "Fallback seguro: confirmar detalhe antes de qualquer ajuste.",
+        primaryActionLabel: "Conferir cobrança",
+        secondaryActionLabel: "Ver pagas",
+      };
+    }
+
+    if (completedOrdersWithoutCharge.length > 0) {
+      const order = completedOrdersWithoutCharge[0];
+      return {
+        target: null,
+        title: "Gerar cobrança",
+        entity: `O.S. ${safeText(order?.number ?? order?.id, "concluída")}`,
+        reason: `${completedOrdersWithoutCharge.length} O.S. concluída(s) ainda não viraram cobrança nos dados carregados.`,
+        impact: "Transforma operação concluída em receita rastreável.",
+        safetyNote: "Ação orientativa; use o fluxo existente de nova cobrança.",
+        primaryActionLabel: "Criar cobrança",
+        secondaryActionLabel: "Abrir O.S.",
+      };
+    }
+
+    return {
+      target: null,
+      title: "Revisar carteira financeira",
+      entity: `${enrichedCharges.length} cobrança(s) monitorada(s)`,
+      reason: "Sem pendência crítica nos dados financeiros carregados.",
+      impact:
+        "Mantém governança preventiva sobre cobrança, pagamento e Timeline.",
+      safetyNote:
+        "Nenhuma execução automática; apenas direcionamento para revisão.",
+      primaryActionLabel: "Ver carteira",
+      secondaryActionLabel: undefined,
+    };
+  }, [
+    completedOrdersWithoutCharge,
+    enrichedCharges,
+    paidWithoutRegisteredPayment,
+  ]);
+
+  const financeFlowStages = useMemo(
+    () =>
+      [
+        {
+          id: "customer",
+          label: "Cliente",
+          summary: "Clientes vinculados às cobranças carregadas.",
+          countOrValue: String(
+            new Set(
+              enrichedCharges.map(item => item.customerId).filter(Boolean)
+            ).size
+          ),
+          state: enrichedCharges.some(item => item.customerId)
+            ? "done"
+            : "idle",
+          hrefLabel: "Abrir clientes",
+          onClick: () => navigate("/customers"),
+        },
+        {
+          id: "service-order",
+          label: "O.S.",
+          summary:
+            completedOrdersWithoutCharge.length > 0
+              ? "Há O.S. concluída sem cobrança."
+              : "Origem operacional vinculada quando informada.",
+          countOrValue: String(
+            new Set(
+              enrichedCharges.map(item => item.serviceOrderId).filter(Boolean)
+            ).size
+          ),
+          state:
+            completedOrdersWithoutCharge.length > 0
+              ? "warning"
+              : enrichedCharges.some(item => item.serviceOrderId)
+                ? "done"
+                : "idle",
+          hrefLabel: "Abrir O.S.",
+          onClick: () => navigate("/service-orders"),
+        },
+        {
+          id: "charge",
+          label: "Cobrança",
+          summary: cashHealth.collectionBottleneck,
+          countOrValue: `${enrichedCharges.length} cobrança(s)`,
+          state:
+            cashHealth.overdueCount > 0
+              ? "blocked"
+              : cashHealth.pendingCount > 0
+                ? "warning"
+                : "done",
+          hrefLabel: "Ver carteira",
+          onClick: () => setStatusFilter("all"),
+        },
+        {
+          id: "payment",
+          label: "Pagamento",
+          summary:
+            cashHealth.overdueCount > 0
+              ? "Vencidas impedem conversão em caixa."
+              : cashHealth.pendingCount > 0
+                ? "Pendências aguardam recebimento."
+                : "Pagamentos confirmados na carteira.",
+          countOrValue: `${cashHealth.paidCount} pago(s)`,
+          state:
+            cashHealth.overdueCount > 0
+              ? "blocked"
+              : cashHealth.pendingCount > 0
+                ? "warning"
+                : "done",
+        },
+        {
+          id: "timeline",
+          label: "Timeline",
+          summary:
+            timelineItems.length > 0
+              ? "Eventos oficiais encontrados para o contexto selecionado."
+              : "Sem timeline retornada; abrir prova completa.",
+          countOrValue:
+            timelineItems.length > 0
+              ? `${timelineItems.length} evento(s)`
+              : "Fallback",
+          state: timelineItems.length > 0 ? "done" : "idle",
+          hrefLabel: "Abrir Timeline",
+          onClick: () =>
+            navigate(
+              selectedCharge?.customerId
+                ? `/timeline?customerId=${selectedCharge.customerId}`
+                : "/timeline"
+            ),
+        },
+        {
+          id: "risk",
+          label: "Risco/Governança",
+          summary:
+            cashHealth.overdueCount > 0
+              ? "Atrasos elevam risco financeiro e governança."
+              : "Risco financeiro monitorado sem bloqueio dominante.",
+          countOrValue: financeCommandState.level,
+          state:
+            financeCommandState.level === "RESTRICTED"
+              ? "blocked"
+              : financeCommandState.level === "WARNING"
+                ? "warning"
+                : "done",
+          hrefLabel: "Abrir governança",
+          onClick: () => navigate("/governance?source=finances"),
+        },
+      ] as Array<{
+        id: string;
+        label: string;
+        summary: string;
+        state: OperationalFlowStageState;
+        countOrValue?: string;
+        hrefLabel?: string;
+        onClick?: () => void;
+      }>,
+    [
+      cashHealth,
+      completedOrdersWithoutCharge.length,
+      enrichedCharges,
+      financeCommandState.level,
+      navigate,
+      selectedCharge?.customerId,
+      timelineItems.length,
+    ]
+  );
+
+  const financeTimelineEvents = useMemo(() => {
+    if (timelineItems.length > 0) {
+      return timelineItems.slice(0, 4).map(item => ({
+        id: String(item?.id ?? `${item?.createdAt ?? ""}-${item?.title ?? ""}`),
+        type: String(item?.type ?? item?.category ?? "Timeline"),
+        occurredAt: formatDate(item?.createdAt),
+        entity: String(item?.title ?? item?.description ?? "Evento financeiro"),
+        actor: item?.actor?.name ?? item?.user?.name ?? undefined,
+        summary: String(
+          item?.description ??
+            item?.summary ??
+            "Evento oficial retornado pela Timeline."
+        ),
+      }));
+    }
+
+    const contextualEvents: Array<{
+      id: string;
+      type: string;
+      occurredAt: string;
+      entity: string;
+      summary: string;
+    }> = [];
+    if (selectedFinancialRecord?.id) {
+      contextualEvents.push({
+        id: `charge-${selectedFinancialRecord.id}`,
+        type: "Cobrança contextual",
+        occurredAt: formatDate(
+          selectedFinancialRecord.createdAt ?? selectedFinancialRecord.dueDate
+        ),
+        entity: `${safeText(selectedFinancialRecord.customerName, "Cliente")} · ${formatCurrency(Number(selectedFinancialRecord.amountCents ?? 0))}`,
+        summary: `Cobrança ${chargeStatusLabel(selectedFinancialRecord.status)} derivada dos dados financeiros carregados; não substitui a Timeline oficial.`,
+      });
+    }
+    const payments = Array.isArray(selectedFinancialRecord?.payments)
+      ? selectedFinancialRecord.payments
+      : [];
+    for (const payment of payments.slice(0, 3)) {
+      contextualEvents.push({
+        id: `payment-${payment?.id ?? payment?.paidAt ?? contextualEvents.length}`,
+        type: "Pagamento contextual",
+        occurredAt: formatDate(payment?.paidAt ?? payment?.createdAt),
+        entity: `${safeText(selectedFinancialRecord.customerName, "Cliente")} · ${formatCurrency(Number(payment?.amountCents ?? 0))}`,
+        summary: `Pagamento retornado no detalhe da cobrança com método ${safeText(payment?.method)}.`,
+      });
+    }
+    return contextualEvents.slice(0, 4);
+  }, [selectedFinancialRecord, timelineItems]);
+
   const filterTabs = useMemo(
     () => [
       {
@@ -705,9 +1093,6 @@ export default function FinancesPage() {
       if (!["PENDING", "OVERDUE"].includes(item.status)) return false;
       return getCommunicationState(item) === "not_sent";
     });
-    const paidWithoutRegisteredPayment = enrichedCharges.filter(
-      item => !hasRegisteredPayment(item)
-    );
     const communicationUnknownCount = enrichedCharges.filter(item => {
       if (!["PENDING", "OVERDUE"].includes(item.status)) return false;
       return getCommunicationState(item) === "unknown";
@@ -984,82 +1369,88 @@ export default function FinancesPage() {
         </p>
       </AppOperationalHeader>
 
-      <AppSectionCard className="space-y-3">
-        <div className="border-b border-[var(--border-subtle)]/60 pb-3.5">
-          <h3 className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">
-            Próxima decisão financeira · cobrança recomendada
-          </h3>
-          <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
-            A melhor ação de cobrança aparece antes da carteira para reduzir
-            risco financeiro.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0 flex-1 space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <AppStatusBadge
-                label="Próxima cobrança recomendada"
-                tone="info"
-              />
-              {nextBestAction ? (
-                <>
-                  <AppPriorityBadge
-                    priority={getChargePriority(nextBestAction)}
-                  />
-                  <AppStatusBadge
-                    label={chargeStatusLabel(nextBestAction.status)}
-                    tone={getChargeStatusTone(nextBestAction.status)}
-                  />
-                </>
-              ) : (
-                <AppOperationalStatusBadge
-                  status="NORMAL"
-                  label="Sem cobrança crítica"
-                />
-              )}
-            </div>
-            <h2 className="text-xl font-semibold leading-tight text-[var(--nexo-text-primary)]">
-              {nextBestAction
-                ? `Cobrar ${nextBestAction.customerName}`
-                : "Caixa sem cobrança crítica agora"}
-            </h2>
-            <p className="max-w-3xl text-sm leading-6 text-[var(--nexo-text-secondary)]">
-              {nextBestAction
-                ? `${formatCurrency(Number(nextBestAction?.amountCents ?? 0))} · ${nextBestAction.status === "OVERDUE" ? `${nextBestAction.overdueDays} dia(s) em atraso` : "pendência ativa"} · Origem/O.S.: ${nextBestAction.serviceOrderLabel}`
-                : "Nenhuma cobrança pendente ou vencida foi retornada pelo backend para ação imediata."}
-            </p>
-            {nextBestAction ? (
-              <p className="text-xs text-[var(--nexo-text-muted)]">
-                Motivo: {getChargeRisk(nextBestAction)}
-              </p>
-            ) : null}
-          </div>
-          <div className="flex shrink-0 flex-wrap gap-2">
-            {nextBestAction ? (
-              <>
-                <Button
-                  onClick={() => {
-                    setSelectedChargeId(String(nextBestAction?.id ?? ""));
-                    goToWhatsApp(nextBestAction);
-                  }}
-                >
-                  Cobrar agora
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => void openMarkAsPaid(nextBestAction)}
-                >
-                  Marcar como pago
-                </Button>
-              </>
-            ) : (
-              <Button variant="outline" onClick={() => setStatusFilter("all")}>
-                Ver carteira
-              </Button>
-            )}
-          </div>
-        </div>
+      <div className="grid gap-3 xl:grid-cols-2">
+        <OperationalStateCard
+          title="Estado financeiro operacional"
+          level={financeCommandState.level}
+          reason={financeCommandState.reason}
+          impact={financeCommandState.impact}
+          detailsLabel={
+            cashHealth.overdueCount > 0 ? "Ver vencidas" : "Ver carteira"
+          }
+          onDetails={() =>
+            setStatusFilter(cashHealth.overdueCount > 0 ? "overdue" : "all")
+          }
+        />
+        <OperationalRiskCard
+          title={financeRisk.title}
+          reason={financeRisk.reason}
+          impact={financeRisk.impact}
+          ctaLabel={
+            cashHealth.overdueCount > 0
+              ? "Priorizar atrasos"
+              : "Revisar carteira"
+          }
+          onClick={() =>
+            setStatusFilter(cashHealth.overdueCount > 0 ? "overdue" : "all")
+          }
+        />
+      </div>
+
+      <AppSectionCard className="space-y-0 border-0 bg-transparent p-0">
+        <span className="sr-only">Próxima melhor ação financeira</span>
+        <NextBestActionCard
+          title={financeNextBestAction.title}
+          entity={financeNextBestAction.entity}
+          reason={financeNextBestAction.reason}
+          impact={financeNextBestAction.impact}
+          safetyNote={financeNextBestAction.safetyNote}
+          primaryActionLabel={financeNextBestAction.primaryActionLabel}
+          onPrimaryAction={() => {
+            const target = financeNextBestAction.target;
+            if (target) {
+              setSelectedChargeId(String(target.id ?? ""));
+              if (target.status === "OVERDUE" || target.status === "PENDING") {
+                goToWhatsApp(target);
+                return;
+              }
+              setStatusFilter("paid");
+              return;
+            }
+            if (financeNextBestAction.title === "Gerar cobrança") {
+              setOpenCreate(true);
+              return;
+            }
+            setStatusFilter("all");
+          }}
+          secondaryActionLabel={financeNextBestAction.secondaryActionLabel}
+          onSecondaryAction={
+            financeNextBestAction.secondaryActionLabel
+              ? () => {
+                  if (financeNextBestAction.title === "Cobrar cliente")
+                    setStatusFilter("overdue");
+                  else if (
+                    financeNextBestAction.title === "Enviar link de pagamento"
+                  )
+                    setStatusFilter("pending");
+                  else if (
+                    financeNextBestAction.title === "Revisar recebimento"
+                  )
+                    setStatusFilter("paid");
+                  else if (financeNextBestAction.title === "Gerar cobrança")
+                    navigate("/service-orders");
+                  else setStatusFilter("all");
+                }
+              : undefined
+          }
+        />
       </AppSectionCard>
+
+      <OperationalFlowCard
+        title="Fluxo financeiro operacional"
+        subtitle="Cliente → O.S. → Cobrança → Pagamento → Timeline → Risco/Governança"
+        stages={financeFlowStages}
+      />
 
       <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
         <AppStatCard
@@ -1232,8 +1623,20 @@ export default function FinancesPage() {
               Mais filtros
             </summary>
             <div className="absolute right-0 z-20 mt-2 grid min-w-[190px] gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-2">
-              <Button size="sm" variant="outline" onClick={() => setStatusFilter("overdue")}>Priorizar atraso</Button>
-              <Button size="sm" variant="outline" onClick={() => setStatusFilter("pending")}>Cobrar pendências</Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setStatusFilter("overdue")}
+              >
+                Priorizar atraso
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setStatusFilter("pending")}
+              >
+                Cobrar pendências
+              </Button>
             </div>
           </details>
           <span className="rounded-md border border-[var(--border-subtle)] px-2 py-1 text-xs text-[var(--text-muted)]">
@@ -1322,94 +1725,115 @@ export default function FinancesPage() {
                       </td>
                       <td>
                         <div className="space-y-2">
-                          <p className="font-medium text-[var(--text-primary)]">{formatCurrency(Number(row?.amountCents ?? 0))}</p>
-                          <AppStatusBadge label={chargeStatusLabel(row.status)} tone={getChargeStatusTone(row.status)} />
+                          <p className="font-medium text-[var(--text-primary)]">
+                            {formatCurrency(Number(row?.amountCents ?? 0))}
+                          </p>
+                          <AppStatusBadge
+                            label={chargeStatusLabel(row.status)}
+                            tone={getChargeStatusTone(row.status)}
+                          />
                         </div>
                       </td>
                       <td>
                         <div className="space-y-1 text-xs text-[var(--text-secondary)]">
-                          <p className="font-medium text-[var(--text-primary)]">{formatDate(row?.dueDate)}</p>
-                          <p>{row.status === "OVERDUE" ? `${row.overdueDays} dia(s)` : "Sem atraso"}</p>
+                          <p className="font-medium text-[var(--text-primary)]">
+                            {formatDate(row?.dueDate)}
+                          </p>
+                          <p>
+                            {row.status === "OVERDUE"
+                              ? `${row.overdueDays} dia(s)`
+                              : "Sem atraso"}
+                          </p>
                         </div>
                       </td>
                       <td>
                         <div className="space-y-1">
                           <AppPriorityBadge priority={getChargePriority(row)} />
-                          <p className="max-w-[180px] truncate text-xs text-[var(--text-muted)]">{safeText(row.serviceOrderLabel, "Sem O.S.")}</p>
+                          <p className="max-w-[180px] truncate text-xs text-[var(--text-muted)]">
+                            {safeText(row.serviceOrderLabel, "Sem O.S.")}
+                          </p>
                         </div>
                       </td>
-                      <td className="p-2.5" onClick={event => event.stopPropagation()}>
+                      <td
+                        className="p-2.5"
+                        onClick={event => event.stopPropagation()}
+                      >
                         <div className="flex min-w-[160px] items-center justify-end gap-2">
                           <Button
                             size="sm"
-                            variant={primaryAction.kind === "collect" ? "default" : "outline"}
+                            variant={
+                              primaryAction.kind === "collect"
+                                ? "default"
+                                : "outline"
+                            }
                             onClick={() => {
                               setSelectedChargeId(String(row?.id ?? ""));
-                              if (primaryAction.kind === "collect") goToWhatsApp(row);
+                              if (primaryAction.kind === "collect")
+                                goToWhatsApp(row);
                             }}
                             disabled={row.status === "CANCELED"}
                           >
                             {primaryAction.label}
                           </Button>
-                        <AppRowActionsDropdown
-                          items={[
-                            {
-                              label: "Ver histórico",
-                              onSelect: () =>
-                                setSelectedChargeId(String(row?.id ?? "")),
-                            },
-                            {
-                              label: "Marcar como pago",
-                              onSelect: () => void openMarkAsPaid(row),
-                              disabled:
-                                row.status === "PAID" ||
-                                row.status === "CANCELED",
-                              tone: "primary",
-                            },
-                            {
-                              label:
-                                normalizeStatus(row?.status) === "PAID"
-                                  ? "WhatsApp pós-pagamento"
-                                  : "Cobrar via WhatsApp",
-                              onSelect: () => goToWhatsApp(row),
-                              disabled: !row.customerId,
-                              tone: "primary",
-                            },
-                            {
-                              label: "Enviar link",
-                              onSelect: () => goToWhatsApp(row),
-                              disabled:
-                                !row.customerId ||
-                                row.status === "PAID" ||
-                                row.status === "CANCELED",
-                            },
-                            {
-                              label: "Editar cobrança",
-                              onSelect: () => openEditCharge(row),
-                              disabled:
-                                row.status === "PAID" ||
-                                row.status === "CANCELED",
-                            },
-                            {
-                              label: "Cancelar cobrança",
-                              onSelect: () => void handleCancelCharge(row),
-                              disabled:
-                                row.status === "PAID" ||
-                                row.status === "CANCELED",
-                            },
-                            { type: "separator", label: "Navegação" },
-                            {
-                              label: "Abrir cliente",
-                              onSelect: () => goToCustomer(row),
-                              disabled: !row.customerId,
-                            },
-                            {
-                              label: "Abrir O.S.",
-                              onSelect: () => goToServiceOrder(row),
-                              disabled: !row.serviceOrderId,
-                            },
-                          ]}
-                        />
+                          <AppRowActionsDropdown
+                            items={[
+                              {
+                                label: "Ver histórico",
+                                onSelect: () =>
+                                  setSelectedChargeId(String(row?.id ?? "")),
+                              },
+                              {
+                                label: "Marcar como pago",
+                                onSelect: () => void openMarkAsPaid(row),
+                                disabled:
+                                  row.status === "PAID" ||
+                                  row.status === "CANCELED",
+                                tone: "primary",
+                              },
+                              {
+                                label:
+                                  normalizeStatus(row?.status) === "PAID"
+                                    ? "WhatsApp pós-pagamento"
+                                    : "Cobrar via WhatsApp",
+                                onSelect: () => goToWhatsApp(row),
+                                disabled: !row.customerId,
+                                tone: "primary",
+                              },
+                              {
+                                label: "Enviar link",
+                                onSelect: () => goToWhatsApp(row),
+                                disabled:
+                                  !row.customerId ||
+                                  row.status === "PAID" ||
+                                  row.status === "CANCELED",
+                              },
+                              {
+                                label: "Editar cobrança",
+                                onSelect: () => openEditCharge(row),
+                                disabled:
+                                  row.status === "PAID" ||
+                                  row.status === "CANCELED",
+                              },
+                              {
+                                label: "Cancelar cobrança",
+                                onSelect: () => void handleCancelCharge(row),
+                                disabled:
+                                  row.status === "PAID" ||
+                                  row.status === "CANCELED",
+                              },
+                              { type: "separator", label: "Navegação" },
+                              {
+                                label: "Abrir cliente",
+                                onSelect: () => goToCustomer(row),
+                                disabled: !row.customerId,
+                              },
+                              {
+                                label: "Abrir O.S.",
+                                onSelect: () => goToServiceOrder(row),
+                                disabled: !row.serviceOrderId,
+                              },
+                            ]}
+                          />
                         </div>
                       </td>
                     </tr>
@@ -1550,41 +1974,27 @@ export default function FinancesPage() {
             </AppActionBar>
 
             <div className="grid gap-3 lg:grid-cols-3">
-              <AppInfoCard className="lg:col-span-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                  Histórico / timeline
-                </p>
-                {timelineByCustomerQuery.isLoading ||
-                timelineByServiceOrderQuery.isLoading ? (
-                  <p className="mt-2 text-sm text-[var(--text-secondary)]">
-                    Carregando histórico...
-                  </p>
-                ) : timelineItems.length === 0 ? (
-                  <p className="mt-2 text-sm text-[var(--text-secondary)]">
-                    Histórico indisponível neste ambiente para cliente/O.S.
-                    selecionados.
-                  </p>
-                ) : (
-                  <ul className="mt-2 space-y-2 text-sm text-[var(--text-secondary)]">
-                    {timelineItems.map(item => (
-                      <li
-                        key={String(
-                          item?.id ??
-                            `${item?.createdAt ?? ""}-${item?.title ?? ""}`
-                        )}
-                        className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)]/40 p-2.5"
-                      >
-                        <p className="font-medium text-[var(--text-primary)]">
-                          {String(item?.title ?? item?.description ?? "Evento")}
-                        </p>
-                        <p className="text-xs text-[var(--text-muted)]">
-                          {formatDate(item?.createdAt)}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </AppInfoCard>
+              <EntityTimelineCard
+                className="lg:col-span-2"
+                title="Prova operacional financeira"
+                subtitle={
+                  timelineByCustomerQuery.isLoading ||
+                  timelineByServiceOrderQuery.isLoading
+                    ? "Carregando Timeline oficial para cliente/O.S. selecionados."
+                    : timelineItems.length > 0
+                      ? "Últimos eventos oficiais retornados pela Timeline para sustentar cobrança, pagamento e risco."
+                      : "Fallback contextual: eventos abaixo vêm de cobranças/pagamentos carregados e não substituem a Timeline oficial."
+                }
+                events={financeTimelineEvents}
+                fullTimelineLabel="Abrir Timeline completa"
+                onFullTimeline={() =>
+                  navigate(
+                    selectedFinancialRecord?.customerId
+                      ? `/timeline?customerId=${selectedFinancialRecord.customerId}`
+                      : "/timeline"
+                  )
+                }
+              />
               <AppInfoCard>
                 <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                   Comunicação / WhatsApp
