@@ -149,3 +149,42 @@ Esses fallbacks são declarados no card de Próxima Melhor Ação e não executa
 ### Diretriz para próximas páginas
 
 Clientes agora serve como segunda prova do padrão operacional transversal depois do Dashboard: cada módulo deve adaptar seus dados existentes aos componentes canônicos, manter fallbacks explícitos e evitar criar cards paralelos de próxima ação, fluxo ou timeline. Novas páginas devem seguir o mesmo padrão sem alterar backend, banco, contratos de API ou regras de negócio apenas para adotar a camada.
+
+## Adoção em Financeiro
+
+A página de Financeiro (`FinancesPage`) adota a camada operacional transversal para transformar a carteira de cobranças em controle operacional de receita. A primeira leitura deixa de ser apenas KPI/lista e passa a responder qual dinheiro está travado, quem deve ser cobrado agora, qual risco financeiro existe e onde isso aparece no fluxo `Cobrança → Pagamento → Timeline → Risco/Governança`.
+
+### Como Financeiro usa a camada
+
+- `OperationalStateCard` abre a página com estado financeiro operacional (`NORMAL`, `WARNING` ou `RESTRICTED`) a partir de vencidas, valor vencido, pendências, vencimentos próximos, pagamentos recebidos e O.S. concluídas sem cobrança quando esse dado já está carregado.
+- `OperationalRiskCard` explica o risco com valor vencido, quantidade de cobranças vencidas, maior/médio atraso calculado por `dueDate` e cobrança/cliente mais crítico.
+- `NextBestActionCard` concentra a Próxima Melhor Ação financeira, sem execução automática: cobrar vencida, enviar link antes do vencimento, revisar recebimento, gerar cobrança para O.S. concluída sem cobrança ou revisar carteira.
+- `OperationalFlowCard` mostra a cadeia `Cliente → O.S. → Cobrança → Pagamento → Timeline → Risco/Governança` com estados `done`, `warning`, `blocked` ou `idle` conforme os dados financeiros carregados.
+- `EntityTimelineCard` substitui timeline visual solta por prova operacional financeira: usa eventos oficiais quando a Timeline retorna dados e, quando não retorna, exibe fallback contextual derivado de cobranças/pagamentos carregados, deixando claro que não substitui a Timeline oficial.
+
+### Dados reaproveitados
+
+Financeiro reaproveita apenas dados já disponíveis na página:
+
+- cobranças retornadas por `finance.charges.list` e detalhe por `finance.charges.getById`;
+- status, valor, vencimento e pagamentos vinculados à cobrança;
+- clientes carregados para enriquecer nome e vínculo operacional;
+- O.S. carregadas para indicar origem e detectar O.S. concluída sem cobrança;
+- campos existentes de comunicação/WhatsApp somente como leitura ou CTA contextual já existente;
+- eventos oficiais de Timeline por cliente e por O.S. quando retornados pelos endpoints já usados.
+
+### Fallbacks seguros
+
+- Se não há Timeline retornada, a página informa fallback contextual e não cria histórico fictício.
+- Se a lista geral de pagamentos não está exposta, a leitura usa pagamentos vinculados ao detalhe da cobrança e sinaliza essa limitação.
+- Se telemetria de WhatsApp/comunicação não vem no payload, Financeiro não inventa falha de envio; apenas mantém CTA contextual existente.
+- `SUSPENDED` não é usado em Financeiro sem dado real que comprove suspensão.
+- A Próxima Melhor Ação apenas orienta o operador; não envia mensagem, não registra pagamento e não altera cobrança automaticamente.
+
+### Relação Cobrança → Pagamento → Timeline → Risco/Governança
+
+Financeiro trata cobrança como ponte entre operação concluída e caixa. Cobrança vencida bloqueia o estágio de pagamento, aumenta risco financeiro, deve gerar prova operacional na Timeline quando houver ação real e alimenta a leitura de Governança. Cobrança pendente próxima do vencimento fica em atenção preventiva. Cobrança paga sem pagamento vinculado vira revisão de recebimento para evitar divergência entre status financeiro e prova operacional.
+
+### Congelamento de WhatsApp e próximas páginas
+
+WhatsApp permanece congelado nesta adoção: `WhatsAppPage.tsx` não deve ser alterado, não há novo fluxo de comunicação e os CTAs continuam apenas navegando para o contexto já existente. Depois de Financeiro, as próximas páginas candidatas para adoção da Operational Command Layer são O.S. e Agendamentos.
