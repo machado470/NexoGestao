@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  AlertTriangle,
   ArrowRight,
   CalendarClock,
   CheckCircle2,
@@ -25,6 +24,15 @@ import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
 import { Button } from "@/components/design-system";
 import {
+  EntityTimelineCard,
+  NextBestActionCard,
+  OperationalFlowCard,
+  OperationalRiskCard,
+  OperationalStateCard,
+  type OperationalFlowStageState,
+  type OperationalStateLevel,
+} from "@/components/app";
+import {
   AppDataTable,
   AppOperationalStatusBadge,
   AppPageShell,
@@ -40,7 +48,6 @@ import {
   AppFiltersBar,
   AppActionBar,
   AppContextWorkspace,
-  AppEmbeddedTimeline,
   AppOperationalKpiGrid,
   AppOperationalStatusSummary,
   AppOperationalHeader,
@@ -230,6 +237,19 @@ function isServiceOrderOpen(order: ServiceOrder) {
   return openServiceOrderStatuses.includes(
     String(order.status ?? "").toUpperCase()
   );
+}
+
+function isServiceOrderOverdue(order: ServiceOrder) {
+  if (!isServiceOrderOpen(order)) return false;
+  const deadline = toDate(
+    order.dueDate ?? order.deadline ?? order.scheduledFor ?? order.endsAt
+  );
+  return Boolean(deadline && deadline.getTime() < Date.now());
+}
+
+function isAppointmentUnconfirmed(appointment: Appointment) {
+  const status = String(appointment.status ?? "").toUpperCase();
+  return ["PENDING", "REQUESTED", "UNCONFIRMED", "TENTATIVE"].includes(status);
 }
 
 function resolveRiskSignal(
@@ -475,7 +495,7 @@ export default function CustomersPage() {
   const [createServiceOrderOpen, setCreateServiceOrderOpen] = useState(false);
   const [showInlineCharges, setShowInlineCharges] = useState(false);
   const [whatsAppQuickMessage, setWhatsAppQuickMessage] = useState("");
-  const timelineAnchorRef = useRef<HTMLElement | null>(null);
+  const timelineAnchorRef = useRef<HTMLDivElement | null>(null);
 
   const customersQuery = trpc.nexo.customers.list.useQuery(
     { page: 1, limit: 300 },
@@ -823,6 +843,409 @@ export default function CustomersPage() {
         new Date(String(b.updatedAt ?? b.createdAt ?? 0)).getTime() -
         new Date(String(a.updatedAt ?? a.createdAt ?? 0)).getTime()
     )[0];
+
+  const workspacePendingCharges = workspaceCharges.filter(isChargePending);
+  const workspaceOpenServiceOrders =
+    workspaceServiceOrders.filter(isServiceOrderOpen);
+  const workspaceOverdueServiceOrders = workspaceServiceOrders.filter(
+    isServiceOrderOverdue
+  );
+  const workspaceUnconfirmedAppointments = workspaceAppointments.filter(
+    isAppointmentUnconfirmed
+  );
+  const selectedCustomerName = String(selectedCustomer?.name ?? "Cliente");
+  const customerOfficialTimelineEvents = (workspace.timeline ?? [])
+    .slice(0, 5)
+    .map((event, index) => ({
+      id: String(event.id ?? `event-${index}`),
+      type: String(event.type ?? event.category ?? "Evento"),
+      occurredAt: formatDateTime(event.occurredAt ?? event.createdAt),
+      entity: String(
+        event.entity ?? event.entityType ?? event.target ?? selectedCustomerName
+      ),
+      actor: String(
+        event.actor ?? event.author ?? event.createdBy ?? "Sistema"
+      ),
+      summary: buildCustomerTimelineSummary(event),
+    }));
+
+  const customerOperationalState = (() => {
+    const multiplePendingSignals =
+      workspaceOverdueCharges.length +
+      workspacePendingCharges.length +
+      workspaceOverdueServiceOrders.length +
+      workspaceOpenServiceOrders.length +
+      (selectedProfile && selectedProfile.daysWithoutContact >= 30 ? 1 : 0);
+
+    if (workspaceOverdueCharges.length > 0) {
+      return {
+        level: "RESTRICTED" as OperationalStateLevel,
+        reason: `${workspaceOverdueCharges.length} cobrança(s) vencida(s) somando ${formatCurrency(workspacePendingCents || selectedProfile?.pendingCents)}.`,
+        impact:
+          "Pode travar caixa, priorização de atendimento e evolução segura para novas etapas até a cobrança ser tratada.",
+        detailsLabel: "Abrir financeiro",
+        onDetails: () => navigate(`/finances?customerId=${activeCustomerId}`),
+      };
+    }
+
+    if (workspaceOverdueServiceOrders.length > 0) {
+      return {
+        level: "RESTRICTED" as OperationalStateLevel,
+        reason: `${workspaceOverdueServiceOrders.length} O.S. aberta(s) com prazo vencido nos dados disponíveis.`,
+        impact:
+          "A execução pode estar atrasando entrega, cobrança e percepção de suporte do cliente.",
+        detailsLabel: "Abrir O.S.",
+        onDetails: () =>
+          navigate(`/service-orders?customerId=${activeCustomerId}`),
+      };
+    }
+
+    if (multiplePendingSignals >= 2) {
+      return {
+        level: "RESTRICTED" as OperationalStateLevel,
+        reason: `${multiplePendingSignals} sinais operacionais pedem atenção no dossiê.`,
+        impact:
+          "Há múltiplas pendências competindo entre atendimento, execução e financeiro; priorize a próxima ação antes de avançar o fluxo.",
+        detailsLabel: "Ver risco",
+        onDetails: () =>
+          navigate(
+            `/governance?customerId=${activeCustomerId}&source=customers`
+          ),
+      };
+    }
+
+    if (workspacePendingCharges.length > 0) {
+      return {
+        level: "WARNING" as OperationalStateLevel,
+        reason: `${workspacePendingCharges.length} cobrança(s) pendente(s), totalizando ${formatCurrency(workspacePendingCents || selectedProfile?.pendingCents)}.`,
+        impact:
+          "Financeiro ainda não bloqueia o cliente, mas precisa de acompanhamento para evitar vencimento e retrabalho.",
+        detailsLabel: "Abrir cobranças",
+        onDetails: () => navigate(`/finances?customerId=${activeCustomerId}`),
+      };
+    }
+
+    if (workspaceOpenServiceOrders.length > 0) {
+      return {
+        level: "WARNING" as OperationalStateLevel,
+        reason: `${workspaceOpenServiceOrders.length} O.S. aberta(s) aguardando conclusão.`,
+        impact:
+          "A execução segue ativa e deve ser acompanhada para não atrasar cobrança, pagamento ou satisfação do cliente.",
+        detailsLabel: "Acompanhar O.S.",
+        onDetails: () =>
+          navigate(`/service-orders?customerId=${activeCustomerId}`),
+      };
+    }
+
+    if (workspaceUnconfirmedAppointments.length > 0) {
+      return {
+        level: "WARNING" as OperationalStateLevel,
+        reason: `${workspaceUnconfirmedAppointments.length} agendamento(s) sem confirmação explícita.`,
+        impact:
+          "Confirmação pendente pode gerar deslocamento improdutivo, remarcação ou atraso de O.S.",
+        detailsLabel: "Ver agenda",
+        onDetails: () =>
+          navigate(`/appointments?customerId=${activeCustomerId}`),
+      };
+    }
+
+    if (selectedProfile && selectedProfile.daysWithoutContact >= 15) {
+      return {
+        level: "WARNING" as OperationalStateLevel,
+        reason: `Sem movimentação recente há ${selectedProfile.daysWithoutContact} dias.`,
+        impact:
+          "Relacionamento sem registro recente pode perder contexto, oportunidade de agendamento ou cobrança preventiva.",
+        detailsLabel: "Retomar contato",
+        onDetails: () => openCustomerWhatsApp(selectedCustomer ?? {}, null),
+      };
+    }
+
+    return {
+      level: "NORMAL" as OperationalStateLevel,
+      reason:
+        "Sem cobrança vencida, O.S. atrasada ou pendência relevante nos dados disponíveis.",
+      impact:
+        "Cliente pode seguir para revisão histórica, novo agendamento ou acompanhamento preventivo sem bloqueio operacional detectado.",
+      detailsLabel: "Revisar histórico",
+      onDetails: () =>
+        timelineAnchorRef.current?.scrollIntoView({ behavior: "smooth" }),
+    };
+  })();
+
+  const customerNextBestAction = (() => {
+    const entity = selectedCustomerName;
+    const fallbackNote =
+      "Recomendação calculada localmente com os dados já carregados na página; nenhuma ação é executada automaticamente.";
+
+    if (workspaceOverdueCharges.length > 0) {
+      return {
+        title: "Cobrar cliente",
+        entity,
+        reason: `${workspaceOverdueCharges.length} cobrança(s) vencida(s) aparecem no financeiro do cliente.`,
+        impact:
+          "Reduz risco de caixa travado e atualiza o contexto antes de novos atendimentos.",
+        safetyNote: fallbackNote,
+        primaryActionLabel: "Abrir cobrança no WhatsApp",
+        onPrimaryAction: () =>
+          openCustomerWhatsApp(
+            selectedCustomer ?? {},
+            String(
+              workspaceOverdueCharges[0]?.id ??
+                selectedProfile?.pendingChargeId ??
+                ""
+            ) || null
+          ),
+        secondaryActionLabel: "Ver financeiro",
+        onSecondaryAction: () =>
+          navigate(`/finances?customerId=${activeCustomerId}`),
+      };
+    }
+
+    if (workspaceOverdueServiceOrders.length > 0 || workspaceOpenServiceOrder) {
+      return {
+        title:
+          workspaceOverdueServiceOrders.length > 0
+            ? "Revisar O.S. atrasada"
+            : "Acompanhar O.S. aberta",
+        entity,
+        reason:
+          workspaceOverdueServiceOrders.length > 0
+            ? "Existe O.S. aberta com prazo vencido nos dados disponíveis."
+            : "Existe O.S. aberta ou em andamento para este cliente.",
+        impact:
+          "Evita que execução pendente bloqueie cobrança, pagamento e atualização da timeline oficial.",
+        safetyNote: fallbackNote,
+        primaryActionLabel: "Abrir ordem de serviço",
+        onPrimaryAction: () =>
+          navigate(`/service-orders?customerId=${activeCustomerId}`),
+        secondaryActionLabel: "Criar nova O.S.",
+        onSecondaryAction: () => setCreateServiceOrderOpen(true),
+      };
+    }
+
+    if (
+      workspaceUnconfirmedAppointments.length > 0 ||
+      workspaceNextAppointment
+    ) {
+      return {
+        title: "Confirmar agendamento",
+        entity,
+        reason:
+          workspaceUnconfirmedAppointments.length > 0
+            ? "Há agendamento sem confirmação explícita."
+            : "Existe agendamento futuro que merece confirmação preventiva.",
+        impact:
+          "Diminui remarcações e prepara a etapa de O.S. com contexto claro.",
+        safetyNote: fallbackNote,
+        primaryActionLabel: "Abrir agenda",
+        onPrimaryAction: () =>
+          navigate(`/appointments?customerId=${activeCustomerId}`),
+        secondaryActionLabel: String(selectedCustomer?.phone ?? "").trim()
+          ? "Enviar mensagem"
+          : undefined,
+        onSecondaryAction: String(selectedCustomer?.phone ?? "").trim()
+          ? () => openCustomerWhatsApp(selectedCustomer ?? {}, null)
+          : undefined,
+      };
+    }
+
+    if (selectedProfile && selectedProfile.daysWithoutContact >= 15) {
+      return {
+        title: "Enviar mensagem",
+        entity,
+        reason: `Cliente sem movimentação registrada há ${selectedProfile.daysWithoutContact} dias.`,
+        impact:
+          "Recupera contexto de relacionamento antes de criar novas atividades ou cobranças.",
+        safetyNote: fallbackNote,
+        primaryActionLabel: "Abrir WhatsApp",
+        onPrimaryAction: () =>
+          openCustomerWhatsApp(selectedCustomer ?? {}, null),
+        secondaryActionLabel: "Criar novo agendamento",
+        onSecondaryAction: () => setCreateAppointmentOpen(true),
+      };
+    }
+
+    if (!workspaceNextAppointment && workspaceAppointments.length === 0) {
+      return {
+        title: "Criar novo agendamento",
+        entity,
+        reason: "Não há agendamento futuro retornado para este cliente.",
+        impact:
+          "Mantém o relacionamento ativo e cria próximo marco operacional oficial.",
+        safetyNote: fallbackNote,
+        primaryActionLabel: "Agendar cliente",
+        onPrimaryAction: () => setCreateAppointmentOpen(true),
+        secondaryActionLabel: "Revisar histórico",
+        onSecondaryAction: () =>
+          timelineAnchorRef.current?.scrollIntoView({ behavior: "smooth" }),
+      };
+    }
+
+    return {
+      title: "Revisar histórico do cliente",
+      entity,
+      reason: "Dossiê sem pendência relevante nos dados carregados.",
+      impact:
+        "Mantém a leitura saudável apoiada na prova operacional antes de qualquer intervenção manual.",
+      safetyNote: fallbackNote,
+      primaryActionLabel: "Ver últimos eventos",
+      onPrimaryAction: () =>
+        timelineAnchorRef.current?.scrollIntoView({ behavior: "smooth" }),
+      secondaryActionLabel: "Ver financeiro",
+      onSecondaryAction: () =>
+        navigate(`/finances?customerId=${activeCustomerId}`),
+    };
+  })();
+
+  const customerOperationalFlowStages = [
+    {
+      id: "customer",
+      label: "Cliente",
+      state: selectedCustomer ? "done" : "idle",
+      summary: selectedCustomer
+        ? (selectedProfile?.contact ?? "Cadastro carregado.")
+        : "Selecione um cliente.",
+      countOrValue: selectedCustomer ? "1" : "0",
+      hrefLabel: "Editar cadastro",
+      onClick: selectedCustomer
+        ? () => setEditingCustomerId(activeCustomerId)
+        : undefined,
+    },
+    {
+      id: "appointment",
+      label: "Agendamento",
+      state:
+        workspaceUnconfirmedAppointments.length > 0
+          ? "warning"
+          : workspaceNextAppointment
+            ? "active"
+            : "idle",
+      summary:
+        workspaceUnconfirmedAppointments.length > 0
+          ? "Há agenda sem confirmação."
+          : workspaceNextAppointment
+            ? `Próximo em ${formatDateTime(workspaceNextAppointment.startsAt ?? workspaceNextAppointment.scheduledAt)}.`
+            : "Sem agenda futura retornada.",
+      countOrValue: String(workspaceAppointments.length),
+      hrefLabel: "Abrir agenda",
+      onClick: () => navigate(`/appointments?customerId=${activeCustomerId}`),
+    },
+    {
+      id: "service-order",
+      label: "O.S.",
+      state:
+        workspaceOverdueServiceOrders.length > 0
+          ? "blocked"
+          : workspaceOpenServiceOrders.length > 0
+            ? "active"
+            : workspaceLastCompletedServiceOrder
+              ? "done"
+              : "idle",
+      summary:
+        workspaceOverdueServiceOrders.length > 0
+          ? "O.S. aberta com prazo vencido."
+          : workspaceOpenServiceOrders.length > 0
+            ? `${workspaceOpenServiceOrders.length} O.S. em execução.`
+            : workspaceLastCompletedServiceOrder
+              ? "Última O.S. concluída."
+              : "Sem O.S. relacionada retornada.",
+      countOrValue: String(workspaceServiceOrders.length),
+      hrefLabel: "Abrir O.S.",
+      onClick: () => navigate(`/service-orders?customerId=${activeCustomerId}`),
+    },
+    {
+      id: "charge",
+      label: "Cobrança",
+      state:
+        workspaceOverdueCharges.length > 0
+          ? "blocked"
+          : workspacePendingCharges.length > 0
+            ? "warning"
+            : workspaceCharges.length > 0
+              ? "done"
+              : "idle",
+      summary:
+        workspaceOverdueCharges.length > 0
+          ? "Cobrança vencida exige ação."
+          : workspacePendingCharges.length > 0
+            ? "Cobrança pendente em acompanhamento."
+            : workspaceCharges.length > 0
+              ? "Sem cobrança pendente retornada."
+              : "Sem cobrança retornada.",
+      countOrValue: formatCurrency(
+        workspacePendingCents || selectedProfile?.pendingCents
+      ),
+      hrefLabel: "Abrir financeiro",
+      onClick: () => navigate(`/finances?customerId=${activeCustomerId}`),
+    },
+    {
+      id: "payment",
+      label: "Pagamento",
+      state:
+        workspaceOverdueCharges.length > 0
+          ? "blocked"
+          : workspacePendingCharges.length > 0
+            ? "warning"
+            : workspaceLastPayment
+              ? "done"
+              : workspaceCharges.length > 0
+                ? "idle"
+                : "idle",
+      summary: workspaceLastPayment
+        ? `Último pagamento em ${formatDateTime(workspaceLastPayment.paidAt ?? workspaceLastPayment.updatedAt ?? workspaceLastPayment.createdAt)}.`
+        : workspacePendingCharges.length > 0
+          ? "Pagamento ainda pendente."
+          : "Sem pagamento retornado.",
+      countOrValue: workspaceLastPayment
+        ? formatCurrency(
+            Number(
+              workspaceLastPayment.amountCents ??
+                workspaceLastPayment.amount ??
+                0
+            )
+          )
+        : undefined,
+      hrefLabel: "Ver pagamentos",
+      onClick: () => navigate(`/finances?customerId=${activeCustomerId}`),
+    },
+    {
+      id: "timeline",
+      label: "Timeline",
+      state: customerOfficialTimelineEvents.length > 0 ? "done" : "idle",
+      summary:
+        customerOfficialTimelineEvents.length > 0
+          ? "Histórico oficial ligado ao cliente."
+          : "Sem evento oficial retornado.",
+      countOrValue: String(customerOfficialTimelineEvents.length),
+      hrefLabel: "Ver eventos",
+      onClick: () =>
+        timelineAnchorRef.current?.scrollIntoView({ behavior: "smooth" }),
+    },
+    {
+      id: "risk",
+      label: "Risco/Gov.",
+      state:
+        customerOperationalState.level === "RESTRICTED" ||
+        customerOperationalState.level === "SUSPENDED"
+          ? "blocked"
+          : customerOperationalState.level === "WARNING"
+            ? "warning"
+            : "done",
+      summary: customerOperationalState.reason,
+      countOrValue: selectedProfile?.status,
+      hrefLabel: "Abrir Governança",
+      onClick: () =>
+        navigate(`/governance?customerId=${activeCustomerId}&source=customers`),
+    },
+  ] satisfies Array<{
+    id: string;
+    label: string;
+    summary: string;
+    state: OperationalFlowStageState;
+    countOrValue?: string;
+    hrefLabel?: string;
+    onClick?: () => void;
+  }>;
 
   async function refreshCustomerWorkspace(
     customerId: string,
@@ -1301,21 +1724,39 @@ export default function CustomersPage() {
                     key={`card-${profile.customerId}`}
                     className={cn(
                       "rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3",
-                      profile.customerId === activeCustomerId ? "bg-[var(--accent-soft)]/35" : undefined
+                      profile.customerId === activeCustomerId
+                        ? "bg-[var(--accent-soft)]/35"
+                        : undefined
                     )}
                     onClick={() => setActiveCustomerId(profile.customerId)}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-[var(--text-primary)]">{String(profile.customer.name ?? "Sem nome")}</p>
-                        <p className="mt-1 truncate text-xs text-[var(--text-secondary)]">{profile.contact}</p>
+                        <p className="text-sm font-semibold text-[var(--text-primary)]">
+                          {String(profile.customer.name ?? "Sem nome")}
+                        </p>
+                        <p className="mt-1 truncate text-xs text-[var(--text-secondary)]">
+                          {profile.contact}
+                        </p>
                       </div>
-                      <AppOperationalStatusBadge status={getCustomerOperationalStatus(profile)} label={profile.status} />
+                      <AppOperationalStatusBadge
+                        status={getCustomerOperationalStatus(profile)}
+                        label={profile.status}
+                      />
                     </div>
-                    <p className="mt-2 line-clamp-2 text-xs text-[var(--text-muted)]">{profile.riskSignal}</p>
+                    <p className="mt-2 line-clamp-2 text-xs text-[var(--text-muted)]">
+                      {profile.riskSignal}
+                    </p>
                     <div className="mt-3 flex items-center justify-between gap-2">
-                      <span className="text-sm font-medium text-[var(--text-primary)]">{formatCurrency(profile.pendingCents)}</span>
-                      <Button size="sm" onClick={() => setActiveCustomerId(profile.customerId)}>{profile.nextActionLabel}</Button>
+                      <span className="text-sm font-medium text-[var(--text-primary)]">
+                        {formatCurrency(profile.pendingCents)}
+                      </span>
+                      <Button
+                        size="sm"
+                        onClick={() => setActiveCustomerId(profile.customerId)}
+                      >
+                        {profile.nextActionLabel}
+                      </Button>
                     </div>
                   </article>
                 ))}
@@ -1364,17 +1805,23 @@ export default function CustomersPage() {
                                 status={getCustomerOperationalStatus(profile)}
                                 label={profile.status}
                               />
-                              <AppPriorityBadge priority={getCustomerPriority(profile)} />
+                              <AppPriorityBadge
+                                priority={getCustomerPriority(profile)}
+                              />
                             </div>
                             <p className="line-clamp-2">{profile.riskSignal}</p>
                           </div>
                         </td>
                         <td>
                           <div className="min-w-[180px] space-y-1 text-xs text-[var(--text-secondary)]">
-                            <p className="font-medium text-[var(--text-primary)]">{profile.nextActionLabel}</p>
+                            <p className="font-medium text-[var(--text-primary)]">
+                              {profile.nextActionLabel}
+                            </p>
                             <p>
                               {profile.nextAppointment
-                                ? formatDateTime(profile.nextAppointment.startsAt)
+                                ? formatDateTime(
+                                    profile.nextAppointment.startsAt
+                                  )
                                 : profile.lastService
                                   ? `Última O.S.: ${String(profile.lastService.status ?? "-")}`
                                   : "Sem agenda futura"}
@@ -1551,6 +1998,52 @@ export default function CustomersPage() {
                   )}
                 </p>
               </article>
+
+              <div className="grid gap-3 xl:grid-cols-2">
+                <OperationalStateCard
+                  title="Estado operacional do cliente"
+                  level={customerOperationalState.level}
+                  reason={customerOperationalState.reason}
+                  impact={customerOperationalState.impact}
+                  detailsLabel={customerOperationalState.detailsLabel}
+                  onDetails={customerOperationalState.onDetails}
+                />
+                <OperationalRiskCard
+                  title={
+                    customerOperationalState.level === "NORMAL"
+                      ? "Sem risco dominante"
+                      : selectedProfile.riskSignal
+                  }
+                  reason={customerOperationalState.reason}
+                  impact={customerOperationalState.impact}
+                  ctaLabel="Abrir Governança"
+                  onClick={() =>
+                    navigate(
+                      `/governance?customerId=${activeCustomerId}&source=customers`
+                    )
+                  }
+                />
+              </div>
+
+              <NextBestActionCard
+                title={customerNextBestAction.title}
+                entity={customerNextBestAction.entity}
+                reason={customerNextBestAction.reason}
+                impact={customerNextBestAction.impact}
+                safetyNote={customerNextBestAction.safetyNote}
+                primaryActionLabel={customerNextBestAction.primaryActionLabel}
+                onPrimaryAction={customerNextBestAction.onPrimaryAction}
+                secondaryActionLabel={
+                  customerNextBestAction.secondaryActionLabel
+                }
+                onSecondaryAction={customerNextBestAction.onSecondaryAction}
+              />
+
+              <OperationalFlowCard
+                title="Fluxo operacional do cliente"
+                subtitle="Cliente → Agendamento → O.S. → Cobrança → Pagamento → Timeline → Risco/Governança"
+                stages={customerOperationalFlowStages}
+              />
 
               <AppActionBar className="gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2 py-2">
                 <Button
@@ -1874,10 +2367,7 @@ export default function CustomersPage() {
                 ]}
               />
 
-              <article
-                ref={timelineAnchorRef}
-                className="rounded-xl border border-[var(--border-subtle)] p-3"
-              >
+              <article className="rounded-xl border border-[var(--border-subtle)] p-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
                   O.S. relacionadas
                 </p>
@@ -1940,47 +2430,17 @@ export default function CustomersPage() {
                 </div>
               </article>
 
-              <article className="rounded-xl border border-[var(--border-subtle)] p-3">
-                <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-                  <AlertTriangle className="h-3.5 w-3.5" /> Timeline recente
-                </p>
-                <div className="mt-2">
-                  <AppEmbeddedTimeline
-                    items={(workspace.timeline ?? [])
-                      .slice(0, 5)
-                      .map((event, index) => ({
-                        id: String(event.id ?? `event-${index}`),
-                        type: String(event.type ?? event.category ?? "Evento"),
-                        summary: buildCustomerTimelineSummary(event),
-                        entity: String(
-                          event.entity ??
-                            event.entityType ??
-                            event.target ??
-                            "Cliente"
-                        ),
-                        actor: String(
-                          event.actor ??
-                            event.author ??
-                            event.createdBy ??
-                            "Sistema"
-                        ),
-                        happenedAt: formatDateTime(
-                          event.occurredAt ?? event.createdAt
-                        ),
-                        action: event.link ? (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => navigate(String(event.link))}
-                          >
-                            Ver histórico
-                          </Button>
-                        ) : null,
-                      }))}
-                    emptyMessage="Sem timeline retornada para este cliente."
-                  />
-                </div>
-              </article>
+              <div ref={timelineAnchorRef}>
+                <EntityTimelineCard
+                  title="Últimos eventos oficiais"
+                  subtitle="Prova operacional do cliente e histórico oficial ligado ao cliente."
+                  events={customerOfficialTimelineEvents}
+                  fullTimelineLabel="Abrir Timeline completa"
+                  onFullTimeline={() =>
+                    navigate(`/timeline?customerId=${activeCustomerId}`)
+                  }
+                />
+              </div>
             </div>
           )}
         </AppContextWorkspace>
