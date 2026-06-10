@@ -6,6 +6,15 @@ import { trpc } from "@/lib/trpc";
 import type { OperationalSeverity } from "@/lib/operations/operational-intelligence";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
 import { Button } from "@/components/design-system";
+import {
+  EntityTimelineCard,
+  NextBestActionCard,
+  OperationalFlowCard,
+  OperationalRiskCard,
+  OperationalStateCard,
+  type OperationalFlowStageState,
+  type OperationalStateLevel,
+} from "@/components/app/OperationalCommandLayer";
 import { FormModal } from "@/components/app-modal-system";
 import {
   AppDataTable,
@@ -26,14 +35,12 @@ import { useAssigneeWarningTelemetry } from "@/hooks/useAssigneeWarningTelemetry
 import {
   AppActionBar,
   AppFiltersBar,
-  AppEmbeddedTimeline,
   AppOperationalHeader,
   AppPageEmptyState,
   AppPageErrorState,
   AppPageLoadingState,
   AppPagination,
   AppSectionBlock,
-  AppNextBestActionBlock,
 } from "@/components/internal-page-system";
 
 // Contract guard: <AppSectionCard <AppOperationalStatusBadge
@@ -102,6 +109,37 @@ function durationLabel(startsAt?: string | null, endsAt?: string | null) {
   return `${minutes} min`;
 }
 
+function getChargeStatus(charge: any) {
+  return String(charge?.status ?? "")
+    .trim()
+    .toUpperCase();
+}
+
+function isChargeOverdue(charge: any) {
+  const status = getChargeStatus(charge);
+  if (status === "OVERDUE") return true;
+  if (status !== "PENDING") return false;
+  const dueDate = asDate(charge?.dueDate);
+  if (!dueDate) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const due = new Date(dueDate);
+  due.setHours(0, 0, 0, 0);
+  return due.getTime() < today.getTime();
+}
+
+function hasPaymentEvidence(charge: any) {
+  return (
+    getChargeStatus(charge) === "PAID" ||
+    (Array.isArray(charge?.payments) && charge.payments.length > 0)
+  );
+}
+
+function safeEntityLabel(value: unknown, fallback: string) {
+  const text = String(value ?? "").trim();
+  return text || fallback;
+}
+
 function mapStatus(status?: string | null) {
   const normalized = String(status ?? "SCHEDULED").toUpperCase();
   if (normalized === "SCHEDULED")
@@ -117,6 +155,18 @@ function mapStatus(status?: string | null) {
   return { label: "No-show", tone: "accent" as const };
 }
 
+type AppointmentCommandAction = {
+  title: string;
+  entity: string;
+  reason: string;
+  impact: string;
+  safetyNote: string;
+  primaryActionLabel: string;
+  onPrimaryAction: () => void;
+  secondaryActionLabel?: string;
+  onSecondaryAction?: () => void;
+};
+
 type MappedAppointment = {
   item: AppointmentRow;
   status: string;
@@ -125,8 +175,12 @@ type MappedAppointment = {
   customerName: string;
   ownerName: string;
   order: any;
+  charge: any;
+  ownerId: string;
+  hasAssignee: boolean;
   isOverdue: boolean;
   startsSoon: boolean;
+  hasConflict: boolean;
 };
 
 function deriveAppointmentOperationalStatus(
@@ -142,9 +196,12 @@ function deriveAppointmentOperationalStatus(
 function deriveAppointmentPriority(
   row: MappedAppointment
 ): AppPriorityLevel | null {
-  if (row.status === "NO_SHOW" || row.isOverdue) return "P0";
-  if (row.status === "SCHEDULED" && row.startsSoon) return "P1";
-  if (row.status === "SCHEDULED" && !row.order) return "P2";
+  if (row.status === "NO_SHOW" || row.isOverdue || row.hasConflict) return "P0";
+  if (row.status === "DONE" && !row.order) return "P0";
+  if (row.status === "SCHEDULED" || row.startsSoon || !row.hasAssignee)
+    return "P1";
+  if (["SCHEDULED", "CONFIRMED"].includes(row.status) && !row.order)
+    return "P2";
   return null;
 }
 
@@ -241,6 +298,10 @@ export default function AppointmentsPage() {
     { page: 1, limit: 100 },
     { enabled: isAuthenticated, retry: false }
   );
+  const chargesQuery = trpc.finance.charges.list.useQuery(
+    { page: 1, limit: 100 },
+    { enabled: isAuthenticated, retry: false }
+  );
   const timelineQuery = trpc.nexo.timeline.listByCustomer.useQuery(
     { customerId: queryParams.customerId ?? "", limit: 25 },
     {
@@ -267,6 +328,10 @@ export default function AppointmentsPage() {
   const serviceOrders = useMemo(
     () => normalizeArrayPayload<any>(serviceOrdersQuery.data),
     [serviceOrdersQuery.data]
+  );
+  const charges = useMemo(
+    () => normalizeArrayPayload<any>(chargesQuery.data),
+    [chargesQuery.data]
   );
   const timeline = useMemo(
     () => normalizeArrayPayload<any>(timelineQuery.data),
@@ -299,6 +364,26 @@ export default function AppointmentsPage() {
     }
     return map;
   }, [serviceOrders]);
+  const chargeByServiceOrderId = useMemo(() => {
+    const map = new Map<string, any>();
+    for (const charge of charges) {
+      const serviceOrderId = String(
+        charge?.serviceOrderId ?? charge?.serviceOrder?.id ?? ""
+      );
+      if (!serviceOrderId) continue;
+      const current = map.get(serviceOrderId);
+      if (!current) {
+        map.set(serviceOrderId, charge);
+        continue;
+      }
+      const currentUpdated =
+        asDate(current?.updatedAt ?? current?.createdAt)?.getTime() ?? 0;
+      const nextUpdated =
+        asDate(charge?.updatedAt ?? charge?.createdAt)?.getTime() ?? 0;
+      if (nextUpdated >= currentUpdated) map.set(serviceOrderId, charge);
+    }
+    return map;
+  }, [charges]);
 
   const now = new Date();
   const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -322,13 +407,20 @@ export default function AppointmentsPage() {
     () =>
       appointments.map(item => {
         const start = asDate(item.startsAt);
+        const end = asDate(item.endsAt);
         const status = String(item.status ?? "SCHEDULED").toUpperCase();
         const customerId = String(item.customerId ?? item.customer?.id ?? "");
+        const ownerId = String(item.assignedToPersonId ?? item.personId ?? "");
         const customerName =
           item.customer?.name ||
           customerById.get(customerId) ||
           "Cliente não identificado";
         const order = orderByAppointment.get(String(item.id ?? ""));
+        const charge = order?.id
+          ? (chargeByServiceOrderId.get(String(order.id)) ??
+            order?.financialSummary?.latestCharge ??
+            null)
+          : null;
         const isOverdue = Boolean(
           start && start < now && ["SCHEDULED", "CONFIRMED"].includes(status)
         );
@@ -337,22 +429,58 @@ export default function AppointmentsPage() {
           start >= now &&
           (start.getTime() - now.getTime()) / 60000 <= 120
         );
+        const hasConflict = Boolean(
+          start &&
+          end &&
+          ["SCHEDULED", "CONFIRMED"].includes(status) &&
+          appointments.some(other => {
+            if (String(other.id ?? "") === String(item.id ?? "")) return false;
+            const otherStatus = String(
+              other.status ?? "SCHEDULED"
+            ).toUpperCase();
+            if (!["SCHEDULED", "CONFIRMED"].includes(otherStatus)) return false;
+            const otherStart = asDate(other.startsAt);
+            const otherEnd = asDate(other.endsAt);
+            if (!otherStart || !otherEnd) return false;
+            const sameOwner =
+              ownerId &&
+              ownerId ===
+                String(other.assignedToPersonId ?? other.personId ?? "");
+            const sameCustomer =
+              customerId &&
+              customerId ===
+                String(other.customerId ?? other.customer?.id ?? "");
+            return (
+              (sameOwner || sameCustomer) &&
+              start < otherEnd &&
+              end > otherStart
+            );
+          })
+        );
         return {
           item,
           status,
           start,
           customerId,
           customerName,
-          ownerName:
-            personById.get(
-              String(item.assignedToPersonId ?? item.personId ?? "")
-            ) ?? "Não definido",
+          ownerId,
+          hasAssignee: Boolean(ownerId),
+          ownerName: personById.get(ownerId) ?? "Não definido",
           order,
+          charge,
           isOverdue,
           startsSoon,
+          hasConflict,
         };
       }),
-    [appointments, customerById, orderByAppointment, personById, now]
+    [
+      appointments,
+      chargeByServiceOrderId,
+      customerById,
+      orderByAppointment,
+      personById,
+      now,
+    ]
   );
 
   const filtered = useMemo(() => {
@@ -586,12 +714,14 @@ export default function AppointmentsPage() {
     appointmentsQuery.isLoading ||
     customersQuery.isLoading ||
     peopleQuery.isLoading ||
-    serviceOrdersQuery.isLoading;
+    serviceOrdersQuery.isLoading ||
+    chargesQuery.isLoading;
   const hasError =
     appointmentsQuery.isError ||
     customersQuery.isError ||
     peopleQuery.isError ||
-    serviceOrdersQuery.isError;
+    serviceOrdersQuery.isError ||
+    chargesQuery.isError;
 
   const agendaHealth = useMemo(() => {
     const scheduled = mapped.filter(row => row.status === "SCHEDULED").length;
@@ -610,8 +740,11 @@ export default function AppointmentsPage() {
       .filter(
         row =>
           row.isOverdue ||
+          row.hasConflict ||
           row.status === "SCHEDULED" ||
           row.status === "NO_SHOW" ||
+          !row.hasAssignee ||
+          (row.status === "DONE" && !row.order) ||
           (row.startsSoon && !row.order)
       )
       .sort(
@@ -675,6 +808,74 @@ export default function AppointmentsPage() {
           void updateStatus(String(unconfirmedSoon.item.id), "CONFIRMED"),
       };
     }
+    const startsSoon = actionable.find(row => row.startsSoon && row.item.id);
+    if (startsSoon) {
+      return {
+        row: startsSoon,
+        priority:
+          deriveAppointmentPriority(startsSoon) ?? ("P1" as AppPriorityLevel),
+        action: "Preparar atendimento",
+        reason: `${startsSoon.customerName} está próximo do horário de atendimento.`,
+        impact:
+          "Organiza responsável, contexto e O.S. antes da execução operacional.",
+        ctaLabel: "Preparar",
+        onClick: () => setSelectedAppointmentId(String(startsSoon.item.id)),
+      };
+    }
+    const unassigned = actionable.find(row => !row.hasAssignee && row.item.id);
+    if (unassigned) {
+      return {
+        row: unassigned,
+        priority:
+          deriveAppointmentPriority(unassigned) ?? ("P1" as AppPriorityLevel),
+        action: "Atribuir responsável",
+        reason: `${unassigned.customerName} ainda não possui responsável definido.`,
+        impact:
+          "Cria dono claro para confirmação, preparo, execução e governança.",
+        ctaLabel: "Editar responsável",
+        onClick: () => {
+          setSelectedAppointmentId(String(unassigned.item.id));
+          setEditing(unassigned.item);
+          setOpenModal(true);
+        },
+      };
+    }
+    const doneWithoutOrder = actionable.find(
+      row => row.status === "DONE" && !row.order && row.item.id
+    );
+    if (doneWithoutOrder) {
+      return {
+        row: doneWithoutOrder,
+        priority:
+          deriveAppointmentPriority(doneWithoutOrder) ??
+          ("P0" as AppPriorityLevel),
+        action: "Gerar O.S. do atendimento concluído",
+        reason: `${doneWithoutOrder.customerName} foi concluído sem O.S. vinculada neste carregamento.`,
+        impact:
+          "Conecta atendimento concluído à execução, cobrança, pagamento e Timeline.",
+        ctaLabel: "Criar O.S.",
+        onClick: () => {
+          setSelectedAppointmentId(String(doneWithoutOrder.item.id));
+          setOpenServiceOrderModal(true);
+        },
+      };
+    }
+    const canceled = actionable.find(
+      row => row.status === "CANCELED" && row.item.id
+    );
+    if (canceled) {
+      return {
+        row: canceled,
+        priority:
+          deriveAppointmentPriority(canceled) ?? ("P3" as AppPriorityLevel),
+        action: "Revisar histórico do cancelamento",
+        reason: `${canceled.customerName} está com agendamento cancelado.`,
+        impact:
+          "Evita reabertura sem prova operacional ou contexto de governança.",
+        ctaLabel: "Abrir histórico",
+        onClick: () => setSelectedAppointmentId(String(canceled.item.id)),
+      };
+    }
     const withoutOrder = actionable.find(
       row =>
         ["SCHEDULED", "CONFIRMED"].includes(row.status) &&
@@ -699,6 +900,560 @@ export default function AppointmentsPage() {
     }
     return null;
   }, [mapped, updateStatus]);
+
+  const commandTarget =
+    selected ?? nextBestAction?.row ?? filtered[0] ?? mapped[0] ?? null;
+
+  const appointmentCommandState = useMemo(() => {
+    if (!commandTarget) {
+      return {
+        level: (mapped.length > 0
+          ? "NORMAL"
+          : "WARNING") as OperationalStateLevel,
+        reason:
+          mapped.length > 0
+            ? "Carteira carregada sem agendamento selecionado para foco."
+            : "Nenhum agendamento retornado para a leitura de entrada operacional.",
+        impact:
+          mapped.length > 0
+            ? "Selecione um horário para conectar cliente, execução, cobrança, Timeline e Governança."
+            : "A entrada da operação ainda não tem próximo atendimento rastreável nesta página.",
+        cta: mapped.length > 0 ? "Selecionar agendamento" : "Criar agendamento",
+      };
+    }
+    if (
+      commandTarget.status === "NO_SHOW" ||
+      commandTarget.hasConflict ||
+      commandTarget.isOverdue
+    ) {
+      return {
+        level: "RESTRICTED" as OperationalStateLevel,
+        reason: commandTarget.hasConflict
+          ? "Há sobreposição real de horário para o mesmo cliente ou responsável nos dados carregados."
+          : commandTarget.status === "NO_SHOW"
+            ? "Agendamento marcado como no-show."
+            : `Horário vencido em ${formatDateTime(commandTarget.item.startsAt)}.`,
+        impact:
+          "Entrada travada: a operação pode perder execução, receita e prova oficial se o agendamento não for revisado.",
+        cta: "Revisar agendamento",
+      };
+    }
+    if (commandTarget.status === "CANCELED") {
+      return {
+        level: "WARNING" as OperationalStateLevel,
+        reason:
+          "Agendamento cancelado; avanço para O.S. depende de revisão do histórico.",
+        impact:
+          "Governança precisa entender o motivo antes de reagendar, gerar O.S. ou considerar receita.",
+        cta: "Revisar histórico",
+      };
+    }
+    if (
+      commandTarget.status === "SCHEDULED" ||
+      commandTarget.startsSoon ||
+      !commandTarget.hasAssignee
+    ) {
+      return {
+        level: "WARNING" as OperationalStateLevel,
+        reason:
+          commandTarget.status === "SCHEDULED"
+            ? "Agendamento ainda não confirmado."
+            : commandTarget.startsSoon
+              ? "Horário próximo exige preparo de atendimento."
+              : "Agendamento sem responsável definido.",
+        impact:
+          "A entrada ainda precisa de confirmação, dono ou preparação para virar execução com segurança.",
+        cta:
+          commandTarget.status === "SCHEDULED"
+            ? "Confirmar"
+            : "Preparar atendimento",
+      };
+    }
+    if (commandTarget.status === "DONE" && !commandTarget.order?.id) {
+      return {
+        level: "RESTRICTED" as OperationalStateLevel,
+        reason:
+          "Agendamento concluído sem O.S. vinculada nos dados carregados.",
+        impact:
+          "Atendimento aconteceu, mas ainda não virou execução, cobrança e pagamento rastreáveis.",
+        cta: "Gerar O.S.",
+      };
+    }
+    return {
+      level: "NORMAL" as OperationalStateLevel,
+      reason: "Agendamento organizado nos dados carregados.",
+      impact:
+        "Cliente, horário e passagem para execução podem ser acompanhados no fluxo operacional.",
+      cta: "Revisar detalhes",
+    };
+  }, [commandTarget, mapped.length]);
+
+  const appointmentRisk = useMemo(() => {
+    if (!commandTarget) {
+      return {
+        title: "Sem agendamento em foco",
+        reason: "A página não recebeu um agendamento selecionável.",
+        impact:
+          "Não há risco específico para explicar sem dados reais de agenda.",
+        cta: "Criar agendamento",
+      };
+    }
+    if (commandTarget.status === "NO_SHOW" || commandTarget.isOverdue) {
+      return {
+        title: "Entrada atrasada ou no-show",
+        reason:
+          commandTarget.status === "NO_SHOW"
+            ? `${commandTarget.customerName} está marcado como no-show.`
+            : `${commandTarget.customerName} passou do horário ${formatDateTime(commandTarget.item.startsAt)} sem encerramento.`,
+        impact:
+          "Pode bloquear O.S., postergar cobrança/pagamento e exigir evidência na Timeline.",
+        cta: "Revisar atraso",
+      };
+    }
+    if (commandTarget.hasConflict) {
+      return {
+        title: "Conflito de agenda",
+        reason:
+          "Existe sobreposição por cliente ou responsável com data/hora suficientes no carregamento.",
+        impact:
+          "O mesmo recurso pode estar comprometido em dois atendimentos, elevando risco de atraso e no-show.",
+        cta: "Ver conflito",
+      };
+    }
+    if (commandTarget.status === "SCHEDULED") {
+      return {
+        title: "Falta confirmação",
+        reason: `${commandTarget.customerName} ainda está como agendado, não confirmado.`,
+        impact:
+          "A execução pode não acontecer e a previsão de receita fica menos confiável.",
+        cta: "Confirmar agendamento",
+      };
+    }
+    if (!commandTarget.hasAssignee) {
+      return {
+        title: "Sem responsável",
+        reason:
+          "Não há pessoa responsável vinculada ao agendamento nos dados carregados.",
+        impact:
+          "Sem dono, confirmação, preparo e conversão em O.S. ficam frágeis para governança.",
+        cta: "Atribuir responsável",
+      };
+    }
+    if (commandTarget.status === "DONE" && !commandTarget.order?.id) {
+      return {
+        title: "Concluído sem O.S.",
+        reason:
+          "O atendimento foi concluído, mas não há O.S. vinculada neste carregamento.",
+        impact:
+          "A operação perde trilha para cobrança, pagamento e prova formal de execução.",
+        cta: "Gerar O.S.",
+      };
+    }
+    return {
+      title: "Sem risco crítico",
+      reason:
+        "Status, horário, responsável e vínculo operacional não indicam bloqueio imediato.",
+      impact:
+        "Mantenha a Timeline atualizada para sustentar execução, receita e governança.",
+      cta: "Revisar agenda",
+    };
+  }, [commandTarget]);
+
+  const canonicalNextBestAction = useMemo<AppointmentCommandAction>(() => {
+    const target = commandTarget;
+    if (!target) {
+      return {
+        title: "Revisar agenda do dia",
+        entity: "Agenda",
+        reason: "Nenhum agendamento carregado para ação específica.",
+        impact:
+          "Mantém a entrada operacional pronta para receber novos horários.",
+        primaryActionLabel: "Novo agendamento",
+        safetyNote:
+          "A ação apenas abre o cadastro; nada é executado automaticamente.",
+        onPrimaryAction: () => {
+          setEditing(null);
+          setOpenModal(true);
+        },
+      };
+    }
+    const openDetail = () =>
+      setSelectedAppointmentId(String(target.item.id ?? ""));
+    if (target.status === "NO_SHOW" || target.isOverdue) {
+      return {
+        title: "Revisar agendamento",
+        entity: `${target.customerName} · ${formatDateTime(target.item.startsAt)}`,
+        reason:
+          target.status === "NO_SHOW"
+            ? "Agendamento em no-show."
+            : "Horário atrasado ainda aberto.",
+        impact:
+          "Define se a entrada será remarcada, cancelada ou transformada em execução com prova.",
+        primaryActionLabel: "Abrir agendamento",
+        secondaryActionLabel: "Remarcar/editar",
+        safetyNote:
+          "Orientação contextual; alterações exigem confirmação nos controles existentes.",
+        onPrimaryAction: openDetail,
+        onSecondaryAction: () => {
+          setEditing(target.item);
+          setOpenModal(true);
+        },
+      };
+    }
+    if (target.status === "SCHEDULED") {
+      return {
+        title: "Confirmar agendamento",
+        entity: `${target.customerName} · ${formatDateTime(target.item.startsAt)}`,
+        reason: "Agendamento sem confirmação oficial no status atual.",
+        impact: "Reduz no-show e prepara a passagem para O.S. e atendimento.",
+        primaryActionLabel: "Confirmar",
+        secondaryActionLabel: "Abrir detalhe",
+        safetyNote:
+          "Usa a ação de confirmação já existente; não cria fluxo novo de comunicação.",
+        onPrimaryAction: () =>
+          void updateStatus(String(target.item.id), "CONFIRMED"),
+        onSecondaryAction: openDetail,
+      };
+    }
+    if (target.startsSoon) {
+      return {
+        title: "Preparar atendimento",
+        entity: `${target.customerName} · ${formatDateTime(target.item.startsAt)}`,
+        reason: "Horário próximo dentro da janela operacional de 120 minutos.",
+        impact:
+          "Organiza responsável, contexto do cliente e O.S. antes da execução.",
+        primaryActionLabel: target.order?.id ? "Abrir O.S." : "Criar O.S.",
+        secondaryActionLabel: "Abrir cliente",
+        safetyNote:
+          "A camada só orienta a preparação; criação/abertura segue os fluxos existentes.",
+        onPrimaryAction: () => {
+          setSelectedAppointmentId(String(target.item.id));
+          if (target.order?.id) {
+            navigate(
+              `/service-orders?customerId=${target.customerId}&appointmentId=${target.item.id}`
+            );
+            return;
+          }
+          setOpenServiceOrderModal(true);
+        },
+        onSecondaryAction: () =>
+          navigate(`/customers?customerId=${target.customerId}`),
+      };
+    }
+    if (!target.hasAssignee) {
+      return {
+        title: "Atribuir responsável",
+        entity: `${target.customerName} · ${formatDateTime(target.item.startsAt)}`,
+        reason: "Agendamento sem responsável nos dados carregados.",
+        impact:
+          "Cria dono claro para confirmação, preparo, execução e auditoria.",
+        primaryActionLabel: "Editar responsável",
+        secondaryActionLabel: "Abrir detalhe",
+        safetyNote:
+          "Atribuição acontece somente ao salvar o formulário existente.",
+        onPrimaryAction: () => {
+          setEditing(target.item);
+          setOpenModal(true);
+        },
+        onSecondaryAction: openDetail,
+      };
+    }
+    if (target.status === "DONE" && !target.order?.id) {
+      return {
+        title: "Gerar O.S.",
+        entity: `${target.customerName} · agendamento concluído`,
+        reason: "Atendimento concluído sem O.S. vinculada.",
+        impact: "Conecta execução à cobrança, pagamento e Timeline oficial.",
+        primaryActionLabel: "Criar O.S.",
+        secondaryActionLabel: "Abrir detalhe",
+        safetyNote:
+          "A O.S. será criada apenas no modal existente, com confirmação do usuário.",
+        onPrimaryAction: () => {
+          setSelectedAppointmentId(String(target.item.id));
+          setOpenServiceOrderModal(true);
+        },
+        onSecondaryAction: openDetail,
+      };
+    }
+    if (target.status === "CANCELED") {
+      return {
+        title: "Revisar histórico",
+        entity: `${target.customerName} · agendamento cancelado`,
+        reason:
+          "Agendamento cancelado não deve avançar para execução sem contexto.",
+        impact:
+          "Evita reabertura sem prova e mantém governança sobre perda/reagendamento.",
+        primaryActionLabel: "Abrir Timeline",
+        secondaryActionLabel: "Abrir detalhe",
+        safetyNote:
+          "Sem criar histórico fictício; a Timeline oficial é a fonte de prova.",
+        onPrimaryAction: () =>
+          navigate(
+            target.customerId
+              ? `/timeline?customerId=${target.customerId}`
+              : "/timeline"
+          ),
+        onSecondaryAction: openDetail,
+      };
+    }
+    return {
+      title: "Revisar agenda do dia",
+      entity: `${target.customerName} · ${formatDateTime(target.item.startsAt)}`,
+      reason:
+        "Nenhuma pendência forte foi detectada para o agendamento em foco.",
+      impact:
+        "Mantém a carteira pronta para virar execução no horário previsto.",
+      primaryActionLabel: "Abrir detalhe",
+      secondaryActionLabel: "Ver agenda de hoje",
+      safetyNote: "Leitura consultiva baseada apenas nos dados carregados.",
+      onPrimaryAction: openDetail,
+      onSecondaryAction: () => setSelectedFilter("today"),
+    };
+  }, [commandTarget, navigate, updateStatus]);
+
+  const appointmentFlowStages = useMemo(() => {
+    const target = commandTarget;
+    const hasTimeline = timeline.length > 0;
+    const orderStatus = String(target?.order?.status ?? "").toUpperCase();
+    const hasCharge =
+      Boolean(target?.charge?.id) ||
+      Boolean(target?.order?.financialSummary?.hasCharge);
+    const chargeStatus = getChargeStatus(target?.charge);
+    const paymentDone = hasPaymentEvidence(target?.charge);
+    const chargeOverdue = isChargeOverdue(target?.charge);
+    const stages: Array<{
+      id: string;
+      label: string;
+      summary: string;
+      state: OperationalFlowStageState;
+      countOrValue?: string;
+      hrefLabel?: string;
+      onClick?: () => void;
+    }> = [
+      {
+        id: "customer",
+        label: "Cliente",
+        summary: target?.customerId
+          ? `Cliente vinculado: ${target.customerName}.`
+          : "Sem cliente vinculado nos dados carregados.",
+        state: target?.customerId ? "done" : "blocked",
+        countOrValue: target?.customerId ? "1" : "0",
+        hrefLabel: "Abrir cliente",
+        onClick: target?.customerId
+          ? () => navigate(`/customers?customerId=${target.customerId}`)
+          : undefined,
+      },
+      {
+        id: "appointment",
+        label: "Agendamento",
+        summary: target
+          ? `${mapStatus(target.status).label} · ${formatDateTime(target.item.startsAt)}.`
+          : "Nenhum horário em foco.",
+        state: !target
+          ? "idle"
+          : target.status === "DONE"
+            ? "done"
+            : target.isOverdue ||
+                target.status === "NO_SHOW" ||
+                target.hasConflict
+              ? "blocked"
+              : target.status === "SCHEDULED" ||
+                  target.startsSoon ||
+                  !target.hasAssignee
+                ? "warning"
+                : "active",
+        countOrValue: target
+          ? durationLabel(target.item.startsAt, target.item.endsAt)
+          : undefined,
+      },
+      {
+        id: "service-order",
+        label: "O.S.",
+        summary: target?.order?.id
+          ? `O.S. #${target.order.id} vinculada (${safeEntityLabel(orderStatus, "sem status")}).`
+          : "Ainda sem O.S. vinculada neste carregamento.",
+        state: target?.order?.id
+          ? orderStatus === "DONE"
+            ? "done"
+            : "active"
+          : target?.status === "DONE"
+            ? "blocked"
+            : "idle",
+        countOrValue: target?.order?.id ? `#${target.order.id}` : "0",
+        hrefLabel: target?.order?.id ? "Abrir O.S." : "Criar O.S.",
+        onClick: target?.item.id
+          ? () => {
+              if (target.order?.id) {
+                navigate(
+                  `/service-orders?customerId=${target.customerId}&appointmentId=${target.item.id}`
+                );
+                return;
+              }
+              setSelectedAppointmentId(String(target.item.id));
+              setOpenServiceOrderModal(true);
+            }
+          : undefined,
+      },
+      {
+        id: "charge",
+        label: "Cobrança",
+        summary: hasCharge
+          ? `Cobrança ${safeEntityLabel(chargeStatus, "vinculada").toLowerCase()}.`
+          : "Sem cobrança vinculada ao ciclo carregado.",
+        state: hasCharge
+          ? paymentDone
+            ? "done"
+            : chargeOverdue
+              ? "blocked"
+              : "warning"
+          : orderStatus === "DONE"
+            ? "blocked"
+            : "idle",
+        countOrValue: hasCharge
+          ? safeEntityLabel(target?.charge?.id, "1")
+          : "0",
+        hrefLabel: "Abrir financeiro",
+        onClick: target?.customerId
+          ? () => navigate(`/finances?customerId=${target.customerId}`)
+          : undefined,
+      },
+      {
+        id: "payment",
+        label: "Pagamento",
+        summary: paymentDone
+          ? "Pagamento com evidência carregada."
+          : hasCharge
+            ? "Cobrança ainda sem pagamento confirmado."
+            : "Aguardando cobrança para medir pagamento.",
+        state: paymentDone
+          ? "done"
+          : hasCharge
+            ? chargeOverdue
+              ? "blocked"
+              : "warning"
+            : "idle",
+        countOrValue: paymentDone ? "OK" : "—",
+      },
+      {
+        id: "timeline",
+        label: "Timeline",
+        summary: hasTimeline
+          ? `${timeline.length} evento(s) oficiais retornados.`
+          : "Sem evento oficial retornado para esta leitura.",
+        state: hasTimeline ? "done" : "idle",
+        countOrValue: String(timeline.length),
+        hrefLabel: "Abrir Timeline",
+        onClick: () =>
+          navigate(
+            target?.customerId
+              ? `/timeline?customerId=${target.customerId}`
+              : "/timeline"
+          ),
+      },
+      {
+        id: "governance",
+        label: "Risco/Gov.",
+        summary:
+          appointmentCommandState.level === "NORMAL"
+            ? "Sem gargalo crítico detectado."
+            : appointmentCommandState.reason,
+        state:
+          appointmentCommandState.level === "NORMAL"
+            ? "done"
+            : appointmentCommandState.level === "WARNING"
+              ? "warning"
+              : "blocked",
+        hrefLabel: "Abrir Governança",
+        onClick: () => navigate("/governance"),
+      },
+    ];
+    return stages;
+  }, [appointmentCommandState, commandTarget, navigate, timeline.length]);
+
+  const appointmentTimelineEvents = useMemo(() => {
+    if (timeline.length > 0) {
+      return timeline.slice(0, 4).map((event: any) => ({
+        id: String(event?.id ?? `${event?.createdAt}-${event?.action}`),
+        type: safeEntityLabel(event?.action, "Evento"),
+        occurredAt: formatDateTime(
+          String(event?.createdAt ?? event?.occurredAt ?? "")
+        ),
+        entity: safeEntityLabel(event?.entityType, "Agendamento"),
+        actor: safeEntityLabel(event?.actorName ?? event?.actor, "Sistema"),
+        summary: safeEntityLabel(
+          event?.description ?? event?.summary,
+          "Sem descrição"
+        ),
+      }));
+    }
+    const target = commandTarget;
+    if (!target) return [];
+    const derived = [
+      target.item.createdAt
+        ? {
+            id: `${target.item.id}-created`,
+            type: "Criado",
+            occurredAt: formatDateTime(target.item.createdAt),
+            entity: "Agendamento",
+            actor: target.ownerName,
+            summary: `Agendamento de ${target.customerName} criado com data real do registro.`,
+          }
+        : null,
+      target.status === "CONFIRMED" && target.item.updatedAt
+        ? {
+            id: `${target.item.id}-confirmed`,
+            type: "Confirmado",
+            occurredAt: formatDateTime(target.item.updatedAt),
+            entity: "Agendamento",
+            actor: target.ownerName,
+            summary:
+              "Status atual indica confirmação; evento derivado do próprio agendamento.",
+          }
+        : null,
+      target.status === "CANCELED" && target.item.updatedAt
+        ? {
+            id: `${target.item.id}-canceled`,
+            type: "Cancelado",
+            occurredAt: formatDateTime(target.item.updatedAt),
+            entity: "Agendamento",
+            actor: target.ownerName,
+            summary:
+              "Status atual indica cancelamento; evento derivado do próprio agendamento.",
+          }
+        : null,
+      target.status === "DONE" && target.item.updatedAt
+        ? {
+            id: `${target.item.id}-done`,
+            type: "Concluído",
+            occurredAt: formatDateTime(target.item.updatedAt),
+            entity: "Agendamento",
+            actor: target.ownerName,
+            summary:
+              "Status atual indica conclusão; evento derivado do próprio agendamento.",
+          }
+        : null,
+      target.order?.id
+        ? {
+            id: `${target.item.id}-order`,
+            type: "O.S. gerada",
+            occurredAt: formatDateTime(
+              target.order.createdAt ?? target.order.updatedAt
+            ),
+            entity: `O.S. #${target.order.id}`,
+            actor: target.ownerName,
+            summary: "O.S. vinculada encontrada nos dados carregados.",
+          }
+        : null,
+    ].filter(Boolean);
+    return derived.slice(0, 4) as Array<{
+      id: string;
+      type: string;
+      occurredAt: string;
+      entity: string;
+      actor?: string;
+      summary: string;
+    }>;
+  }, [commandTarget, timeline]);
 
   function goToWhatsAppAppointment(customerId: string, appointmentId: string) {
     if (!String(customerId ?? "").trim()) {
@@ -744,6 +1499,59 @@ export default function AppointmentsPage() {
             </div>
           </div>
         </AppOperationalHeader>
+
+        <div className="grid gap-3 xl:grid-cols-[1.05fr_0.95fr]">
+          <OperationalStateCard
+            title={
+              commandTarget
+                ? "Estado da entrada operacional"
+                : "Estado da carteira de agendamentos"
+            }
+            level={appointmentCommandState.level}
+            reason={appointmentCommandState.reason}
+            impact={appointmentCommandState.impact}
+            detailsLabel={appointmentCommandState.cta}
+            onDetails={() => {
+              if (commandTarget?.item.id) {
+                setSelectedAppointmentId(String(commandTarget.item.id));
+                return;
+              }
+              setOpenModal(true);
+            }}
+          />
+          <OperationalRiskCard
+            title={appointmentRisk.title}
+            reason={appointmentRisk.reason}
+            impact={appointmentRisk.impact}
+            ctaLabel={appointmentRisk.cta}
+            onClick={() => {
+              if (commandTarget?.item.id) {
+                setSelectedAppointmentId(String(commandTarget.item.id));
+                return;
+              }
+              setOpenModal(true);
+            }}
+          />
+        </div>
+
+        {/* Contrato AppSectionCard oficial: Próxima melhor ação canônica de Agendamentos. */}
+        <NextBestActionCard
+          title={canonicalNextBestAction.title}
+          entity={canonicalNextBestAction.entity}
+          reason={canonicalNextBestAction.reason}
+          impact={canonicalNextBestAction.impact}
+          safetyNote={canonicalNextBestAction.safetyNote}
+          primaryActionLabel={canonicalNextBestAction.primaryActionLabel}
+          onPrimaryAction={canonicalNextBestAction.onPrimaryAction}
+          secondaryActionLabel={canonicalNextBestAction.secondaryActionLabel}
+          onSecondaryAction={canonicalNextBestAction.onSecondaryAction}
+        />
+
+        <OperationalFlowCard
+          title="Fluxo de entrada do agendamento"
+          subtitle="Cliente → Agendamento → O.S. → Cobrança → Pagamento → Timeline → Risco/Governança"
+          stages={appointmentFlowStages}
+        />
 
         <AppSectionBlock
           title="Resumo operacional"
@@ -817,50 +1625,6 @@ export default function AppointmentsPage() {
             ))}
           </div>
         </AppSectionBlock>
-
-        {/* Contrato <AppSectionCard oficial preservado via AppSectionBlock: Próxima melhor ação. */}
-        <AppNextBestActionBlock
-          title="Próxima melhor ação"
-          subtitle="Sugestão calculada somente com os agendamentos, clientes, responsáveis e O.S. já carregados."
-          compact
-        >
-          {nextBestAction ? (
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0 flex-1 space-y-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <AppPriorityBadge
-                    priority={nextBestAction.priority}
-                    label={appointmentPriorityLabel(nextBestAction.priority)}
-                  />
-                  <AppStatusBadge
-                    {...mapOperationalStatus(nextBestAction.row)}
-                  />
-                </div>
-                <p className="text-sm font-semibold text-[var(--text-primary)]">
-                  {nextBestAction.action}
-                </p>
-                <p className="text-xs text-[var(--text-secondary)]">
-                  Motivo: {nextBestAction.reason}
-                </p>
-                <p className="text-xs text-[var(--text-secondary)]">
-                  Impacto: {nextBestAction.impact}
-                </p>
-              </div>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={nextBestAction.onClick}
-              >
-                {nextBestAction.ctaLabel}
-              </Button>
-            </div>
-          ) : (
-            <AppPageEmptyState
-              title="Sem ação imediata"
-              description="Não há agendamento carregado exigindo confirmação, remarcação ou preparação de O.S. agora."
-            />
-          )}
-        </AppNextBestActionBlock>
 
         <AppSectionBlock
           title="Atenção imediata"
@@ -978,6 +1742,7 @@ export default function AppointmentsPage() {
                   customersQuery.refetch(),
                   peopleQuery.refetch(),
                   serviceOrdersQuery.refetch(),
+                  chargesQuery.refetch(),
                 ]);
               }}
             />
@@ -1006,167 +1771,227 @@ export default function AppointmentsPage() {
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="text-sm font-semibold text-[var(--text-primary)]">{formatDateTime(row.item.startsAt)}</p>
-                          <p className="mt-1 truncate text-sm text-[var(--text-secondary)]">{row.customerName}</p>
-                          <p className="mt-1 line-clamp-2 text-xs text-[var(--text-muted)]">{row.item.title || row.item.notes || "Sem observação"}</p>
+                          <p className="text-sm font-semibold text-[var(--text-primary)]">
+                            {formatDateTime(row.item.startsAt)}
+                          </p>
+                          <p className="mt-1 truncate text-sm text-[var(--text-secondary)]">
+                            {row.customerName}
+                          </p>
+                          <p className="mt-1 line-clamp-2 text-xs text-[var(--text-muted)]">
+                            {row.item.title ||
+                              row.item.notes ||
+                              "Sem observação"}
+                          </p>
                         </div>
-                        <AppStatusBadge label={status.label} tone={status.tone} />
+                        <AppStatusBadge
+                          label={status.label}
+                          tone={status.tone}
+                        />
                       </div>
                       <div className="mt-3 flex flex-wrap items-center gap-2">
-                        {priority ? <AppPriorityBadge priority={priority} label={appointmentPriorityLabel(priority)} /> : null}
-                        <span className="text-xs text-[var(--text-muted)]">{row.ownerName}</span>
+                        {priority ? (
+                          <AppPriorityBadge
+                            priority={priority}
+                            label={appointmentPriorityLabel(priority)}
+                          />
+                        ) : null}
+                        <span className="text-xs text-[var(--text-muted)]">
+                          {row.ownerName}
+                        </span>
                       </div>
-                      <Button className="mt-3 w-full" size="sm" onClick={() => setSelectedAppointmentId(appointmentId)}>{nextActionLabel(row)}</Button>
+                      <Button
+                        className="mt-3 w-full"
+                        size="sm"
+                        onClick={() => setSelectedAppointmentId(appointmentId)}
+                      >
+                        {nextActionLabel(row)}
+                      </Button>
                     </article>
                   );
                 })}
               </div>
               <div className="hidden md:block">
-              <AppDataTable className="min-w-[760px]">
-                <thead>
-                  <tr>
-                    <th>Horário</th>
-                    <th>Cliente / serviço</th>
-                    <th>Status / prioridade</th>
-                    <th>Responsável</th>
-                    <th>Ação</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginatedAppointments.map(row => {
-                    const status = mapStatus(row.item.status);
-                    const orderId = row.order?.id ? String(row.order.id) : null;
-                    const appointmentId = String(row.item.id ?? "");
-                    const isSelected = selectedAppointmentId === appointmentId;
-                    const priority = deriveAppointmentPriority(row);
-                    const operationalBadge = mapOperationalStatusBadge(row);
-                    return (
-                      <tr
-                        key={appointmentId}
-                        className={
-                          isSelected
-                            ? "bg-[var(--nexo-table-row-selected,var(--surface-subtle))]"
-                            : undefined
-                        }
-                        onClick={() => setSelectedAppointmentId(appointmentId)}
-                      >
-                        <td>{formatDateTime(row.item.startsAt)}</td>
-                        <td>
-                          <div className="min-w-[220px] space-y-1">
-                            <p className="font-semibold text-[var(--text-primary)]">{row.customerName}</p>
-                            <p className="max-w-[260px] truncate text-xs text-[var(--text-secondary)]">
-                              {row.item.title || row.item.notes || "Sem observação"}
-                            </p>
-                            <p className="text-xs text-[var(--text-muted)]">
-                              {durationLabel(row.item.startsAt, row.item.endsAt)} {orderId ? `· O.S. #${orderId}` : "· sem O.S."}
-                            </p>
-                          </div>
-                        </td>
-                        <td>
-                          <div className="flex min-w-[170px] flex-col items-start gap-2">
-                            <AppStatusBadge label={status.label} tone={status.tone} />
-                            {priority ? <AppPriorityBadge priority={priority} label={appointmentPriorityLabel(priority)} /> : <AppStatusBadge {...operationalBadge} />}
-                          </div>
-                        </td>
-                        <td>{row.ownerName}</td>
-                        <td onClick={event => event.stopPropagation()}>
-                          <div className="flex min-w-[140px] items-center justify-end gap-2">
-                            <Button size="sm" onClick={() => setSelectedAppointmentId(String(row.item.id))}>{nextActionLabel(row)}</Button>
-                          <AppRowActionsDropdown
-                            triggerLabel="Ações do agendamento"
-                            items={[
-                              {
-                                label: "Confirmar",
-                                onSelect: () =>
-                                  void updateStatus(
-                                    String(row.item.id),
-                                    "CONFIRMED"
-                                  ),
-                                disabled: !row.item.id,
-                                tone: "primary",
-                              },
-                              {
-                                label: "Iniciar atendimento",
-                                onSelect: () => {
-                                  if (orderId) {
-                                    navigate(
-                                      `/service-orders?customerId=${row.customerId}&appointmentId=${row.item.id}`
-                                    );
-                                    return;
-                                  }
-                                  setSelectedAppointmentId(String(row.item.id));
-                                  setOpenServiceOrderModal(true);
-                                },
-                                disabled: !row.item.id,
-                              },
-                              {
-                                label: "Cancelar",
-                                onSelect: () =>
-                                  void updateStatus(
-                                    String(row.item.id),
-                                    "CANCELED"
-                                  ),
-                                disabled: !row.item.id,
-                              },
-                              {
-                                label: "Editar/Remarcar",
-                                onSelect: () => {
-                                  setEditing(row.item);
-                                  setOpenModal(true);
-                                },
-                                disabled: !row.item.id,
-                              },
-                              {
-                                label: "Criar O.S.",
-                                onSelect: () => {
-                                  setSelectedAppointmentId(String(row.item.id));
-                                  setOpenServiceOrderModal(true);
-                                },
-                                disabled: !row.item.id,
-                              },
-                              { type: "separator" },
-                              {
-                                label: "Abrir detalhe",
-                                onSelect: () =>
-                                  setSelectedAppointmentId(String(row.item.id)),
-                                disabled: !row.item.id,
-                              },
-                              {
-                                label: "Abrir cliente",
-                                onSelect: () =>
-                                  navigate(
-                                    `/customers?customerId=${row.customerId}`
-                                  ),
-                                disabled: !row.customerId,
-                              },
-                              {
-                                label: "Enviar WhatsApp",
-                                onSelect: () =>
-                                  goToWhatsAppAppointment(
-                                    String(row.customerId ?? ""),
-                                    String(row.item.id ?? "")
-                                  ),
-                                disabled: !row.customerId || !row.item.id,
-                              },
-                              {
-                                label: "Abrir O.S.",
-                                onSelect: () =>
-                                  orderId
-                                    ? navigate(
-                                        `/service-orders?customerId=${row.customerId}&appointmentId=${row.item.id}`
-                                      )
-                                    : undefined,
-                                disabled: !orderId,
-                              },
-                            ]}
-                          />
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </AppDataTable>
+                <AppDataTable className="min-w-[760px]">
+                  <thead>
+                    <tr>
+                      <th>Horário</th>
+                      <th>Cliente / serviço</th>
+                      <th>Status / prioridade</th>
+                      <th>Responsável</th>
+                      <th>Ação</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedAppointments.map(row => {
+                      const status = mapStatus(row.item.status);
+                      const orderId = row.order?.id
+                        ? String(row.order.id)
+                        : null;
+                      const appointmentId = String(row.item.id ?? "");
+                      const isSelected =
+                        selectedAppointmentId === appointmentId;
+                      const priority = deriveAppointmentPriority(row);
+                      const operationalBadge = mapOperationalStatusBadge(row);
+                      return (
+                        <tr
+                          key={appointmentId}
+                          className={
+                            isSelected
+                              ? "bg-[var(--nexo-table-row-selected,var(--surface-subtle))]"
+                              : undefined
+                          }
+                          onClick={() =>
+                            setSelectedAppointmentId(appointmentId)
+                          }
+                        >
+                          <td>{formatDateTime(row.item.startsAt)}</td>
+                          <td>
+                            <div className="min-w-[220px] space-y-1">
+                              <p className="font-semibold text-[var(--text-primary)]">
+                                {row.customerName}
+                              </p>
+                              <p className="max-w-[260px] truncate text-xs text-[var(--text-secondary)]">
+                                {row.item.title ||
+                                  row.item.notes ||
+                                  "Sem observação"}
+                              </p>
+                              <p className="text-xs text-[var(--text-muted)]">
+                                {durationLabel(
+                                  row.item.startsAt,
+                                  row.item.endsAt
+                                )}{" "}
+                                {orderId ? `· O.S. #${orderId}` : "· sem O.S."}
+                              </p>
+                            </div>
+                          </td>
+                          <td>
+                            <div className="flex min-w-[170px] flex-col items-start gap-2">
+                              <AppStatusBadge
+                                label={status.label}
+                                tone={status.tone}
+                              />
+                              {priority ? (
+                                <AppPriorityBadge
+                                  priority={priority}
+                                  label={appointmentPriorityLabel(priority)}
+                                />
+                              ) : (
+                                <AppStatusBadge {...operationalBadge} />
+                              )}
+                            </div>
+                          </td>
+                          <td>{row.ownerName}</td>
+                          <td onClick={event => event.stopPropagation()}>
+                            <div className="flex min-w-[140px] items-center justify-end gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() =>
+                                  setSelectedAppointmentId(String(row.item.id))
+                                }
+                              >
+                                {nextActionLabel(row)}
+                              </Button>
+                              <AppRowActionsDropdown
+                                triggerLabel="Ações do agendamento"
+                                items={[
+                                  {
+                                    label: "Confirmar",
+                                    onSelect: () =>
+                                      void updateStatus(
+                                        String(row.item.id),
+                                        "CONFIRMED"
+                                      ),
+                                    disabled: !row.item.id,
+                                    tone: "primary",
+                                  },
+                                  {
+                                    label: "Iniciar atendimento",
+                                    onSelect: () => {
+                                      if (orderId) {
+                                        navigate(
+                                          `/service-orders?customerId=${row.customerId}&appointmentId=${row.item.id}`
+                                        );
+                                        return;
+                                      }
+                                      setSelectedAppointmentId(
+                                        String(row.item.id)
+                                      );
+                                      setOpenServiceOrderModal(true);
+                                    },
+                                    disabled: !row.item.id,
+                                  },
+                                  {
+                                    label: "Cancelar",
+                                    onSelect: () =>
+                                      void updateStatus(
+                                        String(row.item.id),
+                                        "CANCELED"
+                                      ),
+                                    disabled: !row.item.id,
+                                  },
+                                  {
+                                    label: "Editar/Remarcar",
+                                    onSelect: () => {
+                                      setEditing(row.item);
+                                      setOpenModal(true);
+                                    },
+                                    disabled: !row.item.id,
+                                  },
+                                  {
+                                    label: "Criar O.S.",
+                                    onSelect: () => {
+                                      setSelectedAppointmentId(
+                                        String(row.item.id)
+                                      );
+                                      setOpenServiceOrderModal(true);
+                                    },
+                                    disabled: !row.item.id,
+                                  },
+                                  { type: "separator" },
+                                  {
+                                    label: "Abrir detalhe",
+                                    onSelect: () =>
+                                      setSelectedAppointmentId(
+                                        String(row.item.id)
+                                      ),
+                                    disabled: !row.item.id,
+                                  },
+                                  {
+                                    label: "Abrir cliente",
+                                    onSelect: () =>
+                                      navigate(
+                                        `/customers?customerId=${row.customerId}`
+                                      ),
+                                    disabled: !row.customerId,
+                                  },
+                                  {
+                                    label: "Enviar WhatsApp",
+                                    onSelect: () =>
+                                      goToWhatsAppAppointment(
+                                        String(row.customerId ?? ""),
+                                        String(row.item.id ?? "")
+                                      ),
+                                    disabled: !row.customerId || !row.item.id,
+                                  },
+                                  {
+                                    label: "Abrir O.S.",
+                                    onSelect: () =>
+                                      orderId
+                                        ? navigate(
+                                            `/service-orders?customerId=${row.customerId}&appointmentId=${row.item.id}`
+                                          )
+                                        : undefined,
+                                    disabled: !orderId,
+                                  },
+                                ]}
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </AppDataTable>
               </div>
               <AppPagination
                 currentPage={currentPage}
@@ -1281,36 +2106,23 @@ export default function AppointmentsPage() {
                 </Button>
               </AppActionBar>
 
-              <div className="pt-1">
-                <p className="mb-2 text-xs uppercase text-[var(--text-muted)]">
-                  Timeline / histórico
-                </p>
-                {queryParams.customerId ? (
-                  <AppEmbeddedTimeline
-                    items={timeline.slice(0, 5).map((event: any) => ({
-                      id: String(
-                        event?.id ?? `${event?.createdAt}-${event?.action}`
-                      ),
-                      type: String(event?.action ?? "Evento"),
-                      summary: String(
-                        event?.description ?? event?.summary ?? "Sem descrição"
-                      ),
-                      entity: String(event?.entityType ?? "Agendamento"),
-                      actor: String(
-                        event?.actorName ?? event?.actor ?? "Sistema"
-                      ),
-                      happenedAt: formatDateTime(
-                        String(event?.createdAt ?? event?.occurredAt ?? "")
-                      ),
-                    }))}
-                    emptyMessage="Sem histórico para este cliente."
-                  />
-                ) : (
-                  <p className="text-xs text-[var(--text-muted)]">
-                    Histórico disponível ao abrir com customerId na URL.
-                  </p>
-                )}
-              </div>
+              <EntityTimelineCard
+                title="Prova operacional da agenda"
+                subtitle={
+                  timeline.length > 0
+                    ? "Últimos eventos oficiais retornados para sustentar o agendamento."
+                    : "Sem Timeline oficial carregada; eventos abaixo são derivados de datas reais do próprio agendamento e não substituem a Timeline completa."
+                }
+                events={appointmentTimelineEvents}
+                fullTimelineLabel="Abrir Timeline completa"
+                onFullTimeline={() =>
+                  navigate(
+                    selected.customerId
+                      ? `/timeline?customerId=${selected.customerId}`
+                      : "/timeline"
+                  )
+                }
+              />
             </div>
           )}
         </AppSectionBlock>
