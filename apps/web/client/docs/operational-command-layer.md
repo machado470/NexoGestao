@@ -235,3 +235,49 @@ A Timeline é tratada como prova oficial da execução. Atraso, ausência de res
 ### Congelamento de WhatsApp e próxima página candidata
 
 WhatsApp permanece congelado nesta adoção: `WhatsAppPage.tsx` não deve ser alterado, não há novo fluxo de comunicação e os CTAs continuam apenas navegando para contextos já existentes. Depois de O.S., a próxima página candidata para adoção da Operational Command Layer é Agendamentos.
+
+## Adoção em Agendamentos
+
+A página de Agendamentos (`AppointmentsPage`) adota a camada operacional transversal para funcionar como controle de entrada operacional. A primeira leitura deixa de ser apenas agenda/lista de horários e passa a responder o que vai acontecer, quando, com quem, qual risco existe, qual ação deve acontecer agora e como o agendamento avança para O.S., cobrança, pagamento, Timeline e Governança.
+
+### Como Agendamentos usa a camada operacional
+
+- `OperationalStateCard` calcula o estado da entrada (`NORMAL`, `WARNING` ou `RESTRICTED`) a partir do agendamento em foco ou, quando não houver detalhe selecionado, da carteira carregada. A leitura considera atraso, no-show, conflito real por sobreposição, falta de confirmação, proximidade do horário, ausência de responsável, cancelamento e conclusão sem O.S. `SUSPENDED` não é usado sem dado real.
+- `OperationalRiskCard` explica o risco dominante com motivo específico: atraso/no-show, conflito, falta de confirmação, ausência de responsável ou atendimento concluído sem O.S. Quando não há bloqueio crítico, o card declara a condição saudável sem inventar risco genérico.
+- `NextBestActionCard` concentra a Próxima Melhor Ação de Agendamentos, sem execução automática: revisar atraso/no-show, confirmar agendamento, preparar atendimento, atribuir responsável, gerar O.S., revisar histórico de cancelado ou revisar agenda do dia.
+- `OperationalFlowCard` mostra a cadeia `Cliente → Agendamento → O.S. → Cobrança → Pagamento → Timeline → Risco/Governança`, indicando onde a entrada já está concluída, ativa, em atenção, bloqueada ou ainda ociosa.
+- `EntityTimelineCard` apresenta a prova operacional da agenda. Quando há eventos oficiais retornados, eles são exibidos como fonte principal; quando não há Timeline oficial carregada, a página mostra fallback explícito e pode listar até quatro eventos contextuais derivados apenas de datas reais do próprio agendamento ou da O.S. vinculada.
+
+### Dados reaproveitados
+
+Agendamentos reaproveita dados já disponíveis ou contratos já existentes no front-end:
+
+- agendamentos retornados por `nexo.appointments.list`;
+- cliente vinculado pelo payload do agendamento ou por `nexo.customers.list`;
+- responsável/assignee por `assignedToPersonId`, `personId` e `people.list`;
+- status, data/hora inicial, data/hora final, duração, criação, atualização e observações do agendamento;
+- O.S. vinculada por `nexo.serviceOrders.list` via `appointmentId`;
+- cobrança vinculada à O.S. por `finance.charges.list` ou `financialSummary.latestCharge`, quando existir;
+- evidência de pagamento por status `PAID` ou pagamentos embutidos na cobrança, quando retornados;
+- eventos oficiais da Timeline por cliente quando a página está em contexto de cliente.
+
+### Fallbacks seguros
+
+- Se não houver agendamento selecionado, a camada usa a carteira carregada para escolher o primeiro item acionável ou orienta criar/selecionar agendamento.
+- Se não houver Timeline oficial carregada, o card informa explicitamente que eventos contextuais são derivados de datas reais e não substituem a Timeline completa.
+- Se não houver O.S. vinculada, a etapa de O.S. fica `idle` antes da execução e `blocked` somente quando o agendamento já está concluído.
+- Se não houver cobrança ou pagamento exposto pelo vínculo com O.S., as etapas financeiras ficam `idle` ou `blocked` apenas quando o ciclo já deveria ter avançado.
+- Conflito de agenda só é sinalizado quando há datas suficientes e sobreposição real para o mesmo cliente ou responsável.
+- A Próxima Melhor Ação apenas orienta. Confirmar, editar/remarcar, criar O.S. ou navegar continuam usando ações existentes.
+
+### Relação Cliente → Agendamento → O.S. → Cobrança → Pagamento
+
+Agendamentos fecha a entrada da operação. Cliente confirma o contexto; agendamento define quando e com quem o atendimento deve acontecer; O.S. transforma o horário em execução; cobrança transforma execução em receita; pagamento fecha o ciclo financeiro. O fluxo visual mostra gargalos quando a entrada está atrasada, sem confirmação, sem responsável, concluída sem O.S. ou sem evidência financeira depois da execução.
+
+### Timeline, Risco e Governança
+
+A Timeline é tratada como prova oficial da agenda. Atraso, no-show, falta de confirmação, conflito, ausência de responsável e conclusão sem O.S. elevam o risco operacional e alimentam a leitura de Governança. Quando a Timeline não retorna eventos, a página não cria histórico fictício: apenas deriva eventos de datas reais já presentes no agendamento e orienta abrir a Timeline completa para prova oficial.
+
+### Congelamento de WhatsApp e próximas páginas candidatas
+
+WhatsApp permanece congelado nesta adoção: `WhatsAppPage.tsx` não foi alterado, não há novo fluxo de comunicação e os CTAs existentes continuam apenas navegando para contextos já existentes. Depois de Agendamentos, as próximas páginas candidatas para adoção da Operational Command Layer são Timeline e Governança.
