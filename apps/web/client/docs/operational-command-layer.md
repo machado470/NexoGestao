@@ -328,3 +328,43 @@ O evento é o fato registrado. A Timeline organiza esse fato como prova oficial.
 ### Congelamento de WhatsApp e próxima página candidata
 
 WhatsApp permanece congelado nesta adoção: `WhatsAppPage.tsx` não foi alterado, não há novo fluxo de WhatsApp e falhas de comunicação só são consideradas quando já aparecem como eventos reais na Timeline. Depois de Timeline, a próxima página candidata para adoção da Operational Command Layer é Governança.
+
+## Adoção em Governança
+
+A página de Governança (`GovernancePage`) adota a Operational Command Layer para fechar o ciclo `Evento → Timeline → Risco → Governança → Política → Ação`. A primeira leitura deixa de ser apenas relatório de estado, lista de alertas ou histórico de execuções: ela passa a responder qual estado operacional foi detectado, qual risco explica esse estado, qual decisão/intervenção existe e qual ação deve acontecer agora.
+
+### Como Governança usa a camada operacional
+
+- `OperationalStateCard` mostra o estado operacional governado (`NORMAL`, `WARNING`, `RESTRICTED` ou `SUSPENDED`) com motivo principal, impacto no fluxo `Cliente → Agendamento → O.S. → Cobrança → Pagamento` e CTA para histórico/Timeline. `SUSPENDED` só é exibido quando o resumo ou a última execução retornam suspensão real.
+- `OperationalRiskCard` explica o risco dominante a partir dos sinais concretos já carregados: cobranças vencidas, O.S. atrasadas, O.S. sem responsável, agendamentos pendentes no passado, score/alertas de governança e ausência de execução oficial recente.
+- `NextBestActionCard` concentra a Próxima Melhor Ação canônica de Governança, sem execução automática: revisar intervenção crítica, analisar sinais de risco, revisar política aplicada, investigar evento crítico, abrir Financeiro, abrir O.S., abrir Agendamentos ou revisar histórico de governança.
+- `OperationalFlowCard` mostra a cadeia `Evento → Timeline → Risco → Governança → Política → Ação`, indicando quando há evento detectado, prova/histórico real, risco governado, execução recente, política aplicada/pendente e ação orientada.
+- `EntityTimelineCard` exibe “Últimas decisões oficiais de governança” com até quatro registros reais derivados de execuções de governança que tenham data válida. Quando não há eventos, o fallback canônico deixa claro que o Nexo não cria histórico fictício e orienta abrir a Timeline completa.
+
+### Dados reaproveitados
+
+Governança reaproveita somente dados e contratos já disponíveis na página:
+
+- resumo de `governance.summary`, incluindo score, alertas, ações automáticas, restrições e metadados de políticas quando retornados;
+- execuções de `governance.runs`, usadas como histórico real e prova operacional quando possuem datas válidas;
+- cobranças vencidas de `finance.charges.list` para risco financeiro dominante;
+- O.S. de `nexo.serviceOrders.list` para detectar atraso e ausência de responsável;
+- agendamentos de `nexo.appointments.list` para detectar pendências no passado;
+- status, estado, motivo, mensagem, ator, regra, política e datas já presentes nos payloads de resumo/execução.
+
+### Fallbacks seguros
+
+- Se não houver execução real de governança, a página sinaliza ausência de execução recente como um sinal médio e não cria evento artificial na prova operacional.
+- Se a Timeline/prova não retornar registros, `EntityTimelineCard` usa o fallback explícito do componente canônico e orienta abrir a Timeline completa.
+- Se não houver política aplicada ou pendente no resumo, a etapa `Política` fica `idle` e a seção de regras informa ausência de metadado retornado.
+- Se não houver risco dominante, `OperationalRiskCard` declara risco governado sem sinal crítico em vez de inventar risco genérico.
+- `SUSPENDED` permanece reservado para dado real de suspensão vindo de resumo ou execução; sinais críticos derivados restringem a operação, mas não criam suspensão fictícia.
+- A Próxima Melhor Ação apenas navega para contextos existentes. Nenhuma política, cobrança, O.S., agenda ou comunicação é executada automaticamente.
+
+### Relação Evento → Timeline → Risco → Governança → Política → Ação
+
+Governança funciona como centro de decisão e intervenção: o evento nasce dos sinais operacionais; a Timeline/histórico fornece prova oficial quando retornada; o risco interpreta cobranças, execução, agenda e score; Governança consolida o estado; Política mostra regra aplicada ou pendente quando houver metadado; Ação orienta o operador para o próximo contexto seguro sem automatizar a intervenção.
+
+### Congelamento de WhatsApp e próximas páginas candidatas
+
+WhatsApp permanece congelado nesta adoção: `WhatsAppPage.tsx` não foi alterado, não há novo fluxo de comunicação e falhas de comunicação só devem entrar na leitura de Governança quando já existirem como dados reais. Depois de Governança, as próximas páginas candidatas para adoção da Operational Command Layer são Pessoas e Perfil.
