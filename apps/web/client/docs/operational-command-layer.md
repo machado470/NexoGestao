@@ -281,3 +281,50 @@ A Timeline é tratada como prova oficial da agenda. Atraso, no-show, falta de co
 ### Congelamento de WhatsApp e próximas páginas candidatas
 
 WhatsApp permanece congelado nesta adoção: `WhatsAppPage.tsx` não foi alterado, não há novo fluxo de comunicação e os CTAs existentes continuam apenas navegando para contextos já existentes. Depois de Agendamentos, as próximas páginas candidatas para adoção da Operational Command Layer são Timeline e Governança.
+
+## Adoção em Timeline
+
+A página de Timeline (`TimelinePage`) adota a Operational Command Layer para funcionar como camada de evidência operacional oficial. A primeira leitura deixa de ser somente um histórico visual e passa a responder qual evidência importa agora, qual risco ela revela, qual entidade foi afetada, quem registrou o evento e qual ação ou investigação deve acontecer depois.
+
+### Como Timeline usa a camada operacional
+
+- `OperationalStateCard` calcula o estado da evidência (`NORMAL`, `WARNING`, `RESTRICTED` ou `SUSPENDED`) a partir dos eventos oficiais já carregados. A leitura considera criticidade, sinais financeiros, O.S., agendamentos, governança, risco, falhas reais de comunicação quando já existem no evento e ausência de evento recente. `SUSPENDED` só aparece quando metadados reais da Timeline indicam suspensão.
+- `OperationalRiskCard` mostra o risco dominante baseado em evidência concreta do feed: cobrança vencida/pendente, O.S. atrasada ou travada, agendamento cancelado/no-show/atrasado, falha de comunicação já registrada ou evento de governança/risco. Quando não há risco dominante, o card declara ausência de evidência relevante em vez de criar risco genérico.
+- `NextBestActionCard` concentra a Próxima Melhor Ação da Timeline sem execução automática: investigar evento crítico, abrir cobrança, abrir O.S., abrir agendamento, abrir governança ou revisar histórico recente.
+- `OperationalFlowCard` mostra a cadeia `Evento → Timeline → Risco → Governança → Ação`, com estados `done`, `active`, `warning`, `blocked` ou `idle` conforme o carregamento do feed, a presença de risco e a existência de evidência de governança.
+- `EntityTimelineCard` destaca “Eventos oficiais mais relevantes” com até quatro eventos reais normalizados a partir do recorte carregado. Não há criação de eventos fictícios.
+
+### Dados reaproveitados
+
+Timeline reaproveita somente dados já disponíveis na própria página e no contrato existente de `nexo.timeline.listByOrg`:
+
+- eventos oficiais carregados no feed;
+- tipo do evento por `action` ou `type`, incluindo aliases legados já normalizados;
+- entidade por `customerId`, `serviceOrderId`, `appointmentId`, `chargeId` ou `metadata.entityType`;
+- identificador da entidade por campos diretos ou `metadata.entityId`;
+- ator/responsável por `personName`, `actorName` ou fallback explícito para `Sistema`;
+- timestamp por `createdAt`;
+- descrição, resumo, status e metadados relevantes (`operationalState`, `previousState`, `nextState`, `riskLevel`, `result`, `severity`, `reason`, `messageStatus`);
+- filtros existentes de período, tipo, módulo, criticidade, cliente, entidade e responsável;
+- rotas já existentes para cliente, O.S., financeiro, agendamento, governança, WhatsApp e dashboard.
+
+### Fallbacks seguros
+
+- Se não houver evento oficial no recorte, a camada informa que não há evidência real para calcular risco ou ação específica e orienta limpar filtros, revisar histórico ou abrir módulos principais.
+- Se não houver risco dominante, `OperationalRiskCard` declara a ausência de sinais concretos sem inventar risco genérico.
+- Se não houver evento recente, o estado pode ir para `WARNING` por silêncio operacional, deixando claro que a prova carregada pode estar incompleta.
+- Se a Timeline falhar ao carregar, o fluxo marca a etapa de Timeline como `blocked` e preserva o estado de erro existente do feed.
+- `EntityTimelineCard` usa apenas eventos retornados pelo feed. Quando a lista está vazia, o fallback canônico informa que o Nexo não cria histórico fictício.
+- A Próxima Melhor Ação apenas orienta e navega. Nenhuma cobrança, O.S., governança ou comunicação é executada automaticamente.
+
+### Papel da Timeline como prova oficial
+
+Timeline passa a ser a memória auditável que conecta acontecimento, data/hora, ator, entidade, motivo, risco e próxima investigação. O feed continua preservado com filtros, paginação, seleção e detalhe do evento; a camada operacional apenas antecipa a leitura executiva para evidenciar o que exige atenção antes da lista completa.
+
+### Relação Evento → Timeline → Risco → Governança → Ação
+
+O evento é o fato registrado. A Timeline organiza esse fato como prova oficial. A camada de risco interpreta apenas sinais reais do evento. Governança entra quando há mudança de estado, risco explícito ou evidência restritiva. A ação final é uma orientação segura para abrir o contexto correto e investigar, nunca para executar automaticamente.
+
+### Congelamento de WhatsApp e próxima página candidata
+
+WhatsApp permanece congelado nesta adoção: `WhatsAppPage.tsx` não foi alterado, não há novo fluxo de WhatsApp e falhas de comunicação só são consideradas quando já aparecem como eventos reais na Timeline. Depois de Timeline, a próxima página candidata para adoção da Operational Command Layer é Governança.

@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { operationalCopy } from "@/lib/operational-semantics";
 import {
   AlertTriangle,
   ArrowRight,
@@ -19,7 +18,6 @@ import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
 import {
   AppFiltersBar,
-  AppNextActionCard,
   AppOperationalHeader,
   AppPagination,
   AppPageEmptyState,
@@ -34,11 +32,19 @@ import {
   AppPageShell,
   AppSectionCard,
   AppSelect,
-  AppStatCard,
   AppTimeline,
   AppTimelineItem,
 } from "@/components/app-system";
 import { Button } from "@/components/design-system";
+import {
+  EntityTimelineCard,
+  NextBestActionCard,
+  OperationalFlowCard,
+  OperationalRiskCard,
+  OperationalStateCard,
+  type OperationalFlowStageState,
+  type OperationalStateLevel,
+} from "@/components/app/OperationalCommandLayer";
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import { useRenderWatchdog } from "@/hooks/useRenderWatchdog";
 import { setBootPhase } from "@/lib/bootPhase";
@@ -461,6 +467,98 @@ function eventSeverityLabel(severity: Exclude<SeverityFilter, "all">) {
   return "Baixa";
 }
 
+function eventEvidenceBucket(event: TimelineEvent) {
+  return [
+    eventAction(event),
+    text(event?.description, ""),
+    text(event?.summary, ""),
+    text(event?.status, ""),
+    metadataSearchBucket(event),
+  ]
+    .join(" ")
+    .toLowerCase();
+}
+
+function isFinancialRiskEvent(event: TimelineEvent) {
+  const bucket = eventEvidenceBucket(event);
+  return (
+    eventModule(event) === "finance" &&
+    (bucket.includes("overdue") ||
+      bucket.includes("vencid") ||
+      bucket.includes("atras") ||
+      bucket.includes("pendente") ||
+      bucket.includes("pending") ||
+      bucket.includes("failed") ||
+      bucket.includes("falh"))
+  );
+}
+
+function isServiceOrderRiskEvent(event: TimelineEvent) {
+  const bucket = eventEvidenceBucket(event);
+  return (
+    eventModule(event) === "service_order" &&
+    (bucket.includes("atras") ||
+      bucket.includes("overdue") ||
+      bucket.includes("trav") ||
+      bucket.includes("blocked") ||
+      bucket.includes("sem cobrança") ||
+      bucket.includes("without charge") ||
+      bucket.includes("failed") ||
+      bucket.includes("falh"))
+  );
+}
+
+function isAppointmentRiskEvent(event: TimelineEvent) {
+  const action = eventAction(event);
+  const bucket = eventEvidenceBucket(event);
+  return (
+    eventModule(event) === "appointment" &&
+    (action.includes("CANCEL") ||
+      action.includes("NO_SHOW") ||
+      bucket.includes("cancel") ||
+      bucket.includes("no-show") ||
+      bucket.includes("no show") ||
+      bucket.includes("falt") ||
+      bucket.includes("atras") ||
+      bucket.includes("failed") ||
+      bucket.includes("falh"))
+  );
+}
+
+function isGovernanceRiskEvent(event: TimelineEvent) {
+  const action = eventAction(event);
+  return (
+    eventModule(event) === "governance" ||
+    action === "RISK_UPDATED" ||
+    action === "OPERATIONAL_STATE_CHANGED" ||
+    hasCriticalOperationalMetadata(event) ||
+    hasWarningOperationalMetadata(event)
+  );
+}
+
+function isCommunicationFailureEvent(event: TimelineEvent) {
+  const bucket = eventEvidenceBucket(event);
+  return (
+    eventModule(event) === "whatsapp" &&
+    (bucket.includes("failed") ||
+      bucket.includes("error") ||
+      bucket.includes("erro") ||
+      bucket.includes("falh"))
+  );
+}
+
+function isRiskEvidenceEvent(event: TimelineEvent) {
+  return (
+    eventSeverity(event) === "critical" ||
+    eventSeverity(event) === "high" ||
+    isFinancialRiskEvent(event) ||
+    isServiceOrderRiskEvent(event) ||
+    isAppointmentRiskEvent(event) ||
+    isGovernanceRiskEvent(event) ||
+    isCommunicationFailureEvent(event)
+  );
+}
+
 const METADATA_PRIORITY_FIELDS = [
   "amount",
   "previousState",
@@ -738,170 +836,430 @@ export default function TimelinePage() {
     return Array.from(groups.entries());
   }, [paginatedFilteredEvents]);
 
-  const summary = useMemo(() => {
-    const critical = filteredEvents.filter(
+  const operationalEvidence = useMemo(() => {
+    const criticalEvents = filteredEvents.filter(
       item => eventSeverity(item) === "critical"
-    ).length;
-    const payments = filteredEvents.filter(item =>
-      eventAction(item).includes("PAYMENT_RECEIVED")
-    ).length;
-    const opStateChanges = filteredEvents.filter(item =>
-      eventAction(item).includes("OPERATIONAL_STATE_CHANGED")
-    ).length;
-    const failedMessaging = filteredEvents.filter(item => {
-      const bucket =
-        `${eventAction(item)} ${text(item?.description, "")}`.toLowerCase();
-      return (
-        eventModule(item) === "whatsapp" &&
-        (bucket.includes("failed") || bucket.includes("erro"))
-      );
-    }).length;
-
-    return { critical, payments, opStateChanges, failedMessaging };
-  }, [filteredEvents]);
-
-  const immediateAttention = useMemo(() => {
-    return filteredEvents
-      .filter(item => eventSeverity(item) === "critical")
-      .slice(0, 3)
-      .map(item => ({
-        id: String(item?.id ?? ""),
-        title: eventDisplayTitle(item),
-        context: `${eventEntityLabel(item)} #${eventEntityId(item)} · ${formatDateTime(
-          item?.createdAt
-        )}`,
-        impact:
-          eventModule(item) === "finance"
-            ? "Impacto financeiro imediato no caixa e na previsibilidade."
-            : eventModule(item) === "whatsapp"
-              ? "Risco de quebra de comunicação e perda de resposta operacional."
-              : "Risco de escalada operacional que exige investigação rastreável.",
-        route: eventRoute(item),
-      }));
-  }, [filteredEvents]);
-
-  const nextAction = useMemo(() => {
-    const groupedByCustomer = new Map<
-      string,
-      {
-        targetId: string;
-        targetLabel: string;
-        route: string;
-        score: number;
-        reasons: string[];
-        lastEvent: TimelineEvent;
-      }
-    >();
-
-    filteredEvents.forEach(event => {
-      const customerId = eventCustomerId(event);
-      const entityId = eventEntityId(event);
-      const targetId = customerId || (entityId !== "—" ? entityId : "operação");
-      const targetLabel = customerId
-        ? `cliente #${customerId}`
-        : `${eventEntityLabel(event).toLowerCase()} #${targetId}`;
-      const action = eventAction(event);
-      const detail = text(event?.description, "").toLowerCase();
-      const metadataSignal = normalizedMetadataValue(event, [
-        "riskLevel",
+    );
+    const highEvents = filteredEvents.filter(item => eventSeverity(item) === "high");
+    const financeRiskEvents = filteredEvents.filter(isFinancialRiskEvent);
+    const serviceOrderRiskEvents = filteredEvents.filter(isServiceOrderRiskEvent);
+    const appointmentRiskEvents = filteredEvents.filter(isAppointmentRiskEvent);
+    const governanceEvents = filteredEvents.filter(isGovernanceRiskEvent);
+    const communicationFailures = filteredEvents.filter(isCommunicationFailureEvent);
+    const riskEvents = filteredEvents.filter(isRiskEvidenceEvent);
+    const suspendedEvents = filteredEvents.filter(item =>
+      normalizedMetadataValue(item, [
         "operationalState",
         "previousState",
         "nextState",
         "result",
         "severity",
-      ]);
-      let score = 0;
-      const reasons: string[] = [];
-
-      if (metadataSignal.includes("SUSPENDED")) {
-        score += 6;
-        reasons.push("estado suspenso");
-      } else if (metadataSignal.includes("RESTRICTED")) {
-        score += 5;
-        reasons.push("estado restrito");
-      } else if (metadataSignal.includes("WARNING")) {
-        score += 3;
-        reasons.push("estado em alerta");
-      }
-      if (action === "OPERATIONAL_STATE_CHANGED") {
-        score += 5;
-        reasons.push("mudança de estado operacional");
-      }
-      if (action === "RISK_UPDATED") {
-        score += 4;
-        reasons.push("risco atualizado");
-      }
-      if (action === "GOVERNANCE_RUN_COMPLETED") {
-        score += 3;
-        reasons.push("governança concluída");
-      }
-      if (eventSeverity(event) === "critical") {
-        score += 4;
-        reasons.push("evento crítico");
-      } else if (eventSeverity(event) === "high") {
-        score += 2;
-        reasons.push("evento de alta criticidade");
-      }
-      if (
-        action.includes("PAYMENT") ||
-        action.includes("CHARGE") ||
-        detail.includes("atras")
-      ) {
-        score += 3;
-        reasons.push("sinal financeiro");
-      }
-      if (
-        action.includes("WHATSAPP") ||
-        detail.includes("mensag") ||
-        detail.includes("contato")
-      ) {
-        score += 2;
-        reasons.push("falha de contato");
-      }
-      if (action.includes("CANCELED") || action.includes("NO_SHOW")) {
-        score += 2;
-        reasons.push("ruptura de execução");
-      }
-
-      if (score <= 0) return;
-      const existing = groupedByCustomer.get(targetId);
-      if (!existing) {
-        groupedByCustomer.set(targetId, {
-          targetId,
-          targetLabel,
-          route: customerId ? "/customers" : eventRoute(event),
-          score,
-          reasons,
-          lastEvent: event,
-        });
-        return;
-      }
-
-      existing.score += score;
-      existing.reasons.push(...reasons);
-      if (
-        new Date(String(event?.createdAt ?? 0)).getTime() >
-        new Date(String(existing.lastEvent?.createdAt ?? 0)).getTime()
-      ) {
-        existing.lastEvent = event;
-      }
-    });
-
-    const candidate = Array.from(groupedByCustomer.values()).sort(
-      (a, b) => b.score - a.score
-    )[0];
-    if (!candidate) return null;
+        "riskLevel",
+      ]).includes("SUSPENDED")
+    );
+    const restrictedEvents = filteredEvents.filter(hasCriticalOperationalMetadata);
+    const latestEvent = filteredEvents[0] ?? null;
+    const latestTimestamp = latestEvent
+      ? new Date(String(latestEvent?.createdAt ?? "")).getTime()
+      : Number.NaN;
+    const hasRecentEvent =
+      Number.isFinite(latestTimestamp) &&
+      Date.now() - latestTimestamp <= 7 * 24 * 60 * 60 * 1000;
 
     return {
-      targetId: candidate.targetId,
-      title: `Investigar ${candidate.targetLabel}`,
-      description: `Motivo: ${Array.from(new Set(candidate.reasons)).slice(0, 3).join(" + ")}. Evento mais recente em ${formatDateTime(candidate.lastEvent?.createdAt)}.`,
-      impact:
-        "Impacto: risco operacional crescente com possível efeito em receita, execução e governança.",
-      route: candidate.route,
-      score: candidate.score,
+      criticalEvents,
+      highEvents,
+      financeRiskEvents,
+      serviceOrderRiskEvents,
+      appointmentRiskEvents,
+      governanceEvents,
+      communicationFailures,
+      riskEvents,
+      suspendedEvents,
+      restrictedEvents,
+      latestEvent,
+      hasRecentEvent,
     };
   }, [filteredEvents]);
+
+  const operationalState = useMemo((): {
+    level: OperationalStateLevel;
+    reason: string;
+    impact: string;
+    detailsLabel: string;
+    onDetails: () => void;
+  } => {
+    const evidence = operationalEvidence;
+
+    if (evidence.suspendedEvents.length > 0) {
+      return {
+        level: "SUSPENDED",
+        reason: `${evidence.suspendedEvents.length} evento(s) retornaram estado SUSPENDED em metadados reais da Timeline.`,
+        impact:
+          "A prova oficial indica suspensão operacional; a próxima leitura deve preservar trilha e abrir governança antes de qualquer execução.",
+        detailsLabel: "Filtrar eventos suspensos",
+        onDetails: () => {
+          setSeverityFilter("critical");
+          setModuleFilter("governance");
+        },
+      };
+    }
+
+    if (
+      evidence.restrictedEvents.length >= 2 ||
+      evidence.criticalEvents.length >= 3 ||
+      evidence.governanceEvents.some(hasCriticalOperationalMetadata)
+    ) {
+      return {
+        level: "RESTRICTED",
+        reason: `${evidence.criticalEvents.length} crítico(s), ${evidence.restrictedEvents.length} restritivo(s) e ${evidence.governanceEvents.length} evidência(s) de governança no recorte.`,
+        impact:
+          "A Timeline deixou de ser apenas histórico e passa a apontar bloqueio ou investigação formal antes da continuidade operacional.",
+        detailsLabel: "Ver eventos críticos",
+        onDetails: () => setSeverityFilter("critical"),
+      };
+    }
+
+    if (
+      evidence.criticalEvents.length > 0 ||
+      evidence.highEvents.length > 0 ||
+      evidence.financeRiskEvents.length > 0 ||
+      evidence.serviceOrderRiskEvents.length > 0 ||
+      evidence.appointmentRiskEvents.length > 0 ||
+      evidence.communicationFailures.length > 0 ||
+      !evidence.hasRecentEvent
+    ) {
+      const reason = !evidence.hasRecentEvent
+        ? "Nenhum evento recente foi encontrado no recorte carregado; a prova operacional pode estar silenciosa."
+        : `${evidence.highEvents.length + evidence.criticalEvents.length} evento(s) de atenção, incluindo ${evidence.financeRiskEvents.length} financeiro(s), ${evidence.serviceOrderRiskEvents.length} O.S. e ${evidence.appointmentRiskEvents.length} agendamento(s).`;
+      return {
+        level: "WARNING",
+        reason,
+        impact:
+          "A evidência exige revisão dirigida para evitar perda de receita, atraso de execução ou lacuna de governança.",
+        detailsLabel: evidence.criticalEvents.length > 0
+          ? "Investigar críticos"
+          : "Revisar recorte",
+        onDetails: () => {
+          if (evidence.criticalEvents.length > 0) setSeverityFilter("critical");
+          else setSeverityFilter("high");
+        },
+      };
+    }
+
+    return {
+      level: "NORMAL",
+      reason: `${filteredEvents.length} evento(s) normais no recorte, sem sinais críticos ou restritivos detectados pelos dados carregados.`,
+      impact:
+        "A Timeline sustenta monitoramento regular: o histórico responde o que aconteceu, quando, quem fez e qual entidade foi afetada.",
+      detailsLabel: "Ver feed oficial",
+      onDetails: () => setSeverityFilter("all"),
+    };
+  }, [filteredEvents.length, operationalEvidence]);
+
+  const operationalRisk = useMemo(() => {
+    const evidence = operationalEvidence;
+    const pick = (items: TimelineEvent[]) => items[0] ?? null;
+    const selected =
+      pick(evidence.criticalEvents) ??
+      pick(evidence.financeRiskEvents) ??
+      pick(evidence.serviceOrderRiskEvents) ??
+      pick(evidence.appointmentRiskEvents) ??
+      pick(evidence.governanceEvents) ??
+      pick(evidence.communicationFailures) ??
+      null;
+
+    if (!selected) {
+      return {
+        title: "Sem risco dominante no recorte",
+        reason:
+          filteredEvents.length > 0
+            ? `${filteredEvents.length} evento(s) carregados sem cobrança vencida, O.S. travada, agendamento problemático ou governança restritiva identificável.`
+            : "Nenhum evento oficial foi retornado para calcular risco sem inventar evidência.",
+        impact:
+          "A leitura permanece auditável e deve ser usada para revisão de histórico recente, não para acionar bloqueios automáticos.",
+        ctaLabel: "Revisar histórico",
+        route: "/timeline",
+      };
+    }
+
+    const module = eventModule(selected);
+    const entity = `${eventEntityLabel(selected)} #${eventEntityId(selected)}`;
+    const when = formatDateTime(selected?.createdAt);
+
+    if (isFinancialRiskEvent(selected)) {
+      return {
+        title: "Risco financeiro evidenciado",
+        reason: `${entity} registrou evento financeiro de atenção em ${when}: ${eventReason(selected)}`,
+        impact:
+          "Pode afetar caixa, cobrança e governança de receita se não for tratado no módulo financeiro.",
+        ctaLabel: "Abrir financeiro",
+        route: "/finances",
+      };
+    }
+    if (isServiceOrderRiskEvent(selected)) {
+      return {
+        title: "Risco de execução em O.S.",
+        reason: `${entity} aparece com atraso, trava ou falha em ${when}: ${eventReason(selected)}`,
+        impact:
+          "Pode gerar retrabalho, SLA rompido e perda de rastreabilidade entre execução e cobrança.",
+        ctaLabel: "Abrir O.S.",
+        route: "/service-orders",
+      };
+    }
+    if (isAppointmentRiskEvent(selected)) {
+      return {
+        title: "Risco de entrada operacional",
+        reason: `${entity} teve cancelamento, no-show ou atraso registrado em ${when}: ${eventReason(selected)}`,
+        impact:
+          "Pode comprometer agenda, capacidade operacional e continuidade até O.S. ou cobrança.",
+        ctaLabel: "Abrir agendamentos",
+        route: "/appointments",
+      };
+    }
+    if (isGovernanceRiskEvent(selected)) {
+      return {
+        title: "Risco de governança operacional",
+        reason: `${entity} registrou evidência de estado/risco em ${when}: ${eventReason(selected)}`,
+        impact:
+          "Pode exigir decisão formal, auditoria ou restrição antes da próxima ação operacional.",
+        ctaLabel: "Abrir governança",
+        route: "/governance",
+      };
+    }
+    if (isCommunicationFailureEvent(selected)) {
+      return {
+        title: "Falha de comunicação registrada",
+        reason: `${entity} registrou falha de comunicação em ${when}: ${eventReason(selected)}`,
+        impact:
+          "Pode reduzir resposta operacional; a Timeline apenas evidencia a falha, sem criar novo fluxo de WhatsApp.",
+        ctaLabel: "Abrir contexto",
+        route: eventRoute(selected),
+      };
+    }
+
+    return {
+      title: module === "all" ? "Evento crítico operacional" : `Evento crítico em ${eventModuleLabel(module)}`,
+      reason: `${entity} registrou criticidade em ${when}: ${eventReason(selected)}`,
+      impact:
+        "A evidência deve ser investigada no módulo de origem e, se necessário, elevada para governança.",
+      ctaLabel: "Abrir contexto",
+      route: eventRoute(selected),
+    };
+  }, [filteredEvents.length, operationalEvidence]);
+
+  const nextBestAction = useMemo(() => {
+    const evidence = operationalEvidence;
+    const selected =
+      evidence.criticalEvents[0] ??
+      evidence.financeRiskEvents[0] ??
+      evidence.serviceOrderRiskEvents[0] ??
+      evidence.appointmentRiskEvents[0] ??
+      evidence.governanceEvents[0] ??
+      filteredEvents[0] ??
+      null;
+
+    if (!selected) {
+      return {
+        title: "Revisar histórico recente",
+        entity: "Timeline sem eventos oficiais no recorte",
+        reason:
+          "Não há evento real carregado para orientar investigação específica sem criar dados fictícios.",
+        impact:
+          "Mantém segurança da prova oficial e direciona o operador para gerar operação real ou abrir módulos principais.",
+        safetyNote:
+          "Nenhuma ação é executada automaticamente; ajuste filtros ou abra módulos operacionais para produzir evidência real.",
+        primaryActionLabel: "Limpar filtros",
+        primaryRoute: null as string | null,
+        secondaryActionLabel: "Abrir dashboard",
+        secondaryRoute: "/dashboard" as string | null,
+        applyPrimary: () => clearFilters(),
+      };
+    }
+
+    const entity = `${eventEntityLabel(selected)} #${eventEntityId(selected)}`;
+    const reason = `${eventReason(selected)} Evidência registrada em ${formatDateTime(selected?.createdAt)} por ${text(selected?.personName ?? selected?.actorName, "Sistema")}.`;
+    const base = {
+      entity,
+      reason,
+      safetyNote:
+        "Orientação baseada somente na Timeline carregada. O Nexo não executa ação automática; apenas navega para investigação.",
+      secondaryActionLabel: "Ver no feed",
+      secondaryRoute: "/timeline" as string | null,
+      applyPrimary: null as (() => void) | null,
+    };
+
+    if (evidence.criticalEvents[0] === selected) {
+      return {
+        ...base,
+        title: "Investigar evento crítico",
+        impact:
+          "Reduz risco de escalada operacional e preserva trilha para governança.",
+        primaryActionLabel: "Abrir contexto crítico",
+        primaryRoute: eventRoute(selected),
+      };
+    }
+    if (evidence.financeRiskEvents[0] === selected) {
+      return {
+        ...base,
+        title: "Abrir cobrança",
+        impact: "Prioriza recuperação de receita ou validação de pendência financeira.",
+        primaryActionLabel: "Abrir financeiro",
+        primaryRoute: "/finances",
+      };
+    }
+    if (evidence.serviceOrderRiskEvents[0] === selected) {
+      return {
+        ...base,
+        title: "Abrir O.S.",
+        impact: "Ajuda a destravar execução antes que vire falha de SLA ou cobrança.",
+        primaryActionLabel: "Abrir O.S.",
+        primaryRoute: "/service-orders",
+      };
+    }
+    if (evidence.appointmentRiskEvents[0] === selected) {
+      return {
+        ...base,
+        title: "Abrir agendamento",
+        impact: "Permite revisar entrada operacional problemática antes de nova execução.",
+        primaryActionLabel: "Abrir agendamento",
+        primaryRoute: "/appointments",
+      };
+    }
+    if (evidence.governanceEvents[0] === selected) {
+      return {
+        ...base,
+        title: "Abrir governança",
+        impact: "Conecta a evidência oficial à decisão, risco ou restrição operacional.",
+        primaryActionLabel: "Abrir governança",
+        primaryRoute: "/governance",
+      };
+    }
+
+    return {
+      ...base,
+      title: "Revisar histórico recente",
+      impact:
+        "Confirma a cadeia de evidências sem acionar fluxo desnecessário quando não há problema relevante.",
+      primaryActionLabel: "Ver evento selecionado",
+      primaryRoute: eventRoute(selected),
+    };
+  }, [filteredEvents, operationalEvidence]);
+
+  const operationalFlowStages = useMemo(
+    (): Array<{
+      id: string;
+      label: string;
+      summary: string;
+      state: OperationalFlowStageState;
+      countOrValue?: string;
+      hrefLabel?: string;
+      onClick?: () => void;
+    }> => [
+      {
+        id: "event",
+        label: "Evento",
+        summary:
+          filteredEvents.length > 0
+            ? "Eventos reais sustentam a prova oficial."
+            : "Sem evento real no recorte carregado.",
+        countOrValue: String(filteredEvents.length),
+        state: filteredEvents.length > 0 ? "done" : "idle",
+      },
+      {
+        id: "timeline",
+        label: "Timeline",
+        summary: isInitialLoading
+          ? "Feed ainda carregando."
+          : hasInitialError
+            ? "Falha no carregamento da prova."
+            : "Feed carregado como memória auditável.",
+        state: hasInitialError ? "blocked" : isInitialLoading ? "idle" : "active",
+        hrefLabel: "Ver feed",
+        onClick: () => setSeverityFilter("all"),
+      },
+      {
+        id: "risk",
+        label: "Risco",
+        summary:
+          operationalEvidence.riskEvents.length > 0
+            ? "Eventos indicam atenção ou restrição."
+            : "Sem risco dominante detectado.",
+        countOrValue: String(operationalEvidence.riskEvents.length),
+        state:
+          operationalState.level === "RESTRICTED" || operationalState.level === "SUSPENDED"
+            ? "blocked"
+            : operationalState.level === "WARNING"
+              ? "warning"
+              : "idle",
+        hrefLabel: "Filtrar risco",
+        onClick: () => setSeverityFilter("high"),
+      },
+      {
+        id: "governance",
+        label: "Governança",
+        summary:
+          operationalEvidence.governanceEvents.length > 0
+            ? "Há evidências de risco/estado operacional."
+            : "Sem evento de governança no recorte.",
+        countOrValue: String(operationalEvidence.governanceEvents.length),
+        state:
+          operationalEvidence.governanceEvents.some(hasCriticalOperationalMetadata)
+            ? "warning"
+            : operationalEvidence.governanceEvents.length > 0
+              ? "active"
+              : "idle",
+        hrefLabel: "Abrir governança",
+        onClick: () => navigate("/governance"),
+      },
+      {
+        id: "action",
+        label: "Ação",
+        summary: nextBestAction.title,
+        state: filteredEvents.length > 0 || nextBestAction.applyPrimary ? "active" : "idle",
+        hrefLabel: nextBestAction.primaryActionLabel,
+        onClick: () => {
+          if (nextBestAction.applyPrimary) nextBestAction.applyPrimary();
+          else if (nextBestAction.primaryRoute) navigate(nextBestAction.primaryRoute);
+        },
+      },
+    ],
+    [
+      filteredEvents.length,
+      hasInitialError,
+      isInitialLoading,
+      navigate,
+      nextBestAction,
+      operationalEvidence.governanceEvents,
+      operationalEvidence.riskEvents.length,
+      operationalState.level,
+    ]
+  );
+
+  const officialEvidenceEvents = useMemo(
+    () =>
+      [...filteredEvents]
+        .sort((a, b) => {
+          const severityWeight = { critical: 4, high: 3, medium: 2, low: 1 };
+          const severityDelta =
+            severityWeight[eventSeverity(b)] - severityWeight[eventSeverity(a)];
+          if (severityDelta !== 0) return severityDelta;
+          return (
+            new Date(String(b?.createdAt ?? 0)).getTime() -
+            new Date(String(a?.createdAt ?? 0)).getTime()
+          );
+        })
+        .slice(0, 4)
+        .map(event => ({
+          id: String(event?.id ?? `${eventEntityId(event)}-${event?.createdAt}`),
+          type: eventSeverityLabel(eventSeverity(event)),
+          occurredAt: formatDateTime(event?.createdAt),
+          entity: `${eventEntityLabel(event)} #${eventEntityId(event)}`,
+          actor: text(event?.personName ?? event?.actorName, "Sistema"),
+          summary: eventReason(event),
+        })),
+    [filteredEvents]
+  );
 
   function loadMore() {
     const last = events[events.length - 1];
@@ -998,123 +1356,56 @@ export default function TimelinePage() {
         }
       />
 
-      <div className="grid gap-3 lg:grid-cols-3">
-        <AppSectionBlock
-          title={operationalCopy.immediateAttention}
-          subtitle="Até 3 sinais críticos para ação imediata."
-          className="lg:col-span-2"
-        >
-          {immediateAttention.length === 0 ? (
-            <AppPageEmptyState
-              title="Sem alerta crítico no recorte"
-              description="A operação está estável neste período. Mantenha monitoramento ativo."
-            />
-          ) : (
-            <div className="grid gap-2 md:grid-cols-3">
-              {immediateAttention.map(alert => (
-                <article
-                  key={alert.id}
-                  className="rounded-xl border border-[var(--danger)] bg-[var(--surface-base)] p-3"
-                >
-                  <p className="text-sm font-semibold text-[var(--text-primary)]">
-                    {alert.title}
-                  </p>
-                  <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                    {alert.context}
-                  </p>
-                  <p className="mt-2 text-xs text-[var(--text-secondary)]">
-                    {alert.impact}
-                  </p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="mt-2"
-                    onClick={() => {
-                      setSelectedEventId(alert.id);
-                      navigate(alert.route);
-                    }}
-                  >
-                    Investigar agora
-                  </Button>
-                </article>
-              ))}
-            </div>
-          )}
-        </AppSectionBlock>
-
-        <AppSectionCard className="space-y-2.5">
-          <div>
-            <p className="nexo-overline">Próxima melhor ação</p>
-            <h2 className="mt-1 text-base font-semibold text-[var(--text-primary)]">
-              Recomendação contextual
-            </h2>
-            <p className="mt-1 text-sm text-[var(--text-secondary)]">
-              Sinal calculado a partir da timeline carregada para reduzir risco
-              operacional.
-            </p>
-          </div>
-          {nextAction ? (
-            <AppNextActionCard
-              title={nextAction.title}
-              description={`${nextAction.description} ${nextAction.impact}`}
-              severity={
-                nextAction.score >= 11
-                  ? "critical"
-                  : nextAction.score >= 7
-                    ? "high"
-                    : "medium"
-              }
-              metadata="Timeline oficial"
-              action={{
-                label: "Abrir histórico",
-                onClick: () => navigate(nextAction.route),
-              }}
-            />
-          ) : (
-            <AppPageEmptyState
-              title="Sem recomendação crítica"
-              description="Nenhuma sequência de risco detectada agora."
-            />
-          )}
-        </AppSectionCard>
+      <div className="grid gap-3 xl:grid-cols-3">
+        <OperationalStateCard
+          title="Estado da evidência operacional"
+          level={operationalState.level}
+          reason={operationalState.reason}
+          impact={operationalState.impact}
+          detailsLabel={operationalState.detailsLabel}
+          onDetails={operationalState.onDetails}
+        />
+        <OperationalRiskCard
+          title={operationalRisk.title}
+          reason={operationalRisk.reason}
+          impact={operationalRisk.impact}
+          ctaLabel={operationalRisk.ctaLabel}
+          onClick={() => navigate(operationalRisk.route)}
+        />
+        {/* Próxima melhor ação canônica */}
+        <NextBestActionCard
+          title={nextBestAction.title}
+          entity={nextBestAction.entity}
+          reason={nextBestAction.reason}
+          impact={nextBestAction.impact}
+          safetyNote={nextBestAction.safetyNote}
+          primaryActionLabel={nextBestAction.primaryActionLabel}
+          onPrimaryAction={() => {
+            if (nextBestAction.applyPrimary) nextBestAction.applyPrimary();
+            else if (nextBestAction.primaryRoute) navigate(nextBestAction.primaryRoute);
+          }}
+          secondaryActionLabel={nextBestAction.secondaryActionLabel}
+          onSecondaryAction={
+            nextBestAction.secondaryRoute
+              ? () => navigate(nextBestAction.secondaryRoute ?? "/timeline")
+              : undefined
+          }
+        />
       </div>
 
-      <AppSectionBlock
-        title="Pulso auditável"
-        subtitle="Volume, criticidade, financeiro e governança do recorte."
-      >
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <AppStatCard
-            label="Eventos hoje"
-            value={
-              filteredEvents.filter(item => {
-                const date = new Date(String(item?.createdAt ?? ""));
-                return (
-                  !Number.isNaN(date.getTime()) &&
-                  date.toDateString() === new Date().toDateString()
-                );
-              }).length
-            }
-            helper="Volume do dia"
-          />
-          <AppStatCard
-            label="Eventos críticos"
-            value={summary.critical}
-            helper="Exigem resposta"
-          />
-          <AppStatCard
-            label="Pagamentos recebidos"
-            value={summary.payments}
-            helper="Sinal financeiro"
-          />
-          <AppStatCard
-            label="Mudanças de estado"
-            value={summary.opStateChanges}
-            helper="Governança operacional"
-          />
-        </div>
-      </AppSectionBlock>
+      <OperationalFlowCard
+        title="Evento → Timeline → Risco → Governança → Ação"
+        subtitle="A Timeline funciona como prova oficial: registra o evento, revela risco e orienta a próxima investigação sem executar ação automática."
+        stages={operationalFlowStages}
+      />
+
+      <EntityTimelineCard
+        title="Eventos oficiais mais relevantes"
+        subtitle="Até 4 eventos reais normalizados pelo recorte atual para responder o que aconteceu, quando, quem fez e qual entidade foi afetada."
+        events={officialEvidenceEvents}
+        fullTimelineLabel="Ver feed filtrado"
+        onFullTimeline={() => setSeverityFilter("all")}
+      />
 
       <AppSectionBlock
         title="Filtros"
