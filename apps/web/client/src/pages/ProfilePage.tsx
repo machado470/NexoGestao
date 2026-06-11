@@ -1,15 +1,6 @@
 import { useMemo } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import {
-  EntityTimelineCard,
-  NextBestActionCard,
-  OperationalFlowCard,
-  OperationalRiskCard,
-  OperationalStateCard,
-  type OperationalFlowStageState,
-  type OperationalStateLevel,
-} from "@/components/app/OperationalCommandLayer";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import {
   AppDataTable,
@@ -75,6 +66,17 @@ function averageMinutes(items: any[]) {
     durations.reduce((total, item) => total + item, 0) / durations.length
   );
   return avg < 60 ? `${avg} min` : `${Math.floor(avg / 60)}h ${avg % 60}min`;
+}
+
+function compactTitle(item: any, fallback: string) {
+  return String(
+    item?.title ??
+      item?.name ??
+      item?.serviceName ??
+      item?.code ??
+      item?.id ??
+      fallback
+  );
 }
 
 export default function ProfilePage() {
@@ -241,453 +243,173 @@ export default function ProfilePage() {
     0
   );
   const assignedWorkload = pendingOrders.length + pendingAppointments.length;
-  const isOverloaded =
-    assignedWorkload >= 12 ||
-    pendingOrders.length >= 8 ||
-    pendingAppointments.length >= 8;
   const hasLowActivityWithWork = assignedWorkload > 0 && !hasRecentActivity;
   const hasInsufficientPermissionSignal = Boolean(
     me.permissionsRequired && permissionCount === 0
   );
+  const criticalPendingCount =
+    delayedOrders.length +
+    overdueAppointments.length +
+    (hasInsufficientPermissionSignal ? 1 : 0);
+  const hasAnyExecutionSignal =
+    myOrders.length > 0 || myAppointments.length > 0 || assignedWorkload > 0;
+  const hasPerformanceSignal =
+    completedOrders.length > 0 ||
+    delayedOrders.length > 0 ||
+    failedOrders.length > 0;
 
-  const operationRows = [
-    {
-      label: "Minhas O.S.",
-      value: String(myOrders.length),
-      detail: `${pendingOrders.length} pendente(s)`,
-      path: "/service-orders?scope=mine",
-    },
-    {
-      label: "Meus agendamentos",
-      value: String(myAppointments.length),
-      detail: `${pendingAppointments.length} pendente(s)`,
-      path: "/appointments?scope=mine",
-    },
-    {
-      label: "Minhas pendências",
-      value: String(assignedWorkload),
-      detail:
-        delayedOrders.length || overdueAppointments.length
-          ? `${delayedOrders.length + overdueAppointments.length} atraso(s)`
-          : "Sem atraso crítico",
-      path: "/service-orders?scope=mine&status=open",
-    },
-  ];
-
-  const operationalState = useMemo((): {
-    level: OperationalStateLevel;
-    reason: string;
-    impact: string;
-    detailsLabel: string;
-    detailsPath: string;
-  } => {
-    if (
-      String(me.status ?? me.person?.status ?? "").toUpperCase() === "SUSPENDED"
-    ) {
-      return {
-        level: "SUSPENDED",
-        reason:
-          "O usuário veio com status real de suspensão no cadastro carregado.",
-        impact:
-          "Evita atribuir execução individual sem validação de responsabilidade e permissões.",
-        detailsLabel: "Revisar permissões",
-        detailsPath: "/settings",
-      };
-    }
-    if (delayedOrders.length || overdueAppointments.length || isOverloaded) {
-      return {
-        level: "RESTRICTED",
-        reason: delayedOrders.length
-          ? `${delayedOrders.length} O.S. atribuída(s) a mim estão atrasadas.`
-          : isOverloaded
-            ? `${assignedWorkload} item(ns) ativos indicam sobrecarga pessoal.`
-            : `${overdueAppointments.length} agendamento(s) atribuídos a mim estão pendentes no passado.`,
-        impact:
-          "Execução, agenda e governança podem depender de intervenção antes de receber novas prioridades.",
-        detailsLabel: delayedOrders.length
-          ? "Destravar O.S."
-          : "Revisar prioridades",
-        detailsPath: delayedOrders.length
-          ? "/service-orders?scope=mine&status=open"
-          : "/appointments?scope=mine",
-      };
-    }
-    if (
-      pendingOrders.length ||
-      pendingAppointments.length ||
-      hasLowActivityWithWork ||
-      hasInsufficientPermissionSignal
-    ) {
-      return {
-        level: "WARNING",
-        reason: hasLowActivityWithWork
-          ? "Há itens atribuídos a mim sem atividade recente disponível na leitura."
-          : `${pendingOrders.length} O.S. e ${pendingAppointments.length} agendamento(s) exigem acompanhamento.`,
-        impact:
-          "A fila individual deve ser revisada para manter prazos, evidência e continuidade operacional.",
-        detailsLabel: "Abrir minha fila",
-        detailsPath: "/service-orders?scope=mine",
-      };
-    }
-    return {
-      level: "NORMAL",
-      reason:
-        "Não há pendência relevante atribuída a mim no recorte carregado.",
-      impact:
-        "A operação individual está apta para revisão preventiva, acompanhamento de Timeline e novas prioridades.",
-      detailsLabel: "Revisar operação",
-      detailsPath: "/timeline?scope=mine",
-    };
-  }, [
-    assignedWorkload,
-    delayedOrders.length,
-    hasInsufficientPermissionSignal,
-    hasLowActivityWithWork,
-    isOverloaded,
-    me.person?.status,
-    me.status,
-    overdueAppointments.length,
-    pendingAppointments.length,
-    pendingOrders.length,
-  ]);
-
-  const riskReading = useMemo(() => {
+  const nextAction = useMemo(() => {
     if (delayedOrders.length) {
       return {
-        title: "O.S. atrasadas sob minha responsabilidade",
-        reason: `${delayedOrders.length} de ${pendingOrders.length} O.S. pendente(s) atribuídas a mim estão vencidas no recorte atual.`,
-        impact:
-          "Pode travar execução, comprometer agenda futura e acionar governança sobre responsabilidade individual.",
-        ctaLabel: "Abrir O.S. atrasadas",
+        label: "Destravar O.S. atrasadas",
+        detail: `${delayedOrders.length} O.S. atribuída(s) a mim estão vencidas.`,
         path: "/service-orders?scope=mine&status=open",
       };
     }
     if (overdueAppointments.length) {
       return {
-        title: "Agenda individual pendente no passado",
-        reason: `${overdueAppointments.length} agendamento(s) atribuídos a mim seguem pendentes com data anterior a agora.`,
-        impact:
-          "Pode gerar O.S. sem entrada validada, perda de prova de atendimento e retrabalho operacional.",
-        ctaLabel: "Revisar agenda",
+        label: "Revisar agenda vencida",
+        detail: `${overdueAppointments.length} agendamento(s) pendente(s) ficaram no passado.`,
         path: "/appointments?scope=mine",
       };
     }
-    if (isOverloaded) {
+    if (pendingOrders.length) {
       return {
-        title: "Sobrecarga pessoal detectada",
-        reason: `${assignedWorkload} item(ns) ativos estão vinculados a mim entre O.S. e agendamentos.`,
-        impact:
-          "A priorização fica vulnerável e pode afetar execução, SLA, financeiro decorrente e governança.",
-        ctaLabel: "Revisar prioridades",
+        label: "Continuar minhas O.S.",
+        detail: `${pendingOrders.length} O.S. aberta(s) sob minha responsabilidade.`,
         path: "/service-orders?scope=mine",
+      };
+    }
+    if (pendingAppointments.length) {
+      return {
+        label: "Preparar próximos agendamentos",
+        detail: `${pendingAppointments.length} agendamento(s) atribuídos a mim.`,
+        path: "/appointments?scope=mine",
       };
     }
     if (hasLowActivityWithWork) {
       return {
-        title: "Baixa atividade com itens atribuídos",
-        reason:
-          "Há trabalho vinculado a mim, mas a página não recebeu atividade recente do usuário.",
-        impact:
-          "A Timeline pode ficar sem prova suficiente sobre andamento, decisão e responsabilidade.",
-        ctaLabel: "Atualizar andamento",
+        label: "Atualizar andamento",
+        detail: "Há trabalho comigo sem atividade recente disponível.",
         path: "/timeline?scope=mine",
       };
     }
     if (hasInsufficientPermissionSignal) {
       return {
-        title: "Permissão insuficiente para ação crítica",
-        reason:
-          "O payload informa necessidade de permissão, mas não retornou permissão acionável para este usuário.",
-        impact:
-          "A execução pode depender de apoio de governança ou de um responsável com alçada adequada.",
-        ctaLabel: "Solicitar apoio",
+        label: "Solicitar apoio de alçada",
+        detail:
+          "Permissões acionáveis não foram retornadas para uma necessidade crítica.",
         path: "/governance",
       };
     }
     return {
-      title: "Sem risco individual dominante",
-      reason:
-        "Não há O.S. atrasada, agendamento vencido, sobrecarga ou silêncio operacional relevante no recorte carregado.",
-      impact:
-        "A leitura permanece preventiva; continue acompanhando fila, Timeline e permissões sem criar risco genérico.",
-      ctaLabel: "Abrir Timeline",
-      path: "/timeline?scope=mine",
+      label: "Nenhuma pendência atribuída agora.",
+      detail: "Fila individual saudável no recorte carregado.",
+      path: "/service-orders?scope=mine",
     };
   }, [
-    assignedWorkload,
     delayedOrders.length,
     hasInsufficientPermissionSignal,
     hasLowActivityWithWork,
-    isOverloaded,
-    overdueAppointments.length,
-    pendingOrders.length,
-  ]);
-
-  const nextBestAction = useMemo(() => {
-    if (delayedOrders.length) {
-      return {
-        title: "Destravar minhas O.S.",
-        entity: `${delayedOrders.length} O.S. atrasada(s)`,
-        reason: "O atraso é o sinal mais crítico ligado à minha execução.",
-        impact: "Reduz bloqueio de entrega, retrabalho e risco de intervenção.",
-        primaryActionLabel: "Abrir minhas O.S.",
-        primaryPath: "/service-orders?scope=mine&status=open",
-        secondaryActionLabel: "Ver prova",
-        secondaryPath: "/timeline?scope=mine",
-      };
-    }
-    if (pendingAppointments.length) {
-      return {
-        title: "Revisar minha agenda",
-        entity: `${pendingAppointments.length} agendamento(s) pendente(s)`,
-        reason:
-          "A agenda é a entrada operacional que pode gerar ou destravar execução.",
-        impact: "Confirma prioridades do dia e evita O.S. sem contexto.",
-        primaryActionLabel: "Abrir agenda",
-        primaryPath: "/appointments?scope=mine",
-        secondaryActionLabel: "Abrir O.S.",
-        secondaryPath: "/service-orders?scope=mine",
-      };
-    }
-    if (isOverloaded) {
-      return {
-        title: "Revisar prioridades",
-        entity: `${assignedWorkload} item(ns) ativos`,
-        reason: "A carga pessoal ultrapassa o limite seguro desta leitura.",
-        impact:
-          "Organiza sequência de execução e reduz risco de atraso encadeado.",
-        primaryActionLabel: "Abrir fila",
-        primaryPath: "/service-orders?scope=mine",
-        secondaryActionLabel: "Ver governança",
-        secondaryPath: "/governance",
-      };
-    }
-    if (hasLowActivityWithWork) {
-      return {
-        title: "Atualizar andamento",
-        entity: "Minha Timeline operacional",
-        reason: "Há itens comigo sem atividade recente disponível.",
-        impact: "Melhora prova oficial e reduz dúvida sobre responsabilidade.",
-        primaryActionLabel: "Abrir Timeline",
-        primaryPath: "/timeline?scope=mine",
-        secondaryActionLabel: "Abrir fila",
-        secondaryPath: "/service-orders?scope=mine",
-      };
-    }
-    if (hasInsufficientPermissionSignal) {
-      return {
-        title: "Solicitar apoio",
-        entity: "Permissões do usuário",
-        reason:
-          "A leitura indica possível alçada insuficiente para uma ação crítica.",
-        impact:
-          "Evita tentativa de execução sem autorização e direciona para suporte operacional.",
-        primaryActionLabel: "Abrir governança",
-        primaryPath: "/governance",
-        secondaryActionLabel: "Ver permissões",
-        secondaryPath: "/settings",
-      };
-    }
-    return {
-      title: "Revisar minha operação",
-      entity: name,
-      reason: "Não há pendência crítica no recorte carregado.",
-      impact:
-        "Mantém a fila individual auditável e pronta para novas prioridades.",
-      primaryActionLabel: "Abrir Timeline",
-      primaryPath: "/timeline?scope=mine",
-      secondaryActionLabel: "Abrir minha fila",
-      secondaryPath: "/service-orders?scope=mine",
-    };
-  }, [
-    assignedWorkload,
-    delayedOrders.length,
-    hasInsufficientPermissionSignal,
-    hasLowActivityWithWork,
-    isOverloaded,
-    name,
-    pendingAppointments.length,
-  ]);
-
-  const flowStages = useMemo<
-    Array<{
-      id: string;
-      label: string;
-      summary: string;
-      state: OperationalFlowStageState;
-      countOrValue?: string;
-      hrefLabel?: string;
-      onClick?: () => void;
-    }>
-  >(() => {
-    const orderState: OperationalFlowStageState = delayedOrders.length
-      ? "blocked"
-      : pendingOrders.length
-        ? "warning"
-        : completedOrders.length
-          ? "done"
-          : "idle";
-    const riskState: OperationalFlowStageState =
-      operationalState.level === "RESTRICTED"
-        ? "warning"
-        : operationalState.level === "SUSPENDED"
-          ? "blocked"
-          : "done";
-    return [
-      {
-        id: "profile",
-        label: "Perfil",
-        countOrValue: name,
-        summary: `Função ${role} em ${organization}.`,
-        state: meQuery.isLoading ? "idle" : "done",
-        hrefLabel: "Atualizar",
-        onClick: () => void meQuery.refetch(),
-      },
-      {
-        id: "tasks",
-        label: "Minhas tarefas",
-        countOrValue: String(assignedWorkload),
-        summary: assignedWorkload
-          ? "Pendências pessoais em O.S. e agenda."
-          : "Sem tarefa atribuída no recorte.",
-        state: assignedWorkload
-          ? delayedOrders.length || overdueAppointments.length
-            ? "warning"
-            : "active"
-          : "idle",
-        hrefLabel: "Abrir fila",
-        onClick: () => navigate("/service-orders?scope=mine"),
-      },
-      {
-        id: "appointments",
-        label: "Agendamentos",
-        countOrValue: String(myAppointments.length),
-        summary: pendingAppointments.length
-          ? `${pendingAppointments.length} compromisso(s) pendente(s).`
-          : "Sem agenda pendente retornada.",
-        state: pendingAppointments.length
-          ? overdueAppointments.length
-            ? "warning"
-            : "active"
-          : "idle",
-        hrefLabel: "Abrir agenda",
-        onClick: () => navigate("/appointments?scope=mine"),
-      },
-      {
-        id: "orders",
-        label: "O.S.",
-        countOrValue: String(myOrders.length),
-        summary: delayedOrders.length
-          ? "Há O.S. atrasada comigo."
-          : pendingOrders.length
-            ? "Execução aberta sob minha responsabilidade."
-            : completedOrders.length
-              ? "Execução concluída no recorte."
-              : "Sem O.S. atribuída retornada.",
-        state: orderState,
-        hrefLabel: "Abrir O.S.",
-        onClick: () => navigate("/service-orders?scope=mine"),
-      },
-      {
-        id: "finance",
-        label: "Financeiro",
-        countOrValue: revenueCents ? currencyBRL(revenueCents) : undefined,
-        summary: revenueCents
-          ? "Receita paga vinculada à minha execução."
-          : "Sem dado financeiro atribuído ao usuário.",
-        state: revenueCents ? "active" : "idle",
-        hrefLabel: "Abrir financeiro",
-        onClick: () => navigate("/finances"),
-      },
-      {
-        id: "timeline",
-        label: "Timeline",
-        countOrValue: String(myTimeline.length),
-        summary: myTimeline.length
-          ? "Prova oficial vinculada a mim."
-          : "Sem evento oficial individual retornado.",
-        state: myTimeline.length ? "done" : "idle",
-        hrefLabel: "Abrir Timeline",
-        onClick: () => navigate("/timeline?scope=mine"),
-      },
-      {
-        id: "risk",
-        label: "Risco/Gov.",
-        countOrValue: operationalState.level,
-        summary:
-          operationalState.level === "NORMAL"
-            ? "Leitura saudável no recorte."
-            : "Risco individual exige atenção.",
-        state: riskState,
-        hrefLabel: "Abrir governança",
-        onClick: () => navigate("/governance"),
-      },
-    ];
-  }, [
-    assignedWorkload,
-    completedOrders.length,
-    delayedOrders.length,
-    meQuery,
-    myAppointments.length,
-    myOrders.length,
-    myTimeline.length,
-    navigate,
-    operationalState.level,
-    organization,
     overdueAppointments.length,
     pendingAppointments.length,
     pendingOrders.length,
-    revenueCents,
-    role,
-    name,
   ]);
 
-  const timelineEvents = useMemo(() => {
-    const officialEvents = myTimeline
-      .slice(0, 4)
-      .map((item: any, index: number) => ({
-        id: String(item?.id ?? `timeline-${index}`),
-        type: String(
-          item?.status ?? item?.severity ?? item?.type ?? "Registrado"
-        ),
-        occurredAt: formatDateTime(item?.createdAt ?? item?.occurredAt),
-        entity: String(
-          item?.title ?? item?.event ?? item?.action ?? "Evento operacional"
-        ),
-        actor: String(item?.actorName ?? item?.personName ?? name),
-        summary: String(
-          item?.description ??
-            item?.message ??
-            "Evento oficial associado ao meu trabalho."
-        ),
-      }));
-    if (officialEvents.length) return officialEvents;
-    return [
-      ...myOrders.slice(0, 2).map((item: any, index: number) => ({
-        id: `order-${String(item?.id ?? index)}`,
-        type: "O.S. atribuída",
-        occurredAt: formatDateTime(item?.updatedAt ?? item?.createdAt),
-        entity: String(
-          item?.title ?? item?.code ?? item?.id ?? "Ordem de serviço"
-        ),
-        actor: name,
-        summary: `Sinal contextual derivado de O.S. real com status ${statusLabel(item?.status)}. Não substitui a Timeline oficial.`,
-      })),
-      ...myAppointments.slice(0, 2).map((item: any, index: number) => ({
-        id: `appointment-${String(item?.id ?? index)}`,
-        type: "Agendamento",
-        occurredAt: formatDateTime(
-          item?.scheduledAt ?? item?.startAt ?? item?.createdAt
-        ),
-        entity: String(
-          item?.title ?? item?.serviceName ?? item?.id ?? "Agendamento"
-        ),
-        actor: name,
-        summary:
-          "Sinal contextual derivado de agendamento real atribuído ao usuário. Não substitui a Timeline oficial.",
-      })),
-    ].slice(0, 4);
-  }, [myAppointments, myOrders, myTimeline, name]);
+  const queueItems = [
+    pendingOrders.length
+      ? {
+          label: "O.S. atribuídas",
+          value: String(pendingOrders.length),
+          detail: delayedOrders.length
+            ? `${delayedOrders.length} atrasada(s)`
+            : "Abertas para execução",
+          path: "/service-orders?scope=mine",
+        }
+      : null,
+    pendingAppointments.length
+      ? {
+          label: "Agendamentos atribuídos",
+          value: String(pendingAppointments.length),
+          detail: overdueAppointments.length
+            ? `${overdueAppointments.length} vencido(s)`
+            : "Próximos compromissos",
+          path: "/appointments?scope=mine",
+        }
+      : null,
+    criticalPendingCount
+      ? {
+          label: "Pendências críticas",
+          value: String(criticalPendingCount),
+          detail: "Exigem minha ação ou apoio de alçada",
+          path: delayedOrders.length
+            ? "/service-orders?scope=mine&status=open"
+            : "/appointments?scope=mine",
+        }
+      : null,
+    {
+      label: "Próxima ação individual",
+      value: nextAction.label,
+      detail: nextAction.detail,
+      path: nextAction.path,
+    },
+  ].filter(Boolean) as Array<{
+    label: string;
+    value: string;
+    detail: string;
+    path: string;
+  }>;
+
+  const operationRows = [
+    myOrders.length
+      ? {
+          label: "Minhas O.S.",
+          value: String(myOrders.length),
+          detail: `${pendingOrders.length} pendente(s)`,
+          path: "/service-orders?scope=mine",
+        }
+      : null,
+    myAppointments.length
+      ? {
+          label: "Meus agendamentos",
+          value: String(myAppointments.length),
+          detail: `${pendingAppointments.length} pendente(s)`,
+          path: "/appointments?scope=mine",
+        }
+      : null,
+    criticalPendingCount
+      ? {
+          label: "Minhas pendências",
+          value: String(criticalPendingCount),
+          detail: "Ação individual necessária",
+          path: nextAction.path,
+        }
+      : null,
+  ].filter(Boolean) as Array<{
+    label: string;
+    value: string;
+    detail: string;
+    path: string;
+  }>;
+
+  const timelineEvents = myTimeline
+    .slice(0, 3)
+    .map((item: any, index: number) => ({
+      id: String(item?.id ?? `timeline-${index}`),
+      type: String(
+        item?.status ?? item?.severity ?? item?.type ?? "Registrado"
+      ),
+      occurredAt: formatDateTime(item?.createdAt ?? item?.occurredAt),
+      entity: String(
+        item?.title ?? item?.event ?? item?.action ?? "Evento operacional"
+      ),
+      actor: String(item?.actorName ?? item?.personName ?? name),
+      summary: String(
+        item?.description ??
+          item?.message ??
+          "Evento oficial associado ao meu trabalho."
+      ),
+    }));
 
   const permissionLabels = permissions
     .slice(0, 8)
@@ -697,13 +419,13 @@ export default function ProfilePage() {
 
   return (
     <PageWrapper
-      title="Perfil"
-      subtitle="Central individual de execução, performance e preferências operacionais."
+      title="Meu Trabalho"
+      subtitle="Central individual simples para fila, histórico, preferências e permissões."
     >
       <AppPageShell>
         <AppOperationalHeader
           title={name}
-          description="Use este perfil para decidir o que executar agora, acompanhar sua performance e ajustar sua forma de trabalho."
+          description={`${role} em ${organization}. Status: ${availability}. Última atividade: ${formatDateTime(lastActivity)}.`}
           primaryAction={
             <Button onClick={() => navigate("/service-orders?scope=mine")}>
               Abrir minha fila
@@ -728,10 +450,8 @@ export default function ProfilePage() {
           contextChips={
             <>
               <AppStatusBadge label={role} />
+              <AppStatusBadge label={organization} />
               <AppStatusBadge label={String(availability)} />
-              <AppStatusBadge
-                label={`Última atividade ${formatDateTime(lastActivity)}`}
-              />
             </>
           }
         />
@@ -753,116 +473,233 @@ export default function ProfilePage() {
           </div>
         </AppFiltersBar>
 
-        <section className="grid gap-4 xl:grid-cols-3">
-          <OperationalStateCard
-            title="Estado operacional individual"
-            level={operationalState.level}
-            reason={operationalState.reason}
-            impact={operationalState.impact}
-            detailsLabel={operationalState.detailsLabel}
-            onDetails={() => navigate(operationalState.detailsPath)}
-          />
-          <OperationalRiskCard
-            title={riskReading.title}
-            reason={riskReading.reason}
-            impact={riskReading.impact}
-            ctaLabel={riskReading.ctaLabel}
-            onClick={() => navigate(riskReading.path)}
-          />
-          <NextBestActionCard
-            title={nextBestAction.title}
-            entity={nextBestAction.entity}
-            reason={nextBestAction.reason}
-            impact={nextBestAction.impact}
-            safetyNote="Esta ação apenas orienta e navega para módulos existentes. Nenhuma O.S., agenda, permissão, governança ou comunicação é executada automaticamente."
-            primaryActionLabel={nextBestAction.primaryActionLabel}
-            onPrimaryAction={() => navigate(nextBestAction.primaryPath)}
-            secondaryActionLabel={nextBestAction.secondaryActionLabel}
-            onSecondaryAction={() => navigate(nextBestAction.secondaryPath)}
-          />
-        </section>
+        <AppSectionBlock
+          title="Minha fila agora"
+          subtitle="Somente o que está comigo neste momento. Sem contadores vazios espalhados."
+        >
+          {assignedWorkload === 0 && criticalPendingCount === 0 ? (
+            <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-4 text-sm text-[var(--text-secondary)]">
+              <strong className="text-[var(--text-primary)]">
+                Nenhuma pendência atribuída agora.
+              </strong>{" "}
+              Sua fila individual está saudável no recorte carregado.
+            </div>
+          ) : (
+            <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
+              {queueItems.slice(0, 4).map(item => (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => navigate(item.path)}
+                  className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-4 text-left transition hover:border-[var(--color-primary)]/60"
+                >
+                  <span className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                    {item.label}
+                  </span>
+                  <strong className="mt-2 block text-lg text-[var(--text-primary)]">
+                    {item.value}
+                  </strong>
+                  <span className="mt-1 block text-xs text-[var(--text-secondary)]">
+                    {item.detail}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </AppSectionBlock>
 
-        <OperationalFlowCard
-          title="Fluxo individual de execução"
-          subtitle="Perfil → Minhas tarefas → Agendamentos → O.S. → Financeiro → Timeline → Risco/Governança"
-          stages={flowStages}
-        />
+        {hasAnyExecutionSignal && operationRows.length > 0 && (
+          <AppSectionBlock
+            title="Minha operação"
+            subtitle="Resumo compacto de O.S., agendamentos e pendências reais atribuídas a mim."
+          >
+            <AppKpiRow
+              items={operationRows.map(item => ({
+                title: item.label,
+                value: item.value,
+                hint: item.detail,
+                onClick: () => navigate(item.path),
+              }))}
+              gridClassName="xl:grid-cols-3"
+            />
+          </AppSectionBlock>
+        )}
 
-        <EntityTimelineCard
-          title="Minha Timeline operacional"
-          subtitle="Prova operacional do usuário. Sinais contextuais derivados de dados reais aparecem apenas quando a Timeline oficial individual não retorna eventos."
-          events={timelineEvents}
-          fullTimelineLabel="Abrir Timeline oficial"
-          onFullTimeline={() => navigate("/timeline?scope=mine")}
-        />
+        {pendingOrders.length > 0 && (
+          <AppSectionBlock
+            title="Minhas O.S."
+            subtitle="Até 5 ordens abertas para execução direta."
+          >
+            <AppDataTable className="min-w-[720px]">
+              <thead>
+                <tr className="border-b border-[var(--border-subtle)] text-left text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                  <th className="px-3 py-2">O.S.</th>
+                  <th className="px-3 py-2">Status</th>
+                  <th className="px-3 py-2">Prazo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendingOrders.slice(0, 5).map((item: any, index: number) => (
+                  <tr
+                    key={String(item?.id ?? index)}
+                    className="border-b border-[var(--border-subtle)]/60"
+                  >
+                    <td className="px-3 py-3 font-medium text-[var(--text-primary)]">
+                      {compactTitle(item, "Ordem de serviço")}
+                    </td>
+                    <td className="px-3 py-3">
+                      <AppStatusBadge label={statusLabel(item?.status)} />
+                    </td>
+                    <td className="px-3 py-3 text-[var(--text-secondary)]">
+                      {formatDateTime(
+                        item?.dueDate ??
+                          item?.scheduledEndAt ??
+                          item?.deadlineAt
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </AppDataTable>
+          </AppSectionBlock>
+        )}
+
+        {pendingAppointments.length > 0 && (
+          <AppSectionBlock
+            title="Meus agendamentos"
+            subtitle="Até 5 compromissos atribuídos para preparação rápida."
+          >
+            <AppDataTable className="min-w-[720px]">
+              <thead>
+                <tr className="border-b border-[var(--border-subtle)] text-left text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                  <th className="px-3 py-2">Agendamento</th>
+                  <th className="px-3 py-2">Status</th>
+                  <th className="px-3 py-2">Quando</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendingAppointments
+                  .slice(0, 5)
+                  .map((item: any, index: number) => (
+                    <tr
+                      key={String(item?.id ?? index)}
+                      className="border-b border-[var(--border-subtle)]/60"
+                    >
+                      <td className="px-3 py-3 font-medium text-[var(--text-primary)]">
+                        {compactTitle(item, "Agendamento")}
+                      </td>
+                      <td className="px-3 py-3">
+                        <AppStatusBadge label={statusLabel(item?.status)} />
+                      </td>
+                      <td className="px-3 py-3 text-[var(--text-secondary)]">
+                        {formatDateTime(
+                          item?.scheduledAt ?? item?.startAt ?? item?.date
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </AppDataTable>
+          </AppSectionBlock>
+        )}
 
         <AppSectionBlock
-          title="Minha operação"
-          subtitle="O.S., agendamentos e pendências que dependem diretamente de mim."
+          title="Minha atividade recente"
+          subtitle="Eventos oficiais individuais, limitados ao que ajuda a leitura rápida."
         >
-          <AppKpiRow
-            items={operationRows.map(item => ({
-              title: item.label,
-              value: item.value,
-              hint: item.detail,
-              onClick: () => navigate(item.path),
-            }))}
-            gridClassName="xl:grid-cols-3"
-          />
+          {timelineEvents.length > 0 ? (
+            <div className="space-y-3">
+              {timelineEvents.map(event => (
+                <div
+                  key={event.id}
+                  className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-4"
+                >
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
+                    <AppStatusBadge label={event.type} />
+                    <span>{event.occurredAt}</span>
+                    <span>{event.actor}</span>
+                  </div>
+                  <strong className="mt-2 block text-sm text-[var(--text-primary)]">
+                    {event.entity}
+                  </strong>
+                  <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                    {event.summary}
+                  </p>
+                </div>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate("/timeline?scope=mine")}
+              >
+                Abrir Timeline oficial
+              </Button>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-4 text-sm text-[var(--text-secondary)]">
+              Nenhum evento individual retornado.
+            </div>
+          )}
         </AppSectionBlock>
 
         <AppSectionBlock
           title="Minha performance"
-          subtitle="Conclusões, atrasos, falhas e tempo médio de execução."
+          subtitle="Conclusões, atrasos, falhas e tempo médio sem cartões zerados redundantes."
         >
-          <AppKpiRow
-            items={[
-              {
-                title: "Concluídas",
-                value: String(completedOrders.length),
-                hint: "O.S. finalizadas por mim.",
-              },
-              {
-                title: "Atrasos",
-                value: String(delayedOrders.length),
-                hint: "Pendências vencidas.",
-              },
-              {
-                title: "Falhas",
-                value: String(failedOrders.length),
-                hint: "Canceladas ou marcadas como falha.",
-              },
-              {
-                title: "Tempo médio",
-                value: averageMinutes(completedOrders),
-                hint: "Média entre início e conclusão.",
-              },
-            ]}
-          />
+          {hasPerformanceSignal ? (
+            <AppKpiRow
+              items={[
+                {
+                  title: "Concluídas",
+                  value: String(completedOrders.length),
+                  hint: "O.S. finalizadas por mim.",
+                },
+                {
+                  title: "Atrasos",
+                  value: String(delayedOrders.length),
+                  hint: "Pendências vencidas.",
+                },
+                {
+                  title: "Falhas",
+                  value: String(failedOrders.length),
+                  hint: "Canceladas ou marcadas como falha.",
+                },
+                {
+                  title: "Tempo médio",
+                  value: averageMinutes(completedOrders),
+                  hint: "Média entre início e conclusão.",
+                },
+              ]}
+            />
+          ) : (
+            <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-4 text-sm text-[var(--text-secondary)]">
+              Sem execução atribuída no período.
+            </div>
+          )}
         </AppSectionBlock>
 
-        <AppSectionBlock
-          title="Impacto financeiro"
-          subtitle="Serviços executados e valor movimentado ligado à minha execução."
-        >
-          <AppKpiRow
-            items={[
-              {
-                title: "Serviços executados",
-                value: String(completedOrders.length),
-                hint: "Base de O.S. concluídas.",
-              },
-              {
-                title: "Valor movimentado",
-                value: currencyBRL(revenueCents),
-                hint: revenueCents
-                  ? "Cobranças pagas atribuídas a mim."
-                  : "Sem dado financeiro atribuído ao usuário no recorte.",
-              },
-            ]}
-            gridClassName="xl:grid-cols-2"
-          />
-        </AppSectionBlock>
+        {revenueCents > 0 && (
+          <AppSectionBlock
+            title="Impacto financeiro"
+            subtitle="Exibido somente quando há valor pago atribuído ao usuário."
+          >
+            <AppKpiRow
+              items={[
+                {
+                  title: "Serviços executados",
+                  value: String(completedOrders.length),
+                  hint: "Base de O.S. concluídas.",
+                },
+                {
+                  title: "Valor movimentado",
+                  value: currencyBRL(revenueCents),
+                  hint: "Cobranças pagas atribuídas a mim.",
+                },
+              ]}
+              gridClassName="xl:grid-cols-2"
+            />
+          </AppSectionBlock>
+        )}
 
         <AppSectionBlock
           title="Dados pessoais e permissões"
