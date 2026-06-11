@@ -11,6 +11,15 @@ import { useLocation } from "wouter";
 import CreatePersonModal from "@/components/CreatePersonModal";
 import EditPersonModal from "@/components/EditPersonModal";
 import {
+  EntityTimelineCard,
+  NextBestActionCard,
+  OperationalFlowCard,
+  OperationalRiskCard,
+  OperationalStateCard,
+  type OperationalFlowStageState,
+  type OperationalStateLevel,
+} from "@/components/app/OperationalCommandLayer";
+import {
   AppDataTable,
   AppInput,
   AppOperationalStatusBadge,
@@ -26,7 +35,6 @@ import {
 import { Button } from "@/components/design-system";
 import {
   AppFiltersBar,
-  AppNextBestActionBlock,
   AppOperationalHeader,
   AppPageEmptyState,
   AppPageErrorState,
@@ -46,6 +54,7 @@ import { trpc } from "@/lib/trpc";
 // createAvailabilityException.mutate({ personId: selectedPersonId
 // deleteAvailabilityException.mutate({ personId: selectedPerson.personId, exceptionId: exception.id })
 // {isAdmin ? <AppSectionBlock title="Sinais de atribuição"
+// Próxima melhor ação
 type LoadStatus = "IDLE" | "NORMAL" | "BUSY" | "OVERLOADED";
 type CapacityStatus = "UNDER_CAPACITY" | "AT_CAPACITY" | "OVER_CAPACITY";
 type AvailabilityStatus = "AVAILABLE" | "UNAVAILABLE_NOW" | "UNAVAILABLE_SOON";
@@ -208,6 +217,559 @@ function personPriorityLabel(priority: AppPriorityLevel) {
   return "P3 · informativo";
 }
 
+type PeopleCommandTarget = {
+  person: OperationalPerson | null;
+  people: OperationalPerson[];
+  warningSummary: AssigneeWarningSummary | null;
+};
+
+type PeopleNextBestAction = {
+  title: string;
+  entity: string;
+  reason: string;
+  impact: string;
+  safetyNote: string;
+  primaryActionLabel: string;
+  onPrimaryAction: () => void;
+  secondaryActionLabel?: string;
+  onSecondaryAction?: () => void;
+};
+
+const hasAssignedItems = (person: OperationalPerson) =>
+  person.openServiceOrdersCount > 0 ||
+  person.todayAppointmentsCount > 0 ||
+  person.futureAppointmentsCount > 0;
+
+const isInactiveWithAssignedItems = (person: OperationalPerson) =>
+  (person.status === "INACTIVE" || person.status === "SUSPENDED") &&
+  hasAssignedItems(person);
+
+const isPersonOverloaded = (person: OperationalPerson) =>
+  person.loadStatus === "OVERLOADED" ||
+  person.capacityStatus === "OVER_CAPACITY";
+
+const hasNoRecentActivitySignal = (person: OperationalPerson) =>
+  !person.lastActivityAt && hasAssignedItems(person);
+
+function sortByOperationalIntervention(
+  people: OperationalPerson[]
+): OperationalPerson[] {
+  const order: Record<AppPriorityLevel, number> = {
+    P0: 0,
+    P1: 1,
+    P2: 2,
+    P3: 3,
+  };
+  return [...people].sort((a, b) => {
+    const priorityA = derivePersonPriority(a) ?? "P3";
+    const priorityB = derivePersonPriority(b) ?? "P3";
+    if (order[priorityA] !== order[priorityB]) {
+      return order[priorityA] - order[priorityB];
+    }
+    if (b.overdueServiceOrdersCount !== a.overdueServiceOrdersCount) {
+      return b.overdueServiceOrdersCount - a.overdueServiceOrdersCount;
+    }
+    return (
+      b.openServiceOrdersCount +
+      b.todayAppointmentsCount +
+      b.futureAppointmentsCount -
+      (a.openServiceOrdersCount +
+        a.todayAppointmentsCount +
+        a.futureAppointmentsCount)
+    );
+  });
+}
+
+function pickOperationalPerson(people: OperationalPerson[]) {
+  return sortByOperationalIntervention(people).find(person =>
+    Boolean(derivePersonPriority(person) || hasNoRecentActivitySignal(person))
+  );
+}
+
+function buildPeopleState(target: PeopleCommandTarget): {
+  level: OperationalStateLevel;
+  reason: string;
+  impact: string;
+  title: string;
+  detailsLabel: string;
+} {
+  if (target.person) {
+    const person = target.person;
+    if (person.status === "SUSPENDED") {
+      return {
+        level: "SUSPENDED",
+        title: `Estado de ${person.name}`,
+        reason: `${person.name} está suspenso e mantém ${person.openServiceOrdersCount} O.S. aberta(s) e ${person.futureAppointmentsCount + person.todayAppointmentsCount} agendamento(s) atribuídos.`,
+        impact:
+          "Responsabilidade crítica pode ficar sem execução real enquanto itens seguem vinculados a uma pessoa suspensa.",
+        detailsLabel: "Revisar responsabilidade",
+      };
+    }
+    if (isInactiveWithAssignedItems(person)) {
+      return {
+        level: "RESTRICTED",
+        title: `Estado de ${person.name}`,
+        reason: `${person.name} está ${personStatusLabel(person.status).toLowerCase()} com itens operacionais atribuídos.`,
+        impact:
+          "A operação pode perder dono real em O.S. e agendamentos já vinculados à pessoa.",
+        detailsLabel: "Redistribuir itens",
+      };
+    }
+    if (person.overdueServiceOrdersCount > 0) {
+      return {
+        level: "RESTRICTED",
+        title: `Estado de ${person.name}`,
+        reason: `${person.name} concentra ${person.overdueServiceOrdersCount} O.S. atrasada(s).`,
+        impact:
+          "A execução tende a atrasar cliente, agenda, financeiro e governança se a fila não for destravada.",
+        detailsLabel: "Ver O.S. atribuídas",
+      };
+    }
+    if (
+      isPersonOverloaded(person) ||
+      person.availabilityStatus === "UNAVAILABLE_NOW"
+    ) {
+      return {
+        level: "RESTRICTED",
+        title: `Estado de ${person.name}`,
+        reason: `${loadLabels[person.loadStatus]} · ${capacityLabels[person.capacityStatus]} · ${availabilityLabels[person.availabilityStatus]}.`,
+        impact:
+          "Novas atribuições podem aumentar fila parada ou colocar demanda em responsável indisponível.",
+        detailsLabel: "Rebalancear carga",
+      };
+    }
+    if (
+      person.loadStatus === "BUSY" ||
+      person.capacityStatus === "AT_CAPACITY" ||
+      person.availabilityStatus === "UNAVAILABLE_SOON" ||
+      hasNoRecentActivitySignal(person)
+    ) {
+      return {
+        level: "WARNING",
+        title: `Estado de ${person.name}`,
+        reason: hasNoRecentActivitySignal(person)
+          ? "Há itens atribuídos, mas a última atividade não foi registrada nesta leitura."
+          : `${loadLabels[person.loadStatus]} · ${capacityLabels[person.capacityStatus]} · ${availabilityLabels[person.availabilityStatus]}.`,
+        impact:
+          "A pessoa ainda pode executar, mas a fila precisa de acompanhamento antes de receber nova carga.",
+        detailsLabel: "Acompanhar pessoa",
+      };
+    }
+    return {
+      level: "NORMAL",
+      title: `Estado de ${person.name}`,
+      reason: `${person.name} está ativo, sem atraso vinculado e com carga dentro da capacidade carregada.`,
+      impact:
+        "Responsabilidade rastreável e sem intervenção imediata apontada pelos sinais disponíveis.",
+      detailsLabel: "Ver detalhe",
+    };
+  }
+
+  const interventionPerson = pickOperationalPerson(target.people);
+  const overloaded = target.people.filter(isPersonOverloaded).length;
+  const inactiveAssigned = target.people.filter(
+    isInactiveWithAssignedItems
+  ).length;
+  const overdue = target.people.reduce(
+    (total, person) => total + person.overdueServiceOrdersCount,
+    0
+  );
+  if (inactiveAssigned > 0 || overdue > 0 || overloaded > 0) {
+    return {
+      level: "RESTRICTED",
+      title: "Estado operacional da equipe",
+      reason: interventionPerson
+        ? `${interventionPerson.name} é o principal ponto de intervenção por status, atraso ou carga.`
+        : `${inactiveAssigned} pessoa(s) inativa(s) com itens, ${overdue} O.S. atrasada(s) e ${overloaded} pessoa(s) acima da capacidade.`,
+      impact:
+        "A responsabilidade operacional precisa ser redistribuída ou destravada antes de a fila crescer.",
+      detailsLabel: "Abrir responsável crítico",
+    };
+  }
+  const attention = target.people.filter(
+    person => derivePersonOperationalStatus(person) === "ATENÇÃO"
+  ).length;
+  if (attention > 0 || target.warningSummary?.totals.shown) {
+    return {
+      level: "WARNING",
+      title: "Estado operacional da equipe",
+      reason: `${attention} pessoa(s) em atenção e ${target.warningSummary?.totals.shown ?? 0} alerta(s) de atribuição observado(s).`,
+      impact:
+        "A equipe está operando, mas disponibilidade, capacidade e decisões manuais pedem acompanhamento.",
+      detailsLabel: "Filtrar atenção",
+    };
+  }
+  return {
+    level: "NORMAL",
+    title: "Estado operacional da equipe",
+    reason:
+      "Equipe carregada sem atraso, sobrecarga ou indisponibilidade crítica nos sinais disponíveis.",
+    impact:
+      "A responsabilidade está distribuída de forma rastreável conforme os dados já retornados pela página.",
+    detailsLabel: "Revisar equipe",
+  };
+}
+
+function buildPeopleRisk(target: PeopleCommandTarget): {
+  title: string;
+  reason: string;
+  impact: string;
+  ctaLabel: string;
+} {
+  const person = target.person ?? pickOperationalPerson(target.people) ?? null;
+  if (person && isInactiveWithAssignedItems(person)) {
+    return {
+      title: "Pessoa inativa ainda segura operação",
+      reason: `${person.name} está ${personStatusLabel(person.status).toLowerCase()} com ${person.openServiceOrdersCount} O.S. aberta(s) e ${person.todayAppointmentsCount + person.futureAppointmentsCount} agendamento(s).`,
+      impact:
+        "Execução, agenda e governança ficam sem dono real se os itens permanecerem atribuídos.",
+      ctaLabel: "Abrir pessoa",
+    };
+  }
+  if (person && person.overdueServiceOrdersCount > 0) {
+    return {
+      title: "Atraso vinculado a responsável",
+      reason: `${person.name} tem ${person.overdueServiceOrdersCount} O.S. atrasada(s) entre ${person.openServiceOrdersCount} aberta(s).`,
+      impact:
+        "Atrasos de execução podem atrasar agenda, cobrança e prova operacional na Timeline.",
+      ctaLabel: "Ver O.S.",
+    };
+  }
+  if (person && isPersonOverloaded(person)) {
+    return {
+      title: "Sobrecarga concentrada",
+      reason: `${person.name} aparece como ${loadLabels[person.loadStatus].toLowerCase()} e ${capacityLabels[person.capacityStatus].toLowerCase()}.`,
+      impact:
+        "A fila pode parar no mesmo responsável e elevar retrabalho ou intervenção de governança.",
+      ctaLabel: "Rebalancear",
+    };
+  }
+  if (
+    person &&
+    person.todayAppointmentsCount + person.futureAppointmentsCount > 0
+  ) {
+    return {
+      title: "Agenda precisa de acompanhamento",
+      reason: `${person.name} tem ${person.todayAppointmentsCount} agendamento(s) hoje e ${person.futureAppointmentsCount} futuro(s).`,
+      impact:
+        "Confirmações e execução devem ser acompanhadas para evitar entrada operacional sem dono.",
+      ctaLabel: "Ver agenda",
+    };
+  }
+  return {
+    title: "Sem risco dominante carregado",
+    reason:
+      "Os sinais disponíveis não indicam pessoa inativa com itens, O.S. atrasada ou sobrecarga dominante.",
+    impact:
+      "A página mantém a revisão da equipe como controle preventivo sem inventar risco genérico.",
+    ctaLabel: target.person ? "Revisar pessoa" : "Revisar equipe",
+  };
+}
+
+function buildPeopleNextBestAction(
+  target: PeopleCommandTarget,
+  actions: {
+    openPerson: (personId: string) => void;
+    openServiceOrders: () => void;
+    openAppointments: () => void;
+    openTimeline: () => void;
+    focusAttention: () => void;
+  }
+): PeopleNextBestAction {
+  const ordered = target.person
+    ? [target.person]
+    : sortByOperationalIntervention(target.people);
+  const inactiveAssigned = ordered.find(isInactiveWithAssignedItems);
+  if (inactiveAssigned) {
+    return {
+      title: "Redistribuir responsabilidades",
+      entity: inactiveAssigned.name,
+      reason: `${inactiveAssigned.name} não está ativo e ainda possui itens operacionais atribuídos.`,
+      impact:
+        "Retira O.S. e agenda de uma pessoa sem execução ativa e devolve dono real à operação.",
+      safetyNote:
+        "O Nexo apenas orienta a revisão; nenhuma redistribuição é executada automaticamente.",
+      primaryActionLabel: "Abrir pessoa",
+      onPrimaryAction: () => actions.openPerson(inactiveAssigned.personId),
+      secondaryActionLabel: "Ver O.S.",
+      onSecondaryAction: actions.openServiceOrders,
+    };
+  }
+  const overduePerson = ordered.find(
+    person => person.overdueServiceOrdersCount > 0
+  );
+  if (overduePerson) {
+    return {
+      title: "Destravar execução",
+      entity: overduePerson.name,
+      reason: `${overduePerson.name} tem ${overduePerson.overdueServiceOrdersCount} O.S. atrasada(s).`,
+      impact:
+        "Reduz atraso visível em execução, financeiro e prova oficial da operação.",
+      safetyNote:
+        "A ação navega para investigação; não altera prazo, status ou responsável automaticamente.",
+      primaryActionLabel: "Ver O.S. atribuídas",
+      onPrimaryAction: actions.openServiceOrders,
+      secondaryActionLabel: "Abrir pessoa",
+      onSecondaryAction: () => actions.openPerson(overduePerson.personId),
+    };
+  }
+  const overloadedPerson = ordered.find(isPersonOverloaded);
+  if (overloadedPerson) {
+    return {
+      title: "Rebalancear carga",
+      entity: overloadedPerson.name,
+      reason: `${overloadedPerson.name} está ${loadLabels[overloadedPerson.loadStatus].toLowerCase()} e ${capacityLabels[overloadedPerson.capacityStatus].toLowerCase()}.`,
+      impact:
+        "Evita concentração de fila e reduz risco de atraso por responsável único.",
+      safetyNote:
+        "Use a leitura como apoio de decisão; não há automação de reatribuição nesta página.",
+      primaryActionLabel: "Abrir pessoa",
+      onPrimaryAction: () => actions.openPerson(overloadedPerson.personId),
+      secondaryActionLabel: "Ver O.S.",
+      onSecondaryAction: actions.openServiceOrders,
+    };
+  }
+  const appointmentPerson = ordered.find(
+    person => person.todayAppointmentsCount + person.futureAppointmentsCount > 0
+  );
+  if (appointmentPerson) {
+    return {
+      title: "Confirmar agenda",
+      entity: appointmentPerson.name,
+      reason: `${appointmentPerson.name} tem ${appointmentPerson.todayAppointmentsCount} agendamento(s) hoje e ${appointmentPerson.futureAppointmentsCount} futuro(s).`,
+      impact:
+        "Mantém a entrada operacional conectada ao responsável antes de virar execução.",
+      safetyNote:
+        "WhatsApp permanece congelado; esta ação só navega para conferência de agenda.",
+      primaryActionLabel: "Ver agendamentos",
+      onPrimaryAction: actions.openAppointments,
+      secondaryActionLabel: "Abrir pessoa",
+      onSecondaryAction: () => actions.openPerson(appointmentPerson.personId),
+    };
+  }
+  const noRecentActivity = ordered.find(hasNoRecentActivitySignal);
+  if (noRecentActivity) {
+    return {
+      title: "Revisar disponibilidade",
+      entity: noRecentActivity.name,
+      reason:
+        "Há itens atribuídos, mas a última atividade não foi registrada nesta leitura.",
+      impact:
+        "Ajuda a confirmar se a pessoa pode assumir a fila já vinculada ao seu nome.",
+      safetyNote:
+        "Ausência de atividade é tratada como sinal de revisão, não como bloqueio automático.",
+      primaryActionLabel: "Abrir pessoa",
+      onPrimaryAction: () => actions.openPerson(noRecentActivity.personId),
+      secondaryActionLabel: "Abrir Timeline",
+      onSecondaryAction: actions.openTimeline,
+    };
+  }
+  return {
+    title: "Revisar equipe",
+    entity: target.person?.name ?? "Equipe operacional",
+    reason:
+      "Não há pendência dominante nos sinais de responsabilidade carregados.",
+    impact:
+      "Mantém a equipe sob controle preventivo e confirma se a distribuição segue saudável.",
+    safetyNote:
+      "Sem pendência crítica, a recomendação é somente revisar; nada é executado automaticamente.",
+    primaryActionLabel: target.person ? "Revisar pessoa" : "Filtrar atenção",
+    onPrimaryAction: target.person
+      ? () => actions.openPerson(target.person?.personId ?? "")
+      : actions.focusAttention,
+    secondaryActionLabel: "Abrir Timeline",
+    onSecondaryAction: actions.openTimeline,
+  };
+}
+
+function buildPeopleFlowStages(target: PeopleCommandTarget): Array<{
+  id: string;
+  label: string;
+  summary: string;
+  state: OperationalFlowStageState;
+  countOrValue?: string;
+  hrefLabel?: string;
+  onClick?: () => void;
+}> {
+  const people = target.person ? [target.person] : target.people;
+  const personLabel = target.person?.name ?? `${people.length} pessoa(s)`;
+  const todayAppointments = people.reduce(
+    (total, person) => total + person.todayAppointmentsCount,
+    0
+  );
+  const futureAppointments = people.reduce(
+    (total, person) => total + person.futureAppointmentsCount,
+    0
+  );
+  const openServiceOrders = people.reduce(
+    (total, person) => total + person.openServiceOrdersCount,
+    0
+  );
+  const overdueServiceOrders = people.reduce(
+    (total, person) => total + person.overdueServiceOrdersCount,
+    0
+  );
+  const warningSignals = target.warningSummary?.totals.shown ?? 0;
+  const hasEvents = people.some(
+    person =>
+      person.lastActivityAt ||
+      person.currentAvailabilityException ||
+      person.nextAvailabilityException
+  );
+  const hasOperationalRisk = people.some(
+    person =>
+      isInactiveWithAssignedItems(person) ||
+      person.overdueServiceOrdersCount > 0 ||
+      isPersonOverloaded(person) ||
+      person.availabilityStatus !== "AVAILABLE"
+  );
+  return [
+    {
+      id: "person",
+      label: "Pessoa",
+      summary: target.person
+        ? `${target.person.role} · ${personStatusLabel(target.person.status)}.`
+        : "Equipe carregada como mapa de responsáveis reais.",
+      state: people.length > 0 ? "done" : "idle",
+      countOrValue: personLabel,
+    },
+    {
+      id: "appointments",
+      label: "Agendamentos",
+      summary:
+        todayAppointments + futureAppointments > 0
+          ? `${todayAppointments} hoje e ${futureAppointments} futuro(s) atribuídos.`
+          : "Sem agendamentos atribuídos nos dados carregados.",
+      state:
+        todayAppointments > 0
+          ? "warning"
+          : futureAppointments > 0
+            ? "active"
+            : "idle",
+      countOrValue: `${todayAppointments + futureAppointments}`,
+    },
+    {
+      id: "service-orders",
+      label: "O.S.",
+      summary:
+        overdueServiceOrders > 0
+          ? `${overdueServiceOrders} atrasada(s) vinculada(s) a responsável.`
+          : openServiceOrders > 0
+            ? `${openServiceOrders} aberta(s) sem atraso informado.`
+            : "Sem O.S. aberta atribuída nesta leitura.",
+      state:
+        overdueServiceOrders > 0
+          ? "blocked"
+          : openServiceOrders > 0
+            ? "warning"
+            : "idle",
+      countOrValue: `${openServiceOrders}`,
+    },
+    {
+      id: "finance",
+      label: "Financeiro",
+      summary:
+        "Esta página não recebeu cobranças por responsável; financeiro fica como etapa de navegação segura.",
+      state: "idle",
+      countOrValue: "—",
+    },
+    {
+      id: "timeline",
+      label: "Timeline",
+      summary: hasEvents
+        ? "Há sinais reais de atividade/indisponibilidade para prova contextual."
+        : "Sem eventos oficiais retornados para Pessoas nesta leitura.",
+      state: hasEvents ? "done" : "idle",
+    },
+    {
+      id: "governance",
+      label: "Risco/Governança",
+      summary: hasOperationalRisk
+        ? "Há atraso, sobrecarga, indisponibilidade ou status que pede intervenção."
+        : "Responsabilidade sem risco dominante nos sinais disponíveis.",
+      state: hasOperationalRisk
+        ? "warning"
+        : warningSignals > 0
+          ? "warning"
+          : "done",
+      countOrValue: warningSignals ? `${warningSignals} alerta(s)` : undefined,
+    },
+  ];
+}
+
+function buildPeopleTimelineEvents(target: PeopleCommandTarget) {
+  const people = target.person
+    ? [target.person]
+    : sortByOperationalIntervention(target.people);
+  return people
+    .flatMap(person => {
+      const events: Array<{
+        id: string;
+        type: string;
+        occurredAt: string;
+        entity: string;
+        actor?: string;
+        summary: string;
+      }> = [];
+      if (person.lastActivityAt) {
+        events.push({
+          id: `${person.personId}-last-activity`,
+          type: "Atividade",
+          occurredAt: formatDateTime(person.lastActivityAt),
+          entity: person.name,
+          actor: person.name,
+          summary:
+            "Última atividade registrada para a pessoa nos dados operacionais carregados.",
+        });
+      }
+      if (person.overdueServiceOrdersCount > 0) {
+        events.push({
+          id: `${person.personId}-overdue-os`,
+          type: "O.S.",
+          occurredAt: "Sinal atual",
+          entity: `${person.overdueServiceOrdersCount} O.S. atrasada(s)`,
+          actor: person.name,
+          summary:
+            "Evento contextual derivado da contagem real de O.S. atrasadas atribuídas; não substitui a Timeline oficial.",
+        });
+      }
+      if (person.todayAppointmentsCount + person.futureAppointmentsCount > 0) {
+        events.push({
+          id: `${person.personId}-appointments`,
+          type: "Agenda",
+          occurredAt: "Sinal atual",
+          entity: `${person.todayAppointmentsCount + person.futureAppointmentsCount} agendamento(s) atribuídos`,
+          actor: person.name,
+          summary:
+            "Evento contextual derivado dos agendamentos vinculados ao responsável nesta leitura.",
+        });
+      }
+      if (person.currentAvailabilityException) {
+        events.push({
+          id: `${person.personId}-${person.currentAvailabilityException.id}`,
+          type: "Indisponibilidade",
+          occurredAt: formatDateTime(
+            person.currentAvailabilityException.startsAt
+          ),
+          entity: person.name,
+          actor: person.name,
+          summary: `Indisponibilidade atual registrada até ${formatDateTime(person.currentAvailabilityException.endsAt)}${person.currentAvailabilityException.reason ? ` · ${person.currentAvailabilityException.reason}` : ""}.`,
+        });
+      } else if (person.nextAvailabilityException) {
+        events.push({
+          id: `${person.personId}-${person.nextAvailabilityException.id}`,
+          type: "Indisponibilidade",
+          occurredAt: formatDateTime(person.nextAvailabilityException.startsAt),
+          entity: person.name,
+          actor: person.name,
+          summary: `Próxima indisponibilidade registrada até ${formatDateTime(person.nextAvailabilityException.endsAt)}${person.nextAvailabilityException.reason ? ` · ${person.nextAvailabilityException.reason}` : ""}.`,
+        });
+      }
+      return events;
+    })
+    .slice(0, 4);
+}
+
 export default function PeoplePage() {
   const [, navigate] = useLocation();
   const { isAuthenticated, isInitializing, role } = useAuth();
@@ -258,9 +820,9 @@ export default function PeoplePage() {
         ]);
       },
     });
-  const summaryPayload = normalizeObjectPayload<{ people?: OperationalPerson[] }>(
-    summaryQuery.data
-  );
+  const summaryPayload = normalizeObjectPayload<{
+    people?: OperationalPerson[];
+  }>(summaryQuery.data);
   const people = normalizeArrayPayload<OperationalPerson>(
     summaryPayload?.people
   );
@@ -270,9 +832,9 @@ export default function PeoplePage() {
     exceptionsQuery.data
   );
   const isAdmin = role === "ADMIN";
-  const rawWarningSummary = normalizeObjectPayload<Partial<AssigneeWarningSummary>>(
-    warningSummaryQuery.data
-  );
+  const rawWarningSummary = normalizeObjectPayload<
+    Partial<AssigneeWarningSummary>
+  >(warningSummaryQuery.data);
   const warningTypes = normalizeArrayPayload<
     AssigneeWarningSummary["byWarningType"][number]
   >(rawWarningSummary?.byWarningType);
@@ -281,7 +843,7 @@ export default function PeoplePage() {
   >(rawWarningSummary?.byContext);
   const warningTotals = rawWarningSummary?.totals ?? null;
   const warningSummary = rawWarningSummary
-    ? {
+    ? ({
         totals: {
           shown: Number(warningTotals?.shown ?? 0),
           confirmed: Number(warningTotals?.confirmed ?? 0),
@@ -292,7 +854,7 @@ export default function PeoplePage() {
         },
         byContext: warningContexts,
         byWarningType: warningTypes,
-      } satisfies AssigneeWarningSummary
+      } satisfies AssigneeWarningSummary)
     : null;
   const mostFrequentWarningType = warningTypes.length
     ? warningTypes.reduce(
@@ -344,42 +906,71 @@ export default function PeoplePage() {
         .includes(search);
     });
   }, [people, peopleFilter, queryText]);
-  const nextBestAction = useMemo(() => {
-    const ordered = [...people].sort((a, b) => {
-      const order: Record<AppPriorityLevel, number> = {
-        P0: 0,
-        P1: 1,
-        P2: 2,
-        P3: 3,
-      };
-      const priorityA = derivePersonPriority(a) ?? "P3";
-      const priorityB = derivePersonPriority(b) ?? "P3";
-      if (order[priorityA] !== order[priorityB])
-        return order[priorityA] - order[priorityB];
-      return b.overdueServiceOrdersCount - a.overdueServiceOrdersCount;
-    });
-    const critical = ordered.find(person => derivePersonPriority(person));
-    if (!critical) return null;
-    const priority = derivePersonPriority(critical) ?? "P2";
-    const overloaded =
-      critical.loadStatus === "OVERLOADED" ||
-      critical.overdueServiceOrdersCount > 0;
-    return {
-      person: critical,
-      priority,
-      action: overloaded
-        ? "Verificar redistribuição de carga"
-        : "Revisar disponibilidade e capacidade",
-      reason: overloaded
-        ? `${critical.name} tem ${critical.openServiceOrdersCount} O.S. abertas e ${critical.overdueServiceOrdersCount} atrasada(s).`
-        : `${critical.name} está com status ${availabilityLabels[critical.availabilityStatus]} e capacidade ${capacityLabels[critical.capacityStatus]}.`,
-      impact: overloaded
-        ? "Reduz atraso de execução e evita sobrecarga no responsável."
-        : "Evita atribuição manual em pessoa indisponível ou perto do limite.",
-      ctaLabel: "Abrir detalhe",
-      onClick: () => setSelectedPersonId(critical.personId),
-    };
-  }, [people]);
+  const commandTarget = useMemo(
+    () => ({ person: selectedPerson, people, warningSummary }),
+    [selectedPerson, people, warningSummary]
+  );
+  const commandState = useMemo(
+    () => buildPeopleState(commandTarget),
+    [commandTarget]
+  );
+  const commandRisk = useMemo(
+    () => buildPeopleRisk(commandTarget),
+    [commandTarget]
+  );
+  const commandFlowStages = useMemo(
+    () => buildPeopleFlowStages(commandTarget),
+    [commandTarget]
+  );
+  const commandTimelineEvents = useMemo(
+    () => buildPeopleTimelineEvents(commandTarget),
+    [commandTarget]
+  );
+  const nextBestAction = useMemo(
+    () =>
+      buildPeopleNextBestAction(commandTarget, {
+        openPerson: personId => {
+          if (personId) setSelectedPersonId(personId);
+        },
+        openServiceOrders: () => navigate("/service-orders"),
+        openAppointments: () => navigate("/appointments"),
+        openTimeline: () => navigate("/timeline"),
+        focusAttention: () => setPeopleFilter("attention"),
+      }),
+    [commandTarget, navigate]
+  );
+  const stateDetailsAction = () => {
+    if (selectedPerson) {
+      if (commandState.detailsLabel.includes("O.S.")) {
+        navigate("/service-orders");
+        return;
+      }
+      setSelectedPersonId(selectedPerson.personId);
+      return;
+    }
+    const interventionPerson = pickOperationalPerson(people);
+    if (interventionPerson && commandState.level === "RESTRICTED") {
+      setSelectedPersonId(interventionPerson.personId);
+      return;
+    }
+    setPeopleFilter("attention");
+  };
+  const riskAction = () => {
+    if (commandRisk.ctaLabel.includes("O.S.")) {
+      navigate("/service-orders");
+      return;
+    }
+    if (commandRisk.ctaLabel.includes("agenda")) {
+      navigate("/appointments");
+      return;
+    }
+    const interventionPerson = selectedPerson ?? pickOperationalPerson(people);
+    if (interventionPerson) {
+      setSelectedPersonId(interventionPerson.personId);
+      return;
+    }
+    setPeopleFilter("attention");
+  };
   const refresh = () => void summaryQuery.refetch();
   const submitAvailability = () =>
     selectedPersonId &&
@@ -484,48 +1075,67 @@ export default function PeoplePage() {
         </div>
       </AppSectionCard>
 
-      <AppNextBestActionBlock
-        title="Próxima melhor ação"
-        subtitle="Sugestão contextual usando somente carga, capacidade e disponibilidade já carregadas."
-        compact
-      >
-        {nextBestAction ? (
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0 flex-1 space-y-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <AppPriorityBadge
-                  priority={nextBestAction.priority}
-                  label={personPriorityLabel(nextBestAction.priority)}
-                />
-                <AppOperationalStatusBadge
-                  status={derivePersonOperationalStatus(nextBestAction.person)}
-                />
-              </div>
-              <p className="text-sm font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
-                {nextBestAction.action}
-              </p>
-              <p className="text-xs text-[var(--nexo-text-secondary,var(--text-secondary))]">
-                Motivo: {nextBestAction.reason}
-              </p>
-              <p className="text-xs text-[var(--nexo-text-secondary,var(--text-secondary))]">
-                Impacto: {nextBestAction.impact}
-              </p>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={nextBestAction.onClick}
-            >
-              {nextBestAction.ctaLabel}
-            </Button>
-          </div>
-        ) : (
-          <AppPageEmptyState
-            title="Sem intervenção dominante"
-            description="Não há pessoa carregada com sobrecarga, atraso ou indisponibilidade exigindo ação imediata."
-          />
-        )}
-      </AppNextBestActionBlock>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <OperationalStateCard
+          level={commandState.level}
+          title={commandState.title}
+          reason={commandState.reason}
+          impact={commandState.impact}
+          detailsLabel={commandState.detailsLabel}
+          onDetails={stateDetailsAction}
+        />
+        <OperationalRiskCard
+          title={commandRisk.title}
+          reason={commandRisk.reason}
+          impact={commandRisk.impact}
+          ctaLabel={commandRisk.ctaLabel}
+          onClick={riskAction}
+        />
+      </div>
+
+      <NextBestActionCard
+        title={nextBestAction.title}
+        entity={nextBestAction.entity}
+        reason={nextBestAction.reason}
+        impact={nextBestAction.impact}
+        safetyNote={nextBestAction.safetyNote}
+        primaryActionLabel={nextBestAction.primaryActionLabel}
+        onPrimaryAction={nextBestAction.onPrimaryAction}
+        secondaryActionLabel={nextBestAction.secondaryActionLabel}
+        onSecondaryAction={nextBestAction.onSecondaryAction}
+      />
+
+      <OperationalFlowCard
+        title="Fluxo de responsabilidade"
+        subtitle="Pessoa → Agendamentos → O.S. → Cobranças/Financeiro → Timeline → Risco/Governança"
+        stages={commandFlowStages.map(stage => ({
+          ...stage,
+          hrefLabel:
+            stage.id === "appointments"
+              ? "Abrir agenda"
+              : stage.id === "service-orders"
+                ? "Abrir O.S."
+                : stage.id === "finance"
+                  ? "Abrir financeiro"
+                  : stage.id === "timeline"
+                    ? "Abrir Timeline"
+                    : stage.id === "governance"
+                      ? "Abrir governança"
+                      : undefined,
+          onClick:
+            stage.id === "appointments"
+              ? () => navigate("/appointments")
+              : stage.id === "service-orders"
+                ? () => navigate("/service-orders")
+                : stage.id === "finance"
+                  ? () => navigate("/finances")
+                  : stage.id === "timeline"
+                    ? () => navigate("/timeline")
+                    : stage.id === "governance"
+                      ? () => navigate("/governance")
+                      : undefined,
+        }))}
+      />
 
       <AppFiltersBar className="gap-2 border border-[var(--nexo-border-subtle,var(--border-subtle))] bg-[var(--nexo-card-bg,var(--surface-base))] px-3 py-3">
         {peopleFilters.map(filter => (
@@ -896,6 +1506,18 @@ export default function PeoplePage() {
           />
         )}
       </AppSectionBlock>
+
+      <EntityTimelineCard
+        title={
+          selectedPerson
+            ? "Últimos eventos oficiais da pessoa"
+            : "Prova operacional da responsabilidade"
+        }
+        subtitle="Usa eventos oficiais quando disponíveis; na ausência deles, exibe no máximo quatro sinais contextuais derivados dos dados reais carregados e orienta abrir a Timeline completa."
+        events={commandTimelineEvents}
+        fullTimelineLabel="Abrir Timeline completa"
+        onFullTimeline={() => navigate("/timeline")}
+      />
       <CreatePersonModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}

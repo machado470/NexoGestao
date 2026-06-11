@@ -368,3 +368,42 @@ Governança funciona como centro de decisão e intervenção: o evento nasce dos
 ### Congelamento de WhatsApp e próximas páginas candidatas
 
 WhatsApp permanece congelado nesta adoção: `WhatsAppPage.tsx` não foi alterado, não há novo fluxo de comunicação e falhas de comunicação só devem entrar na leitura de Governança quando já existirem como dados reais. Depois de Governança, as próximas páginas candidatas para adoção da Operational Command Layer são Pessoas e Perfil.
+
+## Adoção em Pessoas
+
+A página de Pessoas (`PeoplePage`) adota a Operational Command Layer para transformar cadastro de usuários em controle de responsabilidade operacional. A primeira leitura passa a responder quem está executando, quem está sobrecarregado, quem está parado ou indisponível, quem está ligado a atrasos e qual intervenção segura deve acontecer agora.
+
+### Como Pessoas usa a camada operacional
+
+- `OperationalStateCard` mostra o estado da equipe ou da pessoa selecionada (`NORMAL`, `WARNING`, `RESTRICTED` ou `SUSPENDED`) a partir de status ativo/inativo/suspenso, carga de O.S., carga de agendamentos, O.S. atrasadas, capacidade planejada, disponibilidade e última atividade quando retornada. `SUSPENDED` só é usado quando a pessoa já vem com status real `SUSPENDED`.
+- `OperationalRiskCard` explica o risco dominante de responsabilidade com sinais concretos: pessoa inativa/suspensa com itens atribuídos, O.S. atrasadas por responsável, sobrecarga/capacidade excedida, agendamentos sob responsabilidade ou ausência de risco dominante.
+- `NextBestActionCard` concentra a Próxima Melhor Ação canônica de Pessoas, sem execução automática: redistribuir responsabilidades, destravar execução, rebalancear carga, confirmar agenda, revisar disponibilidade ou revisar equipe.
+- `OperationalFlowCard` mostra a cadeia `Pessoa → Agendamentos → O.S. → Cobranças/Financeiro → Timeline → Risco/Governança`, usando estados `done`, `active`, `warning`, `blocked` e `idle` conforme os dados de responsabilidade já carregados.
+- `EntityTimelineCard` apresenta “Últimos eventos oficiais da pessoa” quando há pessoa selecionada ou “Prova operacional da responsabilidade” no agregado. Quando a Timeline oficial não está disponível na página, o card usa até quatro sinais contextuais derivados de dados reais e explicita que eles não substituem a Timeline completa.
+
+### Dados reaproveitados
+
+Pessoas reaproveita somente dados e contratos já disponíveis na própria página:
+
+- resumo operacional de `people.operationalSummary`, incluindo pessoa, função/papel, status, O.S. abertas, O.S. atrasadas, agendamentos de hoje, próximos agendamentos, última atividade, carga, capacidade diária, uso percentual, notas operacionais e disponibilidade;
+- exceções reais de disponibilidade de `people.listAvailabilityExceptions` para detalhe da pessoa selecionada;
+- sinais agregados de atribuição de `analytics.assigneeWarningSummary` para administradores, incluindo contexto, tipo de alerta, exibições, confirmações e taxa de confirmação;
+- filtros, busca, tabela, detalhe da pessoa, edição, criação e ações de navegação já existentes;
+- rotas existentes para Agendamentos, O.S., Financeiro, Timeline e Governança.
+
+### Fallbacks seguros
+
+- Quando não há pessoa selecionada, a camada faz leitura agregada da equipe e escolhe o primeiro responsável acionável pelos sinais já carregados.
+- Quando não há cobranças ou ações financeiras por responsável no payload da página, a etapa Financeiro fica `idle` e informa explicitamente que não recebeu dado financeiro por pessoa.
+- Quando não há Timeline oficial retornada para Pessoas, `EntityTimelineCard` usa o fallback canônico; sinais contextuais são derivados apenas de última atividade, contagem real de O.S. atrasadas, agendamentos atribuídos e indisponibilidades registradas.
+- Ausência de última atividade é tratada como sinal de revisão de disponibilidade quando há itens atribuídos, não como bloqueio automático.
+- Ausência de itens sem responsável no contrato atual não é inventada; a página apenas orienta atribuição quando esse sinal existir em dados futuros.
+- A Próxima Melhor Ação apenas orienta e navega. Nenhuma redistribuição, alteração de status, agenda, O.S., cobrança ou comunicação é executada automaticamente.
+
+### Relação Pessoa → Agendamentos → O.S. → Financeiro → Timeline → Risco/Governança
+
+Pessoa é o dono operacional. Agendamentos mostram a entrada sob responsabilidade. O.S. mostram execução e atrasos vinculados. Financeiro permanece como consequência da execução, mas só ganha leitura específica quando houver dado financeiro por responsável. Timeline é a prova oficial da responsabilidade; sinais contextuais em Pessoas servem somente para antecipar a investigação. Risco/Governança interpreta sobrecarga, atraso, indisponibilidade e status crítico como necessidade de intervenção segura.
+
+### Congelamento de WhatsApp e próxima página candidata
+
+WhatsApp permanece congelado nesta adoção: `WhatsAppPage.tsx` não foi alterado, não há novo fluxo de comunicação e a ação “Confirmar agenda” apenas navega para Agendamentos. Depois de Pessoas, a próxima página candidata para adoção da Operational Command Layer é Perfil.
