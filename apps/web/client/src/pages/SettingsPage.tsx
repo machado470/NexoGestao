@@ -3,19 +3,9 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import {
-  EntityTimelineCard,
-  NextBestActionCard,
-  OperationalFlowCard,
-  type OperationalFlowStageState,
-  OperationalRiskCard,
-  OperationalStateCard,
-  type OperationalStateLevel,
-} from "@/components/app/OperationalCommandLayer";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import {
   AppDataTable,
-  AppKpiRow,
   AppOperationalHeader,
   AppPageShell,
   AppSectionBlock,
@@ -25,14 +15,16 @@ import { trpc } from "@/lib/trpc";
 import {
   normalizeArrayPayload,
   normalizeObjectPayload,
+  unwrapTrpcPayload,
 } from "@/lib/query-helpers";
 import { useAuth } from "@/contexts/AuthContext";
 
-type Section = {
+type ControlStatus = "Configurado" | "Atenção" | "Incompleto";
+
+type ControlSection = {
   title: string;
   description: string;
-  impact: string;
-  status: string;
+  status: ControlStatus;
   action: string;
   path?: string;
 };
@@ -42,10 +34,24 @@ type SettingsSignal = {
   label: string;
   configured: boolean;
   reason: string;
-  impact: string;
   path?: string;
   actionLabel: string;
   critical?: boolean;
+};
+
+type Member = {
+  id?: string;
+  email?: string | null;
+  role?: string | null;
+  active?: boolean | null;
+  person?: { name?: string | null } | null;
+  name?: string | null;
+};
+
+type MembersSource = {
+  users: Member[];
+  pendingInvites: Member[];
+  sourceKind: "users-array" | "members-object" | "unknown";
 };
 
 function configured(readiness: Record<string, any>, key: string) {
@@ -69,15 +75,44 @@ function hasAnySettingValue(source: Record<string, any>, keys: string[]) {
   });
 }
 
-function flowState(
-  configured: boolean,
-  active: boolean,
-  critical?: boolean
-): OperationalFlowStageState {
-  if (configured) return "done";
-  if (critical) return "blocked";
-  if (active) return "active";
-  return "warning";
+function extractMembersSource(payload: unknown): MembersSource {
+  const raw = unwrapTrpcPayload(payload);
+
+  if (Array.isArray(raw)) {
+    return {
+      users: raw as Member[],
+      pendingInvites: [],
+      sourceKind: "users-array",
+    };
+  }
+
+  if (raw && typeof raw === "object") {
+    const candidate = raw as Record<string, unknown>;
+    const users = normalizeArrayPayload<Member>(candidate.users);
+    const pendingInvites = normalizeArrayPayload<Member>(
+      candidate.pendingInvites
+    );
+
+    if (users.length || pendingInvites.length || "users" in candidate) {
+      return { users, pendingInvites, sourceKind: "members-object" };
+    }
+  }
+
+  return { users: [], pendingInvites: [], sourceKind: "unknown" };
+}
+
+function memberName(member: Member) {
+  return String(
+    member.person?.name ?? member.name ?? member.email ?? "Usuário sem nome"
+  );
+}
+
+function statusFromConfigured(
+  configuredValue: boolean,
+  attention?: boolean
+): ControlStatus {
+  if (configuredValue) return "Configurado";
+  return attention ? "Atenção" : "Incompleto";
 }
 
 export default function SettingsPage() {
@@ -101,10 +136,12 @@ export default function SettingsPage() {
     () => normalizeObjectPayload<any>(settingsQuery.data) ?? {},
     [settingsQuery.data]
   );
-  const members = useMemo(
-    () => normalizeArrayPayload<any>(membersQuery.data),
+  const memberSource = useMemo(
+    () => extractMembersSource(membersQuery.data),
     [membersQuery.data]
   );
+  const members = memberSource.users;
+  const pendingInvites = memberSource.pendingInvites;
   const readiness = useMemo(
     () => normalizeObjectPayload<any>(readinessQuery.data) ?? {},
     [readinessQuery.data]
@@ -170,7 +207,7 @@ export default function SettingsPage() {
     "riskRules",
     "policies",
   ]);
-  const hasPermissionOwner = members.some((member: any) =>
+  const hasPermissionOwner = members.some(member =>
     ["ADMIN", "OWNER", "MANAGER"].includes(
       String(member?.role ?? "").toUpperCase()
     )
@@ -187,295 +224,157 @@ export default function SettingsPage() {
       label: "Empresa",
       configured: hasCompany && hasTimezone,
       reason: hasCompany
-        ? "Fuso horário precisa permanecer visível para agenda, prazos e relatórios."
+        ? "Fuso horário precisa estar definido para agenda, prazos e relatórios."
         : "Nome da empresa ainda não está completo.",
-      impact:
-        "Agenda, O.S., relatórios e comunicações perdem referência comum quando a empresa base fica incompleta.",
-      actionLabel: "Completar configuração crítica",
+      actionLabel: "Configurar empresa",
       critical: true,
-    },
-    {
-      key: "finance",
-      label: "Financeiro",
-      configured: hasFinancialRule,
-      reason:
-        "Nenhum parâmetro financeiro visível foi retornado para prazo, moeda ou regra de cobrança padrão.",
-      impact:
-        "Cobrança, inadimplência e previsibilidade de caixa podem ser interpretadas de formas diferentes pela operação.",
-      actionLabel: "Configurar regras financeiras",
-      path: "/finances",
-    },
-    {
-      key: "operation",
-      label: "Operação",
-      configured: hasOperationPattern,
-      reason:
-        "A leitura atual não retornou padrão operacional explícito para agenda, O.S. ou horário de atendimento.",
-      impact:
-        "A fila diária pode depender de decisão manual sem padrão comum de execução.",
-      actionLabel: "Configurar fluxo operacional",
-      path: "/service-orders",
-    },
-    {
-      key: "communication",
-      label: "Comunicação",
-      configured: hasCommunicationTemplate,
-      reason:
-        "Nenhum canal/template de comunicação configurado foi confirmado pela leitura atual.",
-      impact:
-        "Confirmações, cobranças e avisos podem exigir ação manual e gerar retrabalho.",
-      actionLabel: "Configurar comunicação",
-      path: "/whatsapp",
-    },
-    {
-      key: "governance",
-      label: "Governança/Risco",
-      configured: hasGovernancePolicy,
-      reason:
-        "Nenhuma política ou regra de risco visível foi retornada junto das configurações.",
-      impact:
-        "Sinais de risco podem ficar sem critério administrativo explícito para intervenção.",
-      actionLabel: "Revisar governança",
-      path: "/governance",
     },
     {
       key: "permissions",
       label: "Usuários e permissões",
       configured: permissionsConfigured,
       reason: members.length
-        ? "Equipe retornou sem papel administrativo claro na leitura de permissões."
-        : "Nenhum usuário foi retornado pela fonte de permissões.",
-      impact:
-        "Execução, aprovação e rastreabilidade ficam frágeis quando responsabilidades não estão claras.",
-      actionLabel: "Revisar usuários e permissões",
+        ? "Equipe retornou sem papel administrativo claro."
+        : "A fonte administrativa não retornou usuários ativos.",
+      actionLabel: "Revisar usuários",
       path: "/people",
+    },
+    {
+      key: "operation",
+      label: "Operação",
+      configured: hasOperationPattern,
+      reason: "Sem padrão operacional visível para agenda, O.S. ou horários.",
+      actionLabel: "Abrir operação",
+      path: "/service-orders",
+    },
+    {
+      key: "finance",
+      label: "Financeiro",
+      configured: hasFinancialRule,
+      reason: "Sem parâmetro financeiro visível para prazo, moeda ou cobrança.",
+      actionLabel: "Configurar financeiro",
+      path: "/finances",
+    },
+    {
+      key: "communication",
+      label: "Comunicação",
+      configured: hasCommunicationTemplate,
+      reason:
+        "Canal ou template de comunicação não confirmado na leitura atual.",
+      actionLabel: "Revisar comunicação",
+      path: "/whatsapp",
+    },
+    {
+      key: "governance",
+      label: "Governança/Risco",
+      configured: hasGovernancePolicy,
+      reason: "Sem política administrativa visível para risco e intervenção.",
+      actionLabel: "Abrir governança",
+      path: "/governance",
     },
     {
       key: "integrations",
       label: "Integrações",
       configured: integrationsConfigured,
       reason:
-        "Pagamentos e comunicação ainda não aparecem simultaneamente como integrações prontas.",
-      impact:
-        "O ciclo O.S. → cobrança → aviso ao cliente pode exigir operação manual ou conferência extra.",
+        "Pagamentos e comunicação ainda não aparecem juntos como prontos.",
       actionLabel: "Ver integrações",
+    },
+    {
+      key: "system",
+      label: "Sistema",
+      configured: hasTimezone,
+      reason: "Fuso horário é a preferência global mínima para prazos.",
+      actionLabel: "Revisar sistema",
     },
   ];
 
-  const firstCriticalSignal = signals.find(
-    signal => signal.critical && !signal.configured
-  );
-  const firstPendingSignal =
-    firstCriticalSignal ?? signals.find(signal => !signal.configured);
-  const pendingCount = signals.filter(signal => !signal.configured).length;
-  const operationalState: OperationalStateLevel = firstCriticalSignal
-    ? "RESTRICTED"
-    : pendingCount > 0
-      ? "WARNING"
-      : "NORMAL";
-  const stateReason = firstPendingSignal
-    ? `${firstPendingSignal.label}: ${firstPendingSignal.reason}`
-    : "Configurações essenciais completas na leitura atual.";
-  const stateImpact = firstPendingSignal
-    ? firstPendingSignal.impact
-    : "Empresa, operação, financeiro, comunicação, governança, permissões e integrações têm sinais suficientes para operar com previsibilidade.";
-  const riskSignal = firstPendingSignal ?? signals[signals.length - 1];
-  const nextAction = firstPendingSignal ?? {
-    key: "healthy",
-    label: "Configurações",
-    configured: true,
-    reason: "Nenhuma pendência crítica foi detectada na leitura atual.",
-    impact: "A administração pode revisar parâmetros sem bloquear a operação.",
-    actionLabel: "Revisar configurações da operação",
-  };
+  const pendingSignals = signals.filter(signal => !signal.configured);
+  const nextAction =
+    pendingSignals.find(signal => signal.critical) ?? pendingSignals[0] ?? null;
+  const pendingItems = pendingSignals.slice(0, 5);
 
-  const sections: Section[] = [
+  const sections: ControlSection[] = [
     {
       title: "Empresa",
-      description: "Nome, fuso horário e identidade operacional.",
-      impact:
-        "Agenda, prazos, comunicações e relatórios passam a usar a mesma referência.",
-      status: hasCompany && hasTimezone ? "Configurado" : "Pendente",
-      action: "Salvar dados da empresa",
+      description:
+        "Identidade e fuso horário usados por agenda, prazos e relatórios.",
+      status: statusFromConfigured(hasCompany && hasTimezone, hasCompany),
+      action: hasCompany && hasTimezone ? "Revisar" : "Configurar",
     },
     {
-      title: "Usuários e permissões",
-      description: "Pessoas que podem executar, aprovar e administrar rotinas.",
-      impact:
-        "Define responsabilidade, segurança e rastreabilidade por pessoa.",
-      status: members.length ? `${members.length} usuário(s)` : "Sem equipe",
-      action: "Gerenciar equipe",
+      title: "Usuários",
+      description: "Acesso, papéis administrativos e convites pendentes.",
+      status: statusFromConfigured(permissionsConfigured, members.length > 0),
+      action: "Abrir Pessoas",
       path: "/people",
     },
     {
       title: "Operação",
-      description: "Regras de execução para O.S., agenda e pendências.",
-      impact: "Muda como a fila diária é priorizada e acompanhada.",
-      status: hasOperationPattern ? "Padrão visível" : "Padrão pendente",
-      action: "Abrir operação",
+      description: "Padrões que influenciam O.S., agenda e execução diária.",
+      status: statusFromConfigured(hasOperationPattern),
+      action: "Abrir O.S.",
       path: "/service-orders",
     },
     {
       title: "Financeiro",
-      description: "Parâmetros de cobrança, recorrência e recebimento.",
-      impact: "Afeta previsibilidade de caixa e bloqueios por inadimplência.",
-      status: hasFinancialRule
-        ? "Regra visível"
-        : stripeReady
-          ? "Pagamento sem regra"
-          : "Pagamento pendente",
+      description:
+        "Regras de cobrança, prazo, moeda e recorrência operacional.",
+      status: statusFromConfigured(hasFinancialRule, stripeReady),
       action: "Abrir financeiro",
       path: "/finances",
     },
     {
-      title: "WhatsApp",
+      title: "Comunicação",
       description:
-        "Canal de confirmação, cobrança e relacionamento com clientes.",
-      impact: "Muda o alcance das notificações e reduz retrabalho manual.",
-      status: whatsappReady ? "Canal conectado" : "Canal pendente",
-      action: "Abrir WhatsApp",
+        "Canal e templates que apoiam avisos sem criar automação nova.",
+      status: statusFromConfigured(hasCommunicationTemplate, whatsappReady),
+      action: "Abrir comunicação",
       path: "/whatsapp",
     },
     {
-      title: "Automações",
-      description: "Rotinas automáticas acionadas por evento operacional.",
-      impact:
-        "Padroniza lembretes, follow-ups e alertas sem depender de ação manual.",
-      status: hasGovernancePolicy ? "Governado" : "Regra pendente",
-      action: "Revisar governança",
-      path: "/governance",
-    },
-    {
-      title: "Governança",
-      description: "Critérios que indicam risco, restrição e recomendação.",
-      impact:
-        "Muda quando o sistema recomenda intervenção antes do problema escalar.",
-      status: hasGovernancePolicy ? "Política visível" : "Política pendente",
+      title: "Governança/Risco",
+      description:
+        "Critérios administrativos para atenção, risco e intervenção.",
+      status: statusFromConfigured(hasGovernancePolicy),
       action: "Abrir governança",
       path: "/governance",
     },
     {
       title: "Integrações",
-      description: "Conexões externas essenciais para operação e cobrança.",
-      impact: "Evita ruptura de comunicação, pagamento e auditoria.",
-      status: integrationsConfigured ? "Integrações ativas" : "Ação necessária",
-      action: "Ver integrações",
+      description:
+        "Prontidão de pagamentos e comunicação conectados ao sistema.",
+      status: statusFromConfigured(
+        integrationsConfigured,
+        stripeReady || whatsappReady
+      ),
+      action: "Atualizar leitura",
     },
     {
       title: "Sistema",
-      description: "Preferências globais de estabilidade, ambiente e suporte.",
-      impact: "Mantém comportamento previsível para o piloto e para o time.",
-      status: hasTimezone ? timezone : "Fuso pendente",
-      action: "Atualizar leitura",
+      description: "Preferências globais que mantêm comportamento previsível.",
+      status: statusFromConfigured(hasTimezone),
+      action: "Revisar",
     },
   ];
 
-  const flowStages: Array<{
-    id: string;
-    label: string;
-    summary: string;
-    state: OperationalFlowStageState;
-    countOrValue?: string;
-    hrefLabel?: string;
-    onClick?: () => void;
-  }> = [
-    {
-      id: "company",
-      label: "Empresa",
-      summary:
-        hasCompany && hasTimezone
-          ? "Identidade e fuso horário prontos para orientar agenda e relatórios."
-          : "Complete nome e fuso para estabilizar a referência operacional.",
-      state: flowState(hasCompany && hasTimezone, true, true),
-      countOrValue: hasCompany ? "OK" : "Pendente",
-    },
-    {
-      id: "operation",
-      label: "Operação",
-      summary: hasOperationPattern
-        ? "Padrão operacional retornado nas configurações."
-        : "Sem padrão operacional visível para O.S. e agenda.",
-      state: flowState(hasOperationPattern, hasCompany && hasTimezone),
-      onClick: () => navigate("/service-orders"),
-      hrefLabel: "Abrir O.S.",
-    },
-    {
-      id: "finance",
-      label: "Financeiro",
-      summary: hasFinancialRule
-        ? "Regra financeira visível para a operação."
-        : "Defina moeda, prazo ou regra padrão de cobrança.",
-      state: flowState(hasFinancialRule, hasOperationPattern),
-      onClick: () => navigate("/finances"),
-      hrefLabel: "Abrir financeiro",
-    },
-    {
-      id: "communication",
-      label: "Comunicação",
-      summary: hasCommunicationTemplate
-        ? "Canal/template confirmado pela leitura atual."
-        : "Canal ou template não confirmado; WhatsApp segue congelado.",
-      state: flowState(hasCommunicationTemplate, hasFinancialRule),
-      onClick: () => navigate("/whatsapp"),
-      hrefLabel: "Abrir canal",
-    },
-    {
-      id: "governance",
-      label: "Governança/Risco",
-      summary: hasGovernancePolicy
-        ? "Política de risco visível para intervenção administrativa."
-        : "Sem política visível para classificar risco operacional.",
-      state: flowState(
-        hasGovernancePolicy,
-        hasOperationPattern || hasFinancialRule
-      ),
-      onClick: () => navigate("/governance"),
-      hrefLabel: "Abrir governança",
-    },
-    {
-      id: "integrations",
-      label: "Integrações",
-      summary: integrationsConfigured
-        ? "Pagamentos e comunicação conectados."
-        : "Integrações essenciais ainda exigem conferência.",
-      state: flowState(integrationsConfigured, stripeReady || whatsappReady),
-      countOrValue: `${Number(stripeReady) + Number(whatsappReady)}/2`,
-    },
-    {
-      id: "system",
-      label: "Sistema",
-      summary: hasTimezone
-        ? `Fuso ${timezone} aplicado como preferência global.`
-        : "Sistema sem fuso horário persistente para prazos.",
-      state: hasTimezone ? "done" : "warning",
-    },
-  ];
-
-  const timelineEvents = settings?.updatedAt
-    ? [
-        {
-          id: "settings-updated",
-          type: "Configuração",
-          occurredAt: new Date(settings.updatedAt).toLocaleString("pt-BR"),
-          entity: "Configurações da organização",
-          summary:
-            "Última alteração real retornada pelo payload de configurações.",
-          actor: String(
-            settings?.updatedBy?.name ?? settings?.updatedByName ?? "Sistema"
-          ),
-        },
-      ]
-    : [];
+  const sourceMessage = membersQuery.isError
+    ? "Não foi possível carregar membros nesta fonte. Gerencie usuários na página Pessoas."
+    : memberSource.sourceKind === "unknown" && !membersQuery.isLoading
+      ? "Fonte administrativa sem lista compatível. Gerencie usuários na página Pessoas."
+      : members.length === 0
+        ? "Nenhum membro ativo retornado pela fonte administrativa; Pessoas pode usar outra fonte operacional."
+        : `${members.length} membro(s) retornado(s) pela fonte administrativa.`;
 
   return (
     <PageWrapper
       title="Configurações"
-      subtitle="Centro de controle operacional com impacto explicado em linguagem de negócio."
+      subtitle="Controle de empresa, operação, permissões e integrações."
     >
       <AppPageShell>
         <AppOperationalHeader
-          title="Configurações operacionais"
-          description="Cada bloco mostra o que muda na operação antes de pedir uma ação. Evita painel técnico e decisões sem contexto."
+          title="Configurações"
+          description="Centro de Controle do Nexo: veja o que está configurado, o que precisa de atenção e onde ajustar o comportamento do sistema."
           primaryAction={
             <Button
               disabled={!unsaved || updateMutation.isPending}
@@ -503,96 +402,124 @@ export default function SettingsPage() {
               <AppStatusBadge
                 label={unsaved ? "Alterações não salvas" : "Sem alterações"}
               />
-              <AppStatusBadge label={`${pendingCount} pendência(s)`} />
+              <AppStatusBadge label={`${pendingSignals.length} pendência(s)`} />
             </>
           }
         />
 
-        <div className="grid gap-4 xl:grid-cols-3">
-          <OperationalStateCard
-            title="Estado das configurações"
-            level={operationalState}
-            reason={stateReason}
-            impact={stateImpact}
-            detailsLabel="Ver blocos de configuração"
-            onDetails={() =>
-              document
-                .getElementById("settings-control-center")
-                ?.scrollIntoView({ behavior: "smooth", block: "start" })
-            }
-          />
-          <OperationalRiskCard
-            title={
-              riskSignal?.configured
-                ? "Configuração sem risco crítico"
-                : `Risco em ${riskSignal?.label ?? "configuração"}`
-            }
-            reason={
-              riskSignal?.configured
-                ? "A leitura atual não encontrou configuração crítica ausente."
-                : (riskSignal?.reason ??
-                  "Há configuração pendente na leitura atual.")
-            }
-            impact={
-              riskSignal?.configured
-                ? "A operação pode seguir com revisão administrativa periódica."
-                : (riskSignal?.impact ??
-                  "A operação pode exigir conferência administrativa.")
-            }
-            ctaLabel={
-              riskSignal?.path ? riskSignal.actionLabel : "Atualizar leitura"
-            }
-            onClick={() =>
-              riskSignal?.path
-                ? navigate(riskSignal.path)
-                : void Promise.all([
-                    settingsQuery.refetch(),
-                    readinessQuery.refetch(),
-                  ])
-            }
-          />
-          <NextBestActionCard
-            title={nextAction.actionLabel}
-            entity={nextAction.label}
-            reason={nextAction.reason}
-            impact={nextAction.impact}
-            safetyNote="A ação é apenas orientativa: nenhuma configuração, permissão, automação ou comunicação é executada automaticamente."
-            primaryActionLabel={nextAction.actionLabel}
-            onPrimaryAction={() =>
-              nextAction.path
-                ? navigate(nextAction.path)
-                : document
-                    .getElementById("settings-company-form")
-                    ?.scrollIntoView({ behavior: "smooth", block: "start" })
-            }
-            secondaryActionLabel="Atualizar leitura"
-            onSecondaryAction={() =>
-              void Promise.all([
-                settingsQuery.refetch(),
-                membersQuery.refetch(),
-                readinessQuery.refetch(),
-              ])
-            }
-          />
+        <div id="settings-control-center">
+          <AppSectionBlock
+            title="Centro de controle"
+            subtitle="Áreas que controlam o comportamento do sistema, com estado e ação direta."
+            compact
+          >
+            <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
+              {sections.map(section => (
+                <article
+                  key={section.title}
+                  className="flex min-h-[148px] flex-col rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-[var(--text-primary)]">
+                        {section.title}
+                      </p>
+                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--text-secondary)]">
+                        {section.description}
+                      </p>
+                    </div>
+                    <AppStatusBadge label={section.status} />
+                  </div>
+                  <Button
+                    className="mt-auto self-start"
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      section.path
+                        ? navigate(section.path)
+                        : void Promise.all([
+                            settingsQuery.refetch(),
+                            readinessQuery.refetch(),
+                          ])
+                    }
+                  >
+                    {section.action}
+                  </Button>
+                </article>
+              ))}
+            </div>
+          </AppSectionBlock>
         </div>
 
-        <OperationalFlowCard
-          title="Fluxo de configuração operacional"
-          subtitle="Empresa → Operação → Financeiro → Comunicação → Governança/Risco → Integrações → Sistema"
-          stages={flowStages}
-        />
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.6fr)]">
+          <AppSectionBlock
+            title="Próxima ação administrativa"
+            subtitle="Ação compacta; não substitui Dashboard nem Governança."
+            compact
+          >
+            <div className="flex flex-col gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-[var(--text-primary)]">
+                  {nextAction?.actionLabel ??
+                    "Configurações essenciais revisadas"}
+                </p>
+                <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
+                  {nextAction?.reason ??
+                    "Nenhuma pendência administrativa foi detectada na leitura atual."}
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  nextAction?.path
+                    ? navigate(nextAction.path)
+                    : document
+                        .getElementById("settings-company-form")
+                        ?.scrollIntoView({ behavior: "smooth", block: "start" })
+                }
+              >
+                {nextAction?.actionLabel ?? "Revisar empresa"}
+              </Button>
+            </div>
+          </AppSectionBlock>
 
-        <EntityTimelineCard
-          title="Últimas alterações de configuração"
-          subtitle={
-            timelineEvents.length
-              ? "Eventos reais retornados pelo payload de configurações."
-              : "Fallback seguro: nenhuma timeline real de configuração foi retornada; o Nexo não cria histórico fictício."
-          }
-          events={timelineEvents}
-          fullTimelineLabel="Abrir Timeline"
-          onFullTimeline={() => navigate("/timeline")}
-        />
+          <AppSectionBlock
+            title="Pendências de configuração"
+            subtitle="Lista curta, sem múltiplos estados vazios."
+            compact
+          >
+            {pendingItems.length ? (
+              <ul className="space-y-2">
+                {pendingItems.map(item => (
+                  <li
+                    key={item.key}
+                    className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold text-[var(--text-primary)]">
+                          {item.label}
+                        </p>
+                        <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
+                          {item.reason}
+                        </p>
+                      </div>
+                      <AppStatusBadge
+                        label={item.critical ? "Crítico" : "Atenção"}
+                      />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2 text-sm text-[var(--text-secondary)]">
+                Sem alterações recentes registradas e sem pendências
+                administrativas na leitura atual.
+              </p>
+            )}
+          </AppSectionBlock>
+        </div>
 
         <div id="settings-company-form">
           <AppSectionBlock
@@ -623,81 +550,10 @@ export default function SettingsPage() {
           </AppSectionBlock>
         </div>
 
-        <AppKpiRow
-          items={[
-            {
-              title: "Blocos de controle",
-              value: String(sections.length),
-              hint: "Áreas organizadas por impacto operacional.",
-            },
-            {
-              title: "Equipe",
-              value: String(members.length),
-              hint: "Usuários e permissões atuais.",
-            },
-            {
-              title: "Integrações",
-              value: stripeReady && whatsappReady ? "Ativas" : "Pendentes",
-              hint: "Pagamentos e comunicação.",
-            },
-            {
-              title: "Pendências",
-              value: String(pendingCount),
-              hint: "Itens que podem afetar piloto.",
-            },
-          ]}
-        />
-
-        <div id="settings-control-center">
-          <AppSectionBlock
-            title="Centro de controle"
-            subtitle="Áreas em cards: impacto visível antes da ação."
-            compact
-          >
-            <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
-              {sections.map(section => (
-                <article
-                  key={section.title}
-                  className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-[var(--text-primary)]">
-                        {section.title}
-                      </p>
-                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--text-secondary)]">
-                        {section.description}
-                      </p>
-                    </div>
-                    <AppStatusBadge label={section.status} />
-                  </div>
-                  <p className="mt-3 text-xs leading-5 text-[var(--text-muted)]">
-                    {section.impact}
-                  </p>
-                  <Button
-                    className="mt-3"
-                    size="sm"
-                    variant="outline"
-                    onClick={() =>
-                      section.path
-                        ? navigate(section.path)
-                        : void Promise.all([
-                            settingsQuery.refetch(),
-                            readinessQuery.refetch(),
-                          ])
-                    }
-                  >
-                    {section.action}
-                  </Button>
-                </article>
-              ))}
-            </div>
-          </AppSectionBlock>
-        </div>
-
         <AppSectionBlock
           title="Usuários e permissões"
-          subtitle="Leitura rápida de quem pode agir no sistema."
+          subtitle={sourceMessage}
+          compact
         >
           <AppDataTable className="min-w-[720px]">
             <thead>
@@ -710,13 +566,13 @@ export default function SettingsPage() {
             </thead>
             <tbody>
               {members.length ? (
-                members.slice(0, 8).map((member: any, index: number) => (
+                members.slice(0, 8).map((member, index) => (
                   <tr
-                    key={String(member?.id ?? index)}
+                    key={String(member?.id ?? member?.email ?? index)}
                     className="border-b border-[var(--border-subtle)]/60"
                   >
                     <td className="px-3 py-3 text-[var(--text-primary)]">
-                      {String(member?.name ?? member?.email ?? "Usuário")}
+                      {memberName(member)}
                     </td>
                     <td className="px-3 py-3 text-[var(--text-secondary)]">
                       {String(member?.role ?? "Sem função")}
@@ -727,7 +583,7 @@ export default function SettingsPage() {
                       />
                     </td>
                     <td className="px-3 py-3 text-[var(--text-secondary)]">
-                      Define o que essa pessoa pode executar ou aprovar.
+                      Define acesso, execução ou aprovação administrativa.
                     </td>
                   </tr>
                 ))
@@ -737,12 +593,22 @@ export default function SettingsPage() {
                     colSpan={4}
                     className="px-3 py-4 text-[var(--text-muted)]"
                   >
-                    Nenhum usuário retornado pela fonte de permissões.
+                    {sourceMessage}
                   </td>
                 </tr>
               )}
             </tbody>
           </AppDataTable>
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[var(--text-secondary)]">
+            <span>{pendingInvites.length} convite(s) pendente(s).</span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => navigate("/people")}
+            >
+              Gerenciar na página Pessoas
+            </Button>
+          </div>
         </AppSectionBlock>
       </AppPageShell>
     </PageWrapper>
