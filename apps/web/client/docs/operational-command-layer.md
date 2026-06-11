@@ -11,6 +11,12 @@ A camada operacional transversal transforma o Dashboard em uma mesa de comando �
 
 Essa camada não cria regra de negócio nova, não muda contrato de API e não inventa backend. Ela organiza leituras já disponíveis e mostra fallbacks explícitos quando algum dado não existe ou está indisponível.
 
+## Configurações como Centro de Controle
+
+Configurações usa a camada operacional de forma compacta e adaptada. A página é administrativa: deve explicar como a empresa está configurada, quais regras estão ativas, quais áreas precisam de configuração, quem tem acesso, quais integrações estão prontas e quais ajustes mudam o comportamento do sistema.
+
+Evite repetir em Configurações os blocos completos de Estado, Risco, Próxima Melhor Ação, Fluxo Operacional e Timeline quando eles não gerarem uma decisão administrativa nova. OCL pesada continua mais apropriada para Dashboard, Governança e páginas operacionais; em Configurações, a leitura deve virar cards curtos, pendências compactas e CTAs de ajuste.
+
 ## Componentes canônicos
 
 ### `OperationalStateCard`
