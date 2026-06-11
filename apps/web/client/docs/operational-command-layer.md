@@ -535,3 +535,52 @@ Plano define a capacidade contratada da organização. Assinatura indica se o co
 ### Congelamento de WhatsApp e próxima página candidata
 
 WhatsApp permanece congelado nesta adoção: `WhatsAppPage.tsx` não foi alterado, não há novo fluxo de comunicação e Billing não cria mensagem, template, campanha ou automação. Depois de Billing, a próxima página candidata para adoção da Operational Command Layer é Calendário.
+
+## Adoção em Calendário
+
+A página de Calendário (`CalendarPage`) adota a Operational Command Layer para transformar a grade de eventos em leitura estratégica do tempo da operação. A primeira leitura passa a responder se a agenda está distribuída, se há conflitos, se algum responsável está sobrecarregado, se existem janelas vazias relevantes, quais eventos indicam impacto em O.S. e qual ajuste deve ser feito agora.
+
+### Calendário não é Agendamentos
+
+Calendário e Agendamentos continuam separados:
+
+- Agendamentos é o controle operacional da entrada: confirmar, remarcar, abrir detalhe e conduzir o fluxo transacional do atendimento.
+- Calendário é a visão estratégica do tempo: distribuição, conflito, sobrecarga, vazio, atraso e impacto temporal sobre O.S., execução, Timeline e Governança.
+
+Essa separação evita transformar a tela de calendário em um segundo fluxo de agendamentos. A Operational Command Layer no Calendário orienta e navega; ela não executa confirmação, remarcação, comunicação ou automação automaticamente.
+
+### Como Calendário usa a camada operacional
+
+- `OperationalStateCard` mostra o estado do tempo operacional (`NORMAL`, `WARNING` ou `RESTRICTED`) a partir de conflitos por responsável, sobreposição de horário, excesso de eventos no mesmo recorte, atraso, agenda vazia demais, agendamentos sem confirmação e responsáveis não atribuídos. `SUSPENDED` não é usado sem dado real de suspensão.
+- `OperationalRiskCard` explica o risco dominante do calendário com motivo e impacto: conflito entre atendimentos, responsável sobrecarregado, atraso de execução, agendamento sem confirmação, agenda vazia demais ou calendário saudável.
+- `NextBestActionCard` segue a prioridade definida para Calendário sem acionar fluxo automático: resolver conflito de horário, rebalancear agenda, revisar agenda do dia, confirmar agendamento, preencher janela operacional ou revisar semana.
+- `OperationalFlowCard` mostra a cadeia `Tempo → Agendamento → Responsável → O.S. → Execução → Timeline → Risco/Governança`, usando estados `done`, `active`, `warning`, `blocked` e `idle` conforme os sinais já lidos na página.
+- `EntityTimelineCard` exibe “Prova operacional do tempo” usando eventos reais derivados dos agendamentos com datas reais. O subtítulo declara explicitamente que esse fallback não substitui a Timeline oficial.
+
+### Dados reaproveitados
+
+Calendário reaproveita somente dados e ações já disponíveis na própria página ou no payload já consumido pelo Calendário:
+
+- agendamentos retornados por `nexo.appointments.list`, incluindo cliente, responsável, status, início, término, título, atualização e possíveis vínculos de O.S. quando retornados no payload;
+- clientes retornados por `nexo.customers.list`, usados para filtro e identificação do evento;
+- responsáveis retornados por `people.assignees`, usados para filtro, leitura de sobrecarga e explicação de conflito;
+- filtros e modos persistidos de visão (`Dia`, `Semana`, `Mês`, equipe, serviço, status e cliente);
+- links já existentes para Agendamentos, O.S., Cliente, Timeline e Governança;
+- mutation existente de atualização de agendamento, preservada nas ações antigas da página, mas não acionada pela Próxima Melhor Ação da camada operacional.
+
+### Fallbacks seguros
+
+- Se o agendamento não retorna vínculo direto de O.S., a etapa de O.S. fica `idle` e a navegação usa o filtro por `appointmentId`; nenhum vínculo fictício é criado.
+- Se não há Timeline oficial carregada no Calendário, a prova operacional usa apenas eventos derivados de datas reais dos agendamentos e informa que isso não substitui a Timeline oficial.
+- Se um evento não tem `endsAt`, a detecção de conflito considera uma duração operacional padrão apenas para leitura de sobreposição, sem gravar ou alterar duração real.
+- Se não há eventos no recorte filtrado, o estado informa vazio operacional em vez de criar agenda fictícia.
+- `SUSPENDED` permanece reservado para dado real de suspensão e não é inferido no Calendário.
+- A Próxima Melhor Ação apenas orienta/navega ou abre o modal já existente de novo agendamento para preencher janela; não confirma, remarca, envia mensagem ou cria automação sozinha.
+
+### Relação Tempo → Agendamento → O.S. → Execução → Timeline → Risco/Governança
+
+Tempo é a matéria-prima do Calendário: ele mostra onde a operação está concentrada, vazia ou em conflito. Agendamento materializa a entrada em uma janela real. Responsável indica distribuição de capacidade. O.S. mostra quando o evento passa a impactar execução. Execução traduz atrasos e sobrecarga em risco de entrega. Timeline deve registrar a prova oficial quando houver evento real. Risco/Governança interpreta os sinais de conflito, atraso, vazio e sobrecarga para orientar decisão antes que o problema vire falha operacional.
+
+### Congelamento de WhatsApp e próxima etapa
+
+WhatsApp permanece congelado nesta adoção: `WhatsAppPage.tsx` não foi alterado, não há novo fluxo de comunicação e Calendário não cria mensagem, template, campanha ou automação. A próxima etapa recomendada é uma auditoria final da Operational Command Layer para validar consistência entre Dashboard, Clientes, Agendamentos, O.S., Financeiro, Timeline, Governança, Pessoas, Perfil, Configurações, Billing e Calendário.
