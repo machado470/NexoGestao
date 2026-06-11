@@ -448,3 +448,41 @@ Perfil identifica o responsável individual. Minhas tarefas agregam o que está 
 ### Congelamento de WhatsApp e próxima página candidata
 
 WhatsApp permanece congelado nesta adoção: `WhatsAppPage.tsx` não foi alterado, não há novo fluxo de comunicação e a Próxima Melhor Ação de Perfil não cria mensagens nem automações. Depois de Perfil, a próxima página candidata para adoção da Operational Command Layer é Configurações.
+
+## Adoção em Configurações
+
+A página de Configurações (`SettingsPage`) adota a Operational Command Layer para deixar de ser uma coleção técnica de toggles e funcionar como centro de controle do comportamento operacional do NexoGestão. A primeira leitura passa a responder como o sistema está configurado, qual regra afeta Agenda, O.S., Financeiro, Comunicação, Governança/Risco e Integrações, qual pendência exige atenção e qual ajuste administrativo deve ser feito agora.
+
+### Como Configurações usa a camada operacional
+
+- `OperationalStateCard` mostra o estado das configurações (`NORMAL`, `WARNING` ou `RESTRICTED`) a partir da completude da empresa, fuso horário, regras financeiras visíveis, padrão operacional, comunicação, governança/risco, permissões e integrações. `SUSPENDED` não é usado porque a página não recebe dado real de suspensão de configuração.
+- `OperationalRiskCard` explica o risco dominante de configuração com motivo e impacto operacional: empresa incompleta, regra financeira ausente, operação sem padrão, comunicação sem canal/template confirmado, governança sem política visível, permissões frágeis ou integrações pendentes.
+- `NextBestActionCard` segue a prioridade administrativa canônica sem executar nada automaticamente: completar configuração crítica, configurar regras financeiras, configurar fluxo operacional, configurar comunicação, revisar governança, revisar usuários e permissões ou revisar configurações quando a leitura está saudável.
+- `OperationalFlowCard` mostra a cadeia `Empresa → Operação → Financeiro → Comunicação → Governança/Risco → Integrações → Sistema`, usando estados `done`, `active`, `warning`, `blocked` e `idle` conforme os sinais já carregados na página.
+- `EntityTimelineCard` exibe “Últimas alterações de configuração” quando o payload de configurações retorna data real de atualização. Quando não há evento real, o fallback é explícito e informa que o Nexo não cria histórico fictício.
+
+### Dados reaproveitados
+
+Configurações reaproveita somente dados já disponíveis na própria página:
+
+- configurações da organização retornadas por `nexo.settings.get`, incluindo nome, fuso horário, moeda, regras ou objetos de operação/governança quando presentes;
+- usuários e papéis retornados por `nexo.invites.members`, usados para leitura de responsabilidade e permissões;
+- readiness de integrações retornado por `integrations.readiness`, usado para Stripe/pagamentos e canal de comunicação já existente;
+- estado local dos campos de empresa e fuso horário para indicar alterações não salvas sem alterar contratos;
+- rotas existentes para Pessoas, O.S., Financeiro, WhatsApp, Governança e Timeline.
+
+### Fallbacks seguros
+
+- Se a configuração não retorna regra financeira, padrão operacional, política de governança ou template de comunicação, a página marca o bloco como pendente em vez de inventar uma regra.
+- Se não há data real de alteração de configuração, `EntityTimelineCard` usa o fallback canônico e não fabrica histórico.
+- Se não há membros ou papel administrativo claro, permissões entram como atenção, mas nenhuma permissão é criada ou alterada.
+- Integrações são lidas apenas pelo readiness existente; ausência de Stripe ou comunicação conectada vira sinal administrativo, não bloqueio técnico novo.
+- A Próxima Melhor Ação apenas orienta ou navega para páginas existentes. Nenhuma configuração, comunicação, automação, cobrança, permissão ou política é executada automaticamente.
+
+### Relação Configurações → Operação → Financeiro → Comunicação → Governança/Risco
+
+Configurações define a base administrativa que condiciona a operação. Empresa e Sistema estabilizam identidade e fuso; Operação orienta Agenda e O.S.; Financeiro define como execução vira cobrança; Comunicação indica se avisos e confirmações têm canal/template confirmado; Governança/Risco interpreta pendências e políticas visíveis; Integrações mostram se dependências externas sustentam o ciclo operacional. A camada explicita onde uma lacuna de configuração pode afetar a execução antes que o operador avance para os módulos transacionais.
+
+### Congelamento de WhatsApp e próxima página candidata
+
+WhatsApp permanece congelado nesta adoção: `WhatsAppPage.tsx` não foi alterado, não há novo fluxo de comunicação e Configurações apenas lê readiness/navega para a rota existente quando necessário. Depois de Configurações, a próxima página candidata para adoção da Operational Command Layer é Billing.
