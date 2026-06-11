@@ -486,3 +486,52 @@ Configurações define a base administrativa que condiciona a operação. Empres
 ### Congelamento de WhatsApp e próxima página candidata
 
 WhatsApp permanece congelado nesta adoção: `WhatsAppPage.tsx` não foi alterado, não há novo fluxo de comunicação e Configurações apenas lê readiness/navega para a rota existente quando necessário. Depois de Configurações, a próxima página candidata para adoção da Operational Command Layer é Billing.
+
+## Adoção em Billing
+
+A página de Billing (`BillingPage`) adota a Operational Command Layer para deixar de ser apenas uma tela de plano, checkout e histórico, e passar a funcionar como controle operacional da assinatura da empresa que usa o NexoGestão. A primeira leitura passa a responder qual é o plano atual, qual é o status da assinatura, quando ocorre a próxima cobrança, se existe falha de pagamento, se há risco de restrição de acesso e qual ação administrativa deve ser tomada agora.
+
+### Billing não é Financeiro
+
+Billing e Financeiro continuam separados:
+
+- Financeiro trata o cliente da empresa pagando pelos serviços prestados por ela, incluindo cobranças, recebimentos e inadimplência operacional dos clientes.
+- Billing trata a empresa pagando para usar o Nexo, incluindo plano contratado, assinatura SaaS, cobrança da plataforma, método de pagamento, faturas, limites do plano e risco de acesso ao próprio Nexo.
+
+Essa separação evita misturar inadimplência de clientes com risco comercial da organização usuária dentro da plataforma.
+
+### Como Billing usa a camada operacional
+
+- `OperationalStateCard` mostra o estado da assinatura (`NORMAL`, `WARNING`, `RESTRICTED` ou `SUSPENDED`) a partir de status real, falha ou vencimento de fatura, trial perto do fim, próxima cobrança próxima, método de pagamento ausente e uso próximo do limite quando esses dados existem.
+- `OperationalRiskCard` explica o risco dominante de acesso/plano com motivo e impacto: pagamento falhou, assinatura `PAST_DUE`, fatura vencida, trial expirando, método ausente, limite próximo ou ausência de risco crítico.
+- `NextBestActionCard` segue a prioridade administrativa de Billing sem executar nada automaticamente: atualizar pagamento, regularizar assinatura, escolher plano, adicionar método de pagamento, revisar plano ou revisar assinatura.
+- `OperationalFlowCard` mostra a cadeia `Plano → Assinatura → Fatura → Pagamento → Acesso → Governança/Billing`, usando `done`, `active`, `warning`, `blocked` e `idle` conforme os sinais já retornados.
+- `EntityTimelineCard` exibe “Histórico oficial de Billing” com faturas, pagamentos e eventos reais retornados pelo Billing. Quando não há eventos, o fallback canônico informa explicitamente que nenhum histórico fictício é criado.
+
+### Dados reaproveitados
+
+Billing reaproveita somente dados e ações já disponíveis na própria página:
+
+- planos retornados por `billing.plans` para manter a leitura administrativa de plano;
+- status da assinatura retornado por `billing.status`, incluindo plano, status, `currentPeriodEnd`, próxima cobrança, valor, método de pagamento e eventos quando retornados;
+- limites e uso retornados por `billing.limits`, incluindo trial, plano, limites e percentuais de uso por entidade quando disponíveis;
+- readiness de Stripe retornado por `integrations.readiness`, usado apenas para habilitar ou bloquear ações já existentes de checkout;
+- mutations já existentes de checkout e cancelamento, preservadas nos blocos existentes e não acionadas automaticamente pela Próxima Melhor Ação;
+- tabela existente de histórico, usada como prova detalhada de faturas, pagamentos e falhas quando a fonte de Billing retorna eventos.
+
+### Fallbacks seguros
+
+- Se a próxima cobrança não é retornada, a camada marca atenção por dado incompleto em vez de inventar data.
+- Se o método de pagamento não é retornado em plano pago, a camada orienta revisão/adição de método sem criar meio de pagamento fictício.
+- Se não há eventos de fatura ou pagamento, `EntityTimelineCard` e a tabela informam ausência de histórico retornado, sem fabricar fatura.
+- `SUSPENDED` só é usado quando o status real retorna cancelamento ou suspensão/bloqueio compatível.
+- Uso próximo do limite só aparece quando `billing.limits` retorna percentuais reais de uso; limites ilimitados não geram alerta artificial.
+- A Próxima Melhor Ação apenas orienta e navega para a área de ações administrativas já existente. Ela não dispara pagamento, checkout, cancelamento, comunicação ou automação.
+
+### Relação Plano → Assinatura → Fatura → Pagamento → Acesso
+
+Plano define a capacidade contratada da organização. Assinatura indica se o contrato SaaS está ativo, em trial, atrasado, cancelado ou suspenso. Fatura representa a cobrança da plataforma e sua próxima data ou histórico real. Pagamento indica falha, ausência de método ou normalidade. Acesso traduz esses sinais em risco de bloqueio ou restrição. Governança/Billing consolida a prova administrativa para revisão da empresa dentro do Nexo.
+
+### Congelamento de WhatsApp e próxima página candidata
+
+WhatsApp permanece congelado nesta adoção: `WhatsAppPage.tsx` não foi alterado, não há novo fluxo de comunicação e Billing não cria mensagem, template, campanha ou automação. Depois de Billing, a próxima página candidata para adoção da Operational Command Layer é Calendário.
