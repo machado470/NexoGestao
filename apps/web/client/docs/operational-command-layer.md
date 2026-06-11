@@ -407,3 +407,44 @@ Pessoa é o dono operacional. Agendamentos mostram a entrada sob responsabilidad
 ### Congelamento de WhatsApp e próxima página candidata
 
 WhatsApp permanece congelado nesta adoção: `WhatsAppPage.tsx` não foi alterado, não há novo fluxo de comunicação e a ação “Confirmar agenda” apenas navega para Agendamentos. Depois de Pessoas, a próxima página candidata para adoção da Operational Command Layer é Perfil.
+
+## Adoção em Perfil
+
+A página de Perfil (`ProfilePage`) adota a Operational Command Layer para deixar de ser apenas uma tela de dados pessoais e preferências. A primeira leitura passa a responder quem é o usuário dentro da operação, qual papel ele exerce, quais pendências estão atribuídas a ele, qual risco individual existe e qual ação segura deve ser tomada agora.
+
+### Como Perfil usa a camada operacional
+
+- `OperationalStateCard` mostra o estado operacional individual (`NORMAL`, `WARNING`, `RESTRICTED` ou `SUSPENDED`) a partir do status real do usuário, papel/função, permissões retornadas, O.S. atribuídas, agendamentos atribuídos, atrasos, carga pessoal e ausência de atividade recente quando há itens sob responsabilidade. `SUSPENDED` só é usado quando o payload do usuário já retorna suspensão real.
+- `OperationalRiskCard` explica o risco dominante do usuário com sinais concretos: O.S. atrasadas atribuídas ao usuário, agendamentos pendentes no passado, sobrecarga pessoal, baixa atividade com itens atribuídos ou permissão insuficiente quando esse sinal já existe no payload. Quando não há sinal dominante, o card declara ausência de risco individual relevante em vez de criar risco genérico.
+- `NextBestActionCard` concentra a Próxima Melhor Ação canônica de Perfil, sem execução automática: destravar minhas O.S., revisar minha agenda, revisar prioridades, atualizar andamento, solicitar apoio ou revisar minha operação.
+- `OperationalFlowCard` mostra a cadeia `Perfil → Minhas tarefas → Agendamentos → O.S. → Financeiro → Timeline → Risco/Governança`, usando estados `done`, `active`, `warning`, `blocked` e `idle` conforme os dados individuais já carregados.
+- `EntityTimelineCard` apresenta “Minha Timeline operacional” com eventos oficiais do usuário quando retornados. Se a Timeline individual não retornar eventos, usa apenas sinais contextuais derivados de O.S. e agendamentos reais atribuídos ao usuário, deixando claro que eles não substituem a Timeline oficial.
+
+### Dados reaproveitados
+
+Perfil reaproveita somente dados e contratos já disponíveis na própria página:
+
+- usuário autenticado por `nexo.me`, incluindo nome, e-mail, papel/função, status, organização, permissões/papéis quando retornados e última atividade quando disponível;
+- agendamentos existentes de `nexo.appointments.list`, filtrados por referências do usuário ou pessoa;
+- O.S. existentes de `nexo.serviceOrders.list`, filtradas por referências do usuário ou pessoa;
+- cobranças existentes de `finance.charges.list`, usadas apenas quando já há vínculo com o usuário para estimar impacto financeiro individual;
+- eventos oficiais existentes de `nexo.timeline.listByOrg`, filtrados por ator, usuário, pessoa ou vínculo operacional;
+- preferências locais já existentes de disponibilidade, notificações e preferência de trabalho;
+- rotas existentes para O.S., Agendamentos, Financeiro, Timeline, Governança e Configurações.
+
+### Fallbacks seguros
+
+- Quando não há O.S., agenda, financeiro ou Timeline atribuídos ao usuário, as etapas correspondentes ficam `idle` e informam explicitamente que não receberam dado individual no recorte carregado.
+- Quando não há dado financeiro atribuído ao usuário, Financeiro permanece `idle`; nenhum valor é inventado.
+- Quando não há evento oficial individual, a Timeline operacional mostra o fallback canônico ou até quatro sinais contextuais derivados somente de dados reais de O.S. e agendamentos. Esses sinais são marcados como contexto e não substituem a Timeline oficial.
+- Ausência de atividade recente só vira sinal de atenção quando há itens atribuídos ao usuário; não bloqueia automaticamente a operação.
+- Permissão insuficiente só aparece quando o payload já indica necessidade de permissão sem alçada acionável retornada; a página não altera auth nem regras de permissão.
+- A Próxima Melhor Ação apenas orienta e navega para módulos existentes. Nenhuma O.S., agenda, cobrança, governança, permissão ou comunicação é executada automaticamente.
+
+### Relação Perfil → Tarefas → Agendamentos → O.S. → Timeline → Risco/Governança
+
+Perfil identifica o responsável individual. Minhas tarefas agregam o que está sob responsabilidade do usuário. Agendamentos representam a entrada operacional pessoal. O.S. representam a execução e seus atrasos. Financeiro aparece apenas quando há cobrança paga atribuída ao usuário; caso contrário, permanece como consequência sem dado individual. Timeline é a prova oficial das ações do usuário. Risco/Governança interpreta atraso, sobrecarga, baixa atividade ou alçada insuficiente como necessidade de orientação segura.
+
+### Congelamento de WhatsApp e próxima página candidata
+
+WhatsApp permanece congelado nesta adoção: `WhatsAppPage.tsx` não foi alterado, não há novo fluxo de comunicação e a Próxima Melhor Ação de Perfil não cria mensagens nem automações. Depois de Perfil, a próxima página candidata para adoção da Operational Command Layer é Configurações.
