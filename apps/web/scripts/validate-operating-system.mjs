@@ -265,6 +265,24 @@ for (const file of modalContrastScopeFiles) {
   });
 }
 
+const serviceOrdersSource = readFileSync(join(root, "client/src/pages/ServiceOrdersPage.tsx"), "utf8");
+const serviceOrdersExecutionContract = [
+  "Centro real de execução operacional",
+  "Alertas compactos: atraso, parada, responsável e cobrança.",
+  "Número, cliente, serviço, status, responsável, prazo, atraso, valor",
+  "Sem prazo",
+  "Cobrar / Gerar cobrança",
+  "Enviar WhatsApp",
+  "Fallback contextual com datas reais da O.S.; não substitui a Timeline oficial.",
+];
+for (const expected of serviceOrdersExecutionContract) {
+  if (!serviceOrdersSource.includes(expected)) {
+    errors.push(
+      `client/src/pages/ServiceOrdersPage.tsx: contrato de execução operacional de O.S. ausente (${expected}).`
+    );
+  }
+}
+
 if (warnings.length > 0) {
   console.warn("\n⚠️ Avisos de padronização visual (não bloqueantes):\n");
   for (const warning of warnings) console.warn(`- ${warning}`);
