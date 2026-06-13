@@ -158,14 +158,16 @@ Clientes agora serve como segunda prova do padrão operacional transversal depoi
 
 ## Adoção em Financeiro
 
-A página de Financeiro (`FinancesPage`) adota a camada operacional transversal para transformar a carteira de cobranças em controle operacional de receita. A primeira leitura deixa de ser apenas KPI/lista e passa a responder qual dinheiro está travado, quem deve ser cobrado agora, qual risco financeiro existe e onde isso aparece no fluxo `Cobrança → Pagamento → Timeline → Risco/Governança`.
+A página de Financeiro (`FinancesPage`) é o centro operacional de conversão da execução em receita. Ela não tenta ser um ERP contábil pesado: a primeira leitura responde quanto já foi recebido, quanto ainda está a receber, o que venceu, o que está previsto, quem deve ser cobrado agora e qual risco financeiro existe com base somente nos dados carregados.
 
 ### Como Financeiro usa a camada
 
 - `OperationalStateCard` abre a página com estado financeiro operacional (`NORMAL`, `WARNING` ou `RESTRICTED`) a partir de vencidas, valor vencido, pendências, vencimentos próximos, pagamentos recebidos e O.S. concluídas sem cobrança quando esse dado já está carregado.
 - `OperationalRiskCard` explica o risco com valor vencido, quantidade de cobranças vencidas, maior/médio atraso calculado por `dueDate` e cobrança/cliente mais crítico.
 - `NextBestActionCard` concentra a Próxima Melhor Ação financeira, sem execução automática: cobrar vencida, enviar link antes do vencimento, revisar recebimento, gerar cobrança para O.S. concluída sem cobrança ou revisar carteira.
-- `OperationalFlowCard` mostra a cadeia `Cliente → O.S. → Cobrança → Pagamento → Timeline → Risco/Governança` com estados `done`, `warning`, `blocked` ou `idle` conforme os dados financeiros carregados.
+- KPIs compactos e o bloco de saúde do caixa mostram recebido, a receber, vencido, previsto, dinheiro pendente, dinheiro em risco e gargalo cobrança → pagamento sem gráficos ou cards vazios.
+- Alertas compactos destacam cobranças vencidas, pendentes, pagamentos sem registro e cobrança sem contato apenas quando a fonte retorna campo suficiente; quando não retorna, a tela declara fallback em vez de inferir automação ou falha.
+- A carteira operacional lista cliente, valor, status, vencimento, dias de atraso e origem/O.S. quando disponível, com ações reais existentes: cobrar/WhatsApp contextual, enviar link via contexto existente, registrar pagamento, abrir cliente, abrir O.S. e ver detalhe.
 - `EntityTimelineCard` substitui timeline visual solta por prova operacional financeira: usa eventos oficiais quando a Timeline retorna dados e, quando não retorna, exibe fallback contextual derivado de cobranças/pagamentos carregados, deixando claro que não substitui a Timeline oficial.
 
 ### Dados reaproveitados
@@ -187,9 +189,9 @@ Financeiro reaproveita apenas dados já disponíveis na página:
 - `SUSPENDED` não é usado em Financeiro sem dado real que comprove suspensão.
 - A Próxima Melhor Ação apenas orienta o operador; não envia mensagem, não registra pagamento e não altera cobrança automaticamente.
 
-### Relação Cobrança → Pagamento → Timeline → Risco/Governança
+### Relação Execução → Cobrança → Pagamento → Receita
 
-Financeiro trata cobrança como ponte entre operação concluída e caixa. Cobrança vencida bloqueia o estágio de pagamento, aumenta risco financeiro, deve gerar prova operacional na Timeline quando houver ação real e alimenta a leitura de Governança. Cobrança pendente próxima do vencimento fica em atenção preventiva. Cobrança paga sem pagamento vinculado vira revisão de recebimento para evitar divergência entre status financeiro e prova operacional.
+Financeiro trata cobrança como ponte direta entre operação concluída e caixa. O.S. concluída sem cobrança é receita operacional ainda não convertida. Cobrança vencida só vira atraso quando existe vencimento confiável, aumenta risco financeiro e deve ser priorizada por ação real do operador. Cobrança pendente próxima do vencimento fica em atenção preventiva. Cobrança paga sem pagamento vinculado vira revisão de recebimento para evitar divergência entre status financeiro e prova operacional. O detalhe financeiro permanece focado em cobrança, pagamento, histórico/timeline e comunicação existente.
 
 ### Congelamento de WhatsApp e próximas páginas
 

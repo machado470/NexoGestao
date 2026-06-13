@@ -1,11 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { operationalCopy } from "@/lib/operational-semantics";
 import { compareOperationalPriority } from "@/lib/operational-prioritization";
 import { aggregateOperationalHealth } from "@/lib/operational-health";
-import {
-  detectOperationalInterventions,
-  getPrimaryOperationalIntervention,
-} from "@/lib/operational-interventions";
 import {
   getAttentionSummary,
   getVisibleAttentionItems,
@@ -52,10 +47,8 @@ import { trpc } from "@/lib/trpc";
 import {
   EntityTimelineCard,
   NextBestActionCard,
-  OperationalFlowCard,
   OperationalRiskCard,
   OperationalStateCard,
-  type OperationalFlowStageState,
   type OperationalStateLevel,
 } from "@/components/app/OperationalCommandLayer";
 import type { OperationalSeverity } from "@/lib/operations/operational-intelligence";
@@ -491,19 +484,6 @@ export default function FinancesPage() {
     [enrichedCharges, serviceOrders]
   );
 
-  const financeIntervention = useMemo(
-    () =>
-      getPrimaryOperationalIntervention(
-        detectOperationalInterventions({
-          charges: enrichedCharges,
-          payments: enrichedCharges.flatMap(item =>
-            Array.isArray(item.payments) ? item.payments : []
-          ),
-          serviceOrders,
-        })
-      ),
-    [enrichedCharges, serviceOrders]
-  );
   const highlightedFinancialAttention = useMemo(
     () =>
       getVisibleAttentionItems(
@@ -875,133 +855,6 @@ export default function FinancesPage() {
     paidWithoutRegisteredPayment,
   ]);
 
-  const financeFlowStages = useMemo(
-    () =>
-      [
-        {
-          id: "customer",
-          label: "Cliente",
-          summary: "Clientes vinculados às cobranças carregadas.",
-          countOrValue: String(
-            new Set(
-              enrichedCharges.map(item => item.customerId).filter(Boolean)
-            ).size
-          ),
-          state: enrichedCharges.some(item => item.customerId)
-            ? "done"
-            : "idle",
-          hrefLabel: "Abrir clientes",
-          onClick: () => navigate("/customers"),
-        },
-        {
-          id: "service-order",
-          label: "O.S.",
-          summary:
-            completedOrdersWithoutCharge.length > 0
-              ? "Há O.S. concluída sem cobrança."
-              : "Origem operacional vinculada quando informada.",
-          countOrValue: String(
-            new Set(
-              enrichedCharges.map(item => item.serviceOrderId).filter(Boolean)
-            ).size
-          ),
-          state:
-            completedOrdersWithoutCharge.length > 0
-              ? "warning"
-              : enrichedCharges.some(item => item.serviceOrderId)
-                ? "done"
-                : "idle",
-          hrefLabel: "Abrir O.S.",
-          onClick: () => navigate("/service-orders"),
-        },
-        {
-          id: "charge",
-          label: "Cobrança",
-          summary: cashHealth.collectionBottleneck,
-          countOrValue: `${enrichedCharges.length} cobrança(s)`,
-          state:
-            cashHealth.overdueCount > 0
-              ? "blocked"
-              : cashHealth.pendingCount > 0
-                ? "warning"
-                : "done",
-          hrefLabel: "Ver carteira",
-          onClick: () => setStatusFilter("all"),
-        },
-        {
-          id: "payment",
-          label: "Pagamento",
-          summary:
-            cashHealth.overdueCount > 0
-              ? "Vencidas impedem conversão em caixa."
-              : cashHealth.pendingCount > 0
-                ? "Pendências aguardam recebimento."
-                : "Pagamentos confirmados na carteira.",
-          countOrValue: `${cashHealth.paidCount} pago(s)`,
-          state:
-            cashHealth.overdueCount > 0
-              ? "blocked"
-              : cashHealth.pendingCount > 0
-                ? "warning"
-                : "done",
-        },
-        {
-          id: "timeline",
-          label: "Timeline",
-          summary:
-            timelineItems.length > 0
-              ? "Eventos oficiais encontrados para o contexto selecionado."
-              : "Sem timeline retornada; abrir prova completa.",
-          countOrValue:
-            timelineItems.length > 0
-              ? `${timelineItems.length} evento(s)`
-              : "Fallback",
-          state: timelineItems.length > 0 ? "done" : "idle",
-          hrefLabel: "Abrir Timeline",
-          onClick: () =>
-            navigate(
-              selectedCharge?.customerId
-                ? `/timeline?customerId=${selectedCharge.customerId}`
-                : "/timeline"
-            ),
-        },
-        {
-          id: "risk",
-          label: "Risco/Governança",
-          summary:
-            cashHealth.overdueCount > 0
-              ? "Atrasos elevam risco financeiro e governança."
-              : "Risco financeiro monitorado sem bloqueio dominante.",
-          countOrValue: financeCommandState.level,
-          state:
-            financeCommandState.level === "RESTRICTED"
-              ? "blocked"
-              : financeCommandState.level === "WARNING"
-                ? "warning"
-                : "done",
-          hrefLabel: "Abrir governança",
-          onClick: () => navigate("/governance?source=finances"),
-        },
-      ] as Array<{
-        id: string;
-        label: string;
-        summary: string;
-        state: OperationalFlowStageState;
-        countOrValue?: string;
-        hrefLabel?: string;
-        onClick?: () => void;
-      }>,
-    [
-      cashHealth,
-      completedOrdersWithoutCharge.length,
-      enrichedCharges,
-      financeCommandState.level,
-      navigate,
-      selectedCharge?.customerId,
-      timelineItems.length,
-    ]
-  );
-
   const financeTimelineEvents = useMemo(() => {
     if (timelineItems.length > 0) {
       return timelineItems.slice(0, 4).map(item => ({
@@ -1329,8 +1182,8 @@ export default function FinancesPage() {
   return (
     <AppPageShell className="gap-3">
       <AppOperationalHeader
-        title="Financeiro"
-        description={`Centro operacional de cobrança e receita · ${enrichedCharges.length} cobrança(s), ${cashHealth.overdueCount} vencida(s) e ${completedOrdersWithoutCharge.length} O.S. concluída(s) sem cobrança.`}
+        title="Financeiro operacional"
+        description={`Centro de conversão da execução em receita · ${enrichedCharges.length} cobrança(s), ${cashHealth.overdueCount} vencida(s), ${cashHealth.pendingCount} pendente(s) e ${completedOrdersWithoutCharge.length} O.S. concluída(s) sem cobrança.`}
         secondaryActions={
           <Button variant="ghost" size="sm" onClick={() => void refreshAll()}>
             Atualizar
@@ -1364,8 +1217,8 @@ export default function FinancesPage() {
         }
       >
         <p className="text-sm text-[var(--text-secondary)]">
-          Ação real primeiro: cobrar, enviar link ou registrar pagamento antes
-          de navegar para cliente/O.S.
+          Financeiro mostra cobrança, pagamento, atraso e risco com os dados já
+          carregados — sem ERP contábil pesado e sem automação inventada.
         </p>
       </AppOperationalHeader>
 
@@ -1445,12 +1298,6 @@ export default function FinancesPage() {
           }
         />
       </AppSectionCard>
-
-      <OperationalFlowCard
-        title="Fluxo financeiro operacional"
-        subtitle="Cliente → O.S. → Cobrança → Pagamento → Timeline → Risco/Governança"
-        stages={financeFlowStages}
-      />
 
       <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
         <AppStatCard
@@ -1534,33 +1381,8 @@ export default function FinancesPage() {
       </AppSectionBlock>
 
       <AppSectionBlock
-        title="Intervenção financeira dominante"
-        subtitle="Recomendação contextual para destravar cobrança → pagamento."
-        compact
-        className="hidden"
-      >
-        {financeIntervention ? (
-          <AppInfoCard>
-            <p className="text-sm font-semibold text-[var(--text-primary)]">
-              {financeIntervention.label}
-            </p>
-            <p className="mt-1 text-xs text-[var(--text-secondary)]">
-              {financeIntervention.summary}
-            </p>
-            <p className="mt-1 text-xs text-[var(--text-secondary)]">
-              Owner sugerido: {financeIntervention.recommendedOwner}
-            </p>
-          </AppInfoCard>
-        ) : (
-          <p className="text-xs text-[var(--text-secondary)]">
-            Sem intervenção financeira dominante no momento.
-          </p>
-        )}
-      </AppSectionBlock>
-
-      <AppSectionBlock
-        title={operationalCopy.immediateAttention}
-        subtitle={`Pendências que afetam cobrança, comunicação e registro de pagamento. ${highlightedFinancialSummary.hidden > 0 ? highlightedFinancialSummary.hiddenMessage : ""}`}
+        title="Alertas compactos de receita"
+        subtitle={`Cobranças vencidas, pendentes, pagamentos sem registro e comunicação somente quando a fonte permite. ${highlightedFinancialSummary.hidden > 0 ? highlightedFinancialSummary.hiddenMessage : ""}`}
         compact
       >
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
@@ -1697,6 +1519,7 @@ export default function FinancesPage() {
                   <th className="p-2.5 text-left">Cliente</th>
                   <th className="text-left">Valor / status</th>
                   <th className="text-left">Vencimento / atraso</th>
+                  <th className="text-left">Origem / O.S.</th>
                   <th className="text-left">Prioridade</th>
                   <th className="p-2.5 text-left">Ação</th>
                 </tr>
@@ -1747,12 +1570,22 @@ export default function FinancesPage() {
                         </div>
                       </td>
                       <td>
-                        <div className="space-y-1">
-                          <AppPriorityBadge priority={getChargePriority(row)} />
-                          <p className="max-w-[180px] truncate text-xs text-[var(--text-muted)]">
-                            {safeText(row.serviceOrderLabel, "Sem O.S.")}
+                        <div className="space-y-1 text-xs text-[var(--text-secondary)]">
+                          <p className="font-medium text-[var(--text-primary)]">
+                            {safeText(
+                              row.serviceOrderLabel,
+                              "Origem não retornada"
+                            )}
+                          </p>
+                          <p>
+                            {row.serviceOrderId
+                              ? "O.S. vinculada"
+                              : "Fonte não informou O.S."}
                           </p>
                         </div>
+                      </td>
+                      <td>
+                        <AppPriorityBadge priority={getChargePriority(row)} />
                       </td>
                       <td
                         className="p-2.5"
@@ -1852,8 +1685,8 @@ export default function FinancesPage() {
       </AppSectionBlock>
 
       <AppSectionBlock
-        title="Painel financeiro secundário"
-        subtitle="Resumo compacto com origem, risco e histórico quando uma cobrança está selecionada."
+        title="Detalhe financeiro de cobrança"
+        subtitle="Cobrança, pagamento, histórico/timeline e comunicação existente, com fallback honesto quando a fonte não entrega dado."
         compact
       >
         {selectedCharge ? (
