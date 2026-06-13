@@ -1,24 +1,9 @@
 import { useMemo, useState } from "react";
-import {
-  CalendarDays,
-  ClipboardList,
-  Pencil,
-  Plus,
-  Trash2,
-  Users,
-} from "lucide-react";
+import { Plus, Trash2, Users } from "lucide-react";
 import { useLocation } from "wouter";
 import CreatePersonModal from "@/components/CreatePersonModal";
 import EditPersonModal from "@/components/EditPersonModal";
-import {
-  EntityTimelineCard,
-  NextBestActionCard,
-  OperationalFlowCard,
-  OperationalRiskCard,
-  OperationalStateCard,
-  type OperationalFlowStageState,
-  type OperationalStateLevel,
-} from "@/components/app/OperationalCommandLayer";
+import { NextBestActionCard } from "@/components/app/OperationalCommandLayer";
 import {
   AppDataTable,
   AppInput,
@@ -286,186 +271,6 @@ function pickOperationalPerson(people: OperationalPerson[]) {
   );
 }
 
-function buildPeopleState(target: PeopleCommandTarget): {
-  level: OperationalStateLevel;
-  reason: string;
-  impact: string;
-  title: string;
-  detailsLabel: string;
-} {
-  if (target.person) {
-    const person = target.person;
-    if (person.status === "SUSPENDED") {
-      return {
-        level: "SUSPENDED",
-        title: `Estado de ${person.name}`,
-        reason: `${person.name} está suspenso e mantém ${person.openServiceOrdersCount} O.S. aberta(s) e ${person.futureAppointmentsCount + person.todayAppointmentsCount} agendamento(s) atribuídos.`,
-        impact:
-          "Responsabilidade crítica pode ficar sem execução real enquanto itens seguem vinculados a uma pessoa suspensa.",
-        detailsLabel: "Revisar responsabilidade",
-      };
-    }
-    if (isInactiveWithAssignedItems(person)) {
-      return {
-        level: "RESTRICTED",
-        title: `Estado de ${person.name}`,
-        reason: `${person.name} está ${personStatusLabel(person.status).toLowerCase()} com itens operacionais atribuídos.`,
-        impact:
-          "A operação pode perder dono real em O.S. e agendamentos já vinculados à pessoa.",
-        detailsLabel: "Redistribuir itens",
-      };
-    }
-    if (person.overdueServiceOrdersCount > 0) {
-      return {
-        level: "RESTRICTED",
-        title: `Estado de ${person.name}`,
-        reason: `${person.name} concentra ${person.overdueServiceOrdersCount} O.S. atrasada(s).`,
-        impact:
-          "A execução tende a atrasar cliente, agenda, financeiro e governança se a fila não for destravada.",
-        detailsLabel: "Ver O.S. atribuídas",
-      };
-    }
-    if (
-      isPersonOverloaded(person) ||
-      person.availabilityStatus === "UNAVAILABLE_NOW"
-    ) {
-      return {
-        level: "RESTRICTED",
-        title: `Estado de ${person.name}`,
-        reason: `${loadLabels[person.loadStatus]} · ${capacityLabels[person.capacityStatus]} · ${availabilityLabels[person.availabilityStatus]}.`,
-        impact:
-          "Novas atribuições podem aumentar fila parada ou colocar demanda em responsável indisponível.",
-        detailsLabel: "Rebalancear carga",
-      };
-    }
-    if (
-      person.loadStatus === "BUSY" ||
-      person.capacityStatus === "AT_CAPACITY" ||
-      person.availabilityStatus === "UNAVAILABLE_SOON" ||
-      hasNoRecentActivitySignal(person)
-    ) {
-      return {
-        level: "WARNING",
-        title: `Estado de ${person.name}`,
-        reason: hasNoRecentActivitySignal(person)
-          ? "Há itens atribuídos, mas a última atividade não foi registrada nesta leitura."
-          : `${loadLabels[person.loadStatus]} · ${capacityLabels[person.capacityStatus]} · ${availabilityLabels[person.availabilityStatus]}.`,
-        impact:
-          "A pessoa ainda pode executar, mas a fila precisa de acompanhamento antes de receber nova carga.",
-        detailsLabel: "Acompanhar pessoa",
-      };
-    }
-    return {
-      level: "NORMAL",
-      title: `Estado de ${person.name}`,
-      reason: `${person.name} está ativo, sem atraso vinculado e com carga dentro da capacidade carregada.`,
-      impact:
-        "Responsabilidade rastreável e sem intervenção imediata apontada pelos sinais disponíveis.",
-      detailsLabel: "Ver detalhe",
-    };
-  }
-
-  const interventionPerson = pickOperationalPerson(target.people);
-  const overloaded = target.people.filter(isPersonOverloaded).length;
-  const inactiveAssigned = target.people.filter(
-    isInactiveWithAssignedItems
-  ).length;
-  const overdue = target.people.reduce(
-    (total, person) => total + person.overdueServiceOrdersCount,
-    0
-  );
-  if (inactiveAssigned > 0 || overdue > 0 || overloaded > 0) {
-    return {
-      level: "RESTRICTED",
-      title: "Estado operacional da equipe",
-      reason: interventionPerson
-        ? `${interventionPerson.name} é o principal ponto de intervenção por status, atraso ou carga.`
-        : `${inactiveAssigned} pessoa(s) inativa(s) com itens, ${overdue} O.S. atrasada(s) e ${overloaded} pessoa(s) acima da capacidade.`,
-      impact:
-        "A responsabilidade operacional precisa ser redistribuída ou destravada antes de a fila crescer.",
-      detailsLabel: "Abrir responsável crítico",
-    };
-  }
-  const attention = target.people.filter(
-    person => derivePersonOperationalStatus(person) === "ATENÇÃO"
-  ).length;
-  if (attention > 0 || target.warningSummary?.totals.shown) {
-    return {
-      level: "WARNING",
-      title: "Estado operacional da equipe",
-      reason: `${attention} pessoa(s) em atenção e ${target.warningSummary?.totals.shown ?? 0} alerta(s) de atribuição observado(s).`,
-      impact:
-        "A equipe está operando, mas disponibilidade, capacidade e decisões manuais pedem acompanhamento.",
-      detailsLabel: "Filtrar atenção",
-    };
-  }
-  return {
-    level: "NORMAL",
-    title: "Estado operacional da equipe",
-    reason:
-      "Equipe carregada sem atraso, sobrecarga ou indisponibilidade crítica nos sinais disponíveis.",
-    impact:
-      "A responsabilidade está distribuída de forma rastreável conforme os dados já retornados pela página.",
-    detailsLabel: "Revisar equipe",
-  };
-}
-
-function buildPeopleRisk(target: PeopleCommandTarget): {
-  title: string;
-  reason: string;
-  impact: string;
-  ctaLabel: string;
-} {
-  const person = target.person ?? pickOperationalPerson(target.people) ?? null;
-  if (person && isInactiveWithAssignedItems(person)) {
-    return {
-      title: "Pessoa inativa ainda segura operação",
-      reason: `${person.name} está ${personStatusLabel(person.status).toLowerCase()} com ${person.openServiceOrdersCount} O.S. aberta(s) e ${person.todayAppointmentsCount + person.futureAppointmentsCount} agendamento(s).`,
-      impact:
-        "Execução, agenda e governança ficam sem dono real se os itens permanecerem atribuídos.",
-      ctaLabel: "Abrir pessoa",
-    };
-  }
-  if (person && person.overdueServiceOrdersCount > 0) {
-    return {
-      title: "Atraso vinculado a responsável",
-      reason: `${person.name} tem ${person.overdueServiceOrdersCount} O.S. atrasada(s) entre ${person.openServiceOrdersCount} aberta(s).`,
-      impact:
-        "Atrasos de execução podem atrasar agenda, cobrança e prova operacional na Timeline.",
-      ctaLabel: "Ver O.S.",
-    };
-  }
-  if (person && isPersonOverloaded(person)) {
-    return {
-      title: "Sobrecarga concentrada",
-      reason: `${person.name} aparece como ${loadLabels[person.loadStatus].toLowerCase()} e ${capacityLabels[person.capacityStatus].toLowerCase()}.`,
-      impact:
-        "A fila pode parar no mesmo responsável e elevar retrabalho ou intervenção de governança.",
-      ctaLabel: "Rebalancear",
-    };
-  }
-  if (
-    person &&
-    person.todayAppointmentsCount + person.futureAppointmentsCount > 0
-  ) {
-    return {
-      title: "Agenda precisa de acompanhamento",
-      reason: `${person.name} tem ${person.todayAppointmentsCount} agendamento(s) hoje e ${person.futureAppointmentsCount} futuro(s).`,
-      impact:
-        "Confirmações e execução devem ser acompanhadas para evitar entrada operacional sem dono.",
-      ctaLabel: "Ver agenda",
-    };
-  }
-  return {
-    title: "Sem risco dominante carregado",
-    reason:
-      "Os sinais disponíveis não indicam pessoa inativa com itens, O.S. atrasada ou sobrecarga dominante.",
-    impact:
-      "A página mantém a revisão da equipe como controle preventivo sem inventar risco genérico.",
-    ctaLabel: target.person ? "Revisar pessoa" : "Revisar equipe",
-  };
-}
-
 function buildPeopleNextBestAction(
   target: PeopleCommandTarget,
   actions: {
@@ -582,192 +387,18 @@ function buildPeopleNextBestAction(
   };
 }
 
-function buildPeopleFlowStages(target: PeopleCommandTarget): Array<{
-  id: string;
-  label: string;
-  summary: string;
-  state: OperationalFlowStageState;
-  countOrValue?: string;
-  hrefLabel?: string;
-  onClick?: () => void;
-}> {
-  const people = target.person ? [target.person] : target.people;
-  const personLabel = target.person?.name ?? `${people.length} pessoa(s)`;
-  const todayAppointments = people.reduce(
-    (total, person) => total + person.todayAppointmentsCount,
-    0
-  );
-  const futureAppointments = people.reduce(
-    (total, person) => total + person.futureAppointmentsCount,
-    0
-  );
-  const openServiceOrders = people.reduce(
-    (total, person) => total + person.openServiceOrdersCount,
-    0
-  );
-  const overdueServiceOrders = people.reduce(
-    (total, person) => total + person.overdueServiceOrdersCount,
-    0
-  );
-  const warningSignals = target.warningSummary?.totals.shown ?? 0;
-  const hasEvents = people.some(
-    person =>
-      person.lastActivityAt ||
-      person.currentAvailabilityException ||
-      person.nextAvailabilityException
-  );
-  const hasOperationalRisk = people.some(
-    person =>
-      isInactiveWithAssignedItems(person) ||
-      person.overdueServiceOrdersCount > 0 ||
-      isPersonOverloaded(person) ||
-      person.availabilityStatus !== "AVAILABLE"
-  );
-  return [
-    {
-      id: "person",
-      label: "Pessoa",
-      summary: target.person
-        ? `${target.person.role} · ${personStatusLabel(target.person.status)}.`
-        : "Equipe carregada como mapa de responsáveis reais.",
-      state: people.length > 0 ? "done" : "idle",
-      countOrValue: personLabel,
-    },
-    {
-      id: "appointments",
-      label: "Agendamentos",
-      summary:
-        todayAppointments + futureAppointments > 0
-          ? `${todayAppointments} hoje e ${futureAppointments} futuro(s) atribuídos.`
-          : "Sem agendamentos atribuídos nos dados carregados.",
-      state:
-        todayAppointments > 0
-          ? "warning"
-          : futureAppointments > 0
-            ? "active"
-            : "idle",
-      countOrValue: `${todayAppointments + futureAppointments}`,
-    },
-    {
-      id: "service-orders",
-      label: "O.S.",
-      summary:
-        overdueServiceOrders > 0
-          ? `${overdueServiceOrders} atrasada(s) vinculada(s) a responsável.`
-          : openServiceOrders > 0
-            ? `${openServiceOrders} aberta(s) sem atraso informado.`
-            : "Sem O.S. aberta atribuída nesta leitura.",
-      state:
-        overdueServiceOrders > 0
-          ? "blocked"
-          : openServiceOrders > 0
-            ? "warning"
-            : "idle",
-      countOrValue: `${openServiceOrders}`,
-    },
-    {
-      id: "finance",
-      label: "Financeiro",
-      summary:
-        "Esta página não recebeu cobranças por responsável; financeiro fica como etapa de navegação segura.",
-      state: "idle",
-      countOrValue: "—",
-    },
-    {
-      id: "timeline",
-      label: "Timeline",
-      summary: hasEvents
-        ? "Há sinais reais de atividade/indisponibilidade para prova contextual."
-        : "Sem eventos oficiais retornados para Pessoas nesta leitura.",
-      state: hasEvents ? "done" : "idle",
-    },
-    {
-      id: "governance",
-      label: "Risco/Governança",
-      summary: hasOperationalRisk
-        ? "Há atraso, sobrecarga, indisponibilidade ou status que pede intervenção."
-        : "Responsabilidade sem risco dominante nos sinais disponíveis.",
-      state: hasOperationalRisk
-        ? "warning"
-        : warningSignals > 0
-          ? "warning"
-          : "done",
-      countOrValue: warningSignals ? `${warningSignals} alerta(s)` : undefined,
-    },
-  ];
-}
-
-function buildPeopleTimelineEvents(target: PeopleCommandTarget) {
-  const people = target.person
-    ? [target.person]
-    : sortByOperationalIntervention(target.people);
-  return people
-    .flatMap(person => {
-      const events: Array<{
-        id: string;
-        type: string;
-        occurredAt: string;
-        entity: string;
-        actor?: string;
-        summary: string;
-      }> = [];
-      if (person.lastActivityAt) {
-        events.push({
-          id: `${person.personId}-last-activity`,
-          type: "Atividade",
-          occurredAt: formatDateTime(person.lastActivityAt),
-          entity: person.name,
-          actor: person.name,
-          summary:
-            "Última atividade registrada para a pessoa nos dados operacionais carregados.",
-        });
-      }
-      if (person.overdueServiceOrdersCount > 0) {
-        events.push({
-          id: `${person.personId}-overdue-os`,
-          type: "O.S.",
-          occurredAt: "Sinal atual",
-          entity: `${person.overdueServiceOrdersCount} O.S. atrasada(s)`,
-          actor: person.name,
-          summary:
-            "Evento contextual derivado da contagem real de O.S. atrasadas atribuídas; não substitui a Timeline oficial.",
-        });
-      }
-      if (person.todayAppointmentsCount + person.futureAppointmentsCount > 0) {
-        events.push({
-          id: `${person.personId}-appointments`,
-          type: "Agenda",
-          occurredAt: "Sinal atual",
-          entity: `${person.todayAppointmentsCount + person.futureAppointmentsCount} agendamento(s) atribuídos`,
-          actor: person.name,
-          summary:
-            "Evento contextual derivado dos agendamentos vinculados ao responsável nesta leitura.",
-        });
-      }
-      if (person.currentAvailabilityException) {
-        events.push({
-          id: `${person.personId}-${person.currentAvailabilityException.id}`,
-          type: "Indisponibilidade",
-          occurredAt: formatDateTime(
-            person.currentAvailabilityException.startsAt
-          ),
-          entity: person.name,
-          actor: person.name,
-          summary: `Indisponibilidade atual registrada até ${formatDateTime(person.currentAvailabilityException.endsAt)}${person.currentAvailabilityException.reason ? ` · ${person.currentAvailabilityException.reason}` : ""}.`,
-        });
-      } else if (person.nextAvailabilityException) {
-        events.push({
-          id: `${person.personId}-${person.nextAvailabilityException.id}`,
-          type: "Indisponibilidade",
-          occurredAt: formatDateTime(person.nextAvailabilityException.startsAt),
-          entity: person.name,
-          actor: person.name,
-          summary: `Próxima indisponibilidade registrada até ${formatDateTime(person.nextAvailabilityException.endsAt)}${person.nextAvailabilityException.reason ? ` · ${person.nextAvailabilityException.reason}` : ""}.`,
-        });
-      }
-      return events;
-    })
-    .slice(0, 4);
+function getPersonRiskSignals(person: OperationalPerson): string[] {
+  const signals: string[] = [];
+  if (isInactiveWithAssignedItems(person))
+    signals.push("status sem execução ativa com itens");
+  if (person.overdueServiceOrdersCount > 0)
+    signals.push(`${person.overdueServiceOrdersCount} O.S. atrasada(s)`);
+  if (isPersonOverloaded(person)) signals.push("carga acima da capacidade");
+  if (person.availabilityStatus !== "AVAILABLE")
+    signals.push(availabilityLabels[person.availabilityStatus].toLowerCase());
+  if (hasNoRecentActivitySignal(person))
+    signals.push("sem última atividade carregada");
+  return signals;
 }
 
 export default function PeoplePage() {
@@ -910,22 +541,6 @@ export default function PeoplePage() {
     () => ({ person: selectedPerson, people, warningSummary }),
     [selectedPerson, people, warningSummary]
   );
-  const commandState = useMemo(
-    () => buildPeopleState(commandTarget),
-    [commandTarget]
-  );
-  const commandRisk = useMemo(
-    () => buildPeopleRisk(commandTarget),
-    [commandTarget]
-  );
-  const commandFlowStages = useMemo(
-    () => buildPeopleFlowStages(commandTarget),
-    [commandTarget]
-  );
-  const commandTimelineEvents = useMemo(
-    () => buildPeopleTimelineEvents(commandTarget),
-    [commandTarget]
-  );
   const nextBestAction = useMemo(
     () =>
       buildPeopleNextBestAction(commandTarget, {
@@ -939,38 +554,6 @@ export default function PeoplePage() {
       }),
     [commandTarget, navigate]
   );
-  const stateDetailsAction = () => {
-    if (selectedPerson) {
-      if (commandState.detailsLabel.includes("O.S.")) {
-        navigate("/service-orders");
-        return;
-      }
-      setSelectedPersonId(selectedPerson.personId);
-      return;
-    }
-    const interventionPerson = pickOperationalPerson(people);
-    if (interventionPerson && commandState.level === "RESTRICTED") {
-      setSelectedPersonId(interventionPerson.personId);
-      return;
-    }
-    setPeopleFilter("attention");
-  };
-  const riskAction = () => {
-    if (commandRisk.ctaLabel.includes("O.S.")) {
-      navigate("/service-orders");
-      return;
-    }
-    if (commandRisk.ctaLabel.includes("agenda")) {
-      navigate("/appointments");
-      return;
-    }
-    const interventionPerson = selectedPerson ?? pickOperationalPerson(people);
-    if (interventionPerson) {
-      setSelectedPersonId(interventionPerson.personId);
-      return;
-    }
-    setPeopleFilter("attention");
-  };
   const refresh = () => void summaryQuery.refetch();
   const submitAvailability = () =>
     selectedPersonId &&
@@ -1001,7 +584,7 @@ export default function PeoplePage() {
     <AppPageShell>
       <AppOperationalHeader
         title="Pessoas"
-        description="Controle de quem executa a operação, carga atual, capacidade planejada e indisponibilidades temporárias."
+        description="Centro de execução da equipe: carga, O.S., agenda, atrasos e indisponibilidades. Usuários, acesso e permissões ficam em Configurações."
         primaryAction={
           <Button onClick={() => setCreateOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
@@ -1014,7 +597,7 @@ export default function PeoplePage() {
           <AppInput
             value={queryText}
             onChange={event => setQueryText(event.target.value)}
-            placeholder="Buscar pessoa, função ou nota operacional"
+            placeholder="Buscar responsável, função ou nota operacional"
             className="h-9"
           />
           <div className="flex h-9 items-center rounded-md border border-[var(--nexo-border-subtle,var(--border-subtle))] bg-[var(--nexo-control-bg,var(--surface-subtle))] px-3 text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
@@ -1022,6 +605,25 @@ export default function PeoplePage() {
           </div>
         </div>
       </AppOperationalHeader>
+
+      <AppSectionCard className="border border-[var(--accent-soft)] p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
+              Equipe operacional, não permissões administrativas
+            </p>
+            <p className="mt-1 max-w-3xl text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
+              Pessoas mostra responsáveis que executam O.S. e agendamentos.
+              Criação/edição aqui mantém o cadastro operacional existente;
+              convites, acessos, papéis administrativos e políticas do sistema
+              devem ser tratados em Configurações.
+            </p>
+          </div>
+          <Button variant="secondary" onClick={() => navigate("/settings")}>
+            Abrir Configurações
+          </Button>
+        </div>
+      </AppSectionCard>
 
       <AppSectionCard
         className="space-y-3"
@@ -1075,24 +677,6 @@ export default function PeoplePage() {
         </div>
       </AppSectionCard>
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        <OperationalStateCard
-          level={commandState.level}
-          title={commandState.title}
-          reason={commandState.reason}
-          impact={commandState.impact}
-          detailsLabel={commandState.detailsLabel}
-          onDetails={stateDetailsAction}
-        />
-        <OperationalRiskCard
-          title={commandRisk.title}
-          reason={commandRisk.reason}
-          impact={commandRisk.impact}
-          ctaLabel={commandRisk.ctaLabel}
-          onClick={riskAction}
-        />
-      </div>
-
       <NextBestActionCard
         title={nextBestAction.title}
         entity={nextBestAction.entity}
@@ -1103,38 +687,6 @@ export default function PeoplePage() {
         onPrimaryAction={nextBestAction.onPrimaryAction}
         secondaryActionLabel={nextBestAction.secondaryActionLabel}
         onSecondaryAction={nextBestAction.onSecondaryAction}
-      />
-
-      <OperationalFlowCard
-        title="Fluxo de responsabilidade"
-        subtitle="Pessoa → Agendamentos → O.S. → Cobranças/Financeiro → Timeline → Risco/Governança"
-        stages={commandFlowStages.map(stage => ({
-          ...stage,
-          hrefLabel:
-            stage.id === "appointments"
-              ? "Abrir agenda"
-              : stage.id === "service-orders"
-                ? "Abrir O.S."
-                : stage.id === "finance"
-                  ? "Abrir financeiro"
-                  : stage.id === "timeline"
-                    ? "Abrir Timeline"
-                    : stage.id === "governance"
-                      ? "Abrir governança"
-                      : undefined,
-          onClick:
-            stage.id === "appointments"
-              ? () => navigate("/appointments")
-              : stage.id === "service-orders"
-                ? () => navigate("/service-orders")
-                : stage.id === "finance"
-                  ? () => navigate("/finances")
-                  : stage.id === "timeline"
-                    ? () => navigate("/timeline")
-                    : stage.id === "governance"
-                      ? () => navigate("/governance")
-                      : undefined,
-        }))}
       />
 
       <AppFiltersBar className="gap-2 border border-[var(--nexo-border-subtle,var(--border-subtle))] bg-[var(--nexo-card-bg,var(--surface-base))] px-3 py-3">
@@ -1219,14 +771,14 @@ export default function PeoplePage() {
       ) : null}
       {summaryQuery.isError ? (
         <AppPageErrorState
-          description="Não foi possível carregar o resumo operacional da equipe."
+          description="Não foi possível carregar people.operationalSummary. Sem essa fonte, a página não infere carga, atrasos ou disponibilidade da equipe."
           onAction={refresh}
         />
       ) : null}
       {!summaryQuery.isLoading && !summaryQuery.isError ? (
         <AppSectionBlock
-          title="Fila de pessoas"
-          subtitle="Responsabilidade, carga e ações reais por responsável."
+          title="Equipe operacional"
+          subtitle="Lista de responsáveis com status, carga atual, O.S./agendamentos atribuídos, atrasos e sinais de risco entregues pela fonte operacional."
         >
           {people.length === 0 ? (
             <AppPageEmptyState
@@ -1248,15 +800,11 @@ export default function PeoplePage() {
                   <th>Nome</th>
                   <th>Função</th>
                   <th>Status</th>
-                  <th>Status operacional</th>
-                  <th>Prioridade</th>
-                  <th>Disponibilidade</th>
-                  <th>O.S. abertas</th>
-                  <th>O.S. atrasadas</th>
-                  <th>Agenda hoje</th>
-                  <th>Próximos agendamentos</th>
-                  <th>Capacidade O.S.</th>
-                  <th>Capacidade agenda</th>
+                  <th>Carga atual</th>
+                  <th>O.S. atribuídas</th>
+                  <th>Agendamentos atribuídos</th>
+                  <th>Atrasos</th>
+                  <th>Sinais de risco</th>
                   <th>Última atividade</th>
                   <th>Ações</th>
                 </tr>
@@ -1278,40 +826,39 @@ export default function PeoplePage() {
                         />
                       </td>
                       <td>
-                        <AppOperationalStatusBadge status={operationalStatus} />
+                        <div className="space-y-1">
+                          <AppOperationalStatusBadge
+                            status={operationalStatus}
+                          />
+                          <div className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
+                            {loadLabels[person.loadStatus]} · O.S.{" "}
+                            {formatUsage(person.serviceOrderCapacityUsagePct)} ·
+                            Agenda{" "}
+                            {formatUsage(person.appointmentCapacityUsagePct)}
+                          </div>
+                        </div>
                       </td>
+                      <td>{person.openServiceOrdersCount}</td>
                       <td>
-                        {priority ? (
+                        {person.todayAppointmentsCount} hoje ·{" "}
+                        {person.futureAppointmentsCount} futuros
+                      </td>
+                      <td>{person.overdueServiceOrdersCount}</td>
+                      <td>
+                        {getPersonRiskSignals(person).length > 0 ? (
+                          <div className="flex max-w-[260px] flex-wrap gap-1">
+                            {getPersonRiskSignals(person).map(signal => (
+                              <AppStatusBadge key={signal} label={signal} />
+                            ))}
+                          </div>
+                        ) : priority ? (
                           <AppPriorityBadge
                             priority={priority}
                             label={personPriorityLabel(priority)}
                           />
                         ) : (
-                          "—"
+                          "Sem sinal carregado"
                         )}
-                      </td>
-                      <td>
-                        <AppStatusBadge
-                          label={availabilityLabels[person.availabilityStatus]}
-                        />
-                      </td>
-                      <td>{person.openServiceOrdersCount}</td>
-                      <td>{person.overdueServiceOrdersCount}</td>
-                      <td>{person.todayAppointmentsCount}</td>
-                      <td>{person.futureAppointmentsCount}</td>
-                      <td>
-                        {formatCapacity(person.dailyServiceOrderCapacity)}
-                        <br />
-                        <span className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-                          {formatUsage(person.serviceOrderCapacityUsagePct)}
-                        </span>
-                      </td>
-                      <td>
-                        {formatCapacity(person.dailyAppointmentCapacity)}
-                        <br />
-                        <span className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-                          {formatUsage(person.appointmentCapacityUsagePct)}
-                        </span>
                       </td>
                       <td>{formatDateTime(person.lastActivityAt)}</td>
                       <td>
@@ -1507,17 +1054,6 @@ export default function PeoplePage() {
         )}
       </AppSectionBlock>
 
-      <EntityTimelineCard
-        title={
-          selectedPerson
-            ? "Últimos eventos oficiais da pessoa"
-            : "Prova operacional da responsabilidade"
-        }
-        subtitle="Usa eventos oficiais quando disponíveis; na ausência deles, exibe no máximo quatro sinais contextuais derivados dos dados reais carregados e orienta abrir a Timeline completa."
-        events={commandTimelineEvents}
-        fullTimelineLabel="Abrir Timeline completa"
-        onFullTimeline={() => navigate("/timeline")}
-      />
       <CreatePersonModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}

@@ -1,15 +1,21 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const source = readFileSync(new URL("./PeoplePage.tsx", import.meta.url), "utf8");
-const editModal = readFileSync(new URL("../components/EditPersonModal.tsx", import.meta.url), "utf8");
+const source = readFileSync(
+  new URL("./PeoplePage.tsx", import.meta.url),
+  "utf8"
+);
+const editModal = readFileSync(
+  new URL("../components/EditPersonModal.tsx", import.meta.url),
+  "utf8"
+);
 
 describe("PeoplePage operational workload contract", () => {
   it("renderiza o shell e o header operacional padronizados", () => {
     expect(source).toContain("<AppPageShell>");
     expect(source).toContain("<AppOperationalHeader");
     expect(source).toContain("<AppSectionCard");
-    expect(source).toContain("<AppNextBestActionBlock");
+    expect(source).toContain("<NextBestActionCard");
     expect(source).toContain("<AppDataTable");
     expect(source).toContain("<AppOperationalStatusBadge");
     expect(source).toContain("<AppPriorityBadge");
@@ -25,12 +31,26 @@ describe("PeoplePage operational workload contract", () => {
 
   it("renderiza carga e capacidade por responsável", () => {
     expect(source).toContain('data-testid="people-workload-table"');
-    expect(source).toContain("O.S. abertas");
-    expect(source).toContain("Próximos agendamentos");
-    expect(source).toContain("Capacidade O.S.");
-    expect(source).toContain("Capacidade agenda");
+    expect(source).toContain("O.S. atribuídas");
+    expect(source).toContain("Agendamentos atribuídos");
+    expect(source).toContain("Carga atual");
+    expect(source).toContain("Sinais de risco");
     expect(source).toContain("capacityLabels[person.capacityStatus]");
-    expect(source).toContain("formatUsage(person.serviceOrderCapacityUsagePct)");
+    expect(source).toContain(
+      "formatUsage(person.serviceOrderCapacityUsagePct)"
+    );
+  });
+
+  it("separa equipe operacional de usuários e permissões", () => {
+    expect(source).toContain(
+      "Equipe operacional, não permissões administrativas"
+    );
+    expect(source).toContain(
+      "Usuários, acesso e permissões ficam em Configurações."
+    );
+    expect(source).toContain(
+      "Sem essa fonte, a página não infere carga, atrasos ou disponibilidade da equipe."
+    );
   });
 
   it("não inventa capacidade quando o resumo não a informa", () => {
@@ -42,7 +62,9 @@ describe("PeoplePage operational workload contract", () => {
   it("envia os campos mínimos pelo modal estável de edição", () => {
     expect(editModal).toContain("dailyServiceOrderCapacity,");
     expect(editModal).toContain("dailyAppointmentCapacity,");
-    expect(editModal).toContain("workloadNotes: formData.workloadNotes.trim() || null");
+    expect(editModal).toContain(
+      "workloadNotes: formData.workloadNotes.trim() || null"
+    );
     expect(editModal).toContain('id="edit-person-service-order-capacity"');
     expect(editModal).toContain('id="edit-person-appointment-capacity"');
     expect(editModal).toContain('id="edit-person-workload-notes"');
@@ -64,10 +86,18 @@ describe("PeoplePage temporary availability contract", () => {
   });
 
   it("envia create e delete pelas procedures tenant-scoped", () => {
-    expect(source).toContain("trpc.people.createAvailabilityException.useMutation");
-    expect(source).toContain("trpc.people.deleteAvailabilityException.useMutation");
-    expect(source).toContain("createAvailabilityException.mutate({ personId: selectedPersonId");
-    expect(source).toContain("deleteAvailabilityException.mutate({ personId: selectedPerson.personId, exceptionId: exception.id })");
+    expect(source).toContain(
+      "trpc.people.createAvailabilityException.useMutation"
+    );
+    expect(source).toContain(
+      "trpc.people.deleteAvailabilityException.useMutation"
+    );
+    expect(source).toContain(
+      "createAvailabilityException.mutate({ personId: selectedPersonId"
+    );
+    expect(source).toContain(
+      "deleteAvailabilityException.mutate({ personId: selectedPerson.personId, exceptionId: exception.id })"
+    );
   });
 });
 
@@ -83,7 +113,9 @@ describe("PeoplePage assignee warning summary", () => {
     expect(source).toContain('label="Taxa de confirmação"');
     expect(source).toContain("Contextos observados");
     expect(source).toContain("Sinal mais frequente");
-    expect(source).toContain("Serve somente para observação operacional das decisões manuais.");
+    expect(source).toContain(
+      "Serve somente para observação operacional das decisões manuais."
+    );
     expect(source).not.toContain("ranking competitivo");
     expect(source).not.toContain("score de produtividade");
   });
