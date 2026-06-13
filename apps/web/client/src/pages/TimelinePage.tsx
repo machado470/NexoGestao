@@ -49,7 +49,7 @@ import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import { useRenderWatchdog } from "@/hooks/useRenderWatchdog";
 import { setBootPhase } from "@/lib/bootPhase";
 
-type TimelineEvent = Record<string, any>;
+export type TimelineEvent = Record<string, unknown>;
 type ModuleFilter =
   | "all"
   | "finance"
@@ -95,12 +95,12 @@ const MODULE_OPTIONS: Array<{ value: ModuleFilter; label: string }> = [
   { value: "customer", label: "Clientes" },
 ];
 
-function text(value: unknown, fallback = "—") {
+export function text(value: unknown, fallback = "—") {
   const normalized = String(value ?? "").trim();
   return normalized.length > 0 ? normalized : fallback;
 }
 
-function metadataRecord(event: TimelineEvent): Record<string, unknown> {
+export function metadataRecord(event: TimelineEvent): Record<string, unknown> {
   const metadata = event?.metadata;
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata))
     return {};
@@ -159,7 +159,7 @@ function metadataSearchBucket(event: TimelineEvent) {
     .join(" ");
 }
 
-function eventAction(event: TimelineEvent) {
+export function eventAction(event: TimelineEvent) {
   return normalizeTimelineEventType(
     text(event?.action ?? event?.type, "EVENTO")
   );
@@ -224,33 +224,36 @@ function isWhatsAppExecutionEvent(action: string) {
   ].includes(action);
 }
 
-function eventEntityLabel(event: TimelineEvent) {
+export function eventEntityLabel(event: TimelineEvent) {
+  const metadata = metadataRecord(event);
+  const explicitType = text(event?.entityType ?? metadata.entityType, "");
+  if (explicitType) return explicitType;
   if (event?.customerId) return "Cliente";
   if (event?.serviceOrderId) return "Ordem de serviço";
   if (event?.appointmentId) return "Agendamento";
   if (event?.chargeId) return "Cobrança";
-  const metadata = metadataRecord(event);
-  return text(metadata.entityType, "Operação");
+  return "Entidade não informada";
 }
 
-function eventEntityId(event: TimelineEvent) {
+export function eventEntityId(event: TimelineEvent) {
   const metadata = metadataRecord(event);
   return (
+    text(event?.entityId, "") ||
+    text(metadata.entityId, "") ||
     text(event?.customerId, "") ||
     text(event?.serviceOrderId, "") ||
     text(event?.appointmentId, "") ||
     text(event?.chargeId, "") ||
-    text(metadata.entityId, "") ||
     "—"
   );
 }
 
-function eventCustomerId(event: TimelineEvent) {
+export function eventCustomerId(event: TimelineEvent) {
   const metadata = metadataRecord(event);
   return text(event?.customerId ?? metadata.customerId, "");
 }
 
-function eventModule(event: TimelineEvent): ModuleFilter {
+export function eventModule(event: TimelineEvent): ModuleFilter {
   const action = eventAction(event);
   const bucket = [
     action.toLowerCase(),
@@ -308,7 +311,7 @@ function eventModule(event: TimelineEvent): ModuleFilter {
   return "all";
 }
 
-function eventSeverity(event: TimelineEvent): Exclude<SeverityFilter, "all"> {
+export function eventSeverity(event: TimelineEvent): Exclude<SeverityFilter, "all"> {
   const action = eventAction(event);
   const bucket = [
     action.toLowerCase(),
@@ -398,6 +401,97 @@ function eventRoute(event: TimelineEvent) {
   if (module === "appointment") return "/appointments";
   if (module === "customer") return "/customers";
   return "/dashboard";
+}
+
+function eventActorLabel(event: TimelineEvent) {
+  return text(
+    event?.personName ?? event?.actorName ?? event?.actorUserId,
+    "Ator não informado pela fonte"
+  );
+}
+
+function normalizedEntityType(event: TimelineEvent) {
+  const raw = eventEntityLabel(event).toLowerCase();
+  if (raw.includes("cliente") || raw.includes("customer")) return "customer";
+  if (
+    raw.includes("ordem") ||
+    raw.includes("serviceorder") ||
+    raw.includes("service_order")
+  )
+    return "service_order";
+  if (raw.includes("agendamento") || raw.includes("appointment"))
+    return "appointment";
+  if (
+    raw.includes("cobrança") ||
+    raw.includes("cobranca") ||
+    raw.includes("charge") ||
+    raw.includes("payment") ||
+    raw.includes("pagamento")
+  )
+    return "finance";
+  if (raw.includes("whatsapp") || raw.includes("message")) return "whatsapp";
+  return null;
+}
+
+function eventAuditFallbacks(event: TimelineEvent) {
+  const pairs = usefulMetadataPairs(event);
+  return [
+    eventActorLabel(event).startsWith("Ator não informado")
+      ? "Ator não veio na fonte oficial"
+      : null,
+    eventEntityId(event) === "—" ? "Entidade sem ID rastreável" : null,
+    eventEntityLabel(event) === "Entidade não informada"
+      ? "Tipo de entidade não veio na fonte"
+      : null,
+    eventModule(event) === "all" ? "Módulo não identificável pela fonte" : null,
+    pairs.length === 0 ? "Sem metadados operacionais resumíveis" : null,
+  ].filter(Boolean) as string[];
+}
+
+function eventRealCtas(event: TimelineEvent) {
+  const id = eventEntityId(event);
+  const type = normalizedEntityType(event);
+  const module = eventModule(event);
+  const hasUsableEntity = id !== "—";
+  const ctas: Array<{ label: string; route: string; reason: string }> = [];
+
+  if (hasUsableEntity && (type === "customer" || eventCustomerId(event))) {
+    ctas.push({
+      label: "Abrir cliente",
+      route: "/customers",
+      reason: "entityType/entityId ou customerId utilizável",
+    });
+  }
+  if (hasUsableEntity && (type === "service_order" || event?.serviceOrderId)) {
+    ctas.push({
+      label: "Abrir O.S.",
+      route: "/service-orders",
+      reason: "entityType/entityId ou serviceOrderId utilizável",
+    });
+  }
+  if (hasUsableEntity && (type === "appointment" || event?.appointmentId)) {
+    ctas.push({
+      label: "Abrir agendamento",
+      route: "/appointments",
+      reason: "entityType/entityId ou appointmentId utilizável",
+    });
+  }
+  if (hasUsableEntity && (type === "finance" || event?.chargeId)) {
+    ctas.push({
+      label: "Abrir financeiro",
+      route: "/finances",
+      reason: "entityType/entityId ou chargeId utilizável",
+    });
+  }
+  if (hasUsableEntity && (type === "whatsapp" || module === "whatsapp")) {
+    ctas.push({
+      label: "Abrir WhatsApp",
+      route: "/whatsapp",
+      reason: "evento WhatsApp com entidade utilizável",
+    });
+  }
+
+  return ctas;
 }
 
 function severityColorClass(severity: Exclude<SeverityFilter, "all">) {
@@ -587,7 +681,7 @@ function formatMetadataValue(value: unknown) {
   return "";
 }
 
-function usefulMetadataPairs(event: TimelineEvent) {
+export function usefulMetadataPairs(event: TimelineEvent) {
   const metadata = metadataRecord(event);
   const pairs = METADATA_PRIORITY_FIELDS.map(key => ({
     key,
@@ -597,7 +691,7 @@ function usefulMetadataPairs(event: TimelineEvent) {
   return pairs.slice(0, 6);
 }
 
-function formatDateTime(input: unknown) {
+export function formatDateTime(input: unknown) {
   if (!input) return "Sem data";
   const parsed = new Date(String(input));
   if (Number.isNaN(parsed.getTime())) return "Sem data";
@@ -696,7 +790,7 @@ export default function TimelinePage() {
     const values = Array.from(
       new Set(
         events.map(event =>
-          text(event?.personName ?? event?.actorName, "Sistema")
+          eventActorLabel(event)
         )
       )
     );
@@ -715,10 +809,7 @@ export default function TimelinePage() {
       const entity = eventEntityLabel(event);
       const module = eventModule(event);
       const customerId = eventCustomerId(event);
-      const responsible = text(
-        event?.personName ?? event?.actorName,
-        "Sistema"
-      );
+      const responsible = eventActorLabel(event);
       const severity = eventSeverity(event);
 
       if (eventTypeFilter !== "all" && action !== eventTypeFilter) return false;
@@ -1078,7 +1169,7 @@ export default function TimelinePage() {
     }
 
     const entity = `${eventEntityLabel(selected)} #${eventEntityId(selected)}`;
-    const reason = `${eventReason(selected)} Evidência registrada em ${formatDateTime(selected?.createdAt)} por ${text(selected?.personName ?? selected?.actorName, "Sistema")}.`;
+    const reason = `${eventReason(selected)} Evidência registrada em ${formatDateTime(selected?.createdAt)} por ${eventActorLabel(selected)}.`;
     const base = {
       entity,
       reason,
@@ -1255,7 +1346,7 @@ export default function TimelinePage() {
           type: eventSeverityLabel(eventSeverity(event)),
           occurredAt: formatDateTime(event?.createdAt),
           entity: `${eventEntityLabel(event)} #${eventEntityId(event)}`,
-          actor: text(event?.personName ?? event?.actorName, "Sistema"),
+          actor: eventActorLabel(event),
           summary: eventReason(event),
         })),
     [filteredEvents]
@@ -1297,7 +1388,7 @@ export default function TimelinePage() {
       eventEntityLabel(item),
       eventEntityId(item),
       eventCustomerId(item),
-      text(item?.personName ?? item?.actorName, "Sistema"),
+      eventActorLabel(item),
       eventModule(item),
       eventSeverity(item),
       formatDateTime(item?.createdAt),
@@ -1321,8 +1412,8 @@ export default function TimelinePage() {
   return (
     <AppPageShell className="gap-3">
       <AppOperationalHeader
-        title="Timeline"
-        description="Prova oficial da operação, com contexto e ação."
+        title="Timeline de auditoria operacional"
+        description="Fonte oficial para provar o que aconteceu, quando, qual entidade foi afetada e qual ator a fonte informou — sem inferir eventos ausentes."
         density="compact"
         primaryAction={
           <Button type="button" variant="outline" size="sm" onClick={exportCsv}>
@@ -1355,6 +1446,27 @@ export default function TimelinePage() {
           </div>
         }
       />
+
+      <AppSectionCard className="p-3">
+        <div className="grid gap-2 text-xs md:grid-cols-4">
+          <div>
+            <span className="font-semibold text-[var(--success)]">Saudável</span>
+            <p className="text-[var(--text-muted)]">Sem crítico no recorte carregado.</p>
+          </div>
+          <div>
+            <span className="font-semibold text-[var(--warning)]">Atenção</span>
+            <p className="text-[var(--text-muted)]">Risco, atraso, falha ou silêncio recente.</p>
+          </div>
+          <div>
+            <span className="font-semibold text-[var(--danger)]">Crítico</span>
+            <p className="text-[var(--text-muted)]">Evento restritivo priorizado acima do ruído.</p>
+          </div>
+          <div>
+            <span className="font-semibold text-[var(--text-primary)]">Vazio/erro</span>
+            <p className="text-[var(--text-muted)]">Estado explícito: sem inventar histórico.</p>
+          </div>
+        </div>
+      </AppSectionCard>
 
       <div className="grid gap-3 xl:grid-cols-3">
         <OperationalStateCard
@@ -1574,14 +1686,28 @@ export default function TimelinePage() {
                             </p>
                             <p>
                               Quem:{" "}
-                              {text(
-                                event?.personName ?? event?.actorName,
-                                "Sistema"
-                              )}
+                              {eventActorLabel(event)}
                             </p>
                             <p>Quando: {formatDateTime(event?.createdAt)}</p>
-                            <p>Por quê: {eventReason(event)}</p>
+                            <p>Módulo: {eventModuleLabel(module)}</p>
                           </div>
+                          {usefulMetadataPairs(event).length > 0 ? (
+                            <div className="mt-2 flex flex-wrap gap-1">
+                              {usefulMetadataPairs(event).slice(0, 3).map(pair => (
+                                <span
+                                  key={pair.key}
+                                  className="rounded-md border border-[var(--border-subtle)] px-2 py-1 text-[11px] text-[var(--text-muted)]"
+                                >
+                                  {pair.key}: {pair.value}
+                                </span>
+                              ))}
+                            </div>
+                          ) : null}
+                          {eventAuditFallbacks(event).length > 0 ? (
+                            <p className="mt-2 text-xs text-[var(--text-muted)]">
+                              Fallback honesto: {eventAuditFallbacks(event).join("; ")}.
+                            </p>
+                          ) : null}
                         </AppTimelineItem>
                       );
                     })}
@@ -1651,10 +1777,7 @@ export default function TimelinePage() {
                   </li>
                   <li>
                     Responsável:{" "}
-                    {text(
-                      selectedEvent?.personName ?? selectedEvent?.actorName,
-                      "Sistema"
-                    )}
+                    {eventActorLabel(selectedEvent)}
                   </li>
                   <li>Data/hora: {formatDateTime(selectedEvent?.createdAt)}</li>
                   <li>
@@ -1688,7 +1811,11 @@ export default function TimelinePage() {
                       ))}
                     </dl>
                   </div>
-                ) : null}
+                ) : (
+                  <p className="mt-3 border-t border-[var(--border-subtle)] pt-3 text-xs text-[var(--text-muted)]">
+                    Metadados não vieram em formato resumível pela fonte oficial.
+                  </p>
+                )}
               </div>
 
               <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/60 p-3">
@@ -1725,53 +1852,23 @@ export default function TimelinePage() {
                     Abrir governança
                   </Button>
                 ) : null}
-                {eventModule(selectedEvent) === "whatsapp" ? (
+                {eventRealCtas(selectedEvent).map(cta => (
                   <Button
+                    key={cta.label}
                     type="button"
                     variant="outline"
-                    onClick={() => navigate("/whatsapp")}
+                    title={cta.reason}
+                    onClick={() => navigate(cta.route)}
                   >
-                    Abrir WhatsApp
+                    {cta.label}
                   </Button>
-                ) : null}
-                {eventModule(selectedEvent) === "finance" ||
-                selectedEvent?.chargeId ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => navigate("/finances")}
-                  >
-                    Abrir financeiro
-                  </Button>
-                ) : null}
-                {eventModule(selectedEvent) === "service_order" ||
-                selectedEvent?.serviceOrderId ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => navigate("/service-orders")}
-                  >
-                    Abrir O.S.
-                  </Button>
-                ) : null}
-                {eventModule(selectedEvent) === "appointment" ||
-                selectedEvent?.appointmentId ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => navigate("/appointments")}
-                  >
-                    Abrir agendamento
-                  </Button>
-                ) : null}
-                {eventCustomerId(selectedEvent) ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => navigate("/customers")}
-                  >
-                    Abrir cliente
-                  </Button>
+                ))}
+                {eventRealCtas(selectedEvent).length === 0 ? (
+                  <p className="text-xs text-[var(--text-muted)]">
+                    Sem CTA de entidade: a fonte não trouxe entityType/entityId
+                    utilizável para cliente, O.S., financeiro, agendamento ou
+                    WhatsApp.
+                  </p>
                 ) : null}
                 <Button
                   type="button"
