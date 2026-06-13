@@ -68,6 +68,7 @@ type AttentionItem = {
   impact: string;
   ctaLabel: string;
   path: string;
+  primaryValue?: string;
 };
 type QueueItem = {
   id: string;
@@ -77,6 +78,7 @@ type QueueItem = {
   status: string;
   dueLabel: string;
   responsible: string;
+  responsibleMissing: boolean;
   priority: Severity;
   ctaLabel: string;
   path: string;
@@ -98,6 +100,7 @@ type RecommendedAction = {
   path: string;
   ctaLabel: string;
   safetyNote?: string;
+  primaryValue?: string;
 };
 type DashboardTimelineEvent = DashboardRecord & {
   id?: unknown;
@@ -244,12 +247,34 @@ function formatPeriod() {
 }
 
 function readResponsible(record: DashboardRecord) {
-  return (
+  const responsible =
     readString(record, "responsibleName") ||
     readString(record, "assigneeName") ||
-    readString(record, "ownerName") ||
-    "Responsável não informado"
-  );
+    readString(record, "ownerName");
+
+  return {
+    label: responsible || "—",
+    missing: !responsible,
+  };
+}
+
+function compactIncidentTitle(title: string) {
+  return title
+    .replace(/ exigem destravamento| pressionam o caixa| ativa$/gi, "")
+    .replace(
+      /^Serviços concluídos ainda não viraram cobrança$/i,
+      "O.S. sem cobrança"
+    )
+    .replace(/^Clientes com pendência financeira$/i, "Clientes com pendência")
+    .replace(
+      /^Clientes com pendência financeira ativa$/i,
+      "Clientes com pendência"
+    )
+    .replace(/^Mensagens WhatsApp com falha$/i, "WhatsApp com falha");
+}
+
+function extractFirstNumber(value: string) {
+  return value.match(/(?:R\$\s*)?[0-9][0-9.]*?(?:,[0-9]{2})?/)?.[0];
 }
 
 function normalizeOperationLevel(value: string): OperationalStateLevel | null {
@@ -349,6 +374,9 @@ function fromSignal(signal: OperationalSignal): AttentionItem {
     ),
     ctaLabel: signal.suggestedAction ?? "Abrir contexto",
     path: buildSignalPath(signal),
+    primaryValue: extractFirstNumber(
+      `${signal.title} ${signal.summary ?? ""} ${signal.impact ?? ""}`
+    ),
   };
 }
 
@@ -364,7 +392,8 @@ function buildAttention(
   };
   add(alerts.overdueOrders?.count ?? 0, {
     severity: "critical",
-    title: "O.S. atrasadas exigem destravamento",
+    title: "O.S. atrasadas",
+    primaryValue: String(alerts.overdueOrders?.count ?? 0),
     reason: `${alerts.overdueOrders?.count} ordem(ns) passaram do prazo operacional.`,
     impact:
       "Atrasos ativos podem comprometer as próximas janelas de atendimento.",
@@ -373,7 +402,8 @@ function buildAttention(
   });
   add(alerts.overdueCharges?.count ?? 0, {
     severity: "critical",
-    title: "Cobranças vencidas pressionam o caixa",
+    title: "Cobranças vencidas",
+    primaryValue: String(alerts.overdueCharges?.count ?? 0),
     reason: `${alerts.overdueCharges?.count} cobrança(s) vencida(s), somando ${formatCurrencyFromCents(alerts.overdueCharges?.totalAmountCents ?? 0)}.`,
     impact:
       "Recebimentos atrasados interrompem o fechamento financeiro do serviço.",
@@ -382,7 +412,8 @@ function buildAttention(
   });
   add(alerts.doneOrdersWithoutCharge?.count ?? 0, {
     severity: "high",
-    title: "Serviços concluídos ainda não viraram cobrança",
+    title: "O.S. sem cobrança",
+    primaryValue: String(alerts.doneOrdersWithoutCharge?.count ?? 0),
     reason: `${alerts.doneOrdersWithoutCharge?.count} O.S. concluída(s) sem cobrança vinculada.`,
     impact: "Serviço entregue sem cobrança prolonga o ciclo até pagamento.",
     ctaLabel: "Fechar serviços concluídos",
@@ -390,7 +421,8 @@ function buildAttention(
   });
   add(alerts.customersWithPending?.count ?? 0, {
     severity: "high",
-    title: "Clientes com pendência financeira ativa",
+    title: "Clientes com pendência",
+    primaryValue: String(alerts.customersWithPending?.count ?? 0),
     reason: `${alerts.customersWithPending?.count} cliente(s) possuem cobranças pendentes ou vencidas.`,
     impact: "Carteira sem contato aumenta risco de inadimplência e retrabalho.",
     ctaLabel: "Abrir carteira financeira",
@@ -403,6 +435,7 @@ function buildAttention(
   add(unconfirmedAppointments, {
     severity: "high",
     title: "Agendamentos sem confirmação",
+    primaryValue: String(unconfirmedAppointments),
     reason: `${unconfirmedAppointments} agendamento(s) nas próximas 48 horas ainda precisam confirmação.`,
     impact:
       "Agenda sem confirmação aumenta o risco de deslocamento perdido e O.S. parada.",
@@ -418,7 +451,8 @@ function buildAttention(
   );
   add(failedMessages, {
     severity: "high",
-    title: "Mensagens WhatsApp com falha",
+    title: "WhatsApp com falha",
+    primaryValue: String(failedMessages),
     reason: `${failedMessages} mensagem(ns) falharam no canal operacional.`,
     impact: "Confirmações, cobranças e retornos podem não chegar ao cliente.",
     ctaLabel: "Revisar WhatsApp",
@@ -427,6 +461,7 @@ function buildAttention(
   add(customersNoResponse, {
     severity: "medium",
     title: "Clientes aguardando resposta",
+    primaryValue: String(customersNoResponse),
     reason: `${customersNoResponse} conversa(s) estão aguardando operador.`,
     impact:
       "Tempo de resposta alto trava confirmação e continuidade do atendimento.",
@@ -470,7 +505,8 @@ function buildQueue(alerts: DashboardAlerts): QueueItem[] {
         ),
         status: "Prazo vencido",
         dueLabel: "Vencida",
-        responsible: readResponsible(asRecord(item)),
+        responsible: readResponsible(asRecord(item)).label,
+        responsibleMissing: readResponsible(asRecord(item)).missing,
         priority: "critical",
         ctaLabel: "Destravar",
         path: `/service-orders?id=${String(item.serviceOrderId ?? item.id)}`,
@@ -497,7 +533,8 @@ function buildQueue(alerts: DashboardAlerts): QueueItem[] {
         context: `${amountLabel} pendentes${context ? ` · ${context}` : ""}`,
         status: "Vencida",
         dueLabel: "Financeiro vencido",
-        responsible: readResponsible(asRecord(item)),
+        responsible: readResponsible(asRecord(item)).label,
+        responsibleMissing: readResponsible(asRecord(item)).missing,
         priority: "critical",
         ctaLabel: "Cobrar",
         path: "/finances?view=charges&status=overdue",
@@ -513,7 +550,8 @@ function buildQueue(alerts: DashboardAlerts): QueueItem[] {
         ),
         status: "Aguardando operador",
         dueLabel: formatShortDateTime(item.lastMessageAt),
-        responsible: readResponsible(asRecord(item)),
+        responsible: readResponsible(asRecord(item)).label,
+        responsibleMissing: readResponsible(asRecord(item)).missing,
         priority: "high",
         ctaLabel: "Responder cliente",
         path: "/whatsapp",
@@ -528,7 +566,8 @@ function buildQueue(alerts: DashboardAlerts): QueueItem[] {
         ),
         status: "Sem confirmação",
         dueLabel: formatShortDateTime(item.startsAt),
-        responsible: readResponsible(asRecord(item)),
+        responsible: readResponsible(asRecord(item)).label,
+        responsibleMissing: readResponsible(asRecord(item)).missing,
         priority: "high",
         ctaLabel: "Confirmar agenda",
         path: "/appointments",
@@ -542,7 +581,8 @@ function buildQueue(alerts: DashboardAlerts): QueueItem[] {
       ),
       status: "Falha de envio",
       dueLabel: "Falha recente",
-      responsible: readResponsible(asRecord(item)),
+      responsible: readResponsible(asRecord(item)).label,
+      responsibleMissing: readResponsible(asRecord(item)).missing,
       priority: "high",
       ctaLabel: "Resolver mensagem",
       path: "/whatsapp",
@@ -558,41 +598,41 @@ function AttentionRow({
   navigate: (path: string) => void;
 }) {
   return (
-    <article className="relative w-full min-w-0 py-3 pl-6 first:pt-0 last:pb-0">
-      <ShieldAlert className="absolute left-0 top-3 h-4 w-4 text-[var(--danger)] first:top-0" />
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <AppStatusBadge
-              label={
-                item.severity === "critical"
-                  ? "Risco crítico"
-                  : item.severity === "high"
-                    ? "Aguardando ação"
-                    : "Monitorar"
-              }
-            />
-            <p className="text-sm font-semibold text-[var(--text-primary)]">
-              {item.title}
-            </p>
-          </div>
-          <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
-            <strong className="text-[var(--text-primary)]">Motivo:</strong>{" "}
-            {item.reason}
-          </p>
-          <p className="text-xs leading-5 text-[var(--text-secondary)]">
-            <strong className="text-[var(--text-primary)]">Impacto:</strong>{" "}
-            {item.impact}
+    <article className="grid w-full min-w-0 gap-2 rounded-xl border border-[var(--border-subtle)]/70 bg-[var(--surface-primary)]/35 p-2.5 md:grid-cols-[auto_minmax(0,1fr)_auto_auto] md:items-center">
+      <span className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--danger)]/25 bg-[var(--danger)]/8">
+        <ShieldAlert className="h-4 w-4 text-[var(--danger)]" />
+      </span>
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <AppStatusBadge
+            label={
+              item.severity === "critical"
+                ? "Crítico"
+                : item.severity === "high"
+                  ? "Ação"
+                  : "Monitorar"
+            }
+          />
+          <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
+            {compactIncidentTitle(item.title)}
           </p>
         </div>
-        <Button
-          className="w-full shrink-0 md:w-auto"
-          size="sm"
-          onClick={() => navigate(item.path)}
-        >
-          {item.ctaLabel}
-        </Button>
+        <p className="mt-1 line-clamp-1 text-xs leading-4 text-[var(--text-secondary)]">
+          Impacto: {item.impact}
+        </p>
       </div>
+      {item.primaryValue ? (
+        <strong className="text-2xl font-semibold leading-none text-[var(--text-primary)] md:text-right">
+          {item.primaryValue}
+        </strong>
+      ) : null}
+      <Button
+        className="h-8 w-full shrink-0 px-3 text-xs md:w-auto"
+        size="sm"
+        onClick={() => navigate(item.path)}
+      >
+        {item.ctaLabel}
+      </Button>
     </article>
   );
 }
@@ -652,6 +692,7 @@ export default function ExecutiveDashboard() {
     [alerts, signals, metrics]
   );
   const queue = useMemo(() => buildQueue(alerts), [alerts]);
+  const hasMissingResponsible = queue.some(item => item.responsibleMissing);
   const pendingWhatsAppApprovals = Array.isArray(
     pendingWhatsAppApprovalsQuery.data
   )
@@ -670,6 +711,7 @@ export default function ExecutiveDashboard() {
     item => item.severity === "critical"
   ).length;
   const overdueOrders = alerts.overdueOrders?.count ?? 0;
+  const todayServicesCount = alerts.todayServices?.count ?? 0;
   const overdueCharges = alerts.overdueCharges?.count ?? 0;
   const missingCharges = alerts.doneOrdersWithoutCharge?.count ?? 0;
   const timelineEvents = normalizeTimelineEvents(timelineQuery.data);
@@ -679,12 +721,12 @@ export default function ExecutiveDashboard() {
   );
   const operationLevel: OperationalStateLevel = pageError
     ? "SUSPENDED"
-    : governanceLevel ??
+    : (governanceLevel ??
       (criticalCount > 0
         ? "RESTRICTED"
         : attention.length > 0
           ? "WARNING"
-          : "NORMAL");
+          : "NORMAL"));
   const operationStateFallback = governanceLevel
     ? "Estado retornado pela governança."
     : "Estado operacional não retornado pela fonte atual; nível derivado de alertas e sinais disponíveis.";
@@ -702,8 +744,9 @@ export default function ExecutiveDashboard() {
     {
       id: "appointments",
       label: "Agendamento",
-      value: String(alerts.todayServices?.count ?? 0),
-      context: "agendamentos hoje",
+      value: String(todayServicesCount),
+      context:
+        todayServicesCount > 0 ? "agendamentos hoje" : "sem agendamentos hoje",
       path: "/appointments",
       action: "Ver agenda",
       state: (alerts.todayServices?.count ?? 0) > 0 ? "active" : "idle",
@@ -847,6 +890,9 @@ export default function ExecutiveDashboard() {
         ctaLabel: "Cobrar carteira vencida",
         safetyNote:
           "Fallback local baseado em alertas financeiros já carregados; não executa cobrança automática.",
+        primaryValue: formatCurrencyFromCents(
+          readNumber(highestValueChargeRecord, "amountCents")
+        ),
       }
     : overdueOrders > 0
       ? {
@@ -865,17 +911,19 @@ export default function ExecutiveDashboard() {
           ctaLabel: "Revisar O.S. atrasadas",
           safetyNote:
             "Fallback local baseado na fila operacional; não altera status sem ação do usuário.",
+          primaryValue: `${overdueOrders} O.S.`,
         }
       : firstQueueItem
         ? {
             title: `${firstQueueItem.ctaLabel} — ${firstQueueItem.entity}`,
             entity: firstQueueItem.entity,
             reason: `${firstQueueItem.type}: ${firstQueueItem.context}`,
-            impact: `Responsável: ${firstQueueItem.responsible}. Status atual: ${firstQueueItem.status}.`,
+            impact: `${firstQueueItem.responsibleMissing ? "Responsável não informado" : `Responsável: ${firstQueueItem.responsible}`}. Status atual: ${firstQueueItem.status}.`,
             path: firstQueueItem.path,
             ctaLabel: firstQueueItem.ctaLabel,
             safetyNote:
               "Fallback local da fila operacional; abre o módulo responsável para validação.",
+            primaryValue: firstQueueItem.dueLabel || firstQueueItem.status,
           }
         : failedMessages > 0
           ? {
@@ -888,6 +936,7 @@ export default function ExecutiveDashboard() {
               ctaLabel: "Revisar WhatsApp",
               safetyNote:
                 "Fallback local baseado em métricas de comunicação; abre WhatsApp sem enviar mensagens automaticamente.",
+              primaryValue: `${failedMessages} falha(s)`,
             }
           : null;
   const recommendedAction: RecommendedAction | null = nextBestAction
@@ -913,6 +962,9 @@ export default function ExecutiveDashboard() {
         ctaLabel: nextBestAction.suggestedAction ?? "Abrir ação prioritária",
         safetyNote:
           "Sinal retornado pelo motor operacional; execução permanece no módulo de origem.",
+        primaryValue: extractFirstNumber(
+          `${nextBestAction.title} ${nextBestAction.summary ?? ""} ${nextBestAction.impact ?? ""}`
+        ),
       }
     : fallbackAction;
   const availableComparisons = pulseComparisons.flatMap(
@@ -927,13 +979,15 @@ export default function ExecutiveDashboard() {
     pulseComparisons.length - availableComparisons.length;
   const hasOperationalData =
     Object.keys(metrics).length > 0 || attention.length > 0 || queue.length > 0;
+  const weeklyRevenueInCents = readNumber(metrics, "weeklyRevenueInCents");
   const kpiCards = [
     {
       label: "Receita da semana",
-      value: formatCurrencyFromCents(
-        readNumber(metrics, "weeklyRevenueInCents")
-      ),
-      context: "Pagamentos registrados no período atual.",
+      value: formatCurrencyFromCents(weeklyRevenueInCents),
+      context:
+        weeklyRevenueInCents > 0
+          ? "Pagamentos registrados no período atual."
+          : "Sem pagamentos registrados no período.",
       cta: "Ver pagamentos",
       path: "/finances?view=paid",
       Icon: WalletCards,
@@ -1147,11 +1201,7 @@ export default function ExecutiveDashboard() {
             {attention.length > 0 ? (
               <div className="w-full min-w-0 divide-y divide-[var(--border-subtle)]/70">
                 {attention.map(item => (
-                  <AttentionRow
-                    key={item.id}
-                    item={item}
-                    navigate={navigate}
-                  />
+                  <AttentionRow key={item.id} item={item} navigate={navigate} />
                 ))}
               </div>
             ) : (
@@ -1175,6 +1225,7 @@ export default function ExecutiveDashboard() {
                 reason={recommendedAction.reason}
                 impact={recommendedAction.impact}
                 safetyNote={recommendedAction.safetyNote}
+                primaryValue={recommendedAction.primaryValue}
                 primaryActionLabel={recommendedAction.ctaLabel}
                 onPrimaryAction={() => navigate(recommendedAction.path)}
                 secondaryActionLabel={
@@ -1237,68 +1288,6 @@ export default function ExecutiveDashboard() {
           </AppSectionBlock>
 
           <AppSectionBlock
-            title="Fila operacional"
-            compact
-            className={dashboardSectionClass}
-            subtitle="Pendências curtas para destravar agora."
-          >
-            {queue.length > 0 ? (
-              <div className="w-full min-w-0">
-                <div className="max-h-[340px] w-full min-w-0 overflow-auto rounded-xl border border-[var(--border-subtle)]/70 p-2">
-                  <div className="grid min-w-0 gap-2 text-xs">
-                    {queue.slice(0, 10).map(item => (
-                      <article
-                        key={`${item.type}-${item.id}`}
-                        className="grid min-w-0 gap-2 rounded-xl border border-[var(--border-subtle)]/60 bg-[var(--surface-primary)]/35 p-2.5 text-[var(--text-secondary)] md:grid-cols-[1.1fr_1.6fr_0.9fr_0.9fr_1fr_auto] md:items-center"
-                      >
-                        <span className="flex min-w-0 items-center gap-2">
-                          <AppPriorityBadge label={item.priority} />
-                          <span className="truncate font-semibold text-[var(--text-primary)]">
-                            {item.type}
-                          </span>
-                        </span>
-                        <span className="min-w-0">
-                          <strong className="block truncate text-sm text-[var(--text-primary)]">
-                            {item.entity}
-                          </strong>
-                          <span className="block truncate">{item.context}</span>
-                        </span>
-                        <span className="font-medium text-[var(--text-primary)]">
-                          {item.status}
-                        </span>
-                        <span>{item.dueLabel}</span>
-                        <span>{item.responsible}</span>
-                        <Button
-                          className="h-8 justify-self-start px-3 text-xs md:justify-self-end"
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => navigate(item.path)}
-                        >
-                          {item.ctaLabel}
-                        </Button>
-                      </article>
-                    ))}
-                  </div>
-                </div>
-                <Button
-                  className="mt-2 h-auto px-0 py-0 text-[var(--accent-primary)]"
-                  variant="link"
-                  size="sm"
-                  onClick={() => navigate("/timeline")}
-                >
-                  Abrir Timeline
-                  <ArrowRight className="ml-1 h-3.5 w-3.5" />
-                </Button>
-              </div>
-            ) : (
-              <AppPageEmptyState
-                title="Fila operacional sem itens retornados"
-                description="Não há itens acionáveis na leitura atual. A operação não preenche a fila com exemplos."
-              />
-            )}
-          </AppSectionBlock>
-
-          <AppSectionBlock
             title="Pulso da operação"
             compact
             className={dashboardSectionClass}
@@ -1339,6 +1328,91 @@ export default function ExecutiveDashboard() {
                 ) : null}
               </div>
             ) : null}
+          </AppSectionBlock>
+
+          <AppSectionBlock
+            title="Fila operacional"
+            compact
+            className={dashboardSectionClass}
+            subtitle="Pendências curtas para destravar agora."
+          >
+            {queue.length > 0 ? (
+              <div className="w-full min-w-0">
+                <div className="max-h-[340px] w-full min-w-0 overflow-auto rounded-xl border border-[var(--border-subtle)]/70 p-2">
+                  <div className="grid min-w-0 gap-2 text-xs">
+                    {queue.slice(0, 10).map(item => (
+                      <article
+                        key={`${item.type}-${item.id}`}
+                        className="grid min-w-0 gap-2 rounded-xl border border-[var(--border-subtle)]/60 bg-[var(--surface-primary)]/35 p-2.5 text-[var(--text-secondary)] md:grid-cols-[1.1fr_1.6fr_0.9fr_0.9fr_1fr_auto] md:items-center"
+                      >
+                        <span className="flex min-w-0 items-center gap-2">
+                          <AppPriorityBadge label={item.priority} />
+                          <span className="truncate font-semibold text-[var(--text-primary)]">
+                            {item.type}
+                          </span>
+                        </span>
+                        <span className="min-w-0">
+                          <strong className="block truncate text-sm text-[var(--text-primary)]">
+                            {item.entity}
+                          </strong>
+                          <span className="block truncate">{item.context}</span>
+                        </span>
+                        <span className="font-medium text-[var(--text-primary)]">
+                          {item.status}
+                        </span>
+                        <span>{item.dueLabel}</span>
+                        <span
+                          className={
+                            item.responsibleMissing
+                              ? "text-[var(--text-muted)]"
+                              : undefined
+                          }
+                          title={
+                            item.responsibleMissing
+                              ? "Responsável não informado"
+                              : item.responsible
+                          }
+                          aria-label={
+                            item.responsibleMissing
+                              ? "Responsável não informado"
+                              : undefined
+                          }
+                        >
+                          {item.responsible}
+                        </span>
+                        <Button
+                          className="h-8 justify-self-start px-3 text-xs md:justify-self-end"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => navigate(item.path)}
+                        >
+                          {item.ctaLabel}
+                        </Button>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+                {hasMissingResponsible ? (
+                  <p className="mt-2 text-xs text-[var(--text-muted)]">
+                    Alguns itens não retornaram responsável pela fonte atual.
+                  </p>
+                ) : null}
+                <Button
+                  className="mt-2 h-auto px-0 py-0 text-[var(--accent-primary)]"
+                  variant="link"
+                  size="sm"
+                  onClick={() => navigate("/timeline")}
+                >
+                  Abrir Timeline
+                  <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ) : (
+              <AppPageEmptyState
+                title="Fila operacional sem itens retornados"
+                description="Não há itens acionáveis na leitura atual. A operação não preenche a fila com exemplos."
+              />
+            )}
           </AppSectionBlock>
 
           <AppSectionBlock
@@ -1405,7 +1479,8 @@ export default function ExecutiveDashboard() {
                 </div>
               ) : (
                 <p className="mt-2 text-xs text-[var(--text-secondary)]">
-                  Nenhuma aprovação pendente retornada. Sem prova operacional recente retornada quando a Timeline não trouxer eventos.
+                  Nenhuma aprovação pendente retornada. Sem prova operacional
+                  recente retornada quando a Timeline não trouxer eventos.
                 </p>
               )}
             </div>
