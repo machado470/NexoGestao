@@ -90,6 +90,8 @@ describe("ExecutiveDashboard decision center", () => {
     expect(source).toContain("piorou");
     expect(source).toContain("estável em relação ao período anterior");
     expect(source).toContain("sem base histórica suficiente");
+    expect(source).toContain("describeMicroTrend");
+    expect(source).toContain("Sem base histórica suficiente");
     expect(source).toContain("Resumo executivo dos sinais antes da fila.");
     expect(source).not.toContain(
       "Tendência histórica: indisponível neste lote"
@@ -105,14 +107,18 @@ describe("ExecutiveDashboard decision center", () => {
     expect(source).toContain('path: "/appointments"');
     expect(source).toContain('path: "/whatsapp"');
     expect(source).toContain("Linhas acionáveis sem cabeçalho de tabela.");
+    expect(source).toContain("formatRelativeDelay");
+    expect(source).toContain("Cliente com cobrança vencida");
   });
 
   it("humanizes timeline evidence and does not show raw technical events", () => {
     expect(source).toContain("humanizeEvent");
-    expect(source).toContain("Cobrança bloqueada");
-    expect(source).toContain("Lembrete de cobrança não executado");
+    expect(source).toContain("Cobrança não enviada");
+    expect(source).toContain("Lembrete de cobrança bloqueado");
     expect(source).toContain("Pagamento recebido");
     expect(source).toContain("SERVICE_ORDER_COMPLETED");
+    expect(source).not.toContain("Cobrança bloqueada");
+    expect(source).not.toContain("Follow-up bloqueado");
   });
 
   it("enriches the operational state with compact real mini metrics", () => {

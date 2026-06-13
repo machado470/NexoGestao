@@ -132,6 +132,9 @@ type QueueRecord = DashboardRecord & {
   context?: unknown;
   amountCents?: unknown;
   startsAt?: unknown;
+  dueAt?: unknown;
+  dueDate?: unknown;
+  deadlineAt?: unknown;
   lastMessageAt?: unknown;
   serviceOrderId?: unknown;
   chargeId?: unknown;
@@ -242,6 +245,32 @@ function formatCurrencyMentions(value: string) {
   );
 }
 
+function formatRelativeDelay(value: unknown) {
+  if (typeof value !== "string" && !(value instanceof Date)) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const diffMs = Date.now() - date.getTime();
+  if (diffMs <= 0) return "Prazo operacional vencido";
+  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (days <= 0) return "Vencida hoje";
+  return `Vencida há ${days} ${days === 1 ? "dia" : "dias"}`;
+}
+
+function describeMicroTrend(
+  value: number | null,
+  lowerIsBetter = false,
+  unit: "pct" | "count" = "pct"
+) {
+  if (value === null) return "Sem base histórica suficiente";
+  if (value === 0) return "Estável";
+  const improved = lowerIsBetter ? value < 0 : value > 0;
+  const arrow = value > 0 ? "↑" : "↓";
+  const amount = Math.abs(value).toLocaleString("pt-BR");
+  if (unit === "pct")
+    return `${arrow} ${improved ? "melhorou" : "piorou"} ${amount}%`;
+  return `${arrow} ${value > 0 ? "+" : "-"}${amount} desde o período anterior`;
+}
+
 function formatPeriod() {
   return `Hoje · ${new Intl.DateTimeFormat("pt-BR", { dateStyle: "long" }).format(new Date())}`;
 }
@@ -310,9 +339,9 @@ function normalizeTimelineEvents(payload: unknown) {
   return source.slice(0, 3).map((raw, index) => {
     const event = asRecord(raw) as DashboardTimelineEvent;
     const humanEvent = humanizeEvent(event);
-    const entityType = toTitleCase(
-      String(event.entityType ?? "Entidade").replace(/_/g, " ")
-    );
+    const entityType = event.entityType
+      ? toTitleCase(String(event.entityType).replace(/_/g, " "))
+      : "Operação";
     const entityId = event.entityId ? ` #${String(event.entityId)}` : "";
     return {
       id: String(event.id ?? `${humanEvent.type}-${index}`),
@@ -361,8 +390,8 @@ function humanizeEvent(event: DashboardTimelineEvent) {
     actionSource.includes("overdue-charge-reminder")
   ) {
     return {
-      type: "Cobrança bloqueada",
-      summary: "Lembrete de cobrança não executado.",
+      type: "Cobrança não enviada",
+      summary: "Lembrete de cobrança bloqueado.",
     };
   }
   if (
@@ -370,27 +399,27 @@ function humanizeEvent(event: DashboardTimelineEvent) {
     actionSource.includes("create-charge-followup")
   ) {
     return {
-      type: "Follow-up bloqueado",
-      summary: "Ação de cobrança não foi executada.",
+      type: "Follow-up não executado",
+      summary: "Ação de cobrança não foi concluída.",
     };
   }
 
   const known: Record<string, { type: string; summary: string }> = {
     PAYMENT_RECEIVED: {
       type: "Pagamento recebido",
-      summary: "Recebimento registrado oficialmente.",
+      summary: "Pagamento registrado na operação.",
     },
     CHARGE_CREATED: {
       type: "Cobrança criada",
-      summary: "Cobrança registrada no fluxo financeiro.",
+      summary: "Nova cobrança registrada.",
     },
     SERVICE_ORDER_COMPLETED: {
       type: "O.S. concluída",
-      summary: "Ordem de serviço finalizada.",
+      summary: "Serviço finalizado.",
     },
     APPOINTMENT_CONFIRMED: {
       type: "Agendamento confirmado",
-      summary: "Agenda confirmada com o cliente.",
+      summary: "Cliente confirmado na agenda.",
     },
   };
 
@@ -568,7 +597,10 @@ function buildQueue(alerts: DashboardAlerts): QueueItem[] {
           String(item.context ?? "Prazo operacional vencido")
         ),
         status: "Prazo vencido",
-        dueLabel: "Vencida",
+        dueLabel:
+          formatRelativeDelay(
+            item.deadlineAt ?? item.dueAt ?? item.dueDate ?? item.startsAt
+          ) || "Prazo operacional vencido",
         responsible: readResponsible(asRecord(item)).label,
         responsibleMissing: readResponsible(asRecord(item)).missing,
         priority: "critical",
@@ -596,7 +628,9 @@ function buildQueue(alerts: DashboardAlerts): QueueItem[] {
         entity: String(item.title ?? "Cliente"),
         context: `${amountLabel} pendentes${context ? ` · ${context}` : ""}`,
         status: "Vencida",
-        dueLabel: "Financeiro vencido",
+        dueLabel:
+          formatRelativeDelay(item.dueAt ?? item.dueDate ?? item.startsAt) ||
+          "Cliente com cobrança vencida",
         responsible: readResponsible(asRecord(item)).label,
         responsibleMissing: readResponsible(asRecord(item)).missing,
         priority: "critical",
@@ -954,6 +988,20 @@ export default function ExecutiveDashboard() {
     asRecord(metrics.whatsappSignals),
     "failedMessages"
   );
+  const revenueTrend = describeMicroTrend(
+    readNullableNumber(comparison, "revenueReceivedPct")
+  );
+  const completedOrdersTrend = describeMicroTrend(
+    readNullableNumber(comparison, "completedServiceOrdersPct")
+  );
+  const overdueChargesTrend = describeMicroTrend(
+    readNullableNumber(comparison, "overdueChargesPct"),
+    true
+  );
+  const failedMessagesTrend = describeMicroTrend(
+    readNullableNumber(comparison, "failedMessagesPct"),
+    true
+  );
   const nextBestAction = nextBestActionQuery.data;
   const highestValueOverdueCharge = (alerts.overdueCharges?.items ?? [])
     .slice()
@@ -1076,8 +1124,8 @@ export default function ExecutiveDashboard() {
       value: formatCurrencyFromCents(weeklyRevenueInCents),
       context:
         weeklyRevenueInCents > 0
-          ? "Pagamentos registrados no período atual."
-          : "Sem pagamentos registrados no período.",
+          ? `Pagamentos registrados no período atual. ${revenueTrend}.`
+          : `Sem pagamentos registrados no período. ${revenueTrend}.`,
       cta: "Ver pagamentos",
       path: "/finances?view=paid",
       Icon: WalletCards,
@@ -1087,8 +1135,8 @@ export default function ExecutiveDashboard() {
       value: String(readNumber(metrics, "openServiceOrders")),
       context:
         overdueOrders > 0
-          ? `${overdueOrders} atrasada(s) exigem avanço.`
-          : "Sem atraso retornado.",
+          ? `${overdueOrders} atrasada(s) exigem avanço. ${completedOrdersTrend}.`
+          : `Sem atraso retornado. ${completedOrdersTrend}.`,
       cta: "Abrir execução",
       path: "/service-orders?status=open",
       Icon: ClipboardList,
@@ -1100,8 +1148,8 @@ export default function ExecutiveDashboard() {
       ),
       context:
         overdueCharges > 0
-          ? `${overdueCharges} cobrança(s) vencida(s).`
-          : "Sem carteira vencida retornada.",
+          ? `${overdueCharges} cobrança(s) vencida(s). ${overdueChargesTrend}.`
+          : `Sem carteira vencida retornada. ${overdueChargesTrend}.`,
       cta: "Abrir cobranças",
       path: "/finances?view=charges&status=overdue",
       Icon: CircleDollarSign,
@@ -1111,8 +1159,8 @@ export default function ExecutiveDashboard() {
       value: String(failedMessages),
       context:
         failedMessages > 0
-          ? "Falhas podem bloquear confirmações."
-          : "Sem falhas retornadas.",
+          ? `Falhas podem bloquear confirmações. ${failedMessagesTrend}.`
+          : `Sem falhas retornadas. ${failedMessagesTrend}.`,
       cta: "Revisar WhatsApp",
       path: "/whatsapp",
       Icon: MessageSquareWarning,
@@ -1154,26 +1202,35 @@ export default function ExecutiveDashboard() {
   const pulseInsights = [
     {
       label: "Prioridade",
+      keyword: bottleneck?.label ?? "Sem gargalo",
       Icon: ShieldAlert,
       iconClass: bottleneck
         ? "text-[var(--accent-primary)]"
         : "text-[var(--text-muted)]",
       text: bottleneck
-        ? `${bottleneck.label} concentra a principal quebra do fluxo.`
-        : "Pipeline sem quebra ativa; acompanhe a fila antes de redistribuir o time.",
+        ? "Principal quebra do fluxo agora."
+        : "Pipeline sem quebra ativa.",
+      trend: overdueChargesTrend,
     },
     {
       label: "Capacidade",
+      keyword:
+        overdueOrders > 0 ? `${overdueOrders} O.S. atrasada(s)` : "Sem atraso",
       Icon: Clock3,
       iconClass:
         overdueOrders > 0 ? "text-[var(--danger)]" : "text-[var(--text-muted)]",
       text:
         overdueOrders > 0
-          ? `${overdueOrders} O.S. atrasada(s) indicam pressão na execução.`
-          : "Execução sem atraso retornado; preserve o ritmo das próximas janelas.",
+          ? "Pressão na execução."
+          : "Preserve o ritmo das próximas janelas.",
+      trend: completedOrdersTrend,
     },
     {
       label: "Contato",
+      keyword:
+        failedMessages > 0
+          ? `${failedMessages} falha(s)`
+          : "Sem falhas retornadas",
       Icon: MessageSquareWarning,
       iconClass:
         failedMessages > 0
@@ -1181,11 +1238,16 @@ export default function ExecutiveDashboard() {
           : "text-[var(--text-muted)]",
       text:
         failedMessages > 0
-          ? `${failedMessages} falha(s) podem quebrar confirmações e retorno ao cliente.`
-          : "Nenhuma falha retornada; o canal não bloqueia o fluxo agora.",
+          ? "Pode quebrar confirmações."
+          : "Canal não bloqueia o fluxo agora.",
+      trend: failedMessagesTrend,
     },
     {
       label: "Caixa",
+      keyword:
+        overdueCharges > 0
+          ? `${formatCurrencyFromCents(alerts.overdueCharges?.totalAmountCents ?? 0)} vencidos`
+          : "Sem vencimentos",
       Icon: WalletCards,
       iconClass:
         overdueCharges > 0
@@ -1193,8 +1255,9 @@ export default function ExecutiveDashboard() {
           : "text-[var(--text-muted)]",
       text:
         overdueCharges > 0
-          ? `${formatCurrencyFromCents(alerts.overdueCharges?.totalAmountCents ?? 0)} vencidos prolongam o ciclo até recebimento.`
-          : "Sem vencimentos retornados; caixa não exige reação imediata.",
+          ? "Ciclo até recebimento prolongado."
+          : "Caixa não exige reação imediata.",
+      trend: overdueChargesTrend,
     },
   ];
   const statusLabel =
@@ -1277,6 +1340,7 @@ export default function ExecutiveDashboard() {
             />
 
             <EntityTimelineCard
+              className="h-full"
               events={timelineEvents}
               fullTimelineLabel="Ver Timeline"
               onFullTimeline={() => navigate("/timeline")}
@@ -1327,6 +1391,7 @@ export default function ExecutiveDashboard() {
                     ? () => void nextBestActionQuery.refetch()
                     : undefined
                 }
+                className="border-[var(--accent-primary)]/55 bg-[var(--accent-soft)]/50"
               />
             ) : (
               <AppPageEmptyState
@@ -1385,22 +1450,30 @@ export default function ExecutiveDashboard() {
             subtitle="Resumo executivo dos sinais antes da fila."
           >
             <div className="flex w-full min-w-0 flex-col divide-y divide-[var(--border-subtle)]/70 lg:flex-row lg:divide-x lg:divide-y-0">
-              {pulseInsights.map(({ label, Icon, iconClass, text }) => (
-                <article
-                  key={label}
-                  className="w-full min-w-0 px-3 py-3 text-sm leading-5 text-[var(--text-secondary)] first:pt-0 lg:flex-1 lg:first:pt-3"
-                >
-                  <div className="mb-2 flex items-center gap-2">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full border border-[var(--border-subtle)]/70 bg-[var(--surface-elevated)]/65">
-                      <Icon className={`h-4 w-4 ${iconClass}`} />
+              {pulseInsights.map(
+                ({ label, keyword, Icon, iconClass, text, trend }) => (
+                  <article
+                    key={label}
+                    className="w-full min-w-0 px-3 py-3 text-sm leading-5 text-[var(--text-secondary)] first:pt-0 lg:flex-1 lg:first:pt-3"
+                  >
+                    <div className="mb-2 flex items-center gap-2">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-xl border border-[var(--accent-primary)]/20 bg-[var(--surface-elevated)]/75">
+                        <Icon className={`h-4 w-4 ${iconClass}`} />
+                      </span>
+                      <strong className="text-[var(--text-primary)]">
+                        {label}
+                      </strong>
+                    </div>
+                    <p className="text-base font-semibold leading-5 text-[var(--text-primary)]">
+                      {keyword}
+                    </p>
+                    <p className="mt-1 line-clamp-1">{text}</p>
+                    <span className="mt-2 inline-flex rounded-full border border-[var(--border-subtle)]/70 bg-[var(--surface-primary)]/55 px-2 py-0.5 text-[11px] font-medium text-[var(--text-muted)]">
+                      {trend}
                     </span>
-                    <strong className="text-[var(--text-primary)]">
-                      {label}
-                    </strong>
-                  </div>
-                  <p>{text}</p>
-                </article>
-              ))}
+                  </article>
+                )
+              )}
             </div>
             {availableComparisons.length > 0 || missingComparisonCount > 0 ? (
               <div className="mt-3 border-t border-[var(--border-subtle)]/70 pt-2 text-xs leading-5 text-[var(--text-secondary)]">
