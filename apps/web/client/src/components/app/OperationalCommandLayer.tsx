@@ -115,39 +115,37 @@ export function OperationalStateCard({
 
   return (
     <AppSectionCard
-      className={cn("flex h-full flex-col gap-4", tone.className, className)}
+      className={cn("flex h-full flex-col gap-2.5", tone.className, className)}
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="nexo-overline">Comando operacional</p>
-          <h3 className="mt-1 text-lg font-semibold leading-tight text-[var(--text-primary)]">
-            {title}
+          <h3 className="mt-0.5 text-base font-semibold leading-tight text-[var(--text-primary)]">
+            {title}: {level}
           </h3>
         </div>
         <AppStatusBadge label={tone.label} tone={tone.badgeTone} />
       </div>
-      <div className="space-y-3 text-sm leading-6 text-[var(--text-secondary)]">
+      <div className="grid gap-2 text-xs leading-5 text-[var(--text-secondary)] sm:grid-cols-2">
         <p>
           <strong className="text-[var(--text-primary)]">
             Motivo principal:
           </strong>{" "}
           {reason}
         </p>
-        <p className="rounded-xl border border-[var(--border-subtle)]/70 bg-[var(--surface-primary)]/45 p-3">
-          <strong className="text-[var(--text-primary)]">
-            Impacto operacional:
-          </strong>{" "}
+        <p>
+          <strong className="text-[var(--text-primary)]">Impacto:</strong>{" "}
           {impact}
         </p>
       </div>
       {onDetails ? (
         <Button
-          className="mt-auto w-full justify-between"
+          className="mt-auto h-8 justify-between px-3 text-xs"
           variant="secondary"
           onClick={onDetails}
         >
           {detailsLabel}
-          <ArrowRight className="h-4 w-4" />
+          <ArrowRight className="h-3.5 w-3.5" />
         </Button>
       ) : null}
     </AppSectionCard>
@@ -180,17 +178,17 @@ export function NextBestActionCard({
   return (
     <AppSectionCard
       className={cn(
-        "flex h-full flex-col gap-4 border-[var(--accent-primary)]/35 bg-[var(--accent-soft)]/35",
+        "flex h-full flex-col gap-3 border-[var(--accent-primary)]/35 bg-[var(--accent-soft)]/35",
         className
       )}
     >
       <div className="flex items-start gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--accent-primary)]/25 bg-[var(--surface-primary)]/60">
-          <Zap className="h-5 w-5 text-[var(--accent-primary)]" />
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[var(--accent-primary)]/25 bg-[var(--surface-primary)]/60">
+          <Zap className="h-4 w-4 text-[var(--accent-primary)]" />
         </span>
         <div className="min-w-0 flex-1">
           <p className="nexo-overline">Próxima Melhor Ação</p>
-          <h3 className="mt-1 text-lg font-semibold leading-tight text-[var(--text-primary)]">
+          <h3 className="mt-1 text-base font-semibold leading-tight text-[var(--text-primary)]">
             {title}
           </h3>
           <p className="mt-1 text-xs font-medium text-[var(--text-muted)]">
@@ -198,7 +196,7 @@ export function NextBestActionCard({
           </p>
         </div>
       </div>
-      <div className="grid gap-3 text-sm leading-6 text-[var(--text-secondary)] md:grid-cols-2">
+      <div className="grid gap-2 text-sm leading-5 text-[var(--text-secondary)] md:grid-cols-2">
         <p>
           <strong className="text-[var(--text-primary)]">Motivo:</strong>{" "}
           {reason}
@@ -211,7 +209,7 @@ export function NextBestActionCard({
         </p>
       </div>
       {safetyNote ? (
-        <p className="rounded-xl border border-[var(--border-subtle)]/70 bg-[var(--surface-primary)]/50 p-3 text-xs leading-5 text-[var(--text-secondary)]">
+        <p className="rounded-xl border border-[var(--border-subtle)]/70 bg-[var(--surface-primary)]/50 p-2.5 text-xs leading-5 text-[var(--text-secondary)]">
           <strong className="text-[var(--text-primary)]">Segurança:</strong>{" "}
           {safetyNote}
         </p>
@@ -255,7 +253,7 @@ export function OperationalFlowCard({
   className?: string;
 }) {
   return (
-    <AppSectionCard className={cn("space-y-4", className)}>
+    <AppSectionCard className={cn("space-y-3", className)}>
       <div>
         <p className="nexo-overline">Cadeia viva da operação</p>
         <h3 className="mt-1 text-lg font-semibold text-[var(--text-primary)]">
@@ -265,14 +263,14 @@ export function OperationalFlowCard({
           {subtitle}
         </p>
       </div>
-      <div className="grid gap-2 lg:grid-cols-7">
+      <div className="grid gap-2 lg:grid-cols-5">
         {stages.map((stage, index) => {
           const tone = flowStageTone[stage.state];
           return (
             <article
               key={stage.id}
               className={cn(
-                "relative min-w-0 rounded-xl border p-3",
+                "relative min-w-0 rounded-xl border p-2.5",
                 tone.container
               )}
             >
@@ -296,11 +294,11 @@ export function OperationalFlowCard({
                 </span>
               </div>
               {stage.countOrValue ? (
-                <p className="mt-2 text-xl font-semibold leading-tight text-[var(--text-primary)]">
+                <p className="mt-1.5 text-lg font-semibold leading-tight text-[var(--text-primary)]">
                   {stage.countOrValue}
                 </p>
               ) : null}
-              <p className="mt-1 min-h-[40px] text-xs leading-5 text-[var(--text-secondary)]">
+              <p className="mt-1 min-h-[32px] text-xs leading-4 text-[var(--text-secondary)]">
                 {stage.summary}
               </p>
               {stage.onClick ? (
@@ -344,55 +342,50 @@ export function EntityTimelineCard({
   className?: string;
 }) {
   return (
-    <AppSectionCard className={cn("space-y-4", className)}>
+    <AppSectionCard className={cn("space-y-3", className)}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="nexo-overline">Prova operacional</p>
-          <h3 className="mt-1 text-lg font-semibold text-[var(--text-primary)]">
+          <h3 className="mt-0.5 text-base font-semibold text-[var(--text-primary)]">
             {title}
           </h3>
-          <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
+          <p className="mt-0.5 text-xs leading-4 text-[var(--text-muted)]">
             {subtitle}
           </p>
         </div>
         <History className="h-5 w-5 shrink-0 text-[var(--text-muted)]" />
       </div>
       {events.length > 0 ? (
-        <ol className="space-y-2">
+        <ol className="divide-y divide-[var(--border-subtle)]/70">
           {events.map(event => (
             <li
               key={event.id}
-              className="rounded-xl border border-[var(--border-subtle)]/70 bg-[var(--surface-primary)]/45 p-3"
+              className="py-2 first:pt-0 last:pb-0"
             >
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 text-xs">
                 <AppStatusBadge label={event.type} tone="neutral" />
-                <span className="text-xs text-[var(--text-muted)]">
+                <span className="text-[var(--text-muted)]">
                   {event.occurredAt}
                 </span>
+                <span className="min-w-0 truncate font-semibold text-[var(--text-primary)]">
+                  {event.entity}
+                </span>
               </div>
-              <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
-                {event.entity}
-              </p>
-              <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
+              <p className="mt-1 line-clamp-1 text-xs leading-4 text-[var(--text-secondary)]">
                 {event.summary}
               </p>
-              {event.actor ? (
-                <p className="mt-1 text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                  Responsável: {event.actor}
-                </p>
-              ) : null}
             </li>
           ))}
         </ol>
       ) : (
-        <div className="rounded-xl border border-[var(--border-subtle)]/70 bg-[var(--surface-primary)]/45 p-4 text-sm leading-6 text-[var(--text-secondary)]">
+        <div className="rounded-xl border border-[var(--border-subtle)]/70 bg-[var(--surface-primary)]/45 p-3 text-sm leading-5 text-[var(--text-secondary)]">
           Nenhum evento oficial foi retornado nesta leitura. O Nexo não cria
           histórico fictício; abra a Timeline para investigar a trilha completa.
         </div>
       )}
       {onFullTimeline ? (
         <Button
-          className="w-full justify-between"
+          className="h-8 w-full justify-between px-3 text-xs"
           variant="secondary"
           onClick={onFullTimeline}
         >
