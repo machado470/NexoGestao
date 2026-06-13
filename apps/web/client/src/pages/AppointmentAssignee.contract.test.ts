@@ -18,23 +18,28 @@ describe("appointment assignee UI contract", () => {
     );
   });
 
-  it("permite filtrar, editar e remover o responsável na tela padronizada de agendamentos", () => {
+  it("mantém agendamentos como controle operacional do tempo e entrada da execução", () => {
     const appointments = readFileSync(
       "client/src/pages/AppointmentsPage.tsx",
       "utf8"
     );
     const normalizedAppointments = compact(appointments);
 
-    expect(appointments).toContain("<AppPageShell>");
-    expect(appointments).toContain("<AppOperationalHeader");
-    expect(appointments).toContain("<AppSectionCard");
-    expect(appointments).toContain("<AppNextBestActionBlock");
-    expect(appointments).toContain("<AppDataTable");
-    expect(appointments).toContain("<AppOperationalStatusBadge");
-    expect(appointments).toContain("<AppPriorityBadge");
-    expect(appointments).toContain("<AppRowActionsDropdown");
-    expect(appointments).not.toContain("PageWrapper");
-    expect(appointments).not.toContain("OperationalTopCard");
+    expect(appointments).toContain(
+      "Controle do tempo, confirmação e preparação da execução"
+    );
+    expect(appointments).toContain("Alertas compactos");
+    expect(appointments).toContain("Lista operacional de agendamentos");
+    expect(appointments).toContain("Detalhe do agendamento");
+    expect(appointments).toContain(
+      "Fonte atual não entrega resposta do cliente nesta tela."
+    );
+    expect(appointments).toContain("Sem Timeline oficial carregada");
+    expect(appointments).toContain("NextBestActionCard");
+    expect(appointments).toContain("Abrir/criar O.S.");
+    expect(appointments).toContain("Enviar WhatsApp");
+    expect(appointments).not.toContain("Google Calendar");
+    expect(appointments).not.toContain("automático");
     expect(normalizedAppointments).toContain(
       'responsibleFilter === "all" ? { limit: 100 } : { assignedToPersonId: responsibleFilter, limit: 100 }'
     );
