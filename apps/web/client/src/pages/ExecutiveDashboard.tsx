@@ -1115,6 +1115,42 @@ export default function ExecutiveDashboard() {
               />
             )}
 
+            <EntityTimelineCard
+              events={timelineEvents}
+              onFullTimeline={() => navigate("/timeline")}
+            />
+          </div>
+
+          <AppSectionBlock
+            title="Atenção imediata"
+            compact
+            className="border-[var(--danger)]/30 bg-[var(--surface-base)]"
+            subtitle="Riscos que interrompem execução, recebimento ou atendimento."
+          >
+            {attention.length > 0 ? (
+              <div className="w-full min-w-0 divide-y divide-[var(--border-subtle)]/70">
+                {attention.map(item => (
+                  <AttentionRow
+                    key={item.id}
+                    item={item}
+                    navigate={navigate}
+                  />
+                ))}
+              </div>
+            ) : (
+              <AppPageEmptyState
+                title="Nenhum alerta operacional retornado"
+                description="A leitura foi concluída sem riscos ativos. Continue acompanhando a fila operacional."
+              />
+            )}
+          </AppSectionBlock>
+
+          <AppSectionBlock
+            title="Próxima melhor ação"
+            compact
+            className={dashboardSectionClass}
+            subtitle="Ação contextual mais importante retornada pelos sinais operacionais."
+          >
             {recommendedAction ? (
               <NextBestActionCard
                 title={recommendedAction.title}
@@ -1139,50 +1175,49 @@ export default function ExecutiveDashboard() {
                 description="A leitura atual não identificou urgências acionáveis; nenhuma ação artificial foi criada."
               />
             )}
-          </div>
+          </AppSectionBlock>
 
-          <OperationalFlowCard
-            stages={flow.map(stage => ({
-              id: stage.id,
-              label: stage.label,
-              summary: stage.context,
-              state: stage.state,
-              countOrValue: stage.value,
-              hrefLabel: stage.action,
-              onClick: () => navigate(stage.path),
-            }))}
-          />
-
-          <div className="grid w-full min-w-0 gap-3 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-            <EntityTimelineCard
-              events={timelineEvents}
-              onFullTimeline={() => navigate("/timeline")}
-            />
-
-            <AppSectionBlock
-              title="Atenção imediata"
-              compact
-              className="border-[var(--danger)]/30 bg-[var(--surface-base)]"
-              subtitle="Riscos que interrompem execução, recebimento ou atendimento."
-            >
-              {attention.length > 0 ? (
-                <div className="w-full min-w-0 divide-y divide-[var(--border-subtle)]/70">
-                  {attention.map(item => (
-                    <AttentionRow
-                      key={item.id}
-                      item={item}
-                      navigate={navigate}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <AppPageEmptyState
-                  title="Nenhum alerta operacional retornado"
-                  description="A leitura foi concluída sem riscos ativos. Continue acompanhando a fila operacional."
+          <AppSectionBlock
+            title="KPIs operacionais"
+            compact
+            className={dashboardSectionClass}
+            subtitle="Indicadores de apoio para decidir rápido."
+          >
+            <div className="grid w-full min-w-0 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {kpiCards.map(({ label, value, context, cta, path, Icon }) => (
+                <AppMetricCard
+                  key={label}
+                  title={label}
+                  value={value}
+                  hint={context}
+                  icon={<Icon className="h-4 w-4" />}
+                  ctaLabel={cta}
+                  onClick={() => navigate(path)}
                 />
-              )}
-            </AppSectionBlock>
-          </div>
+              ))}
+            </div>
+          </AppSectionBlock>
+
+          <AppSectionBlock
+            title="Fluxo operacional"
+            compact
+            className={dashboardSectionClass}
+            subtitle="Gargalos do fluxo Cliente → Agendamento → O.S. → Cobrança → Pagamento."
+          >
+            <OperationalFlowCard
+              title="Gargalos operacionais"
+              subtitle="Use os pontos de quebra para direcionar a próxima ação sem duplicar diagnósticos das páginas específicas."
+              stages={flow.map(stage => ({
+                id: stage.id,
+                label: stage.label,
+                summary: stage.context,
+                state: stage.state,
+                countOrValue: stage.value,
+                hrefLabel: stage.action,
+                onClick: () => navigate(stage.path),
+              }))}
+            />
+          </AppSectionBlock>
 
           <AppSectionBlock
             title="Fila operacional"
@@ -1249,27 +1284,6 @@ export default function ExecutiveDashboard() {
                 description="Não há itens acionáveis na leitura atual. A operação não preenche a fila com exemplos."
               />
             )}
-          </AppSectionBlock>
-
-          <AppSectionBlock
-            title="KPIs operacionais"
-            compact
-            className={dashboardSectionClass}
-            subtitle="Indicadores de apoio; a decisão principal fica acima."
-          >
-            <div className="grid w-full min-w-0 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-              {kpiCards.map(({ label, value, context, cta, path, Icon }) => (
-                <AppMetricCard
-                  key={label}
-                  title={label}
-                  value={value}
-                  hint={context}
-                  icon={<Icon className="h-4 w-4" />}
-                  ctaLabel={cta}
-                  onClick={() => navigate(path)}
-                />
-              ))}
-            </div>
           </AppSectionBlock>
 
           <AppSectionBlock
