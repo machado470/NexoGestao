@@ -122,6 +122,9 @@ type ComparisonKey =
   | "failedMessagesPct";
 type QueueRecord = DashboardRecord & {
   id?: unknown;
+  responsibleName?: unknown;
+  assigneeName?: unknown;
+  ownerName?: unknown;
   type?: unknown;
   title?: unknown;
   context?: unknown;
@@ -151,6 +154,14 @@ type DashboardAlerts = {
   operationalQueue?: QueueRecord[];
 };
 
+/**
+ * Fonte de dados do cockpit operacional:
+ * - dashboard.kpis: volumes, comparação histórica, WhatsApp Signals e governança quando o BFF entregar.
+ * - dashboard.alerts: alertas financeiros/O.S. e fila transversal leve.
+ * - /internal/operational-signals: riscos operacionais e próxima melhor ação do motor existente.
+ * - nexo.timeline.listByOrg: prova operacional recente; sem eventos, o dashboard declara ausência em vez de inventar tendência.
+ * Tudo abaixo é cálculo de priorização no frontend, preservando contratos, rotas, API e Prisma.
+ */
 const fullWidthLayoutClass = "w-full min-w-0";
 const dashboardSectionClass = fullWidthLayoutClass;
 
@@ -231,6 +242,22 @@ function formatCurrencyMentions(value: string) {
 
 function formatPeriod() {
   return `Hoje · ${new Intl.DateTimeFormat("pt-BR", { dateStyle: "long" }).format(new Date())}`;
+}
+
+function readResponsible(record: DashboardRecord) {
+  return (
+    readString(record, "responsibleName") ||
+    readString(record, "assigneeName") ||
+    readString(record, "ownerName") ||
+    "Responsável não informado"
+  );
+}
+
+function normalizeOperationLevel(value: string): OperationalStateLevel | null {
+  const normalized = value.toUpperCase();
+  return ["NORMAL", "WARNING", "RESTRICTED", "SUSPENDED"].includes(normalized)
+    ? (normalized as OperationalStateLevel)
+    : null;
 }
 
 function formatEventDateTime(value: unknown) {
@@ -432,7 +459,7 @@ function buildAttention(
 }
 
 function buildQueue(alerts: DashboardAlerts): QueueItem[] {
-  return (alerts.operationalQueue ?? []).slice(0, 6).map(item => {
+  return (alerts.operationalQueue ?? []).slice(0, 10).map(item => {
     const type = String(item.type);
     if (type === "OVERDUE_SERVICE_ORDER")
       return {
@@ -444,7 +471,7 @@ function buildQueue(alerts: DashboardAlerts): QueueItem[] {
         ),
         status: "Prazo vencido",
         dueLabel: "Vencida",
-        responsible: "Operação / O.S.",
+        responsible: readResponsible(asRecord(item)),
         priority: "critical",
         ctaLabel: "Destravar",
         path: `/service-orders?id=${String(item.serviceOrderId ?? item.id)}`,
@@ -471,7 +498,7 @@ function buildQueue(alerts: DashboardAlerts): QueueItem[] {
         context: `${amountLabel} pendentes${context ? ` · ${context}` : ""}`,
         status: "Vencida",
         dueLabel: "Financeiro vencido",
-        responsible: "Financeiro",
+        responsible: readResponsible(asRecord(item)),
         priority: "critical",
         ctaLabel: "Cobrar",
         path: "/finances?view=charges&status=overdue",
@@ -487,7 +514,7 @@ function buildQueue(alerts: DashboardAlerts): QueueItem[] {
         ),
         status: "Aguardando operador",
         dueLabel: formatShortDateTime(item.lastMessageAt),
-        responsible: "Atendimento",
+        responsible: readResponsible(asRecord(item)),
         priority: "high",
         ctaLabel: "Responder cliente",
         path: "/whatsapp",
@@ -502,7 +529,7 @@ function buildQueue(alerts: DashboardAlerts): QueueItem[] {
         ),
         status: "Sem confirmação",
         dueLabel: formatShortDateTime(item.startsAt),
-        responsible: "Agenda",
+        responsible: readResponsible(asRecord(item)),
         priority: "high",
         ctaLabel: "Confirmar agenda",
         path: "/appointments",
@@ -516,7 +543,7 @@ function buildQueue(alerts: DashboardAlerts): QueueItem[] {
       ),
       status: "Falha de envio",
       dueLabel: "Falha recente",
-      responsible: "WhatsApp",
+      responsible: readResponsible(asRecord(item)),
       priority: "high",
       ctaLabel: "Resolver mensagem",
       path: "/whatsapp",
@@ -647,19 +674,21 @@ export default function ExecutiveDashboard() {
   const overdueCharges = alerts.overdueCharges?.count ?? 0;
   const missingCharges = alerts.doneOrdersWithoutCharge?.count ?? 0;
   const timelineEvents = normalizeTimelineEvents(timelineQuery.data);
+  const governance = asRecord(metrics.governance);
+  const governanceLevel = normalizeOperationLevel(
+    readString(governance, "level")
+  );
   const operationLevel: OperationalStateLevel = pageError
     ? "SUSPENDED"
-    : criticalCount > 0
-      ? "SUSPENDED"
-      : attention.length > 0
-        ? "WARNING"
-        : "NORMAL";
-  const operationState =
-    operationLevel === "SUSPENDED"
-      ? "Crítico"
-      : operationLevel === "WARNING"
-        ? "Atenção"
-        : "Normal";
+    : governanceLevel ??
+      (criticalCount > 0
+        ? "RESTRICTED"
+        : attention.length > 0
+          ? "WARNING"
+          : "NORMAL");
+  const operationStateFallback = governanceLevel
+    ? "Estado retornado pela governança."
+    : "Estado operacional não retornado pela fonte atual; nível derivado de alertas e sinais disponíveis.";
 
   const flow: FlowStage[] = [
     {
@@ -752,7 +781,7 @@ export default function ExecutiveDashboard() {
     {
       id: "governance",
       label: "Risco/Governança",
-      value: operationState,
+      value: operationLevel,
       context:
         criticalCount > 0
           ? `${criticalCount} risco(s) crítico(s)`
@@ -816,7 +845,7 @@ export default function ExecutiveDashboard() {
         impact:
           "Ação direta sobre o maior valor parado reduz pressão imediata no caixa.",
         path: "/finances?view=charges&status=overdue",
-        ctaLabel: "Enviar cobrança",
+        ctaLabel: "Cobrar carteira vencida",
         safetyNote:
           "Fallback local baseado em alertas financeiros já carregados; não executa cobrança automática.",
       }
@@ -1026,9 +1055,13 @@ export default function ExecutiveDashboard() {
     },
   ];
   const statusLabel =
-    operationState === "Normal"
-      ? "Operação normal"
-      : "Atenção / Aguardando ação";
+    operationLevel === "NORMAL"
+      ? "NORMAL"
+      : operationLevel === "WARNING"
+        ? "WARNING"
+        : operationLevel === "RESTRICTED"
+          ? "RESTRICTED"
+          : "SUSPENDED";
   return (
     <AppPageShell className="gap-3 sm:gap-4">
       <AppOperationalHeader
@@ -1038,8 +1071,9 @@ export default function ExecutiveDashboard() {
         contextChips={
           <>
             <AppContextChip>{formatPeriod()}</AppContextChip>
+            <AppContextChip>Período: Hoje / Semana / 30 dias</AppContextChip>
             <AppContextChip
-              tone={operationState === "Normal" ? "success" : "accent"}
+              tone={operationLevel === "NORMAL" ? "success" : "accent"}
             >
               Estado: {statusLabel}
             </AppContextChip>
@@ -1052,6 +1086,9 @@ export default function ExecutiveDashboard() {
             </AppContextChip>
             <AppContextChip tone={overdueOrders > 0 ? "warning" : "neutral"}>
               {overdueOrders} O.S. atrasadas
+            </AppContextChip>
+            <AppContextChip tone={bottleneck ? "warning" : "neutral"}>
+              Gargalo: {bottleneck?.label ?? "sem gargalo calculável"}
             </AppContextChip>
           </>
         }
@@ -1087,7 +1124,7 @@ export default function ExecutiveDashboard() {
               level={operationLevel}
               reason={
                 attention[0]?.reason ??
-                "Nenhum risco ativo foi retornado pelas leituras de alertas, sinais e governança."
+                operationStateFallback
               }
               impact={
                 attention[0]?.impact ??
@@ -1237,7 +1274,7 @@ export default function ExecutiveDashboard() {
                       <span>Responsável</span>
                       <span className="text-right">Ação</span>
                     </div>
-                    {queue.slice(0, 5).map(item => (
+                    {queue.slice(0, 10).map(item => (
                       <article
                         key={`${item.type}-${item.id}`}
                         className="grid grid-cols-[0.8fr_1.5fr_1fr_1fr_1fr_0.8fr] items-center gap-3 px-3 py-2.5 text-[var(--text-secondary)]"
@@ -1274,7 +1311,7 @@ export default function ExecutiveDashboard() {
                   size="sm"
                   onClick={() => navigate("/timeline")}
                 >
-                  Ver todas as pendências
+                  Abrir Timeline
                   <ArrowRight className="ml-1 h-3.5 w-3.5" />
                 </Button>
               </div>
@@ -1393,7 +1430,7 @@ export default function ExecutiveDashboard() {
                 </div>
               ) : (
                 <p className="mt-2 text-xs text-[var(--text-secondary)]">
-                  Nenhuma aprovação pendente retornada.
+                  Nenhuma aprovação pendente retornada. Sem prova operacional recente retornada quando a Timeline não trouxer eventos.
                 </p>
               )}
             </div>
