@@ -237,7 +237,6 @@ export default function SettingsPage() {
         ? "Equipe retornou sem papel administrativo claro."
         : "A fonte administrativa não retornou usuários ativos.",
       actionLabel: "Revisar usuários",
-      path: "/people",
     },
     {
       key: "operation",
@@ -306,8 +305,7 @@ export default function SettingsPage() {
       title: "Usuários",
       description: "Acesso, papéis administrativos e convites pendentes.",
       status: statusFromConfigured(permissionsConfigured, members.length > 0),
-      action: "Abrir Pessoas",
-      path: "/people",
+      action: "Revisar aqui",
     },
     {
       title: "Operação",
@@ -359,9 +357,9 @@ export default function SettingsPage() {
   ];
 
   const sourceMessage = membersQuery.isError
-    ? "Não foi possível carregar membros nesta fonte. Gerencie usuários na página Pessoas."
+    ? "Não foi possível carregar membros nesta fonte. Revise usuários e permissões em Configurações; Pessoas é a visão operacional da equipe."
     : memberSource.sourceKind === "unknown" && !membersQuery.isLoading
-      ? "Fonte administrativa sem lista compatível. Gerencie usuários na página Pessoas."
+      ? "Fonte administrativa sem lista compatível. Revise usuários e permissões em Configurações; Pessoas é a visão operacional da equipe."
       : members.length === 0
         ? "Nenhum membro ativo retornado pela fonte administrativa; Pessoas pode usar outra fonte operacional."
         : `${members.length} membro(s) retornado(s) pela fonte administrativa.`;
