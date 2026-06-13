@@ -7,13 +7,14 @@ O `ExecutiveDashboard` é o cockpit diário do NexoGestão. Ele não deve atuar 
 ## Estrutura final
 
 1. **Header Operacional** — título `Operação hoje`, período atual, estado `NORMAL`, `WARNING`, `RESTRICTED` ou `SUSPENDED`, quantidade de riscos críticos e gargalo principal quando calculável.
-2. **Atenção Imediata** — até 5 riscos ordenados por severidade/impacto, sempre com motivo, impacto e CTA real.
-3. **Próxima Melhor Ação** — sinal do endpoint existente de next-best-action ou fallback seguro baseado em alertas reais já carregados.
-4. **KPIs Operacionais** — indicadores compactos com microcontexto e CTA para o módulo dono.
-5. **Fluxo Operacional** — assinatura Cliente → Agendamento → O.S. → Cobrança → Pagamento, com estado por etapa e leitura de gargalo.
-6. **Fila Operacional** — até 10 itens acionáveis da fila transversal retornada pelo dashboard alerts.
-7. **Pulso da Operação** — leitura humana de caixa, execução, comunicação e comparações históricas quando a API entregar base.
-8. **Acessos Rápidos Contextuais** — atalhos secundários para os módulos operacionais.
+2. **Bloco compacto de estado + prova** — substitui os antigos cards altos de estado/maior risco/prova por uma leitura executiva curta: estado operacional, motivo principal, impacto e CTA real para o módulo responsável, ao lado de até 3 eventos oficiais resumidos com CTA para a Timeline.
+3. **Atenção Imediata** — até 5 riscos ordenados por severidade/impacto, sempre com motivo, impacto e CTA real; fica na primeira dobra e é a prioridade visual máxima depois do resumo de estado.
+4. **Próxima Melhor Ação** — sinal do endpoint existente de next-best-action ou fallback seguro baseado em alertas reais já carregados, em card compacto com motivo, impacto esperado, segurança e CTA principal.
+5. **KPIs Operacionais** — indicadores compactos com microcontexto e CTA para o módulo dono, mantendo até 4 cards por linha em desktop.
+6. **Fluxo Operacional** — assinatura Cliente → Agendamento → O.S. → Cobrança → Pagamento, com estado por etapa e leitura de gargalo em cards reduzidos.
+7. **Fila Operacional** — até 10 itens acionáveis da fila transversal retornada pelo dashboard alerts, apresentada como linhas operacionais priorizadas em vez de tabela administrativa pesada.
+8. **Pulso da Operação** — leitura humana de caixa, execução, comunicação e comparações históricas quando a API entregar base.
+9. **Acessos Rápidos Contextuais** — atalhos secundários para os módulos operacionais.
 
 ## Fontes usadas
 
@@ -29,7 +30,7 @@ O `ExecutiveDashboard` é o cockpit diário do NexoGestão. Ele não deve atuar 
 - Sem prazo válido, o dashboard mostra `Prazo não informado` e não calcula atraso.
 - Sem responsável no payload, a fila mostra `Responsável não informado`.
 - Sem histórico de comparação, o pulso mostra que a base histórica ainda está em formação.
-- Sem Timeline ou erro na leitura, a interface não cria prova operacional artificial.
+- Sem Timeline ou erro na leitura, a interface não cria prova operacional artificial; o bloco compacto mostra fallback curto e direciona para a Timeline completa.
 - Sem governança/risk explícito, o header declara que o estado operacional não foi retornado pela fonte atual e deriva nível apenas de alertas/sinais carregados.
 - Sem status WhatsApp, o dashboard não afirma ausência de resposta; só usa `whatsappSignals` ou itens da `operationalQueue` quando retornados.
 - Sem valor financeiro, o dashboard não calcula impacto monetário e direciona para validação no módulo dono.
@@ -37,7 +38,7 @@ O `ExecutiveDashboard` é o cockpit diário do NexoGestão. Ele não deve atuar 
 
 ## CTAs permitidos e preservados
 
-Os CTAs levam para módulos existentes: O.S., Financeiro, Agendamentos, WhatsApp, Timeline, Governança e Clientes. Eles apenas navegam para contexto real; não disparam cobrança, WhatsApp, automação ou alteração de status automática.
+Os CTAs levam para módulos existentes: O.S., Financeiro, Agendamentos, WhatsApp, Timeline, Governança e Clientes. O resumo de estado usa o CTA do maior risco quando há risco real; sem risco, abre Governança. Eles apenas navegam para contexto real; não disparam cobrança, WhatsApp, automação ou alteração de status automática.
 
 ## Diferença para páginas específicas
 

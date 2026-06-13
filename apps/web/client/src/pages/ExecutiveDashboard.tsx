@@ -33,7 +33,6 @@ import {
   EntityTimelineCard,
   NextBestActionCard,
   OperationalFlowCard,
-  OperationalRiskCard,
   OperationalStateCard,
   type OperationalFlowStageState,
   type OperationalStateLevel,
@@ -283,7 +282,7 @@ function normalizeTimelineEvents(payload: unknown) {
         ? (asRecord(payload).events as unknown[])
         : [];
 
-  return source.slice(0, 4).map((raw, index) => {
+  return source.slice(0, 3).map((raw, index) => {
     const event = asRecord(raw) as DashboardTimelineEvent;
     const type = String(
       event.eventType ?? event.type ?? event.action ?? "Evento oficial"
@@ -641,7 +640,7 @@ export default function ExecutiveDashboard() {
     retry: false,
   });
   const timelineQuery = trpc.nexo.timeline.listByOrg.useQuery(
-    { limit: 4 },
+    { limit: 3 },
     { enabled: isAuthenticated, retry: false }
   );
 
@@ -1119,41 +1118,22 @@ export default function ExecutiveDashboard() {
 
       {!pageLoading && !pageError && hasOperationalData ? (
         <div className="w-full min-w-0 space-y-3 sm:space-y-4">
-          <div className="grid w-full min-w-0 gap-3 xl:grid-cols-3">
+          <div className="grid w-full min-w-0 gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
             <OperationalStateCard
               level={operationLevel}
-              reason={
-                attention[0]?.reason ??
-                operationStateFallback
-              }
+              title="Estado operacional"
+              reason={attention[0]?.reason ?? operationStateFallback}
               impact={
                 attention[0]?.impact ??
-                "A operação pode seguir o fluxo normal; mantenha acompanhamento da fila e da Timeline."
+                "Fluxo sem bloqueio crítico retornado; acompanhe fila e Timeline."
               }
-              detailsLabel="Abrir governança"
-              onDetails={() => navigate("/governance")}
+              detailsLabel={attention[0]?.ctaLabel ?? "Abrir governança"}
+              onDetails={() => navigate(attention[0]?.path ?? "/governance")}
             />
-
-            {attention[0] ? (
-              <OperationalRiskCard
-                title={attention[0].title}
-                reason={attention[0].reason}
-                impact={attention[0].impact}
-                ctaLabel={attention[0].ctaLabel}
-                onClick={() => navigate(attention[0].path)}
-              />
-            ) : (
-              <OperationalRiskCard
-                title="Nenhum risco imediato retornado"
-                reason="Alertas, sinais operacionais e governança não indicaram bloqueio ativo nesta leitura."
-                impact="A decisão principal passa a ser preservar o fluxo e monitorar a prova operacional."
-                ctaLabel="Abrir Timeline"
-                onClick={() => navigate("/timeline")}
-              />
-            )}
 
             <EntityTimelineCard
               events={timelineEvents}
+              fullTimelineLabel="Ver Timeline"
               onFullTimeline={() => navigate("/timeline")}
             />
           </div>
@@ -1264,23 +1244,18 @@ export default function ExecutiveDashboard() {
           >
             {queue.length > 0 ? (
               <div className="w-full min-w-0">
-                <div className="max-h-[360px] w-full min-w-0 overflow-auto rounded-xl border border-[var(--border-subtle)]/70">
-                  <div className="min-w-[760px] divide-y divide-[var(--border-subtle)]/70 text-xs">
-                    <div className="grid grid-cols-[0.8fr_1.5fr_1fr_1fr_1fr_0.8fr] gap-3 bg-[var(--surface-primary)]/35 px-3 py-2 font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                      <span>Tipo</span>
-                      <span>Entidade</span>
-                      <span>Status</span>
-                      <span>Prazo</span>
-                      <span>Responsável</span>
-                      <span className="text-right">Ação</span>
-                    </div>
+                <div className="max-h-[340px] w-full min-w-0 overflow-auto rounded-xl border border-[var(--border-subtle)]/70 p-2">
+                  <div className="grid min-w-0 gap-2 text-xs">
                     {queue.slice(0, 10).map(item => (
                       <article
                         key={`${item.type}-${item.id}`}
-                        className="grid grid-cols-[0.8fr_1.5fr_1fr_1fr_1fr_0.8fr] items-center gap-3 px-3 py-2.5 text-[var(--text-secondary)]"
+                        className="grid min-w-0 gap-2 rounded-xl border border-[var(--border-subtle)]/60 bg-[var(--surface-primary)]/35 p-2.5 text-[var(--text-secondary)] md:grid-cols-[1.1fr_1.6fr_0.9fr_0.9fr_1fr_auto] md:items-center"
                       >
-                        <span className="flex items-center gap-2">
-                          <AppPriorityBadge label={item.priority} /> {item.type}
+                        <span className="flex min-w-0 items-center gap-2">
+                          <AppPriorityBadge label={item.priority} />
+                          <span className="truncate font-semibold text-[var(--text-primary)]">
+                            {item.type}
+                          </span>
                         </span>
                         <span className="min-w-0">
                           <strong className="block truncate text-sm text-[var(--text-primary)]">
@@ -1294,8 +1269,8 @@ export default function ExecutiveDashboard() {
                         <span>{item.dueLabel}</span>
                         <span>{item.responsible}</span>
                         <Button
-                          className="h-auto justify-self-end px-0 py-0 text-[var(--accent-primary)]"
-                          variant="link"
+                          className="h-8 justify-self-start px-3 text-xs md:justify-self-end"
+                          variant="secondary"
                           size="sm"
                           onClick={() => navigate(item.path)}
                         >
