@@ -33,7 +33,7 @@ describe("ExecutiveDashboard decision center", () => {
 
   it("limits immediate attention and the queue instead of rendering giant lists", () => {
     expect(source).toContain(".slice(0, 5)");
-    expect(source).toContain(".slice(0, 6)");
+    expect(source).toContain(".slice(0, 10)");
     expect(source).not.toContain("<table");
   });
 
