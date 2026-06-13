@@ -76,14 +76,14 @@ type AppointmentRow = {
 };
 
 const FILTERS: Array<{ key: FilterKey; label: string }> = [
-  { key: "all", label: "Todos" },
   { key: "today", label: "Hoje" },
-  { key: "tomorrow", label: "Amanhã" },
-  { key: "week", label: "Semana" },
   { key: "unconfirmed", label: "Não confirmados" },
-  { key: "confirmed", label: "Confirmados" },
   { key: "overdue", label: "Atrasados" },
+  { key: "week", label: "Próximos" },
   { key: "canceled", label: "Cancelados" },
+  { key: "all", label: "Todos" },
+  { key: "tomorrow", label: "Amanhã" },
+  { key: "confirmed", label: "Confirmados" },
 ];
 
 function asDate(value?: string | null) {
@@ -1499,6 +1499,98 @@ export default function AppointmentsPage() {
             </div>
           </div>
         </AppOperationalHeader>
+
+        <AppFiltersBar className="gap-2 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2">
+          {FILTERS.slice(0, 5).map(filter => {
+            const count =
+              filter.key === "today"
+                ? agendaHealth.today
+                : filter.key === "unconfirmed"
+                  ? agendaHealth.scheduled
+                  : filter.key === "overdue"
+                    ? agendaHealth.overdue
+                    : filter.key === "week"
+                      ? mapped.filter(
+                          row =>
+                            row.start &&
+                            row.start >= dayStart &&
+                            row.start <= weekEnd
+                        ).length
+                      : filter.key === "canceled"
+                        ? mapped.filter(row => row.status === "CANCELED").length
+                        : filtered.length;
+            return (
+              <button
+                key={filter.key}
+                type="button"
+                onClick={() => setSelectedFilter(filter.key)}
+                className={`h-8 rounded-full border px-3 text-xs font-medium transition-colors ${
+                  selectedFilter === filter.key
+                    ? "border-[var(--accent-primary)] bg-[var(--accent-soft)] text-[var(--accent-primary)]"
+                    : "border-[var(--border-subtle)] bg-[var(--surface-subtle)] text-[var(--text-muted)]"
+                }`}
+              >
+                {filter.label} · {count}
+              </button>
+            );
+          })}
+        </AppFiltersBar>
+
+        <AppSectionBlock
+          title="Alertas compactos"
+          subtitle="Somente sinais disponíveis no carregamento atual."
+          compact
+        >
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+            {[
+              {
+                label: "Sem confirmação",
+                value: agendaHealth.scheduled,
+                text:
+                  agendaHealth.scheduled > 0
+                    ? "Confirmar antes da execução."
+                    : "Nenhum pendente de confirmação.",
+              },
+              {
+                label: "Atrasados",
+                value: agendaHealth.overdue,
+                text:
+                  agendaHealth.overdue > 0
+                    ? "Revisar/remarcar sem inferir execução."
+                    : "Sem atraso calculável por data.",
+              },
+              {
+                label: "Conflitos",
+                value: mapped.filter(row => row.hasConflict).length,
+                text: mapped.some(row => row.hasConflict)
+                  ? "Sobreposição detectada por cliente ou responsável."
+                  : "Nenhum conflito nos horários carregados.",
+              },
+              {
+                label: "Sem resposta",
+                value: "—",
+                text: "Fonte atual não entrega resposta do cliente nesta tela.",
+              },
+            ].map(alert => (
+              <article
+                key={alert.label}
+                className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-2"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-medium text-[var(--text-muted)]">
+                    {alert.label}
+                  </p>
+                  <span className="text-sm font-semibold text-[var(--text-primary)]">
+                    {alert.value}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  {alert.text}
+                </p>
+              </article>
+            ))}
+          </div>
+        </AppSectionBlock>
 
         <div className="grid gap-3 xl:grid-cols-[1.05fr_0.95fr]">
           <OperationalStateCard
