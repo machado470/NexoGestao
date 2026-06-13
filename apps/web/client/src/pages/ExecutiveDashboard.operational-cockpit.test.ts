@@ -14,8 +14,8 @@ describe("ExecutiveDashboard decision center", () => {
       "Próxima melhor ação",
       "KPIs operacionais",
       "Fluxo operacional",
-      "Fila operacional",
       "Pulso da operação",
+      "Fila operacional",
       "Acessos rápidos contextuais",
     ];
     sections.forEach(section => expect(source).toContain(section));
@@ -35,6 +35,18 @@ describe("ExecutiveDashboard decision center", () => {
     expect(source).toContain(".slice(0, 5)");
     expect(source).toContain(".slice(0, 10)");
     expect(source).not.toContain("<table");
+    expect(source).toContain("Impacto: {item.impact}");
+    expect(source).not.toContain("Motivo:</strong>");
+  });
+
+  it("keeps zero and missing states honest without repeating noisy fallbacks", () => {
+    expect(source).toContain("Sem pagamentos registrados no período.");
+    expect(source).toContain("sem agendamentos hoje");
+    expect(source).toContain(
+      "Alguns itens não retornaram responsável pela fonte atual."
+    );
+    expect(source).toContain("Responsável não informado");
+    expect(source).toContain("item.responsibleMissing");
   });
 
   it("uses the real next best action endpoint and an honest empty state", () => {

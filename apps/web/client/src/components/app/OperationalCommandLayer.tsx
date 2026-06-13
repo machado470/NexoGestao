@@ -158,6 +158,7 @@ export function NextBestActionCard({
   reason,
   impact,
   safetyNote,
+  primaryValue,
   primaryActionLabel,
   onPrimaryAction,
   secondaryActionLabel,
@@ -169,6 +170,7 @@ export function NextBestActionCard({
   reason: string;
   impact: string;
   safetyNote?: string;
+  primaryValue?: string;
   primaryActionLabel: string;
   onPrimaryAction: () => void;
   secondaryActionLabel?: string;
@@ -188,11 +190,21 @@ export function NextBestActionCard({
         </span>
         <div className="min-w-0 flex-1">
           <p className="nexo-overline">Próxima Melhor Ação</p>
-          <h3 className="mt-1 text-base font-semibold leading-tight text-[var(--text-primary)]">
+          {primaryValue ? (
+            <p className="mt-1 text-3xl font-semibold leading-none tracking-tight text-[var(--text-primary)] sm:text-4xl">
+              {primaryValue}
+            </p>
+          ) : null}
+          <h3
+            className={cn(
+              "text-base font-semibold leading-tight text-[var(--text-primary)]",
+              primaryValue ? "mt-2" : "mt-1"
+            )}
+          >
             {title}
           </h3>
           <p className="mt-1 text-xs font-medium text-[var(--text-muted)]">
-            Entidade: {entity}
+            {entity}
           </p>
         </div>
       </div>
@@ -358,10 +370,7 @@ export function EntityTimelineCard({
       {events.length > 0 ? (
         <ol className="divide-y divide-[var(--border-subtle)]/70">
           {events.map(event => (
-            <li
-              key={event.id}
-              className="py-2 first:pt-0 last:pb-0"
-            >
+            <li key={event.id} className="py-2 first:pt-0 last:pb-0">
               <div className="flex flex-wrap items-center gap-2 text-xs">
                 <AppStatusBadge label={event.type} tone="neutral" />
                 <span className="text-[var(--text-muted)]">
