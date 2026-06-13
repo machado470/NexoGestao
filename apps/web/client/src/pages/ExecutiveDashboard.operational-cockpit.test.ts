@@ -14,8 +14,8 @@ describe("ExecutiveDashboard decision center", () => {
       "Próxima melhor ação",
       "KPIs operacionais",
       "Fluxo operacional",
-      "Pulso da operação",
-      "Fila operacional",
+      "Radar operacional",
+      "Incidentes operacionais",
       "Acessos rápidos contextuais",
     ];
     sections.forEach(section => expect(source).toContain(section));
@@ -36,6 +36,7 @@ describe("ExecutiveDashboard decision center", () => {
     expect(source).toContain(".slice(0, 10)");
     expect(source).not.toContain("<table");
     expect(source).toContain("Impacto: {item.impact}");
+    expect(source).toContain("Responsável:");
     expect(source).not.toContain("Motivo:</strong>");
   });
 
@@ -63,7 +64,7 @@ describe("ExecutiveDashboard decision center", () => {
     expect(source).toContain("/whatsapp");
   });
 
-  it("shows the real payment volume in the full operational flow and keeps an honest unavailable state", () => {
+  it("shows the real payment volume in the visual pipeline and keeps an honest unavailable state", () => {
     ["Cliente", "Agendamento", "O.S.", "Cobrança", "Pagamento"].forEach(stage =>
       expect(source).toContain(`label: "${stage}"`)
     );
@@ -71,6 +72,9 @@ describe("ExecutiveDashboard decision center", () => {
       'readNullableNumber(metrics, "paymentsReceivedCount")'
     );
     expect(source).toContain("pagamentos recebidos nesta semana");
+    expect(source).toContain(
+      "Gargalos do fluxo Cliente → Agendamento → O.S. → Cobrança → Pagamento."
+    );
     expect(source).toContain("volume não disponível no contrato");
     expect(source).not.toContain("volume não exposto pelo backend");
   });
@@ -86,12 +90,13 @@ describe("ExecutiveDashboard decision center", () => {
     expect(source).toContain("piorou");
     expect(source).toContain("estável em relação ao período anterior");
     expect(source).toContain("sem base histórica suficiente");
+    expect(source).toContain("Resumo executivo dos sinais antes da fila.");
     expect(source).not.toContain(
       "Tendência histórica: indisponível neste lote"
     );
   });
 
-  it("uses the light transversal queue exposed by dashboard alerts", () => {
+  it("uses the light transversal queue exposed by dashboard alerts as operational incidents", () => {
     expect(source).toContain("alerts.operationalQueue");
     expect(source).toContain("OVERDUE_SERVICE_ORDER");
     expect(source).toContain("OVERDUE_CHARGE");
@@ -99,6 +104,23 @@ describe("ExecutiveDashboard decision center", () => {
     expect(source).toContain("CUSTOMER_AWAITING_RESPONSE");
     expect(source).toContain('path: "/appointments"');
     expect(source).toContain('path: "/whatsapp"');
+    expect(source).toContain("Linhas acionáveis sem cabeçalho de tabela.");
+  });
+
+  it("humanizes timeline evidence and does not show raw technical events", () => {
+    expect(source).toContain("humanizeEvent");
+    expect(source).toContain("Cobrança bloqueada");
+    expect(source).toContain("Lembrete de cobrança não executado");
+    expect(source).toContain("Pagamento recebido");
+    expect(source).toContain("SERVICE_ORDER_COMPLETED");
+  });
+
+  it("enriches the operational state with compact real mini metrics", () => {
+    expect(source).toContain("operationStateMetrics");
+    expect(source).toContain("O.S. atrasadas");
+    expect(source).toContain("Cobranças vencidas");
+    expect(source).toContain("Riscos críticos");
+    expect(source).toContain("Gargalo");
   });
 
   it("does not disguise errors as a healthy empty operation", () => {

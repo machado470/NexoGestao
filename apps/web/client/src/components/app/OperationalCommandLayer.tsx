@@ -101,6 +101,7 @@ export function OperationalStateCard({
   title = "Estado da operação",
   detailsLabel = "Ver detalhes",
   onDetails,
+  metrics = [],
   className,
 }: {
   level: OperationalStateLevel;
@@ -109,13 +110,18 @@ export function OperationalStateCard({
   title?: string;
   detailsLabel?: string;
   onDetails?: () => void;
+  metrics?: Array<{
+    label: string;
+    value: string;
+    tone?: "neutral" | "warning" | "danger";
+  }>;
   className?: string;
 }) {
   const tone = operationalStateTone[level];
 
   return (
     <AppSectionCard
-      className={cn("flex h-full flex-col gap-2.5", tone.className, className)}
+      className={cn("flex h-full flex-col gap-2", tone.className, className)}
     >
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
@@ -126,11 +132,33 @@ export function OperationalStateCard({
         </div>
         <AppStatusBadge label={tone.label} tone={tone.badgeTone} />
       </div>
-      <div className="grid gap-2 text-xs leading-5 text-[var(--text-secondary)] sm:grid-cols-2">
+      {metrics.length > 0 ? (
+        <div className="grid grid-cols-2 gap-1.5 text-xs sm:grid-cols-4">
+          {metrics.map(metric => (
+            <div
+              key={metric.label}
+              className={cn(
+                "rounded-lg border border-[var(--border-subtle)]/70 bg-[var(--surface-primary)]/45 p-2",
+                metric.tone === "danger"
+                  ? "border-[var(--danger)]/25 bg-[var(--danger)]/8"
+                  : metric.tone === "warning"
+                    ? "border-[var(--warning)]/25 bg-[var(--warning)]/10"
+                    : undefined
+              )}
+            >
+              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                {metric.label}
+              </p>
+              <p className="mt-0.5 truncate font-semibold text-[var(--text-primary)]">
+                {metric.value}
+              </p>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      <div className="grid gap-1.5 text-xs leading-4 text-[var(--text-secondary)] sm:grid-cols-2">
         <p>
-          <strong className="text-[var(--text-primary)]">
-            Motivo principal:
-          </strong>{" "}
+          <strong className="text-[var(--text-primary)]">Motivo:</strong>{" "}
           {reason}
         </p>
         <p>
@@ -247,7 +275,7 @@ export function NextBestActionCard({
 
 export function OperationalFlowCard({
   title = "Fluxo operacional transversal",
-  subtitle = "Cliente → Agendamento → O.S. → Cobrança → Pagamento → Timeline → Risco/Governança",
+  subtitle = "Cliente → Agendamento → O.S. → Cobrança → Pagamento",
   stages,
   className,
 }: {
@@ -264,10 +292,13 @@ export function OperationalFlowCard({
   }>;
   className?: string;
 }) {
+  const primaryStages = stages.slice(0, 5);
+  const auxiliaryStages = stages.slice(5);
+
   return (
     <AppSectionCard className={cn("space-y-3", className)}>
       <div>
-        <p className="nexo-overline">Cadeia viva da operação</p>
+        <p className="nexo-overline">Pipeline operacional</p>
         <h3 className="mt-1 text-lg font-semibold text-[var(--text-primary)]">
           {title}
         </h3>
@@ -276,23 +307,25 @@ export function OperationalFlowCard({
         </p>
       </div>
       <div className="grid gap-2 lg:grid-cols-5">
-        {stages.map((stage, index) => {
+        {primaryStages.map((stage, index) => {
           const tone = flowStageTone[stage.state];
+          const isBottleneck =
+            stage.state === "blocked" || stage.state === "warning";
           return (
             <article
               key={stage.id}
               className={cn(
-                "relative min-w-0 rounded-xl border p-2.5",
-                tone.container
+                "relative min-w-0 rounded-xl border p-2.5 shadow-sm",
+                tone.container,
+                isBottleneck
+                  ? "ring-1 ring-[var(--accent-primary)]/25"
+                  : undefined
               )}
             >
-              {index < stages.length - 1 ? (
-                <span
-                  className={cn(
-                    "absolute -right-1 top-6 hidden h-0.5 w-2 lg:block",
-                    tone.rail
-                  )}
-                />
+              {index < primaryStages.length - 1 ? (
+                <span className="absolute -right-2 top-1/2 z-10 hidden -translate-y-1/2 items-center text-[var(--text-muted)] lg:flex">
+                  <ArrowRight className="h-4 w-4" />
+                </span>
               ) : null}
               <div className="flex items-center justify-between gap-2">
                 <span className="flex min-w-0 items-center gap-2">
@@ -327,6 +360,29 @@ export function OperationalFlowCard({
           );
         })}
       </div>
+      {auxiliaryStages.length > 0 ? (
+        <div className="flex flex-wrap gap-2 border-t border-[var(--border-subtle)]/70 pt-2">
+          {auxiliaryStages.map(stage => {
+            const tone = flowStageTone[stage.state];
+            return (
+              <button
+                type="button"
+                key={stage.id}
+                className="flex min-w-0 items-center gap-2 rounded-full border border-[var(--border-subtle)]/70 bg-[var(--surface-primary)]/45 px-3 py-1.5 text-left text-xs text-[var(--text-secondary)] transition-colors hover:border-[var(--accent-primary)]/30 hover:text-[var(--text-primary)]"
+                onClick={stage.onClick}
+              >
+                {tone.icon}
+                <span className="font-semibold text-[var(--text-primary)]">
+                  {stage.label}
+                </span>
+                <span className="truncate">
+                  {stage.countOrValue} · {stage.summary}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
     </AppSectionCard>
   );
 }

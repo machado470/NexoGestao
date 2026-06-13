@@ -7,14 +7,22 @@ O `ExecutiveDashboard` é o cockpit diário do NexoGestão. Ele não deve atuar 
 ## Estrutura final
 
 1. **Header Operacional** — título `Operação hoje`, período atual, estado `NORMAL`, `WARNING`, `RESTRICTED` ou `SUSPENDED`, quantidade de riscos críticos e gargalo principal quando calculável.
-2. **Bloco compacto de estado + prova** — substitui os antigos cards altos de estado/maior risco/prova por uma leitura executiva curta: estado operacional, motivo principal, impacto e CTA real para o módulo responsável, ao lado de até 3 eventos oficiais resumidos com CTA para a Timeline.
+2. **Bloco compacto de estado + prova** — substitui os antigos cards altos de estado/maior risco/prova por uma leitura executiva curta: estado operacional, mini-métricas reais (O.S. atrasadas, cobranças vencidas, riscos críticos e gargalo), motivo principal, impacto e CTA real para o módulo responsável, ao lado de até 3 eventos oficiais humanizados com CTA para a Timeline.
 3. **Atenção Imediata** — painel de incidentes com até 5 riscos ordenados por severidade/impacto, exibindo severidade, título curto, número principal quando a fonte retornar, impacto em uma linha e CTA real; fica na primeira dobra e evita repetir “Motivo”/“Impacto” como relatório.
 4. **Próxima Melhor Ação** — sinal do endpoint existente de next-best-action ou fallback seguro baseado em alertas reais já carregados, em card com valor, prazo ou status em destaque, entidade visível, motivo, impacto esperado, segurança e CTA principal.
 5. **KPIs Operacionais** — indicadores compactos com microcontexto e CTA para o módulo dono; valores zerados continuam explícitos, mas recebem microcopy humana como “Sem pagamentos registrados no período”.
-6. **Fluxo Operacional** — assinatura Cliente → Agendamento → O.S. → Cobrança → Pagamento, com estado por etapa e leitura de gargalo em cards reduzidos.
-7. **Pulso da Operação** — leitura humana de caixa, execução, comunicação e comparações históricas quando a API entregar base; aparece antes da fila para ganhar visibilidade sem competir com Atenção/NBA.
-8. **Fila Operacional** — até 10 itens acionáveis da fila transversal retornada pelo dashboard alerts, apresentada como linhas operacionais priorizadas em vez de tabela administrativa pesada. Responsável ausente aparece como `—` discreto e nota agregada no rodapé.
+6. **Fluxo Operacional** — pipeline visual Cliente → Agendamento → O.S. → Cobrança → Pagamento, com conectores, estado por etapa, destaque de gargalo e CTAs preservados; Timeline e Risco/Governança ficam como chips auxiliares de prova/supervisão.
+7. **Radar Operacional / Pulso da Operação** — resumo executivo dos quatro sinais (Prioridade, Capacidade, Contato e Caixa), com surface levemente diferenciado e comparações históricas quando a API entregar base; aparece antes dos incidentes para ganhar visibilidade sem competir com Atenção/NBA.
+8. **Incidentes Operacionais** — até 10 itens acionáveis da fila transversal retornada pelo dashboard alerts, apresentados como incidentes com severidade, entidade, contexto, status/prazo, responsável discreto e CTA real, sem cabeçalho de tabela. Responsável ausente aparece como `—` discreto e nota agregada no rodapé.
 9. **Acessos Rápidos Contextuais** — atalhos secundários para os módulos operacionais.
+
+## Ajustes finais da Sprint Dashboard Final
+
+- **Estado Operacional enriquecido:** mantém a leitura compacta, mas reduz espaço morto com mini-métricas derivadas dos sinais já carregados: O.S. atrasadas, cobranças vencidas, riscos críticos e gargalo calculável. Quando não há sinal, usa `0`, `sem gargalo` ou o fallback honesto existente, sem criar dado novo.
+- **Prova Operacional humanizada:** eventos técnicos da Timeline são traduzidos no Dashboard para títulos e resumos humanos, como `Cobrança bloqueada`, `Follow-up bloqueado`, `Pagamento recebido`, `Cobrança criada`, `O.S. concluída` e `Agendamento confirmado`. O fallback apenas transforma o tipo oficial em texto legível, sem exibir payload bruto longo.
+- **Fluxo como pipeline:** o fluxo principal fica restrito à cadeia Cliente → Agendamento → O.S. → Cobrança → Pagamento, com setas/conectores, estados visuais e destaque em gargalos. Timeline e Risco/Governança continuam acessíveis como prova e supervisão, mas não competem com o fluxo principal.
+- **Radar/Pulso em destaque:** o pulso permanece antes dos incidentes e usa uma surface sutil para marcar que é interpretação executiva dos sinais, mantendo quatro leituras curtas sem gráfico ou tendência inventada.
+- **Fila como incidentes:** a fila perde a aparência de tabela e passa a apresentar linhas de incidente operacional, limitadas a 10 itens, preservando dados reais, fallback `—` para responsável ausente, nota agregada e CTA por item.
 
 ## Fontes usadas
 

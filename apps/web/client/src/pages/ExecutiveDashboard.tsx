@@ -309,17 +309,14 @@ function normalizeTimelineEvents(payload: unknown) {
 
   return source.slice(0, 3).map((raw, index) => {
     const event = asRecord(raw) as DashboardTimelineEvent;
-    const type = String(
-      event.eventType ?? event.type ?? event.action ?? "Evento oficial"
-    ).replace(/_/g, " ");
-    const entityType = String(event.entityType ?? "Entidade").replace(
-      /_/g,
-      " "
+    const humanEvent = humanizeEvent(event);
+    const entityType = toTitleCase(
+      String(event.entityType ?? "Entidade").replace(/_/g, " ")
     );
     const entityId = event.entityId ? ` #${String(event.entityId)}` : "";
     return {
-      id: String(event.id ?? `${type}-${index}`),
-      type,
+      id: String(event.id ?? `${humanEvent.type}-${index}`),
+      type: humanEvent.type,
       occurredAt: formatEventDateTime(event.occurredAt ?? event.createdAt),
       entity: `${entityType}${entityId}`,
       actor:
@@ -328,16 +325,83 @@ function normalizeTimelineEvents(payload: unknown) {
           : typeof event.responsibleName === "string"
             ? event.responsibleName
             : undefined,
-      summary: formatCurrencyMentions(
-        String(
-          event.summary ??
-            event.description ??
-            event.title ??
-            "Evento oficial registrado na Timeline."
-        )
-      ),
+      summary: humanEvent.summary,
     };
   });
+}
+
+function toTitleCase(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/(^|\s)\S/g, letter => letter.toUpperCase());
+}
+
+function compactActionName(value: unknown) {
+  return String(value ?? "")
+    .replace(/^action-/i, "")
+    .replace(/_/g, "-")
+    .toLowerCase();
+}
+
+function humanizeEvent(event: DashboardTimelineEvent) {
+  const eventType = String(
+    event.eventType ?? event.type ?? event.action ?? "Evento oficial"
+  );
+  const normalizedType = eventType.toUpperCase();
+  const actionName = compactActionName(
+    event.action ?? readString(asRecord(event), "actionId")
+  );
+  const rawSummary = String(
+    event.summary ?? event.description ?? event.title ?? ""
+  );
+  const actionSource = `${actionName} ${rawSummary}`.toLowerCase();
+
+  if (
+    normalizedType === "EXECUTION_BLOCKED" &&
+    actionSource.includes("overdue-charge-reminder")
+  ) {
+    return {
+      type: "Cobrança bloqueada",
+      summary: "Lembrete de cobrança não executado.",
+    };
+  }
+  if (
+    normalizedType === "EXECUTION_BLOCKED" &&
+    actionSource.includes("create-charge-followup")
+  ) {
+    return {
+      type: "Follow-up bloqueado",
+      summary: "Ação de cobrança não foi executada.",
+    };
+  }
+
+  const known: Record<string, { type: string; summary: string }> = {
+    PAYMENT_RECEIVED: {
+      type: "Pagamento recebido",
+      summary: "Recebimento registrado oficialmente.",
+    },
+    CHARGE_CREATED: {
+      type: "Cobrança criada",
+      summary: "Cobrança registrada no fluxo financeiro.",
+    },
+    SERVICE_ORDER_COMPLETED: {
+      type: "O.S. concluída",
+      summary: "Ordem de serviço finalizada.",
+    },
+    APPOINTMENT_CONFIRMED: {
+      type: "Agendamento confirmado",
+      summary: "Agenda confirmada com o cliente.",
+    },
+  };
+
+  if (known[normalizedType]) return known[normalizedType];
+
+  return {
+    type: toTitleCase(eventType.replace(/_/g, " ")),
+    summary: formatCurrencyMentions(
+      rawSummary || "Evento oficial registrado na Timeline."
+    ),
+  };
 }
 
 function buildSignalPath(
@@ -860,6 +924,32 @@ export default function ExecutiveDashboard() {
               path: "/service-orders?status=done",
             }
           : null;
+  const operationStateMetrics = [
+    {
+      label: "O.S. atrasadas",
+      value: String(overdueOrders),
+      tone: overdueOrders > 0 ? "danger" : "neutral",
+    },
+    {
+      label: "Cobranças vencidas",
+      value: String(overdueCharges),
+      tone: overdueCharges > 0 ? "danger" : "neutral",
+    },
+    {
+      label: "Riscos críticos",
+      value: String(criticalCount),
+      tone: criticalCount > 0 ? "warning" : "neutral",
+    },
+    {
+      label: "Gargalo",
+      value: bottleneck?.label ?? "sem gargalo",
+      tone: bottleneck ? "warning" : "neutral",
+    },
+  ] satisfies Array<{
+    label: string;
+    value: string;
+    tone: "neutral" | "warning" | "danger";
+  }>;
   const failedMessages = readNumber(
     asRecord(metrics.whatsappSignals),
     "failedMessages"
@@ -1182,6 +1272,7 @@ export default function ExecutiveDashboard() {
                 "Fluxo sem bloqueio crítico retornado; acompanhe fila e Timeline."
               }
               detailsLabel={attention[0]?.ctaLabel ?? "Abrir governança"}
+              metrics={operationStateMetrics}
               onDetails={() => navigate(attention[0]?.path ?? "/governance")}
             />
 
@@ -1288,10 +1379,10 @@ export default function ExecutiveDashboard() {
           </AppSectionBlock>
 
           <AppSectionBlock
-            title="Pulso da operação"
+            title="Radar operacional"
             compact
-            className={dashboardSectionClass}
-            subtitle="Interpretação dos sinais para orientar a decisão."
+            className="border-[var(--accent-primary)]/20 bg-[var(--accent-soft)]/20"
+            subtitle="Resumo executivo dos sinais antes da fila."
           >
             <div className="flex w-full min-w-0 flex-col divide-y divide-[var(--border-subtle)]/70 lg:flex-row lg:divide-x lg:divide-y-0">
               {pulseInsights.map(({ label, Icon, iconClass, text }) => (
@@ -1331,10 +1422,10 @@ export default function ExecutiveDashboard() {
           </AppSectionBlock>
 
           <AppSectionBlock
-            title="Fila operacional"
+            title="Incidentes operacionais"
             compact
             className={dashboardSectionClass}
-            subtitle="Pendências curtas para destravar agora."
+            subtitle="Linhas acionáveis sem cabeçalho de tabela."
           >
             {queue.length > 0 ? (
               <div className="w-full min-w-0">
@@ -1343,43 +1434,50 @@ export default function ExecutiveDashboard() {
                     {queue.slice(0, 10).map(item => (
                       <article
                         key={`${item.type}-${item.id}`}
-                        className="grid min-w-0 gap-2 rounded-xl border border-[var(--border-subtle)]/60 bg-[var(--surface-primary)]/35 p-2.5 text-[var(--text-secondary)] md:grid-cols-[1.1fr_1.6fr_0.9fr_0.9fr_1fr_auto] md:items-center"
+                        className="grid min-w-0 gap-2 rounded-xl border border-[var(--border-subtle)]/60 bg-[var(--surface-primary)]/35 p-2.5 text-[var(--text-secondary)] md:grid-cols-[minmax(0,1fr)_auto] md:items-center"
                       >
-                        <span className="flex min-w-0 items-center gap-2">
-                          <AppPriorityBadge label={item.priority} />
-                          <span className="truncate font-semibold text-[var(--text-primary)]">
-                            {item.type}
-                          </span>
-                        </span>
-                        <span className="min-w-0">
-                          <strong className="block truncate text-sm text-[var(--text-primary)]">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <AppPriorityBadge label={item.priority} />
+                            <span className="font-semibold text-[var(--text-primary)]">
+                              {item.type}
+                            </span>
+                            <span className="text-[var(--text-muted)]">
+                              · {item.status}
+                            </span>
+                          </div>
+                          <strong className="mt-1 block truncate text-sm text-[var(--text-primary)]">
                             {item.entity}
                           </strong>
-                          <span className="block truncate">{item.context}</span>
-                        </span>
-                        <span className="font-medium text-[var(--text-primary)]">
-                          {item.status}
-                        </span>
-                        <span>{item.dueLabel}</span>
-                        <span
-                          className={
-                            item.responsibleMissing
-                              ? "text-[var(--text-muted)]"
-                              : undefined
-                          }
-                          title={
-                            item.responsibleMissing
-                              ? "Responsável não informado"
-                              : item.responsible
-                          }
-                          aria-label={
-                            item.responsibleMissing
-                              ? "Responsável não informado"
-                              : undefined
-                          }
-                        >
-                          {item.responsible}
-                        </span>
+                          <p className="mt-0.5 line-clamp-1 text-xs">
+                            {item.context}
+                          </p>
+                          <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-[var(--text-muted)]">
+                            <span>{item.dueLabel}</span>
+                            <span>
+                              Responsável:{" "}
+                              <span
+                                className={
+                                  item.responsibleMissing
+                                    ? "text-[var(--text-muted)]"
+                                    : "text-[var(--text-secondary)]"
+                                }
+                                title={
+                                  item.responsibleMissing
+                                    ? "Responsável não informado"
+                                    : item.responsible
+                                }
+                                aria-label={
+                                  item.responsibleMissing
+                                    ? "Responsável não informado"
+                                    : undefined
+                                }
+                              >
+                                {item.responsible}
+                              </span>
+                            </span>
+                          </div>
+                        </div>
                         <Button
                           className="h-8 justify-self-start px-3 text-xs md:justify-self-end"
                           variant="secondary"
