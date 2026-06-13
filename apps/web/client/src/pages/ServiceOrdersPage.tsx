@@ -35,15 +35,7 @@ import {
 } from "@/components/internal-page-system";
 import CreateServiceOrderModal from "@/components/CreateServiceOrderModal";
 import EditServiceOrderModal from "@/components/EditServiceOrderModal";
-import {
-  EntityTimelineCard,
-  NextBestActionCard,
-  OperationalFlowCard,
-  OperationalRiskCard,
-  OperationalStateCard,
-  type OperationalFlowStageState,
-  type OperationalStateLevel,
-} from "@/components/app/OperationalCommandLayer";
+import { EntityTimelineCard } from "@/components/app/OperationalCommandLayer";
 import { cn } from "@/lib/utils";
 
 type ServiceOrdersFilter =
@@ -79,6 +71,13 @@ function formatCurrency(cents?: number | null) {
     style: "currency",
     currency: "BRL",
   }).format(Number(cents) / 100);
+}
+
+function formatOverdue(dueDate: Date | null, isOverdue: boolean) {
+  if (!dueDate) return "Sem prazo";
+  if (!isOverdue) return "No prazo";
+  const days = Math.max(1, Math.ceil((Date.now() - dueDate.getTime()) / 86_400_000));
+  return `${days} dia${days === 1 ? "" : "s"}`;
 }
 
 function getStatusLabel(status: string) {
@@ -131,12 +130,6 @@ function hasPaymentEvidence(charge: any) {
     getChargeStatus(charge) === "PAID" ||
     (Array.isArray(charge?.payments) && charge.payments.length > 0)
   );
-}
-
-function getAppointmentStatus(appointment: any) {
-  return String(appointment?.status ?? "")
-    .trim()
-    .toUpperCase();
 }
 
 function getOperationalDateLabel(value: unknown) {
@@ -440,6 +433,7 @@ export default function ServiceOrdersPage() {
         dueDate.getTime() < now &&
         ["OPEN", "ASSIGNED", "IN_PROGRESS"].includes(status)
       );
+      const isStalled = status === "IN_PROGRESS" && !dueDate;
       const linkedCharge =
         chargeByServiceOrderId.get(id) ??
         order?.financialSummary?.latestCharge ??
@@ -489,6 +483,8 @@ export default function ServiceOrdersPage() {
         chargePending,
         paymentConfirmed,
         isOverdue,
+        isStalled,
+        overdueLabel: formatOverdue(dueDate, isOverdue),
         appointmentId,
         linkedAppointment: appointmentById.get(appointmentId) ?? null,
         assignedToPersonId,
@@ -619,6 +615,7 @@ export default function ServiceOrdersPage() {
         item.status !== "DONE" &&
         item.status !== "CANCELED"
     ).length;
+    const stalled = enrichedOrders.filter(item => item.isStalled).length;
     const overdueCharges = enrichedOrders.filter(
       item => item.chargeOverdue
     ).length;
@@ -632,6 +629,7 @@ export default function ServiceOrdersPage() {
       noCharge,
       unassigned,
       overdueCharges,
+      stalled,
     };
   }, [enrichedOrders]);
 
@@ -709,485 +707,32 @@ export default function ServiceOrdersPage() {
 
   const commandTarget = selectedOrder ?? nextExecution;
 
-  const serviceOrderCommandState = useMemo(() => {
-    if (!commandTarget) {
-      const level: OperationalStateLevel =
-        counts.all > 0 ? "NORMAL" : "WARNING";
-      return {
-        level,
-        reason:
-          counts.all > 0
-            ? "Carteira carregada sem O.S. selecionada para detalhe."
-            : "Nenhuma O.S. retornada para leitura operacional.",
-        impact:
-          counts.all > 0
-            ? "Selecione uma O.S. para conectar execução, cobrança, pagamento, Timeline e Governança."
-            : "A operação ainda não tem execução rastreável nesta página.",
-        cta: counts.all > 0 ? "Selecionar O.S." : "Criar O.S.",
-      };
-    }
-
-    if (commandTarget.status === "CANCELED") {
-      return {
-        level: "WARNING" as OperationalStateLevel,
-        reason:
-          "O.S. cancelada; execução não deve avançar sem revisão do histórico.",
-        impact:
-          "Governança precisa conferir motivo, Timeline e impacto financeiro antes de nova ação.",
-        cta: "Revisar histórico",
-      };
-    }
-    if (commandTarget.isOverdue) {
-      return {
-        level: "RESTRICTED" as OperationalStateLevel,
-        reason: `Prazo vencido em ${commandTarget.dueDateLabel}.`,
-        impact:
-          "Execução travada pode atrasar agenda, cobrança, pagamento e prova operacional.",
-        cta: "Destravar execução",
-      };
-    }
-    if (commandTarget.status === "DONE" && !commandTarget.hasCharge) {
-      return {
-        level: "RESTRICTED" as OperationalStateLevel,
-        reason:
-          "Serviço concluído sem cobrança vinculada nos dados carregados.",
-        impact:
-          "Execução já aconteceu, mas ainda não virou receita operacional rastreável.",
-        cta: "Gerar cobrança",
-      };
-    }
-    if (commandTarget.chargeOverdue) {
-      return {
-        level: "RESTRICTED" as OperationalStateLevel,
-        reason: "Cobrança vinculada está vencida.",
-        impact:
-          "Pagamento bloqueia o fechamento do ciclo e aumenta risco financeiro/governança.",
-        cta: "Cobrar cliente",
-      };
-    }
-    if (!commandTarget.assignedToPersonId) {
-      return {
-        level: "WARNING" as OperationalStateLevel,
-        reason: "O.S. aberta sem responsável definido.",
-        impact:
-          "Sem dono explícito, a execução pode parar e perder prova de responsabilidade.",
-        cta: "Atribuir responsável",
-      };
-    }
-    if (["OPEN", "ASSIGNED", "IN_PROGRESS"].includes(commandTarget.status)) {
-      return {
-        level: "WARNING" as OperationalStateLevel,
-        reason: `${commandTarget.statusLabel} aguardando avanço operacional.`,
-        impact:
-          "A execução ainda precisa virar conclusão para liberar cobrança e pagamento.",
-        cta:
-          commandTarget.status === "IN_PROGRESS"
-            ? "Concluir serviço"
-            : "Atualizar andamento",
-      };
-    }
-    return {
-      level: "NORMAL" as OperationalStateLevel,
-      reason: "O.S. sem pendência crítica nos dados carregados.",
-      impact:
-        "Execução, cobrança e pagamento podem ser revisados pela Timeline e pela Governança.",
-      cta: "Revisar detalhes",
-    };
-  }, [commandTarget, counts.all]);
-
-  const serviceOrderRisk = useMemo(() => {
-    if (!commandTarget) {
-      return {
-        title: "Sem O.S. em foco",
-        reason: "A carteira não retornou uma execução selecionável.",
-        impact: "Não há risco específico para explicar sem dados reais de O.S.",
-        cta: "Criar O.S.",
-      };
-    }
-    if (commandTarget.isOverdue) {
-      return {
-        title: "Execução atrasada",
-        reason: `A O.S. #${commandTarget.code} passou do prazo ${commandTarget.dueDateLabel}.`,
-        impact:
-          "Atraso pressiona agenda, posterga cobrança/pagamento e exige evidência na Timeline.",
-        cta: "Ver atrasadas",
-      };
-    }
-    if (
-      !commandTarget.assignedToPersonId &&
-      commandTarget.status !== "DONE" &&
-      commandTarget.status !== "CANCELED"
-    ) {
-      return {
-        title: "Execução sem responsável",
-        reason: "Nenhuma pessoa responsável foi retornada para esta O.S.",
-        impact:
-          "Sem owner, fica mais difícil cobrar andamento, concluir serviço e auditar governança.",
-        cta: "Atribuir responsável",
-      };
-    }
-    if (commandTarget.status === "DONE" && !commandTarget.hasCharge) {
-      return {
-        title: "Receita não capturada",
-        reason:
-          "A O.S. está concluída, mas sem cobrança vinculada nos dados carregados.",
-        impact:
-          "O serviço executado ainda não entrou no fluxo de recebimento e conciliação.",
-        cta: "Gerar cobrança",
-      };
-    }
-    if (commandTarget.chargeOverdue) {
-      return {
-        title: "Cobrança vencida vinculada",
-        reason: `Cobrança ${safeText(commandTarget.linkedCharge?.id, "vinculada")} passou do vencimento ${formatDate(commandTarget.linkedCharge?.dueDate, "sem data")}.`,
-        impact:
-          "O dinheiro está travado após a execução e deve gerar ação de cobrança com prova operacional.",
-        cta: "Cobrar cliente",
-      };
-    }
-    if (commandTarget.status === "IN_PROGRESS" && !commandTarget.dueDate) {
-      return {
-        title: "Execução sem prazo",
-        reason:
-          "A O.S. está em andamento, mas não tem prazo confiável retornado.",
-        impact:
-          "Sem data, a agenda e a governança perdem referência para cobrança de avanço.",
-        cta: "Editar O.S.",
-      };
-    }
-    return {
-      title: "Sem bloqueio crítico",
-      reason:
-        "Status, responsável, prazo e cobrança não indicam risco imediato.",
-      impact:
-        "Mantenha a prova operacional atualizada para sustentar cobrança, pagamento e governança.",
-      cta: "Revisar detalhes",
-    };
-  }, [commandTarget]);
-
   const serviceOrderNextBestAction = useMemo(() => {
     if (!commandTarget) {
       return {
         title: "Criar ou selecionar O.S.",
-        entity: "Carteira de Ordens de Serviço",
         reason: "Sem execução selecionada para orientar com segurança.",
-        impact:
-          "Permite iniciar o ciclo Cliente → Agendamento → O.S. → Cobrança → Pagamento.",
-        safetyNote:
-          "A camada apenas orienta; nenhuma O.S. é criada automaticamente.",
+        safetyNote: "A tela apenas orienta; nenhuma O.S. é criada automaticamente.",
         primaryActionLabel: "Criar O.S.",
         secondaryActionLabel: counts.all > 0 ? "Ver carteira" : undefined,
         kind: "create" as const,
       };
     }
-    const base = {
-      entity: `O.S. #${commandTarget.code} · ${commandTarget.customerName}`,
-      safetyNote:
-        "Próxima Melhor Ação é orientação operacional; use os botões existentes para executar e registrar evidência real.",
-    };
-    if (commandTarget.isOverdue) {
-      return {
-        ...base,
-        title: "Destravar execução",
-        reason: `Prazo vencido (${commandTarget.dueDateLabel}) com status ${commandTarget.statusLabel}.`,
-        impact:
-          "Reduz atraso em agenda e libera caminho para cobrança, pagamento e Timeline.",
-        primaryActionLabel:
-          commandTarget.status === "IN_PROGRESS"
-            ? "Concluir serviço"
-            : "Iniciar agora",
-        secondaryActionLabel: "Ver detalhes",
-        kind:
-          commandTarget.status === "IN_PROGRESS"
-            ? ("complete" as const)
-            : ("start" as const),
-      };
-    }
-    if (
-      !commandTarget.assignedToPersonId &&
-      commandTarget.status !== "DONE" &&
-      commandTarget.status !== "CANCELED"
-    ) {
-      return {
-        ...base,
-        title: "Atribuir responsável",
-        reason: "A O.S. não tem owner operacional nos dados retornados.",
-        impact:
-          "Cria accountability para andamento, conclusão e evidência de execução.",
-        primaryActionLabel: "Editar responsável",
-        secondaryActionLabel: "Ver detalhes",
-        kind: "edit" as const,
-      };
-    }
-    if (["OPEN", "ASSIGNED", "IN_PROGRESS"].includes(commandTarget.status)) {
-      return {
-        ...base,
-        title:
-          commandTarget.status === "IN_PROGRESS"
-            ? "Concluir serviço"
-            : "Atualizar andamento",
-        reason: `A execução está ${commandTarget.statusLabel.toLowerCase()} e precisa avançar.`,
-        impact:
-          "A próxima movimentação aproxima a O.S. da cobrança e da prova operacional.",
-        primaryActionLabel:
-          commandTarget.status === "IN_PROGRESS" ? "Concluir" : "Iniciar",
-        secondaryActionLabel: "Editar O.S.",
-        kind:
-          commandTarget.status === "IN_PROGRESS"
-            ? ("complete" as const)
-            : ("start" as const),
-      };
-    }
-    if (commandTarget.status === "DONE" && !commandTarget.hasCharge) {
-      return {
-        ...base,
-        title: "Gerar cobrança",
-        reason: "Serviço concluído sem cobrança vinculada.",
-        impact:
-          "Transforma execução concluída em receita cobrável e rastreável.",
-        primaryActionLabel: "Gerar cobrança",
-        secondaryActionLabel: "Abrir financeiro",
-        kind: "charge" as const,
-      };
-    }
-    if (commandTarget.chargeOverdue) {
-      return {
-        ...base,
-        title: "Cobrar cliente",
-        reason: "Cobrança vinculada está vencida.",
-        impact:
-          "Tenta destravar pagamento e reduz risco financeiro/governança.",
-        primaryActionLabel: "Abrir contexto de cobrança",
-        secondaryActionLabel: "Abrir cliente",
-        kind: "collect" as const,
-      };
-    }
-    if (commandTarget.status === "CANCELED") {
-      return {
-        ...base,
-        title: "Revisar histórico",
-        reason:
-          "O.S. cancelada não deve gerar execução/cobrança sem auditoria.",
-        impact: "Protege governança e evita cobrança indevida.",
-        primaryActionLabel: "Abrir Timeline",
-        secondaryActionLabel: "Abrir cliente",
-        kind: "timeline" as const,
-      };
-    }
+    const next = commandTarget.nextAction;
     return {
-      ...base,
-      title: "Revisar detalhes da O.S.",
-      reason: "Não há pendência crítica nos dados carregados.",
-      impact:
-        "Mantém conferência de execução, cobrança, pagamento, Timeline e Governança.",
-      primaryActionLabel: "Revisar detalhes",
-      secondaryActionLabel: "Abrir Timeline",
-      kind: "detail" as const,
+      title: next.label,
+      reason: `${next.reason}: O.S. #${commandTarget.code} · ${commandTarget.customerName}.`,
+      safetyNote: "Use somente ações existentes: iniciar, concluir, abrir detalhe, gerar cobrança, editar ou navegar para fluxos conectados.",
+      primaryActionLabel: next.label,
+      secondaryActionLabel:
+        next.type === "charge"
+          ? "Abrir financeiro"
+          : next.type === "edit"
+            ? "Ver detalhes"
+            : "Editar O.S.",
+      kind: next.type,
     };
   }, [commandTarget, counts.all]);
-
-  const serviceOrderFlowStages = useMemo(() => {
-    const order = commandTarget;
-    const noOrderState: OperationalFlowStageState =
-      counts.all > 0 ? "idle" : "warning";
-    if (!order) {
-      return [
-        {
-          id: "customer",
-          label: "Cliente",
-          summary: "Sem O.S. selecionada para vínculo de cliente.",
-          state: noOrderState,
-        },
-        {
-          id: "appointment",
-          label: "Agendamento",
-          summary: "Selecione uma O.S. para verificar origem na agenda.",
-          state: "idle" as OperationalFlowStageState,
-        },
-        {
-          id: "service-order",
-          label: "O.S.",
-          summary: `${counts.all} O.S. retornada(s) na carteira.`,
-          countOrValue: String(counts.all),
-          state:
-            counts.all > 0
-              ? ("active" as OperationalFlowStageState)
-              : ("idle" as OperationalFlowStageState),
-        },
-        {
-          id: "charge",
-          label: "Cobrança",
-          summary: `${counts.doneWithoutCharge} concluída(s) sem cobrança.`,
-          countOrValue: String(counts.doneWithoutCharge),
-          state:
-            counts.doneWithoutCharge > 0
-              ? ("blocked" as OperationalFlowStageState)
-              : ("idle" as OperationalFlowStageState),
-        },
-        {
-          id: "payment",
-          label: "Pagamento",
-          summary: "Pagamento depende de cobrança vinculada.",
-          state: "idle" as OperationalFlowStageState,
-        },
-        {
-          id: "timeline",
-          label: "Timeline",
-          summary: "Prova oficial aparece após selecionar a O.S.",
-          state: "idle" as OperationalFlowStageState,
-        },
-        {
-          id: "risk",
-          label: "Risco/Governança",
-          summary: `${counts.overdue + counts.unassigned + counts.doneWithoutCharge} alerta(s) de carteira.`,
-          countOrValue: String(
-            counts.overdue + counts.unassigned + counts.doneWithoutCharge
-          ),
-          state:
-            counts.overdue + counts.unassigned + counts.doneWithoutCharge > 0
-              ? ("warning" as OperationalFlowStageState)
-              : ("done" as OperationalFlowStageState),
-        },
-      ];
-    }
-    const appointmentStatus = getAppointmentStatus(order.linkedAppointment);
-    const appointmentWarning = ["PENDING", "REQUESTED", "UNCONFIRMED"].includes(
-      appointmentStatus
-    );
-    const serviceState: OperationalFlowStageState = order.isOverdue
-      ? "blocked"
-      : !order.assignedToPersonId &&
-          order.status !== "DONE" &&
-          order.status !== "CANCELED"
-        ? "warning"
-        : order.status === "DONE"
-          ? "done"
-          : ["OPEN", "ASSIGNED", "IN_PROGRESS"].includes(order.status)
-            ? "active"
-            : order.status === "CANCELED"
-              ? "blocked"
-              : "idle";
-    const chargeState: OperationalFlowStageState =
-      order.status === "DONE" && !order.hasCharge
-        ? "blocked"
-        : order.chargeOverdue
-          ? "blocked"
-          : order.chargePending
-            ? "warning"
-            : order.hasCharge
-              ? "done"
-              : "idle";
-    const paymentState: OperationalFlowStageState = order.paymentConfirmed
-      ? "done"
-      : order.chargeOverdue
-        ? "blocked"
-        : order.chargePending
-          ? "warning"
-          : order.hasCharge
-            ? "warning"
-            : "idle";
-    const riskState: OperationalFlowStageState =
-      order.isOverdue ||
-      (order.status === "DONE" && !order.hasCharge) ||
-      order.chargeOverdue
-        ? "blocked"
-        : !order.assignedToPersonId ||
-            (order.status === "IN_PROGRESS" && !order.dueDate)
-          ? "warning"
-          : "done";
-    return [
-      {
-        id: "customer",
-        label: "Cliente",
-        summary: order.customerId
-          ? `Cliente vinculado: ${order.customerName}.`
-          : "O.S. sem cliente confiável retornado.",
-        state: order.customerId
-          ? ("done" as OperationalFlowStageState)
-          : ("blocked" as OperationalFlowStageState),
-        hrefLabel: "Abrir cliente",
-        onClick: order.customerId
-          ? () => navigate(`/customers?customerId=${order.customerId}`)
-          : undefined,
-      },
-      {
-        id: "appointment",
-        label: "Agendamento",
-        summary: order.linkedAppointment
-          ? `Origem na agenda com status ${safeText(appointmentStatus, "informado")}.`
-          : "Sem agendamento vinculado nos dados carregados.",
-        state: (order.linkedAppointment
-          ? appointmentWarning
-            ? "warning"
-            : "done"
-          : "idle") as OperationalFlowStageState,
-        hrefLabel: "Abrir agenda",
-        onClick: order.appointmentId
-          ? () => navigate(`/appointments?id=${order.appointmentId}`)
-          : undefined,
-      },
-      {
-        id: "service-order",
-        label: "O.S.",
-        summary: `${order.statusLabel}; responsável: ${order.responsibleName}; prazo: ${order.dueDateLabel}.`,
-        countOrValue: `#${order.code}`,
-        state: serviceState,
-      },
-      {
-        id: "charge",
-        label: "Cobrança",
-        summary: order.hasCharge
-          ? `${order.financialStatusLabel}; valor ${formatCurrency(order.amountCents)}.`
-          : order.status === "DONE"
-            ? "Concluída sem cobrança vinculada."
-            : "Cobrança ainda não gerada para esta execução.",
-        countOrValue: order.hasCharge
-          ? formatCurrency(order.amountCents)
-          : undefined,
-        state: chargeState,
-        hrefLabel: "Abrir financeiro",
-        onClick: () => navigate("/finances"),
-      },
-      {
-        id: "payment",
-        label: "Pagamento",
-        summary: order.paymentConfirmed
-          ? "Pagamento confirmado ou evidência de pagamento retornada."
-          : order.hasCharge
-            ? "Pagamento ainda precisa ser acompanhado no financeiro."
-            : "Sem cobrança, ainda não há pagamento esperado.",
-        state: paymentState,
-        hrefLabel: "Abrir financeiro",
-        onClick: () => navigate("/finances"),
-      },
-      {
-        id: "timeline",
-        label: "Timeline",
-        summary:
-          timeline.length > 0
-            ? `${timeline.length} evento(s) oficiais retornados.`
-            : "Sem evento oficial retornado para esta O.S.",
-        countOrValue: String(timeline.length),
-        state: (timeline.length > 0
-          ? "done"
-          : "idle") as OperationalFlowStageState,
-        hrefLabel: "Abrir Timeline",
-        onClick: () => navigate(`/timeline?serviceOrderId=${order.id}`),
-      },
-      {
-        id: "risk",
-        label: "Risco/Governança",
-        summary: serviceOrderRisk.title,
-        state: riskState,
-      },
-    ];
-  }, [
-    commandTarget,
-    counts,
-    navigate,
-    serviceOrderRisk.title,
-    timeline.length,
-  ]);
 
   const serviceOrderTimelineEvents = useMemo(() => {
     if (timeline.length > 0) {
@@ -1429,13 +974,7 @@ export default function ServiceOrdersPage() {
       setEditingId(order.id);
       return;
     }
-    if (serviceOrderNextBestAction.kind === "collect") {
-      navigate("/finances");
-      return;
-    }
-    if (serviceOrderNextBestAction.kind === "timeline") {
-      navigate(`/timeline?serviceOrderId=${order.id}`);
-    }
+    setSelectedOrderId(order.id);
   }
 
   function runCommandSecondaryAction() {
@@ -1517,7 +1056,7 @@ export default function ServiceOrdersPage() {
     <AppPageShell className="gap-3">
       <AppOperationalHeader
         title="Ordens de Serviço"
-        description="Centro de execução: priorize atrasos, responsáveis, conclusão e cobrança antes de navegar."
+        description="Centro real de execução operacional: status, dono, prazo, atraso e cobrança em uma única leitura."
         density="compact"
         primaryAction={
           <Button type="button" onClick={() => setOpenCreate(true)}>
@@ -1541,6 +1080,10 @@ export default function ServiceOrdersPage() {
               label={`${counts.doneWithoutCharge} concluída(s) sem cobrança`}
               tone="danger"
             />
+            <AppStatusBadge
+              label={`${counts.stalled} parada(s) sem prazo`}
+              tone="warning"
+            />
           </>
         }
       >
@@ -1551,87 +1094,34 @@ export default function ServiceOrdersPage() {
         </div>
       </AppOperationalHeader>
 
-      <div className="grid gap-3 xl:grid-cols-2">
-        <OperationalStateCard
-          title={
-            commandTarget
-              ? "Estado operacional da O.S."
-              : "Estado operacional da carteira"
-          }
-          level={serviceOrderCommandState.level}
-          reason={serviceOrderCommandState.reason}
-          impact={serviceOrderCommandState.impact}
-          detailsLabel={serviceOrderCommandState.cta}
-          onDetails={() => {
-            if (commandTarget) {
-              setSelectedOrderId(commandTarget.id);
-              if (serviceOrderCommandState.cta === "Gerar cobrança") {
-                void handleGenerateCharge(commandTarget.id);
-              } else if (
-                serviceOrderCommandState.cta === "Atribuir responsável"
-              ) {
-                setEditingId(commandTarget.id);
-              } else if (
-                serviceOrderCommandState.cta === "Destravar execução"
-              ) {
-                runPrimaryAction(commandTarget);
-              }
-              return;
-            }
-            if (counts.all > 0) setActiveFilter("all");
-            else setOpenCreate(true);
-          }}
-        />
-        <OperationalRiskCard
-          title={serviceOrderRisk.title}
-          reason={serviceOrderRisk.reason}
-          impact={serviceOrderRisk.impact}
-          ctaLabel={serviceOrderRisk.cta}
-          onClick={() => {
-            if (!commandTarget) {
-              setOpenCreate(true);
-              return;
-            }
-            if (serviceOrderRisk.cta === "Ver atrasadas")
-              setActiveFilter("overdue");
-            else if (
-              serviceOrderRisk.cta === "Atribuir responsável" ||
-              serviceOrderRisk.cta === "Editar O.S."
-            )
-              setEditingId(commandTarget.id);
-            else if (serviceOrderRisk.cta === "Gerar cobrança")
-              void handleGenerateCharge(commandTarget.id);
-            else if (serviceOrderRisk.cta === "Cobrar cliente")
-              navigate("/finances");
-            else setSelectedOrderId(commandTarget.id);
-          }}
-        />
-      </div>
-
-      <AppSectionCard className="space-y-0 border-0 bg-transparent p-0">
-        <span className="sr-only">Próxima melhor ação de O.S.</span>
-        <NextBestActionCard
-          title={serviceOrderNextBestAction.title}
-          entity={serviceOrderNextBestAction.entity}
-          reason={serviceOrderNextBestAction.reason}
-          impact={serviceOrderNextBestAction.impact}
-          safetyNote={serviceOrderNextBestAction.safetyNote}
-          primaryActionLabel={serviceOrderNextBestAction.primaryActionLabel}
-          onPrimaryAction={runCommandPrimaryAction}
-          secondaryActionLabel={serviceOrderNextBestAction.secondaryActionLabel}
-          onSecondaryAction={
-            serviceOrderNextBestAction.secondaryActionLabel
-              ? runCommandSecondaryAction
-              : undefined
-          }
-        />
+      <AppSectionCard className="space-y-2 p-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+              Próxima melhor ação
+            </p>
+            <h2 className="text-base font-semibold text-[var(--text-primary)]">
+              {serviceOrderNextBestAction.title}
+            </h2>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">
+              {serviceOrderNextBestAction.reason}
+            </p>
+            <p className="mt-1 text-xs text-[var(--text-muted)]">
+              {serviceOrderNextBestAction.safetyNote}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {serviceOrderNextBestAction.secondaryActionLabel ? (
+              <Button type="button" variant="outline" onClick={runCommandSecondaryAction}>
+                {serviceOrderNextBestAction.secondaryActionLabel}
+              </Button>
+            ) : null}
+            <Button type="button" onClick={runCommandPrimaryAction}>
+              {serviceOrderNextBestAction.primaryActionLabel}
+            </Button>
+          </div>
+        </div>
       </AppSectionCard>
-
-      <OperationalFlowCard
-        title="Fluxo operacional da execução"
-        subtitle="Cliente → Agendamento → O.S. → Cobrança → Pagamento → Timeline → Risco/Governança"
-        stages={serviceOrderFlowStages}
-      />
 
       <AppSectionBlock
         title="Saúde operacional"
@@ -1768,7 +1258,7 @@ export default function ServiceOrdersPage() {
         <div className="flex flex-col gap-3">
           <AppSectionBlock
             title="Lista operacional de O.S."
-            subtitle="Número, cliente, estado, prazo, responsável e ação rápida."
+            subtitle="Número, cliente, serviço, status, responsável, prazo, atraso, valor e ações rápidas existentes."
             className="flex flex-col"
             compact
           >
@@ -1802,9 +1292,9 @@ export default function ServiceOrdersPage() {
                   <AppDataTable className="min-w-[760px]">
                     <thead>
                       <tr>
-                        <th>O.S. / cliente</th>
-                        <th>Estado</th>
-                        <th>Prazo / responsável</th>
+                        <th>Número / cliente / serviço</th>
+                        <th>Status / atraso</th>
+                        <th>Responsável / prazo / valor</th>
                         <th className="text-right">Ações</th>
                       </tr>
                     </thead>
@@ -1849,8 +1339,7 @@ export default function ServiceOrdersPage() {
                                   {item.customerName}
                                 </p>
                                 <p className="text-xs text-[var(--text-muted)]">
-                                  {formatCurrency(item.amountCents)} ·{" "}
-                                  {item.financialStatusLabel}
+                                  Serviço: {item.title}
                                 </p>
                               </div>
                             </td>
@@ -1870,7 +1359,7 @@ export default function ServiceOrdersPage() {
                                   label={item.riskLabel}
                                 />
                                 <span className="text-xs text-[var(--text-muted)]">
-                                  Execução: {item.statusLabel}
+                                  Atraso: {item.overdueLabel}
                                 </span>
                               </div>
                             </td>
@@ -1880,6 +1369,7 @@ export default function ServiceOrdersPage() {
                                   {item.responsibleName}
                                 </p>
                                 <p>Prazo: {item.dueDateLabel}</p>
+                                <p>Valor: {formatCurrency(item.amountCents)}</p>
                                 <p>
                                   Agenda:{" "}
                                   {item.linkedAppointment
