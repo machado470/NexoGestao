@@ -219,7 +219,7 @@ export function NextBestActionCard({
         <div className="min-w-0 flex-1">
           <p className="nexo-overline">Próxima Melhor Ação</p>
           {primaryValue ? (
-            <p className="mt-1 text-3xl font-semibold leading-none tracking-tight text-[var(--text-primary)] sm:text-4xl">
+            <p className="mt-1 text-4xl font-bold leading-none tracking-tight text-[var(--text-primary)] sm:text-5xl">
               {primaryValue}
             </p>
           ) : null}
@@ -236,7 +236,7 @@ export function NextBestActionCard({
           </p>
         </div>
       </div>
-      <div className="grid gap-2 text-sm leading-5 text-[var(--text-secondary)] md:grid-cols-2">
+      <div className="grid gap-2 text-xs leading-5 text-[var(--text-secondary)] md:grid-cols-2">
         <p>
           <strong className="text-[var(--text-primary)]">Motivo:</strong>{" "}
           {reason}
@@ -255,7 +255,10 @@ export function NextBestActionCard({
         </p>
       ) : null}
       <div className="mt-auto flex flex-col gap-2 sm:flex-row">
-        <Button className="flex-1 justify-between" onClick={onPrimaryAction}>
+        <Button
+          className="h-11 flex-[1.35] justify-between px-4 text-sm font-semibold"
+          onClick={onPrimaryAction}
+        >
           {primaryActionLabel}
           <ArrowRight className="h-4 w-4" />
         </Button>

@@ -16,13 +16,15 @@ O `ExecutiveDashboard` é o cockpit diário do NexoGestão. Ele não deve atuar 
 8. **Incidentes Operacionais** — até 10 itens acionáveis da fila transversal retornada pelo dashboard alerts, apresentados como incidentes com severidade, entidade, contexto, status/prazo, responsável discreto e CTA real, sem cabeçalho de tabela. Responsável ausente aparece como `—` discreto e nota agregada no rodapé.
 9. **Acessos Rápidos Contextuais** — atalhos secundários para os módulos operacionais.
 
-## Ajustes finais da Sprint Dashboard Final
+## Ajustes finais da Sprint Dashboard Premium Final
 
-- **Estado Operacional enriquecido:** mantém a leitura compacta, mas reduz espaço morto com mini-métricas derivadas dos sinais já carregados: O.S. atrasadas, cobranças vencidas, riscos críticos e gargalo calculável. Quando não há sinal, usa `0`, `sem gargalo` ou o fallback honesto existente, sem criar dado novo.
-- **Prova Operacional humanizada:** eventos técnicos da Timeline são traduzidos no Dashboard para títulos e resumos humanos, como `Cobrança bloqueada`, `Follow-up bloqueado`, `Pagamento recebido`, `Cobrança criada`, `O.S. concluída` e `Agendamento confirmado`. O fallback apenas transforma o tipo oficial em texto legível, sem exibir payload bruto longo.
+- **Estado Operacional enriquecido:** mantém a leitura compacta, reduz espaço morto e usa mini-métricas derivadas dos sinais já carregados: O.S. atrasadas, cobranças vencidas, riscos críticos e gargalo calculável. Quando não há sinal, usa `0`, `sem gargalo` ou fallback honesto, sem criar dado novo.
+- **Prova Operacional humanizada final:** eventos técnicos da Timeline são traduzidos no Dashboard para títulos e resumos de negócio, como `Cobrança não enviada` / `Lembrete de cobrança bloqueado`, `Follow-up não executado` / `Ação de cobrança não foi concluída`, `Pagamento recebido` / `Pagamento registrado na operação`, `Cobrança criada` / `Nova cobrança registrada`, `O.S. concluída` / `Serviço finalizado` e `Agendamento confirmado` / `Cliente confirmado na agenda`. O fallback apenas transforma o tipo oficial em texto legível, sem exibir payload bruto longo ou eventType técnico cru quando houver tradução.
+- **Tendências honestas:** KPIs e Radar exibem microtendências somente quando `metrics.comparison` entregar base. Quando a fonte não trouxer comparação, a UI declara `Sem base histórica suficiente`; não há cálculo novo complexo, gráfico ou histórico inventado.
 - **Fluxo como pipeline:** o fluxo principal fica restrito à cadeia Cliente → Agendamento → O.S. → Cobrança → Pagamento, com setas/conectores, estados visuais e destaque em gargalos. Timeline e Risco/Governança continuam acessíveis como prova e supervisão, mas não competem com o fluxo principal.
-- **Radar/Pulso em destaque:** o pulso permanece antes dos incidentes e usa uma surface sutil para marcar que é interpretação executiva dos sinais, mantendo quatro leituras curtas sem gráfico ou tendência inventada.
-- **Fila como incidentes:** a fila perde a aparência de tabela e passa a apresentar linhas de incidente operacional, limitadas a 10 itens, preservando dados reais, fallback `—` para responsável ausente, nota agregada e CTA por item.
+- **Radar como inteligência operacional:** o pulso permanece antes dos incidentes, mantém quatro sinais fixos (Prioridade, Capacidade, Contato e Caixa), ganha ícones/chips/surface mais presentes e destaca a palavra-chave de cada sinal sem virar BI nem aumentar demais a altura.
+- **NBA com CTA dominante:** a Próxima Melhor Ação destaca valor/status/entidade como decisão principal do dia, reforça o CTA primário e preserva motivo, impacto esperado, segurança, fallback seguro e botão secundário de retry quando existir.
+- **Incidentes com contexto temporal:** a fila mantém até 10 itens sem aparência de tabela e mostra contexto mais acionável quando a fonte permitir, como `Vencida há N dias`, `Prazo operacional vencido`, valor pendente e responsável `—` discreto quando ausente, sem inventar prazo, valor ou responsável.
 
 ## Fontes usadas
 
