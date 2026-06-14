@@ -62,8 +62,9 @@ describe("FinancesPage manual payment contract", () => {
       financesPage.indexOf("Pipeline Financeiro")
     );
     expect(financesPage.indexOf("Pipeline Financeiro")).toBeLessThan(
-      financesPage.indexOf("Pulso Financeiro")
+      financesPage.indexOf("Radar financeiro")
     );
+    expect(financesPage).toContain("Conversão de receita");
   });
 
   it("humaniza Timeline e protege contra vazamentos técnicos na experiência renderizada", () => {
@@ -71,11 +72,12 @@ describe("FinancesPage manual payment contract", () => {
     expect(financesPage).toContain("humanizeFinancialTimelineEvent");
     expect(financesPage).toContain("getFinancialBusinessLabel");
     expect(financesPage).toContain("safeFinancialEntityName");
-    expect(financesPage).toContain("Cobrança registrada");
-    expect(financesPage).toContain("Cobrança preparada");
-    expect(financesPage).toContain("Lembrete de cobrança enviado");
+    expect(financesPage).toContain("Cobrança criada");
+    expect(financesPage).toContain("Lembrete preparado");
+    expect(financesPage).toContain("Lembrete enviado");
     expect(financesPage).toContain("Pagamento registrado");
-    expect(financesPage).toContain("Cobrança cancelada");
+    expect(financesPage).toContain("Cobrança atualizada");
+    expect(financesPage).toContain("Ação financeira registrada");
     expect(financesPage).toContain("Evento financeiro registrado");
     for (const leak of [
       "EXECUTION_STARTED",
@@ -100,14 +102,17 @@ describe("FinancesPage manual payment contract", () => {
     expect(financesPage).toContain("Origem não informada pela fonte atual");
     expect(financesPage).toContain("Detalhe financeiro de cobrança");
     expect(financesPage).toContain("Decisão operacional");
+    expect(financesPage.indexOf("Cliente vinculado")).toBeLessThan(
+      financesPage.indexOf("Decisão operacional")
+    );
+    expect(financesPage.indexOf("Valor da cobrança")).toBeLessThan(
+      financesPage.indexOf("Decisão operacional")
+    );
     expect(financesPage.indexOf("Decisão operacional")).toBeLessThan(
       financesPage.indexOf("Prova operacional financeira")
     );
     expect(financesPage.indexOf("Prova operacional financeira")).toBeLessThan(
       financesPage.indexOf("Comunicação / WhatsApp")
-    );
-    expect(financesPage.indexOf("Comunicação / WhatsApp")).toBeLessThan(
-      financesPage.indexOf("Cliente vinculado")
     );
     expect(financesPage).not.toContain("Cobrança ID");
     expect(financesPage).not.toContain(
@@ -118,6 +123,11 @@ describe("FinancesPage manual payment contract", () => {
 
   it("remove telefone cru e usa linguagem operacional de contato", () => {
     expect(financesPage).toContain("getContactAvailability");
+    expect(financesPage).toContain("getHumanPriorityLabel");
+    expect(financesPage).toContain("Crítico");
+    expect(financesPage).toContain("Atenção");
+    expect(financesPage).toContain("Acompanhar");
+    expect(financesPage).toContain("Informativo");
     expect(financesPage).toContain("Contato cadastrado");
     expect(financesPage).toContain("WhatsApp disponível");
     expect(financesPage).toContain("Sem contato retornado");
@@ -125,14 +135,15 @@ describe("FinancesPage manual payment contract", () => {
     expect(financesPage).not.toContain("Telefone não retornado");
   });
 
-  it("usa Pulso Financeiro, Radar compacto e WhatsApp com linguagem operacional", () => {
+  it("remove Pulso repetitivo e usa Radar compacto com linguagem operacional", () => {
     expect(financesPage).toContain("Radar financeiro");
-    expect(financesPage).toContain("Pulso Financeiro");
-    expect(financesPage).toContain("Conversão cobrança → pagamento");
-    expect(financesPage).toContain("Receita travada");
-    expect(financesPage).toContain("Maior gargalo");
-    expect(financesPage).toContain("Sem automação falsa");
+    expect(financesPage).not.toContain("Pulso Financeiro");
+    expect(financesPage).toContain("Conversão de receita");
+    expect(financesPage).toContain("Recebido");
+    expect(financesPage).toContain("Previsto total");
     expect(financesPage).toContain("Resolver");
+    expect(financesPage).toContain("Usar WhatsApp");
+    expect(financesPage).toContain("Priorizar");
     expect(financesPage).toContain(
       "Nenhum histórico de envio disponível nesta leitura. Use o WhatsApp contextual para continuar a cobrança."
     );
