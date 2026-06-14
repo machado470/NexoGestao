@@ -1621,6 +1621,8 @@ export default function AppointmentsPage() {
     updateStatus,
   ]);
 
+  const walletNeedsInternalScroll = paginatedAppointments.length > 5;
+
   function goToWhatsAppAppointment(customerId: string, appointmentId: string) {
     if (!String(customerId ?? "").trim()) {
       toast.error("Agendamento sem cliente válido para WhatsApp.");
@@ -1834,79 +1836,85 @@ export default function AppointmentsPage() {
           })}
         </AppFiltersBar>
 
-        <AppSectionCard className="space-y-5 border-2 border-[var(--accent-primary)]/30 bg-gradient-to-r from-[var(--surface-base)] to-[var(--accent-soft)]/20 p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="nexo-overline">
-                Decisão e próxima ação · Próxima melhor ação
-              </p>
-              <h3 className="mt-1 text-xl font-semibold text-[var(--text-primary)]">
-                {canonicalNextBestAction.title}
-              </h3>
-              <p className="mt-1 text-sm text-[var(--text-muted)]">
-                {canonicalNextBestAction.entity}
-              </p>
+        <AppSectionCard
+          className="space-y-4 border-2 border-[var(--accent-primary)]/45 bg-gradient-to-br from-[var(--accent-soft)]/35 via-[var(--surface-base)] to-[var(--surface-subtle)] p-0"
+          data-contract-decision-command="true"
+        >
+          <div className="border-b border-[var(--accent-primary)]/20 px-5 py-4 md:px-6">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="nexo-overline">
+                  Decisão e próxima ação · Próxima melhor ação
+                </p>
+                <h3 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text-primary)] md:text-3xl">
+                  Faça agora: {canonicalNextBestAction.title}
+                </h3>
+                <p className="mt-1 text-sm text-[var(--text-muted)]">
+                  {canonicalNextBestAction.entity}
+                </p>
+              </div>
+              <AppStatusBadge
+                {...mapOperationalStatus(
+                  commandTarget ??
+                    mapped[0] ??
+                    ({
+                      status: "SCHEDULED",
+                      isOverdue: false,
+                      startsSoon: false,
+                      hasConflict: false,
+                      item: {},
+                      customerName: "",
+                      ownerName: "",
+                      customerId: "",
+                      ownerId: "",
+                      hasAssignee: true,
+                      order: null,
+                      charge: null,
+                      start: null,
+                    } as MappedAppointment)
+                )}
+              />
             </div>
-            <AppStatusBadge
-              {...mapOperationalStatus(
-                commandTarget ??
-                  mapped[0] ??
-                  ({
-                    status: "SCHEDULED",
-                    isOverdue: false,
-                    startsSoon: false,
-                    hasConflict: false,
-                    item: {},
-                    customerName: "",
-                    ownerName: "",
-                    customerId: "",
-                    ownerId: "",
-                    hasAssignee: true,
-                    order: null,
-                    charge: null,
-                    start: null,
-                  } as MappedAppointment)
-              )}
-            />
           </div>
-          <div className="grid gap-3 lg:grid-cols-3">
-            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
+          <div className="grid gap-3 px-5 md:px-6 lg:grid-cols-[0.9fr_1.1fr]">
+            <div className="rounded-2xl border border-[var(--accent-primary)]/25 bg-[var(--surface-base)]/80 p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
                 Estado operacional
               </p>
               <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
                 {appointmentCommandState.reason}
               </p>
-              <p className="mt-2 text-xs text-[var(--text-muted)]">
+              <p className="mt-3 text-xs leading-5 text-[var(--text-muted)]">
                 Motivo: {canonicalNextBestAction.reason}
               </p>
             </div>
-            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
+            <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/70 p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
                 Maior risco agora
               </p>
               <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
                 {appointmentRisk.reason}
               </p>
-              <p className="mt-2 text-xs text-[var(--text-muted)]">
+              <p className="mt-3 text-xs leading-5 text-[var(--text-muted)]">
                 Impacto: {appointmentRisk.impact}
               </p>
-            </div>
-            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                Próxima ação
-              </p>
-              <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
-                {canonicalNextBestAction.impact}
-              </p>
-              <p className="mt-2 text-xs text-[var(--text-muted)]">
+              <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">
                 Nota de segurança: {canonicalNextBestAction.safetyNote}
               </p>
             </div>
           </div>
-          <AppActionBar className="gap-2">
+          <AppActionBar className="gap-2 border-t border-[var(--accent-primary)]/20 px-5 pb-5 pt-1 md:px-6">
+            <div className="mr-auto max-w-xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                Próxima ação
+              </p>
+              <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                {canonicalNextBestAction.impact}
+              </p>
+            </div>
             <Button
-              className="bg-[var(--accent-primary)] text-[var(--primary-foreground)] hover:bg-[var(--accent-primary-hover)]"
+              size="lg"
+              className="min-w-[220px] bg-[var(--accent-primary)] text-[var(--primary-foreground)] hover:bg-[var(--accent-primary-hover)]"
               onClick={canonicalNextBestAction.onPrimaryAction}
             >
               {canonicalNextBestAction.primaryActionLabel}
@@ -1958,6 +1966,26 @@ export default function AppointmentsPage() {
             ))}
           </div>
         </AppSectionBlock>
+
+        {selected ? (
+          <EntityTimelineCard
+            title="Timeline humanizada do agendamento"
+            subtitle={
+              timeline.length > 0
+                ? "Últimos eventos oficiais retornados para sustentar a leitura do cliente e do horário."
+                : "Sem Timeline oficial carregada; exibimos apenas eventos derivados de datas reais do agendamento, sem criar histórico fictício."
+            }
+            events={appointmentTimelineEvents}
+            fullTimelineLabel="Abrir Timeline completa"
+            onFullTimeline={() =>
+              navigate(
+                selected.customerId
+                  ? `/timeline?customerId=${selected.customerId}`
+                  : "/timeline"
+              )
+            }
+          />
+        ) : null}
 
         <OperationalFlowCard
           title="Fluxo de entrada do agendamento"
@@ -2049,26 +2077,6 @@ export default function AppointmentsPage() {
           </div>
         </AppSectionBlock>
 
-        {selected ? (
-          <EntityTimelineCard
-            title="Timeline humanizada do agendamento"
-            subtitle={
-              timeline.length > 0
-                ? "Últimos eventos oficiais retornados para sustentar a leitura do cliente e do horário."
-                : "Sem Timeline oficial carregada; exibimos apenas eventos derivados de datas reais do agendamento, sem criar histórico fictício."
-            }
-            events={appointmentTimelineEvents}
-            fullTimelineLabel="Abrir Timeline completa"
-            onFullTimeline={() =>
-              navigate(
-                selected.customerId
-                  ? `/timeline?customerId=${selected.customerId}`
-                  : "/timeline"
-              )
-            }
-          />
-        ) : null}
-
         <AppSectionBlock
           title="Radar operacional"
           data-contract-copy="Alertas compactos"
@@ -2078,32 +2086,27 @@ export default function AppointmentsPage() {
           {attentionItems.length > 0 ? (
             <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
               {attentionItems.map(row => {
-                const priority = deriveAppointmentPriority(row) ?? "P3";
                 return (
                   <article
                     key={String(
                       row.item.id ?? `${row.customerId}-${row.item.startsAt}`
                     )}
-                    className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-2"
+                    className="rounded-lg border border-[var(--border-subtle)]/70 bg-[var(--surface-subtle)] px-2.5 py-2"
                   >
-                    <div className="flex flex-wrap items-center gap-2">
-                      <AppPriorityBadge
-                        priority={priority}
-                        label={appointmentPriorityLabel(priority)}
-                      />
-                      <AppStatusBadge {...mapOperationalStatusBadge(row)} />
-                    </div>
-                    <p className="mt-3 text-sm font-semibold text-[var(--text-primary)]">
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">
                       {row.customerName}
                     </p>
                     <p className="mt-1 text-xs text-[var(--text-muted)]">
-                      {formatDateTime(row.item.startsAt)} · {row.ownerName}
+                      {formatDateTime(row.item.startsAt)}
                     </p>
-                    <p className="mt-2 line-clamp-2 text-xs text-[var(--text-secondary)]">
-                      Próxima ação: {nextActionLabel(row)}
+                    <p className="mt-1 line-clamp-1 text-xs text-[var(--text-secondary)]">
+                      {mapOperationalStatusBadge(row).label}
+                    </p>
+                    <p className="mt-1 line-clamp-1 text-xs text-[var(--text-muted)]">
+                      Ação: {nextActionLabel(row)}
                     </p>
                     <Button
-                      className="mt-3 w-full"
+                      className="mt-2 w-full"
                       size="sm"
                       variant="outline"
                       onClick={() =>
@@ -2111,7 +2114,7 @@ export default function AppointmentsPage() {
                       }
                       disabled={!row.item.id}
                     >
-                      Resolver incidente
+                      Resolver
                     </Button>
                   </article>
                 );
@@ -2232,7 +2235,10 @@ export default function AppointmentsPage() {
             </AppSectionCard>
           ) : (
             <>
-              <div className="grid gap-2 md:hidden">
+              <div
+                data-contract-wallet-dynamic-height="true"
+                className={`${walletNeedsInternalScroll ? "max-h-[520px] overflow-y-auto pr-1" : ""} grid gap-2 md:hidden`}
+              >
                 {paginatedAppointments.map(row => {
                   const status = mapStatus(row.item.status);
                   const priority = deriveAppointmentPriority(row);
@@ -2284,7 +2290,10 @@ export default function AppointmentsPage() {
                   );
                 })}
               </div>
-              <div className="hidden gap-2 md:grid">
+              <div
+                data-contract-wallet-scroll-only-when-many="true"
+                className={`${walletNeedsInternalScroll ? "max-h-[560px] overflow-y-auto pr-1" : ""} hidden gap-2 md:grid`}
+              >
                 {paginatedAppointments.map(row => {
                   const status = mapStatus(row.item.status);
                   const orderId = row.order?.id ? String(row.order.id) : null;

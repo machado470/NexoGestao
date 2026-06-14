@@ -91,6 +91,14 @@ describe("AppointmentsPage as operational execution entry", () => {
       selectedExperience.indexOf("Hero executivo do agendamento")
     ).toBeLessThan(selectedExperience.indexOf("Decisão e próxima ação"));
     expect(selectedExperience.indexOf("Decisão e próxima ação")).toBeLessThan(
+      selectedExperience.indexOf("Preparação da execução")
+    );
+    expect(selectedExperience.indexOf("Preparação da execução")).toBeLessThan(
+      selectedExperience.indexOf("Timeline humanizada do agendamento")
+    );
+    expect(
+      selectedExperience.indexOf("Timeline humanizada do agendamento")
+    ).toBeLessThan(
       selectedExperience.indexOf("Fluxo de entrada do agendamento")
     );
     expect(
@@ -131,8 +139,10 @@ describe("AppointmentsPage as operational execution entry", () => {
       "Concluídos",
     ].forEach(metric => expect(source).toContain(metric));
     expect(source).toContain("Radar operacional");
-    expect(source).toContain("Resolver incidente");
+    expect(source).toContain("Resolver");
+    expect(source).not.toContain("Resolver incidente");
     expect(source).toContain('title="Resumo operacional"');
+    expect(source).toContain("text-[1.65rem]");
     expect(source).toContain("px-3 py-2 text-left");
     expect(source).toContain("relative z-30 shrink-0 gap-2 overflow-visible");
     expect(source).toContain("absolute right-0 z-50 mt-2 grid");
@@ -155,6 +165,12 @@ describe("AppointmentsPage final polish guardrails", () => {
     expect(source).toContain("Outros agendamentos da operação");
     expect(source).toContain("Carteira operacional de agendamentos");
     expect(source).toContain("lg:grid-cols-[150px_1.4fr_1fr_150px_220px]");
+    expect(source).toContain("walletNeedsInternalScroll");
+    expect(source).toContain('data-contract-wallet-dynamic-height="true"');
+    expect(source).toContain(
+      'data-contract-wallet-scroll-only-when-many="true"'
+    );
+    expect(source).toContain("max-h-[560px] overflow-y-auto pr-1");
     expect(source).not.toContain("<thead>");
     expect(source).not.toContain("<th>");
     expect(source).not.toContain("AppDataTable");
