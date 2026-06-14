@@ -241,6 +241,71 @@ function getRiskLabel(item: {
   return "Sem bloqueio crítico";
 }
 
+function isRawTechnicalId(value: unknown) {
+  const text = String(value ?? "").trim();
+  if (!text) return false;
+  if (
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      text
+    )
+  )
+    return true;
+  if (/^[0-9a-f]{24,}$/i.test(text)) return true;
+  if (
+    /^[A-Za-z0-9_-]{28,}$/.test(text) &&
+    /\d/.test(text) &&
+    /[A-Za-z]/.test(text)
+  )
+    return true;
+  return false;
+}
+
+function safeHumanCode(value: unknown, fallback = "O.S. selecionada") {
+  const text = String(value ?? "").trim();
+  if (!text || isRawTechnicalId(text)) return fallback;
+  return text;
+}
+
+function sanitizeOperationalText(value: unknown, fallback = "—") {
+  const text = String(value ?? "").trim();
+  if (!text) return fallback;
+  return text
+    .replace(/SERVICE_ORDER_CHARGE_CREATED/g, "Cobrança criada")
+    .replace(/CHARGE_CREATED/g, "Cobrança vinculada")
+    .replace(/EXECUTION_DONE/g, "Execução concluída")
+    .replace(/SERVICE_ORDER_COMPLETED/g, "O.S. concluída")
+    .replace(
+      /[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/gi,
+      "registro operacional"
+    )
+    .replace(/\b[0-9a-f]{24,}\b/gi, "registro operacional");
+}
+
+function getTimelineBusinessLabel(value: unknown) {
+  const type = String(value ?? "").toUpperCase();
+  if (type.includes("SERVICE_ORDER_CHARGE_CREATED")) return "Cobrança criada";
+  if (type.includes("CHARGE_CREATED")) return "Cobrança vinculada";
+  if (type.includes("EXECUTION_DONE")) return "Execução concluída";
+  if (type.includes("SERVICE_ORDER_COMPLETED")) return "O.S. concluída";
+  if (type.includes("CREATED") && type.includes("SERVICE_ORDER"))
+    return "O.S. criada";
+  if (type.includes("START")) return "Execução iniciada";
+  return "Evento operacional registrado";
+}
+
+function getHumanEntity(
+  event: any,
+  target?: { customerName: string; hasCharge: boolean } | null
+) {
+  const raw = String(
+    event?.entity ?? event?.entityType ?? event?.module ?? ""
+  ).toUpperCase();
+  if (raw.includes("CHARGE") || raw.includes("COBRAN")) return "Cobrança";
+  if (raw.includes("CUSTOMER") || raw.includes("CLIENT"))
+    return target?.customerName ?? "Cliente";
+  return "O.S.";
+}
+
 function safeText(value: unknown, fallback = "—") {
   const text = String(value ?? "").trim();
   return text.length > 0 ? text : fallback;
@@ -462,7 +527,7 @@ export default function ServiceOrdersPage() {
       const enriched = {
         raw: order,
         id,
-        code: safeText(order?.number ?? order?.code ?? order?.id),
+        code: safeHumanCode(order?.number ?? order?.code),
         title: safeText(order?.title ?? order?.serviceName, "Sem descrição"),
         description: safeText(order?.description, "Sem descrição detalhada"),
         customerId,
@@ -730,7 +795,7 @@ export default function ServiceOrdersPage() {
     const next = commandTarget.nextAction;
     return {
       title: next.label,
-      reason: `${next.reason}: O.S. #${commandTarget.code} · ${commandTarget.customerName}.`,
+      reason: `${next.reason}: ${commandTarget.code} · ${commandTarget.customerName}.`,
       safetyNote:
         "Use somente ações existentes: iniciar, concluir, abrir detalhe, gerar cobrança, editar ou navegar para fluxos conectados.",
       primaryActionLabel: next.label,
@@ -746,24 +811,19 @@ export default function ServiceOrdersPage() {
 
   const serviceOrderTimelineEvents = useMemo(() => {
     if (timeline.length > 0) {
-      return timeline.slice(0, 4).map(event => ({
-        id: String(
-          event?.id ?? `${event?.action ?? event?.type}-${event?.createdAt}`
-        ),
-        type: safeText(
-          event?.action ?? event?.type ?? event?.category,
-          "Timeline"
+      return timeline.slice(0, 4).map((event, index) => ({
+        id: `timeline-${index}-${String(event?.createdAt ?? index)}`,
+        type: getTimelineBusinessLabel(
+          event?.action ?? event?.type ?? event?.category
         ),
         occurredAt: getOperationalDateLabel(
           event?.createdAt ?? event?.occurredAt
         ),
-        entity: commandTarget
-          ? `O.S. #${commandTarget.code}`
-          : "Ordem de Serviço",
+        entity: getHumanEntity(event, commandTarget),
         actor: event?.actor?.name ?? event?.user?.name ?? undefined,
-        summary: safeText(
+        summary: sanitizeOperationalText(
           event?.description ?? event?.summary,
-          "Evento oficial retornado pela Timeline."
+          "Evento operacional registrado."
         ),
       }));
     }
@@ -781,7 +841,7 @@ export default function ServiceOrdersPage() {
         id: `created-${commandTarget.id}`,
         type: "O.S. criada",
         occurredAt: getOperationalDateLabel(commandTarget.raw.createdAt),
-        entity: `O.S. #${commandTarget.code}`,
+        entity: "O.S.",
         summary:
           "Evento contextual derivado da data real de criação da O.S.; não substitui a Timeline oficial.",
         actor:
@@ -822,8 +882,8 @@ export default function ServiceOrdersPage() {
       commandTarget.linkedCharge?.id
     ) {
       contextualEvents.push({
-        id: `charge-${commandTarget.linkedCharge?.id ?? commandTarget.id}`,
-        type: "Cobrança gerada",
+        id: `charge-${commandTarget.id}`,
+        type: "Cobrança criada",
         occurredAt: getOperationalDateLabel(
           commandTarget.linkedCharge?.createdAt
         ),
@@ -932,7 +992,7 @@ export default function ServiceOrdersPage() {
           ? `Cliente vinculado: ${target.customerName}.`
           : "Sem cliente vinculado.",
         state: target?.customerId ? "done" : "blocked",
-        countOrValue: target?.customerId ? "1" : "0",
+        countOrValue: target?.customerId ? "Vinculado" : "—",
         hrefLabel: "Abrir cliente",
         onClick: target?.customerId
           ? () => navigate(`/customers?customerId=${target.customerId}`)
@@ -945,7 +1005,7 @@ export default function ServiceOrdersPage() {
           ? `Agendado para ${formatDate(target.linkedAppointment?.startsAt)}.`
           : "Sem agendamento vinculado.",
         state: target?.linkedAppointment ? "done" : "idle",
-        countOrValue: target?.linkedAppointment ? "Vinculado" : "0",
+        countOrValue: target?.linkedAppointment ? "Vinculado" : "—",
       },
       {
         id: "service-order",
@@ -962,7 +1022,7 @@ export default function ServiceOrdersPage() {
               : target.status === "IN_PROGRESS"
                 ? "active"
                 : "warning",
-        countOrValue: target ? `#${target.code}` : "—",
+        countOrValue: target ? target.statusLabel : "—",
         hrefLabel: target ? "Abrir O.S." : undefined,
         onClick: target ? () => setSelectedOrderId(target.id) : undefined,
       },
@@ -1001,8 +1061,10 @@ export default function ServiceOrdersPage() {
             ? "blocked"
             : "idle",
         countOrValue: target?.hasCharge
-          ? formatCurrency(target.amountCents)
-          : "0",
+          ? target.financialStatusLabel
+          : target?.status === "DONE"
+            ? "Cobrança pendente"
+            : "Sem cobrança",
         hrefLabel: "Abrir financeiro",
         onClick: target?.customerId
           ? () => navigate(`/finances?customerId=${target.customerId}`)
@@ -1011,9 +1073,7 @@ export default function ServiceOrdersPage() {
       {
         id: "payment",
         label: "Pagamento",
-        summary: paymentDone
-          ? "Pagamento recebido."
-          : "Pagamento ainda sem evidência carregada.",
+        summary: paymentDone ? "Pagamento recebido." : "Aguardando pagamento.",
         state: paymentDone
           ? "done"
           : target?.hasCharge
@@ -1251,6 +1311,46 @@ export default function ServiceOrdersPage() {
       `/whatsapp?customerId=${customerId}&serviceOrderId=${serviceOrderId}&template=SERVICE_UPDATE`
     );
   }
+  function getStartUnavailableReason(order: NonNullable<typeof selectedOrder>) {
+    if (!capabilities.start) return "Iniciar indisponível: ação não disponível";
+    if (anyActionPending)
+      return "Iniciar indisponível: outra ação está em andamento";
+    if (order.status === "DONE")
+      return "Iniciar indisponível: O.S. já concluída";
+    if (order.status === "CANCELED")
+      return "Iniciar indisponível: O.S. cancelada";
+    if (!["OPEN", "ASSIGNED"].includes(order.status))
+      return "Iniciar indisponível: execução já iniciada";
+    return "Iniciar execução";
+  }
+
+  function getCompleteUnavailableReason(
+    order: NonNullable<typeof selectedOrder>
+  ) {
+    if (!capabilities.complete)
+      return "Concluir indisponível: ação não disponível";
+    if (anyActionPending)
+      return "Concluir indisponível: outra ação está em andamento";
+    if (order.status === "DONE")
+      return "Concluir indisponível: O.S. já concluída";
+    if (order.status !== "IN_PROGRESS")
+      return "Concluir indisponível: O.S. não está em execução";
+    return "Concluir execução";
+  }
+
+  function getChargeUnavailableReason(
+    order: NonNullable<typeof selectedOrder>
+  ) {
+    if (!capabilities.generateCharge)
+      return "Cobrar indisponível: ação não disponível";
+    if (anyActionPending)
+      return "Cobrar indisponível: outra ação está em andamento";
+    if (order.hasCharge) return "Cobrar indisponível: cobrança já vinculada";
+    if (order.status !== "DONE")
+      return "Cobrar indisponível: O.S. ainda não concluída";
+    return "Gerar cobrança";
+  }
+
   const serviceOrdersOperationalStatus =
     getServiceOrdersOperationalStatus(counts);
 
@@ -1297,7 +1397,7 @@ export default function ServiceOrdersPage() {
       </AppOperationalHeader>
 
       {selectedOrder ? (
-        <AppSectionCard className="overflow-hidden border-2 border-[var(--accent-primary)]/35 bg-gradient-to-br from-[var(--surface-base)] via-[var(--surface-subtle)] to-[var(--accent-soft)]/40 p-0">
+        <AppSectionCard className="overflow-hidden border border-[var(--border-subtle)] bg-gradient-to-br from-[var(--surface-base)] via-[var(--surface-subtle)] to-[var(--surface-base)] p-0">
           <div className="grid gap-0 lg:grid-cols-[1.45fr_0.55fr]">
             <div className="p-6 md:p-8">
               <p className="nexo-overline">Hero executivo da O.S.</p>
@@ -1324,7 +1424,7 @@ export default function ServiceOrdersPage() {
               <p className="mt-2 text-lg font-medium text-[var(--text-secondary)]">
                 {selectedOrder.title}
               </p>
-              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+              <div className="mt-5 grid gap-2 sm:grid-cols-3">
                 {[
                   ["Status principal", selectedOrder.statusLabel],
                   ["Responsável", selectedOrder.responsibleName],
@@ -1335,7 +1435,7 @@ export default function ServiceOrdersPage() {
                 ].map(([label, value]) => (
                   <div
                     key={label}
-                    className="rounded-xl bg-[var(--surface-base)]/70 p-3"
+                    className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/70 p-2.5"
                   >
                     <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
                       {label}
@@ -1359,6 +1459,8 @@ export default function ServiceOrdersPage() {
               </Button>
               <Button
                 variant="outline"
+                title={getStartUnavailableReason(selectedOrder)}
+                aria-label={getStartUnavailableReason(selectedOrder)}
                 onClick={() => void handleStart(selectedOrder.id)}
                 disabled={
                   !capabilities.start ||
@@ -1370,6 +1472,8 @@ export default function ServiceOrdersPage() {
               </Button>
               <Button
                 variant="outline"
+                title={getCompleteUnavailableReason(selectedOrder)}
+                aria-label={getCompleteUnavailableReason(selectedOrder)}
                 onClick={() => void handleComplete(selectedOrder.id)}
                 disabled={
                   !capabilities.complete ||
@@ -1381,6 +1485,8 @@ export default function ServiceOrdersPage() {
               </Button>
               <Button
                 variant="outline"
+                title={getChargeUnavailableReason(selectedOrder)}
+                aria-label={getChargeUnavailableReason(selectedOrder)}
                 onClick={() => void handleGenerateCharge(selectedOrder.id)}
                 disabled={
                   !capabilities.generateCharge ||
@@ -1537,7 +1643,7 @@ export default function ServiceOrdersPage() {
         subtitle="Resumo compacto; não compete com o hero nem com o bloco de decisão."
         compact
       >
-        <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
           {operationalKpis.map(kpi => (
             <AppStatCard
               key={kpi.label}
@@ -1628,7 +1734,7 @@ export default function ServiceOrdersPage() {
               description="Os dados retornados não indicam O.S. atrasada, sem responsável, concluída sem cobrança ou parada sem prazo."
             />
           ) : (
-            <div className="grid gap-2 md:grid-cols-2 2xl:grid-cols-4">
+            <div className="grid max-h-[220px] gap-2 overflow-auto md:grid-cols-2 2xl:grid-cols-4">
               {immediateAttention.slice(0, 4).map(item => (
                 <article
                   key={`attention-${item.id}`}
@@ -1644,7 +1750,7 @@ export default function ServiceOrdersPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
-                        #{item.code} · {item.customerName}
+                        {item.customerName}
                       </p>
                       <p className="mt-1 text-xs text-[var(--text-secondary)]">
                         {item.riskLabel}
@@ -1726,9 +1832,6 @@ export default function ServiceOrdersPage() {
                             </p>
                             <p className="mt-1 truncate text-xs text-[var(--text-secondary)]">
                               Serviço: {item.title}
-                            </p>
-                            <p className="mt-1 text-[11px] text-[var(--text-muted)]">
-                              #{item.code}
                             </p>
                           </div>
                           <div className="flex flex-wrap items-center gap-2">
@@ -1859,7 +1962,7 @@ export default function ServiceOrdersPage() {
                     Resumo
                   </p>
                   <h2 className="text-lg font-semibold text-[var(--text-primary)]">
-                    #{selectedOrder.code} · {selectedOrder.title}
+                    {selectedOrder.code} · {selectedOrder.title}
                   </h2>
                   <p className="mt-1 text-sm text-[var(--text-secondary)]">
                     {selectedOrder.description}
@@ -1877,78 +1980,65 @@ export default function ServiceOrdersPage() {
                   </div>
                 </article>
 
-                <div className="grid gap-3 md:grid-cols-2">
-                  <article className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">
-                    <p className="text-xs uppercase text-[var(--text-muted)]">
-                      Cliente e datas
-                    </p>
-                    <p className="font-semibold text-[var(--text-primary)]">
-                      {selectedOrder.customerName}
-                    </p>
-                    <p className="text-[var(--text-secondary)]">
-                      Início execução:{" "}
-                      {formatDate(selectedOrder.startedAt, "Não iniciada")}
-                    </p>
-                    <p className="text-[var(--text-secondary)]">
-                      Conclusão:{" "}
-                      {formatDate(selectedOrder.finishedAt, "Não concluída")}
-                    </p>
-                    <p className="text-[var(--text-secondary)]">
-                      Criada em: {formatDate(selectedOrder.raw?.createdAt)}
-                    </p>
-                    <p className="text-[var(--text-secondary)]">
-                      Atualizada em: {formatDate(selectedOrder.raw?.updatedAt)}
-                    </p>
-                  </article>
-
-                  <article className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">
-                    <p className="text-xs uppercase text-[var(--text-muted)]">
-                      Cobrança / financeiro
-                    </p>
-                    <p className="text-[var(--text-secondary)]">
-                      Valor: {formatCurrency(selectedOrder.amountCents)}
-                    </p>
-                    <p className="text-[var(--text-secondary)]">
-                      Status:{" "}
-                      {selectedOrder.hasCharge
-                        ? "Cobrança vinculada"
-                        : "Sem cobrança"}
-                    </p>
-                    <p className="text-[var(--text-secondary)]">
-                      Cobrança ID:{" "}
-                      {safeText(selectedOrder.linkedCharge?.id, "—")}
-                    </p>
-                    <p className="text-[var(--text-secondary)]">
-                      Vencimento:{" "}
-                      {formatDate(selectedOrder.linkedCharge?.dueDate, "—")}
-                    </p>
-                  </article>
+                <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+                  {[
+                    {
+                      label: "Cliente",
+                      value: selectedOrder.customerName,
+                      detail: selectedOrder.customerId
+                        ? "Cliente vinculado"
+                        : "Sem cliente nos dados",
+                    },
+                    {
+                      label: "Execução",
+                      value: selectedOrder.statusLabel,
+                      detail: selectedOrder.finishedAt
+                        ? `Concluída em ${formatDate(selectedOrder.finishedAt)}`
+                        : selectedOrder.startedAt
+                          ? `Iniciada em ${formatDate(selectedOrder.startedAt)}`
+                          : "Não iniciada",
+                    },
+                    {
+                      label: "Financeiro",
+                      value: selectedOrder.hasCharge
+                        ? selectedOrder.financialStatusLabel
+                        : "Sem cobrança",
+                      detail: `Valor: ${formatCurrency(selectedOrder.amountCents)}`,
+                    },
+                    {
+                      label: "Agendamento",
+                      value: selectedOrder.linkedAppointment
+                        ? "Agendamento vinculado"
+                        : "Sem agendamento vinculado",
+                      detail: selectedOrder.linkedAppointment
+                        ? formatDate(selectedOrder.linkedAppointment?.startsAt)
+                        : "Sem data de agenda",
+                    },
+                    {
+                      label: "Governança/Timeline",
+                      value:
+                        serviceOrderTimelineEvents.length > 0
+                          ? `${serviceOrderTimelineEvents.length} evento(s)`
+                          : "Sem prova carregada",
+                      detail: selectedOrder.riskLabel,
+                    },
+                  ].map(card => (
+                    <article
+                      key={card.label}
+                      className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/70 p-3 text-sm"
+                    >
+                      <p className="text-xs uppercase text-[var(--text-muted)]">
+                        {card.label}
+                      </p>
+                      <p className="mt-1 font-semibold text-[var(--text-primary)]">
+                        {card.value}
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                        {card.detail}
+                      </p>
+                    </article>
+                  ))}
                 </div>
-
-                <article className="rounded-lg border border-[var(--border-subtle)] p-3 text-sm">
-                  <p className="text-xs uppercase text-[var(--text-muted)]">
-                    Agendamento vinculado
-                  </p>
-                  {selectedOrder.linkedAppointment ? (
-                    <div className="space-y-1">
-                      <p className="text-[var(--text-secondary)]">
-                        ID: {String(selectedOrder.linkedAppointment?.id ?? "—")}
-                      </p>
-                      <p className="text-[var(--text-secondary)]">
-                        Status:{" "}
-                        {safeText(selectedOrder.linkedAppointment?.status)}
-                      </p>
-                      <p className="text-[var(--text-secondary)]">
-                        Início:{" "}
-                        {formatDate(selectedOrder.linkedAppointment?.startsAt)}
-                      </p>
-                    </div>
-                  ) : (
-                    <p className="text-[var(--text-secondary)]">
-                      Nenhum agendamento vinculado.
-                    </p>
-                  )}
-                </article>
 
                 <EntityTimelineCard
                   title="Prova operacional da execução"
@@ -1971,6 +2061,8 @@ export default function ServiceOrdersPage() {
                 <AppActionBar className="gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2 py-2">
                   <Button
                     type="button"
+                    title={getStartUnavailableReason(selectedOrder)}
+                    aria-label={getStartUnavailableReason(selectedOrder)}
                     onClick={() => void handleStart(selectedOrder.id)}
                     isLoading={isPendingAction(selectedOrder.id, "start")}
                     loadingLabel="Iniciando..."
@@ -1984,6 +2076,8 @@ export default function ServiceOrdersPage() {
                   </Button>
                   <Button
                     type="button"
+                    title={getCompleteUnavailableReason(selectedOrder)}
+                    aria-label={getCompleteUnavailableReason(selectedOrder)}
                     onClick={() => void handleComplete(selectedOrder.id)}
                     isLoading={isPendingAction(selectedOrder.id, "complete")}
                     loadingLabel="Concluindo..."
@@ -1999,6 +2093,8 @@ export default function ServiceOrdersPage() {
                   </Button>
                   <Button
                     type="button"
+                    title={getChargeUnavailableReason(selectedOrder)}
+                    aria-label={getChargeUnavailableReason(selectedOrder)}
                     onClick={() => void handleGenerateCharge(selectedOrder.id)}
                     isLoading={isPendingAction(selectedOrder.id, "charge")}
                     loadingLabel="Gerando..."
