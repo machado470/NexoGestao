@@ -182,7 +182,7 @@ function safeText(value: unknown, fallback = "—") {
 }
 
 const RAW_TECHNICAL_PATTERN =
-  /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b|\b[0-9a-f]{24,}\b|EXECUTION_STARTED|EXECUTION_EXECUTED|action-send-overdue-charge-reminder|action-create-charge-followup|eventType|endpoint|BFF|backend|payload|metadata/gi;
+  /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b|\b[0-9a-f]{24,}\b|EXECUTION_STARTED|EXECUTION_EXECUTED|action-send-overdue-charge-reminder|action-create-charge-followup|eventType|endpoint|BFF|backend|payload|metadata|pending|executed|started/gi;
 
 function sanitizeFinancialText(value: unknown, fallback = "Informação financeira registrada") {
   const text = safeText(value, fallback).replace(RAW_TECHNICAL_PATTERN, "").trim();
@@ -193,7 +193,6 @@ function humanizeFinancialTimelineEvent(item: Record<string, any>) {
   const source = `${item?.type ?? ""} ${item?.category ?? ""} ${item?.title ?? ""} ${item?.description ?? ""}`.toLowerCase();
   if (source.includes("paid") || source.includes("pagamento")) return "Pagamento registrado";
   if (source.includes("cancel")) return "Cobrança cancelada";
-  if (source.includes("sent") || source.includes("enviad")) return "Cobrança enviada";
   if (source.includes("reminder") || source.includes("lembrete")) {
     return source.includes("sent") || source.includes("enviad")
       ? "Lembrete de cobrança enviado"
@@ -266,6 +265,44 @@ function getChargeRisk(charge: ChargeRecord) {
 function hasRegisteredPayment(charge: ChargeRecord) {
   if (normalizeStatus(charge?.status) !== "PAID") return true;
   return Array.isArray(charge?.payments) && charge.payments.length > 0;
+}
+
+function getContactAvailability(charge: ChargeRecord) {
+  const customer = charge?.customer ?? {};
+  const hasAnyContact = Boolean(
+    customer?.phone ||
+      customer?.whatsapp ||
+      customer?.whatsappPhone ||
+      charge?.customerPhone ||
+      charge?.phone
+  );
+  const hasWhatsApp = Boolean(
+    customer?.whatsapp ||
+      customer?.whatsappPhone ||
+      charge?.whatsapp ||
+      charge?.whatsappPhone ||
+      customer?.phone ||
+      charge?.customerPhone
+  );
+  if (hasWhatsApp) return "WhatsApp disponível";
+  if (hasAnyContact) return "Contato cadastrado";
+  return "Sem contato retornado";
+}
+
+function getPipelineStageState(stage: string, charges: ChargeRecord[]) {
+  const actionable = charges.filter(item => ["PENDING", "OVERDUE"].includes(item.status));
+  if (stage === "Cliente") return charges.length > 0 ? `${charges.length} cliente(s) com cobrança` : "Sem carteira carregada";
+  if (stage === "Cobrança") return actionable.length > 0 ? `${actionable.length} cobrança(s) ativas` : "Sem cobrança ativa";
+  if (stage === "Envio") {
+    const sent = actionable.filter(item => getCommunicationState(item) === "sent").length;
+    return sent > 0 ? `${sent} envio(s) identificado(s)` : "Envio via WhatsApp contextual";
+  }
+  if (stage === "Contato") {
+    const available = actionable.filter(item => getContactAvailability(item) !== "Sem contato retornado").length;
+    return available > 0 ? `${available} contato(s) acionável(is)` : "Contato não retornado";
+  }
+  if (stage === "Pagamento") return charges.some(item => item.status === "PAID") ? "Pagamento registrado" : "Aguardando pagamento";
+  return charges.some(item => item.status === "PAID") ? "Recebimento no caixa" : "Recebimento pendente";
 }
 
 function getCommunicationState(charge: ChargeRecord) {
@@ -1268,34 +1305,6 @@ export default function FinancesPage() {
         </div>
       </AppSectionBlock>
 
-      <div className="grid gap-3 xl:grid-cols-2">
-        <OperationalStateCard
-          title="Estado financeiro operacional"
-          level={financeCommandState.level}
-          reason={financeCommandState.reason}
-          impact={financeCommandState.impact}
-          detailsLabel={
-            cashHealth.overdueCount > 0 ? "Ver vencidas" : "Ver carteira"
-          }
-          onDetails={() =>
-            setStatusFilter(cashHealth.overdueCount > 0 ? "overdue" : "all")
-          }
-        />
-        <OperationalRiskCard
-          title={financeRisk.title}
-          reason={financeRisk.reason}
-          impact={financeRisk.impact}
-          ctaLabel={
-            cashHealth.overdueCount > 0
-              ? "Priorizar atrasos"
-              : "Revisar carteira"
-          }
-          onClick={() =>
-            setStatusFilter(cashHealth.overdueCount > 0 ? "overdue" : "all")
-          }
-        />
-      </div>
-
       <AppSectionCard className="space-y-0 border-0 bg-transparent p-0">
         <span className="sr-only">Próxima melhor ação financeira · FAÇA AGORA: comando financeiro dominante</span>
         <div className="mb-2 rounded-xl border border-[var(--accent-primary)] bg-[var(--accent-soft)] p-4">
@@ -1350,83 +1359,57 @@ export default function FinancesPage() {
         />
       </AppSectionCard>
 
-      <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
-        <AppStatCard
-          label="Recebido"
-          value={formatCurrency(health.received)}
-          helper={`Consequência: ${cashHealth.paidCount} cobrança(s) confirmada(s) no caixa.`}
-        />
-        <AppStatCard
-          label="A receber"
-          value={formatCurrency(health.receivable)}
-          helper={`Consequência: ${cashHealth.pendingCount} cobrança(s) ainda pedem acompanhamento.`}
-        />
-        <AppStatCard
-          label="Vencido"
-          value={formatCurrency(health.overdue)}
-          helper={
-            cashHealth.overdueCount > 0
-              ? "Consequência: cobrar antes de navegar."
-              : "Consequência: manter rotina preventiva."
-          }
-        />
-        <AppStatCard
-          label="Previsto"
-          value={formatCurrency(health.projected)}
-          helper="Consequência: visão dos próximos 30 dias com dados de vencimento."
-        />
-      </div>
+      <AppSectionBlock
+        title="Pipeline Financeiro"
+        subtitle="Cliente → Cobrança → Envio → Contato → Pagamento → Recebimento, usando somente dados já carregados e CTAs existentes."
+        compact
+      >
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+          {["Cliente", "Cobrança", "Envio", "Contato", "Pagamento", "Recebimento"].map((stage, index) => (
+            <AppInfoCard key={stage} className="relative overflow-hidden">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                {index + 1}. {stage}
+              </p>
+              <p className="mt-2 min-h-10 text-sm font-semibold text-[var(--text-primary)]">
+                {getPipelineStageState(stage, enrichedCharges)}
+              </p>
+              <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                {stage === "Envio" || stage === "Contato"
+                  ? "Continuar pelo WhatsApp contextual quando houver cobrança ativa."
+                  : stage === "Recebimento"
+                    ? "Confirmar pagamento somente pelo registro real existente."
+                    : "Etapa calculada a partir da carteira carregada."}
+              </p>
+            </AppInfoCard>
+          ))}
+        </div>
+      </AppSectionBlock>
 
       <AppSectionBlock
-        title="Saúde do caixa"
-        subtitle="Leitura operacional do dinheiro e do gargalo cobrança → pagamento."
+        title="Saúde/Radar de caixa"
+        subtitle="Consequência operacional do caixa, sem repetir os mesmos números executivos do Hero."
         compact
       >
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <AppInfoCard>
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-              Dinheiro recebido
-            </p>
-            <p className="mt-2 text-xl font-semibold text-[var(--text-primary)]">
-              {formatCurrency(health.received)}
-            </p>
-            <p className="mt-1 text-sm text-[var(--text-secondary)]">
-              Já entrou no caixa conforme cobranças pagas.
-            </p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Ritmo de recebimento</p>
+            <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">{cashHealth.collectionBottleneck}</p>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">Indica onde a conversão execução → receita está travando.</p>
           </AppInfoCard>
           <AppInfoCard>
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-              Dinheiro pendente
-            </p>
-            <p className="mt-2 text-xl font-semibold text-[var(--text-primary)]">
-              {formatCurrency(cashHealth.pendingAmount)}
-            </p>
-            <p className="mt-1 text-sm text-[var(--text-secondary)]">
-              Precisa de acompanhamento antes do vencimento.
-            </p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Risco para caixa</p>
+            <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">{financeCommandState.level === "RESTRICTED" ? "Restrito" : financeCommandState.level === "WARNING" ? "Atenção" : "Normal"}</p>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">{financeCommandState.impact}</p>
           </AppInfoCard>
           <AppInfoCard>
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-              Dinheiro em risco
-            </p>
-            <p className="mt-2 text-xl font-semibold text-[var(--text-primary)]">
-              {formatCurrency(cashHealth.riskAmount)}
-            </p>
-            <p className="mt-1 text-sm text-[var(--text-secondary)]">
-              Toda cobrança vencida sugere cobrança imediata.
-            </p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Impacto operacional</p>
+            <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">Timeline/Governança/WhatsApp/Cliente</p>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">Dinheiro em risco e cobranças vencidas priorizam cobrança, prova operacional e contato contextual.</p>
           </AppInfoCard>
           <AppInfoCard>
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-              Saúde financeira
-            </p>
-            <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
-              {operationalHealth.label}
-            </p>
-            <p className="mt-1 text-sm text-[var(--text-secondary)]">
-              {operationalHealth.bottleneck.label}:{" "}
-              {operationalHealth.bottleneck.reason}
-            </p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Segurança</p>
+            <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">Sem automação falsa</p>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">A tela orienta decisões e usa apenas ações reais já disponíveis.</p>
           </AppInfoCard>
         </div>
       </AppSectionBlock>
@@ -1580,7 +1563,7 @@ export default function FinancesPage() {
                           {safeFinancialEntityName(row.customerName)}
                         </p>
                         <p className="mt-1 text-xs text-[var(--text-muted)]">
-                          {safeText(row?.customer?.phone, "Contato não informado")}
+                          {getContactAvailability(row)}
                         </p>
                       </div>
                       <div>
@@ -1656,6 +1639,15 @@ export default function FinancesPage() {
       >
         {selectedCharge ? (
           <div className="space-y-3">
+            <AppInfoCard className="border-[var(--accent-primary)] bg-[var(--accent-soft)]">
+              <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--accent-primary)]">Decisão operacional</p>
+              <p className="mt-2 text-xl font-semibold text-[var(--text-primary)]">{getChargePrimaryAction(selectedFinancialRecord).label}</p>
+              <div className="mt-3 grid gap-3 md:grid-cols-3">
+                <p className="text-sm text-[var(--text-secondary)]"><strong>Motivo:</strong> {getChargePrimaryAction(selectedFinancialRecord).reason}</p>
+                <p className="text-sm text-[var(--text-secondary)]"><strong>Impacto:</strong> {getChargeRisk(selectedFinancialRecord)}</p>
+                <p className="text-sm text-[var(--text-secondary)]"><strong>Segurança:</strong> decisão orientativa; pagamento e mensagem exigem CTA real.</p>
+              </div>
+            </AppInfoCard>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <AppInfoCard>
                 <p className="text-xs text-[var(--text-muted)]">
@@ -1665,10 +1657,7 @@ export default function FinancesPage() {
                   {selectedFinancialRecord.customerName}
                 </p>
                 <p className="mt-1 text-xs text-[var(--text-muted)]">
-                  {safeText(
-                    selectedFinancialRecord?.customer?.phone,
-                    "Telefone não retornado"
-                  )}
+                  {getContactAvailability(selectedFinancialRecord)}
                 </p>
               </AppInfoCard>
               <AppInfoCard>
