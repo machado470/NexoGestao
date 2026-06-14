@@ -7,7 +7,10 @@ const financesPage = readFileSync(
 );
 
 const renderedText = financesPage
-  .replace(/const RAW_TECHNICAL_PATTERN[\s\S]*?function getChargePrimaryAction/, "function getChargePrimaryAction")
+  .replace(
+    /const RAW_TECHNICAL_PATTERN[\s\S]*?function getChargePrimaryAction/,
+    "function getChargePrimaryAction"
+  )
   .replace(/navigate\(`[^`]+`\)/g, "navigate(...) ")
   .replace(/trpc\.[\w.]+/g, "trpc.call")
   .replace(/pending|executed|started/gi, "");
@@ -27,14 +30,16 @@ describe("FinancesPage manual payment contract", () => {
 
   it("posiciona Financeiro como cockpit operacional de conversão em receita", () => {
     expect(financesPage).toContain("Financeiro operacional");
-    expect(financesPage).toContain("Centro de conversão da execução em receita");
+    expect(financesPage).toContain(
+      "Centro de conversão da execução em receita"
+    );
     expect(financesPage).toContain("Hero Executivo Financeiro");
     expect(financesPage).toContain("Dinheiro recebido");
     expect(financesPage).toContain("Dinheiro pendente");
     expect(financesPage).toContain("Dinheiro em risco");
-    expect(financesPage).toContain("Maior cobrança em atraso");
-    expect(financesPage).toContain("Cliente prioritário");
-    expect(financesPage).toContain("Próxima ação financeira");
+    expect(financesPage).not.toContain("Maior cobrança em atraso");
+    expect(financesPage).not.toContain("Cliente prioritário");
+    expect(financesPage).not.toContain("Próxima ação financeira");
   });
 
   it("mantém FAÇA AGORA como comando financeiro dominante com CTAs reais", () => {
@@ -47,10 +52,18 @@ describe("FinancesPage manual payment contract", () => {
 
   it("cria Pipeline Financeiro logo após FAÇA AGORA", () => {
     expect(financesPage).toContain("Pipeline Financeiro");
-    expect(financesPage).toContain("Cliente → Cobrança → Envio → Contato → Pagamento → Recebimento");
-    expect(financesPage).toContain("getPipelineStageState");
-    expect(financesPage.indexOf("FAÇA AGORA")).toBeLessThan(financesPage.indexOf("Pipeline Financeiro"));
-    expect(financesPage.indexOf("Pipeline Financeiro")).toBeLessThan(financesPage.indexOf("Saúde/Radar de caixa"));
+    expect(financesPage).toContain(
+      "Cliente → Cobrança → Envio → Contato → Pagamento → Recebimento"
+    );
+    expect(financesPage).toContain("getPipelineStages");
+    expect(financesPage).toContain("Gargalo principal");
+    expect(financesPage).toContain("pipelineBottleneck");
+    expect(financesPage.indexOf("FAÇA AGORA")).toBeLessThan(
+      financesPage.indexOf("Pipeline Financeiro")
+    );
+    expect(financesPage.indexOf("Pipeline Financeiro")).toBeLessThan(
+      financesPage.indexOf("Pulso Financeiro")
+    );
   });
 
   it("humaniza Timeline e protege contra vazamentos técnicos na experiência renderizada", () => {
@@ -58,12 +71,11 @@ describe("FinancesPage manual payment contract", () => {
     expect(financesPage).toContain("humanizeFinancialTimelineEvent");
     expect(financesPage).toContain("getFinancialBusinessLabel");
     expect(financesPage).toContain("safeFinancialEntityName");
-    expect(financesPage).toContain("Cobrança criada");
-    expect(financesPage).toContain("Lembrete de cobrança preparado");
+    expect(financesPage).toContain("Cobrança registrada");
+    expect(financesPage).toContain("Cobrança preparada");
     expect(financesPage).toContain("Lembrete de cobrança enviado");
     expect(financesPage).toContain("Pagamento registrado");
     expect(financesPage).toContain("Cobrança cancelada");
-    expect(financesPage).toContain("Ação financeira registrada");
     expect(financesPage).toContain("Evento financeiro registrado");
     for (const leak of [
       "EXECUTION_STARTED",
@@ -88,9 +100,19 @@ describe("FinancesPage manual payment contract", () => {
     expect(financesPage).toContain("Origem não informada pela fonte atual");
     expect(financesPage).toContain("Detalhe financeiro de cobrança");
     expect(financesPage).toContain("Decisão operacional");
-    expect(financesPage.indexOf("Decisão operacional")).toBeLessThan(financesPage.indexOf("Cliente vinculado"));
+    expect(financesPage.indexOf("Decisão operacional")).toBeLessThan(
+      financesPage.indexOf("Prova operacional financeira")
+    );
+    expect(financesPage.indexOf("Prova operacional financeira")).toBeLessThan(
+      financesPage.indexOf("Comunicação / WhatsApp")
+    );
+    expect(financesPage.indexOf("Comunicação / WhatsApp")).toBeLessThan(
+      financesPage.indexOf("Cliente vinculado")
+    );
     expect(financesPage).not.toContain("Cobrança ID");
-    expect(financesPage).not.toContain('placeholder="Buscar cliente, O.S., status ou ID"');
+    expect(financesPage).not.toContain(
+      'placeholder="Buscar cliente, O.S., status ou ID"'
+    );
     expect(renderedText).not.toContain("ID: {");
   });
 
@@ -103,9 +125,12 @@ describe("FinancesPage manual payment contract", () => {
     expect(financesPage).not.toContain("Telefone não retornado");
   });
 
-  it("usa Radar financeiro e WhatsApp com linguagem operacional", () => {
+  it("usa Pulso Financeiro, Radar compacto e WhatsApp com linguagem operacional", () => {
     expect(financesPage).toContain("Radar financeiro");
-    expect(financesPage).toContain("Impacto operacional");
+    expect(financesPage).toContain("Pulso Financeiro");
+    expect(financesPage).toContain("Conversão cobrança → pagamento");
+    expect(financesPage).toContain("Receita travada");
+    expect(financesPage).toContain("Maior gargalo");
     expect(financesPage).toContain("Sem automação falsa");
     expect(financesPage).toContain("Resolver");
     expect(financesPage).toContain(
