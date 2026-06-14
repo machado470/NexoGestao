@@ -22,8 +22,7 @@ describe("AppointmentsPage as operational execution entry", () => {
       "Abrir O.S.",
       "Criar O.S.",
       "WhatsApp",
-      "Ver financeiro",
-      "Ver timeline",
+      "Abrir financeiro",
     ].forEach(cta => expect(source).toContain(cta));
     expect(source).toContain("Sinal principal");
     expect(source).toContain("Próxima ação:");
@@ -44,25 +43,40 @@ describe("AppointmentsPage as operational execution entry", () => {
     ["Cliente", "Agendamento", "O.S.", "Cobrança", "Pagamento"].forEach(stage =>
       expect(flowSource).toContain(`label: "${stage}"`)
     );
-    expect(source).toContain("Cliente → Agendamento → O.S. → Cobrança → Pagamento");
+    expect(source).toContain(
+      "Cliente → Agendamento → O.S. → Cobrança → Pagamento"
+    );
     expect(flowSource).not.toContain('label: "Timeline"');
     expect(flowSource).not.toContain('label: "Risco"');
     expect(flowSource).not.toContain('id: "timeline"');
     expect(flowSource).not.toContain('id: "risk"');
-    expect(flowSource).toContain("Vinculada");
-    expect(flowSource).toContain("Sem cobrança vinculada");
+    expect(flowSource).toContain("Cliente vinculado");
+    expect(source).toContain("Sem O.S.");
+    expect(source).toContain("O.S. aberta");
+    expect(source).toContain("Em execução");
+    expect(source).toContain("Concluída");
+    expect(source).toContain("Cobrança pendente");
+    expect(source).toContain("Cobrança vencida");
+    expect(source).toContain("Cobrança paga");
+    expect(flowSource).toContain("Aguardando pagamento");
+    expect(flowSource).toContain("Pagamento recebido");
   });
 
-  it("orders selected detail before supporting operational list", () => {
-    expect(selectedExperience.indexOf("Hero executivo do agendamento")).toBeLessThan(
-      selectedExperience.indexOf("Outros agendamentos da operação")
-    );
+  it("orders selected detail and timeline before supporting operational list", () => {
+    expect(
+      selectedExperience.indexOf("Hero executivo do agendamento")
+    ).toBeLessThan(selectedExperience.indexOf("Decisão e próxima ação"));
     expect(selectedExperience.indexOf("Decisão e próxima ação")).toBeLessThan(
+      selectedExperience.indexOf("Fluxo de entrada do agendamento")
+    );
+    expect(
+      selectedExperience.indexOf("Timeline humanizada do agendamento")
+    ).toBeLessThan(
       selectedExperience.indexOf("Outros agendamentos da operação")
     );
-    expect(selectedExperience.indexOf("Fluxo de entrada do agendamento")).toBeLessThan(
-      selectedExperience.indexOf("Outros agendamentos da operação")
-    );
+    expect(
+      selectedExperience.indexOf("Timeline humanizada do agendamento")
+    ).toBeLessThan(selectedExperience.indexOf("Radar operacional"));
   });
 
   it("humanizes embedded timeline events and hides raw technical fields", () => {
@@ -85,14 +99,40 @@ describe("AppointmentsPage as operational execution entry", () => {
   });
 
   it("keeps operational summary, honest incidents, empty filter copy and no fake automation", () => {
-    ["Hoje", "Confirmados", "Não confirmados", "Atrasados", "Concluídos"].forEach(metric =>
-      expect(source).toContain(metric)
+    [
+      "Hoje",
+      "Confirmados",
+      "Não confirmados",
+      "Atrasados",
+      "Concluídos",
+    ].forEach(metric => expect(source).toContain(metric));
+    expect(source).toContain("Radar operacional");
+    expect(source).toContain("Resolver incidente");
+    expect(source).toContain("relative z-30 shrink-0 gap-2 overflow-visible");
+    expect(source).toContain("absolute right-0 z-50 mt-2 grid");
+    expect(source).toContain(
+      "Fonte atual não entrega resposta do cliente nesta tela"
     );
-    expect(source).toContain("Atenção imediata");
-    expect(source).toContain("Fonte atual não entrega resposta do cliente nesta tela");
     expect(source).toContain("Nenhum agendamento para o filtro atual");
     expect(source).toContain("não cria fluxo novo de comunicação");
     expect(source).not.toContain("automação automática");
     expect(source).not.toContain("disparo automático");
+  });
+});
+
+describe("AppointmentsPage final polish guardrails", () => {
+  it("does not duplicate the open appointment CTA across operational sections", () => {
+    expect(source.match(/>\s*Abrir agendamento\s*</g) ?? []).toHaveLength(1);
+  });
+
+  it("does not expose raw backend identifiers or enum states in operational slices", () => {
+    const operatorFacingSource = `${flowSource}\n${embeddedTimelineSource}`;
+    expect(operatorFacingSource).not.toMatch(
+      /\b(?:IN_PROGRESS|PENDING|COMPLETED|CANCELLED|FAILED|PROCESSING)\b/
+    );
+    expect(operatorFacingSource).not.toMatch(
+      /[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i
+    );
+    expect(operatorFacingSource).not.toMatch(/\b[a-f0-9]{12,}\b/i);
   });
 });

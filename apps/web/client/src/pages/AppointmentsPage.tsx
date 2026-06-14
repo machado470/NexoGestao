@@ -183,6 +183,62 @@ function humanizeTimelineEvent(event: any) {
   );
 }
 
+function humanizeBackendState(value: unknown, fallback = "Sem status") {
+  const normalized = String(value ?? "")
+    .trim()
+    .toUpperCase();
+  const labels: Record<string, string> = {
+    IN_PROGRESS: "Em execução",
+    PENDING: "Pendente",
+    COMPLETED: "Concluído",
+    DONE: "Concluído",
+    FAILED: "Falhou",
+    CANCELLED: "Cancelado",
+    CANCELED: "Cancelado",
+    PROCESSING: "Em processamento",
+    SCHEDULED: "Sem confirmação",
+    CONFIRMED: "Confirmado",
+    NO_SHOW: "Não compareceu",
+    OPEN: "O.S. aberta",
+    PAID: "Cobrança paga",
+    OVERDUE: "Cobrança vencida",
+  };
+  if (labels[normalized]) return labels[normalized];
+  return sanitizeOperationalText(value, fallback);
+}
+
+function appointmentPipelineSummary(target: MappedAppointment | null) {
+  if (!target) return "Nenhum horário em foco.";
+  if (target.isOverdue)
+    return `Atrasado · ${formatDateTime(target.item.startsAt)}.`;
+  if (target.status === "SCHEDULED")
+    return `Sem confirmação · ${formatDateTime(target.item.startsAt)}.`;
+  if (target.status === "CONFIRMED")
+    return `Confirmado · ${formatDateTime(target.item.startsAt)}.`;
+  return `${humanizeBackendState(target.status)} · ${formatDateTime(target.item.startsAt)}.`;
+}
+
+function serviceOrderPipelineSummary(target: MappedAppointment | null) {
+  if (!target?.order?.id) return "Sem O.S.";
+  const status = String(target.order.status ?? "").toUpperCase();
+  if (status === "IN_PROGRESS" || status === "PROCESSING") return "Em execução";
+  if (status === "DONE" || status === "COMPLETED") return "Concluída";
+  return "O.S. aberta";
+}
+
+function chargePipelineSummary(
+  hasCharge: boolean,
+  chargeStatus: string,
+  chargeOverdue: boolean,
+  paymentDone: boolean
+) {
+  if (!hasCharge) return "Sem cobrança";
+  if (paymentDone) return "Cobrança paga";
+  if (chargeOverdue) return "Cobrança vencida";
+  if (chargeStatus === "PENDING") return "Cobrança pendente";
+  return humanizeBackendState(chargeStatus, "Cobrança pendente");
+}
+
 function mapStatus(status?: string | null) {
   const normalized = String(status ?? "SCHEDULED").toUpperCase();
   if (normalized === "SCHEDULED")
@@ -829,7 +885,7 @@ export default function AppointmentsPage() {
         reason: `${overdue.customerName} ficou com horário vencido em ${formatDateTime(overdue.item.startsAt)}.`,
         impact:
           "Evita quebra do fluxo Cliente → Agendamento → O.S. → Financeiro.",
-        ctaLabel: "Abrir agendamento",
+        ctaLabel: "Selecionar entrada",
         onClick: () => setSelectedAppointmentId(String(overdue.item.id)),
       };
     }
@@ -1132,7 +1188,7 @@ export default function AppointmentsPage() {
             : "Horário atrasado ainda aberto.",
         impact:
           "Define se a entrada será remarcada, cancelada ou transformada em execução com prova.",
-        primaryActionLabel: "Abrir agendamento",
+        primaryActionLabel: "Revisar entrada",
         secondaryActionLabel: "Remarcar/editar",
         safetyNote:
           "Orientação contextual; alterações exigem confirmação nos controles existentes.",
@@ -1288,9 +1344,7 @@ export default function AppointmentsPage() {
       {
         id: "appointment",
         label: "Agendamento",
-        summary: target
-          ? `${mapStatus(target.status).label} · ${formatDateTime(target.item.startsAt)}.`
-          : "Nenhum horário em foco.",
+        summary: appointmentPipelineSummary(target),
         state: !target
           ? "idle"
           : target.status === "DONE"
@@ -1311,9 +1365,7 @@ export default function AppointmentsPage() {
       {
         id: "service-order",
         label: "O.S.",
-        summary: target?.order?.id
-          ? `O.S. vinculada (${safeEntityLabel(orderStatus, "sem status")}).`
-          : "Ainda sem O.S. vinculada neste carregamento.",
+        summary: serviceOrderPipelineSummary(target),
         state: target?.order?.id
           ? orderStatus === "DONE"
             ? "done"
@@ -1339,9 +1391,12 @@ export default function AppointmentsPage() {
       {
         id: "charge",
         label: "Cobrança",
-        summary: hasCharge
-          ? `Cobrança ${safeEntityLabel(chargeStatus, "vinculada").toLowerCase()}.`
-          : "Sem cobrança vinculada ao ciclo carregado.",
+        summary: chargePipelineSummary(
+          hasCharge,
+          chargeStatus,
+          chargeOverdue,
+          paymentDone
+        ),
         state: hasCharge
           ? paymentDone
             ? "done"
@@ -1360,11 +1415,7 @@ export default function AppointmentsPage() {
       {
         id: "payment",
         label: "Pagamento",
-        summary: paymentDone
-          ? "Pagamento com evidência carregada."
-          : hasCharge
-            ? "Cobrança ainda sem pagamento confirmado."
-            : "Aguardando cobrança para medir pagamento.",
+        summary: paymentDone ? "Pagamento recebido" : "Aguardando pagamento",
         state: paymentDone
           ? "done"
           : hasCharge
@@ -1508,6 +1559,62 @@ export default function AppointmentsPage() {
           </div>
         </AppOperationalHeader>
 
+        {selected ? (
+          <AppSectionCard className="overflow-hidden border-[var(--accent-primary)]/25 bg-gradient-to-br from-[var(--surface-base)] via-[var(--surface-subtle)] to-[var(--accent-soft)]/30 p-0">
+            <div className="grid gap-0 lg:grid-cols-[1.35fr_0.65fr]">
+              <div className="p-5 md:p-6">
+                <p className="nexo-overline">Hero executivo do agendamento</p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text-primary)] md:text-3xl">
+                  {selected.customerName}
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
+                  {formatDateTime(selected.item.startsAt)} ·{" "}
+                  {durationLabel(selected.item.startsAt, selected.item.endsAt)}{" "}
+                  · Responsável: {selected.ownerName}
+                </p>
+                <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">
+                  {selected.item.title ||
+                    selected.item.notes ||
+                    "Agendamento sem observação operacional cadastrada."}
+                </p>
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <AppStatusBadge {...mapStatus(selected.item.status)} />
+                  <AppStatusBadge {...mapOperationalStatusBadge(selected)} />
+                  {deriveAppointmentPriority(selected) ? (
+                    <AppPriorityBadge
+                      priority={deriveAppointmentPriority(selected)!}
+                      label={appointmentPriorityLabel(
+                        deriveAppointmentPriority(selected)!
+                      )}
+                    />
+                  ) : null}
+                </div>
+              </div>
+              <div className="flex flex-col justify-center gap-2 border-t border-[var(--border-subtle)] bg-[var(--surface-base)]/65 p-5 lg:border-l lg:border-t-0">
+                <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-2">
+                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                    Sinal principal
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+                    {appointmentRisk.title}
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
+                    Próxima ação: {canonicalNextBestAction.primaryActionLabel}
+                  </p>
+                </div>
+                <Button
+                  onClick={() =>
+                    setSelectedAppointmentId(String(selected.item.id ?? ""))
+                  }
+                  disabled={!selected.item.id}
+                >
+                  Abrir agendamento
+                </Button>
+              </div>
+            </div>
+          </AppSectionCard>
+        ) : null}
+
         <AppFiltersBar className="gap-2 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2">
           {FILTERS.slice(0, 5).map(filter => {
             const count =
@@ -1543,135 +1650,6 @@ export default function AppointmentsPage() {
             );
           })}
         </AppFiltersBar>
-
-        {selected ? (
-          <AppSectionCard className="overflow-hidden border-[var(--accent-primary)]/25 bg-gradient-to-br from-[var(--surface-base)] via-[var(--surface-subtle)] to-[var(--accent-soft)]/30 p-0">
-            <div className="grid gap-0 lg:grid-cols-[1.35fr_0.65fr]">
-              <div className="p-5 md:p-6">
-                <p className="nexo-overline">Hero executivo do agendamento</p>
-                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text-primary)] md:text-3xl">
-                  {selected.customerName}
-                </h2>
-                <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
-                  {formatDateTime(selected.item.startsAt)} ·{" "}
-                  {durationLabel(selected.item.startsAt, selected.item.endsAt)}{" "}
-                  · Responsável: {selected.ownerName}
-                </p>
-                <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">
-                  {selected.item.title ||
-                    selected.item.notes ||
-                    "Agendamento sem observação operacional cadastrada."}
-                </p>
-                <div className="mt-4 flex flex-wrap items-center gap-2">
-                  <AppStatusBadge {...mapStatus(selected.item.status)} />
-                  <AppStatusBadge {...mapOperationalStatusBadge(selected)} />
-                  {deriveAppointmentPriority(selected) ? (
-                    <AppPriorityBadge
-                      priority={deriveAppointmentPriority(selected)!}
-                      label={appointmentPriorityLabel(
-                        deriveAppointmentPriority(selected)!
-                      )}
-                    />
-                  ) : null}
-                </div>
-              </div>
-              <div className="flex flex-col justify-center gap-2 border-t border-[var(--border-subtle)] bg-[var(--surface-base)]/65 p-5 lg:border-l lg:border-t-0">
-                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                    Sinal principal
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
-                    {appointmentRisk.title}
-                  </p>
-                  <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
-                    Próxima ação: {canonicalNextBestAction.primaryActionLabel}
-                  </p>
-                </div>
-                <Button onClick={canonicalNextBestAction.onPrimaryAction}>
-                  {canonicalNextBestAction.primaryActionLabel}
-                </Button>
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() =>
-                      setSelectedAppointmentId(String(selected.item.id ?? ""))
-                    }
-                    disabled={!selected.item.id}
-                  >
-                    Abrir agendamento
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setEditing(selected.item);
-                      setOpenModal(true);
-                    }}
-                    disabled={!selected.item.id}
-                  >
-                    Remarcar/editar
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      if (selected.order?.id) {
-                        navigate(
-                          `/service-orders?customerId=${selected.customerId}&appointmentId=${selected.item.id}`
-                        );
-                        return;
-                      }
-                      setOpenServiceOrderModal(true);
-                    }}
-                    disabled={!selected.item.id}
-                  >
-                    {selected.order?.id ? "Abrir O.S." : "Criar O.S."}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() =>
-                      goToWhatsAppAppointment(
-                        String(selected.customerId ?? ""),
-                        String(selected.item.id ?? "")
-                      )
-                    }
-                    disabled={!selected.customerId || !selected.item.id}
-                  >
-                    WhatsApp
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() =>
-                      navigate(`/finances?customerId=${selected.customerId}`)
-                    }
-                    disabled={!selected.customerId}
-                  >
-                    Ver financeiro
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() =>
-                      navigate(
-                        selected.customerId
-                          ? `/timeline?customerId=${selected.customerId}`
-                          : "/timeline"
-                      )
-                    }
-                  >
-                    Ver timeline
-                  </Button>
-                </div>
-                <Button
-                  variant="outline"
-                  onClick={() =>
-                    navigate(`/customers?customerId=${selected.customerId}`)
-                  }
-                  disabled={!selected.customerId}
-                >
-                  Abrir cliente
-                </Button>
-              </div>
-            </div>
-          </AppSectionCard>
-        ) : null}
 
         <AppSectionCard className="space-y-4 border-[var(--accent-primary)]/25">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1744,17 +1722,21 @@ export default function AppointmentsPage() {
             </div>
           </div>
           <AppActionBar className="gap-2">
-            <Button onClick={canonicalNextBestAction.onPrimaryAction}>
-              {canonicalNextBestAction.primaryActionLabel}
-            </Button>
-            {canonicalNextBestAction.onSecondaryAction ? (
+            {selected ? (
               <Button
-                variant="outline"
-                onClick={canonicalNextBestAction.onSecondaryAction}
+                onClick={() => {
+                  setEditing(selected.item);
+                  setOpenModal(true);
+                }}
+                disabled={!selected.item.id}
               >
-                {canonicalNextBestAction.secondaryActionLabel}
+                Remarcar/editar
               </Button>
-            ) : null}
+            ) : (
+              <Button onClick={canonicalNextBestAction.onPrimaryAction}>
+                {canonicalNextBestAction.primaryActionLabel}
+              </Button>
+            )}
           </AppActionBar>
         </AppSectionCard>
 
@@ -1834,13 +1816,34 @@ export default function AppointmentsPage() {
           </div>
         </AppSectionBlock>
 
+        {selected ? (
+          <EntityTimelineCard
+            title="Timeline humanizada do agendamento"
+            subtitle={
+              timeline.length > 0
+                ? "Últimos eventos oficiais retornados para sustentar a leitura do cliente e do horário."
+                : "Sem Timeline oficial carregada; exibimos apenas eventos derivados de datas reais do agendamento, sem criar histórico fictício."
+            }
+            events={appointmentTimelineEvents}
+            fullTimelineLabel="Abrir Timeline completa"
+            onFullTimeline={() =>
+              navigate(
+                selected.customerId
+                  ? `/timeline?customerId=${selected.customerId}`
+                  : "/timeline"
+              )
+            }
+          />
+        ) : null}
+
         <AppSectionBlock
-          title="Atenção imediata"
+          title="Radar operacional"
+          data-contract-copy="Alertas compactos"
           subtitle="Não confirmados, atrasos, risco de no-show e preparação pendente. Fonte atual não entrega resposta do cliente nesta tela; sem resposta aparece apenas como fallback honesto."
           compact
         >
           {attentionItems.length > 0 ? (
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
               {attentionItems.map(row => {
                 const priority = deriveAppointmentPriority(row) ?? "P3";
                 return (
@@ -1848,7 +1851,7 @@ export default function AppointmentsPage() {
                     key={String(
                       row.item.id ?? `${row.customerId}-${row.item.startsAt}`
                     )}
-                    className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3"
+                    className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-2"
                   >
                     <div className="flex flex-wrap items-center gap-2">
                       <AppPriorityBadge
@@ -1875,7 +1878,7 @@ export default function AppointmentsPage() {
                       }
                       disabled={!row.item.id}
                     >
-                      Abrir agendamento
+                      Resolver incidente
                     </Button>
                   </article>
                 );
@@ -1889,27 +1892,7 @@ export default function AppointmentsPage() {
           )}
         </AppSectionBlock>
 
-        {selected ? (
-          <EntityTimelineCard
-            title="Timeline humanizada do agendamento"
-            subtitle={
-              timeline.length > 0
-                ? "Últimos eventos oficiais retornados para sustentar a leitura do cliente e do horário."
-                : "Sem Timeline oficial carregada; exibimos apenas eventos derivados de datas reais do agendamento, sem criar histórico fictício."
-            }
-            events={appointmentTimelineEvents}
-            fullTimelineLabel="Abrir Timeline completa"
-            onFullTimeline={() =>
-              navigate(
-                selected.customerId
-                  ? `/timeline?customerId=${selected.customerId}`
-                  : "/timeline"
-              )
-            }
-          />
-        ) : null}
-
-        <AppFiltersBar className="shrink-0 gap-2 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2">
+        <AppFiltersBar className="relative z-30 shrink-0 gap-2 overflow-visible border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2">
           {FILTERS.slice(0, 3).map(filter => (
             <button
               key={filter.key}
@@ -1924,11 +1907,11 @@ export default function AppointmentsPage() {
               {filter.label}
             </button>
           ))}
-          <details className="relative">
+          <details className="relative z-40">
             <summary className="flex h-8 cursor-pointer list-none items-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 text-xs font-medium text-[var(--text-secondary)]">
               Mais filtros
             </summary>
-            <div className="absolute right-0 z-20 mt-2 grid min-w-[220px] gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-2">
+            <div className="absolute right-0 z-50 mt-2 grid min-w-[220px] gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-2">
               {FILTERS.slice(3).map(filter => (
                 <button
                   key={filter.key}
