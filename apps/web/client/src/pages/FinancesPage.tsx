@@ -184,38 +184,58 @@ function safeText(value: unknown, fallback = "—") {
 const RAW_TECHNICAL_PATTERN =
   /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b|\b[0-9a-f]{24,}\b|EXECUTION_STARTED|EXECUTION_EXECUTED|action-send-overdue-charge-reminder|action-create-charge-followup|eventType|endpoint|BFF|backend|payload|metadata|pending|executed|started/gi;
 
-function sanitizeFinancialText(value: unknown, fallback = "Informação financeira registrada") {
-  const text = safeText(value, fallback).replace(RAW_TECHNICAL_PATTERN, "").trim();
+function sanitizeFinancialText(
+  value: unknown,
+  fallback = "Informação financeira registrada"
+) {
+  const text = safeText(value, fallback)
+    .replace(RAW_TECHNICAL_PATTERN, "")
+    .replace(/\|/g, " ")
+    .replace(/=>/g, " ")
+    .trim();
   return text.length > 0 ? text : fallback;
 }
 
 function humanizeFinancialTimelineEvent(item: Record<string, any>) {
-  const source = `${item?.type ?? ""} ${item?.category ?? ""} ${item?.title ?? ""} ${item?.description ?? ""}`.toLowerCase();
-  if (source.includes("paid") || source.includes("pagamento")) return "Pagamento registrado";
+  const source =
+    `${item?.type ?? ""} ${item?.category ?? ""} ${item?.title ?? ""} ${item?.description ?? ""}`.toLowerCase();
+  if (source.includes("paid") || source.includes("pagamento"))
+    return "Pagamento registrado";
   if (source.includes("cancel")) return "Cobrança cancelada";
   if (source.includes("reminder") || source.includes("lembrete")) {
     return source.includes("sent") || source.includes("enviad")
       ? "Lembrete de cobrança enviado"
       : "Lembrete de cobrança preparado";
   }
-  if (source.includes("created") || source.includes("criad")) return "Cobrança criada";
-  if (source.includes("charge") || source.includes("cobran")) return "Ação financeira registrada";
+  if (source.includes("created") || source.includes("criad"))
+    return "Cobrança registrada";
+  if (source.includes("prepared") || source.includes("prepar"))
+    return "Cobrança preparada";
+  if (source.includes("charge") || source.includes("cobran"))
+    return "Evento financeiro registrado";
   return "Evento financeiro registrado";
 }
 
-function getFinancialBusinessLabel(value: unknown, fallback = "Origem não informada pela fonte atual") {
+function getFinancialBusinessLabel(
+  value: unknown,
+  fallback = "Origem não informada pela fonte atual"
+) {
   const text = sanitizeFinancialText(value, "");
   if (!text) return fallback;
   return text;
 }
 
-function safeFinancialEntityName(value: unknown, fallback = "Cliente não identificado") {
+function safeFinancialEntityName(
+  value: unknown,
+  fallback = "Cliente não identificado"
+) {
   return sanitizeFinancialText(value, fallback);
 }
 
 function getServiceOrderBusinessLabel(charge: ChargeRecord) {
   if (charge?.serviceOrderId || charge?.serviceOrder) return "O.S. vinculada";
-  if ("serviceOrderId" in charge || "serviceOrder" in charge) return "Sem O.S. vinculada";
+  if ("serviceOrderId" in charge || "serviceOrder" in charge)
+    return "Sem O.S. vinculada";
   return "Origem não informada pela fonte atual";
 }
 
@@ -271,38 +291,120 @@ function getContactAvailability(charge: ChargeRecord) {
   const customer = charge?.customer ?? {};
   const hasAnyContact = Boolean(
     customer?.phone ||
-      customer?.whatsapp ||
-      customer?.whatsappPhone ||
-      charge?.customerPhone ||
-      charge?.phone
+    customer?.whatsapp ||
+    customer?.whatsappPhone ||
+    charge?.customerPhone ||
+    charge?.phone
   );
   const hasWhatsApp = Boolean(
     customer?.whatsapp ||
-      customer?.whatsappPhone ||
-      charge?.whatsapp ||
-      charge?.whatsappPhone ||
-      customer?.phone ||
-      charge?.customerPhone
+    customer?.whatsappPhone ||
+    charge?.whatsapp ||
+    charge?.whatsappPhone ||
+    customer?.phone ||
+    charge?.customerPhone
   );
   if (hasWhatsApp) return "WhatsApp disponível";
   if (hasAnyContact) return "Contato cadastrado";
   return "Sem contato retornado";
 }
 
-function getPipelineStageState(stage: string, charges: ChargeRecord[]) {
-  const actionable = charges.filter(item => ["PENDING", "OVERDUE"].includes(item.status));
-  if (stage === "Cliente") return charges.length > 0 ? `${charges.length} cliente(s) com cobrança` : "Sem carteira carregada";
-  if (stage === "Cobrança") return actionable.length > 0 ? `${actionable.length} cobrança(s) ativas` : "Sem cobrança ativa";
-  if (stage === "Envio") {
-    const sent = actionable.filter(item => getCommunicationState(item) === "sent").length;
-    return sent > 0 ? `${sent} envio(s) identificado(s)` : "Envio via WhatsApp contextual";
-  }
-  if (stage === "Contato") {
-    const available = actionable.filter(item => getContactAvailability(item) !== "Sem contato retornado").length;
-    return available > 0 ? `${available} contato(s) acionável(is)` : "Contato não retornado";
-  }
-  if (stage === "Pagamento") return charges.some(item => item.status === "PAID") ? "Pagamento registrado" : "Aguardando pagamento";
-  return charges.some(item => item.status === "PAID") ? "Recebimento no caixa" : "Recebimento pendente";
+function getPipelineStages(charges: ChargeRecord[]) {
+  const actionable = charges.filter(item =>
+    ["PENDING", "OVERDUE"].includes(item.status)
+  );
+  const sent = actionable.filter(
+    item => getCommunicationState(item) === "sent"
+  ).length;
+  const unknownCommunication = actionable.filter(
+    item => getCommunicationState(item) === "unknown"
+  ).length;
+  const contactable = actionable.filter(
+    item => getContactAvailability(item) !== "Sem contato retornado"
+  ).length;
+  const paid = charges.filter(item => item.status === "PAID").length;
+  const overdue = charges.filter(item => item.status === "OVERDUE").length;
+  const pending = charges.filter(item => item.status === "PENDING").length;
+
+  return [
+    {
+      stage: "Cliente",
+      represents: "Origem da cobrança",
+      state:
+        charges.length > 0
+          ? `${charges.length} cliente(s) com cobrança`
+          : "Sem carteira carregada",
+      consequence:
+        charges.length > 0
+          ? "Carteira pronta para priorização."
+          : "Carregue a carteira para decidir.",
+      bottleneck: charges.length === 0,
+    },
+    {
+      stage: "Cobrança",
+      represents: "Valor a converter",
+      state:
+        actionable.length > 0
+          ? `${actionable.length} cobrança(s) ativa(s)`
+          : "Sem cobrança ativa",
+      consequence:
+        overdue > 0
+          ? "Atraso exige ação imediata."
+          : "Pendências seguem monitoradas.",
+      bottleneck: overdue > 0,
+    },
+    {
+      stage: "Envio",
+      represents: "Comunicação registrada",
+      state:
+        sent > 0
+          ? `${sent} envio(s) identificado(s)`
+          : unknownCommunication > 0
+            ? "Histórico não retornado"
+            : "Sem envio registrado",
+      consequence:
+        sent > 0
+          ? "Continue pelo contexto existente."
+          : "Use WhatsApp contextual, sem automação falsa.",
+      bottleneck: actionable.length > 0 && sent === 0,
+    },
+    {
+      stage: "Contato",
+      represents: "Canal acionável",
+      state:
+        contactable > 0
+          ? `${contactable} contato(s) acionável(is)`
+          : "Contato não retornado",
+      consequence:
+        contactable > 0
+          ? "Cobrança pode seguir pelo CTA real."
+          : "Conferir cadastro antes de cobrar.",
+      bottleneck: actionable.length > 0 && contactable === 0,
+    },
+    {
+      stage: "Pagamento",
+      represents: "Confirmação financeira",
+      state:
+        paid > 0
+          ? `${paid} pagamento(s) registrado(s)`
+          : "Aguardando pagamento",
+      consequence:
+        pending > 0 || overdue > 0
+          ? "Recebimento ainda precisa acontecer."
+          : "Sem bloqueio de pagamento ativo.",
+      bottleneck: actionable.length > 0 && paid === 0,
+    },
+    {
+      stage: "Recebimento",
+      represents: "Entrada no caixa",
+      state: paid > 0 ? "Receita reconhecida" : "Recebimento pendente",
+      consequence:
+        paid > 0
+          ? "Execução já virou receita."
+          : "Caixa depende das etapas anteriores.",
+      bottleneck: actionable.length > 0 && paid === 0,
+    },
+  ];
 }
 
 function getCommunicationState(charge: ChargeRecord) {
@@ -433,7 +535,13 @@ export default function FinancesPage() {
           safeFinancialEntityName(customer?.name ?? charge?.customerName)
         ),
         serviceOrderLabel: String(
-          serviceOrder?.number ? `O.S. ${serviceOrder.number}` : getServiceOrderBusinessLabel({ ...charge, serviceOrderId, serviceOrder })
+          serviceOrder?.number
+            ? `O.S. ${serviceOrder.number}`
+            : getServiceOrderBusinessLabel({
+                ...charge,
+                serviceOrderId,
+                serviceOrder,
+              })
         ),
         overdueDays,
       } as ChargeRecord;
@@ -656,6 +764,14 @@ export default function FinancesPage() {
   const hasSearchNoResults =
     Boolean(searchTerm.trim()) && filteredCharges.length === 0;
   const paymentsListAvailable = false;
+
+  const pipelineStages = useMemo(
+    () => getPipelineStages(enrichedCharges),
+    [enrichedCharges]
+  );
+  const pipelineBottleneck =
+    pipelineStages.find(stage => stage.bottleneck) ??
+    pipelineStages[pipelineStages.length - 1];
 
   const completedOrdersWithoutCharge = useMemo(() => {
     const chargedOrderIds = new Set(
@@ -933,9 +1049,15 @@ export default function FinancesPage() {
         id: String(item?.id ?? `${item?.createdAt ?? ""}-${item?.title ?? ""}`),
         type: humanizeFinancialTimelineEvent(item),
         occurredAt: formatDate(item?.createdAt),
-        entity: sanitizeFinancialText(item?.title ?? item?.description, "Evento financeiro registrado"),
+        entity: sanitizeFinancialText(
+          item?.title ?? item?.description,
+          "Evento financeiro registrado"
+        ),
         actor: item?.actor?.name ?? item?.user?.name ?? undefined,
-        summary: sanitizeFinancialText(item?.description ?? item?.summary, "Evento financeiro registrado na Timeline."),
+        summary: sanitizeFinancialText(
+          item?.description ?? item?.summary,
+          "Evento financeiro registrado na Timeline."
+        ),
       }));
     }
 
@@ -1028,8 +1150,7 @@ export default function FinancesPage() {
           overdueCharges.length > 0
             ? "Priorize cobrança por WhatsApp ou registre pagamento."
             : "Sem atraso financeiro no momento.",
-        actionLabel:
-          overdueCharges.length > 0 ? "Priorizar atraso" : "Ver carteira",
+        actionLabel: overdueCharges.length > 0 ? "Priorizar" : "Resolver",
         onAction: () =>
           setStatusFilter(overdueCharges.length > 0 ? "overdue" : "all"),
       },
@@ -1046,7 +1167,7 @@ export default function FinancesPage() {
             : communicationUnknownCount > 0
               ? "Nenhum histórico de envio disponível nesta leitura. Use o WhatsApp contextual para continuar a cobrança."
               : "Nenhuma pendência sem envio registrada.",
-        actionLabel: "Abrir pendências",
+        actionLabel: "Usar WhatsApp",
         onAction: () => setStatusFilter("pending"),
       },
       {
@@ -1058,9 +1179,7 @@ export default function FinancesPage() {
             ? "Receita operacional ainda não virou cobrança."
             : "Nenhuma O.S. concluída sem cobrança encontrada nos dados carregados.",
         actionLabel:
-          completedOrdersWithoutCharge.length > 0
-            ? "Ver O.S."
-            : "Ver cobranças",
+          completedOrdersWithoutCharge.length > 0 ? "Resolver" : "Conferir",
         onAction: () => {
           if (completedOrdersWithoutCharge.length > 0)
             navigate("/service-orders");
@@ -1078,7 +1197,7 @@ export default function FinancesPage() {
           paidWithoutRegisteredPayment.length > 0
             ? "Cobrança paga sem lista de pagamentos vinculada no detalhe."
             : "Nenhum histórico consolidado de pagamentos disponível nesta leitura. Confira a cobrança selecionada.",
-        actionLabel: "Conferir detalhe",
+        actionLabel: "Conferir",
         onAction: () =>
           selectedChargeId
             ? undefined
@@ -1090,7 +1209,7 @@ export default function FinancesPage() {
         value: "Acompanhar",
         consequence:
           "Sem falha de comunicação comprovada nesta leitura; continue a cobrança pelo WhatsApp contextual.",
-        actionLabel: "Usar WhatsApp contextual",
+        actionLabel: "Usar WhatsApp",
         onAction: () =>
           selectedCharge
             ? goToWhatsApp(selectedCharge)
@@ -1292,25 +1411,52 @@ export default function FinancesPage() {
 
       <AppSectionBlock
         title="Hero Executivo Financeiro"
-        subtitle="Contexto executivo: dinheiro recebido, pendente, em risco e a próxima ação para converter execução em receita."
+        subtitle="Contexto executivo: dinheiro recebido, pendente e em risco para converter execução em receita."
         compact
       >
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-          <AppInfoCard><p className="text-xs uppercase text-[var(--text-muted)]">Dinheiro recebido</p><p className="mt-2 text-lg font-semibold text-[var(--text-primary)]">{formatCurrency(health.received)}</p></AppInfoCard>
-          <AppInfoCard><p className="text-xs uppercase text-[var(--text-muted)]">Dinheiro pendente</p><p className="mt-2 text-lg font-semibold text-[var(--text-primary)]">{formatCurrency(health.receivable)}</p></AppInfoCard>
-          <AppInfoCard><p className="text-xs uppercase text-[var(--text-muted)]">Dinheiro em risco</p><p className="mt-2 text-lg font-semibold text-[var(--text-primary)]">{formatCurrency(health.overdue)}</p></AppInfoCard>
-          <AppInfoCard><p className="text-xs uppercase text-[var(--text-muted)]">Maior cobrança em atraso</p><p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">{mostCriticalCharge?.status === "OVERDUE" ? formatCurrency(Number(mostCriticalCharge.amountCents ?? 0)) : "Sem atraso dominante"}</p></AppInfoCard>
-          <AppInfoCard><p className="text-xs uppercase text-[var(--text-muted)]">Cliente prioritário</p><p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">{safeFinancialEntityName(mostCriticalCharge?.customerName, "Sem prioridade crítica")}</p></AppInfoCard>
-          <AppInfoCard><p className="text-xs uppercase text-[var(--text-muted)]">Próxima ação financeira</p><p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">{financeNextBestAction.title}</p></AppInfoCard>
+        <div className="grid gap-3 md:grid-cols-3">
+          <AppInfoCard>
+            <p className="text-xs uppercase text-[var(--text-muted)]">
+              Dinheiro recebido
+            </p>
+            <p className="mt-2 text-lg font-semibold text-[var(--text-primary)]">
+              {formatCurrency(health.received)}
+            </p>
+          </AppInfoCard>
+          <AppInfoCard>
+            <p className="text-xs uppercase text-[var(--text-muted)]">
+              Dinheiro pendente
+            </p>
+            <p className="mt-2 text-lg font-semibold text-[var(--text-primary)]">
+              {formatCurrency(health.receivable)}
+            </p>
+          </AppInfoCard>
+          <AppInfoCard>
+            <p className="text-xs uppercase text-[var(--text-muted)]">
+              Dinheiro em risco
+            </p>
+            <p className="mt-2 text-lg font-semibold text-[var(--text-primary)]">
+              {formatCurrency(health.overdue)}
+            </p>
+          </AppInfoCard>
         </div>
       </AppSectionBlock>
 
       <AppSectionCard className="space-y-0 border-0 bg-transparent p-0">
-        <span className="sr-only">Próxima melhor ação financeira · FAÇA AGORA: comando financeiro dominante</span>
+        <span className="sr-only">
+          Próxima melhor ação financeira · FAÇA AGORA: comando financeiro
+          dominante
+        </span>
         <div className="mb-2 rounded-xl border border-[var(--accent-primary)] bg-[var(--accent-soft)] p-4">
-          <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--accent-primary)]">FAÇA AGORA</p>
-          <p className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">{financeNextBestAction.title}</p>
-          <p className="mt-1 text-sm text-[var(--text-secondary)]">{financeNextBestAction.reason}</p>
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--accent-primary)]">
+            FAÇA AGORA
+          </p>
+          <p className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">
+            {financeNextBestAction.title}
+          </p>
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">
+            {financeNextBestAction.reason}
+          </p>
         </div>
         <NextBestActionCard
           title={financeNextBestAction.title}
@@ -1364,52 +1510,104 @@ export default function FinancesPage() {
         subtitle="Cliente → Cobrança → Envio → Contato → Pagamento → Recebimento, usando somente dados já carregados e CTAs existentes."
         compact
       >
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-          {["Cliente", "Cobrança", "Envio", "Contato", "Pagamento", "Recebimento"].map((stage, index) => (
-            <AppInfoCard key={stage} className="relative overflow-hidden">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                {index + 1}. {stage}
-              </p>
-              <p className="mt-2 min-h-10 text-sm font-semibold text-[var(--text-primary)]">
-                {getPipelineStageState(stage, enrichedCharges)}
-              </p>
-              <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                {stage === "Envio" || stage === "Contato"
-                  ? "Continuar pelo WhatsApp contextual quando houver cobrança ativa."
-                  : stage === "Recebimento"
-                    ? "Confirmar pagamento somente pelo registro real existente."
-                    : "Etapa calculada a partir da carteira carregada."}
-              </p>
-            </AppInfoCard>
+        <div className="mb-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-2 text-sm text-[var(--text-secondary)]">
+          Gargalo principal:{" "}
+          <strong className="text-[var(--text-primary)]">
+            {pipelineBottleneck.stage}
+          </strong>{" "}
+          — {pipelineBottleneck.consequence}
+        </div>
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-stretch">
+          {pipelineStages.map((item, index) => (
+            <div key={item.stage} className="flex flex-1 items-stretch gap-3">
+              <AppInfoCard
+                className={cn(
+                  "min-h-full flex-1 border-l-4",
+                  item.bottleneck
+                    ? "border-l-[var(--accent-primary)] bg-[var(--accent-soft)]"
+                    : "border-l-[var(--border-subtle)]"
+                )}
+              >
+                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                  {index + 1}. {item.stage}
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                  {item.represents}
+                </p>
+                <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
+                  {item.state}
+                </p>
+                <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
+                  {item.consequence}
+                </p>
+              </AppInfoCard>
+              {index < pipelineStages.length - 1 ? (
+                <div
+                  aria-hidden="true"
+                  className="hidden items-center text-xl text-[var(--accent-primary)] xl:flex"
+                >
+                  →
+                </div>
+              ) : null}
+            </div>
           ))}
         </div>
       </AppSectionBlock>
 
       <AppSectionBlock
-        title="Saúde/Radar de caixa"
-        subtitle="Consequência operacional do caixa, sem repetir os mesmos números executivos do Hero."
+        title="Pulso Financeiro"
+        subtitle="Leitura executiva curta da conversão cobrança para pagamento, receita travada e segurança operacional."
         compact
       >
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <AppInfoCard>
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Ritmo de recebimento</p>
-            <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">{cashHealth.collectionBottleneck}</p>
-            <p className="mt-1 text-sm text-[var(--text-secondary)]">Indica onde a conversão execução → receita está travando.</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+              Conversão cobrança → pagamento
+            </p>
+            <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
+              {cashHealth.collectionBottleneck}
+            </p>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">
+              Indica onde a conversão execução → receita está travando.
+            </p>
           </AppInfoCard>
           <AppInfoCard>
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Risco para caixa</p>
-            <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">{financeCommandState.level === "RESTRICTED" ? "Restrito" : financeCommandState.level === "WARNING" ? "Atenção" : "Normal"}</p>
-            <p className="mt-1 text-sm text-[var(--text-secondary)]">{financeCommandState.impact}</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+              Receita travada
+            </p>
+            <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
+              {financeCommandState.level === "RESTRICTED"
+                ? "Restrito"
+                : financeCommandState.level === "WARNING"
+                  ? "Atenção"
+                  : "Normal"}
+            </p>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">
+              {financeCommandState.impact}
+            </p>
           </AppInfoCard>
           <AppInfoCard>
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Impacto operacional</p>
-            <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">Timeline/Governança/WhatsApp/Cliente</p>
-            <p className="mt-1 text-sm text-[var(--text-secondary)]">Dinheiro em risco e cobranças vencidas priorizam cobrança, prova operacional e contato contextual.</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+              Maior gargalo
+            </p>
+            <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
+              {cashHealth.collectionBottleneck}
+            </p>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">
+              Dinheiro em risco e cobranças vencidas priorizam cobrança, prova
+              operacional e contato contextual.
+            </p>
           </AppInfoCard>
           <AppInfoCard>
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Segurança</p>
-            <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">Sem automação falsa</p>
-            <p className="mt-1 text-sm text-[var(--text-secondary)]">A tela orienta decisões e usa apenas ações reais já disponíveis.</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+              Segurança operacional
+            </p>
+            <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">
+              Sem automação falsa
+            </p>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">
+              A tela orienta decisões e usa apenas ações reais já disponíveis.
+            </p>
           </AppInfoCard>
         </div>
       </AppSectionBlock>
@@ -1437,7 +1635,7 @@ export default function FinancesPage() {
                 variant="outline"
                 onClick={item.onAction}
               >
-                {item.actionLabel === "Abrir pendências" ? "Resolver" : item.actionLabel}
+                {item.actionLabel}
               </Button>
             </AppInfoCard>
           ))}
@@ -1581,7 +1779,11 @@ export default function FinancesPage() {
                             ? `${row.overdueDays} dia(s) em atraso`
                             : `Vence em ${formatDate(row?.dueDate)}`}
                         </p>
-                        <p>{getFinancialBusinessLabel(getServiceOrderBusinessLabel(row))}</p>
+                        <p>
+                          {getFinancialBusinessLabel(
+                            getServiceOrderBusinessLabel(row)
+                          )}
+                        </p>
                       </div>
                       <div className="flex items-center gap-2">
                         <AppPriorityBadge priority={getChargePriority(row)} />
@@ -1595,10 +1797,15 @@ export default function FinancesPage() {
                       >
                         <Button
                           size="sm"
-                          variant={primaryAction.kind === "collect" ? "default" : "outline"}
+                          variant={
+                            primaryAction.kind === "collect"
+                              ? "default"
+                              : "outline"
+                          }
                           onClick={() => {
                             setSelectedChargeId(String(row?.id ?? ""));
-                            if (primaryAction.kind === "collect") goToWhatsApp(row);
+                            if (primaryAction.kind === "collect")
+                              goToWhatsApp(row);
                           }}
                           disabled={row.status === "CANCELED"}
                         >
@@ -1606,14 +1813,53 @@ export default function FinancesPage() {
                         </Button>
                         <AppRowActionsDropdown
                           items={[
-                            { label: "Ver detalhe", onSelect: () => setSelectedChargeId(String(row?.id ?? "")) },
-                            { label: "Marcar como pago", onSelect: () => void openMarkAsPaid(row), disabled: row.status === "PAID" || row.status === "CANCELED", tone: "primary" },
-                            { label: normalizeStatus(row?.status) === "PAID" ? "WhatsApp pós-pagamento" : "Cobrar via WhatsApp", onSelect: () => goToWhatsApp(row), disabled: !row.customerId, tone: "primary" },
-                            { label: "Editar cobrança", onSelect: () => openEditCharge(row), disabled: row.status === "PAID" || row.status === "CANCELED" },
-                            { label: "Cancelar cobrança", onSelect: () => void handleCancelCharge(row), disabled: row.status === "PAID" || row.status === "CANCELED" },
+                            {
+                              label: "Ver detalhe",
+                              onSelect: () =>
+                                setSelectedChargeId(String(row?.id ?? "")),
+                            },
+                            {
+                              label: "Marcar como pago",
+                              onSelect: () => void openMarkAsPaid(row),
+                              disabled:
+                                row.status === "PAID" ||
+                                row.status === "CANCELED",
+                              tone: "primary",
+                            },
+                            {
+                              label:
+                                normalizeStatus(row?.status) === "PAID"
+                                  ? "WhatsApp pós-pagamento"
+                                  : "Cobrar via WhatsApp",
+                              onSelect: () => goToWhatsApp(row),
+                              disabled: !row.customerId,
+                              tone: "primary",
+                            },
+                            {
+                              label: "Editar cobrança",
+                              onSelect: () => openEditCharge(row),
+                              disabled:
+                                row.status === "PAID" ||
+                                row.status === "CANCELED",
+                            },
+                            {
+                              label: "Cancelar cobrança",
+                              onSelect: () => void handleCancelCharge(row),
+                              disabled:
+                                row.status === "PAID" ||
+                                row.status === "CANCELED",
+                            },
                             { type: "separator", label: "Navegação" },
-                            { label: "Abrir cliente", onSelect: () => goToCustomer(row), disabled: !row.customerId },
-                            { label: "Abrir O.S.", onSelect: () => goToServiceOrder(row), disabled: !row.serviceOrderId },
+                            {
+                              label: "Abrir cliente",
+                              onSelect: () => goToCustomer(row),
+                              disabled: !row.customerId,
+                            },
+                            {
+                              label: "Abrir O.S.",
+                              onSelect: () => goToServiceOrder(row),
+                              disabled: !row.serviceOrderId,
+                            },
                           ]}
                         />
                       </div>
@@ -1640,68 +1886,27 @@ export default function FinancesPage() {
         {selectedCharge ? (
           <div className="space-y-3">
             <AppInfoCard className="border-[var(--accent-primary)] bg-[var(--accent-soft)]">
-              <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--accent-primary)]">Decisão operacional</p>
-              <p className="mt-2 text-xl font-semibold text-[var(--text-primary)]">{getChargePrimaryAction(selectedFinancialRecord).label}</p>
+              <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--accent-primary)]">
+                Decisão operacional
+              </p>
+              <p className="mt-2 text-xl font-semibold text-[var(--text-primary)]">
+                {getChargePrimaryAction(selectedFinancialRecord).label}
+              </p>
               <div className="mt-3 grid gap-3 md:grid-cols-3">
-                <p className="text-sm text-[var(--text-secondary)]"><strong>Motivo:</strong> {getChargePrimaryAction(selectedFinancialRecord).reason}</p>
-                <p className="text-sm text-[var(--text-secondary)]"><strong>Impacto:</strong> {getChargeRisk(selectedFinancialRecord)}</p>
-                <p className="text-sm text-[var(--text-secondary)]"><strong>Segurança:</strong> decisão orientativa; pagamento e mensagem exigem CTA real.</p>
-              </div>
-            </AppInfoCard>
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <AppInfoCard>
-                <p className="text-xs text-[var(--text-muted)]">
-                  Cliente vinculado
+                <p className="text-sm text-[var(--text-secondary)]">
+                  <strong>Motivo:</strong>{" "}
+                  {getChargePrimaryAction(selectedFinancialRecord).reason}
                 </p>
-                <p className="text-sm font-semibold text-[var(--text-primary)]">
-                  {selectedFinancialRecord.customerName}
-                </p>
-                <p className="mt-1 text-xs text-[var(--text-muted)]">
-                  {getContactAvailability(selectedFinancialRecord)}
-                </p>
-              </AppInfoCard>
-              <AppInfoCard>
-                <p className="text-xs text-[var(--text-muted)]">
-                  Valor da cobrança
-                </p>
-                <p className="text-sm font-semibold text-[var(--text-primary)]">
-                  {formatCurrency(
-                    Number(selectedFinancialRecord?.amountCents ?? 0)
-                  )}
-                </p>
-                <p className="mt-1 text-xs text-[var(--text-muted)]">
-                  Método recebido:{" "}
-                  {latestPaymentMethod(selectedFinancialRecord)}
-                </p>
-              </AppInfoCard>
-              <AppInfoCard>
-                <p className="text-xs text-[var(--text-muted)]">
-                  Status / vencimento
-                </p>
-                <p className="text-sm font-semibold text-[var(--text-primary)]">
-                  {chargeStatusLabel(selectedFinancialRecord.status)} ·{" "}
-                  {formatDate(selectedFinancialRecord?.dueDate)}
-                </p>
-                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                <p className="text-sm text-[var(--text-secondary)]">
+                  <strong>Impacto:</strong>{" "}
                   {getChargeRisk(selectedFinancialRecord)}
                 </p>
-              </AppInfoCard>
-              <AppInfoCard>
-                <p className="text-xs text-[var(--text-muted)]">
-                  Origem operacional
+                <p className="text-sm text-[var(--text-secondary)]">
+                  <strong>Segurança:</strong> decisão orientativa; pagamento e
+                  mensagem exigem CTA real.
                 </p>
-                <p className="text-sm font-semibold text-[var(--text-primary)]">
-                  {safeText(
-                    selectedFinancialRecord.serviceOrderLabel,
-                    "Sem O.S. vinculada"
-                  )}
-                </p>
-                <p className="mt-1 text-xs text-[var(--text-muted)]">
-                  {getServiceOrderBusinessLabel(selectedFinancialRecord)}
-                </p>
-              </AppInfoCard>
-            </div>
-
+              </div>
+            </AppInfoCard>
             <AppActionBar className="gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2 py-2">
               <Button
                 onClick={() => goToWhatsApp(selectedFinancialRecord)}
@@ -1806,6 +2011,60 @@ export default function FinancesPage() {
                 >
                   Ir para WhatsApp com contexto
                 </Button>
+              </AppInfoCard>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <AppInfoCard>
+                <p className="text-xs text-[var(--text-muted)]">
+                  Cliente vinculado
+                </p>
+                <p className="text-sm font-semibold text-[var(--text-primary)]">
+                  {selectedFinancialRecord.customerName}
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  {getContactAvailability(selectedFinancialRecord)}
+                </p>
+              </AppInfoCard>
+              <AppInfoCard>
+                <p className="text-xs text-[var(--text-muted)]">
+                  Valor da cobrança
+                </p>
+                <p className="text-sm font-semibold text-[var(--text-primary)]">
+                  {formatCurrency(
+                    Number(selectedFinancialRecord?.amountCents ?? 0)
+                  )}
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  Método recebido:{" "}
+                  {latestPaymentMethod(selectedFinancialRecord)}
+                </p>
+              </AppInfoCard>
+              <AppInfoCard>
+                <p className="text-xs text-[var(--text-muted)]">
+                  Status / vencimento
+                </p>
+                <p className="text-sm font-semibold text-[var(--text-primary)]">
+                  {chargeStatusLabel(selectedFinancialRecord.status)} ·{" "}
+                  {formatDate(selectedFinancialRecord?.dueDate)}
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  {getChargeRisk(selectedFinancialRecord)}
+                </p>
+              </AppInfoCard>
+              <AppInfoCard>
+                <p className="text-xs text-[var(--text-muted)]">
+                  Origem operacional
+                </p>
+                <p className="text-sm font-semibold text-[var(--text-primary)]">
+                  {safeText(
+                    selectedFinancialRecord.serviceOrderLabel,
+                    "Sem O.S. vinculada"
+                  )}
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  {getServiceOrderBusinessLabel(selectedFinancialRecord)}
+                </p>
               </AppInfoCard>
             </div>
           </div>
