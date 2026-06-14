@@ -6,20 +6,22 @@ A página **Agendamentos** é a entrada operacional do tempo no Nexo Operating S
 
 Quando há um agendamento em foco, a ordem da experiência deve privilegiar execução e manter o **Hero Executivo** como primeiro elemento operacional imediatamente abaixo do cabeçalho da página:
 
-1. **Hero Executivo do Agendamento** domina a leitura com cliente em destaque, status forte, data/hora/duração, responsável, serviço/contexto e sinal principal. A busca, chips e filtros assumem papel secundário e não devem competir com o agendamento selecionado.
-2. **Decisão e próxima ação** como bloco único, reunindo estado operacional, maior risco, motivo, impacto, próxima ação recomendada e nota de segurança.
-3. **Pipeline principal** limitado a Cliente, Agendamento, O.S., Cobrança e Pagamento.
-4. **Resumo operacional** em formato de mini-dashboard com Hoje, Confirmados, Não confirmados, Atrasados e Concluídos.
-5. **Timeline/prova operacional** humanizada antes da carteira: a Timeline é evidência operacional, sustenta auditoria e nunca deve aparecer depois da navegação de carteira.
-6. **Radar operacional** substitui Atenção Imediata pesada: incidentes compactos de confirmação, atraso, no-show, conflito calculável e fallback honesto quando a fonte não entrega resposta do cliente.
-7. **Lista/carteira operacional** é navegação secundária de apoio depois do detalhe, da prova e do radar, com filtros rápidos e estado vazio claro para filtro sem resultado.
+1. **Hero Executivo do Agendamento** domina a primeira dobra com cliente em hierarquia máxima, status/sinal principal fortes, data/hora/duração evidentes e contexto/responsável como apoio. A busca, chips e filtros assumem papel secundário e não devem competir com o agendamento selecionado.
+2. **Decisão e próxima ação** é o cérebro operacional: bloco único, visualmente mais forte que cards comuns, reunindo estado operacional, maior risco, motivo, impacto, ação recomendada, CTA principal/secundário e nota de segurança.
+3. **Preparação da execução** aparece entre decisão e pipeline como checklist compacto de prontidão usando somente dados já carregados: cliente, confirmação, responsável, O.S., cobrança, evidência/Timeline e WhatsApp.
+4. **Pipeline principal limpo** permanece limitado a Cliente, Agendamento, O.S., Cobrança e Pagamento, com quebra responsiva e linguagem humana.
+5. **Resumo operacional** é apoio compacto, não dashboard secundário, mantendo Hoje, Confirmados, Não confirmados, Atrasados e Concluídos em métricas baixas e acionáveis.
+6. **Timeline/prova operacional** humanizada antes do radar e da carteira: a Timeline é evidência operacional, sustenta auditoria e nunca deve aparecer depois da navegação de carteira.
+7. **Radar operacional** é alerta auxiliar discreto: incidentes compactos de confirmação, atraso, no-show, conflito calculável e fallback honesto quando a fonte não entrega resposta do cliente.
+8. **Carteira operacional** é navegação secundária depois do detalhe, da prova e do radar, em linhas/cards horizontais selecionáveis com aparência de command center, sem cabeçalho administrativo pesado.
 
 ## Responsabilidade dos CTAs
 
 Os botões devem apontar para fluxos reais já existentes, sem duplicar a mesma responsabilidade em vários blocos:
 
-- **Hero:** abrir o agendamento em foco.
-- **Decisão:** remarcar/editar quando houver seleção ou executar a próxima ação contextual quando não houver seleção.
+- **Hero:** abrir agendamento, remarcar/editar, abrir/criar O.S., WhatsApp e abrir cliente — apenas CTAs reais e principais.
+- **Decisão:** executar a ação recomendada e, quando existir, oferecer uma ação secundária complementar sem repetir a fileira completa do Hero.
+- **Preparação da execução:** CTAs pequenos somente quando houver fluxo real já existente, como abrir cliente, confirmar, editar responsável, abrir/criar O.S., financeiro, Timeline ou WhatsApp.
 - **Pipeline:** abrir cliente, abrir/criar O.S. e abrir financeiro conforme a etapa operacional.
 - **Radar operacional:** resolver incidente do item crítico.
 - **Carteira:** selecionar item, confirmar/cancelar, iniciar atendimento, editar/remarcar, abrir cliente, WhatsApp contextual e O.S. quando aplicável.
@@ -67,3 +69,14 @@ Os botões devem apontar para fluxos reais já existentes, sem duplicar a mesma 
 - Evitar cards gigantes vazios e reduzir altura morta.
 - Dropdowns como **Mais filtros** devem ter camada acima de carteira, tabelas, cards e timeline, sem clipping por overflow ou stacking context inferior.
 - Lista operacional deve apoiar a decisão quando há seleção, não competir com o detalhe executivo.
+
+## Polimento premium final
+
+- O Hero deve transmitir “estou dentro deste agendamento”, não apenas “detalhe aberto”.
+- A Decisão é o cérebro operacional e não deve voltar a ser separada em cards antigos.
+- Preparação da execução é checklist, não automação: nenhum item pode prometer envio, cobrança ou confirmação automática.
+- O Pipeline deve continuar sem Timeline, Risco ou Governança como etapas principais.
+- A Timeline é a prova operacional; quando não houver retorno oficial, o fallback precisa declarar que usa apenas datas reais do agendamento.
+- O Radar não compete com a Timeline nem com a Decisão; sua função é alerta auxiliar de leitura rápida.
+- A Carteira é troca de foco e navegação secundária, não tabela/backoffice.
+- Permanecem preservados backend, API, Prisma, rotas, contratos, payloads, segurança multi-tenant, WhatsAppPage, automações, mocks e seeds.
