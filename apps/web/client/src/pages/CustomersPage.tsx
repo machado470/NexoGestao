@@ -27,8 +27,8 @@ import {
   NexoEvidenceTimeline,
   NexoPriorityPanel,
   NexoOperationalPipeline,
-  NexoIncidentList,
   NexoGovernanceDecisionCard,
+  NexoExecutiveMetric,
   type OperationalFlowStageState,
   type OperationalStateLevel,
 } from "@/components/app";
@@ -46,10 +46,7 @@ import {
 } from "@/components/app-system";
 import {
   AppFiltersBar,
-  AppActionBar,
   AppContextWorkspace,
-  AppOperationalKpiGrid,
-  AppOperationalStatusSummary,
   AppOperationalHeader,
   AppPageEmptyState,
   AppPageErrorState,
@@ -100,15 +97,39 @@ function humanizeCustomerTimelineEvent(event: Record<string, any>) {
   const known: Record<string, { type: string; summary: string }> = {
     CUSTOMER_APPOINTMENT_CREATED: {
       type: "Agendamento criado",
-      summary: "Agenda vinculada ao cliente.",
+      summary: "Novo compromisso registrado para o cliente.",
+    },
+    APPOINTMENT_CREATED: {
+      type: "Agendamento criado",
+      summary: "Novo compromisso registrado para o cliente.",
+    },
+    APPOINTMENT_CONFIRMED: {
+      type: "Agendamento confirmado",
+      summary: "Cliente confirmado na agenda.",
     },
     CUSTOMER_SERVICE_ORDER_CREATED: {
       type: "O.S. criada",
-      summary: "Execução aberta para o cliente.",
+      summary: "Ordem de serviço aberta para o cliente.",
+    },
+    SERVICE_ORDER_CREATED: {
+      type: "O.S. criada",
+      summary: "Ordem de serviço aberta para o cliente.",
+    },
+    SERVICE_ORDER_COMPLETED: {
+      type: "O.S. concluída",
+      summary: "Serviço finalizado para o cliente.",
     },
     CUSTOMER_WHATSAPP_MESSAGE_SENT: {
-      type: "Contato enviado",
-      summary: "Mensagem registrada no relacionamento do cliente.",
+      type: "Mensagem enviada",
+      summary: "Contato operacional registrado com o cliente.",
+    },
+    WHATSAPP_MESSAGE_SENT: {
+      type: "Mensagem enviada",
+      summary: "Contato operacional registrado com o cliente.",
+    },
+    MESSAGE_SENT: {
+      type: "Mensagem enviada",
+      summary: "Contato operacional registrado com o cliente.",
     },
     CUSTOMER_CHARGE_CONTEXT_UPDATED: {
       type: "Cobrança revisada",
@@ -116,11 +137,11 @@ function humanizeCustomerTimelineEvent(event: Record<string, any>) {
     },
     PAYMENT_RECEIVED: {
       type: "Pagamento recebido",
-      summary: "Pagamento registrado para o cliente.",
+      summary: "Pagamento registrado no histórico do cliente.",
     },
     CHARGE_CREATED: {
       type: "Cobrança criada",
-      summary: "Nova cobrança vinculada ao cliente.",
+      summary: "Cobrança registrada para o cliente.",
     },
   };
   const explicit = sanitizeCustomerTimelineText(
@@ -128,7 +149,7 @@ function humanizeCustomerTimelineEvent(event: Record<string, any>) {
     known[normalizedType]?.summary ?? "Evento operacional registrado"
   );
   return {
-    type: known[normalizedType]?.type ?? "Evento operacional",
+    type: known[normalizedType]?.type ?? "Evento operacional registrado",
     summary: explicit,
   };
 }
@@ -1134,7 +1155,7 @@ export default function CustomersPage() {
       label: "Cliente",
       state: selectedCustomer ? "done" : "idle",
       summary: selectedCustomer
-        ? (selectedProfile?.contact ?? "Cadastro carregado.")
+        ? `${selectedCustomerName} · ${selectedProfile?.status ?? "sem sinal retornado"}`
         : "Selecione um cliente.",
       countOrValue: selectedCustomer ? "1" : "0",
       hrefLabel: "Editar cadastro",
@@ -1440,8 +1461,8 @@ export default function CustomersPage() {
   return (
     <AppPageShell className="gap-3">
       <AppOperationalHeader
-        title="Clientes"
-        description="Centro de contexto operacional, financeiro e comunicação de cada relacionamento ativo."
+        title="Centro Operacional do Cliente"
+        description="Memória viva do relacionamento: decisão, fluxo, execução e auditoria em uma leitura compacta."
         density="compact"
         primaryAction={
           <Button onClick={() => setCreateOpen(true)}>Novo cliente</Button>
@@ -1975,8 +1996,8 @@ export default function CustomersPage() {
         </AppSectionBlock>
 
         <AppContextWorkspace
-          title="Detalhe do cliente"
-          subtitle="Resumo, ações principais, financeiro, O.S., agenda, comunicação e histórico disponível."
+          title="Centro Operacional do Cliente"
+          subtitle="Decisão, fluxo, execução e auditoria do cliente selecionado."
           className="2xl:col-span-3"
         >
           {!activeCustomerId || !selectedCustomer || !selectedProfile ? (
@@ -1995,66 +2016,190 @@ export default function CustomersPage() {
           ) : (
             <div className="space-y-3">
               <article className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/35 p-3">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-[var(--text-primary)]">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="nexo-overline">Hero Executivo do Cliente</p>
+                    <h2 className="mt-1 text-lg font-semibold leading-tight text-[var(--text-primary)]">
                       {String(selectedCustomer.name ?? "Cliente")}
+                    </h2>
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[var(--text-secondary)]">
+                      <AppStatusBadge
+                        label={selectedProfile.status}
+                        tone={
+                          selectedProfile.status === "Em risco"
+                            ? "warning"
+                            : "neutral"
+                        }
+                      />
+                      <span>Status: {customerOperationalState.level}</span>
+                      <span className="hidden sm:inline">•</span>
+                      <span className="truncate">
+                        {selectedProfile.contact}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-[var(--warning)]/25 bg-[var(--warning)]/10 px-3 py-2 text-xs">
+                    <p className="font-semibold text-[var(--text-primary)]">
+                      Próxima ação
                     </p>
-                    <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                      {selectedProfile.contact}
+                    <p className="text-[var(--text-secondary)]">
+                      {customerNextBestAction.title}
                     </p>
                   </div>
-                  <AppStatusBadge label={selectedProfile.status} />
                 </div>
-                <p className="mt-3 text-xs leading-5 text-[var(--text-secondary)]">
-                  {selectedProfile.riskSignal}. Próxima ação sugerida:{" "}
-                  {selectedDominantAction?.label ??
-                    selectedProfile.nextActionLabel}
-                  .
-                </p>
-                <p className="mt-2 text-xs text-[var(--text-secondary)]">
-                  Saúde operacional:{" "}
-                  <span className="font-medium">
-                    {customerOperationalHealth.label}
-                  </span>{" "}
-                  · {customerOperationalHealth.summary}
-                </p>
-                <p className="mt-1 text-xs text-[var(--text-muted)]">
-                  Foco: {customerOperationalHealth.recommendedFocus}
-                </p>
-                <p className="mt-2 text-xs text-[var(--text-muted)]">
-                  Observações:{" "}
-                  {String(
-                    selectedCustomer.notes ?? "Sem observações registradas"
-                  )}
-                </p>
+                <div className="mt-3 grid gap-2 text-xs text-[var(--text-secondary)] sm:grid-cols-3">
+                  <p>
+                    <strong className="text-[var(--text-primary)]">
+                      Sinal principal:
+                    </strong>{" "}
+                    {selectedProfile.riskSignal}
+                  </p>
+                  <p>
+                    <strong className="text-[var(--text-primary)]">
+                      Última interação:
+                    </strong>{" "}
+                    {selectedProfile.lastInteractionAt
+                      ? formatDateTime(selectedProfile.lastInteractionAt)
+                      : "sem interação registrada"}
+                  </p>
+                  <p>
+                    <strong className="text-[var(--text-primary)]">
+                      Comunicação:
+                    </strong>{" "}
+                    {String(selectedCustomer.phone ?? "sem telefone retornado")}
+                  </p>
+                </div>
+                <div className="mt-3 grid gap-2 sm:grid-cols-4">
+                  <NexoExecutiveMetric
+                    title="Saldo em aberto"
+                    value={formatCurrency(
+                      workspacePendingCents || selectedProfile.pendingCents
+                    )}
+                    context="Cobranças pendentes/vencidas."
+                    ctaLabel="Cobrar"
+                    onClick={() =>
+                      navigate(`/finances?customerId=${activeCustomerId}`)
+                    }
+                  />
+                  <NexoExecutiveMetric
+                    title="O.S. abertas"
+                    value={String(workspaceOpenServiceOrders.length)}
+                    context={
+                      workspaceOpenServiceOrders.length > 0
+                        ? "Execução em andamento."
+                        : "Sem O.S. aberta retornada."
+                    }
+                    ctaLabel="Abrir O.S."
+                    onClick={() =>
+                      navigate(`/service-orders?customerId=${activeCustomerId}`)
+                    }
+                  />
+                  <NexoExecutiveMetric
+                    title="Próximo agendamento"
+                    value={
+                      workspaceNextAppointment
+                        ? formatDateTime(
+                            workspaceNextAppointment.startsAt ??
+                              workspaceNextAppointment.scheduledAt
+                          )
+                        : "Sem agenda futura"
+                    }
+                    context="Marco operacional do relacionamento."
+                    ctaLabel="Agendar"
+                    onClick={() => setCreateAppointmentOpen(true)}
+                  />
+                  <NexoExecutiveMetric
+                    title="Comunicação"
+                    value={
+                      selectedProfile.lastInteractionAt
+                        ? `${selectedProfile.daysWithoutContact} dias`
+                        : "Sem registro"
+                    }
+                    context="Última interação carregada."
+                    ctaLabel="Abrir WhatsApp"
+                    onClick={() =>
+                      openCustomerWhatsApp(
+                        selectedCustomer,
+                        String(
+                          workspaceCharges.find(isChargePending)?.id ?? ""
+                        ) || null
+                      )
+                    }
+                  />
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() =>
+                      openCustomerWhatsApp(
+                        selectedCustomer,
+                        String(
+                          workspaceCharges.find(isChargePending)?.id ?? ""
+                        ) || null
+                      )
+                    }
+                  >
+                    <MessageCircle className="mr-1.5 h-3.5 w-3.5" />
+                    Abrir WhatsApp
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setCreateAppointmentOpen(true)}
+                  >
+                    <CalendarClock className="mr-1.5 h-3.5 w-3.5" />
+                    Agendar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      navigate(`/finances?customerId=${activeCustomerId}`)
+                    }
+                  >
+                    <CreditCard className="mr-1.5 h-3.5 w-3.5" />
+                    Cobrar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      timelineAnchorRef.current?.scrollIntoView({
+                        behavior: "smooth",
+                        block: "start",
+                      })
+                    }
+                  >
+                    Ver timeline
+                  </Button>
+                </div>
               </article>
 
-              <div className="grid gap-3 xl:grid-cols-2">
-                <NexoGovernanceDecisionCard
-                  title="Estado operacional do cliente"
-                  level={customerOperationalState.level}
-                  reason={customerOperationalState.reason}
-                  impact={customerOperationalState.impact}
-                  detailsLabel={customerOperationalState.detailsLabel}
-                  onDetails={customerOperationalState.onDetails}
-                />
-                <NexoIncidentList
-                  title={
-                    customerOperationalState.level === "NORMAL"
-                      ? "Sem risco dominante"
-                      : selectedProfile.riskSignal
-                  }
-                  reason={customerOperationalState.reason}
-                  impact={customerOperationalState.impact}
-                  ctaLabel="Abrir Governança"
-                  onClick={() =>
-                    navigate(
-                      `/governance?customerId=${activeCustomerId}&source=customers`
-                    )
-                  }
-                />
-              </div>
+              <NexoGovernanceDecisionCard
+                title="Decisão do sistema"
+                level={customerOperationalState.level}
+                reason={customerOperationalState.reason}
+                impact={customerOperationalState.impact}
+                detailsLabel={customerOperationalState.detailsLabel}
+                onDetails={customerOperationalState.onDetails}
+                metrics={[
+                  {
+                    label: "Decisão",
+                    value:
+                      customerOperationalState.level === "NORMAL"
+                        ? "acompanhar"
+                        : "priorizar ação",
+                  },
+                  {
+                    label: "Próxima ação",
+                    value: customerNextBestAction.title,
+                    tone:
+                      customerOperationalState.level === "NORMAL"
+                        ? "neutral"
+                        : "warning",
+                  },
+                ]}
+              />
 
               <NexoPriorityPanel
                 title={customerNextBestAction.title}
@@ -2072,123 +2217,129 @@ export default function CustomersPage() {
 
               <NexoOperationalPipeline
                 title="Fluxo operacional do cliente"
-                subtitle="Cliente → Agendamento → O.S. → Cobrança → Pagamento → Timeline → Risco/Governança"
+                subtitle="Cliente → Agendamento → O.S. → Cobrança → Pagamento"
                 stages={customerOperationalFlowStages}
               />
 
-              <AppActionBar className="gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2 py-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setCreateServiceOrderOpen(true)}
-                >
-                  <Wrench className="mr-1.5 h-3.5 w-3.5" />
-                  Abrir O.S.
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setCreateAppointmentOpen(true)}
-                >
-                  <CalendarClock className="mr-1.5 h-3.5 w-3.5" />
-                  Agendar
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setShowInlineCharges(value => !value)}
-                >
-                  <CreditCard className="mr-1.5 h-3.5 w-3.5" />
-                  {showInlineCharges ? "Ocultar cobranças" : "Cobrar"}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={!String(selectedCustomer.phone ?? "").trim()}
-                  title={
-                    !String(selectedCustomer.phone ?? "").trim()
-                      ? "Cliente sem telefone/WhatsApp cadastrado."
-                      : undefined
-                  }
-                  onClick={() =>
-                    openCustomerWhatsApp(
-                      selectedCustomer,
-                      String(
-                        workspaceCharges.find(isChargePending)?.id ?? ""
-                      ) || null
-                    )
-                  }
-                >
-                  <MessageCircle className="mr-1.5 h-3.5 w-3.5" />
-                  WhatsApp rápido
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() =>
-                    navigate(`/finances?customerId=${activeCustomerId}`)
-                  }
-                >
-                  Ver financeiro
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() =>
-                    navigate(
-                      `/governance?customerId=${activeCustomerId}&source=customers`
-                    )
-                  }
-                >
-                  <ShieldAlert className="mr-1.5 h-3.5 w-3.5" />
-                  Ver risco
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={(workspace.timeline ?? []).length === 0}
-                  title={
-                    (workspace.timeline ?? []).length === 0
-                      ? "Sem eventos de timeline disponíveis para este cliente."
-                      : undefined
-                  }
-                  onClick={() =>
-                    timelineAnchorRef.current?.scrollIntoView({
-                      behavior: "smooth",
-                      block: "start",
-                    })
-                  }
-                >
-                  Ver timeline
-                </Button>
-              </AppActionBar>
               {isRefreshingWorkspace ? (
                 <p className="text-xs text-[var(--text-muted)]">
                   Atualizando dados do cliente...
                 </p>
               ) : null}
+
+              <article className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]/35 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                      Painel operacional do cliente
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--text-muted)]">
+                      Financeiro, execução, agenda, comunicação e governança em
+                      uma leitura única.
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowInlineCharges(value => !value)}
+                  >
+                    {showInlineCharges ? "Ocultar cobranças" : "Ver cobranças"}
+                  </Button>
+                </div>
+                <div className="mt-3 grid gap-3 text-xs md:grid-cols-2 xl:grid-cols-5">
+                  <div>
+                    <p className="font-semibold text-[var(--text-primary)]">
+                      Financeiro
+                    </p>
+                    <p>
+                      Saldo:{" "}
+                      {formatCurrency(
+                        workspacePendingCents || selectedProfile.pendingCents
+                      )}
+                    </p>
+                    <p>Cobranças vencidas: {workspaceOverdueCharges.length}</p>
+                    <p>
+                      Último pagamento:{" "}
+                      {workspaceLastPayment
+                        ? formatDateTime(
+                            workspaceLastPayment.paidAt ??
+                              workspaceLastPayment.updatedAt ??
+                              workspaceLastPayment.createdAt
+                          )
+                        : "não encontrado"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-[var(--text-primary)]">
+                      Execução
+                    </p>
+                    <p>O.S. abertas: {workspaceOpenServiceOrders.length}</p>
+                    <p>
+                      Última O.S.:{" "}
+                      {workspaceLastCompletedServiceOrder
+                        ? formatDateTime(
+                            workspaceLastCompletedServiceOrder.updatedAt ??
+                              workspaceLastCompletedServiceOrder.createdAt
+                          )
+                        : "sem conclusão retornada"}
+                    </p>
+                    <p>
+                      O.S. relacionadas:{" "}
+                      {workspaceServiceOrders.length || "nenhuma"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-[var(--text-primary)]">
+                      Agenda
+                    </p>
+                    <p>
+                      Próximo agendamento:{" "}
+                      {workspaceNextAppointment
+                        ? formatDateTime(
+                            workspaceNextAppointment.startsAt ??
+                              workspaceNextAppointment.scheduledAt
+                          )
+                        : "sem agenda futura"}
+                    </p>
+                    <p>
+                      Agendamentos relacionados:{" "}
+                      {workspaceAppointments.length || "nenhum"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-[var(--text-primary)]">
+                      Comunicação
+                    </p>
+                    <p>
+                      Última interação:{" "}
+                      {selectedProfile.lastInteractionAt
+                        ? `${selectedProfile.daysWithoutContact} dias`
+                        : "sem interação registrada"}
+                    </p>
+                    <p>
+                      Canal:{" "}
+                      {String(
+                        selectedCustomer.phone ?? "WhatsApp não retornado"
+                      )
+                        ? "WhatsApp"
+                        : "sem canal retornado"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-[var(--text-primary)]">
+                      Governança
+                    </p>
+                    <p>Estado: {selectedProfile.status}</p>
+                    <p>Motivo: {customerOperationalState.reason}</p>
+                  </div>
+                </div>
+              </article>
+
               {showInlineCharges ? (
                 <article className="rounded-xl border border-[var(--border-subtle)] p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-                      Cobranças pendentes/vencidas
-                    </p>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        if (activeCustomerId) {
-                          void propagateCustomerOperationalChange(
-                            activeCustomerId,
-                            "CUSTOMER_CHARGE_CONTEXT_UPDATED"
-                          );
-                        }
-                        navigate(`/finances?customerId=${activeCustomerId}`);
-                      }}
-                    >
-                      Abrir financeiro
-                    </Button>
-                  </div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                    Cobranças pendentes/vencidas
+                  </p>
                   <div className="mt-2 space-y-1.5">
                     {workspaceCharges
                       .filter(isChargePending)
@@ -2219,206 +2370,6 @@ export default function CustomersPage() {
                   </div>
                 </article>
               ) : null}
-              <article className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]/35 p-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-                      Comunicação operacional
-                    </p>
-                    <p className="mt-1 text-xs text-[var(--text-muted)]">
-                      Ação real centralizada no WhatsApp completo, sem composer inline duplicado.
-                    </p>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={!String(selectedCustomer.phone ?? "").trim()}
-                    title={
-                      !String(selectedCustomer.phone ?? "").trim()
-                        ? "Cliente sem telefone/WhatsApp cadastrado."
-                        : undefined
-                    }
-                    onClick={() =>
-                      openCustomerWhatsApp(
-                        selectedCustomer,
-                        String(
-                          workspaceCharges.find(isChargePending)?.id ?? ""
-                        ) || null
-                      )
-                    }
-                  >
-                    Abrir WhatsApp completo
-                  </Button>
-                </div>
-              </article>
-
-              <AppOperationalKpiGrid className="xl:grid-cols-2">
-                <AppStatCard
-                  label="Saldo em aberto"
-                  value={formatCurrency(
-                    workspacePendingCents || selectedProfile.pendingCents
-                  )}
-                  helper="Somatório real de cobranças pendentes/vencidas."
-                />
-                <AppStatCard
-                  label="Cobranças vencidas"
-                  value={workspaceOverdueCharges.length}
-                  helper={
-                    workspaceOverdueCharges.length > 0
-                      ? "Priorizar ação de cobrança."
-                      : "Sem cobrança vencida retornada."
-                  }
-                />
-                <AppStatCard
-                  label="Próximo agendamento"
-                  value={
-                    workspaceNextAppointment
-                      ? formatDateTime(
-                          workspaceNextAppointment.startsAt ??
-                            workspaceNextAppointment.scheduledAt
-                        )
-                      : "Sem agenda futura"
-                  }
-                  helper={
-                    workspaceNextAppointment
-                      ? String(
-                          workspaceNextAppointment.status ??
-                            "Status não informado"
-                        )
-                      : "Nenhum agendamento futuro disponível."
-                  }
-                />
-                <AppStatCard
-                  label="Comunicação"
-                  value={String(selectedCustomer.phone ?? "Sem telefone")}
-                  helper={
-                    selectedProfile.lastInteractionAt
-                      ? `Última interação em ${formatDateTime(selectedProfile.lastInteractionAt)}`
-                      : "Sem interação registrada."
-                  }
-                />
-              </AppOperationalKpiGrid>
-
-              <AppOperationalStatusSummary
-                items={[
-                  {
-                    label: "O.S. aberta mais relevante",
-                    value: workspaceOpenServiceOrder
-                      ? String(
-                          workspaceOpenServiceOrder.title ??
-                            workspaceOpenServiceOrder.id ??
-                            "O.S."
-                        )
-                      : "Sem O.S. aberta",
-                    helper: workspaceOpenServiceOrder
-                      ? `${String(workspaceOpenServiceOrder.status ?? "-")} · ${formatDateTime(workspaceOpenServiceOrder.updatedAt ?? workspaceOpenServiceOrder.createdAt)}`
-                      : "Nada em execução no momento.",
-                  },
-                  {
-                    label: "Última O.S. concluída",
-                    value: workspaceLastCompletedServiceOrder
-                      ? String(
-                          workspaceLastCompletedServiceOrder.title ??
-                            workspaceLastCompletedServiceOrder.id ??
-                            "O.S."
-                        )
-                      : "Sem O.S. concluída",
-                    helper: workspaceLastCompletedServiceOrder
-                      ? formatDateTime(
-                          workspaceLastCompletedServiceOrder.updatedAt ??
-                            workspaceLastCompletedServiceOrder.createdAt
-                        )
-                      : "Histórico sem conclusão retornada.",
-                  },
-                  {
-                    label: "Último pagamento",
-                    value: workspaceLastPayment
-                      ? formatCurrency(
-                          Number(
-                            workspaceLastPayment.amountCents ??
-                              workspaceLastPayment.amount ??
-                              0
-                          )
-                        )
-                      : "Não encontrado",
-                    helper: workspaceLastPayment
-                      ? formatDateTime(
-                          workspaceLastPayment.paidAt ??
-                            workspaceLastPayment.updatedAt ??
-                            workspaceLastPayment.createdAt
-                        )
-                      : "Sem pagamento nos dados disponíveis.",
-                  },
-                  {
-                    label: "Governança/Risco",
-                    value: selectedProfile.status,
-                    helper: "Detalhe completo disponível em Governança.",
-                  },
-                ]}
-              />
-
-              <article className="rounded-xl border border-[var(--border-subtle)] p-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-                  O.S. relacionadas
-                </p>
-                <div className="mt-2 space-y-1.5">
-                  {workspaceServiceOrders.slice(0, 3).map((order, index) => (
-                    <div
-                      key={`${String(order.id ?? "order")}-${index}`}
-                      className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/30 p-2"
-                    >
-                      <p className="text-xs font-medium text-[var(--text-primary)]">
-                        {String(order.title ?? order.description ?? "O.S.")}
-                      </p>
-                      <p className="text-[11px] text-[var(--text-muted)]">
-                        {String(order.status ?? "Status não informado")} ·{" "}
-                        {formatDateTime(order.updatedAt ?? order.createdAt)}
-                      </p>
-                    </div>
-                  ))}
-                  {workspaceServiceOrders.length === 0 ? (
-                    <p className="text-xs text-[var(--text-muted)]">
-                      Nenhuma O.S. relacionada retornada.
-                    </p>
-                  ) : null}
-                </div>
-              </article>
-
-              <article className="rounded-xl border border-[var(--border-subtle)] p-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-                  Agendamentos relacionados
-                </p>
-                <div className="mt-2 space-y-1.5">
-                  {workspaceAppointments
-                    .slice(0, 3)
-                    .map((appointment, index) => (
-                      <div
-                        key={`${String(appointment.id ?? "appointment")}-${index}`}
-                        className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/30 p-2"
-                      >
-                        <p className="text-xs font-medium text-[var(--text-primary)]">
-                          {String(
-                            appointment.title ??
-                              appointment.description ??
-                              "Agendamento"
-                          )}
-                        </p>
-                        <p className="text-[11px] text-[var(--text-muted)]">
-                          {formatDateTime(
-                            appointment.startsAt ?? appointment.createdAt
-                          )}{" "}
-                          ·{" "}
-                          {String(appointment.status ?? "Status não informado")}
-                        </p>
-                      </div>
-                    ))}
-                  {workspaceAppointments.length === 0 ? (
-                    <p className="text-xs text-[var(--text-muted)]">
-                      Nenhum agendamento relacionado retornado.
-                    </p>
-                  ) : null}
-                </div>
-              </article>
 
               <div ref={timelineAnchorRef}>
                 <NexoEvidenceTimeline
