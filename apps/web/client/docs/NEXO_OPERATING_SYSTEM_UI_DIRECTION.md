@@ -67,3 +67,13 @@ O front interno deve parecer um sistema operacional para empresas de serviço: a
 - O resumo foi unificado em **Painel operacional do cliente**, agrupando Financeiro, Execução, Agenda, Comunicação e Governança com fallbacks curtos e honestos.
 - A Timeline embutida em Clientes usa linguagem de negócio para eventos reconhecíveis e mantém fallback apenas quando o tipo não é reconhecido.
 - WhatsApp inline continua removido/condensado: Clientes aponta para a ação real no WhatsApp completo, sem textarea duplicado no detalhe.
+
+## Polimento final premium — Clientes
+
+- O Hero Executivo do Cliente deve funcionar como painel de comando compacto/agressivo: nome dominante, badge forte de status/sinal, próxima ação, última interação discreta, mini-métricas densas e CTAs reais sem promover telefone/e-mail a informação principal.
+- A Decisão do sistema deve parecer uma decisão operacional explícita: nível visual forte, motivo, impacto, decisão e CTA em uma composição curta, sem microcopy redundante e sem duplicar a NBA.
+- A Próxima Melhor Ação em Clientes deve ser compacta: título curto, motivo e impacto diretos, nota de segurança em linha discreta e botões reais sem automação implícita.
+- O Painel operacional do cliente deve usar mini-cards visuais com título, valor dominante e microcontexto para Financeiro, Execução, Agenda, Comunicação e Governança, mantendo ausência de dados explícita.
+- Em Clientes, o pipeline deve evitar duplicação visual: o fluxo principal Cliente → Agendamento → O.S. → Cobrança → Pagamento permanece, enquanto chips auxiliares de Timeline e Risco/Governança não devem ser exibidos quando essas leituras aparecem como seções próprias.
+- A Timeline embutida deve combinar eventos humanizados com ícones semânticos de mensagem, agenda, O.S., cobrança, pagamento ou evento neutro, sem vazar `eventType`, UUID ou metadata técnica.
+- A Carteira operacional deve se aproximar de um command center: prioridade visual, status/sinal, próxima ação, financeiro, CTA real e menu secundário, preservando filtros, paginação e ações existentes.
