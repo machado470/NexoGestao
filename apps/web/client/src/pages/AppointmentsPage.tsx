@@ -156,6 +156,33 @@ function sanitizeOperationalText(value: unknown, fallback: string) {
   );
 }
 
+function humanizeTimelineEvent(event: any) {
+  const raw = String(event?.action ?? event?.eventType ?? event?.type ?? "")
+    .trim()
+    .toUpperCase();
+  if (raw.includes("APPOINTMENT") && raw.includes("CONFIRM"))
+    return "Agendamento confirmado";
+  if (raw.includes("APPOINTMENT") && raw.includes("CANCEL"))
+    return "Agendamento cancelado";
+  if (
+    raw.includes("APPOINTMENT") &&
+    (raw.includes("UPDATE") || raw.includes("EDIT"))
+  )
+    return "Agendamento alterado";
+  if (raw.includes("APPOINTMENT") || raw.includes("SCHEDULE"))
+    return "Agendamento criado";
+  if (raw.includes("SERVICE_ORDER") || raw.includes("ORDER"))
+    return "O.S. criada";
+  if (raw.includes("MESSAGE") || raw.includes("WHATSAPP"))
+    return "Mensagem enviada";
+  if (raw.includes("CHARGE") || raw.includes("BILLING"))
+    return "Cobrança criada";
+  return sanitizeOperationalText(
+    event?.description ?? event?.summary ?? event?.action,
+    "Evento operacional registrado"
+  );
+}
+
 function mapStatus(status?: string | null) {
   const normalized = String(status ?? "SCHEDULED").toUpperCase();
   if (normalized === "SCHEDULED")
@@ -1355,7 +1382,7 @@ export default function AppointmentsPage() {
     if (timeline.length > 0) {
       return timeline.slice(0, 4).map((event: any) => ({
         id: String(event?.id ?? `${event?.createdAt}-${event?.action}`),
-        type: sanitizeOperationalText(event?.action, "Evento operacional"),
+        type: humanizeTimelineEvent(event),
         occurredAt: formatDateTime(
           String(event?.createdAt ?? event?.occurredAt ?? "")
         ),
@@ -1373,7 +1400,7 @@ export default function AppointmentsPage() {
       target.item.createdAt
         ? {
             id: `${target.item.id}-created`,
-            type: "Criado",
+            type: "Agendamento criado",
             occurredAt: formatDateTime(target.item.createdAt),
             entity: "Agendamento",
             actor: target.ownerName,
@@ -1383,7 +1410,7 @@ export default function AppointmentsPage() {
       target.status === "CONFIRMED" && target.item.updatedAt
         ? {
             id: `${target.item.id}-confirmed`,
-            type: "Confirmado",
+            type: "Agendamento confirmado",
             occurredAt: formatDateTime(target.item.updatedAt),
             entity: "Agendamento",
             actor: target.ownerName,
@@ -1394,7 +1421,7 @@ export default function AppointmentsPage() {
       target.status === "CANCELED" && target.item.updatedAt
         ? {
             id: `${target.item.id}-canceled`,
-            type: "Cancelado",
+            type: "Agendamento cancelado",
             occurredAt: formatDateTime(target.item.updatedAt),
             entity: "Agendamento",
             actor: target.ownerName,
@@ -1405,7 +1432,7 @@ export default function AppointmentsPage() {
       target.status === "DONE" && target.item.updatedAt
         ? {
             id: `${target.item.id}-done`,
-            type: "Concluído",
+            type: "Agendamento concluído",
             occurredAt: formatDateTime(target.item.updatedAt),
             entity: "Agendamento",
             actor: target.ownerName,
@@ -1416,7 +1443,7 @@ export default function AppointmentsPage() {
       target.order?.id
         ? {
             id: `${target.item.id}-order`,
-            type: "O.S. gerada",
+            type: "O.S. criada",
             occurredAt: formatDateTime(
               target.order.createdAt ?? target.order.updatedAt
             ),
@@ -1517,62 +1544,6 @@ export default function AppointmentsPage() {
           })}
         </AppFiltersBar>
 
-        <AppSectionBlock
-          title="Alertas compactos"
-          subtitle="Somente sinais disponíveis no carregamento atual."
-          compact
-        >
-          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-            {[
-              {
-                label: "Sem confirmação",
-                value: agendaHealth.scheduled,
-                text:
-                  agendaHealth.scheduled > 0
-                    ? "Confirmar antes da execução."
-                    : "Nenhum pendente de confirmação.",
-              },
-              {
-                label: "Atrasados",
-                value: agendaHealth.overdue,
-                text:
-                  agendaHealth.overdue > 0
-                    ? "Revisar/remarcar sem inferir execução."
-                    : "Sem atraso calculável por data.",
-              },
-              {
-                label: "Conflitos",
-                value: mapped.filter(row => row.hasConflict).length,
-                text: mapped.some(row => row.hasConflict)
-                  ? "Sobreposição detectada por cliente ou responsável."
-                  : "Nenhum conflito nos horários carregados.",
-              },
-              {
-                label: "Sem resposta",
-                value: "—",
-                text: "Fonte atual não entrega resposta do cliente nesta tela.",
-              },
-            ].map(alert => (
-              <article
-                key={alert.label}
-                className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-2"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-medium text-[var(--text-muted)]">
-                    {alert.label}
-                  </p>
-                  <span className="text-sm font-semibold text-[var(--text-primary)]">
-                    {alert.value}
-                  </span>
-                </div>
-                <p className="mt-1 text-xs text-[var(--text-muted)]">
-                  {alert.text}
-                </p>
-              </article>
-            ))}
-          </div>
-        </AppSectionBlock>
-
         {selected ? (
           <AppSectionCard className="overflow-hidden border-[var(--accent-primary)]/25 bg-gradient-to-br from-[var(--surface-base)] via-[var(--surface-subtle)] to-[var(--accent-soft)]/30 p-0">
             <div className="grid gap-0 lg:grid-cols-[1.35fr_0.65fr]">
@@ -1605,18 +1576,89 @@ export default function AppointmentsPage() {
                 </div>
               </div>
               <div className="flex flex-col justify-center gap-2 border-t border-[var(--border-subtle)] bg-[var(--surface-base)]/65 p-5 lg:border-l lg:border-t-0">
+                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                    Sinal principal
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+                    {appointmentRisk.title}
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
+                    Próxima ação: {canonicalNextBestAction.primaryActionLabel}
+                  </p>
+                </div>
                 <Button onClick={canonicalNextBestAction.onPrimaryAction}>
                   {canonicalNextBestAction.primaryActionLabel}
                 </Button>
-                {canonicalNextBestAction.onSecondaryAction ? (
+                <div className="grid grid-cols-2 gap-2">
                   <Button
                     variant="outline"
-                    onClick={canonicalNextBestAction.onSecondaryAction}
+                    onClick={() =>
+                      setSelectedAppointmentId(String(selected.item.id ?? ""))
+                    }
+                    disabled={!selected.item.id}
                   >
-                    {canonicalNextBestAction.secondaryActionLabel ??
-                      "Ação secundária"}
+                    Abrir agendamento
                   </Button>
-                ) : null}
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setEditing(selected.item);
+                      setOpenModal(true);
+                    }}
+                    disabled={!selected.item.id}
+                  >
+                    Remarcar/editar
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      if (selected.order?.id) {
+                        navigate(
+                          `/service-orders?customerId=${selected.customerId}&appointmentId=${selected.item.id}`
+                        );
+                        return;
+                      }
+                      setOpenServiceOrderModal(true);
+                    }}
+                    disabled={!selected.item.id}
+                  >
+                    {selected.order?.id ? "Abrir O.S." : "Criar O.S."}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      goToWhatsAppAppointment(
+                        String(selected.customerId ?? ""),
+                        String(selected.item.id ?? "")
+                      )
+                    }
+                    disabled={!selected.customerId || !selected.item.id}
+                  >
+                    WhatsApp
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      navigate(`/finances?customerId=${selected.customerId}`)
+                    }
+                    disabled={!selected.customerId}
+                  >
+                    Ver financeiro
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      navigate(
+                        selected.customerId
+                          ? `/timeline?customerId=${selected.customerId}`
+                          : "/timeline"
+                      )
+                    }
+                  >
+                    Ver timeline
+                  </Button>
+                </div>
                 <Button
                   variant="outline"
                   onClick={() =>
@@ -1674,6 +1716,9 @@ export default function AppointmentsPage() {
               <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
                 {appointmentCommandState.reason}
               </p>
+              <p className="mt-2 text-xs text-[var(--text-muted)]">
+                Motivo: {canonicalNextBestAction.reason}
+              </p>
             </div>
             <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
               <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
@@ -1682,6 +1727,9 @@ export default function AppointmentsPage() {
               <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
                 {appointmentRisk.reason}
               </p>
+              <p className="mt-2 text-xs text-[var(--text-muted)]">
+                Impacto: {appointmentRisk.impact}
+              </p>
             </div>
             <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
               <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
@@ -1689,6 +1737,9 @@ export default function AppointmentsPage() {
               </p>
               <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
                 {canonicalNextBestAction.impact}
+              </p>
+              <p className="mt-2 text-xs text-[var(--text-muted)]">
+                Nota de segurança: {canonicalNextBestAction.safetyNote}
               </p>
             </div>
           </div>
@@ -1785,7 +1836,7 @@ export default function AppointmentsPage() {
 
         <AppSectionBlock
           title="Atenção imediata"
-          subtitle="Não confirmados, atrasos, risco de no-show e preparação pendente."
+          subtitle="Não confirmados, atrasos, risco de no-show e preparação pendente. Fonte atual não entrega resposta do cliente nesta tela; sem resposta aparece apenas como fallback honesto."
           compact
         >
           {attentionItems.length > 0 ? (
@@ -1815,6 +1866,17 @@ export default function AppointmentsPage() {
                     <p className="mt-2 line-clamp-2 text-xs text-[var(--text-secondary)]">
                       Próxima ação: {nextActionLabel(row)}
                     </p>
+                    <Button
+                      className="mt-3 w-full"
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        setSelectedAppointmentId(String(row.item.id ?? ""))
+                      }
+                      disabled={!row.item.id}
+                    >
+                      Abrir agendamento
+                    </Button>
                   </article>
                 );
               })}
@@ -1902,8 +1964,12 @@ export default function AppointmentsPage() {
         ) : null}
 
         <AppSectionBlock
-          title="Lista operacional de agendamentos"
-          subtitle="Tempo, cliente/serviço, status, responsável e ação rápida."
+          title={
+            selected
+              ? "Outros agendamentos da operação"
+              : "Carteira operacional de agendamentos"
+          }
+          subtitle="Tempo, cliente/serviço, status, responsável e ação rápida como apoio à execução."
           className="flex flex-col"
           compact
         >
@@ -1929,10 +1995,25 @@ export default function AppointmentsPage() {
               description="Não há agendamentos cadastrados no backend para este ambiente."
             />
           ) : filtered.length === 0 ? (
-            <AppPageEmptyState
-              title="Busca sem resultado"
-              description="Nenhum agendamento encontrado para o filtro atual."
-            />
+            <AppSectionCard className="flex flex-col items-center justify-center gap-3 p-8 text-center">
+              <p className="text-sm font-semibold text-[var(--text-primary)]">
+                Nenhum agendamento para o filtro atual
+              </p>
+              <p className="max-w-xl text-sm leading-6 text-[var(--text-secondary)]">
+                Existem agendamentos carregados, mas nenhum corresponde ao
+                filtro atual. Limpe ou troque o filtro para voltar à carteira
+                operacional.
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSelectedFilter("all");
+                  setQueryText("");
+                }}
+              >
+                Limpar filtro
+              </Button>
+            </AppSectionCard>
           ) : (
             <>
               <div className="grid gap-2 md:hidden">
