@@ -28,15 +28,15 @@ describe("appointment assignee UI contract", () => {
     expect(appointments).toContain(
       "Controle do tempo, confirmação e preparação da execução"
     );
-    expect(appointments).toContain("Alertas compactos");
-    expect(appointments).toContain("Lista operacional de agendamentos");
-    expect(appointments).toContain("Detalhe do agendamento");
+    expect(appointments).toContain("Radar operacional");
+    expect(appointments).toContain("Carteira operacional de agendamentos");
+    expect(appointments).toContain("Hero executivo do agendamento");
     expect(appointments).toContain(
-      "Fonte atual não entrega resposta do cliente nesta tela."
+      "Fonte atual não entrega resposta do cliente nesta tela"
     );
     expect(appointments).toContain("Sem Timeline oficial carregada");
-    expect(appointments).toContain("NextBestActionCard");
-    expect(appointments).toContain("Abrir/criar O.S.");
+    expect(appointments).toContain("Decisão e próxima ação");
+    expect(appointments).toContain("Abrir O.S.");
     expect(appointments).toContain("Enviar WhatsApp");
     expect(appointments).not.toContain("Google Calendar");
     expect(appointments).not.toContain("automático");
