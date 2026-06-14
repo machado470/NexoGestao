@@ -58,3 +58,12 @@ O front interno deve parecer um sistema operacional para empresas de serviço: a
 
 - `ExecutiveDashboard`: centro diário de prioridades, dinheiro em risco, gargalo, NBA dominante, pipeline e prova compacta.
 - `CustomersPage`: centro operacional do cliente, barra operacional compacta, pipeline protagonista, resumo condensado e Timeline humanizada.
+
+## Nota de refinamento — Clientes como Centro Operacional do Cliente
+
+- `CustomersPage` agora abre o detalhe selecionado com um **Hero Executivo do Cliente** compacto, focado em status, sinal principal, última interação, próxima ação, mini-métricas e CTAs reais.
+- Estado operacional e maior risco foram consolidados em **Decisão do sistema**, com motivo, impacto, decisão derivada com segurança, próxima ação sugerida e CTA real.
+- O pipeline do cliente mantém o fluxo **Cliente → Agendamento → O.S. → Cobrança → Pagamento** sem exibir cadastro bruto, telefone ou e-mail nas etapas.
+- O resumo foi unificado em **Painel operacional do cliente**, agrupando Financeiro, Execução, Agenda, Comunicação e Governança com fallbacks curtos e honestos.
+- A Timeline embutida em Clientes usa linguagem de negócio para eventos reconhecíveis e mantém fallback apenas quando o tipo não é reconhecido.
+- WhatsApp inline continua removido/condensado: Clientes aponta para a ação real no WhatsApp completo, sem textarea duplicado no detalhe.
