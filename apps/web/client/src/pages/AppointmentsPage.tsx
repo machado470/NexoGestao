@@ -8,10 +8,8 @@ import { normalizeArrayPayload } from "@/lib/query-helpers";
 import { Button } from "@/components/design-system";
 import {
   EntityTimelineCard,
-  NextBestActionCard,
   OperationalFlowCard,
-  OperationalRiskCard,
-  OperationalStateCard,
+  NexoExecutiveMetric,
   type OperationalFlowStageState,
   type OperationalStateLevel,
 } from "@/components/app/OperationalCommandLayer";
@@ -23,6 +21,7 @@ import {
   AppInput,
   AppPageShell,
   AppPriorityBadge,
+  AppSectionCard,
   AppRowActionsDropdown,
   AppSelect,
   AppStatusBadge,
@@ -138,6 +137,23 @@ function hasPaymentEvidence(charge: any) {
 function safeEntityLabel(value: unknown, fallback: string) {
   const text = String(value ?? "").trim();
   return text || fallback;
+}
+
+function sanitizeOperationalText(value: unknown, fallback: string) {
+  const text = String(value ?? "").trim();
+  if (!text) return fallback;
+  return (
+    text
+      .replace(/\b[A-Z]+(?:_[A-Z0-9]+){1,}\b/g, fallback)
+      .replace(
+        /\b(?:id|uuid|hash|payload|entityId|appointmentId|customerId|serviceOrderId)\b:?/gi,
+        ""
+      )
+      .replace(/#[a-z0-9-]{8,}/gi, "referência operacional")
+      .replace(/\b[a-f0-9]{12,}\b/gi, "referência operacional")
+      .replace(/\s{2,}/g, " ")
+      .trim() || fallback
+  );
 }
 
 function mapStatus(status?: string | null) {
@@ -1213,7 +1229,6 @@ export default function AppointmentsPage() {
 
   const appointmentFlowStages = useMemo(() => {
     const target = commandTarget;
-    const hasTimeline = timeline.length > 0;
     const orderStatus = String(target?.order?.status ?? "").toUpperCase();
     const hasCharge =
       Boolean(target?.charge?.id) ||
@@ -1270,7 +1285,7 @@ export default function AppointmentsPage() {
         id: "service-order",
         label: "O.S.",
         summary: target?.order?.id
-          ? `O.S. #${target.order.id} vinculada (${safeEntityLabel(orderStatus, "sem status")}).`
+          ? `O.S. vinculada (${safeEntityLabel(orderStatus, "sem status")}).`
           : "Ainda sem O.S. vinculada neste carregamento.",
         state: target?.order?.id
           ? orderStatus === "DONE"
@@ -1279,7 +1294,7 @@ export default function AppointmentsPage() {
           : target?.status === "DONE"
             ? "blocked"
             : "idle",
-        countOrValue: target?.order?.id ? `#${target.order.id}` : "0",
+        countOrValue: target?.order?.id ? "Vinculada" : "0",
         hrefLabel: target?.order?.id ? "Abrir O.S." : "Criar O.S.",
         onClick: target?.item.id
           ? () => {
@@ -1309,9 +1324,7 @@ export default function AppointmentsPage() {
           : orderStatus === "DONE"
             ? "blocked"
             : "idle",
-        countOrValue: hasCharge
-          ? safeEntityLabel(target?.charge?.id, "1")
-          : "0",
+        countOrValue: hasCharge ? "Vinculada" : "0",
         hrefLabel: "Abrir financeiro",
         onClick: target?.customerId
           ? () => navigate(`/finances?customerId=${target.customerId}`)
@@ -1334,55 +1347,23 @@ export default function AppointmentsPage() {
             : "idle",
         countOrValue: paymentDone ? "OK" : "—",
       },
-      {
-        id: "timeline",
-        label: "Timeline",
-        summary: hasTimeline
-          ? `${timeline.length} evento(s) oficiais retornados.`
-          : "Sem evento oficial retornado para esta leitura.",
-        state: hasTimeline ? "done" : "idle",
-        countOrValue: String(timeline.length),
-        hrefLabel: "Abrir Timeline",
-        onClick: () =>
-          navigate(
-            target?.customerId
-              ? `/timeline?customerId=${target.customerId}`
-              : "/timeline"
-          ),
-      },
-      {
-        id: "governance",
-        label: "Risco/Gov.",
-        summary:
-          appointmentCommandState.level === "NORMAL"
-            ? "Sem gargalo crítico detectado."
-            : appointmentCommandState.reason,
-        state:
-          appointmentCommandState.level === "NORMAL"
-            ? "done"
-            : appointmentCommandState.level === "WARNING"
-              ? "warning"
-              : "blocked",
-        hrefLabel: "Abrir Governança",
-        onClick: () => navigate("/governance"),
-      },
     ];
     return stages;
-  }, [appointmentCommandState, commandTarget, navigate, timeline.length]);
+  }, [commandTarget, navigate]);
 
   const appointmentTimelineEvents = useMemo(() => {
     if (timeline.length > 0) {
       return timeline.slice(0, 4).map((event: any) => ({
         id: String(event?.id ?? `${event?.createdAt}-${event?.action}`),
-        type: safeEntityLabel(event?.action, "Evento"),
+        type: sanitizeOperationalText(event?.action, "Evento operacional"),
         occurredAt: formatDateTime(
           String(event?.createdAt ?? event?.occurredAt ?? "")
         ),
-        entity: safeEntityLabel(event?.entityType, "Agendamento"),
+        entity: sanitizeOperationalText(event?.entityType, "Agendamento"),
         actor: safeEntityLabel(event?.actorName ?? event?.actor, "Sistema"),
-        summary: safeEntityLabel(
+        summary: sanitizeOperationalText(
           event?.description ?? event?.summary,
-          "Sem descrição"
+          "Evento operacional registrado."
         ),
       }));
     }
@@ -1439,7 +1420,7 @@ export default function AppointmentsPage() {
             occurredAt: formatDateTime(
               target.order.createdAt ?? target.order.updatedAt
             ),
-            entity: `O.S. #${target.order.id}`,
+            entity: "O.S. vinculada",
             actor: target.ownerName,
             summary: "O.S. vinculada encontrada nos dados carregados.",
           }
@@ -1592,56 +1573,143 @@ export default function AppointmentsPage() {
           </div>
         </AppSectionBlock>
 
-        <div className="grid gap-3 xl:grid-cols-[1.05fr_0.95fr]">
-          <OperationalStateCard
-            title={
-              commandTarget
-                ? "Estado da entrada operacional"
-                : "Estado da carteira de agendamentos"
-            }
-            level={appointmentCommandState.level}
-            reason={appointmentCommandState.reason}
-            impact={appointmentCommandState.impact}
-            detailsLabel={appointmentCommandState.cta}
-            onDetails={() => {
-              if (commandTarget?.item.id) {
-                setSelectedAppointmentId(String(commandTarget.item.id));
-                return;
-              }
-              setOpenModal(true);
-            }}
-          />
-          <OperationalRiskCard
-            title={appointmentRisk.title}
-            reason={appointmentRisk.reason}
-            impact={appointmentRisk.impact}
-            ctaLabel={appointmentRisk.cta}
-            onClick={() => {
-              if (commandTarget?.item.id) {
-                setSelectedAppointmentId(String(commandTarget.item.id));
-                return;
-              }
-              setOpenModal(true);
-            }}
-          />
-        </div>
+        {selected ? (
+          <AppSectionCard className="overflow-hidden border-[var(--accent-primary)]/25 bg-gradient-to-br from-[var(--surface-base)] via-[var(--surface-subtle)] to-[var(--accent-soft)]/30 p-0">
+            <div className="grid gap-0 lg:grid-cols-[1.35fr_0.65fr]">
+              <div className="p-5 md:p-6">
+                <p className="nexo-overline">Hero executivo do agendamento</p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text-primary)] md:text-3xl">
+                  {selected.customerName}
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
+                  {formatDateTime(selected.item.startsAt)} ·{" "}
+                  {durationLabel(selected.item.startsAt, selected.item.endsAt)}{" "}
+                  · Responsável: {selected.ownerName}
+                </p>
+                <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">
+                  {selected.item.title ||
+                    selected.item.notes ||
+                    "Agendamento sem observação operacional cadastrada."}
+                </p>
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <AppStatusBadge {...mapStatus(selected.item.status)} />
+                  <AppStatusBadge {...mapOperationalStatusBadge(selected)} />
+                  {deriveAppointmentPriority(selected) ? (
+                    <AppPriorityBadge
+                      priority={deriveAppointmentPriority(selected)!}
+                      label={appointmentPriorityLabel(
+                        deriveAppointmentPriority(selected)!
+                      )}
+                    />
+                  ) : null}
+                </div>
+              </div>
+              <div className="flex flex-col justify-center gap-2 border-t border-[var(--border-subtle)] bg-[var(--surface-base)]/65 p-5 lg:border-l lg:border-t-0">
+                <Button onClick={canonicalNextBestAction.onPrimaryAction}>
+                  {canonicalNextBestAction.primaryActionLabel}
+                </Button>
+                {canonicalNextBestAction.onSecondaryAction ? (
+                  <Button
+                    variant="outline"
+                    onClick={canonicalNextBestAction.onSecondaryAction}
+                  >
+                    {canonicalNextBestAction.secondaryActionLabel ??
+                      "Ação secundária"}
+                  </Button>
+                ) : null}
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    navigate(`/customers?customerId=${selected.customerId}`)
+                  }
+                  disabled={!selected.customerId}
+                >
+                  Abrir cliente
+                </Button>
+              </div>
+            </div>
+          </AppSectionCard>
+        ) : null}
 
-        {/* Contrato AppSectionCard oficial: Próxima melhor ação canônica de Agendamentos. */}
-        <NextBestActionCard
-          title={canonicalNextBestAction.title}
-          entity={canonicalNextBestAction.entity}
-          reason={canonicalNextBestAction.reason}
-          impact={canonicalNextBestAction.impact}
-          safetyNote={canonicalNextBestAction.safetyNote}
-          primaryActionLabel={canonicalNextBestAction.primaryActionLabel}
-          onPrimaryAction={canonicalNextBestAction.onPrimaryAction}
-          secondaryActionLabel={canonicalNextBestAction.secondaryActionLabel}
-          onSecondaryAction={canonicalNextBestAction.onSecondaryAction}
-        />
+        <AppSectionCard className="space-y-4 border-[var(--accent-primary)]/25">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="nexo-overline">
+                Decisão e próxima ação · Próxima melhor ação
+              </p>
+              <h3 className="mt-1 text-xl font-semibold text-[var(--text-primary)]">
+                {canonicalNextBestAction.title}
+              </h3>
+              <p className="mt-1 text-sm text-[var(--text-muted)]">
+                {canonicalNextBestAction.entity}
+              </p>
+            </div>
+            <AppStatusBadge
+              {...mapOperationalStatus(
+                commandTarget ??
+                  mapped[0] ??
+                  ({
+                    status: "SCHEDULED",
+                    isOverdue: false,
+                    startsSoon: false,
+                    hasConflict: false,
+                    item: {},
+                    customerName: "",
+                    ownerName: "",
+                    customerId: "",
+                    ownerId: "",
+                    hasAssignee: true,
+                    order: null,
+                    charge: null,
+                    start: null,
+                  } as MappedAppointment)
+              )}
+            />
+          </div>
+          <div className="grid gap-3 lg:grid-cols-3">
+            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                Estado operacional
+              </p>
+              <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
+                {appointmentCommandState.reason}
+              </p>
+            </div>
+            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                Maior risco agora
+              </p>
+              <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
+                {appointmentRisk.reason}
+              </p>
+            </div>
+            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                Próxima ação
+              </p>
+              <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
+                {canonicalNextBestAction.impact}
+              </p>
+            </div>
+          </div>
+          <AppActionBar className="gap-2">
+            <Button onClick={canonicalNextBestAction.onPrimaryAction}>
+              {canonicalNextBestAction.primaryActionLabel}
+            </Button>
+            {canonicalNextBestAction.onSecondaryAction ? (
+              <Button
+                variant="outline"
+                onClick={canonicalNextBestAction.onSecondaryAction}
+              >
+                {canonicalNextBestAction.secondaryActionLabel}
+              </Button>
+            ) : null}
+          </AppActionBar>
+        </AppSectionCard>
 
         <OperationalFlowCard
           title="Fluxo de entrada do agendamento"
-          subtitle="Cliente → Agendamento → O.S. → Cobrança → Pagamento → Timeline → Risco/Governança"
+          subtitle="Cliente → Agendamento → O.S. → Cobrança → Pagamento"
           stages={appointmentFlowStages}
         />
 
@@ -1677,44 +1745,41 @@ export default function AppointmentsPage() {
             />
           </div>
           <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-5">
-            {[
-              ["Hoje", agendaHealth.today, "Entradas previstas para o dia."],
-              [
-                "Confirmados",
-                agendaHealth.confirmed,
-                "Agenda preparada para execução.",
-              ],
-              [
-                "Não confirmados",
-                agendaHealth.scheduled,
-                "Pedem confirmação para reduzir no-show.",
-              ],
-              [
-                "Atrasados",
-                agendaHealth.overdue,
-                "Horários vencidos ainda abertos.",
-              ],
-              [
-                "Concluídos",
-                agendaHealth.done,
-                "Atendimentos encerrados no carregamento.",
-              ],
-            ].map(([label, value, helper]) => (
-              <article
-                key={String(label)}
-                className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3"
-              >
-                <p className="text-xs font-medium text-[var(--text-muted)]">
-                  {label}
-                </p>
-                <p className="mt-2 text-2xl font-semibold text-[var(--text-primary)]">
-                  {value}
-                </p>
-                <p className="mt-1 text-xs text-[var(--text-muted)]">
-                  {helper}
-                </p>
-              </article>
-            ))}
+            <NexoExecutiveMetric
+              title="Hoje"
+              value={String(agendaHealth.today)}
+              context="Entradas previstas para o dia."
+              ctaLabel="Ver hoje"
+              onClick={() => setSelectedFilter("today")}
+            />
+            <NexoExecutiveMetric
+              title="Confirmados"
+              value={String(agendaHealth.confirmed)}
+              context="Agenda preparada para execução."
+              ctaLabel="Ver confirmados"
+              onClick={() => setSelectedFilter("confirmed")}
+            />
+            <NexoExecutiveMetric
+              title="Não confirmados"
+              value={String(agendaHealth.scheduled)}
+              context="Pedem confirmação para reduzir no-show."
+              ctaLabel="Confirmar"
+              onClick={() => setSelectedFilter("unconfirmed")}
+            />
+            <NexoExecutiveMetric
+              title="Atrasados"
+              value={String(agendaHealth.overdue)}
+              context="Horários vencidos ainda abertos."
+              ctaLabel="Revisar"
+              onClick={() => setSelectedFilter("overdue")}
+            />
+            <NexoExecutiveMetric
+              title="Concluídos"
+              value={String(agendaHealth.done)}
+              context="Atendimentos encerrados no carregamento."
+              ctaLabel="Ver todos"
+              onClick={() => setSelectedFilter("all")}
+            />
           </div>
         </AppSectionBlock>
 
@@ -1761,6 +1826,26 @@ export default function AppointmentsPage() {
             />
           )}
         </AppSectionBlock>
+
+        {selected ? (
+          <EntityTimelineCard
+            title="Timeline humanizada do agendamento"
+            subtitle={
+              timeline.length > 0
+                ? "Últimos eventos oficiais retornados para sustentar a leitura do cliente e do horário."
+                : "Sem Timeline oficial carregada; exibimos apenas eventos derivados de datas reais do agendamento, sem criar histórico fictício."
+            }
+            events={appointmentTimelineEvents}
+            fullTimelineLabel="Abrir Timeline completa"
+            onFullTimeline={() =>
+              navigate(
+                selected.customerId
+                  ? `/timeline?customerId=${selected.customerId}`
+                  : "/timeline"
+              )
+            }
+          />
+        ) : null}
 
         <AppFiltersBar className="shrink-0 gap-2 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2">
           {FILTERS.slice(0, 3).map(filter => (
@@ -1952,7 +2037,7 @@ export default function AppointmentsPage() {
                                   row.item.startsAt,
                                   row.item.endsAt
                                 )}{" "}
-                                {orderId ? `· O.S. #${orderId}` : "· sem O.S."}
+                                {orderId ? "· O.S. vinculada" : "· sem O.S."}
                               </p>
                             </div>
                           </td>
@@ -2092,130 +2177,6 @@ export default function AppointmentsPage() {
                 onPageChange={setCurrentPage}
               />
             </>
-          )}
-        </AppSectionBlock>
-
-        <AppSectionBlock
-          title="Detalhe do agendamento"
-          subtitle="Resumo, histórico e ações operacionais do agendamento selecionado."
-          className="flex flex-col"
-        >
-          {!selected ? (
-            <AppPageEmptyState
-              title="Selecione um agendamento"
-              description="Escolha um card da carteira para abrir os detalhes operacionais."
-            />
-          ) : (
-            <div className="space-y-3">
-              <article className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/35 p-3">
-                <p className="text-sm font-semibold text-[var(--text-primary)]">
-                  {selected.customerName}
-                </p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <AppStatusBadge
-                    label={mapStatus(selected.item.status).label}
-                    tone={mapStatus(selected.item.status).tone}
-                  />
-                  <AppStatusBadge {...mapOperationalStatusBadge(selected)} />
-                </div>
-                <p className="mt-2 text-xs text-[var(--text-muted)]">
-                  {formatDateTime(selected.item.startsAt)}
-                </p>
-                <p className="mt-1 text-xs text-[var(--text-muted)]">
-                  Responsável: {selected.ownerName} · Duração:{" "}
-                  {durationLabel(selected.item.startsAt, selected.item.endsAt)}
-                </p>
-                <p className="mt-2 text-xs text-[var(--text-muted)]">
-                  Observações: {selected.item.notes || "—"}
-                </p>
-                <p className="mt-1 text-xs text-[var(--text-muted)]">
-                  O.S. vinculada:{" "}
-                  {selected.order?.id ? `#${selected.order.id}` : "sem O.S."}
-                </p>
-              </article>
-
-              <AppActionBar className="gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2 py-2">
-                <Button
-                  size="sm"
-                  onClick={() =>
-                    void updateStatus(String(selected.item.id), "CONFIRMED")
-                  }
-                  disabled={!selected.item.id}
-                >
-                  Confirmar
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() =>
-                    void updateStatus(String(selected.item.id), "CANCELED")
-                  }
-                  disabled={!selected.item.id}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    setEditing(selected.item);
-                    setOpenModal(true);
-                  }}
-                  disabled={!selected.item.id}
-                >
-                  Remarcar/Editar
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setOpenServiceOrderModal(true)}
-                  disabled={!selected.item.id}
-                >
-                  Abrir/criar O.S.
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() =>
-                    goToWhatsAppAppointment(
-                      String(selected.customerId ?? ""),
-                      String(selected.item.id ?? "")
-                    )
-                  }
-                  disabled={!selected.customerId || !selected.item.id}
-                >
-                  Enviar WhatsApp
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() =>
-                    navigate(`/customers?customerId=${selected.customerId}`)
-                  }
-                  disabled={!selected.customerId}
-                >
-                  Abrir cliente
-                </Button>
-              </AppActionBar>
-
-              <EntityTimelineCard
-                title="Prova operacional da agenda"
-                subtitle={
-                  timeline.length > 0
-                    ? "Últimos eventos oficiais retornados para sustentar o agendamento."
-                    : "Sem Timeline oficial carregada; eventos abaixo são derivados de datas reais do próprio agendamento e não substituem a Timeline completa."
-                }
-                events={appointmentTimelineEvents}
-                fullTimelineLabel="Abrir Timeline completa"
-                onFullTimeline={() =>
-                  navigate(
-                    selected.customerId
-                      ? `/timeline?customerId=${selected.customerId}`
-                      : "/timeline"
-                  )
-                }
-              />
-            </div>
           )}
         </AppSectionBlock>
       </div>
