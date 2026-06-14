@@ -24,11 +24,11 @@ import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
 import { Button } from "@/components/design-system";
 import {
-  EntityTimelineCard,
-  NextBestActionCard,
-  OperationalFlowCard,
-  OperationalRiskCard,
-  OperationalStateCard,
+  NexoEvidenceTimeline,
+  NexoPriorityPanel,
+  NexoOperationalPipeline,
+  NexoIncidentList,
+  NexoGovernanceDecisionCard,
   type OperationalFlowStageState,
   type OperationalStateLevel,
 } from "@/components/app";
@@ -78,26 +78,59 @@ import {
   type OperationalAttentionItem,
 } from "@/lib/operational-attention";
 
-function buildCustomerTimelineSummary(event: Record<string, any>) {
-  const explicit = String(
-    event.summary ?? event.description ?? event.title ?? ""
-  ).trim();
-  if (explicit) return explicit;
+function sanitizeCustomerTimelineText(
+  value: unknown,
+  fallback = "Evento operacional registrado"
+) {
+  const text = String(value ?? "").trim();
+  if (!text) return fallback;
+  return text
+    .replace(/\b[A-Z]+(?:_[A-Z0-9]+){1,}\b/g, fallback)
+    .replace(/\b(?:payload|eventType|entityId|slug|uuid)\b:?/gi, "")
+    .replace(/#[a-z0-9-]{8,}/gi, "referência operacional")
+    .replace(/\b[a-f0-9]{12,}\b/gi, "referência operacional")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
 
-  const eventType = String(
-    event.eventType ?? event.type ?? event.action ?? "Evento"
-  ).replace(/_/g, " ");
-  const entityType = String(
-    event.entityType ?? event.entity ?? event.target ?? "operação"
+function humanizeCustomerTimelineEvent(event: Record<string, any>) {
+  const normalizedType = String(
+    event.eventType ?? event.type ?? event.action ?? ""
+  ).toUpperCase();
+  const known: Record<string, { type: string; summary: string }> = {
+    CUSTOMER_APPOINTMENT_CREATED: {
+      type: "Agendamento criado",
+      summary: "Agenda vinculada ao cliente.",
+    },
+    CUSTOMER_SERVICE_ORDER_CREATED: {
+      type: "O.S. criada",
+      summary: "Execução aberta para o cliente.",
+    },
+    CUSTOMER_WHATSAPP_MESSAGE_SENT: {
+      type: "Contato enviado",
+      summary: "Mensagem registrada no relacionamento do cliente.",
+    },
+    CUSTOMER_CHARGE_CONTEXT_UPDATED: {
+      type: "Cobrança revisada",
+      summary: "Contexto financeiro do cliente foi atualizado.",
+    },
+    PAYMENT_RECEIVED: {
+      type: "Pagamento recebido",
+      summary: "Pagamento registrado para o cliente.",
+    },
+    CHARGE_CREATED: {
+      type: "Cobrança criada",
+      summary: "Nova cobrança vinculada ao cliente.",
+    },
+  };
+  const explicit = sanitizeCustomerTimelineText(
+    event.summary ?? event.description ?? event.title,
+    known[normalizedType]?.summary ?? "Evento operacional registrado"
   );
-  const entityId =
-    event.entityId ??
-    event.customerId ??
-    event.serviceOrderId ??
-    event.chargeId ??
-    event.appointmentId;
-  const when = formatDateTime(event.occurredAt ?? event.createdAt);
-  return `${eventType} registrado para ${entityType}${entityId ? ` #${String(entityId)}` : ""} em ${when}.`;
+  return {
+    type: known[normalizedType]?.type ?? "Evento operacional",
+    summary: explicit,
+  };
 }
 
 type Customer = Record<string, any>;
@@ -494,7 +527,6 @@ export default function CustomersPage() {
   const [createAppointmentOpen, setCreateAppointmentOpen] = useState(false);
   const [createServiceOrderOpen, setCreateServiceOrderOpen] = useState(false);
   const [showInlineCharges, setShowInlineCharges] = useState(false);
-  const [whatsAppQuickMessage, setWhatsAppQuickMessage] = useState("");
   const timelineAnchorRef = useRef<HTMLDivElement | null>(null);
 
   const customersQuery = trpc.nexo.customers.list.useQuery(
@@ -518,7 +550,6 @@ export default function CustomersPage() {
     retry: false,
   });
   const trpcUtils = trpc.useUtils();
-  const sendInlineWhatsApp = trpc.nexo.whatsapp.send.useMutation();
   const [isRefreshingWorkspace, setIsRefreshingWorkspace] = useState(false);
 
   const customers = useMemo(
@@ -858,7 +889,7 @@ export default function CustomersPage() {
     .slice(0, 5)
     .map((event, index) => ({
       id: String(event.id ?? `event-${index}`),
-      type: String(event.type ?? event.category ?? "Evento"),
+      type: humanizeCustomerTimelineEvent(event).type,
       occurredAt: formatDateTime(event.occurredAt ?? event.createdAt),
       entity: String(
         event.entity ?? event.entityType ?? event.target ?? selectedCustomerName
@@ -866,7 +897,7 @@ export default function CustomersPage() {
       actor: String(
         event.actor ?? event.author ?? event.createdBy ?? "Sistema"
       ),
-      summary: buildCustomerTimelineSummary(event),
+      summary: humanizeCustomerTimelineEvent(event).summary,
     }));
 
   const customerOperationalState = (() => {
@@ -2000,7 +2031,7 @@ export default function CustomersPage() {
               </article>
 
               <div className="grid gap-3 xl:grid-cols-2">
-                <OperationalStateCard
+                <NexoGovernanceDecisionCard
                   title="Estado operacional do cliente"
                   level={customerOperationalState.level}
                   reason={customerOperationalState.reason}
@@ -2008,7 +2039,7 @@ export default function CustomersPage() {
                   detailsLabel={customerOperationalState.detailsLabel}
                   onDetails={customerOperationalState.onDetails}
                 />
-                <OperationalRiskCard
+                <NexoIncidentList
                   title={
                     customerOperationalState.level === "NORMAL"
                       ? "Sem risco dominante"
@@ -2025,7 +2056,7 @@ export default function CustomersPage() {
                 />
               </div>
 
-              <NextBestActionCard
+              <NexoPriorityPanel
                 title={customerNextBestAction.title}
                 entity={customerNextBestAction.entity}
                 reason={customerNextBestAction.reason}
@@ -2039,7 +2070,7 @@ export default function CustomersPage() {
                 onSecondaryAction={customerNextBestAction.onSecondaryAction}
               />
 
-              <OperationalFlowCard
+              <NexoOperationalPipeline
                 title="Fluxo operacional do cliente"
                 subtitle="Cliente → Agendamento → O.S. → Cobrança → Pagamento → Timeline → Risco/Governança"
                 stages={customerOperationalFlowStages}
@@ -2188,66 +2219,25 @@ export default function CustomersPage() {
                   </div>
                 </article>
               ) : null}
-              <article className="rounded-xl border border-[var(--border-subtle)] p-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-                  WhatsApp inline
-                </p>
-                <textarea
-                  value={whatsAppQuickMessage}
-                  onChange={event =>
-                    setWhatsAppQuickMessage(event.target.value)
-                  }
-                  placeholder="Mensagem rápida para este cliente"
-                  className="mt-2 min-h-[70px] w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
-                />
-                <div className="mt-2 flex flex-wrap gap-2">
+              <article className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]/35 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                      Comunicação operacional
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--text-muted)]">
+                      Ação real centralizada no WhatsApp completo, sem composer inline duplicado.
+                    </p>
+                  </div>
                   <Button
                     size="sm"
-                    disabled={
-                      !String(selectedCustomer.phone ?? "").trim() ||
-                      whatsAppQuickMessage.trim().length === 0 ||
-                      sendInlineWhatsApp.isPending
-                    }
+                    variant="outline"
+                    disabled={!String(selectedCustomer.phone ?? "").trim()}
                     title={
                       !String(selectedCustomer.phone ?? "").trim()
                         ? "Cliente sem telefone/WhatsApp cadastrado."
                         : undefined
                     }
-                    onClick={async () => {
-                      if (!activeCustomerId || !whatsAppQuickMessage.trim())
-                        return;
-                      try {
-                        const content = whatsAppQuickMessage.trim();
-                        await sendInlineWhatsApp.mutateAsync({
-                          customerId: activeCustomerId,
-                          content,
-                          entityType: "CUSTOMER",
-                          entityId: activeCustomerId,
-                          messageType: "MANUAL",
-                        });
-                        setWhatsAppQuickMessage("");
-                        toast.success("Mensagem enviada.");
-                        await propagateCustomerOperationalChange(
-                          activeCustomerId,
-                          "CUSTOMER_WHATSAPP_MESSAGE_SENT",
-                          {
-                            includeTimeline: true,
-                          }
-                        );
-                      } catch (error) {
-                        toast.error(
-                          "Não foi possível enviar a mensagem. Tente novamente."
-                        );
-                      }
-                    }}
-                  >
-                    {sendInlineWhatsApp.isPending
-                      ? "Enviando..."
-                      : "Enviar inline"}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
                     onClick={() =>
                       openCustomerWhatsApp(
                         selectedCustomer,
@@ -2431,7 +2421,7 @@ export default function CustomersPage() {
               </article>
 
               <div ref={timelineAnchorRef}>
-                <EntityTimelineCard
+                <NexoEvidenceTimeline
                   title="Últimos eventos oficiais"
                   subtitle="Prova operacional do cliente e histórico oficial ligado ao cliente."
                   events={customerOfficialTimelineEvents}

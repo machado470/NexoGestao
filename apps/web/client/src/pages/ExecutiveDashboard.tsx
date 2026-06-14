@@ -19,7 +19,6 @@ import { trpc } from "@/lib/trpc";
 import { useRenderWatchdog } from "@/hooks/useRenderWatchdog";
 import {
   AppContextChip,
-  AppMetricCard,
   AppOperationalHeader,
   AppPageEmptyState,
   AppPageErrorState,
@@ -30,10 +29,11 @@ import {
   AppStatusBadge,
 } from "@/components/internal-page-system";
 import {
-  EntityTimelineCard,
-  NextBestActionCard,
-  OperationalFlowCard,
-  OperationalStateCard,
+  NexoEvidenceTimeline,
+  NexoPriorityPanel,
+  NexoOperationalPipeline,
+  NexoGovernanceDecisionCard,
+  NexoExecutiveMetric,
   type OperationalFlowStageState,
   type OperationalStateLevel,
 } from "@/components/app";
@@ -1417,7 +1417,7 @@ export default function ExecutiveDashboard() {
           </AppSectionBlock>
 
           <div className="grid w-full min-w-0 gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
-            <OperationalStateCard
+            <NexoGovernanceDecisionCard
               level={operationLevel}
               title="Estado operacional"
               reason={attention[0]?.reason ?? operationStateFallback}
@@ -1430,7 +1430,7 @@ export default function ExecutiveDashboard() {
               onDetails={() => navigate(attention[0]?.path ?? "/governance")}
             />
 
-            <EntityTimelineCard
+            <NexoEvidenceTimeline
               className="h-full"
               events={timelineEvents}
               fullTimelineLabel="Ver Timeline"
@@ -1465,7 +1465,7 @@ export default function ExecutiveDashboard() {
             subtitle="Ação contextual mais importante retornada pelos sinais operacionais."
           >
             {recommendedAction ? (
-              <NextBestActionCard
+              <NexoPriorityPanel
                 title={recommendedAction.title}
                 entity={recommendedAction.entity}
                 reason={recommendedAction.reason}
@@ -1500,11 +1500,11 @@ export default function ExecutiveDashboard() {
           >
             <div className="grid w-full min-w-0 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
               {kpiCards.map(({ label, value, context, cta, path, Icon }) => (
-                <AppMetricCard
+                <NexoExecutiveMetric
                   key={label}
                   title={label}
                   value={value}
-                  hint={context}
+                  context={context}
                   icon={<Icon className="h-4 w-4" />}
                   ctaLabel={cta}
                   onClick={() => navigate(path)}
@@ -1519,7 +1519,7 @@ export default function ExecutiveDashboard() {
             className={dashboardSectionClass}
             subtitle="Gargalos do fluxo Cliente → Agendamento → O.S. → Cobrança → Pagamento."
           >
-            <OperationalFlowCard
+            <NexoOperationalPipeline
               title="Gargalos operacionais"
               subtitle="Use os pontos de quebra para direcionar a próxima ação sem duplicar diagnósticos das páginas específicas."
               stages={flow.map(stage => ({

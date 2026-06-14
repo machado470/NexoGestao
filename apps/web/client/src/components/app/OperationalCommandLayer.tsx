@@ -94,7 +94,7 @@ const flowStageTone: Record<
   },
 };
 
-export function OperationalStateCard({
+export function NexoGovernanceDecisionCard({
   level,
   reason,
   impact,
@@ -180,7 +180,7 @@ export function OperationalStateCard({
   );
 }
 
-export function NextBestActionCard({
+export function NexoPriorityPanel({
   title,
   entity,
   reason,
@@ -276,7 +276,7 @@ export function NextBestActionCard({
   );
 }
 
-export function OperationalFlowCard({
+export function NexoOperationalPipeline({
   title = "Fluxo operacional transversal",
   subtitle = "Cliente → Agendamento → O.S. → Cobrança → Pagamento",
   stages,
@@ -390,7 +390,7 @@ export function OperationalFlowCard({
   );
 }
 
-export function EntityTimelineCard({
+export function NexoEvidenceTimeline({
   title = "Últimos eventos oficiais",
   subtitle = "Prova operacional recente usada para sustentar a leitura transversal.",
   events,
@@ -465,7 +465,7 @@ export function EntityTimelineCard({
   );
 }
 
-export function OperationalRiskCard({
+export function NexoIncidentList({
   title,
   reason,
   impact,
@@ -510,6 +510,55 @@ export function OperationalRiskCard({
       >
         {ctaLabel}
         <ArrowRight className="h-4 w-4" />
+      </Button>
+    </AppSectionCard>
+  );
+}
+
+
+export const OperationalStateCard = NexoGovernanceDecisionCard;
+export const NextBestActionCard = NexoPriorityPanel;
+export const OperationalFlowCard = NexoOperationalPipeline;
+export const EntityTimelineCard = NexoEvidenceTimeline;
+export const OperationalRiskCard = NexoIncidentList;
+
+export function NexoExecutiveMetric(props: {
+  title: string;
+  value: string;
+  context: string;
+  ctaLabel: string;
+  onClick: () => void;
+  icon?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <AppSectionCard className={cn("flex h-full flex-col gap-2", props.className)}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="nexo-overline">Métrica executiva</p>
+          <h3 className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+            {props.title}
+          </h3>
+        </div>
+        {props.icon ? (
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl border border-[var(--border-subtle)]/70 bg-[var(--surface-primary)]/45 text-[var(--text-secondary)]">
+            {props.icon}
+          </span>
+        ) : null}
+      </div>
+      <p className="text-2xl font-bold leading-tight text-[var(--text-primary)]">
+        {props.value}
+      </p>
+      <p className="text-xs leading-5 text-[var(--text-secondary)]">
+        {props.context}
+      </p>
+      <Button
+        className="mt-auto h-8 justify-between px-3 text-xs"
+        variant="secondary"
+        onClick={props.onClick}
+      >
+        {props.ctaLabel}
+        <ArrowRight className="h-3.5 w-3.5" />
       </Button>
     </AppSectionCard>
   );
