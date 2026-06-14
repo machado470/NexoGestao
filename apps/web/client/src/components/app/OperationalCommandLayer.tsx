@@ -1,13 +1,18 @@
 import type { ReactNode } from "react";
 import {
   ArrowRight,
+  Banknote,
+  CalendarClock,
   CheckCircle2,
   Circle,
   CircleAlert,
   CircleDashed,
-  Lock,
-  ShieldCheck,
+  CreditCard,
   History,
+  Lock,
+  MessageCircle,
+  ShieldCheck,
+  Wrench,
   Zap,
 } from "lucide-react";
 import { AppSectionCard, AppStatusBadge } from "@/components/app-system";
@@ -126,9 +131,10 @@ export function NexoGovernanceDecisionCard({
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="nexo-overline">Comando operacional</p>
-          <h3 className="mt-0.5 text-base font-semibold leading-tight text-[var(--text-primary)]">
-            {title}: {level}
+          <h3 className="mt-0.5 text-lg font-black uppercase leading-tight tracking-tight text-[var(--text-primary)]">
+            {level}
           </h3>
+          <p className="text-xs font-semibold text-[var(--text-secondary)]">{title}</p>
         </div>
         <AppStatusBadge label={tone.label} tone={tone.badgeTone} />
       </div>
@@ -157,14 +163,8 @@ export function NexoGovernanceDecisionCard({
         </div>
       ) : null}
       <div className="grid gap-1.5 text-xs leading-4 text-[var(--text-secondary)] sm:grid-cols-2">
-        <p>
-          <strong className="text-[var(--text-primary)]">Motivo:</strong>{" "}
-          {reason}
-        </p>
-        <p>
-          <strong className="text-[var(--text-primary)]">Impacto:</strong>{" "}
-          {impact}
-        </p>
+        <p><strong className="text-[var(--text-primary)]">Motivo:</strong> {reason}</p>
+        <p><strong className="text-[var(--text-primary)]">Impacto:</strong> {impact}</p>
       </div>
       {onDetails ? (
         <Button
@@ -208,7 +208,7 @@ export function NexoPriorityPanel({
   return (
     <AppSectionCard
       className={cn(
-        "flex h-full flex-col gap-3 border-[var(--accent-primary)]/35 bg-[var(--accent-soft)]/35",
+        "flex h-full flex-col gap-2 border-[var(--accent-primary)]/35 bg-[var(--accent-soft)]/35",
         className
       )}
     >
@@ -217,7 +217,7 @@ export function NexoPriorityPanel({
           <Zap className="h-4 w-4 text-[var(--accent-primary)]" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="nexo-overline">Próxima Melhor Ação</p>
+          <p className="nexo-overline">Próxima ação</p>
           {primaryValue ? (
             <p className="mt-1 text-4xl font-bold leading-none tracking-tight text-[var(--text-primary)] sm:text-5xl">
               {primaryValue}
@@ -236,7 +236,7 @@ export function NexoPriorityPanel({
           </p>
         </div>
       </div>
-      <div className="grid gap-2 text-xs leading-5 text-[var(--text-secondary)] md:grid-cols-2">
+      <div className="grid gap-2 text-xs leading-4 text-[var(--text-secondary)] md:grid-cols-2">
         <p>
           <strong className="text-[var(--text-primary)]">Motivo:</strong>{" "}
           {reason}
@@ -249,14 +249,14 @@ export function NexoPriorityPanel({
         </p>
       </div>
       {safetyNote ? (
-        <p className="rounded-xl border border-[var(--border-subtle)]/70 bg-[var(--surface-primary)]/50 p-2.5 text-xs leading-5 text-[var(--text-secondary)]">
+        <p className="rounded-lg border border-[var(--border-subtle)]/70 bg-[var(--surface-primary)]/50 px-2.5 py-1.5 text-[11px] leading-4 text-[var(--text-secondary)]">
           <strong className="text-[var(--text-primary)]">Segurança:</strong>{" "}
           {safetyNote}
         </p>
       ) : null}
       <div className="mt-auto flex flex-col gap-2 sm:flex-row">
         <Button
-          className="h-11 flex-[1.35] justify-between px-4 text-sm font-semibold"
+          className="h-9 flex-[1.35] justify-between px-3 text-sm font-semibold"
           onClick={onPrimaryAction}
         >
           {primaryActionLabel}
@@ -390,6 +390,16 @@ export function NexoOperationalPipeline({
   );
 }
 
+function getEvidenceTimelineIcon(type: string) {
+  const normalized = type.toLowerCase();
+  if (normalized.includes("mensagem")) return <MessageCircle className="h-3.5 w-3.5 text-[var(--accent-primary)]" />;
+  if (normalized.includes("agendamento")) return <CalendarClock className="h-3.5 w-3.5 text-[var(--dashboard-info)]" />;
+  if (normalized.includes("o.s.")) return normalized.includes("conclu") ? <CheckCircle2 className="h-3.5 w-3.5 text-[var(--success)]" /> : <Wrench className="h-3.5 w-3.5 text-[var(--warning)]" />;
+  if (normalized.includes("pagamento")) return <Banknote className="h-3.5 w-3.5 text-[var(--success)]" />;
+  if (normalized.includes("cobran")) return <CreditCard className="h-3.5 w-3.5 text-[var(--warning)]" />;
+  return <Circle className="h-3.5 w-3.5 text-[var(--text-muted)]" />;
+}
+
 export function NexoEvidenceTimeline({
   title = "Últimos eventos oficiais",
   subtitle = "Prova operacional recente usada para sustentar a leitura transversal.",
@@ -431,6 +441,9 @@ export function NexoEvidenceTimeline({
           {events.map(event => (
             <li key={event.id} className="py-2 first:pt-0 last:pb-0">
               <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-primary)]">
+                  {getEvidenceTimelineIcon(event.type)}
+                </span>
                 <AppStatusBadge label={event.type} tone="neutral" />
                 <span className="text-[var(--text-muted)]">
                   {event.occurredAt}
