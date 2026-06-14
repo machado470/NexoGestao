@@ -24,6 +24,9 @@ describe("AppointmentsPage as operational execution entry", () => {
       "WhatsApp",
       "Abrir financeiro",
     ].forEach(cta => expect(source).toContain(cta));
+    expect(source).toContain("md:text-5xl");
+    expect(source).toContain("Data e hora");
+    expect(source).toContain("Duração");
     expect(source).toContain("Sinal principal");
     expect(source).toContain("Próxima ação:");
   });
@@ -37,6 +40,27 @@ describe("AppointmentsPage as operational execution entry", () => {
     expect(source).toContain("Nota de segurança:");
     expect(source).not.toContain('title="Decisão do sistema"');
     expect(source).not.toContain("<NexoPriorityPanel");
+    expect(source.match(/Decisão e próxima ação/g) ?? []).toHaveLength(1);
+  });
+
+  it("adds execution preparation between decision and the operational pipeline", () => {
+    expect(source).toContain("Preparação da execução");
+    [
+      "Cliente vinculado",
+      "Confirmação pendente",
+      "Responsável definido",
+      "O.S. vinculada",
+      "Cobrança pendente",
+      "Evidência/Timeline disponível",
+      "Canal WhatsApp disponível",
+      "Sem evidência oficial retornada",
+    ].forEach(text => expect(source).toContain(text));
+    expect(selectedExperience.indexOf("Decisão e próxima ação")).toBeLessThan(
+      selectedExperience.indexOf("Preparação da execução")
+    );
+    expect(selectedExperience.indexOf("Preparação da execução")).toBeLessThan(
+      selectedExperience.indexOf("Fluxo de entrada do agendamento")
+    );
   });
 
   it("keeps the main pipeline limited to Cliente → Agendamento → O.S. → Cobrança → Pagamento", () => {
@@ -108,6 +132,8 @@ describe("AppointmentsPage as operational execution entry", () => {
     ].forEach(metric => expect(source).toContain(metric));
     expect(source).toContain("Radar operacional");
     expect(source).toContain("Resolver incidente");
+    expect(source).toContain('title="Resumo operacional"');
+    expect(source).toContain("px-3 py-2 text-left");
     expect(source).toContain("relative z-30 shrink-0 gap-2 overflow-visible");
     expect(source).toContain("absolute right-0 z-50 mt-2 grid");
     expect(source).toContain(
@@ -123,6 +149,15 @@ describe("AppointmentsPage as operational execution entry", () => {
 describe("AppointmentsPage final polish guardrails", () => {
   it("does not duplicate the open appointment CTA across operational sections", () => {
     expect(source.match(/>\s*Abrir agendamento\s*</g) ?? []).toHaveLength(1);
+  });
+
+  it("keeps wallet as compact command-center lines instead of an administrative table", () => {
+    expect(source).toContain("Outros agendamentos da operação");
+    expect(source).toContain("Carteira operacional de agendamentos");
+    expect(source).toContain("lg:grid-cols-[150px_1.4fr_1fr_150px_220px]");
+    expect(source).not.toContain("<thead>");
+    expect(source).not.toContain("<th>");
+    expect(source).not.toContain("AppDataTable");
   });
 
   it("does not expose raw backend identifiers or enum states in operational slices", () => {

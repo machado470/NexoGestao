@@ -9,13 +9,11 @@ import { Button } from "@/components/design-system";
 import {
   EntityTimelineCard,
   OperationalFlowCard,
-  NexoExecutiveMetric,
   type OperationalFlowStageState,
   type OperationalStateLevel,
 } from "@/components/app/OperationalCommandLayer";
 import { FormModal } from "@/components/app-modal-system";
 import {
-  AppDataTable,
   AppField,
   AppForm,
   AppInput,
@@ -1514,6 +1512,115 @@ export default function AppointmentsPage() {
     }>;
   }, [commandTarget, timeline]);
 
+  const executionPreparationItems = useMemo(() => {
+    const target = commandTarget;
+    const hasCharge =
+      Boolean(target?.charge?.id) ||
+      Boolean(target?.order?.financialSummary?.hasCharge);
+    const timelineAvailable =
+      timeline.length > 0 || appointmentTimelineEvents.length > 0;
+    return [
+      {
+        label: target?.customerId
+          ? "Cliente vinculado"
+          : "Sem cliente vinculado",
+        state: target?.customerId ? "ok" : "attention",
+        action: target?.customerId ? "Abrir cliente" : undefined,
+        onClick: target?.customerId
+          ? () => navigate(`/customers?customerId=${target.customerId}`)
+          : undefined,
+      },
+      {
+        label:
+          target?.status === "CONFIRMED" || target?.status === "DONE"
+            ? "Agendamento confirmado"
+            : "Confirmação pendente",
+        state:
+          target?.status === "CONFIRMED" || target?.status === "DONE"
+            ? "ok"
+            : "attention",
+        action: target?.status === "SCHEDULED" ? "Confirmar" : undefined,
+        onClick:
+          target?.status === "SCHEDULED" && target.item.id
+            ? () => void updateStatus(String(target.item.id), "CONFIRMED")
+            : undefined,
+      },
+      {
+        label: target?.hasAssignee
+          ? "Responsável definido"
+          : "Sem responsável definido",
+        state: target?.hasAssignee ? "ok" : "attention",
+        action: target?.item.id ? "Editar" : undefined,
+        onClick: target?.item.id
+          ? () => {
+              setEditing(target.item);
+              setOpenModal(true);
+            }
+          : undefined,
+      },
+      {
+        label: target?.order?.id ? "O.S. vinculada" : "O.S. pendente",
+        state: target?.order?.id ? "ok" : "attention",
+        action: target?.item.id
+          ? target.order?.id
+            ? "Abrir O.S."
+            : "Criar O.S."
+          : undefined,
+        onClick: target?.item.id
+          ? () => {
+              if (target.order?.id) {
+                navigate(
+                  `/service-orders?customerId=${target.customerId}&appointmentId=${target.item.id}`
+                );
+                return;
+              }
+              setSelectedAppointmentId(String(target.item.id));
+              setOpenServiceOrderModal(true);
+            }
+          : undefined,
+      },
+      {
+        label: hasCharge ? "Cobrança preparada" : "Cobrança pendente",
+        state: hasCharge ? "ok" : "attention",
+        action: target?.customerId ? "Financeiro" : undefined,
+        onClick: target?.customerId
+          ? () => navigate(`/finances?customerId=${target.customerId}`)
+          : undefined,
+      },
+      {
+        label: timelineAvailable
+          ? "Evidência/Timeline disponível"
+          : "Sem evidência oficial retornada",
+        state: timelineAvailable ? "ok" : "neutral",
+        action: target?.customerId ? "Ver Timeline" : undefined,
+        onClick: target?.customerId
+          ? () => navigate(`/timeline?customerId=${target.customerId}`)
+          : undefined,
+      },
+      {
+        label: target?.customerId
+          ? "Canal WhatsApp disponível"
+          : "WhatsApp indisponível",
+        state: target?.customerId ? "ok" : "neutral",
+        action: target?.customerId && target?.item.id ? "WhatsApp" : undefined,
+        onClick:
+          target?.customerId && target?.item.id
+            ? () =>
+                goToWhatsAppAppointment(
+                  target.customerId,
+                  String(target.item.id)
+                )
+            : undefined,
+      },
+    ];
+  }, [
+    appointmentTimelineEvents.length,
+    commandTarget,
+    navigate,
+    timeline.length,
+    updateStatus,
+  ]);
+
   function goToWhatsAppAppointment(customerId: string, appointmentId: string) {
     if (!String(customerId ?? "").trim()) {
       toast.error("Agendamento sem cliente válido para WhatsApp.");
@@ -1560,24 +1667,11 @@ export default function AppointmentsPage() {
         </AppOperationalHeader>
 
         {selected ? (
-          <AppSectionCard className="overflow-hidden border-[var(--accent-primary)]/25 bg-gradient-to-br from-[var(--surface-base)] via-[var(--surface-subtle)] to-[var(--accent-soft)]/30 p-0">
-            <div className="grid gap-0 lg:grid-cols-[1.35fr_0.65fr]">
-              <div className="p-5 md:p-6">
+          <AppSectionCard className="overflow-hidden border-2 border-[var(--accent-primary)]/35 bg-gradient-to-br from-[var(--surface-base)] via-[var(--surface-subtle)] to-[var(--accent-soft)]/40 p-0">
+            <div className="grid gap-0 lg:grid-cols-[1.45fr_0.55fr]">
+              <div className="p-6 md:p-8">
                 <p className="nexo-overline">Hero executivo do agendamento</p>
-                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text-primary)] md:text-3xl">
-                  {selected.customerName}
-                </h2>
-                <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
-                  {formatDateTime(selected.item.startsAt)} ·{" "}
-                  {durationLabel(selected.item.startsAt, selected.item.endsAt)}{" "}
-                  · Responsável: {selected.ownerName}
-                </p>
-                <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">
-                  {selected.item.title ||
-                    selected.item.notes ||
-                    "Agendamento sem observação operacional cadastrada."}
-                </p>
-                <div className="mt-4 flex flex-wrap items-center gap-2">
+                <div className="mt-3 flex flex-wrap items-center gap-2">
                   <AppStatusBadge {...mapStatus(selected.item.status)} />
                   <AppStatusBadge {...mapOperationalStatusBadge(selected)} />
                   {deriveAppointmentPriority(selected) ? (
@@ -1589,27 +1683,116 @@ export default function AppointmentsPage() {
                     />
                   ) : null}
                 </div>
+                <h2 className="mt-4 text-3xl font-semibold tracking-tight text-[var(--text-primary)] md:text-5xl">
+                  {selected.customerName}
+                </h2>
+                <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-xl bg-[var(--surface-base)]/70 p-3">
+                    <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                      Data e hora
+                    </p>
+                    <p className="mt-1 text-lg font-semibold text-[var(--text-primary)]">
+                      {formatDateTime(selected.item.startsAt)}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-[var(--surface-base)]/70 p-3">
+                    <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                      Duração
+                    </p>
+                    <p className="mt-1 text-lg font-semibold text-[var(--text-primary)]">
+                      {durationLabel(
+                        selected.item.startsAt,
+                        selected.item.endsAt
+                      )}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-[var(--surface-base)]/70 p-3">
+                    <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                      Responsável
+                    </p>
+                    <p className="mt-1 text-lg font-semibold text-[var(--text-primary)]">
+                      {selected.ownerName}
+                    </p>
+                  </div>
+                </div>
+                <p className="mt-4 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">
+                  {selected.item.title ||
+                    selected.item.notes ||
+                    "Agendamento sem observação operacional cadastrada."}
+                </p>
               </div>
-              <div className="flex flex-col justify-center gap-2 border-t border-[var(--border-subtle)] bg-[var(--surface-base)]/65 p-5 lg:border-l lg:border-t-0">
-                <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-2">
+              <div className="flex flex-col justify-center gap-3 border-t border-[var(--border-subtle)] bg-[var(--surface-base)]/75 p-5 lg:border-l lg:border-t-0">
+                <div className="rounded-2xl border border-[var(--accent-primary)]/30 bg-[var(--accent-soft)]/35 p-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
                     Sinal principal
                   </p>
-                  <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+                  <p className="mt-2 text-lg font-semibold text-[var(--text-primary)]">
                     {appointmentRisk.title}
                   </p>
-                  <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
+                  <p className="mt-2 text-xs leading-5 text-[var(--text-secondary)]">
                     Próxima ação: {canonicalNextBestAction.primaryActionLabel}
                   </p>
                 </div>
-                <Button
-                  onClick={() =>
-                    setSelectedAppointmentId(String(selected.item.id ?? ""))
-                  }
-                  disabled={!selected.item.id}
-                >
-                  Abrir agendamento
-                </Button>
+                <div className="grid gap-2">
+                  <Button
+                    onClick={() =>
+                      setSelectedAppointmentId(String(selected.item.id ?? ""))
+                    }
+                    disabled={!selected.item.id}
+                  >
+                    Abrir agendamento
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setEditing(selected.item);
+                      setOpenModal(true);
+                    }}
+                    disabled={!selected.item.id}
+                  >
+                    Remarcar/editar
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      if (selected.order?.id) {
+                        navigate(
+                          `/service-orders?customerId=${selected.customerId}&appointmentId=${selected.item.id}`
+                        );
+                        return;
+                      }
+                      setOpenServiceOrderModal(true);
+                    }}
+                    disabled={!selected.item.id}
+                  >
+                    {selected.order?.id ? "Abrir O.S." : "Criar O.S."}
+                  </Button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        goToWhatsAppAppointment(
+                          selected.customerId,
+                          String(selected.item.id ?? "")
+                        )
+                      }
+                      disabled={!selected.customerId || !selected.item.id}
+                    >
+                      WhatsApp
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        navigate(`/customers?customerId=${selected.customerId}`)
+                      }
+                      disabled={!selected.customerId}
+                    >
+                      Abrir cliente
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
           </AppSectionCard>
@@ -1651,7 +1834,7 @@ export default function AppointmentsPage() {
           })}
         </AppFiltersBar>
 
-        <AppSectionCard className="space-y-4 border-[var(--accent-primary)]/25">
+        <AppSectionCard className="space-y-5 border-2 border-[var(--accent-primary)]/30 bg-gradient-to-r from-[var(--surface-base)] to-[var(--accent-soft)]/20 p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="nexo-overline">
@@ -1722,23 +1905,59 @@ export default function AppointmentsPage() {
             </div>
           </div>
           <AppActionBar className="gap-2">
-            {selected ? (
+            <Button
+              className="bg-[var(--accent-primary)] text-[var(--primary-foreground)] hover:bg-[var(--accent-primary-hover)]"
+              onClick={canonicalNextBestAction.onPrimaryAction}
+            >
+              {canonicalNextBestAction.primaryActionLabel}
+            </Button>
+            {canonicalNextBestAction.secondaryActionLabel &&
+            canonicalNextBestAction.onSecondaryAction ? (
               <Button
-                onClick={() => {
-                  setEditing(selected.item);
-                  setOpenModal(true);
-                }}
-                disabled={!selected.item.id}
+                variant="outline"
+                onClick={canonicalNextBestAction.onSecondaryAction}
               >
-                Remarcar/editar
+                {canonicalNextBestAction.secondaryActionLabel}
               </Button>
-            ) : (
-              <Button onClick={canonicalNextBestAction.onPrimaryAction}>
-                {canonicalNextBestAction.primaryActionLabel}
-              </Button>
-            )}
+            ) : null}
           </AppActionBar>
         </AppSectionCard>
+
+        <AppSectionBlock
+          title="Preparação da execução"
+          subtitle="Checklist compacto para evitar no-show, atraso ou perda de evidência antes da passagem para execução."
+          compact
+        >
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+            {executionPreparationItems.map(item => (
+              <div
+                key={item.label}
+                className="flex min-h-[68px] items-center justify-between gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-2"
+              >
+                <div className="min-w-0">
+                  <span
+                    className={`inline-flex h-2.5 w-2.5 rounded-full ${
+                      item.state === "ok"
+                        ? "bg-[var(--success)]"
+                        : item.state === "attention"
+                          ? "bg-[var(--warning)]"
+                          : "bg-[var(--text-muted)]"
+                    }`}
+                    aria-hidden="true"
+                  />
+                  <p className="mt-1 truncate text-sm font-medium text-[var(--text-primary)]">
+                    {item.label}
+                  </p>
+                </div>
+                {item.action && item.onClick ? (
+                  <Button size="sm" variant="ghost" onClick={item.onClick}>
+                    {item.action}
+                  </Button>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </AppSectionBlock>
 
         <OperationalFlowCard
           title="Fluxo de entrada do agendamento"
@@ -1777,42 +1996,56 @@ export default function AppointmentsPage() {
               }
             />
           </div>
-          <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-5">
-            <NexoExecutiveMetric
-              title="Hoje"
-              value={String(agendaHealth.today)}
-              context="Entradas previstas para o dia."
-              ctaLabel="Ver hoje"
-              onClick={() => setSelectedFilter("today")}
-            />
-            <NexoExecutiveMetric
-              title="Confirmados"
-              value={String(agendaHealth.confirmed)}
-              context="Agenda preparada para execução."
-              ctaLabel="Ver confirmados"
-              onClick={() => setSelectedFilter("confirmed")}
-            />
-            <NexoExecutiveMetric
-              title="Não confirmados"
-              value={String(agendaHealth.scheduled)}
-              context="Pedem confirmação para reduzir no-show."
-              ctaLabel="Confirmar"
-              onClick={() => setSelectedFilter("unconfirmed")}
-            />
-            <NexoExecutiveMetric
-              title="Atrasados"
-              value={String(agendaHealth.overdue)}
-              context="Horários vencidos ainda abertos."
-              ctaLabel="Revisar"
-              onClick={() => setSelectedFilter("overdue")}
-            />
-            <NexoExecutiveMetric
-              title="Concluídos"
-              value={String(agendaHealth.done)}
-              context="Atendimentos encerrados no carregamento."
-              ctaLabel="Ver todos"
-              onClick={() => setSelectedFilter("all")}
-            />
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+            {[
+              {
+                title: "Hoje",
+                value: agendaHealth.today,
+                action: "Ver",
+                onClick: () => setSelectedFilter("today"),
+              },
+              {
+                title: "Confirmados",
+                value: agendaHealth.confirmed,
+                action: "Ver",
+                onClick: () => setSelectedFilter("confirmed"),
+              },
+              {
+                title: "Não confirmados",
+                value: agendaHealth.scheduled,
+                action: "Confirmar",
+                onClick: () => setSelectedFilter("unconfirmed"),
+              },
+              {
+                title: "Atrasados",
+                value: agendaHealth.overdue,
+                action: "Revisar",
+                onClick: () => setSelectedFilter("overdue"),
+              },
+              {
+                title: "Concluídos",
+                value: agendaHealth.done,
+                action: "Ver",
+                onClick: () => setSelectedFilter("all"),
+              },
+            ].map(metric => (
+              <button
+                key={metric.title}
+                type="button"
+                onClick={metric.onClick}
+                className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-2 text-left transition-colors hover:border-[var(--accent-primary)]/40"
+              >
+                <span className="text-[1.65rem] font-semibold leading-none text-[var(--text-primary)]">
+                  {metric.value}
+                </span>
+                <span className="ml-2 text-xs font-medium text-[var(--text-secondary)]">
+                  {metric.title}
+                </span>
+                <span className="float-right mt-1 text-[11px] font-medium text-[var(--accent-primary)]">
+                  {metric.action}
+                </span>
+              </button>
+            ))}
           </div>
         </AppSectionBlock>
 
@@ -2051,188 +2284,148 @@ export default function AppointmentsPage() {
                   );
                 })}
               </div>
-              <div className="hidden md:block">
-                <AppDataTable className="min-w-[760px]">
-                  <thead>
-                    <tr>
-                      <th>Horário</th>
-                      <th>Cliente / serviço</th>
-                      <th>Status / prioridade</th>
-                      <th>Responsável</th>
-                      <th>Ação</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paginatedAppointments.map(row => {
-                      const status = mapStatus(row.item.status);
-                      const orderId = row.order?.id
-                        ? String(row.order.id)
-                        : null;
-                      const appointmentId = String(row.item.id ?? "");
-                      const isSelected =
-                        selectedAppointmentId === appointmentId;
-                      const priority = deriveAppointmentPriority(row);
-                      const operationalBadge = mapOperationalStatusBadge(row);
-                      return (
-                        <tr
-                          key={appointmentId}
-                          className={
-                            isSelected
-                              ? "bg-[var(--nexo-table-row-selected,var(--surface-subtle))]"
-                              : undefined
-                          }
+              <div className="hidden gap-2 md:grid">
+                {paginatedAppointments.map(row => {
+                  const status = mapStatus(row.item.status);
+                  const orderId = row.order?.id ? String(row.order.id) : null;
+                  const appointmentId = String(row.item.id ?? "");
+                  const isSelected = selectedAppointmentId === appointmentId;
+                  const priority = deriveAppointmentPriority(row);
+                  const operationalBadge = mapOperationalStatusBadge(row);
+                  return (
+                    <article
+                      key={`line-${appointmentId}`}
+                      className={`grid cursor-pointer items-center gap-3 rounded-2xl border px-4 py-3 transition-colors lg:grid-cols-[150px_1.4fr_1fr_150px_220px] ${
+                        isSelected
+                          ? "border-[var(--accent-primary)] bg-[var(--accent-soft)]/35"
+                          : "border-[var(--border-subtle)] bg-[var(--surface-base)] hover:border-[var(--accent-primary)]/30"
+                      }`}
+                      onClick={() => setSelectedAppointmentId(appointmentId)}
+                    >
+                      <div>
+                        <p className="text-sm font-semibold text-[var(--text-primary)]">
+                          {formatDateTime(row.item.startsAt)}
+                        </p>
+                        <p className="text-xs text-[var(--text-muted)]">
+                          {durationLabel(row.item.startsAt, row.item.endsAt)}
+                        </p>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
+                          {row.customerName}
+                        </p>
+                        <p className="truncate text-xs text-[var(--text-secondary)]">
+                          {row.item.title || row.item.notes || "Sem observação"}
+                        </p>
+                        <p className="text-xs text-[var(--text-muted)]">
+                          {orderId ? "O.S. vinculada" : "Sem O.S."}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <AppStatusBadge
+                          label={status.label}
+                          tone={status.tone}
+                        />
+                        {priority ? (
+                          <AppPriorityBadge
+                            priority={priority}
+                            label={appointmentPriorityLabel(priority)}
+                          />
+                        ) : (
+                          <AppStatusBadge {...operationalBadge} />
+                        )}
+                      </div>
+                      <p className="text-sm text-[var(--text-secondary)]">
+                        {row.ownerName}
+                      </p>
+                      <div
+                        className="flex items-center justify-end gap-2"
+                        onClick={event => event.stopPropagation()}
+                      >
+                        <Button
+                          size="sm"
                           onClick={() =>
                             setSelectedAppointmentId(appointmentId)
                           }
                         >
-                          <td>{formatDateTime(row.item.startsAt)}</td>
-                          <td>
-                            <div className="min-w-[220px] space-y-1">
-                              <p className="font-semibold text-[var(--text-primary)]">
-                                {row.customerName}
-                              </p>
-                              <p className="max-w-[260px] truncate text-xs text-[var(--text-secondary)]">
-                                {row.item.title ||
-                                  row.item.notes ||
-                                  "Sem observação"}
-                              </p>
-                              <p className="text-xs text-[var(--text-muted)]">
-                                {durationLabel(
-                                  row.item.startsAt,
-                                  row.item.endsAt
-                                )}{" "}
-                                {orderId ? "· O.S. vinculada" : "· sem O.S."}
-                              </p>
-                            </div>
-                          </td>
-                          <td>
-                            <div className="flex min-w-[170px] flex-col items-start gap-2">
-                              <AppStatusBadge
-                                label={status.label}
-                                tone={status.tone}
-                              />
-                              {priority ? (
-                                <AppPriorityBadge
-                                  priority={priority}
-                                  label={appointmentPriorityLabel(priority)}
-                                />
-                              ) : (
-                                <AppStatusBadge {...operationalBadge} />
-                              )}
-                            </div>
-                          </td>
-                          <td>{row.ownerName}</td>
-                          <td onClick={event => event.stopPropagation()}>
-                            <div className="flex min-w-[140px] items-center justify-end gap-2">
-                              <Button
-                                size="sm"
-                                onClick={() =>
-                                  setSelectedAppointmentId(String(row.item.id))
+                          {nextActionLabel(row)}
+                        </Button>
+                        <AppRowActionsDropdown
+                          triggerLabel="Ações do agendamento"
+                          items={[
+                            {
+                              label: "Confirmar",
+                              onSelect: () =>
+                                void updateStatus(
+                                  String(row.item.id),
+                                  "CONFIRMED"
+                                ),
+                              disabled: !row.item.id,
+                              tone: "primary",
+                            },
+                            {
+                              label: "Iniciar atendimento",
+                              onSelect: () => {
+                                if (orderId) {
+                                  navigate(
+                                    `/service-orders?customerId=${row.customerId}&appointmentId=${row.item.id}`
+                                  );
+                                  return;
                                 }
-                              >
-                                {nextActionLabel(row)}
-                              </Button>
-                              <AppRowActionsDropdown
-                                triggerLabel="Ações do agendamento"
-                                items={[
-                                  {
-                                    label: "Confirmar",
-                                    onSelect: () =>
-                                      void updateStatus(
-                                        String(row.item.id),
-                                        "CONFIRMED"
-                                      ),
-                                    disabled: !row.item.id,
-                                    tone: "primary",
-                                  },
-                                  {
-                                    label: "Iniciar atendimento",
-                                    onSelect: () => {
-                                      if (orderId) {
-                                        navigate(
-                                          `/service-orders?customerId=${row.customerId}&appointmentId=${row.item.id}`
-                                        );
-                                        return;
-                                      }
-                                      setSelectedAppointmentId(
-                                        String(row.item.id)
-                                      );
-                                      setOpenServiceOrderModal(true);
-                                    },
-                                    disabled: !row.item.id,
-                                  },
-                                  {
-                                    label: "Cancelar",
-                                    onSelect: () =>
-                                      void updateStatus(
-                                        String(row.item.id),
-                                        "CANCELED"
-                                      ),
-                                    disabled: !row.item.id,
-                                  },
-                                  {
-                                    label: "Editar/Remarcar",
-                                    onSelect: () => {
-                                      setEditing(row.item);
-                                      setOpenModal(true);
-                                    },
-                                    disabled: !row.item.id,
-                                  },
-                                  {
-                                    label: "Criar O.S.",
-                                    onSelect: () => {
-                                      setSelectedAppointmentId(
-                                        String(row.item.id)
-                                      );
-                                      setOpenServiceOrderModal(true);
-                                    },
-                                    disabled: !row.item.id,
-                                  },
-                                  { type: "separator" },
-                                  {
-                                    label: "Abrir detalhe",
-                                    onSelect: () =>
-                                      setSelectedAppointmentId(
-                                        String(row.item.id)
-                                      ),
-                                    disabled: !row.item.id,
-                                  },
-                                  {
-                                    label: "Abrir cliente",
-                                    onSelect: () =>
-                                      navigate(
-                                        `/customers?customerId=${row.customerId}`
-                                      ),
-                                    disabled: !row.customerId,
-                                  },
-                                  {
-                                    label: "Enviar WhatsApp",
-                                    onSelect: () =>
-                                      goToWhatsAppAppointment(
-                                        String(row.customerId ?? ""),
-                                        String(row.item.id ?? "")
-                                      ),
-                                    disabled: !row.customerId || !row.item.id,
-                                  },
-                                  {
-                                    label: "Abrir O.S.",
-                                    onSelect: () =>
-                                      orderId
-                                        ? navigate(
-                                            `/service-orders?customerId=${row.customerId}&appointmentId=${row.item.id}`
-                                          )
-                                        : undefined,
-                                    disabled: !orderId,
-                                  },
-                                ]}
-                              />
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </AppDataTable>
+                                setSelectedAppointmentId(String(row.item.id));
+                                setOpenServiceOrderModal(true);
+                              },
+                              disabled: !row.item.id,
+                            },
+                            {
+                              label: "Cancelar",
+                              onSelect: () =>
+                                void updateStatus(
+                                  String(row.item.id),
+                                  "CANCELED"
+                                ),
+                              disabled: !row.item.id,
+                            },
+                            {
+                              label: "Editar/Remarcar",
+                              onSelect: () => {
+                                setEditing(row.item);
+                                setOpenModal(true);
+                              },
+                              disabled: !row.item.id,
+                            },
+                            {
+                              label: "Criar O.S.",
+                              onSelect: () => {
+                                setSelectedAppointmentId(String(row.item.id));
+                                setOpenServiceOrderModal(true);
+                              },
+                              disabled: !row.item.id,
+                            },
+                            { type: "separator" },
+                            {
+                              label: "Abrir cliente",
+                              onSelect: () =>
+                                navigate(
+                                  `/customers?customerId=${row.customerId}`
+                                ),
+                              disabled: !row.customerId,
+                            },
+                            {
+                              label: "Enviar WhatsApp",
+                              onSelect: () =>
+                                goToWhatsAppAppointment(
+                                  String(row.customerId ?? ""),
+                                  String(row.item.id ?? "")
+                                ),
+                              disabled: !row.customerId || !row.item.id,
+                            },
+                          ]}
+                        />
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
               <AppPagination
                 currentPage={currentPage}
