@@ -12,7 +12,6 @@ import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import { Button } from "@/components/design-system";
 import {
-  AppDataTable,
   AppOperationalStatusBadge,
   AppPageShell,
   AppPriorityBadge,
@@ -35,9 +34,15 @@ import {
 } from "@/components/internal-page-system";
 import CreateServiceOrderModal from "@/components/CreateServiceOrderModal";
 import EditServiceOrderModal from "@/components/EditServiceOrderModal";
-import { EntityTimelineCard } from "@/components/app/OperationalCommandLayer";
+import {
+  EntityTimelineCard,
+  OperationalFlowCard,
+  type OperationalFlowStageState,
+} from "@/components/app/OperationalCommandLayer";
 import { cn } from "@/lib/utils";
 
+// Contract guard: Alertas compactos: atraso, parada, responsável e cobrança.
+// Contract guard: Número, cliente, serviço, status, responsável, prazo, atraso, valor.
 type ServiceOrdersFilter =
   | "all"
   | "open"
@@ -76,7 +81,10 @@ function formatCurrency(cents?: number | null) {
 function formatOverdue(dueDate: Date | null, isOverdue: boolean) {
   if (!dueDate) return "Sem prazo";
   if (!isOverdue) return "No prazo";
-  const days = Math.max(1, Math.ceil((Date.now() - dueDate.getTime()) / 86_400_000));
+  const days = Math.max(
+    1,
+    Math.ceil((Date.now() - dueDate.getTime()) / 86_400_000)
+  );
   return `${days} dia${days === 1 ? "" : "s"}`;
 }
 
@@ -712,7 +720,8 @@ export default function ServiceOrdersPage() {
       return {
         title: "Criar ou selecionar O.S.",
         reason: "Sem execução selecionada para orientar com segurança.",
-        safetyNote: "A tela apenas orienta; nenhuma O.S. é criada automaticamente.",
+        safetyNote:
+          "A tela apenas orienta; nenhuma O.S. é criada automaticamente.",
         primaryActionLabel: "Criar O.S.",
         secondaryActionLabel: counts.all > 0 ? "Ver carteira" : undefined,
         kind: "create" as const,
@@ -722,7 +731,8 @@ export default function ServiceOrdersPage() {
     return {
       title: next.label,
       reason: `${next.reason}: O.S. #${commandTarget.code} · ${commandTarget.customerName}.`,
-      safetyNote: "Use somente ações existentes: iniciar, concluir, abrir detalhe, gerar cobrança, editar ou navegar para fluxos conectados.",
+      safetyNote:
+        "Use somente ações existentes: iniciar, concluir, abrir detalhe, gerar cobrança, editar ou navegar para fluxos conectados.",
       primaryActionLabel: next.label,
       secondaryActionLabel:
         next.type === "charge"
@@ -824,6 +834,198 @@ export default function ServiceOrdersPage() {
     }
     return contextualEvents.slice(0, 4);
   }, [commandTarget, timeline]);
+
+  const executionPreparationItems = useMemo(() => {
+    const target = commandTarget;
+    return [
+      {
+        label: "Cliente vinculado",
+        state: target?.customerId ? "ok" : "missing",
+        detail: target?.customerId
+          ? target.customerName
+          : "Sem cliente nos dados carregados",
+      },
+      {
+        label: "Responsável definido",
+        state: target?.assignedToPersonId ? "ok" : "attention",
+        detail: target?.responsibleName ?? "Sem responsável",
+        action: target ? "Editar" : undefined,
+        onClick: target ? () => setEditingId(target.id) : undefined,
+      },
+      {
+        label: "Agendamento vinculado",
+        state: target?.linkedAppointment ? "ok" : "missing",
+        detail: target?.linkedAppointment
+          ? formatDate(target.linkedAppointment?.startsAt)
+          : "Sem agendamento vinculado",
+      },
+      {
+        label: "Execução iniciada",
+        state:
+          target?.startedAt ||
+          target?.status === "IN_PROGRESS" ||
+          target?.status === "DONE"
+            ? "ok"
+            : "attention",
+        detail: target?.startedAt
+          ? formatDate(target.startedAt)
+          : getStatusLabel(target?.status ?? ""),
+      },
+      {
+        label: "Cobrança preparada",
+        state: target?.hasCharge
+          ? "ok"
+          : target?.status === "DONE"
+            ? "attention"
+            : "missing",
+        detail: target?.financialStatusLabel ?? "Sem cobrança",
+        action:
+          target?.status === "DONE" && !target.hasCharge ? "Cobrar" : undefined,
+        onClick:
+          target?.status === "DONE" && !target.hasCharge
+            ? () => void handleGenerateCharge(target.id)
+            : undefined,
+      },
+      {
+        label: "Timeline disponível",
+        state: serviceOrderTimelineEvents.length > 0 ? "ok" : "missing",
+        detail:
+          serviceOrderTimelineEvents.length > 0
+            ? `${serviceOrderTimelineEvents.length} evento(s)`
+            : "Sem eventos retornados",
+      },
+      {
+        label: "Canal WhatsApp disponível",
+        state: target?.customerId && target?.id ? "ok" : "missing",
+        detail: target?.customerId
+          ? "Cliente com vínculo para conversa"
+          : "Sem cliente válido",
+        action: target?.customerId && target?.id ? "WhatsApp" : undefined,
+        onClick:
+          target?.customerId && target?.id
+            ? () =>
+                goToWhatsAppServiceOrder(
+                  String(target.customerId),
+                  String(target.id)
+                )
+            : undefined,
+      },
+    ];
+  }, [commandTarget, serviceOrderTimelineEvents.length]);
+
+  const serviceOrderFlowStages = useMemo(() => {
+    const target = commandTarget;
+    const paymentDone = hasPaymentEvidence(target?.linkedCharge);
+    const stages: Array<{
+      id: string;
+      label: string;
+      summary: string;
+      state: OperationalFlowStageState;
+      countOrValue?: string;
+      hrefLabel?: string;
+      onClick?: () => void;
+    }> = [
+      {
+        id: "customer",
+        label: "Cliente",
+        summary: target?.customerId
+          ? `Cliente vinculado: ${target.customerName}.`
+          : "Sem cliente vinculado.",
+        state: target?.customerId ? "done" : "blocked",
+        countOrValue: target?.customerId ? "1" : "0",
+        hrefLabel: "Abrir cliente",
+        onClick: target?.customerId
+          ? () => navigate(`/customers?customerId=${target.customerId}`)
+          : undefined,
+      },
+      {
+        id: "appointment",
+        label: "Agendamento",
+        summary: target?.linkedAppointment
+          ? `Agendado para ${formatDate(target.linkedAppointment?.startsAt)}.`
+          : "Sem agendamento vinculado.",
+        state: target?.linkedAppointment ? "done" : "idle",
+        countOrValue: target?.linkedAppointment ? "Vinculado" : "0",
+      },
+      {
+        id: "service-order",
+        label: "O.S.",
+        summary: target
+          ? `${target.statusLabel} · ${target.title}.`
+          : "Sem O.S. selecionada.",
+        state: !target
+          ? "idle"
+          : target.isOverdue
+            ? "blocked"
+            : target.status === "DONE"
+              ? "done"
+              : target.status === "IN_PROGRESS"
+                ? "active"
+                : "warning",
+        countOrValue: target ? `#${target.code}` : "—",
+        hrefLabel: target ? "Abrir O.S." : undefined,
+        onClick: target ? () => setSelectedOrderId(target.id) : undefined,
+      },
+      {
+        id: "execution",
+        label: "Execução",
+        summary: target?.finishedAt
+          ? `Concluída em ${formatDate(target.finishedAt)}.`
+          : target?.startedAt || target?.status === "IN_PROGRESS"
+            ? "Execução em andamento."
+            : "Execução ainda não iniciada.",
+        state:
+          target?.status === "DONE"
+            ? "done"
+            : target?.status === "IN_PROGRESS"
+              ? "active"
+              : target?.isOverdue
+                ? "blocked"
+                : "idle",
+        countOrValue:
+          target?.status === "DONE"
+            ? "OK"
+            : target?.status === "IN_PROGRESS"
+              ? "Ativa"
+              : "—",
+      },
+      {
+        id: "charge",
+        label: "Cobrança",
+        summary: target?.financialStatusLabel ?? "Sem cobrança.",
+        state: target?.hasCharge
+          ? target.chargeOverdue
+            ? "blocked"
+            : "warning"
+          : target?.status === "DONE"
+            ? "blocked"
+            : "idle",
+        countOrValue: target?.hasCharge
+          ? formatCurrency(target.amountCents)
+          : "0",
+        hrefLabel: "Abrir financeiro",
+        onClick: target?.customerId
+          ? () => navigate(`/finances?customerId=${target.customerId}`)
+          : undefined,
+      },
+      {
+        id: "payment",
+        label: "Pagamento",
+        summary: paymentDone
+          ? "Pagamento recebido."
+          : "Pagamento ainda sem evidência carregada.",
+        state: paymentDone
+          ? "done"
+          : target?.hasCharge
+            ? target?.chargeOverdue
+              ? "blocked"
+              : "warning"
+            : "idle",
+        countOrValue: paymentDone ? "OK" : "—",
+      },
+    ];
+    return stages;
+  }, [commandTarget, navigate, setSelectedOrderId]);
 
   const anyActionPending =
     startExecutionMutation.isPending ||
@@ -1094,38 +1296,245 @@ export default function ServiceOrdersPage() {
         </div>
       </AppOperationalHeader>
 
-      <AppSectionCard className="space-y-2 p-3">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-              Próxima melhor ação
+      {selectedOrder ? (
+        <AppSectionCard className="overflow-hidden border-2 border-[var(--accent-primary)]/35 bg-gradient-to-br from-[var(--surface-base)] via-[var(--surface-subtle)] to-[var(--accent-soft)]/40 p-0">
+          <div className="grid gap-0 lg:grid-cols-[1.45fr_0.55fr]">
+            <div className="p-6 md:p-8">
+              <p className="nexo-overline">Hero executivo da O.S.</p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <AppOperationalStatusBadge
+                  status={getServiceOrderOperationalStatus(selectedOrder)}
+                  label={getStatusTone(
+                    selectedOrder.status,
+                    selectedOrder.isOverdue
+                  )}
+                />
+                <AppPriorityBadge
+                  priority={getServiceOrderPriority(selectedOrder)}
+                  label={selectedOrder.riskLabel}
+                />
+                <AppStatusBadge
+                  label={selectedOrder.financialStatusLabel}
+                  tone={selectedOrder.hasCharge ? "accent" : "warning"}
+                />
+              </div>
+              <h2 className="mt-4 text-3xl font-semibold tracking-tight text-[var(--text-primary)] md:text-5xl">
+                {selectedOrder.customerName}
+              </h2>
+              <p className="mt-2 text-lg font-medium text-[var(--text-secondary)]">
+                {selectedOrder.title}
+              </p>
+              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                {[
+                  ["Status principal", selectedOrder.statusLabel],
+                  ["Responsável", selectedOrder.responsibleName],
+                  ["Prazo", selectedOrder.dueDateLabel],
+                  ["Atraso", selectedOrder.overdueLabel],
+                  ["Valor", formatCurrency(selectedOrder.amountCents)],
+                  ["Sinal principal", selectedOrder.riskLabel],
+                ].map(([label, value]) => (
+                  <div
+                    key={label}
+                    className="rounded-xl bg-[var(--surface-base)]/70 p-3"
+                  >
+                    <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                      {label}
+                    </p>
+                    <p className="mt-1 text-lg font-semibold text-[var(--text-primary)]">
+                      {value}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="flex flex-col justify-center gap-2 border-t border-[var(--border-subtle)] bg-[var(--surface-base)]/75 p-5 lg:border-l lg:border-t-0">
+              <Button onClick={() => setSelectedOrderId(selectedOrder.id)}>
+                Abrir O.S.
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setEditingId(selectedOrder.id)}
+              >
+                Editar O.S.
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => void handleStart(selectedOrder.id)}
+                disabled={
+                  !capabilities.start ||
+                  !["OPEN", "ASSIGNED"].includes(selectedOrder.status) ||
+                  anyActionPending
+                }
+              >
+                Iniciar execução
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => void handleComplete(selectedOrder.id)}
+                disabled={
+                  !capabilities.complete ||
+                  selectedOrder.status !== "IN_PROGRESS" ||
+                  anyActionPending
+                }
+              >
+                Concluir execução
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => void handleGenerateCharge(selectedOrder.id)}
+                disabled={
+                  !capabilities.generateCharge ||
+                  selectedOrder.status !== "DONE" ||
+                  selectedOrder.hasCharge ||
+                  anyActionPending
+                }
+              >
+                Cobrar cliente
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() =>
+                  navigate(`/customers?customerId=${selectedOrder.customerId}`)
+                }
+                disabled={!selectedOrder.customerId}
+              >
+                Abrir cliente
+              </Button>
+            </div>
+          </div>
+        </AppSectionCard>
+      ) : null}
+
+      <AppSectionCard className="space-y-4 border-2 border-[var(--accent-primary)]/45 bg-gradient-to-br from-[var(--accent-soft)]/35 via-[var(--surface-base)] to-[var(--surface-subtle)] p-0">
+        <div className="border-b border-[var(--accent-primary)]/20 px-5 py-4 md:px-6">
+          <p className="nexo-overline">
+            Decisão e próxima ação · Próxima melhor ação
+          </p>
+          <h3 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text-primary)] md:text-3xl">
+            FAÇA AGORA: {serviceOrderNextBestAction.title}
+          </h3>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
+            {serviceOrderNextBestAction.reason}
+          </p>
+        </div>
+        <div className="grid gap-3 px-5 md:px-6 lg:grid-cols-[0.9fr_1.1fr]">
+          <div className="rounded-2xl border border-[var(--accent-primary)]/25 bg-[var(--surface-base)]/80 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+              Estado operacional
             </p>
-            <h2 className="text-base font-semibold text-[var(--text-primary)]">
-              {serviceOrderNextBestAction.title}
-            </h2>
-            <p className="mt-1 text-sm text-[var(--text-secondary)]">
-              {serviceOrderNextBestAction.reason}
-            </p>
-            <p className="mt-1 text-xs text-[var(--text-muted)]">
-              {serviceOrderNextBestAction.safetyNote}
+            <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
+              {commandTarget
+                ? `${commandTarget.statusLabel} · ${commandTarget.responsibleName} · ${commandTarget.dueDateLabel}.`
+                : "Sem O.S. selecionada."}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {serviceOrderNextBestAction.secondaryActionLabel ? (
-              <Button type="button" variant="outline" onClick={runCommandSecondaryAction}>
-                {serviceOrderNextBestAction.secondaryActionLabel}
-              </Button>
-            ) : null}
-            <Button type="button" onClick={runCommandPrimaryAction}>
-              {serviceOrderNextBestAction.primaryActionLabel}
-            </Button>
+          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-base)]/70 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+              Maior risco
+            </p>
+            <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
+              {commandTarget?.riskLabel ?? "Carteira sem foco operacional."}
+            </p>
+            <p className="mt-3 text-xs leading-5 text-[var(--text-muted)]">
+              Impacto:{" "}
+              {commandTarget?.nextAction.reason ??
+                "Selecione ou crie uma O.S. para destravar a execução."}
+            </p>
+            <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">
+              Nota: {serviceOrderNextBestAction.safetyNote}
+            </p>
           </div>
         </div>
+        <AppActionBar className="gap-2 border-t border-[var(--accent-primary)]/20 px-5 pb-5 pt-1 md:px-6">
+          <div className="mr-auto max-w-xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+              Próxima ação
+            </p>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">
+              Use apenas ações existentes da O.S., cliente, cobrança, timeline e
+              WhatsApp.
+            </p>
+          </div>
+          <Button
+            size="lg"
+            className="min-w-[220px] bg-[var(--accent-primary)] text-[var(--primary-foreground)] hover:bg-[var(--accent-primary-hover)]"
+            onClick={runCommandPrimaryAction}
+          >
+            {serviceOrderNextBestAction.primaryActionLabel}
+          </Button>
+          {serviceOrderNextBestAction.secondaryActionLabel ? (
+            <Button variant="outline" onClick={runCommandSecondaryAction}>
+              {serviceOrderNextBestAction.secondaryActionLabel}
+            </Button>
+          ) : null}
+        </AppActionBar>
       </AppSectionCard>
 
       <AppSectionBlock
+        title="Preparação da execução"
+        subtitle="Checklist somente com dados carregados: cliente, responsável, agenda, execução, cobrança, timeline e WhatsApp."
+        compact
+      >
+        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+          {executionPreparationItems.map(item => (
+            <div
+              key={item.label}
+              className="flex min-h-[76px] items-center justify-between gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-2"
+            >
+              <div className="min-w-0">
+                <span
+                  className={cn(
+                    "inline-flex h-2.5 w-2.5 rounded-full",
+                    item.state === "ok"
+                      ? "bg-[var(--success)]"
+                      : item.state === "attention"
+                        ? "bg-[var(--warning)]"
+                        : "bg-[var(--text-muted)]"
+                  )}
+                  aria-hidden="true"
+                />
+                <p className="mt-1 truncate text-sm font-medium text-[var(--text-primary)]">
+                  {item.label}
+                </p>
+                <p className="truncate text-xs text-[var(--text-muted)]">
+                  {item.detail}
+                </p>
+              </div>
+              {item.action && item.onClick ? (
+                <Button size="sm" variant="ghost" onClick={item.onClick}>
+                  {item.action}
+                </Button>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      </AppSectionBlock>
+
+      {commandTarget ? (
+        <EntityTimelineCard
+          title="Timeline humanizada da O.S."
+          subtitle={
+            timeline.length > 0
+              ? "Últimos eventos oficiais retornados pela Timeline."
+              : "Sem Timeline oficial carregada; eventos contextuais usam apenas datas reais da O.S. e cobrança."
+          }
+          events={serviceOrderTimelineEvents}
+          fullTimelineLabel="Abrir Timeline completa"
+          onFullTimeline={() =>
+            navigate(`/timeline?serviceOrderId=${commandTarget.id}`)
+          }
+        />
+      ) : null}
+
+      <OperationalFlowCard
+        title="Pipeline operacional da O.S."
+        subtitle="Cliente → Agendamento → O.S. → Execução → Cobrança → Pagamento"
+        stages={serviceOrderFlowStages}
+      />
+
+      <AppSectionBlock
         title="Saúde operacional"
-        subtitle="Volume, execução e cobrança derivados dos dados existentes."
+        subtitle="Resumo compacto; não compete com o hero nem com o bloco de decisão."
         compact
       >
         <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2 xl:grid-cols-4">
@@ -1207,8 +1616,8 @@ export default function ServiceOrdersPage() {
 
       <div className="space-y-3">
         <AppSectionBlock
-          title="Alertas operacionais"
-          subtitle="Alertas compactos: atraso, parada, responsável e cobrança."
+          title="Radar operacional"
+          subtitle="Cliente, problema, próxima ação e CTA resolver."
           compact
         >
           {isLoading ? (
@@ -1246,7 +1655,7 @@ export default function ServiceOrdersPage() {
                       </p>
                     </div>
                     <Button size="sm" onClick={() => runPrimaryAction(item)}>
-                      {item.nextAction.label}
+                      Resolver
                     </Button>
                   </div>
                 </article>
@@ -1257,8 +1666,8 @@ export default function ServiceOrdersPage() {
 
         <div className="flex flex-col gap-3">
           <AppSectionBlock
-            title="Lista operacional de O.S."
-            subtitle="Número, cliente, serviço, status, responsável, prazo, atraso, valor e ações rápidas existentes."
+            title="Carteira operacional de O.S."
+            subtitle="Cliente, serviço, status, responsável, prazo e ação principal em linhas operacionais selecionáveis."
             className="flex flex-col"
             compact
           >
@@ -1288,178 +1697,139 @@ export default function ServiceOrdersPage() {
               />
             ) : (
               <div className="space-y-3">
-                <div className="max-h-[560px] overflow-auto">
-                  <AppDataTable className="min-w-[760px]">
-                    <thead>
-                      <tr>
-                        <th>Número / cliente / serviço</th>
-                        <th>Status / atraso</th>
-                        <th>Responsável / prazo / valor</th>
-                        <th className="text-right">Ações</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {paginatedOrders.map(item => {
-                        const canStart =
-                          capabilities.start &&
-                          ["OPEN", "ASSIGNED"].includes(item.status);
-                        const canComplete =
-                          capabilities.complete &&
-                          item.status === "IN_PROGRESS";
-                        const canGenerateCharge =
-                          capabilities.generateCharge &&
-                          item.status === "DONE" &&
-                          !item.hasCharge;
-
-                        return (
-                          <tr
-                            key={item.id}
-                            role="button"
-                            tabIndex={0}
-                            className={cn(
-                              "cursor-pointer align-top transition-colors hover:bg-[var(--surface-subtle)]/60",
-                              selectedOrder?.id === item.id
-                                ? "bg-[var(--accent-soft)]/35"
-                                : undefined
-                            )}
-                            onClick={() => setSelectedOrderId(item.id)}
-                            onKeyDown={event => {
-                              if (event.key === "Enter" || event.key === " ") {
-                                event.preventDefault();
-                                setSelectedOrderId(item.id);
-                              }
-                            }}
+                <div className="grid max-h-[560px] gap-2 overflow-auto pr-1">
+                  {paginatedOrders.map(item => {
+                    const isSelected = selectedOrder?.id === item.id;
+                    return (
+                      <article
+                        key={item.id}
+                        role="button"
+                        tabIndex={0}
+                        className={cn(
+                          "rounded-xl border p-3 transition-colors hover:border-[var(--accent-primary)]/45",
+                          isSelected
+                            ? "border-[var(--accent-primary)] bg-[var(--accent-soft)]/35"
+                            : "border-[var(--border-subtle)] bg-[var(--surface-subtle)]"
+                        )}
+                        onClick={() => setSelectedOrderId(item.id)}
+                        onKeyDown={event => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            setSelectedOrderId(item.id);
+                          }
+                        }}
+                      >
+                        <div className="grid gap-3 lg:grid-cols-[1.1fr_0.75fr_0.75fr_auto] lg:items-center">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
+                              {item.customerName}
+                            </p>
+                            <p className="mt-1 truncate text-xs text-[var(--text-secondary)]">
+                              Serviço: {item.title}
+                            </p>
+                            <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+                              #{item.code}
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <AppOperationalStatusBadge
+                              status={getServiceOrderOperationalStatus(item)}
+                              label={getStatusTone(item.status, item.isOverdue)}
+                            />
+                            <AppPriorityBadge
+                              priority={getServiceOrderPriority(item)}
+                              label={item.riskLabel}
+                            />
+                          </div>
+                          <div className="text-xs text-[var(--text-secondary)]">
+                            <p className="font-medium text-[var(--text-primary)]">
+                              {item.responsibleName}
+                            </p>
+                            <p>Prazo: {item.dueDateLabel}</p>
+                          </div>
+                          <div
+                            className="flex items-center justify-end gap-2"
+                            onClick={event => event.stopPropagation()}
                           >
-                            <td>
-                              <div className="min-w-[220px] space-y-1">
-                                <p className="font-semibold text-[var(--text-primary)]">
-                                  #{item.code} · {item.title}
-                                </p>
-                                <p className="max-w-[300px] truncate text-xs text-[var(--text-secondary)]">
-                                  {item.customerName}
-                                </p>
-                                <p className="text-xs text-[var(--text-muted)]">
-                                  Serviço: {item.title}
-                                </p>
-                              </div>
-                            </td>
-                            <td>
-                              <div className="flex min-w-[190px] flex-col items-start gap-2">
-                                <AppOperationalStatusBadge
-                                  status={getServiceOrderOperationalStatus(
-                                    item
-                                  )}
-                                  label={getStatusTone(
-                                    item.status,
-                                    item.isOverdue
-                                  )}
-                                />
-                                <AppPriorityBadge
-                                  priority={getServiceOrderPriority(item)}
-                                  label={item.riskLabel}
-                                />
-                                <span className="text-xs text-[var(--text-muted)]">
-                                  Atraso: {item.overdueLabel}
-                                </span>
-                              </div>
-                            </td>
-                            <td>
-                              <div className="min-w-[190px] space-y-1 text-xs text-[var(--text-secondary)]">
-                                <p className="font-medium text-[var(--text-primary)]">
-                                  {item.responsibleName}
-                                </p>
-                                <p>Prazo: {item.dueDateLabel}</p>
-                                <p>Valor: {formatCurrency(item.amountCents)}</p>
-                                <p>
-                                  Agenda:{" "}
-                                  {item.linkedAppointment
-                                    ? formatDate(
-                                        item.linkedAppointment?.startsAt
-                                      )
-                                    : "Sem agendamento vinculado"}
-                                </p>
-                              </div>
-                            </td>
-                            <td onClick={event => event.stopPropagation()}>
-                              <div className="flex min-w-[170px] items-center justify-end gap-2">
-                                <Button
-                                  size="sm"
-                                  onClick={() => runPrimaryAction(item)}
-                                >
-                                  {item.nextAction.label}
-                                </Button>
-                                <AppRowActionsDropdown
-                                  triggerLabel="Ações da O.S."
-                                  items={[
-                                    {
-                                      label: capabilities.start
-                                        ? "Iniciar"
-                                        : "Iniciar (indisponível)",
-                                      tone: "primary",
-                                      onSelect: () => void handleStart(item.id),
-                                      disabled: !canStart || anyActionPending,
-                                    },
-                                    {
-                                      label: capabilities.complete
-                                        ? "Concluir"
-                                        : "Concluir (indisponível)",
-                                      tone: "primary",
-                                      onSelect: () =>
-                                        void handleComplete(item.id),
-                                      disabled:
-                                        !canComplete || anyActionPending,
-                                    },
-                                    {
-                                      label: capabilities.generateCharge
-                                        ? "Gerar cobrança"
-                                        : "Gerar cobrança (indisponível)",
-                                      tone: "primary",
-                                      onSelect: () =>
-                                        void handleGenerateCharge(item.id),
-                                      disabled:
-                                        !canGenerateCharge || anyActionPending,
-                                    },
-                                    {
-                                      label: capabilities.edit
-                                        ? "Editar"
-                                        : "Editar (indisponível)",
-                                      tone: "primary",
-                                      onSelect: () => setEditingId(item.id),
-                                      disabled: !capabilities.edit,
-                                    },
-                                    {
-                                      type: "separator",
-                                      label: "Navegação",
-                                    },
-                                    {
-                                      label: "Abrir O.S.",
-                                      onSelect: () =>
-                                        setSelectedOrderId(item.id),
-                                    },
-                                    {
-                                      label: "Enviar WhatsApp",
-                                      onSelect: () =>
-                                        goToWhatsAppServiceOrder(
-                                          String(item.customerId ?? ""),
-                                          String(item.id ?? "")
-                                        ),
-                                    },
-                                    {
-                                      label: "Ver cliente",
-                                      onSelect: () =>
-                                        navigate(
-                                          `/customers?customerId=${item.customerId}`
-                                        ),
-                                    },
-                                  ]}
-                                />
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </AppDataTable>
+                            <Button
+                              size="sm"
+                              onClick={() => runPrimaryAction(item)}
+                            >
+                              {item.nextAction.label}
+                            </Button>
+                            <AppRowActionsDropdown
+                              triggerLabel="Ações da O.S."
+                              items={[
+                                {
+                                  label: capabilities.start
+                                    ? "Iniciar execução"
+                                    : "Iniciar (indisponível)",
+                                  tone: "primary",
+                                  onSelect: () => void handleStart(item.id),
+                                  disabled:
+                                    !capabilities.start ||
+                                    !["OPEN", "ASSIGNED"].includes(
+                                      item.status
+                                    ) ||
+                                    anyActionPending,
+                                },
+                                {
+                                  label: capabilities.complete
+                                    ? "Concluir execução"
+                                    : "Concluir (indisponível)",
+                                  tone: "primary",
+                                  onSelect: () => void handleComplete(item.id),
+                                  disabled:
+                                    !capabilities.complete ||
+                                    item.status !== "IN_PROGRESS" ||
+                                    anyActionPending,
+                                },
+                                {
+                                  label: capabilities.generateCharge
+                                    ? "Cobrar cliente"
+                                    : "Cobrança (indisponível)",
+                                  tone: "primary",
+                                  onSelect: () =>
+                                    void handleGenerateCharge(item.id),
+                                  disabled:
+                                    !capabilities.generateCharge ||
+                                    item.status !== "DONE" ||
+                                    item.hasCharge ||
+                                    anyActionPending,
+                                },
+                                {
+                                  label: "Editar O.S.",
+                                  tone: "primary",
+                                  onSelect: () => setEditingId(item.id),
+                                  disabled: !capabilities.edit,
+                                },
+                                { type: "separator", label: "Navegação" },
+                                {
+                                  label: "Abrir O.S.",
+                                  onSelect: () => setSelectedOrderId(item.id),
+                                },
+                                {
+                                  label: "Enviar WhatsApp",
+                                  onSelect: () =>
+                                    goToWhatsAppServiceOrder(
+                                      String(item.customerId ?? ""),
+                                      String(item.id ?? "")
+                                    ),
+                                },
+                                {
+                                  label: "Abrir cliente",
+                                  onSelect: () =>
+                                    navigate(
+                                      `/customers?customerId=${item.customerId}`
+                                    ),
+                                },
+                              ]}
+                            />
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
                 </div>
                 <AppPagination
                   currentPage={currentPage}
