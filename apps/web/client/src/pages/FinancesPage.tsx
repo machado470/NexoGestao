@@ -13,7 +13,6 @@ import { CreateChargeModal } from "@/components/CreateChargeModal";
 import { FormModal } from "@/components/app-modal-system";
 import {
   AppActionBar,
-  AppDataTable,
   AppFiltersBar,
   AppPageEmptyState,
   AppPageErrorState,
@@ -180,6 +179,45 @@ function statusMatchesFilter(status: string, filter: StatusFilter) {
 function safeText(value: unknown, fallback = "—") {
   const text = String(value ?? "").trim();
   return text.length > 0 ? text : fallback;
+}
+
+const RAW_TECHNICAL_PATTERN =
+  /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b|\b[0-9a-f]{24,}\b|EXECUTION_STARTED|EXECUTION_EXECUTED|action-send-overdue-charge-reminder|action-create-charge-followup|eventType|endpoint|BFF|backend|payload|metadata/gi;
+
+function sanitizeFinancialText(value: unknown, fallback = "Informação financeira registrada") {
+  const text = safeText(value, fallback).replace(RAW_TECHNICAL_PATTERN, "").trim();
+  return text.length > 0 ? text : fallback;
+}
+
+function humanizeFinancialTimelineEvent(item: Record<string, any>) {
+  const source = `${item?.type ?? ""} ${item?.category ?? ""} ${item?.title ?? ""} ${item?.description ?? ""}`.toLowerCase();
+  if (source.includes("paid") || source.includes("pagamento")) return "Pagamento registrado";
+  if (source.includes("cancel")) return "Cobrança cancelada";
+  if (source.includes("sent") || source.includes("enviad")) return "Cobrança enviada";
+  if (source.includes("reminder") || source.includes("lembrete")) {
+    return source.includes("sent") || source.includes("enviad")
+      ? "Lembrete de cobrança enviado"
+      : "Lembrete de cobrança preparado";
+  }
+  if (source.includes("created") || source.includes("criad")) return "Cobrança criada";
+  if (source.includes("charge") || source.includes("cobran")) return "Ação financeira registrada";
+  return "Evento financeiro registrado";
+}
+
+function getFinancialBusinessLabel(value: unknown, fallback = "Origem não informada pela fonte atual") {
+  const text = sanitizeFinancialText(value, "");
+  if (!text) return fallback;
+  return text;
+}
+
+function safeFinancialEntityName(value: unknown, fallback = "Cliente não identificado") {
+  return sanitizeFinancialText(value, fallback);
+}
+
+function getServiceOrderBusinessLabel(charge: ChargeRecord) {
+  if (charge?.serviceOrderId || charge?.serviceOrder) return "O.S. vinculada";
+  if ("serviceOrderId" in charge || "serviceOrder" in charge) return "Sem O.S. vinculada";
+  return "Origem não informada pela fonte atual";
 }
 
 function getChargePrimaryAction(charge: ChargeRecord) {
@@ -355,13 +393,10 @@ export default function FinancesPage() {
         customer,
         serviceOrder,
         customerName: String(
-          customer?.name ?? charge?.customerName ?? "Cliente não identificado"
+          safeFinancialEntityName(customer?.name ?? charge?.customerName)
         ),
         serviceOrderLabel: String(
-          serviceOrder?.number ??
-            serviceOrder?.id ??
-            serviceOrderId ??
-            "Sem O.S."
+          serviceOrder?.number ? `O.S. ${serviceOrder.number}` : getServiceOrderBusinessLabel({ ...charge, serviceOrderId, serviceOrder })
         ),
         overdueDays,
       } as ChargeRecord;
@@ -783,7 +818,7 @@ export default function FinancesPage() {
         target,
         title: "Cobrar cliente",
         entity: `${target.customerName} · ${formatCurrency(Number(target.amountCents ?? 0))}`,
-        reason: `Cobrança vencida há ${target.overdueDays} dia(s), vinculada à O.S. ${target.serviceOrderLabel}.`,
+        reason: `Cobrança vencida há ${target.overdueDays} dia(s), com origem operacional: ${getServiceOrderBusinessLabel(target)}.`,
         impact:
           "Destravar recebimento e registrar ação que sustenta caixa, Timeline e Governança.",
         safetyNote:
@@ -859,15 +894,11 @@ export default function FinancesPage() {
     if (timelineItems.length > 0) {
       return timelineItems.slice(0, 4).map(item => ({
         id: String(item?.id ?? `${item?.createdAt ?? ""}-${item?.title ?? ""}`),
-        type: String(item?.type ?? item?.category ?? "Timeline"),
+        type: humanizeFinancialTimelineEvent(item),
         occurredAt: formatDate(item?.createdAt),
-        entity: String(item?.title ?? item?.description ?? "Evento financeiro"),
+        entity: sanitizeFinancialText(item?.title ?? item?.description, "Evento financeiro registrado"),
         actor: item?.actor?.name ?? item?.user?.name ?? undefined,
-        summary: String(
-          item?.description ??
-            item?.summary ??
-            "Evento oficial retornado pela Timeline."
-        ),
+        summary: sanitizeFinancialText(item?.description ?? item?.summary, "Evento financeiro registrado na Timeline."),
       }));
     }
 
@@ -880,7 +911,7 @@ export default function FinancesPage() {
     }> = [];
     if (selectedFinancialRecord?.id) {
       contextualEvents.push({
-        id: `charge-${selectedFinancialRecord.id}`,
+        id: "charge-contextual",
         type: "Cobrança contextual",
         occurredAt: formatDate(
           selectedFinancialRecord.createdAt ?? selectedFinancialRecord.dueDate
@@ -894,7 +925,7 @@ export default function FinancesPage() {
       : [];
     for (const payment of payments.slice(0, 3)) {
       contextualEvents.push({
-        id: `payment-${payment?.id ?? payment?.paidAt ?? contextualEvents.length}`,
+        id: `payment-contextual-${contextualEvents.length}`,
         type: "Pagamento contextual",
         occurredAt: formatDate(payment?.paidAt ?? payment?.createdAt),
         entity: `${safeText(selectedFinancialRecord.customerName, "Cliente")} · ${formatCurrency(Number(payment?.amountCents ?? 0))}`,
@@ -971,12 +1002,12 @@ export default function FinancesPage() {
         value:
           pendingWithoutWhatsApp.length > 0
             ? String(pendingWithoutWhatsApp.length)
-            : "fallback",
+            : "Sem histórico",
         consequence:
           pendingWithoutWhatsApp.length > 0
             ? "Há pendência sem comunicação registrada nos campos retornados."
             : communicationUnknownCount > 0
-              ? "Backend não retornou telemetria de envio; use WhatsApp contextual para cobrar."
+              ? "Nenhum histórico de envio disponível nesta leitura. Use o WhatsApp contextual para continuar a cobrança."
               : "Nenhuma pendência sem envio registrada.",
         actionLabel: "Abrir pendências",
         onAction: () => setStatusFilter("pending"),
@@ -1005,11 +1036,11 @@ export default function FinancesPage() {
         value:
           paidWithoutRegisteredPayment.length > 0
             ? String(paidWithoutRegisteredPayment.length)
-            : "fallback",
+            : "Conferir",
         consequence:
           paidWithoutRegisteredPayment.length > 0
             ? "Cobrança paga sem lista de pagamentos vinculada no detalhe."
-            : "Endpoint de lista geral de pagamentos não está exposto; detalhe busca pagamentos apenas por cobrança.",
+            : "Nenhum histórico consolidado de pagamentos disponível nesta leitura. Confira a cobrança selecionada.",
         actionLabel: "Conferir detalhe",
         onAction: () =>
           selectedChargeId
@@ -1019,9 +1050,9 @@ export default function FinancesPage() {
       {
         key: "communication-failure",
         title: "Falha de cobrança/comunicação",
-        value: "fallback",
+        value: "Acompanhar",
         consequence:
-          "A página não recebeu campo de falha de envio; sem inventar incidentes.",
+          "Sem falha de comunicação comprovada nesta leitura; continue a cobrança pelo WhatsApp contextual.",
         actionLabel: "Usar WhatsApp contextual",
         onAction: () =>
           selectedCharge
@@ -1222,6 +1253,21 @@ export default function FinancesPage() {
         </p>
       </AppOperationalHeader>
 
+      <AppSectionBlock
+        title="Hero Executivo Financeiro"
+        subtitle="Contexto executivo: dinheiro recebido, pendente, em risco e a próxima ação para converter execução em receita."
+        compact
+      >
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+          <AppInfoCard><p className="text-xs uppercase text-[var(--text-muted)]">Dinheiro recebido</p><p className="mt-2 text-lg font-semibold text-[var(--text-primary)]">{formatCurrency(health.received)}</p></AppInfoCard>
+          <AppInfoCard><p className="text-xs uppercase text-[var(--text-muted)]">Dinheiro pendente</p><p className="mt-2 text-lg font-semibold text-[var(--text-primary)]">{formatCurrency(health.receivable)}</p></AppInfoCard>
+          <AppInfoCard><p className="text-xs uppercase text-[var(--text-muted)]">Dinheiro em risco</p><p className="mt-2 text-lg font-semibold text-[var(--text-primary)]">{formatCurrency(health.overdue)}</p></AppInfoCard>
+          <AppInfoCard><p className="text-xs uppercase text-[var(--text-muted)]">Maior cobrança em atraso</p><p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">{mostCriticalCharge?.status === "OVERDUE" ? formatCurrency(Number(mostCriticalCharge.amountCents ?? 0)) : "Sem atraso dominante"}</p></AppInfoCard>
+          <AppInfoCard><p className="text-xs uppercase text-[var(--text-muted)]">Cliente prioritário</p><p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">{safeFinancialEntityName(mostCriticalCharge?.customerName, "Sem prioridade crítica")}</p></AppInfoCard>
+          <AppInfoCard><p className="text-xs uppercase text-[var(--text-muted)]">Próxima ação financeira</p><p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">{financeNextBestAction.title}</p></AppInfoCard>
+        </div>
+      </AppSectionBlock>
+
       <div className="grid gap-3 xl:grid-cols-2">
         <OperationalStateCard
           title="Estado financeiro operacional"
@@ -1251,7 +1297,12 @@ export default function FinancesPage() {
       </div>
 
       <AppSectionCard className="space-y-0 border-0 bg-transparent p-0">
-        <span className="sr-only">Próxima melhor ação financeira</span>
+        <span className="sr-only">Próxima melhor ação financeira · FAÇA AGORA: comando financeiro dominante</span>
+        <div className="mb-2 rounded-xl border border-[var(--accent-primary)] bg-[var(--accent-soft)] p-4">
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--accent-primary)]">FAÇA AGORA</p>
+          <p className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">{financeNextBestAction.title}</p>
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">{financeNextBestAction.reason}</p>
+        </div>
         <NextBestActionCard
           title={financeNextBestAction.title}
           entity={financeNextBestAction.entity}
@@ -1381,8 +1432,8 @@ export default function FinancesPage() {
       </AppSectionBlock>
 
       <AppSectionBlock
-        title="Alertas compactos de receita"
-        subtitle={`Cobranças vencidas, pendentes, pagamentos sem registro e comunicação somente quando a fonte permite. ${highlightedFinancialSummary.hidden > 0 ? highlightedFinancialSummary.hiddenMessage : ""}`}
+        title="Radar financeiro"
+        subtitle={`Alertas densos para proteger caixa, cobrança e conversão da execução em receita. ${highlightedFinancialSummary.hidden > 0 ? highlightedFinancialSummary.hiddenMessage : ""}`}
         compact
       >
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
@@ -1403,7 +1454,7 @@ export default function FinancesPage() {
                 variant="outline"
                 onClick={item.onAction}
               >
-                {item.actionLabel}
+                {item.actionLabel === "Abrir pendências" ? "Resolver" : item.actionLabel}
               </Button>
             </AppInfoCard>
           ))}
@@ -1419,7 +1470,7 @@ export default function FinancesPage() {
             <input
               value={searchTerm}
               onChange={event => setSearchTerm(event.target.value)}
-              placeholder="Buscar cliente, O.S., status ou ID"
+              placeholder="Buscar cliente, O.S. ou status"
               className="h-9 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)]"
             />
           </div>
@@ -1468,13 +1519,7 @@ export default function FinancesPage() {
 
         {hasFiltersContext ? (
           <p className="text-xs text-[var(--text-muted)]">
-            Contexto ativo via URL:{" "}
-            {queryParams.customerId
-              ? `customerId=${queryParams.customerId} `
-              : ""}
-            {queryParams.serviceOrderId
-              ? `serviceOrderId=${queryParams.serviceOrderId}`
-              : ""}
+            Contexto ativo por seleção operacional.
           </p>
         ) : null}
 
@@ -1513,167 +1558,87 @@ export default function FinancesPage() {
         !allQueriesErrored &&
         filteredCharges.length > 0 ? (
           <>
-            <AppDataTable className="min-w-[760px]">
-              <thead className="bg-[var(--surface-elevated)] text-xs text-[var(--text-muted)]">
-                <tr>
-                  <th className="p-2.5 text-left">Cliente</th>
-                  <th className="text-left">Valor / status</th>
-                  <th className="text-left">Vencimento / atraso</th>
-                  <th className="text-left">Origem / O.S.</th>
-                  <th className="text-left">Prioridade</th>
-                  <th className="p-2.5 text-left">Ação</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedCharges.map(row => {
-                  const primaryAction = getChargePrimaryAction(row);
-                  return (
-                    <tr
-                      key={String(row?.id ?? "")}
-                      className="cursor-pointer border-t border-[var(--border-subtle)] hover:bg-[var(--surface-subtle)]/60"
-                      onClick={() => setSelectedChargeId(String(row?.id ?? ""))}
-                    >
-                      <td className="p-2.5">
-                        <div>
-                          <p className="font-medium text-[var(--text-primary)]">
-                            {row.customerName}
-                          </p>
-                          <p className="text-xs text-[var(--text-muted)]">
-                            {safeText(
-                              row?.customer?.phone,
-                              "Telefone não retornado"
-                            )}
-                          </p>
-                        </div>
-                      </td>
-                      <td>
-                        <div className="space-y-2">
-                          <p className="font-medium text-[var(--text-primary)]">
-                            {formatCurrency(Number(row?.amountCents ?? 0))}
-                          </p>
-                          <AppStatusBadge
-                            label={chargeStatusLabel(row.status)}
-                            tone={getChargeStatusTone(row.status)}
-                          />
-                        </div>
-                      </td>
-                      <td>
-                        <div className="space-y-1 text-xs text-[var(--text-secondary)]">
-                          <p className="font-medium text-[var(--text-primary)]">
-                            {formatDate(row?.dueDate)}
-                          </p>
-                          <p>
-                            {row.status === "OVERDUE"
-                              ? `${row.overdueDays} dia(s)`
-                              : "Sem atraso"}
-                          </p>
-                        </div>
-                      </td>
-                      <td>
-                        <div className="space-y-1 text-xs text-[var(--text-secondary)]">
-                          <p className="font-medium text-[var(--text-primary)]">
-                            {safeText(
-                              row.serviceOrderLabel,
-                              "Origem não retornada"
-                            )}
-                          </p>
-                          <p>
-                            {row.serviceOrderId
-                              ? "O.S. vinculada"
-                              : "Fonte não informou O.S."}
-                          </p>
-                        </div>
-                      </td>
-                      <td>
+            <div className="grid gap-3">
+              {paginatedCharges.map(row => {
+                const primaryAction = getChargePrimaryAction(row);
+                const selected = selectedChargeId === String(row?.id ?? "");
+                return (
+                  <button
+                    key={String(row?.id ?? "")}
+                    type="button"
+                    className={cn(
+                      "w-full rounded-2xl border p-4 text-left transition-colors",
+                      selected
+                        ? "border-[var(--accent-primary)] bg-[var(--accent-soft)]"
+                        : "border-[var(--border-subtle)] bg-[var(--surface-base)] hover:bg-[var(--surface-subtle)]/70"
+                    )}
+                    onClick={() => setSelectedChargeId(String(row?.id ?? ""))}
+                  >
+                    <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr_1fr_1fr_auto] lg:items-center">
+                      <div>
+                        <p className="text-sm font-semibold text-[var(--text-primary)]">
+                          {safeFinancialEntityName(row.customerName)}
+                        </p>
+                        <p className="mt-1 text-xs text-[var(--text-muted)]">
+                          {safeText(row?.customer?.phone, "Contato não informado")}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-base font-semibold text-[var(--text-primary)]">
+                          {formatCurrency(Number(row?.amountCents ?? 0))}
+                        </p>
+                        <AppStatusBadge
+                          label={chargeStatusLabel(row.status)}
+                          tone={getChargeStatusTone(row.status)}
+                        />
+                      </div>
+                      <div className="text-xs text-[var(--text-secondary)]">
+                        <p className="font-medium text-[var(--text-primary)]">
+                          {row.status === "OVERDUE"
+                            ? `${row.overdueDays} dia(s) em atraso`
+                            : `Vence em ${formatDate(row?.dueDate)}`}
+                        </p>
+                        <p>{getFinancialBusinessLabel(getServiceOrderBusinessLabel(row))}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
                         <AppPriorityBadge priority={getChargePriority(row)} />
-                      </td>
-                      <td
-                        className="p-2.5"
+                        <span className="text-xs text-[var(--text-muted)]">
+                          {primaryAction.reason}
+                        </span>
+                      </div>
+                      <div
+                        className="flex items-center justify-end gap-2"
                         onClick={event => event.stopPropagation()}
                       >
-                        <div className="flex min-w-[160px] items-center justify-end gap-2">
-                          <Button
-                            size="sm"
-                            variant={
-                              primaryAction.kind === "collect"
-                                ? "default"
-                                : "outline"
-                            }
-                            onClick={() => {
-                              setSelectedChargeId(String(row?.id ?? ""));
-                              if (primaryAction.kind === "collect")
-                                goToWhatsApp(row);
-                            }}
-                            disabled={row.status === "CANCELED"}
-                          >
-                            {primaryAction.label}
-                          </Button>
-                          <AppRowActionsDropdown
-                            items={[
-                              {
-                                label: "Ver histórico",
-                                onSelect: () =>
-                                  setSelectedChargeId(String(row?.id ?? "")),
-                              },
-                              {
-                                label: "Marcar como pago",
-                                onSelect: () => void openMarkAsPaid(row),
-                                disabled:
-                                  row.status === "PAID" ||
-                                  row.status === "CANCELED",
-                                tone: "primary",
-                              },
-                              {
-                                label:
-                                  normalizeStatus(row?.status) === "PAID"
-                                    ? "WhatsApp pós-pagamento"
-                                    : "Cobrar via WhatsApp",
-                                onSelect: () => goToWhatsApp(row),
-                                disabled: !row.customerId,
-                                tone: "primary",
-                              },
-                              {
-                                label: "Enviar link",
-                                onSelect: () => goToWhatsApp(row),
-                                disabled:
-                                  !row.customerId ||
-                                  row.status === "PAID" ||
-                                  row.status === "CANCELED",
-                              },
-                              {
-                                label: "Editar cobrança",
-                                onSelect: () => openEditCharge(row),
-                                disabled:
-                                  row.status === "PAID" ||
-                                  row.status === "CANCELED",
-                              },
-                              {
-                                label: "Cancelar cobrança",
-                                onSelect: () => void handleCancelCharge(row),
-                                disabled:
-                                  row.status === "PAID" ||
-                                  row.status === "CANCELED",
-                              },
-                              { type: "separator", label: "Navegação" },
-                              {
-                                label: "Abrir cliente",
-                                onSelect: () => goToCustomer(row),
-                                disabled: !row.customerId,
-                              },
-                              {
-                                label: "Abrir O.S.",
-                                onSelect: () => goToServiceOrder(row),
-                                disabled: !row.serviceOrderId,
-                              },
-                            ]}
-                          />
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </AppDataTable>
+                        <Button
+                          size="sm"
+                          variant={primaryAction.kind === "collect" ? "default" : "outline"}
+                          onClick={() => {
+                            setSelectedChargeId(String(row?.id ?? ""));
+                            if (primaryAction.kind === "collect") goToWhatsApp(row);
+                          }}
+                          disabled={row.status === "CANCELED"}
+                        >
+                          {primaryAction.label}
+                        </Button>
+                        <AppRowActionsDropdown
+                          items={[
+                            { label: "Ver detalhe", onSelect: () => setSelectedChargeId(String(row?.id ?? "")) },
+                            { label: "Marcar como pago", onSelect: () => void openMarkAsPaid(row), disabled: row.status === "PAID" || row.status === "CANCELED", tone: "primary" },
+                            { label: normalizeStatus(row?.status) === "PAID" ? "WhatsApp pós-pagamento" : "Cobrar via WhatsApp", onSelect: () => goToWhatsApp(row), disabled: !row.customerId, tone: "primary" },
+                            { label: "Editar cobrança", onSelect: () => openEditCharge(row), disabled: row.status === "PAID" || row.status === "CANCELED" },
+                            { label: "Cancelar cobrança", onSelect: () => void handleCancelCharge(row), disabled: row.status === "PAID" || row.status === "CANCELED" },
+                            { type: "separator", label: "Navegação" },
+                            { label: "Abrir cliente", onSelect: () => goToCustomer(row), disabled: !row.customerId },
+                            { label: "Abrir O.S.", onSelect: () => goToServiceOrder(row), disabled: !row.serviceOrderId },
+                          ]}
+                        />
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
             <AppPagination
               currentPage={currentPage}
               totalItems={filteredCharges.length}
@@ -1743,7 +1708,7 @@ export default function FinancesPage() {
                   )}
                 </p>
                 <p className="mt-1 text-xs text-[var(--text-muted)]">
-                  ID: {safeText(selectedFinancialRecord?.id)}
+                  {getServiceOrderBusinessLabel(selectedFinancialRecord)}
                 </p>
               </AppInfoCard>
             </div>
@@ -1838,12 +1803,12 @@ export default function FinancesPage() {
                     : getCommunicationState(selectedFinancialRecord) ===
                         "not_sent"
                       ? "Sem envio registrado nos campos retornados."
-                      : "Backend não retornou telemetria de envio; ação disponível via WhatsApp contextual."}
+                      : "Nenhum histórico de envio disponível nesta leitura. Use o WhatsApp contextual para continuar a cobrança."}
                 </p>
                 <p className="mt-2 text-xs text-[var(--text-muted)]">
                   {paymentsListAvailable
                     ? "Listagem de pagamentos/mensagens conectada."
-                    : "Fallback: endpoint de lista geral de pagamentos/mensagens não exposto no BFF."}
+                    : "Use o WhatsApp contextual para continuar a cobrança sem criar automação paralela."}
                 </p>
                 <Button
                   className="mt-3 w-full"
@@ -1912,7 +1877,7 @@ export default function FinancesPage() {
       >
         <AppFormSection
           title="Recebimento"
-          subtitle="Campos preservam o payload atual de pagamento."
+          subtitle="Campos preservam o registro atual de pagamento."
         >
           <AppFieldGroup>
             <AppField label="Valor">
@@ -1960,13 +1925,13 @@ export default function FinancesPage() {
           if (!open) setOpenEditModalFor(null);
         }}
         title="Editar cobrança"
-        description="Atualize valor, vencimento e observações com persistência no backend."
+        description="Atualize valor, vencimento e observações no fluxo existente."
         size="md"
         closeBlocked={editMutation.isPending}
         footer={
           <div className="flex w-full items-center justify-between gap-3">
             <p className="text-xs text-[var(--text-muted)]">
-              Resumo atualizado no backend em tempo real.
+              Resumo atualizado pelo fluxo existente.
             </p>
             <div className="flex items-center gap-2">
               <Button
