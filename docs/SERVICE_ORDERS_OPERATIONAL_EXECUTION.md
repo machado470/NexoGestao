@@ -24,3 +24,16 @@ O.S. é a ponte operacional entre cliente, agenda e financeiro. Quando a execuç
 5. Lista operacional com número, cliente, serviço, status, responsável, prazo, atraso e valor quando disponível.
 6. Detalhe de O.S. com execução, comunicação/navegação, histórico e financeiro.
 7. Fallback honesto quando a Timeline oficial não retorna eventos: datas reais da O.S. podem ser exibidas como contexto, sem substituir a Timeline oficial.
+
+## Direção Nexo Operating System UI — polimento final
+
+A página `/service-orders` deve funcionar como centro operacional de execução, com hierarquia clara:
+
+1. **Hero como contexto** — o Hero apresenta cliente, serviço, status, responsável, prazo, atraso, valor, sinal principal e CTAs reais. Ele usa superfície e borda neutras para contextualizar sem competir com o comando principal. Quando houver código humano da O.S., ele pode aparecer; UUIDs, hashes e IDs técnicos não devem ser exibidos no título, subtítulo ou resumo do operador.
+2. **Decisão como comando** — o bloco “Decisão e Próxima Ação” é dominante, usa o padrão `FAÇA AGORA: [ação]` e concentra estado operacional, maior risco, motivo, impacto, nota de segurança e CTA principal/secundário. O CTA principal deve ser visualmente mais forte que os demais.
+3. **Preparação como checklist** — o checklist usa apenas dados já carregados: cliente vinculado, responsável, agendamento, execução, cobrança, Timeline e WhatsApp. Cada item mostra status humano e só exibe CTA pequeno quando existe ação real conectada.
+4. **Timeline como prova** — a Timeline traduz eventos técnicos para linguagem de negócio, como “Cobrança criada”, “Cobrança vinculada”, “Execução concluída” e “O.S. concluída”. O fallback é “Evento operacional registrado”. Entidades relacionadas devem ser humanas: cliente, O.S. ou cobrança, nunca ID cru.
+5. **Pipeline como leitura de fluxo** — o fluxo principal permanece `Cliente → Agendamento → O.S. → Execução → Cobrança → Pagamento`, com estados humanos como “Sem agendamento vinculado”, “Execução concluída”, “Cobrança pendente” e “Aguardando pagamento”. IDs técnicos devem ser sanitizados ou ocultados.
+6. **Saúde, Radar e Carteira como apoio** — Saúde operacional é métrica densa e baixa; Radar é compacto, com cliente, problema, próxima ação e CTA “Resolver”; Carteira é seção de apoio com linhas densas contendo cliente, serviço, status/sinal, responsável, prazo e ação principal.
+7. **Detalhe como cockpit operacional** — o detalhe substitui blocos administrativos por mini-cards de Cliente, Execução, Financeiro, Agendamento e Governança/Timeline. Quando faltar dado, o fallback deve ser honesto e curto.
+8. **Linguagem permitida** — a UI não deve vazar `eventType`, UUID, hash, ID interno de O.S. ou cobrança, nem termos brutos de backend. Botões bloqueados precisam explicar o motivo via `title`, `aria-label` ou microcopy discreta.
