@@ -111,6 +111,10 @@ type DashboardTimelineEvent = DashboardRecord & {
   occurredAt?: unknown;
   entityType?: unknown;
   entityId?: unknown;
+  chargeId?: unknown;
+  serviceOrderId?: unknown;
+  appointmentId?: unknown;
+  messageId?: unknown;
   actorName?: unknown;
   responsibleName?: unknown;
   summary?: unknown;
@@ -245,6 +249,38 @@ function formatCurrencyMentions(value: string) {
   );
 }
 
+function sanitizeOperationalText(
+  value: unknown,
+  fallback = "Evento operacional registrado"
+) {
+  const text = String(value ?? "").trim();
+  if (!text) return fallback;
+  const cleaned = formatCurrencyMentions(text)
+    .replace(/\b(?:EXECUTION|ACTION|AUTH)_[A-Z0-9_]+\b/g, fallback)
+    .replace(/\b[A-Z]+(?:_[A-Z0-9]+){1,}\b/g, fallback)
+    .replace(/\baction-[a-z0-9-]+\b/gi, "ação operacional")
+    .replace(/\b[a-z]+(?:-[a-z0-9]+){2,}\b/g, "referência operacional")
+    .replace(/\b(?:payload|eventType|actionId|slug)\b:?/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  return cleaned || fallback;
+}
+
+function resolveExecutiveEntity(event: DashboardTimelineEvent) {
+  const entityType = String(event.entityType ?? "").toUpperCase();
+  if (entityType.includes("CHARGE") || event.chargeId)
+    return "Cobrança relacionada";
+  if (entityType.includes("SERVICE") || event.serviceOrderId)
+    return "Ordem de serviço relacionada";
+  if (entityType.includes("APPOINTMENT") || event.appointmentId)
+    return "Agendamento relacionado";
+  if (entityType.includes("MESSAGE") || event.messageId)
+    return "Contato relacionado";
+  if (entityType.includes("CUSTOMER") || entityType.includes("PERSON"))
+    return "Cliente relacionado";
+  return "Operação relacionada";
+}
+
 function formatRelativeDelay(value: unknown) {
   if (typeof value !== "string" && !(value instanceof Date)) return "";
   const date = value instanceof Date ? value : new Date(value);
@@ -339,15 +375,11 @@ function normalizeTimelineEvents(payload: unknown) {
   return source.slice(0, 3).map((raw, index) => {
     const event = asRecord(raw) as DashboardTimelineEvent;
     const humanEvent = humanizeEvent(event);
-    const entityType = event.entityType
-      ? toTitleCase(String(event.entityType).replace(/_/g, " "))
-      : "Operação";
-    const entityId = event.entityId ? ` #${String(event.entityId)}` : "";
     return {
       id: String(event.id ?? `${humanEvent.type}-${index}`),
       type: humanEvent.type,
       occurredAt: formatEventDateTime(event.occurredAt ?? event.createdAt),
-      entity: `${entityType}${entityId}`,
+      entity: humanEvent.entity ?? resolveExecutiveEntity(event),
       actor:
         typeof event.actorName === "string"
           ? event.actorName
@@ -426,10 +458,12 @@ function humanizeEvent(event: DashboardTimelineEvent) {
   if (known[normalizedType]) return known[normalizedType];
 
   return {
-    type: toTitleCase(eventType.replace(/_/g, " ")),
-    summary: formatCurrencyMentions(
-      rawSummary || "Evento oficial registrado na Timeline."
+    type: "Evento operacional registrado",
+    summary: sanitizeOperationalText(
+      rawSummary,
+      "Evento operacional registrado"
     ),
+    entity: resolveExecutiveEntity(event),
   };
 }
 
@@ -571,10 +605,11 @@ function buildAttention(
         governanceLevel === "SUSPENDED" || governanceLevel === "CRITICAL"
           ? "critical"
           : "high",
-      title: `Governança em ${governanceLevel}`,
-      reason: "O serviço de governança retornou sinal fora do nível normal.",
+      title: "Governança exige atenção",
+      reason:
+        "Há bloqueios, restrições ou aprovações que precisam ser avaliados.",
       impact:
-        "Regras, limites ou restrições podem afetar ações assistidas e operação.",
+        "Riscos de governança podem limitar ações assistidas e continuidade operacional.",
       ctaLabel: "Ver governança",
       path: "/governance",
     });
@@ -1125,7 +1160,7 @@ export default function ExecutiveDashboard() {
       context:
         weeklyRevenueInCents > 0
           ? `Pagamentos registrados no período atual. ${revenueTrend}.`
-          : `Sem pagamentos registrados no período. ${revenueTrend}.`,
+          : `Sem pagamentos registrados. Sem pagamentos registrados no período. ${revenueTrend}.`,
       cta: "Ver pagamentos",
       path: "/finances?view=paid",
       Icon: WalletCards,
@@ -1135,7 +1170,7 @@ export default function ExecutiveDashboard() {
       value: String(readNumber(metrics, "openServiceOrders")),
       context:
         overdueOrders > 0
-          ? `${overdueOrders} atrasada(s) exigem avanço. ${completedOrdersTrend}.`
+          ? `${overdueOrders} atrasada(s) exigem ação. ${completedOrdersTrend}.`
           : `Sem atraso retornado. ${completedOrdersTrend}.`,
       cta: "Abrir execução",
       path: "/service-orders?status=open",
@@ -1148,7 +1183,7 @@ export default function ExecutiveDashboard() {
       ),
       context:
         overdueCharges > 0
-          ? `${overdueCharges} cobrança(s) vencida(s). ${overdueChargesTrend}.`
+          ? `${formatCurrencyFromCents(alerts.overdueCharges?.totalAmountCents ?? 0)} vencidos exigem cobrança. ${overdueChargesTrend}.`
           : `Sem carteira vencida retornada. ${overdueChargesTrend}.`,
       cta: "Abrir cobranças",
       path: "/finances?view=charges&status=overdue",
@@ -1160,7 +1195,7 @@ export default function ExecutiveDashboard() {
       context:
         failedMessages > 0
           ? `Falhas podem bloquear confirmações. ${failedMessagesTrend}.`
-          : `Sem falhas retornadas. ${failedMessagesTrend}.`,
+          : `Sem falhas bloqueando operação. ${failedMessagesTrend}.`,
       cta: "Revisar WhatsApp",
       path: "/whatsapp",
       Icon: MessageSquareWarning,
@@ -1208,8 +1243,8 @@ export default function ExecutiveDashboard() {
         ? "text-[var(--accent-primary)]"
         : "text-[var(--text-muted)]",
       text: bottleneck
-        ? "Principal quebra do fluxo agora."
-        : "Pipeline sem quebra ativa.",
+        ? "O próximo movimento: atacar este ponto antes de expandir a fila."
+        : "O próximo movimento: manter acompanhamento sem reação extra.",
       trend: overdueChargesTrend,
     },
     {
@@ -1221,8 +1256,8 @@ export default function ExecutiveDashboard() {
         overdueOrders > 0 ? "text-[var(--danger)]" : "text-[var(--text-muted)]",
       text:
         overdueOrders > 0
-          ? "Pressão na execução."
-          : "Preserve o ritmo das próximas janelas.",
+          ? "O que destravar: avançar as O.S. atrasadas primeiro."
+          : "O que destravar: nada crítico retornado agora.",
       trend: completedOrdersTrend,
     },
     {
@@ -1238,8 +1273,8 @@ export default function ExecutiveDashboard() {
           : "text-[var(--text-muted)]",
       text:
         failedMessages > 0
-          ? "Pode quebrar confirmações."
-          : "Canal não bloqueia o fluxo agora.",
+          ? "O que responder: priorizar contatos impactados por falha."
+          : "O que responder: sem falhas bloqueando operação.",
       trend: failedMessagesTrend,
     },
     {
@@ -1255,8 +1290,8 @@ export default function ExecutiveDashboard() {
           : "text-[var(--text-muted)]",
       text:
         overdueCharges > 0
-          ? "Ciclo até recebimento prolongado."
-          : "Caixa não exige reação imediata.",
+          ? "O que cobrar: carteira vencida antes de novas cobranças."
+          : "O que cobrar: sem vencimentos retornados agora.",
       trend: overdueChargesTrend,
     },
   ];
@@ -1268,6 +1303,16 @@ export default function ExecutiveDashboard() {
         : operationLevel === "RESTRICTED"
           ? "RESTRICTED"
           : "SUSPENDED";
+  const moneyAtRisk = formatCurrencyFromCents(
+    (alerts.overdueCharges?.totalAmountCents ?? 0) +
+      (alerts.doneOrdersWithoutCharge?.totalAmountCents ?? 0)
+  );
+  const executiveContactSummary = [
+    `${readNumber(asRecord(metrics.whatsappSignals), "customersNoResponse")} aguardando resposta`,
+    `${pendingWhatsAppApprovals.length} aprovações pendentes`,
+    `${failedMessages} falhas relevantes`,
+    `${readNumber(asRecord(metrics.whatsappSignals), "customersNoResponse")} clientes sem retorno`,
+  ].join(" · ");
   return (
     <AppPageShell className="gap-3 sm:gap-4">
       <AppOperationalHeader
@@ -1325,6 +1370,52 @@ export default function ExecutiveDashboard() {
 
       {!pageLoading && !pageError && hasOperationalData ? (
         <div className="w-full min-w-0 space-y-3 sm:space-y-4">
+          <AppSectionBlock
+            title="Bloco executivo"
+            compact
+            className="border-[var(--accent-primary)]/35 bg-[var(--accent-soft)]/25"
+            subtitle="Primeira dobra decisória: dinheiro parado, gargalo e próxima ação."
+          >
+            <div className="grid gap-3 md:grid-cols-3">
+              <article className="rounded-xl border border-[var(--border-subtle)]/70 bg-[var(--surface-primary)]/45 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                  DINHEIRO EM RISCO
+                </p>
+                <strong className="mt-1 block text-2xl text-[var(--text-primary)]">
+                  {moneyAtRisk}
+                </strong>
+                <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                  Valores vencidos ou serviços concluídos ainda sem cobrança.
+                </p>
+              </article>
+              <article className="rounded-xl border border-[var(--border-subtle)]/70 bg-[var(--surface-primary)]/45 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                  GARGALO PRINCIPAL
+                </p>
+                <strong className="mt-1 block text-lg text-[var(--text-primary)]">
+                  {bottleneck?.label ?? "Sem gargalo calculável"}
+                </strong>
+                <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                  {bottleneck
+                    ? "Ponto que trava fluxo e recebimento agora."
+                    : "Nenhum bloqueio ativo retornado pela leitura atual."}
+                </p>
+              </article>
+              <article className="rounded-xl border border-[var(--border-subtle)]/70 bg-[var(--surface-primary)]/45 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                  AÇÃO PRIORITÁRIA
+                </p>
+                <strong className="mt-1 block text-lg text-[var(--text-primary)]">
+                  {recommendedAction?.title ?? "Monitorar operação"}
+                </strong>
+                <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                  {recommendedAction?.impact ??
+                    "Sem ação prioritária real retornada."}
+                </p>
+              </article>
+            </div>
+          </AppSectionBlock>
+
           <div className="grid w-full min-w-0 gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
             <OperationalStateCard
               level={operationLevel}
@@ -1584,6 +1675,24 @@ export default function ExecutiveDashboard() {
                 description="Não há itens acionáveis na leitura atual. A operação não preenche a fila com exemplos."
               />
             )}
+          </AppSectionBlock>
+
+          <AppSectionBlock
+            title="WhatsApp executivo"
+            compact
+            className={dashboardSectionClass}
+            subtitle="Leitura consolidada de contato, sem inbox e sem tarefas."
+          >
+            <div className="rounded-xl border border-[var(--border-subtle)]/70 bg-[var(--surface-primary)]/35 p-3 text-sm text-[var(--text-secondary)]">
+              <strong className="block text-[var(--text-primary)]">
+                Contato operacional
+              </strong>
+              <p className="mt-1">{executiveContactSummary}</p>
+              <p className="mt-2 text-xs text-[var(--text-muted)]">
+                Orientação: responder somente o que destrava confirmação,
+                aprovação, falha relevante ou cliente sem retorno.
+              </p>
+            </div>
           </AppSectionBlock>
 
           <AppSectionBlock
