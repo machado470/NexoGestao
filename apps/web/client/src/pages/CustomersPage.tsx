@@ -25,9 +25,7 @@ import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
 import { Button } from "@/components/design-system";
 import {
   NexoEvidenceTimeline,
-  NexoPriorityPanel,
   NexoOperationalPipeline,
-  NexoGovernanceDecisionCard,
   NexoExecutiveMetric,
   type OperationalFlowStageState,
   type OperationalStateLevel,
@@ -1472,7 +1470,9 @@ export default function CustomersPage() {
         </div>
       </AppOperationalHeader>
 
-      <AppSectionCard className="space-y-2.5">
+      <AppSectionCard
+        className={cn("space-y-2.5", selectedProfile ? "order-3" : undefined)}
+      >
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <p className="nexo-overline">Próxima decisão da carteira</p>
@@ -1605,6 +1605,7 @@ export default function CustomersPage() {
         )}
       </AppNextBestActionBlock>
       <AppSectionBlock
+        className={selectedProfile ? "order-4" : undefined}
         title={operationalCopy.immediateAttention}
         subtitle={`Clientes que podem travar caixa, execução ou resposta no turno. ${attentionSummary.hidden > 0 ? attentionSummary.hiddenMessage : ""}`}
         compact
@@ -1645,7 +1646,12 @@ export default function CustomersPage() {
         )}
       </AppSectionBlock>
 
-      <AppFiltersBar className="shrink-0 gap-2 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2">
+      <AppFiltersBar
+        className={cn(
+          "shrink-0 gap-2 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2",
+          selectedProfile ? "order-2" : undefined
+        )}
+      >
         <div className="min-w-[220px] flex-1">
           <input
             value={searchTerm}
@@ -1705,11 +1711,24 @@ export default function CustomersPage() {
         </span>
       </AppFiltersBar>
 
-      <div className="grid grid-cols-1 gap-4 2xl:grid-cols-12">
+      <div
+        className={cn(
+          "grid grid-cols-1 gap-4 2xl:grid-cols-12",
+          selectedProfile ? "order-1" : undefined
+        )}
+      >
         <AppSectionBlock
           title="Carteira operacional"
-          subtitle="Lista priorizada por contexto, pendência e próxima ação possível."
-          className="2xl:col-span-8"
+          subtitle={
+            selectedProfile
+              ? "Outros clientes da carteira: apoio para trocar contexto sem perder filtros e paginação."
+              : "Lista priorizada por contexto, pendência e próxima ação possível."
+          }
+          className={cn(
+            selectedProfile
+              ? "order-2 2xl:col-span-12"
+              : "order-1 2xl:col-span-8"
+          )}
           compact
         >
           {isLoading ? (
@@ -1969,7 +1988,11 @@ export default function CustomersPage() {
         <AppContextWorkspace
           title="Centro Operacional do Cliente"
           subtitle="Decisão, fluxo, execução e auditoria do cliente selecionado."
-          className="2xl:col-span-4"
+          className={cn(
+            selectedProfile
+              ? "order-1 2xl:col-span-12"
+              : "order-2 2xl:col-span-4"
+          )}
         >
           {!activeCustomerId || !selectedCustomer || !selectedProfile ? (
             <AppPageEmptyState
@@ -1996,12 +2019,21 @@ export default function CustomersPage() {
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[var(--text-secondary)]">
                       <AppStatusBadge
                         label={`${selectedProfile.status} · ${selectedProfile.riskSignal}`}
-                        tone={selectedProfile.status === "Em risco" ? "warning" : "neutral"}
+                        tone={
+                          selectedProfile.status === "Em risco"
+                            ? "warning"
+                            : "neutral"
+                        }
                       />
-                      <span className="truncate text-[var(--text-muted)]">{selectedProfile.contact}</span>
+                      <span className="truncate text-[var(--text-muted)]">
+                        {selectedProfile.contact}
+                      </span>
                     </div>
                     <p className="mt-2 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-secondary)]">
-                      Sinal principal: <span className="text-[var(--text-primary)]">{selectedProfile.riskSignal}</span>
+                      Sinal principal:{" "}
+                      <span className="text-[var(--text-primary)]">
+                        {selectedProfile.riskSignal}
+                      </span>
                     </p>
                   </div>
                   <div className="min-w-[190px] rounded-lg border border-[var(--warning)]/25 bg-[var(--warning)]/10 px-3 py-2 text-xs">
@@ -2010,7 +2042,10 @@ export default function CustomersPage() {
                       {customerNextBestAction.title}
                     </p>
                     <p className="mt-1 text-[var(--text-muted)]">
-                      Última interação: {selectedProfile.lastInteractionAt ? `${selectedProfile.daysWithoutContact} dias` : "sem registro"}
+                      Última interação:{" "}
+                      {selectedProfile.lastInteractionAt
+                        ? `${selectedProfile.daysWithoutContact} dias`
+                        : "sem registro"}
                     </p>
                   </div>
                 </div>
@@ -2116,43 +2151,81 @@ export default function CustomersPage() {
                 </div>
               </article>
 
-              <NexoGovernanceDecisionCard
-                title="Decisão do sistema"
-                level={customerOperationalState.level}
-                reason={customerOperationalState.reason}
-                impact={customerOperationalState.impact}
-                detailsLabel={customerOperationalState.detailsLabel}
-                onDetails={customerOperationalState.onDetails}
-                className="gap-2"
-                metrics={[
-                  {
-                    label: "Decisão",
-                    value:
-                      customerOperationalState.level === "NORMAL"
-                        ? "Acompanhar"
-                        : customerNextBestAction.title,
-                    tone:
-                      customerOperationalState.level === "NORMAL"
-                        ? "neutral"
-                        : "warning",
-                  },
-                ]}
-              />
-
-              <NexoPriorityPanel
-                className="gap-2"
-                title={customerNextBestAction.title}
-                entity={customerNextBestAction.entity}
-                reason={customerNextBestAction.reason}
-                impact={customerNextBestAction.impact}
-                safetyNote={customerNextBestAction.safetyNote}
-                primaryActionLabel={customerNextBestAction.primaryActionLabel}
-                onPrimaryAction={customerNextBestAction.onPrimaryAction}
-                secondaryActionLabel={
-                  customerNextBestAction.secondaryActionLabel
-                }
-                onSecondaryAction={customerNextBestAction.onSecondaryAction}
-              />
+              <AppSectionCard className="space-y-3 border-[var(--warning)]/25 bg-[var(--surface-base)]">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="nexo-overline">Decisão e próxima ação</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <AppStatusBadge
+                        label={customerOperationalState.level}
+                        tone={
+                          customerOperationalState.level === "NORMAL"
+                            ? "neutral"
+                            : "warning"
+                        }
+                      />
+                      <AppStatusBadge
+                        label={customerNextBestAction.title}
+                        tone="info"
+                      />
+                    </div>
+                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                      <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/45 p-3">
+                        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-secondary)]">
+                          Motivo
+                        </p>
+                        <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+                          {customerOperationalState.reason}
+                        </p>
+                        <p className="mt-2 text-xs leading-5 text-[var(--text-secondary)]">
+                          Impacto: {customerOperationalState.impact}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/45 p-3">
+                        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-secondary)]">
+                          Decisão
+                        </p>
+                        <p className="mt-1 text-lg font-black text-[var(--text-primary)]">
+                          {customerOperationalState.level === "NORMAL"
+                            ? "Acompanhar com segurança"
+                            : customerNextBestAction.title}
+                        </p>
+                        <p className="mt-2 text-xs leading-5 text-[var(--text-secondary)]">
+                          Ação recomendada: {customerNextBestAction.reason}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="mt-2 text-xs text-[var(--text-muted)]">
+                      {customerNextBestAction.safetyNote}
+                    </p>
+                  </div>
+                  <div className="flex min-w-[220px] flex-col gap-2">
+                    <Button
+                      size="sm"
+                      onClick={customerNextBestAction.onPrimaryAction}
+                    >
+                      {customerNextBestAction.primaryActionLabel}
+                    </Button>
+                    {customerNextBestAction.secondaryActionLabel &&
+                    customerNextBestAction.onSecondaryAction ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={customerNextBestAction.onSecondaryAction}
+                      >
+                        {customerNextBestAction.secondaryActionLabel}
+                      </Button>
+                    ) : null}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={customerOperationalState.onDetails}
+                    >
+                      {customerOperationalState.detailsLabel}
+                    </Button>
+                  </div>
+                </div>
+              </AppSectionCard>
 
               <NexoOperationalPipeline
                 title="Fluxo operacional do cliente"
@@ -2169,25 +2242,75 @@ export default function CustomersPage() {
               <article className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)]/35 p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <p className="nexo-overline">Painel operacional do cliente</p>
-                    <p className="mt-0.5 text-xs text-[var(--text-muted)]">Mini-cards de financeiro, execução, agenda, comunicação e governança.</p>
+                    <p className="nexo-overline">
+                      Painel operacional do cliente
+                    </p>
+                    <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+                      Mini-dashboard com financeiro, execução, agenda,
+                      comunicação e saúde do cliente.
+                    </p>
                   </div>
-                  <Button size="sm" variant="outline" onClick={() => setShowInlineCharges(value => !value)}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowInlineCharges(value => !value)}
+                  >
                     {showInlineCharges ? "Ocultar cobranças" : "Ver cobranças"}
                   </Button>
                 </div>
                 <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2 xl:grid-cols-5">
                   {[
-                    { title: "Financeiro", value: formatCurrency(workspacePendingCents || selectedProfile.pendingCents), context: `Cobranças vencidas: ${workspaceOverdueCharges.length}` },
-                    { title: "Execução", value: `${workspaceOpenServiceOrders.length} O.S.`, context: workspaceLastCompletedServiceOrder ? `Última O.S.: ${formatDateTime(workspaceLastCompletedServiceOrder.updatedAt ?? workspaceLastCompletedServiceOrder.createdAt)}` : "Última O.S.: sem conclusão" },
-                    { title: "Agenda", value: workspaceNextAppointment ? formatDateTime(workspaceNextAppointment.startsAt ?? workspaceNextAppointment.scheduledAt) : "Sem agenda", context: `Agendamentos: ${workspaceAppointments.length}` },
-                    { title: "Comunicação", value: selectedProfile.lastInteractionAt ? `${selectedProfile.daysWithoutContact} dias` : "Sem registro", context: "Canal: WhatsApp" },
-                    { title: "Governança", value: selectedProfile.status, context: `Motivo: ${selectedProfile.riskSignal}` },
+                    {
+                      title: "Financeiro",
+                      value: formatCurrency(
+                        workspacePendingCents || selectedProfile.pendingCents
+                      ),
+                      context: `Cobranças vencidas: ${workspaceOverdueCharges.length}`,
+                    },
+                    {
+                      title: "Execução",
+                      value: `${workspaceOpenServiceOrders.length} O.S.`,
+                      context: workspaceLastCompletedServiceOrder
+                        ? `Última O.S.: ${formatDateTime(workspaceLastCompletedServiceOrder.updatedAt ?? workspaceLastCompletedServiceOrder.createdAt)}`
+                        : "Última O.S.: sem conclusão",
+                    },
+                    {
+                      title: "Agenda",
+                      value: workspaceNextAppointment
+                        ? formatDateTime(
+                            workspaceNextAppointment.startsAt ??
+                              workspaceNextAppointment.scheduledAt
+                          )
+                        : "Sem agenda",
+                      context: `Agendamentos: ${workspaceAppointments.length}`,
+                    },
+                    {
+                      title: "Comunicação",
+                      value: selectedProfile.lastInteractionAt
+                        ? `${selectedProfile.daysWithoutContact} dias`
+                        : "Sem registro",
+                      context: "Canal: WhatsApp",
+                    },
+                    {
+                      title: "Saúde do cliente",
+                      value:
+                        customerOperationalState.level === "NORMAL"
+                          ? "Saudável"
+                          : selectedProfile.status,
+                      context: selectedProfile.riskSignal,
+                    },
                   ].map(item => (
-                    <div key={item.title} className="rounded-lg border border-[var(--border-subtle)]/70 bg-[var(--surface-base)]/70 p-2.5">
+                    <div
+                      key={item.title}
+                      className="rounded-xl border border-[var(--border-subtle)]/70 bg-[var(--surface-base)]/80 p-3"
+                    >
                       <p className="nexo-overline">{item.title}</p>
-                      <p className="mt-1 truncate text-base font-semibold text-[var(--text-primary)]">{item.value}</p>
-                      <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-[var(--text-secondary)]">{item.context}</p>
+                      <p className="mt-1 truncate text-xl font-black text-[var(--text-primary)]">
+                        {item.value}
+                      </p>
+                      <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-[var(--text-secondary)]">
+                        {item.context}
+                      </p>
                     </div>
                   ))}
                 </div>

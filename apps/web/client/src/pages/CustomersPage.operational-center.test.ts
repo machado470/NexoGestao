@@ -2,7 +2,10 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const source = readFileSync("client/src/pages/CustomersPage.tsx", "utf8");
-const commandLayerSource = readFileSync("client/src/components/app/OperationalCommandLayer.tsx", "utf8");
+const commandLayerSource = readFileSync(
+  "client/src/components/app/OperationalCommandLayer.tsx",
+  "utf8"
+);
 const embeddedTimelineSource = source.slice(
   source.indexOf("<NexoEvidenceTimeline")
 );
@@ -12,9 +15,25 @@ describe("CustomersPage operational client center", () => {
     expect(source).toContain("Centro Operacional do Cliente");
     expect(source).toContain("Hero Executivo do Cliente");
     expect(source).toContain("Sinal principal:");
-    expect(source).toContain("Decisão do sistema");
+    expect(source).toContain("Decisão e próxima ação");
     expect(source).toContain("Painel operacional do cliente");
-    expect(source).toContain("Mini-cards de financeiro, execução, agenda, comunicação e governança.");
+    expect(source).toContain("Mini-dashboard com financeiro");
+    expect(source).toContain("saúde do cliente.");
+  });
+
+  it("moves the selected customer experience before the operational wallet", () => {
+    expect(source).toContain('"grid grid-cols-1 gap-4 2xl:grid-cols-12"');
+    expect(source).toContain('selectedProfile ? "order-1" : undefined');
+    expect(source).toContain('"order-1 2xl:col-span-12"');
+    expect(source).toContain('"order-2 2xl:col-span-12"');
+    expect(source).toContain("Outros clientes da carteira");
+  });
+
+  it("uses one combined decision/action block instead of separated decision and NBA blocks", () => {
+    expect(source).toContain("Decisão e próxima ação");
+    expect(source).not.toContain('title="Decisão do sistema"');
+    expect(source).not.toContain("Próxima melhor ação");
+    expect(source).not.toContain("<NexoPriorityPanel");
   });
 
   it("keeps the client pipeline focused on operational flow instead of raw cadastro", () => {

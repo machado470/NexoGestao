@@ -77,3 +77,11 @@ O front interno deve parecer um sistema operacional para empresas de serviço: a
 - Em Clientes, o pipeline deve evitar duplicação visual: o fluxo principal Cliente → Agendamento → O.S. → Cobrança → Pagamento permanece, enquanto chips auxiliares de Timeline e Risco/Governança não devem ser exibidos quando essas leituras aparecem como seções próprias.
 - A Timeline embutida deve combinar eventos humanizados com ícones semânticos de mensagem, agenda, O.S., cobrança, pagamento ou evento neutro, sem vazar `eventType`, UUID ou metadata técnica.
 - A Carteira operacional deve se aproximar de um command center: prioridade visual, status/sinal, próxima ação, financeiro, CTA real e menu secundário, preservando filtros, paginação e ações existentes.
+
+## Ajuste final de hierarquia — Clientes com cliente selecionado
+
+- Em Clientes, quando há cliente selecionado, o **cliente selecionado domina a experiência**: a leitura contextual sobe para logo após o header e passa a orientar decisão, pipeline, execução e auditoria antes da carteira.
+- A **Carteira operacional vira apoio** quando existe seleção: continua disponível com filtros, ações, paginação e seleção visual, mas passa a funcionar como “outros clientes da carteira” para troca de contexto, não como protagonista da primeira dobra.
+- **Decisão + Próxima Melhor Ação** viram um bloco único em Clientes: o mesmo card explica estado, motivo, impacto, decisão, ação recomendada, CTA principal, CTA secundário quando existir e nota de segurança discreta.
+- O **Hero Executivo do Cliente** sobe para a primeira dobra e deve mostrar nome dominante, status/risco, sinal principal, última interação, próxima ação, mini-métricas e CTAs reais, mantendo telefone/e-mail como informação discreta.
+- O **Painel Operacional do Cliente** vira mini-dashboard visual com valores dominantes para Saúde do cliente, Financeiro, Execução, Agenda e Comunicação, sempre usando dados carregados e fallback honesto, sem gráfico ou score inventado.
