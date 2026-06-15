@@ -26,6 +26,7 @@ type AccountStatus =
   | "SUSPENDED";
 type InvoiceStatus = "PAID" | "PENDING" | "FAILED" | "REFUNDED";
 type GovernanceStatus = "NORMAL" | "WARNING" | "RESTRICTED" | "SUSPENDED";
+type PlanRelation = "current" | "upgrade" | "downgrade" | "available";
 
 const PLAN_PRICE_ID: Record<PlanName, string | null> = {
   FREE: null,
@@ -125,12 +126,58 @@ function brl(valueCents: number) {
   }).format(valueCents / 100);
 }
 
-function safePlanName(value: unknown): PlanName {
-  const candidate = String(value ?? "FREE").toUpperCase();
+function normalizePlanName(value: unknown): PlanName | null {
+  if (!value) return null;
+  const candidate = String(value).toUpperCase();
   const normalized = candidate === "SCALE" ? "BUSINESS" : candidate;
   return ["FREE", "STARTER", "PRO", "BUSINESS"].includes(normalized)
     ? (normalized as PlanName)
-    : "FREE";
+    : null;
+}
+
+function safePlanName(value: unknown): PlanName {
+  return normalizePlanName(value) ?? "FREE";
+}
+
+function visibleCurrentPlan(value: unknown): VisiblePlan | null {
+  const plan = normalizePlanName(value);
+  return plan && VISIBLE_PLANS.includes(plan as VisiblePlan)
+    ? (plan as VisiblePlan)
+    : null;
+}
+
+function planRelation(
+  plan: VisiblePlan,
+  currentVisiblePlan: VisiblePlan | null
+): PlanRelation {
+  if (!currentVisiblePlan) return "available";
+  if (plan === currentVisiblePlan) return "current";
+  return PLAN_ORDER[plan] > PLAN_ORDER[currentVisiblePlan]
+    ? "upgrade"
+    : "downgrade";
+}
+
+function planBadgeLabel(relation: PlanRelation) {
+  if (relation === "current") return "Plano atual";
+  if (relation === "upgrade") return "Upgrade";
+  if (relation === "downgrade") return "Downgrade";
+  return "Disponível";
+}
+
+function planCtaLabel(relation: PlanRelation) {
+  if (relation === "current") return "Revisar plano atual";
+  if (relation === "upgrade") return "Fazer upgrade";
+  if (relation === "downgrade") return "Fazer downgrade";
+  return "Revisar plano";
+}
+
+function planRelationTone(
+  relation: PlanRelation
+): "success" | "info" | "warning" | "neutral" {
+  if (relation === "current") return "success";
+  if (relation === "upgrade") return "info";
+  if (relation === "downgrade") return "warning";
+  return "neutral";
 }
 
 function accountStatus(value: unknown): AccountStatus {
@@ -247,9 +294,9 @@ export default function BillingPage() {
   });
   const utils = trpc.useUtils();
 
-  const currentPlan = safePlanName(
-    statusQuery.data?.plan ?? limitsQuery.data?.plan
-  );
+  const rawCurrentPlan = statusQuery.data?.plan ?? limitsQuery.data?.plan;
+  const currentPlan = safePlanName(rawCurrentPlan);
+  const currentVisiblePlan = visibleCurrentPlan(rawCurrentPlan);
   const meta = PLAN_META[currentPlan];
   const status = accountStatus(
     statusQuery.data?.status ?? limitsQuery.data?.status
@@ -349,6 +396,9 @@ export default function BillingPage() {
 
   const timelineEvents = useMemo(() => events.slice(0, 8), [events]);
   const selectedPlanMeta = selectedPlan ? PLAN_META[selectedPlan] : null;
+  const selectedPlanRelation = selectedPlan
+    ? planRelation(selectedPlan, currentVisiblePlan)
+    : null;
 
   return (
     <PageWrapper
@@ -757,13 +807,7 @@ export default function BillingPage() {
           <div className="grid gap-4 lg:grid-cols-3">
             {VISIBLE_PLANS.map(plan => {
               const planMeta = PLAN_META[plan];
-              const isCurrent = plan === currentPlan;
-              const relation =
-                PLAN_ORDER[plan] > PLAN_ORDER[currentPlan]
-                  ? "Upgrade"
-                  : PLAN_ORDER[plan] < PLAN_ORDER[currentPlan]
-                    ? "Downgrade"
-                    : "Plano atual";
+              const relation = planRelation(plan, currentVisiblePlan);
               return (
                 <AppSectionCard key={plan} className="space-y-4">
                   <div className="flex items-start justify-between gap-3">
@@ -776,14 +820,8 @@ export default function BillingPage() {
                       </p>
                     </div>
                     <AppStatusBadge
-                      label={isCurrent ? "Plano atual" : relation}
-                      tone={
-                        isCurrent
-                          ? "success"
-                          : relation === "Upgrade"
-                            ? "info"
-                            : "warning"
-                      }
+                      label={planBadgeLabel(relation)}
+                      tone={planRelationTone(relation)}
                     />
                   </div>
                   <div className="space-y-2 text-sm text-[var(--text-secondary)]">
@@ -805,14 +843,10 @@ export default function BillingPage() {
                   </div>
                   <Button
                     className="w-full"
-                    variant={isCurrent ? "outline" : "default"}
+                    variant={relation === "current" ? "outline" : "default"}
                     onClick={() => setSelectedPlan(plan)}
                   >
-                    {isCurrent
-                      ? "Revisar plano atual"
-                      : relation === "Upgrade"
-                        ? "Fazer upgrade"
-                        : "Fazer downgrade"}
+                    {planCtaLabel(relation)}
                   </Button>
                 </AppSectionCard>
               );
@@ -823,8 +857,8 @@ export default function BillingPage() {
         <BaseModal
           open={Boolean(selectedPlan)}
           onOpenChange={open => !open && setSelectedPlan(null)}
-          title="Confirmar troca de plano"
-          description="A alteração permanece no Billing da plataforma e não navega para outra página."
+          title="Revisar assinatura"
+          description="Esta ação abre o fluxo administrativo de assinatura. Nenhuma cobrança ou alteração será executada automaticamente nesta tela."
           footer={
             <div className="flex flex-wrap justify-end gap-2">
               <Button variant="outline" onClick={() => setSelectedPlan(null)}>
@@ -839,25 +873,26 @@ export default function BillingPage() {
             </div>
           }
         >
-          {selectedPlanMeta && selectedPlan ? (
+          {selectedPlanMeta && selectedPlan && selectedPlanRelation ? (
             <div className="space-y-3 text-sm text-[var(--text-secondary)]">
               <AppStatusBadge
-                label={
-                  selectedPlan === currentPlan
-                    ? "PLANO ATUAL"
-                    : PLAN_ORDER[selectedPlan] > PLAN_ORDER[currentPlan]
-                      ? "UPGRADE"
-                      : "DOWNGRADE"
-                }
-                tone={
-                  selectedPlan === currentPlan
-                    ? "success"
-                    : PLAN_ORDER[selectedPlan] > PLAN_ORDER[currentPlan]
-                      ? "info"
-                      : "warning"
-                }
+                label={planBadgeLabel(selectedPlanRelation).toUpperCase()}
+                tone={planRelationTone(selectedPlanRelation)}
               />
               <p className="text-base font-semibold text-[var(--text-primary)]">
+                {selectedPlanRelation === "upgrade"
+                  ? `Você está prestes a fazer upgrade para o plano ${selectedPlanMeta.title}.`
+                  : selectedPlanRelation === "downgrade"
+                    ? `Você está prestes a fazer downgrade para o plano ${selectedPlanMeta.title}.`
+                    : selectedPlanRelation === "current"
+                      ? "Você está revisando seu plano atual."
+                      : `Você está revisando o plano ${selectedPlanMeta.title}.`}
+              </p>
+              <p>
+                Esta ação abre o fluxo administrativo de assinatura. Nenhuma
+                cobrança ou alteração será executada automaticamente nesta tela.
+              </p>
+              <p className="font-medium text-[var(--text-primary)]">
                 {selectedPlanMeta.title} — {brl(selectedPlanMeta.priceCents)} /{" "}
                 {selectedPlanMeta.periodicity}
               </p>
