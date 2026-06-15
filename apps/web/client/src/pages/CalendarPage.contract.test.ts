@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const source = () => readFileSync("client/src/pages/CalendarPage.tsx", "utf8");
+const commandLayerSource = () =>
+  readFileSync("client/src/components/app/OperationalCommandLayer.tsx", "utf8");
 const compact = (value: string) => value.replace(/\s+/g, " ").trim();
 
 describe("CalendarPage operational time-control contract", () => {
@@ -31,25 +33,23 @@ describe("CalendarPage operational time-control contract", () => {
     const normalized = compact(calendar);
 
     expect(normalized).toContain(
-      "Tempo → Agenda → Equipe → O.S. → Execução → Prova → Risco"
+      "Tempo → Agendamentos → Responsáveis → Ordens de Serviço → Execução → Evidências → Governança"
     );
     for (const label of [
       'label: "Tempo"',
-      'label: "Agenda"',
-      'label: "Equipe"',
-      'label: "O.S."',
+      'label: "Agendamentos"',
+      'label: "Responsáveis"',
+      'label: "Ordens de Serviço"',
       'label: "Execução"',
-      'label: "Prova"',
-      'label: "Risco"',
+      'label: "Evidências"',
+      'label: "Governança"',
     ]) {
       expect(calendar).toContain(label);
     }
     expect(calendar).toContain("Eventos preparados para execução");
-    expect(calendar).toContain("Responsáveis alocados ou pendentes");
-    expect(calendar).toContain(
-      "Eventos reais enviados para leitura operacional"
-    );
-    expect(calendar).toContain("Sinais antes de afetar governança");
+    expect(calendar).toContain("Equipe vinculada aos eventos");
+    expect(calendar).toContain("Eventos reais derivados do calendário");
+    expect(calendar).toContain("Sinais antes de afetar o controle operacional");
   });
 
   it("mantém grade visual/fallback, painel lateral vivo e ficha operacional", () => {
@@ -75,9 +75,10 @@ describe("CalendarPage operational time-control contract", () => {
     expect(calendar).toContain("Ver semana");
     expect(calendar).toContain("Ver e vincular");
     expect(calendar).toContain("Abrir Timeline oficial");
-    expect(calendar).toContain("Ver responsáveis");
+    expect(calendar).toContain("Revisar capacidade");
     expect(calendar).toContain("Ver conflitos");
     expect(calendar).toContain("Ver janelas livres");
+    expect(calendar).not.toContain("Agendamento #");
     expect(calendar).not.toContain("Confirmar");
     expect(calendar).not.toContain("Executar");
     expect(calendar).not.toContain("Automatizar");
@@ -102,8 +103,37 @@ describe("CalendarPage operational time-control contract", () => {
       "Fallback seguro: eventos derivados de agendamentos com datas reais; não substitui Timeline oficial."
     );
     expect(calendar).toContain(".slice(0, 5)");
+    expect(calendar).toContain("tone:");
+    expect(calendar).toContain('item.status === "NO_SHOW"');
+    expect(calendar).toContain('item.status === "CANCELED"');
     expect(calendar).not.toContain("eventType");
     expect(calendar).not.toContain("payload");
     expect(calendar).not.toContain("metadata");
+  });
+
+  it("compacta alertas, reordena ficha e simplifica comandos", () => {
+    const calendar = source();
+    const normalized = compact(calendar);
+
+    expect(calendar).toContain(".slice(0, 3)");
+    expect(calendar).toContain("Consequência: pode impactar O.S. e prova");
+    expect(
+      normalized.indexOf('["Próxima ação", "Abrir agendamento"]')
+    ).toBeLessThan(normalized.indexOf('"O.S."'));
+    const commandLayer = commandLayerSource();
+    expect(commandLayer).toContain("Problema");
+    expect(commandLayer).toContain("Consequência");
+    expect(commandLayer).not.toContain("Motivo:");
+    expect(commandLayer).not.toContain("Impacto esperado");
+  });
+
+  it("declara grade operacional com período útil e janelas livres calculadas", () => {
+    const calendar = source();
+
+    expect(calendar).toContain("availabilityMarkers");
+    expect(calendar).toContain("Janela livre calculada");
+    expect(calendar).toContain('slotMinTime="07:00:00"');
+    expect(calendar).toContain("businessHours");
+    expect(calendar).toContain("não agendamento real");
   });
 });

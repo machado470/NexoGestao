@@ -134,7 +134,9 @@ export function NexoGovernanceDecisionCard({
           <h3 className="mt-0.5 text-lg font-black uppercase leading-tight tracking-tight text-[var(--text-primary)]">
             {level}
           </h3>
-          <p className="text-xs font-semibold text-[var(--text-secondary)]">{title}</p>
+          <p className="text-xs font-semibold text-[var(--text-secondary)]">
+            {title}
+          </p>
         </div>
         <AppStatusBadge label={tone.label} tone={tone.badgeTone} />
       </div>
@@ -163,8 +165,14 @@ export function NexoGovernanceDecisionCard({
         </div>
       ) : null}
       <div className="grid gap-1.5 text-xs leading-4 text-[var(--text-secondary)] sm:grid-cols-2">
-        <p><strong className="text-[var(--text-primary)]">Motivo:</strong> {reason}</p>
-        <p><strong className="text-[var(--text-primary)]">Impacto:</strong> {impact}</p>
+        <p>
+          <strong className="text-[var(--text-primary)]">Problema:</strong>{" "}
+          {reason}
+        </p>
+        <p>
+          <strong className="text-[var(--text-primary)]">Consequência:</strong>{" "}
+          {impact}
+        </p>
       </div>
       {onDetails ? (
         <Button
@@ -238,13 +246,11 @@ export function NexoPriorityPanel({
       </div>
       <div className="grid gap-2 text-xs leading-4 text-[var(--text-secondary)] md:grid-cols-2">
         <p>
-          <strong className="text-[var(--text-primary)]">Motivo:</strong>{" "}
+          <strong className="text-[var(--text-primary)]">Problema:</strong>{" "}
           {reason}
         </p>
         <p>
-          <strong className="text-[var(--text-primary)]">
-            Impacto esperado:
-          </strong>{" "}
+          <strong className="text-[var(--text-primary)]">Consequência:</strong>{" "}
           {impact}
         </p>
       </div>
@@ -392,11 +398,24 @@ export function NexoOperationalPipeline({
 
 function getEvidenceTimelineIcon(type: string) {
   const normalized = type.toLowerCase();
-  if (normalized.includes("mensagem")) return <MessageCircle className="h-3.5 w-3.5 text-[var(--accent-primary)]" />;
-  if (normalized.includes("agendamento")) return <CalendarClock className="h-3.5 w-3.5 text-[var(--dashboard-info)]" />;
-  if (normalized.includes("o.s.")) return normalized.includes("conclu") ? <CheckCircle2 className="h-3.5 w-3.5 text-[var(--success)]" /> : <Wrench className="h-3.5 w-3.5 text-[var(--warning)]" />;
-  if (normalized.includes("pagamento")) return <Banknote className="h-3.5 w-3.5 text-[var(--success)]" />;
-  if (normalized.includes("cobran")) return <CreditCard className="h-3.5 w-3.5 text-[var(--warning)]" />;
+  if (normalized.includes("mensagem"))
+    return (
+      <MessageCircle className="h-3.5 w-3.5 text-[var(--accent-primary)]" />
+    );
+  if (normalized.includes("agendamento"))
+    return (
+      <CalendarClock className="h-3.5 w-3.5 text-[var(--dashboard-info)]" />
+    );
+  if (normalized.includes("o.s."))
+    return normalized.includes("conclu") ? (
+      <CheckCircle2 className="h-3.5 w-3.5 text-[var(--success)]" />
+    ) : (
+      <Wrench className="h-3.5 w-3.5 text-[var(--warning)]" />
+    );
+  if (normalized.includes("pagamento"))
+    return <Banknote className="h-3.5 w-3.5 text-[var(--success)]" />;
+  if (normalized.includes("cobran"))
+    return <CreditCard className="h-3.5 w-3.5 text-[var(--warning)]" />;
   return <Circle className="h-3.5 w-3.5 text-[var(--text-muted)]" />;
 }
 
@@ -417,6 +436,7 @@ export function NexoEvidenceTimeline({
     entity: string;
     actor?: string;
     summary: string;
+    tone?: "neutral" | "success" | "warning" | "danger" | "accent";
   }>;
   fullTimelineLabel?: string;
   onFullTimeline?: () => void;
@@ -444,7 +464,10 @@ export function NexoEvidenceTimeline({
                 <span className="flex h-6 w-6 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-primary)]">
                   {getEvidenceTimelineIcon(event.type)}
                 </span>
-                <AppStatusBadge label={event.type} tone="neutral" />
+                <AppStatusBadge
+                  label={event.type}
+                  tone={event.tone ?? "neutral"}
+                />
                 <span className="text-[var(--text-muted)]">
                   {event.occurredAt}
                 </span>
@@ -510,10 +533,11 @@ export function NexoIncidentList({
         </div>
       </div>
       <p className="text-sm leading-6 text-[var(--text-secondary)]">
-        <strong className="text-[var(--text-primary)]">Motivo:</strong> {reason}
+        <strong className="text-[var(--text-primary)]">Problema:</strong>{" "}
+        {reason}
       </p>
       <p className="text-sm leading-6 text-[var(--text-secondary)]">
-        <strong className="text-[var(--text-primary)]">Impacto:</strong>{" "}
+        <strong className="text-[var(--text-primary)]">Consequência:</strong>{" "}
         {impact}
       </p>
       <Button
@@ -527,7 +551,6 @@ export function NexoIncidentList({
     </AppSectionCard>
   );
 }
-
 
 export const OperationalStateCard = NexoGovernanceDecisionCard;
 export const NextBestActionCard = NexoPriorityPanel;
@@ -545,7 +568,9 @@ export function NexoExecutiveMetric(props: {
   className?: string;
 }) {
   return (
-    <AppSectionCard className={cn("flex h-full flex-col gap-2", props.className)}>
+    <AppSectionCard
+      className={cn("flex h-full flex-col gap-2", props.className)}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="nexo-overline">Métrica executiva</p>

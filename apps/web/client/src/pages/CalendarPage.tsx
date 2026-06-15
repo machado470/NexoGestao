@@ -41,6 +41,7 @@ import { normalizeArrayPayload } from "@/lib/query-helpers";
 import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
 
 type ViewMode = "timeGridDay" | "timeGridWeek" | "dayGridMonth";
+type EvidenceTone = "neutral" | "success" | "warning" | "danger" | "accent";
 
 type Appointment = {
   id: string;
@@ -115,6 +116,17 @@ function normalizeEventStatus(status: string) {
   if (status === "DONE") return "Concluído";
   if (status === "NO_SHOW") return "Não compareceu";
   return "Agendado";
+}
+
+function getEvidenceTone(
+  item: Appointment,
+  hasConflict: boolean,
+  isDelayed: boolean
+): EvidenceTone {
+  if (hasConflict || isDelayed || item.status === "NO_SHOW") return "danger";
+  if (item.status === "CANCELED") return "warning";
+  if (item.status === "CONFIRMED" || item.status === "DONE") return "success";
+  return "neutral";
 }
 
 export default function CalendarPage() {
@@ -319,7 +331,7 @@ export default function CalendarPage() {
         };
       })
       .filter(Boolean)
-      .slice(0, 4) as Array<{
+      .slice(0, 3) as Array<{
       item: Appointment;
       tone: "critical" | "warning";
       label: string;
@@ -438,16 +450,15 @@ export default function CalendarPage() {
             reason: `${getPersonName(people, overloadedOwner.ownerId)} concentra ${overloadedOwner.count} agendamentos ativos no recorte.`,
             impact:
               "A distribuição desigual aumenta chance de atraso, remarcação e execução sem prova operacional no tempo certo.",
-            ctaLabel: "Ver responsáveis",
+            ctaLabel: "Revisar capacidade",
             appointmentId: overloadedOwner.group[0]?.id,
             action: "rebalance" as const,
           }
         : delayedSample
           ? {
               title: "Risco de atrasar execução",
-              reason: `${delayedSample.customer?.name ?? "Cliente"} já passou do horário planejado e segue ativo.`,
-              impact:
-                "Atraso no calendário reduz previsibilidade de O.S. e compromete a trilha de Timeline e governança.",
+              reason: `${delayedSample.customer?.name ?? "Cliente"} atrasado desde ${formatDateTime(delayedSample.startsAt)}.`,
+              impact: "Pode gerar conflito, atraso ou ociosidade operacional.",
               ctaLabel: "Revisar agenda do dia",
               appointmentId: delayedSample.id,
               action: "review" as const,
@@ -486,10 +497,16 @@ export default function CalendarPage() {
     const nextAction = {
       title: risk.ctaLabel,
       entity: risk.appointmentId
-        ? `Agendamento #${risk.appointmentId}`
+        ? "Agendamento selecionado"
         : "Calendário operacional",
-      reason: risk.reason,
-      impact: risk.impact,
+      reason:
+        delayed.length > 0
+          ? `${delayed.length} atraso detectado no período.`
+          : risk.reason,
+      impact:
+        delayed.length > 0
+          ? "Pode reduzir previsibilidade de O.S. e execução."
+          : risk.impact,
       primaryActionLabel: risk.ctaLabel,
       appointmentId: risk.appointmentId,
       action: risk.action,
@@ -525,8 +542,8 @@ export default function CalendarPage() {
           label: "Tempo",
           summary:
             filteredAppointments.length > 0
-              ? `${filteredAppointments.length} evento(s) no recorte filtrado.`
-              : "Sem eventos no recorte filtrado.",
+              ? "Eventos distribuídos no período."
+              : "Eventos distribuídos no período.",
           state:
             calendarCommand.level === "RESTRICTED"
               ? "blocked"
@@ -539,7 +556,7 @@ export default function CalendarPage() {
         },
         {
           id: "appointment",
-          label: "Agenda",
+          label: "Agendamentos",
           summary:
             calendarCommand.unconfirmedCount > 0
               ? `${calendarCommand.unconfirmedCount} aguardando confirmação.`
@@ -551,13 +568,13 @@ export default function CalendarPage() {
         },
         {
           id: "owner",
-          label: "Equipe",
+          label: "Responsáveis",
           summary:
             calendarCommand.overloadedOwners.length > 0
               ? `${getPersonName(people, calendarCommand.overloadedOwners[0].ownerId)} está sobrecarregado.`
               : calendarCommand.unassignedCount > 0
                 ? `${calendarCommand.unassignedCount} sem responsável.`
-                : "Responsáveis alocados ou pendentes.",
+                : "Equipe vinculada aos eventos.",
           state:
             calendarCommand.overloadedOwners.length > 0
               ? "warning"
@@ -567,11 +584,11 @@ export default function CalendarPage() {
         },
         {
           id: "service-order",
-          label: "O.S.",
+          label: "Ordens de Serviço",
           summary:
             calendarCommand.withServiceOrderCount > 0
-              ? `${calendarCommand.withServiceOrderCount} agendamento(s) indicam vínculo com O.S.`
-              : "Sem vínculo de O.S. retornado para o calendário.",
+              ? "Vínculos operacionais retornados."
+              : "Vínculos operacionais retornados.",
           state: calendarCommand.withServiceOrderCount > 0 ? "active" : "idle",
           hrefLabel: "Ver O.S.",
           onClick: () => navigate("/service-orders?source=calendar"),
@@ -582,24 +599,24 @@ export default function CalendarPage() {
           summary:
             calendarCommand.delayedCount > 0
               ? `${calendarCommand.delayedCount} atraso(s) pressionam execução.`
-              : "Execução depende da fila de O.S.; calendário orienta o tempo.",
+              : "Atrasos e andamento pressionam o dia.",
           state: calendarCommand.delayedCount > 0 ? "blocked" : "active",
         },
         {
           id: "timeline",
-          label: "Prova",
-          summary: "Eventos reais enviados para leitura operacional.",
+          label: "Evidências",
+          summary: "Eventos reais derivados do calendário.",
           state: filteredAppointments.length > 0 ? "active" : "idle",
           hrefLabel: "Abrir Timeline oficial",
           onClick: () => navigate("/timeline?source=calendar"),
         },
         {
           id: "risk",
-          label: "Risco",
+          label: "Governança",
           summary:
             calendarCommand.level === "NORMAL"
-              ? "Sinais antes de afetar governança."
-              : "Sinais antes de afetar governança.",
+              ? "Sinais antes de afetar o controle operacional."
+              : "Sinais antes de afetar o controle operacional.",
           state:
             calendarCommand.level === "RESTRICTED"
               ? "blocked"
@@ -701,7 +718,32 @@ export default function CalendarPage() {
     executiveRead.possibleFits,
   ]);
 
-  const periodSummary = `${filteredAppointments.length} eventos no período · ${delayedIds.size} atraso(s) · ${executiveRead.possibleFits} janelas livres`;
+  const periodSummary = `${filteredAppointments.length} eventos no período · ${delayedIds.size} atraso · ${executiveRead.possibleFits} janelas livres`;
+
+  const availabilityMarkers = useMemo<EventInput[]>(() => {
+    if (filteredAppointments.length >= 6 || executiveRead.possibleFits === 0)
+      return [];
+    const baseDate = filteredAppointments[0]?.startsAt
+      ? new Date(filteredAppointments[0].startsAt)
+      : new Date();
+    return [9, 14, 16]
+      .slice(0, Math.min(3, executiveRead.possibleFits))
+      .map(hour => {
+        const start = new Date(baseDate);
+        start.setHours(hour, 0, 0, 0);
+        const end = new Date(start);
+        end.setMinutes(end.getMinutes() + 45);
+        return {
+          id: `availability-${hour}`,
+          title: "Janela livre calculada",
+          start: start.toISOString(),
+          end: end.toISOString(),
+          display: "background",
+          backgroundColor: "var(--accent-soft)",
+          extendedProps: { isAvailabilityMarker: true },
+        };
+      });
+  }, [executiveRead.possibleFits, filteredAppointments]);
 
   const operationalEvidence = useMemo(() => {
     return [...filteredAppointments]
@@ -720,6 +762,11 @@ export default function CalendarPage() {
         occurredAt: formatDateTime(item.startsAt),
         entity: item.customer?.name ?? "Cliente não identificado",
         actor: getPersonName(people, item.assignedToPersonId),
+        tone: getEvidenceTone(
+          item,
+          conflictIds.has(item.id),
+          delayedIds.has(item.id)
+        ),
         summary: `${item.title ?? "Serviço não informado"}. Evento real do calendário${item.endsAt ? ` até ${formatDateTime(item.endsAt)}` : " sem término informado"}; não substitui Timeline oficial.`,
       }));
   }, [conflictIds, delayedIds, filteredAppointments, people]);
@@ -831,8 +878,8 @@ export default function CalendarPage() {
           </section>
 
           <OperationalFlowCard
-            title="Tempo → Agenda → Equipe → O.S. → Execução → Prova → Risco"
-            subtitle="Pipeline operacional do tempo: leitura macro de distribuição, conflitos, capacidade, vazios e sobrecarga; Agendamentos segue como ação/lista operacional."
+            title="Tempo → Agendamentos → Responsáveis → Ordens de Serviço → Execução → Evidências → Governança"
+            subtitle="Pipeline operacional do tempo: leitura macro de distribuição, responsáveis, ordens, execução, evidências e governança."
             stages={flowStages}
           />
 
@@ -855,11 +902,11 @@ export default function CalendarPage() {
                     .map(({ item, tone, label }) => (
                       <article
                         key={item.id}
-                        className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-3"
+                        className="min-w-0 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-3"
                       >
                         <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <p className="text-sm font-semibold text-[var(--text-primary)]">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
                               {item.customer?.name ??
                                 "Cliente não identificado"}
                             </p>
@@ -875,8 +922,7 @@ export default function CalendarPage() {
                             : "Serviço passou do horário planejado."}
                         </p>
                         <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                          Impacto: pode empurrar execução, O.S. e prova
-                          operacional.
+                          Consequência: pode impactar O.S. e prova operacional.
                         </p>
                         <div className="mt-3 flex flex-wrap gap-2">
                           <Button
@@ -1047,6 +1093,10 @@ export default function CalendarPage() {
                 >
                   <div className="mb-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-3 text-sm font-medium text-[var(--text-primary)]">
                     {periodSummary}
+                    <span className="mt-1 block text-xs font-normal text-[var(--text-secondary)]">
+                      Período útil destacado; marcações suaves indicam janela
+                      livre calculada, não agendamento real.
+                    </span>
                   </div>
                   <div className="hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-2 shadow-sm xl:block">
                     <FullCalendar
@@ -1060,10 +1110,12 @@ export default function CalendarPage() {
                         setViewMode(view.view.type as ViewMode)
                       }
                       headerToolbar={false}
-                      events={events}
-                      eventClick={(arg: EventClickArg) =>
-                        setSelectedId(arg.event.id)
-                      }
+                      events={[...events, ...availabilityMarkers]}
+                      eventClick={(arg: EventClickArg) => {
+                        if (arg.event.extendedProps.isAvailabilityMarker)
+                          return;
+                        setSelectedId(arg.event.id);
+                      }}
                       eventContent={eventInfo => (
                         <div className="rounded-md border-l-4 border-[var(--accent-primary)] bg-[var(--surface-primary)]/90 p-1.5 text-[11px] leading-tight shadow-sm">
                           <p className="truncate text-xs font-bold text-[var(--text-primary)]">
@@ -1078,10 +1130,19 @@ export default function CalendarPage() {
                           </p>
                         </div>
                       )}
-                      height={640}
+                      height="auto"
+                      contentHeight={560}
                       editable={false}
                       locale="pt-br"
                       allDaySlot={false}
+                      slotMinTime="07:00:00"
+                      slotMaxTime="19:00:00"
+                      businessHours={{
+                        daysOfWeek: [1, 2, 3, 4, 5],
+                        startTime: "08:00",
+                        endTime: "18:00",
+                      }}
+                      nowIndicator
                     />
                   </div>
                   <div className="space-y-2 xl:hidden">
@@ -1150,6 +1211,7 @@ export default function CalendarPage() {
                             "Status",
                             normalizeEventStatus(selectedOrCritical.status),
                           ],
+                          ["Próxima ação", "Abrir agendamento"],
                           [
                             "O.S.",
                             selectedOrCritical.serviceOrderId ||
@@ -1168,7 +1230,6 @@ export default function CalendarPage() {
                                 ? "Atraso detectado"
                                 : "Sem risco crítico no recorte",
                           ],
-                          ["Próxima ação", "Abrir agendamento"],
                         ].map(([label, value]) => (
                           <div
                             key={label}
@@ -1333,7 +1394,7 @@ export default function CalendarPage() {
                       variant="outline"
                       onClick={() => setTeamFilter("all")}
                     >
-                      Ver responsáveis
+                      Revisar capacidade
                     </Button>
                     <Button
                       size="sm"
