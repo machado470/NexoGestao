@@ -14,17 +14,23 @@ import {
   type TimelineEvent,
 } from "./TimelinePage";
 
-const source = readFileSync(new URL("./TimelinePage.tsx", import.meta.url), "utf8");
+const source = readFileSync(
+  new URL("./TimelinePage.tsx", import.meta.url),
+  "utf8"
+);
 const docs = readFileSync(
-  new URL("../../../../../docs/TIMELINE_OFFICIAL_OPERATIONAL_AUDIT.md", import.meta.url),
+  new URL(
+    "../../../../../docs/TIMELINE_OFFICIAL_OPERATIONAL_AUDIT.md",
+    import.meta.url
+  ),
   "utf8"
 );
 
 describe("TimelinePage official operational audit contract", () => {
   it("declara a Timeline como prova oficial, não feed social nem log técnico cru", () => {
-    expect(source).toContain("Timeline de auditoria operacional");
+    expect(source).toContain("Centro de Evidências Operacionais");
     expect(source).toContain("Fonte oficial");
-    expect(source).toContain("sem inferir eventos ausentes");
+    expect(source).toContain("sem fabricar histórico");
     expect(source).not.toContain("curtir");
     expect(source).not.toContain("comment");
   });
@@ -42,7 +48,7 @@ describe("TimelinePage official operational audit contract", () => {
     expect(source).toContain("Entidade:");
     expect(source).toContain("Quando:");
     expect(source).toContain("Módulo:");
-    expect(source).toContain("Metadados relevantes");
+    expect(source).toContain("Resumo técnico");
     expect(source).toContain("Fallback honesto");
   });
 
@@ -70,14 +76,20 @@ describe("TimelinePage audit helpers", () => {
     chargeId: "charge-1",
     actorUserId: "user-1",
     createdAt: "2026-06-12T10:00:00.000Z",
-    metadata: { amount: 120, reason: "provider failed", nested: { ignored: true } },
+    metadata: {
+      amount: 120,
+      reason: "provider failed",
+      nested: { ignored: true },
+    },
   };
 
   it("normaliza aliases e preserva fallbacks honestos", () => {
     expect(eventAction(chargeEvent)).toBe("MESSAGE_FAILED");
     expect(eventEntityLabel(chargeEvent)).toBe("Cobrança");
     expect(eventEntityId(chargeEvent)).toBe("charge-1");
-    expect(eventCustomerId({ metadata: { customerId: "customer-1" } })).toBe("customer-1");
+    expect(eventCustomerId({ metadata: { customerId: "customer-1" } })).toBe(
+      "customer-1"
+    );
     expect(metadataRecord({ metadata: [] })).toEqual({});
     expect(text("", "fallback")).toBe("fallback");
   });

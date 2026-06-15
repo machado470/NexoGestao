@@ -32,6 +32,7 @@ import {
   AppPageShell,
   AppSectionCard,
   AppSelect,
+  AppStatCard,
   AppTimeline,
   AppTimelineItem,
 } from "@/components/app-system";
@@ -175,11 +176,40 @@ function whatsappExecutionEventLabel(action: string) {
   return labels[action] ?? action.replace(/_/g, " ");
 }
 
-function humanizeTimelineAction(action: string) {
-  return action
-    .replace(/_/g, " ")
-    .toLowerCase()
-    .replace(/^./, first => first.toUpperCase());
+export function humanizeTimelineAction(action: string) {
+  const normalized = normalizeTimelineEventType(action);
+  const labels: Record<string, string> = {
+    PAYMENT_RECEIVED: "Pagamento recebido",
+    CHARGE_CREATED: "Cobrança criada",
+    EXECUTION_BLOCKED: "Ação bloqueada por segurança",
+    SERVICE_ORDER_COMPLETED: "O.S. concluída",
+    APPOINTMENT_CONFIRMED: "Agendamento confirmado",
+    MESSAGE_SENT: "Mensagem enviada",
+    GOVERNANCE_RUN_COMPLETED: "Governança executada",
+    RISK_UPDATED: "Risco atualizado",
+    MESSAGE_FAILED: "Mensagem com falha",
+  };
+  const slugLabels: Record<string, string> = {
+    "action-send-overdue-charge-reminder":
+      "Lembrete de cobrança vencida bloqueado",
+  };
+  const raw = String(action ?? "").trim();
+  if (slugLabels[raw]) return slugLabels[raw];
+  if (labels[normalized]) return labels[normalized];
+  if (/^[A-Z0-9_]+$/.test(raw) || raw.startsWith("action-")) {
+    return "Evento operacional registrado";
+  }
+  return raw || "Evento operacional registrado";
+}
+
+function isTechnicalEventText(value: string) {
+  return (
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value
+    ) ||
+    /^[A-Z0-9_]+$/.test(value) ||
+    value.startsWith("action-")
+  );
 }
 
 function eventHumanFallback(event: TimelineEvent) {
@@ -204,11 +234,16 @@ function eventHumanFallback(event: TimelineEvent) {
 }
 
 function eventDisplayTitle(event: TimelineEvent) {
+  const action = eventAction(event);
+  const actionLabel = humanizeTimelineAction(
+    text(event?.action ?? event?.type, action)
+  );
+  if (actionLabel !== "Evento operacional registrado") return actionLabel;
   const explicit = text(
     event?.summary ?? event?.title ?? event?.description,
     ""
   );
-  if (explicit) return explicit;
+  if (explicit && !isTechnicalEventText(explicit)) return explicit;
   const whatsappLabel = whatsappExecutionEventLabel(eventAction(event));
   return whatsappLabel === eventAction(event).replace(/_/g, " ")
     ? eventHumanFallback(event)
@@ -311,7 +346,9 @@ export function eventModule(event: TimelineEvent): ModuleFilter {
   return "all";
 }
 
-export function eventSeverity(event: TimelineEvent): Exclude<SeverityFilter, "all"> {
+export function eventSeverity(
+  event: TimelineEvent
+): Exclude<SeverityFilter, "all"> {
   const action = eventAction(event);
   const bucket = [
     action.toLowerCase(),
@@ -369,6 +406,8 @@ function eventReason(event: TimelineEvent) {
   const description = text(event?.description, "");
   if (description) return description;
   const action = eventAction(event);
+  if (action === "EXECUTION_BLOCKED")
+    return "Ação operacional bloqueada por segurança; revise o módulo de origem antes de qualquer nova tentativa.";
   if (action === "WHATSAPP_ACTION_APPROVED")
     return "Ação WhatsApp sensível aprovada por humano e liberada para execução segura.";
   if (action === "WHATSAPP_ACTION_EXECUTED")
@@ -691,6 +730,16 @@ export function usefulMetadataPairs(event: TimelineEvent) {
   return pairs.slice(0, 6);
 }
 
+function formatEventTime(input: unknown) {
+  if (!input) return "--:--";
+  const parsed = new Date(String(input));
+  if (Number.isNaN(parsed.getTime())) return "--:--";
+  return parsed.toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export function formatDateTime(input: unknown) {
   if (!input) return "Sem data";
   const parsed = new Date(String(input));
@@ -788,11 +837,7 @@ export default function TimelinePage() {
 
   const responsibleOptions = useMemo(() => {
     const values = Array.from(
-      new Set(
-        events.map(event =>
-          eventActorLabel(event)
-        )
-      )
+      new Set(events.map(event => eventActorLabel(event)))
     );
     return values
       .slice(0, 20)
@@ -931,12 +976,18 @@ export default function TimelinePage() {
     const criticalEvents = filteredEvents.filter(
       item => eventSeverity(item) === "critical"
     );
-    const highEvents = filteredEvents.filter(item => eventSeverity(item) === "high");
+    const highEvents = filteredEvents.filter(
+      item => eventSeverity(item) === "high"
+    );
     const financeRiskEvents = filteredEvents.filter(isFinancialRiskEvent);
-    const serviceOrderRiskEvents = filteredEvents.filter(isServiceOrderRiskEvent);
+    const serviceOrderRiskEvents = filteredEvents.filter(
+      isServiceOrderRiskEvent
+    );
     const appointmentRiskEvents = filteredEvents.filter(isAppointmentRiskEvent);
     const governanceEvents = filteredEvents.filter(isGovernanceRiskEvent);
-    const communicationFailures = filteredEvents.filter(isCommunicationFailureEvent);
+    const communicationFailures = filteredEvents.filter(
+      isCommunicationFailureEvent
+    );
     const riskEvents = filteredEvents.filter(isRiskEvidenceEvent);
     const suspendedEvents = filteredEvents.filter(item =>
       normalizedMetadataValue(item, [
@@ -948,7 +999,9 @@ export default function TimelinePage() {
         "riskLevel",
       ]).includes("SUSPENDED")
     );
-    const restrictedEvents = filteredEvents.filter(hasCriticalOperationalMetadata);
+    const restrictedEvents = filteredEvents.filter(
+      hasCriticalOperationalMetadata
+    );
     const latestEvent = filteredEvents[0] ?? null;
     const latestTimestamp = latestEvent
       ? new Date(String(latestEvent?.createdAt ?? "")).getTime()
@@ -1028,9 +1081,10 @@ export default function TimelinePage() {
         reason,
         impact:
           "A evidência exige revisão dirigida para evitar perda de receita, atraso de execução ou lacuna de governança.",
-        detailsLabel: evidence.criticalEvents.length > 0
-          ? "Investigar críticos"
-          : "Revisar recorte",
+        detailsLabel:
+          evidence.criticalEvents.length > 0
+            ? "Investigar críticos"
+            : "Revisar recorte",
         onDetails: () => {
           if (evidence.criticalEvents.length > 0) setSeverityFilter("critical");
           else setSeverityFilter("high");
@@ -1130,7 +1184,10 @@ export default function TimelinePage() {
     }
 
     return {
-      title: module === "all" ? "Evento crítico operacional" : `Evento crítico em ${eventModuleLabel(module)}`,
+      title:
+        module === "all"
+          ? "Evento crítico operacional"
+          : `Evento crítico em ${eventModuleLabel(module)}`,
       reason: `${entity} registrou criticidade em ${when}: ${eventReason(selected)}`,
       impact:
         "A evidência deve ser investigada no módulo de origem e, se necessário, elevada para governança.",
@@ -1194,7 +1251,8 @@ export default function TimelinePage() {
       return {
         ...base,
         title: "Abrir cobrança",
-        impact: "Prioriza recuperação de receita ou validação de pendência financeira.",
+        impact:
+          "Prioriza recuperação de receita ou validação de pendência financeira.",
         primaryActionLabel: "Abrir financeiro",
         primaryRoute: "/finances",
       };
@@ -1203,7 +1261,8 @@ export default function TimelinePage() {
       return {
         ...base,
         title: "Abrir O.S.",
-        impact: "Ajuda a destravar execução antes que vire falha de SLA ou cobrança.",
+        impact:
+          "Ajuda a destravar execução antes que vire falha de SLA ou cobrança.",
         primaryActionLabel: "Abrir O.S.",
         primaryRoute: "/service-orders",
       };
@@ -1212,7 +1271,8 @@ export default function TimelinePage() {
       return {
         ...base,
         title: "Abrir agendamento",
-        impact: "Permite revisar entrada operacional problemática antes de nova execução.",
+        impact:
+          "Permite revisar entrada operacional problemática antes de nova execução.",
         primaryActionLabel: "Abrir agendamento",
         primaryRoute: "/appointments",
       };
@@ -1221,7 +1281,8 @@ export default function TimelinePage() {
       return {
         ...base,
         title: "Abrir governança",
-        impact: "Conecta a evidência oficial à decisão, risco ou restrição operacional.",
+        impact:
+          "Conecta a evidência oficial à decisão, risco ou restrição operacional.",
         primaryActionLabel: "Abrir governança",
         primaryRoute: "/governance",
       };
@@ -1258,27 +1319,32 @@ export default function TimelinePage() {
         state: filteredEvents.length > 0 ? "done" : "idle",
       },
       {
-        id: "timeline",
-        label: "Timeline",
+        id: "registry",
+        label: "Registro",
         summary: isInitialLoading
           ? "Feed ainda carregando."
           : hasInitialError
             ? "Falha no carregamento da prova."
             : "Feed carregado como memória auditável.",
-        state: hasInitialError ? "blocked" : isInitialLoading ? "idle" : "active",
+        state: hasInitialError
+          ? "blocked"
+          : isInitialLoading
+            ? "idle"
+            : "active",
         hrefLabel: "Ver feed",
         onClick: () => setSeverityFilter("all"),
       },
       {
-        id: "risk",
-        label: "Risco",
+        id: "impact",
+        label: "Impacto",
         summary:
           operationalEvidence.riskEvents.length > 0
             ? "Eventos indicam atenção ou restrição."
             : "Sem risco dominante detectado.",
         countOrValue: String(operationalEvidence.riskEvents.length),
         state:
-          operationalState.level === "RESTRICTED" || operationalState.level === "SUSPENDED"
+          operationalState.level === "RESTRICTED" ||
+          operationalState.level === "SUSPENDED"
             ? "blocked"
             : operationalState.level === "WARNING"
               ? "warning"
@@ -1287,19 +1353,20 @@ export default function TimelinePage() {
         onClick: () => setSeverityFilter("high"),
       },
       {
-        id: "governance",
-        label: "Governança",
+        id: "decision",
+        label: "Decisão",
         summary:
           operationalEvidence.governanceEvents.length > 0
             ? "Há evidências de risco/estado operacional."
             : "Sem evento de governança no recorte.",
         countOrValue: String(operationalEvidence.governanceEvents.length),
-        state:
-          operationalEvidence.governanceEvents.some(hasCriticalOperationalMetadata)
-            ? "warning"
-            : operationalEvidence.governanceEvents.length > 0
-              ? "active"
-              : "idle",
+        state: operationalEvidence.governanceEvents.some(
+          hasCriticalOperationalMetadata
+        )
+          ? "warning"
+          : operationalEvidence.governanceEvents.length > 0
+            ? "active"
+            : "idle",
         hrefLabel: "Abrir governança",
         onClick: () => navigate("/governance"),
       },
@@ -1307,12 +1374,24 @@ export default function TimelinePage() {
         id: "action",
         label: "Ação",
         summary: nextBestAction.title,
-        state: filteredEvents.length > 0 || nextBestAction.applyPrimary ? "active" : "idle",
+        state:
+          filteredEvents.length > 0 || nextBestAction.applyPrimary
+            ? "active"
+            : "idle",
         hrefLabel: nextBestAction.primaryActionLabel,
         onClick: () => {
           if (nextBestAction.applyPrimary) nextBestAction.applyPrimary();
-          else if (nextBestAction.primaryRoute) navigate(nextBestAction.primaryRoute);
+          else if (nextBestAction.primaryRoute)
+            navigate(nextBestAction.primaryRoute);
         },
+      },
+      {
+        id: "audit",
+        label: "Auditoria",
+        summary: "Exportar ou revisar evidência oficial do período.",
+        state: filteredEvents.length > 0 ? "done" : "idle",
+        hrefLabel: "Exportar",
+        onClick: exportCsv,
       },
     ],
     [
@@ -1342,7 +1421,9 @@ export default function TimelinePage() {
         })
         .slice(0, 4)
         .map(event => ({
-          id: String(event?.id ?? `${eventEntityId(event)}-${event?.createdAt}`),
+          id: String(
+            event?.id ?? `${eventEntityId(event)}-${event?.createdAt}`
+          ),
           type: eventSeverityLabel(eventSeverity(event)),
           occurredAt: formatDateTime(event?.createdAt),
           entity: `${eventEntityLabel(event)} #${eventEntityId(event)}`,
@@ -1409,11 +1490,56 @@ export default function TimelinePage() {
     URL.revokeObjectURL(url);
   }
 
+  const modulePanorama = useMemo(
+    () =>
+      MODULE_OPTIONS.filter(option => option.value !== "all").map(option => {
+        const count = filteredEvents.filter(
+          event => eventModule(event) === option.value
+        ).length;
+        const critical = filteredEvents.some(
+          event =>
+            eventModule(event) === option.value &&
+            eventSeverity(event) === "critical"
+        );
+        const attention = filteredEvents.some(
+          event =>
+            eventModule(event) === option.value &&
+            ["critical", "high"].includes(eventSeverity(event))
+        );
+        return {
+          ...option,
+          count,
+          state:
+            count === 0
+              ? "Sem histórico"
+              : critical
+                ? "Crítico"
+                : attention
+                  ? "Atenção"
+                  : "Saudável",
+          helper:
+            count === 0
+              ? "Sem sinal real no período."
+              : "Evidência oficial no recorte.",
+        };
+      }),
+    [filteredEvents]
+  );
+
+  const latestEventLabel = operationalEvidence.latestEvent
+    ? formatDateTime(operationalEvidence.latestEvent?.createdAt)
+    : "Sem eventos no período";
+
+  const attentionCount =
+    operationalEvidence.criticalEvents.length +
+    operationalEvidence.highEvents.length;
+  const revenueImpactCount = operationalEvidence.financeRiskEvents.length;
+
   return (
     <AppPageShell className="gap-3">
       <AppOperationalHeader
-        title="Timeline de auditoria operacional"
-        description="Fonte oficial para provar o que aconteceu, quando, qual entidade foi afetada e qual ator a fonte informou — sem inferir eventos ausentes."
+        title="Centro de Evidências Operacionais"
+        description="Fonte oficial para provar o que aconteceu, quando, quem fez e qual entidade foi afetada."
         density="compact"
         primaryAction={
           <Button type="button" variant="outline" size="sm" onClick={exportCsv}>
@@ -1447,23 +1573,107 @@ export default function TimelinePage() {
         }
       />
 
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <AppStatCard
+          label="Eventos registrados"
+          value={filteredEvents.length}
+          helper={
+            filteredEvents.length > 0
+              ? "Evidências reais no recorte."
+              : "0 eventos registrados."
+          }
+          icon={<FileClock className="h-4 w-4" />}
+        />
+        <AppStatCard
+          label="Exigem atenção"
+          value={attentionCount}
+          helper={
+            attentionCount > 0
+              ? "Sinais para diagnóstico operacional."
+              : "Sem eventos no período exigindo atenção."
+          }
+          icon={<AlertTriangle className="h-4 w-4" />}
+        />
+        <AppStatCard
+          label="Impactam receita"
+          value={revenueImpactCount}
+          helper={
+            revenueImpactCount > 0
+              ? "Eventos financeiros com consequência."
+              : "Sem impacto financeiro detectado."
+          }
+          icon={<BadgeDollarSign className="h-4 w-4" />}
+        />
+        <AppStatCard
+          label="Último evento"
+          value={latestEventLabel}
+          helper="Data/hora retornada pela fonte oficial."
+          icon={<CalendarClock className="h-4 w-4" />}
+        />
+      </div>
+
+      <AppSectionCard className="space-y-3">
+        <div>
+          <p className="text-sm font-semibold text-[var(--text-primary)]">
+            Panorama por módulo
+          </p>
+          <p className="text-xs text-[var(--text-muted)]">
+            Financeiro, Ordens de Serviço, Agendamentos, WhatsApp, Clientes e
+            Governança lidos sem fabricar histórico.
+          </p>
+        </div>
+        <div className="grid gap-2 md:grid-cols-3 xl:grid-cols-6">
+          {modulePanorama.map(item => (
+            <button
+              key={item.value}
+              type="button"
+              onClick={() => setModuleFilter(item.value)}
+              className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-3 text-left transition-colors hover:border-[var(--accent-primary)]"
+            >
+              <span className="text-xs font-medium text-[var(--text-muted)]">
+                {item.label}
+              </span>
+              <strong className="mt-1 block text-xl text-[var(--text-primary)]">
+                {item.count}
+              </strong>
+              <AppStatusBadge label={item.state} />
+              <span className="mt-2 block text-[11px] text-[var(--text-muted)]">
+                {item.helper}
+              </span>
+            </button>
+          ))}
+        </div>
+      </AppSectionCard>
+
       <AppSectionCard className="p-3">
         <div className="grid gap-2 text-xs md:grid-cols-4">
           <div>
-            <span className="font-semibold text-[var(--success)]">Saudável</span>
-            <p className="text-[var(--text-muted)]">Sem crítico no recorte carregado.</p>
+            <span className="font-semibold text-[var(--success)]">
+              Saudável
+            </span>
+            <p className="text-[var(--text-muted)]">
+              Sem crítico no recorte carregado.
+            </p>
           </div>
           <div>
             <span className="font-semibold text-[var(--warning)]">Atenção</span>
-            <p className="text-[var(--text-muted)]">Risco, atraso, falha ou silêncio recente.</p>
+            <p className="text-[var(--text-muted)]">
+              Risco, atraso, falha ou silêncio recente.
+            </p>
           </div>
           <div>
             <span className="font-semibold text-[var(--danger)]">Crítico</span>
-            <p className="text-[var(--text-muted)]">Evento restritivo priorizado acima do ruído.</p>
+            <p className="text-[var(--text-muted)]">
+              Evento restritivo priorizado acima do ruído.
+            </p>
           </div>
           <div>
-            <span className="font-semibold text-[var(--text-primary)]">Vazio/erro</span>
-            <p className="text-[var(--text-muted)]">Estado explícito: sem inventar histórico.</p>
+            <span className="font-semibold text-[var(--text-primary)]">
+              Vazio/erro
+            </span>
+            <p className="text-[var(--text-muted)]">
+              Estado explícito: sem inventar histórico.
+            </p>
           </div>
         </div>
       </AppSectionCard>
@@ -1494,7 +1704,8 @@ export default function TimelinePage() {
           primaryActionLabel={nextBestAction.primaryActionLabel}
           onPrimaryAction={() => {
             if (nextBestAction.applyPrimary) nextBestAction.applyPrimary();
-            else if (nextBestAction.primaryRoute) navigate(nextBestAction.primaryRoute);
+            else if (nextBestAction.primaryRoute)
+              navigate(nextBestAction.primaryRoute);
           }}
           secondaryActionLabel={nextBestAction.secondaryActionLabel}
           onSecondaryAction={
@@ -1506,7 +1717,7 @@ export default function TimelinePage() {
       </div>
 
       <OperationalFlowCard
-        title="Evento → Timeline → Risco → Governança → Ação"
+        title="Evento → Registro → Impacto → Decisão → Ação → Auditoria"
         subtitle="A Timeline funciona como prova oficial: registra o evento, revela risco e orienta a próxima investigação sem executar ação automática."
         stages={operationalFlowStages}
       />
@@ -1518,6 +1729,390 @@ export default function TimelinePage() {
         fullTimelineLabel="Ver feed filtrado"
         onFullTimeline={() => setSeverityFilter("all")}
       />
+
+      <div className="grid gap-3 xl:grid-cols-12">
+        <AppSectionBlock
+          title="Feed / Linha do Tempo"
+          subtitle="Linha do tempo auditável agrupada por data, com títulos humanos e consequência operacional."
+          className="xl:col-span-8"
+          compact
+        >
+          {isInitialLoading ? (
+            <div className="space-y-2">
+              <AppPageLoadingState
+                title="Carregando memória oficial"
+                description="Organizando histórico com rastreabilidade por entidade, ator e motivo."
+              />
+              <AppSkeleton className="h-20" />
+              <AppSkeleton className="h-20" />
+            </div>
+          ) : hasInitialError ? (
+            <AppPageErrorState
+              description={
+                timelineQuery.error?.message ?? "Falha ao carregar timeline."
+              }
+              actionLabel="Tentar novamente"
+              onAction={() => void timelineQuery.refetch()}
+            />
+          ) : filteredEvents.length === 0 ? (
+            <AppPageEmptyState
+              title="Sem eventos para este recorte"
+              description="Ajuste os filtros para investigar outra janela operacional."
+            />
+          ) : (
+            <div className="max-h-[620px] space-y-3 overflow-y-auto pr-1">
+              {groupedEvents.map(([dateLabel, dayEvents]) => (
+                <section key={dateLabel} className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                    {dateLabel}
+                  </p>
+                  <AppTimeline>
+                    {dayEvents.map(event => {
+                      const module = eventModule(event);
+                      const severity = eventSeverity(event);
+                      const isSelected =
+                        String(event?.id) === String(selectedEvent?.id ?? "");
+
+                      return (
+                        <AppTimelineItem
+                          key={String(
+                            event?.id ??
+                              `${eventEntityId(event)}-${event?.createdAt}`
+                          )}
+                          className={timelineItemClass({
+                            isSelected,
+                            severity,
+                            module,
+                          })}
+                          onClick={() => setSelectedEventId(String(event?.id))}
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <EventIcon
+                                  module={module}
+                                  severity={severity}
+                                />
+                                <span className="text-xs font-semibold text-[var(--text-muted)]">
+                                  {formatEventTime(event?.createdAt)}
+                                </span>
+                                <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
+                                  {eventDisplayTitle(event)}
+                                </p>
+                              </div>
+                              <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                                {eventReason(event)}
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <AppPriorityBadge
+                                label={eventSeverityLabel(severity)}
+                              />
+                              <AppStatusBadge
+                                label={eventModuleLabel(module)}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="mt-2 grid gap-1 text-xs text-[var(--text-muted)] md:grid-cols-2">
+                            <p>
+                              Entidade: {eventEntityLabel(event)} #
+                              {eventEntityId(event)}
+                            </p>
+                            <p>Quem: {eventActorLabel(event)}</p>
+                            <p>Quando: {formatDateTime(event?.createdAt)}</p>
+                            <p>Ação segura: Ver no feed</p>
+                            <p>Módulo: {eventModuleLabel(module)}</p>
+                          </div>
+                          {usefulMetadataPairs(event).length > 0 ? (
+                            <div className="mt-2 flex flex-wrap gap-1">
+                              {usefulMetadataPairs(event)
+                                .slice(0, 3)
+                                .map(pair => (
+                                  <span
+                                    key={pair.key}
+                                    className="rounded-md border border-[var(--border-subtle)] px-2 py-1 text-[11px] text-[var(--text-muted)]"
+                                  >
+                                    {pair.key}: {pair.value}
+                                  </span>
+                                ))}
+                            </div>
+                          ) : null}
+                          {eventAuditFallbacks(event).length > 0 ? (
+                            <p className="mt-2 text-xs text-[var(--text-muted)]">
+                              Fallback honesto:{" "}
+                              {eventAuditFallbacks(event).join("; ")}.
+                            </p>
+                          ) : null}
+                        </AppTimelineItem>
+                      );
+                    })}
+                  </AppTimeline>
+                </section>
+              ))}
+
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-[var(--text-muted)]">
+                  Exibindo lote de ingestão {PAGE_SIZE} evento(s).
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={loadMore}
+                  disabled={!hasMore || timelineQuery.isFetching}
+                >
+                  {timelineQuery.isFetching
+                    ? "Carregando..."
+                    : hasMore
+                      ? `Carregar mais ${PAGE_SIZE}`
+                      : "Sem mais eventos"}
+                </Button>
+              </div>
+              <AppPagination
+                currentPage={currentPage}
+                totalItems={filteredEvents.length}
+                pageSize={LIST_PAGE_SIZE}
+                onPageChange={setCurrentPage}
+              />
+            </div>
+          )}
+        </AppSectionBlock>
+
+        <AppSectionBlock
+          title="Contexto do evento"
+          subtitle="Leitura humana primeiro; resumo técnico fica secundário."
+          className="xl:col-span-4"
+        >
+          {!selectedEvent ? (
+            <AppPageEmptyState
+              title="Selecione um evento"
+              description="Clique em um item da timeline para abrir diagnóstico, metadados e ação."
+            />
+          ) : (
+            <div className="space-y-3">
+              <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/60 p-3 text-sm">
+                <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                  O que aconteceu
+                </p>
+                <p className="mt-1 font-semibold text-[var(--text-primary)]">
+                  {eventDisplayTitle(selectedEvent)}
+                </p>
+                <p className="mt-1 text-[var(--text-secondary)]">
+                  {eventReason(selectedEvent)}
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/60 p-3">
+                <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                  Quem foi impactado
+                </p>
+                <ul className="mt-2 space-y-1 text-xs text-[var(--text-secondary)]">
+                  <li>
+                    Entidade: {eventEntityLabel(selectedEvent)} #
+                    {eventEntityId(selectedEvent)}
+                  </li>
+                  <li>Responsável: {eventActorLabel(selectedEvent)}</li>
+                  <li>Data/hora: {formatDateTime(selectedEvent?.createdAt)}</li>
+                  <li>
+                    Módulo: {eventModuleLabel(eventModule(selectedEvent))}
+                  </li>
+                  <li>
+                    Cliente:{" "}
+                    {eventCustomerId(selectedEvent)
+                      ? `#${eventCustomerId(selectedEvent)}`
+                      : "Não vinculado"}
+                  </li>
+                </ul>
+                {usefulMetadataPairs(selectedEvent).length > 0 ? (
+                  <div className="mt-3 border-t border-[var(--border-subtle)] pt-3">
+                    <p className="text-xs font-semibold text-[var(--text-primary)]">
+                      Resumo técnico
+                    </p>
+                    <dl className="mt-2 grid gap-1 text-xs text-[var(--text-secondary)]">
+                      {usefulMetadataPairs(selectedEvent).map(pair => (
+                        <div
+                          key={pair.key}
+                          className="grid grid-cols-[minmax(0,0.45fr)_minmax(0,0.55fr)] gap-2"
+                        >
+                          <dt className="truncate text-[var(--text-muted)]">
+                            {pair.key}
+                          </dt>
+                          <dd className="break-words font-medium text-[var(--text-secondary)]">
+                            {pair.value}
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
+                ) : (
+                  <p className="mt-3 border-t border-[var(--border-subtle)] pt-3 text-xs text-[var(--text-muted)]">
+                    Metadados não vieram em formato resumível pela fonte
+                    oficial.
+                  </p>
+                )}
+              </div>
+
+              <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/60 p-3">
+                <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                  Diagnóstico de risco
+                </p>
+                <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+                  Próxima ação recomendada
+                </p>
+                <p className="text-xs text-[var(--text-secondary)]">
+                  {eventRealCtas(selectedEvent)[0]?.label ?? "Ver no feed"}
+                </p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <AppStatusBadge
+                    label={
+                      eventSeverity(selectedEvent) === "critical"
+                        ? "Em risco"
+                        : "Monitorado"
+                    }
+                  />
+                  {eventModule(selectedEvent) === "governance" ? (
+                    <ShieldAlert className="h-4 w-4 text-[var(--accent-primary)]" />
+                  ) : null}
+                  {eventModule(selectedEvent) === "finance" ? (
+                    <BadgeDollarSign className="h-4 w-4 text-[var(--success)]" />
+                  ) : null}
+                  {eventSeverity(selectedEvent) === "critical" ? (
+                    <AlertTriangle className="h-4 w-4 text-[var(--danger)]" />
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-2">
+                {eventModule(selectedEvent) === "governance" ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => navigate("/governance")}
+                  >
+                    Abrir governança
+                  </Button>
+                ) : null}
+                {eventRealCtas(selectedEvent).map(cta => (
+                  <Button
+                    key={cta.label}
+                    type="button"
+                    variant="outline"
+                    title={cta.reason}
+                    onClick={() => navigate(cta.route)}
+                  >
+                    {cta.label}
+                  </Button>
+                ))}
+                {eventRealCtas(selectedEvent).length === 0 ? (
+                  <p className="text-xs text-[var(--text-muted)]">
+                    Sem CTA de entidade: a fonte não trouxe entityType/entityId
+                    utilizável para cliente, O.S., financeiro, agendamento ou
+                    WhatsApp.
+                  </p>
+                ) : null}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => navigate(eventRoute(selectedEvent))}
+                >
+                  Abrir contexto <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </AppSectionBlock>
+      </div>
+
+      <AppSectionBlock
+        title="Prova operacional"
+        subtitle="Extrato oficial de evidências do período selecionado."
+      >
+        <div className="grid gap-3 md:grid-cols-4">
+          <AppStatCard
+            label="Eventos oficiais"
+            value={filteredEvents.length}
+            helper="Registros reais carregados."
+          />
+          <AppStatCard
+            label="Financeiro"
+            value={
+              modulePanorama.find(item => item.value === "finance")?.count ?? 0
+            }
+            helper="Receita e cobranças."
+          />
+          <AppStatCard
+            label="Ordens de Serviço"
+            value={
+              modulePanorama.find(item => item.value === "service_order")
+                ?.count ?? 0
+            }
+            helper="Execução operacional."
+          />
+          <AppStatCard
+            label="Governança"
+            value={
+              modulePanorama.find(item => item.value === "governance")?.count ??
+              0
+            }
+            helper={
+              filteredEvents.length === 0
+                ? "Sem sinal / sem histórico."
+                : "Decisão e risco."
+            }
+          />
+        </div>
+        <div className="mt-4 overflow-x-auto rounded-xl border border-[var(--border-subtle)]">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-[var(--surface-secondary)] text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
+              <tr>
+                <th className="p-3">Data/hora</th>
+                <th className="p-3">Módulo</th>
+                <th className="p-3">Evento humano</th>
+                <th className="p-3">Entidade/cliente</th>
+                <th className="p-3">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredEvents.slice(0, 8).map(event => (
+                <tr
+                  key={String(
+                    event?.id ?? `${eventEntityId(event)}-${event?.createdAt}`
+                  )}
+                  className="border-t border-[var(--border-subtle)]"
+                >
+                  <td className="p-3 text-[var(--text-secondary)]">
+                    {formatDateTime(event?.createdAt)}
+                  </td>
+                  <td className="p-3">
+                    {eventModuleLabel(eventModule(event))}
+                  </td>
+                  <td className="p-3 font-medium text-[var(--text-primary)]">
+                    {eventDisplayTitle(event)}
+                  </td>
+                  <td className="p-3 text-[var(--text-secondary)]">
+                    {eventEntityLabel(event)} #{eventEntityId(event)}{" "}
+                    {eventCustomerId(event)
+                      ? `· Cliente #${eventCustomerId(event)}`
+                      : ""}
+                  </td>
+                  <td className="p-3">
+                    {eventSeverityLabel(eventSeverity(event))}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="mt-3"
+          onClick={() => setSeverityFilter("all")}
+        >
+          Ver feed filtrado
+        </Button>
+      </AppSectionBlock>
 
       <AppSectionBlock
         title="Filtros"
@@ -1597,291 +2192,6 @@ export default function TimelinePage() {
           </span>
         </div>
       </AppSectionBlock>
-
-      <div className="grid gap-3 xl:grid-cols-12">
-        <AppSectionBlock
-          title="Timeline oficial da operação"
-          subtitle="Feed auditável com tipo, descrição humana, entidade, responsável e horário."
-          className="xl:col-span-8"
-          compact
-        >
-          {isInitialLoading ? (
-            <div className="space-y-2">
-              <AppPageLoadingState
-                title="Carregando memória oficial"
-                description="Organizando histórico com rastreabilidade por entidade, ator e motivo."
-              />
-              <AppSkeleton className="h-20" />
-              <AppSkeleton className="h-20" />
-            </div>
-          ) : hasInitialError ? (
-            <AppPageErrorState
-              description={
-                timelineQuery.error?.message ?? "Falha ao carregar timeline."
-              }
-              actionLabel="Tentar novamente"
-              onAction={() => void timelineQuery.refetch()}
-            />
-          ) : filteredEvents.length === 0 ? (
-            <AppPageEmptyState
-              title="Sem eventos para este recorte"
-              description="Ajuste os filtros para investigar outra janela operacional."
-            />
-          ) : (
-            <div className="max-h-[620px] space-y-3 overflow-y-auto pr-1">
-              {groupedEvents.map(([dateLabel, dayEvents]) => (
-                <section key={dateLabel} className="space-y-2">
-                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                    {dateLabel}
-                  </p>
-                  <AppTimeline>
-                    {dayEvents.map(event => {
-                      const module = eventModule(event);
-                      const severity = eventSeverity(event);
-                      const isSelected =
-                        String(event?.id) === String(selectedEvent?.id ?? "");
-
-                      return (
-                        <AppTimelineItem
-                          key={String(
-                            event?.id ??
-                              `${eventEntityId(event)}-${event?.createdAt}`
-                          )}
-                          className={timelineItemClass({
-                            isSelected,
-                            severity,
-                            module,
-                          })}
-                          onClick={() => setSelectedEventId(String(event?.id))}
-                        >
-                          <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2">
-                                <EventIcon
-                                  module={module}
-                                  severity={severity}
-                                />
-                                <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
-                                  {eventDisplayTitle(event)}
-                                </p>
-                              </div>
-                              <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                                {eventReason(event)}
-                              </p>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <AppPriorityBadge
-                                label={eventSeverityLabel(severity)}
-                              />
-                              <AppStatusBadge
-                                label={eventModuleLabel(module)}
-                              />
-                            </div>
-                          </div>
-
-                          <div className="mt-2 grid gap-1 text-xs text-[var(--text-muted)] md:grid-cols-2">
-                            <p>
-                              Entidade: {eventEntityLabel(event)} #
-                              {eventEntityId(event)}
-                            </p>
-                            <p>
-                              Quem:{" "}
-                              {eventActorLabel(event)}
-                            </p>
-                            <p>Quando: {formatDateTime(event?.createdAt)}</p>
-                            <p>Módulo: {eventModuleLabel(module)}</p>
-                          </div>
-                          {usefulMetadataPairs(event).length > 0 ? (
-                            <div className="mt-2 flex flex-wrap gap-1">
-                              {usefulMetadataPairs(event).slice(0, 3).map(pair => (
-                                <span
-                                  key={pair.key}
-                                  className="rounded-md border border-[var(--border-subtle)] px-2 py-1 text-[11px] text-[var(--text-muted)]"
-                                >
-                                  {pair.key}: {pair.value}
-                                </span>
-                              ))}
-                            </div>
-                          ) : null}
-                          {eventAuditFallbacks(event).length > 0 ? (
-                            <p className="mt-2 text-xs text-[var(--text-muted)]">
-                              Fallback honesto: {eventAuditFallbacks(event).join("; ")}.
-                            </p>
-                          ) : null}
-                        </AppTimelineItem>
-                      );
-                    })}
-                  </AppTimeline>
-                </section>
-              ))}
-
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs text-[var(--text-muted)]">
-                  Exibindo lote de ingestão {PAGE_SIZE} evento(s).
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={loadMore}
-                  disabled={!hasMore || timelineQuery.isFetching}
-                >
-                  {timelineQuery.isFetching
-                    ? "Carregando..."
-                    : hasMore
-                      ? `Carregar mais ${PAGE_SIZE}`
-                      : "Sem mais eventos"}
-                </Button>
-              </div>
-              <AppPagination
-                currentPage={currentPage}
-                totalItems={filteredEvents.length}
-                pageSize={LIST_PAGE_SIZE}
-                onPageChange={setCurrentPage}
-              />
-            </div>
-          )}
-        </AppSectionBlock>
-
-        <AppSectionBlock
-          title="Contexto do evento"
-          subtitle="Metadados, vínculo e próximos passos do evento selecionado."
-          className="xl:col-span-4"
-        >
-          {!selectedEvent ? (
-            <AppPageEmptyState
-              title="Selecione um evento"
-              description="Clique em um item da timeline para abrir diagnóstico, metadados e ação."
-            />
-          ) : (
-            <div className="space-y-3">
-              <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/60 p-3 text-sm">
-                <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                  Detalhes
-                </p>
-                <p className="mt-1 font-semibold text-[var(--text-primary)]">
-                  {eventDisplayTitle(selectedEvent)}
-                </p>
-                <p className="mt-1 text-[var(--text-secondary)]">
-                  {eventReason(selectedEvent)}
-                </p>
-              </div>
-
-              <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/60 p-3">
-                <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                  Metadados e vínculo
-                </p>
-                <ul className="mt-2 space-y-1 text-xs text-[var(--text-secondary)]">
-                  <li>
-                    Entidade: {eventEntityLabel(selectedEvent)} #
-                    {eventEntityId(selectedEvent)}
-                  </li>
-                  <li>
-                    Responsável:{" "}
-                    {eventActorLabel(selectedEvent)}
-                  </li>
-                  <li>Data/hora: {formatDateTime(selectedEvent?.createdAt)}</li>
-                  <li>
-                    Módulo: {eventModuleLabel(eventModule(selectedEvent))}
-                  </li>
-                  <li>
-                    Cliente:{" "}
-                    {eventCustomerId(selectedEvent)
-                      ? `#${eventCustomerId(selectedEvent)}`
-                      : "Não vinculado"}
-                  </li>
-                </ul>
-                {usefulMetadataPairs(selectedEvent).length > 0 ? (
-                  <div className="mt-3 border-t border-[var(--border-subtle)] pt-3">
-                    <p className="text-xs font-semibold text-[var(--text-primary)]">
-                      Metadados relevantes
-                    </p>
-                    <dl className="mt-2 grid gap-1 text-xs text-[var(--text-secondary)]">
-                      {usefulMetadataPairs(selectedEvent).map(pair => (
-                        <div
-                          key={pair.key}
-                          className="grid grid-cols-[minmax(0,0.45fr)_minmax(0,0.55fr)] gap-2"
-                        >
-                          <dt className="truncate text-[var(--text-muted)]">
-                            {pair.key}
-                          </dt>
-                          <dd className="break-words font-medium text-[var(--text-secondary)]">
-                            {pair.value}
-                          </dd>
-                        </div>
-                      ))}
-                    </dl>
-                  </div>
-                ) : (
-                  <p className="mt-3 border-t border-[var(--border-subtle)] pt-3 text-xs text-[var(--text-muted)]">
-                    Metadados não vieram em formato resumível pela fonte oficial.
-                  </p>
-                )}
-              </div>
-
-              <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/60 p-3">
-                <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                  Diagnóstico de risco
-                </p>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <AppStatusBadge
-                    label={
-                      eventSeverity(selectedEvent) === "critical"
-                        ? "Em risco"
-                        : "Monitorado"
-                    }
-                  />
-                  {eventModule(selectedEvent) === "governance" ? (
-                    <ShieldAlert className="h-4 w-4 text-[var(--accent-primary)]" />
-                  ) : null}
-                  {eventModule(selectedEvent) === "finance" ? (
-                    <BadgeDollarSign className="h-4 w-4 text-[var(--success)]" />
-                  ) : null}
-                  {eventSeverity(selectedEvent) === "critical" ? (
-                    <AlertTriangle className="h-4 w-4 text-[var(--danger)]" />
-                  ) : null}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-2">
-                {eventModule(selectedEvent) === "governance" ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => navigate("/governance")}
-                  >
-                    Abrir governança
-                  </Button>
-                ) : null}
-                {eventRealCtas(selectedEvent).map(cta => (
-                  <Button
-                    key={cta.label}
-                    type="button"
-                    variant="outline"
-                    title={cta.reason}
-                    onClick={() => navigate(cta.route)}
-                  >
-                    {cta.label}
-                  </Button>
-                ))}
-                {eventRealCtas(selectedEvent).length === 0 ? (
-                  <p className="text-xs text-[var(--text-muted)]">
-                    Sem CTA de entidade: a fonte não trouxe entityType/entityId
-                    utilizável para cliente, O.S., financeiro, agendamento ou
-                    WhatsApp.
-                  </p>
-                ) : null}
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => navigate(eventRoute(selectedEvent))}
-                >
-                  Abrir contexto <ArrowRight className="ml-1 h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </div>
-          )}
-        </AppSectionBlock>
-      </div>
     </AppPageShell>
   );
 }
