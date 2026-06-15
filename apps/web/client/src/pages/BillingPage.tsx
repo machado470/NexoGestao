@@ -4,7 +4,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   AppDataTable,
-  AppPageHeader,
   AppPageShell,
   AppSectionCard,
   AppStatCard,
@@ -266,11 +265,12 @@ export default function BillingPage() {
       statusQuery.data?.amountCents ??
       meta.priceCents
   );
-  const paymentMethod = String(
-    statusQuery.data?.paymentMethodBrand ??
-      statusQuery.data?.paymentMethod ??
-      "Não informado"
-  );
+  const rawPaymentMethod =
+    statusQuery.data?.paymentMethodBrand ?? statusQuery.data?.paymentMethod;
+  const hasPaymentMethod = Boolean(String(rawPaymentMethod ?? "").trim());
+  const paymentMethod = hasPaymentMethod
+    ? String(rawPaymentMethod)
+    : "Não informado";
   const events = Array.isArray(statusQuery.data?.events)
     ? statusQuery.data.events
     : [];
@@ -286,11 +286,14 @@ export default function BillingPage() {
         : status === "TRIAL" || paymentMethod === "Não informado"
           ? "WARNING"
           : "NORMAL";
+  const paymentActionLabel = hasPaymentMethod
+    ? "Atualizar pagamento"
+    : "Configurar pagamento";
   const primaryActionLabel =
     status === "CANCELED"
       ? "Revisar assinatura"
       : status === "PAST_DUE" || governanceStatus === "WARNING"
-        ? "Atualizar pagamento"
+        ? paymentActionLabel
         : "Trocar plano";
   const riskDays = nextChargeAt
     ? Math.max(
@@ -352,24 +355,18 @@ export default function BillingPage() {
       title="Billing"
       subtitle="Empresa → plano → assinatura → renovação → acesso."
     >
-      <AppPageShell className="gap-4">
-        <AppPageHeader>
-          <div className="space-y-2">
-            <h1 className="text-2xl font-semibold text-[var(--text-primary)]">
-              Controle da assinatura do Nexo
-            </h1>
-            <p className="text-sm text-[var(--text-secondary)]">
-              Empresa → plano → assinatura → renovação → acesso.
-            </p>
-          </div>
-        </AppPageHeader>
-
-        <AppSectionCard className="space-y-5 border-[color-mix(in_srgb,var(--accent-primary)_28%,var(--border-subtle))]">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                Status da assinatura
-              </p>
+      <AppPageShell className="gap-3">
+        <AppSectionCard className="space-y-4 border-[color-mix(in_srgb,var(--accent-primary)_28%,var(--border-subtle))]">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="space-y-2">
+              <div>
+                <h1 className="text-2xl font-semibold text-[var(--text-primary)]">
+                  Controle da assinatura do Nexo
+                </h1>
+                <p className="text-sm text-[var(--text-secondary)]">
+                  Empresa → plano → assinatura → renovação → acesso.
+                </p>
+              </div>
               <div className="flex flex-wrap items-center gap-2">
                 <AppStatusBadge
                   label={ACCOUNT_STATUS_LABEL[status]}
@@ -381,42 +378,39 @@ export default function BillingPage() {
                 />
               </div>
               <div>
-                <h2 className="text-2xl font-semibold text-[var(--text-primary)]">
-                  {governanceStatus === "NORMAL"
-                    ? "Assinatura saudável"
-                    : ACCOUNT_STATUS_LABEL[status]}
+                <h2 className="text-xl font-semibold text-[var(--text-primary)]">
+                  Plano {meta.title}
                 </h2>
                 <p className="text-sm text-[var(--text-secondary)]">
-                  Plano {meta.title} — {brl(nextChargeValue)} /{" "}
-                  {meta.periodicity}
+                  {brl(nextChargeValue)} / {meta.periodicity}
                 </p>
               </div>
-            </div>
-            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-[var(--text-secondary)]">
-              Código técnico:{" "}
-              <strong className="text-[var(--text-primary)]">{status}</strong>
             </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <AppStatCard
               label="Próxima renovação"
               value={formatDate(nextRenewal)}
-              helper="Próximo ciclo da assinatura."
+              helper="Renovação automática da assinatura."
             />
             <AppStatCard
               label="Próxima cobrança"
               value={formatDate(nextChargeAt)}
-              helper="Próxima tentativa de cobrança."
+              helper={
+                paymentFailed
+                  ? "Falha recente registrada."
+                  : "Nenhuma falha registrada."
+              }
             />
             <AppStatCard
               label="Método"
               value={paymentMethod}
-              helper="Método de pagamento."
+              helper={hasPaymentMethod ? "Método em uso." : "Ação necessária."}
             />
             <AppStatCard
               label="Usuários ativos"
               value={String(activeUsers)}
-              helper="Uso atual na empresa."
+              helper="Uso atual da empresa."
             />
           </div>
         </AppSectionCard>
@@ -442,12 +436,12 @@ export default function BillingPage() {
               onClick={() => startCheckout(currentPlan)}
               disabled={currentPlan === "FREE"}
               variant={
-                primaryActionLabel === "Atualizar pagamento"
+                primaryActionLabel === paymentActionLabel
                   ? "default"
                   : "outline"
               }
             >
-              Atualizar pagamento
+              {paymentActionLabel}
             </Button>
             <Button
               onClick={() =>
@@ -522,7 +516,7 @@ export default function BillingPage() {
                 <strong className="text-[var(--text-primary)]">
                   Ação recomendada:
                 </strong>{" "}
-                atualizar método de pagamento.
+                {paymentActionLabel.toLowerCase()}.
               </p>
             </div>
           )}
@@ -531,16 +525,21 @@ export default function BillingPage() {
               className="w-full sm:w-fit"
               onClick={() => startCheckout(currentPlan)}
             >
-              Atualizar pagamento
+              {paymentActionLabel}
             </Button>
           )}
         </AppSectionCard>
 
         <AppSectionCard className="space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold text-[var(--text-primary)]">
-              Governança do Billing
-            </h2>
+          <div className="flex flex-col gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                Estado operacional
+              </p>
+              <h2 className="mt-1 text-lg font-semibold text-[var(--text-primary)]">
+                Governança do Billing
+              </h2>
+            </div>
             <AppStatusBadge
               label={`${governanceStatus} — ${GOVERNANCE_STATUS_LABEL[governanceStatus]}`}
               tone={governanceTone(governanceStatus)}
@@ -564,7 +563,7 @@ export default function BillingPage() {
             <ul className="mt-2 space-y-1">
               <li>• manter acesso quando a assinatura estiver regular</li>
               <li>• enviar lembrete administrativo quando houver atenção</li>
-              <li>• revalidar método de pagamento</li>
+              <li>• {paymentActionLabel.toLowerCase()}</li>
               <li>• aplicar restrição, se necessário</li>
               <li>• registrar evento na timeline</li>
             </ul>
