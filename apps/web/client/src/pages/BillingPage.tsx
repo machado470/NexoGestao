@@ -1,4 +1,4 @@
-// OperationalTopCard lint contract: quick actions are visible in the AppPageHeader and plan cards use AppSectionCard.
+// Billing hierarchy keeps subscription status first; plan cards remain secondary AppSectionCard content.
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,7 @@ type AccountStatus =
   | "NO_SUBSCRIPTION"
   | "SUSPENDED";
 type InvoiceStatus = "PAID" | "PENDING" | "FAILED" | "REFUNDED";
-type GovernanceStatus = "ACTIVE" | "WARNING" | "RESTRICTED";
+type GovernanceStatus = "NORMAL" | "WARNING" | "RESTRICTED" | "SUSPENDED";
 
 const PLAN_PRICE_ID: Record<PlanName, string | null> = {
   FREE: null,
@@ -89,6 +89,29 @@ const PLAN_META: Record<
 };
 
 const VISIBLE_PLANS: VisiblePlan[] = ["STARTER", "PRO", "BUSINESS"];
+
+const ACCOUNT_STATUS_LABEL: Record<AccountStatus, string> = {
+  ACTIVE: "Assinatura ativa",
+  TRIAL: "Período de avaliação",
+  PAST_DUE: "Pagamento pendente",
+  CANCELED: "Assinatura cancelada",
+  NO_SUBSCRIPTION: "Sem assinatura ativa",
+  SUSPENDED: "Assinatura suspensa",
+};
+
+const GOVERNANCE_STATUS_LABEL: Record<GovernanceStatus, string> = {
+  NORMAL: "Saudável",
+  WARNING: "Atenção",
+  RESTRICTED: "Restrito",
+  SUSPENDED: "Suspenso",
+};
+
+const INVOICE_STATUS_LABEL: Record<InvoiceStatus, string> = {
+  PAID: "Pago",
+  PENDING: "Pendente",
+  FAILED: "Falhou",
+  REFUNDED: "Reembolsado",
+};
 const PLAN_ORDER: Record<PlanName, number> = {
   FREE: 0,
   STARTER: 1,
@@ -165,6 +188,31 @@ function statusTone(
   return "neutral";
 }
 
+function governanceTone(
+  status: GovernanceStatus
+): "success" | "warning" | "danger" | "neutral" {
+  if (status === "NORMAL") return "success";
+  if (status === "WARNING") return "warning";
+  if (status === "RESTRICTED") return "danger";
+  return "neutral";
+}
+
+function timelineLabel(event: any) {
+  const raw = String(event?.type ?? event?.status ?? event?.description ?? "")
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+  if (raw.includes("CREATED") || raw.includes("CREATE")) return "Plano criado";
+  if (raw.includes("TRIAL")) return "Trial iniciado";
+  if (raw.includes("PLAN") || raw.includes("UPDATED")) return "Plano alterado";
+  if (raw.includes("PAID") || raw.includes("SUCCEEDED"))
+    return "Pagamento recebido";
+  if (raw.includes("FAILED") || raw.includes("PAST_DUE"))
+    return "Pagamento falhou";
+  if (raw.includes("RENEW")) return "Renovação executada";
+  if (raw.includes("CANCEL")) return "Assinatura cancelada";
+  return "Fatura gerada";
+}
+
 function invoiceStatus(event: any): InvoiceStatus {
   const raw = String(event?.status ?? event?.state ?? "PENDING").toUpperCase();
   if (["PAID", "COMPLETED", "SUCCEEDED"].some(token => raw.includes(token)))
@@ -231,11 +279,27 @@ export default function BillingPage() {
     limitsQuery.data?.usage?.users?.used ?? statusQuery.data?.activeUsers ?? 1
   );
   const governanceStatus: GovernanceStatus =
-    status === "CANCELED" || status === "SUSPENDED" || paymentFailed
-      ? "RESTRICTED"
-      : status === "TRIAL" || paymentMethod === "Não informado"
-        ? "WARNING"
-        : "ACTIVE";
+    status === "SUSPENDED"
+      ? "SUSPENDED"
+      : status === "CANCELED" || paymentFailed
+        ? "RESTRICTED"
+        : status === "TRIAL" || paymentMethod === "Não informado"
+          ? "WARNING"
+          : "NORMAL";
+  const primaryActionLabel =
+    status === "CANCELED"
+      ? "Revisar assinatura"
+      : status === "PAST_DUE" || governanceStatus === "WARNING"
+        ? "Atualizar pagamento"
+        : "Trocar plano";
+  const riskDays = nextChargeAt
+    ? Math.max(
+        0,
+        Math.ceil(
+          (new Date(String(nextChargeAt)).getTime() - Date.now()) / 86400000
+        )
+      )
+    : null;
 
   const checkoutMutation = trpc.billing.checkout.useMutation({
     onSuccess: payload => {
@@ -290,214 +354,224 @@ export default function BillingPage() {
     >
       <AppPageShell className="gap-4">
         <AppPageHeader>
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div className="space-y-2">
-              <AppStatusBadge label="Billing da plataforma" tone="accent" />
-              <h1 className="text-2xl font-semibold text-[var(--text-primary)]">
-                Controle da assinatura do Nexo
-              </h1>
-              <p className="max-w-3xl text-sm leading-6 text-[var(--text-secondary)]">
-                Quem está pagando, quanto, por quê e o que acontece se parar de
-                pagar. Billing não controla cobranças de clientes; controla a
-                assinatura SaaS da empresa no Nexo.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                onClick={() => startCheckout(currentPlan)}
-                disabled={currentPlan === "FREE"}
-              >
-                Atualizar pagamento
-              </Button>
-              <Button
-                onClick={() =>
-                  setSelectedPlan(
-                    currentPlan === "BUSINESS" ? "PRO" : "BUSINESS"
-                  )
-                }
-              >
-                Trocar plano
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() =>
-                  document
-                    .getElementById("billing-invoices")
-                    ?.scrollIntoView({ behavior: "smooth" })
-                }
-              >
-                Ver histórico
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => cancelMutation.mutate()}
-                disabled={cancelMutation.isPending || currentPlan === "FREE"}
-              >
-                Cancelar assinatura
-              </Button>
-            </div>
+          <div className="space-y-2">
+            <h1 className="text-2xl font-semibold text-[var(--text-primary)]">
+              Controle da assinatura do Nexo
+            </h1>
+            <p className="text-sm text-[var(--text-secondary)]">
+              Empresa → plano → assinatura → renovação → acesso.
+            </p>
           </div>
         </AppPageHeader>
 
-        <AppSectionCard className="order-1 space-y-4 border-[color-mix(in_srgb,var(--accent-primary)_28%,var(--border-subtle))]">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div>
+        <AppSectionCard className="space-y-5 border-[color-mix(in_srgb,var(--accent-primary)_28%,var(--border-subtle))]">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="space-y-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                 Status da assinatura
               </p>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <AppStatusBadge label={status} tone={statusTone(status)} />
-                <span className="text-xl font-semibold text-[var(--text-primary)]">
-                  {meta.title}
-                </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <AppStatusBadge
+                  label={ACCOUNT_STATUS_LABEL[status]}
+                  tone={statusTone(status)}
+                />
+                <AppStatusBadge
+                  label={`Operacional: ${governanceStatus} — ${GOVERNANCE_STATUS_LABEL[governanceStatus]}`}
+                  tone={governanceTone(governanceStatus)}
+                />
+              </div>
+              <div>
+                <h2 className="text-2xl font-semibold text-[var(--text-primary)]">
+                  {governanceStatus === "NORMAL"
+                    ? "Assinatura saudável"
+                    : ACCOUNT_STATUS_LABEL[status]}
+                </h2>
+                <p className="text-sm text-[var(--text-secondary)]">
+                  Plano {meta.title} — {brl(nextChargeValue)} /{" "}
+                  {meta.periodicity}
+                </p>
               </div>
             </div>
-            <p className="text-sm text-[var(--text-secondary)]">
-              Status operacional:{" "}
-              <strong className="text-[var(--text-primary)]">
-                {governanceStatus}
-              </strong>
-            </p>
+            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-[var(--text-secondary)]">
+              Código técnico:{" "}
+              <strong className="text-[var(--text-primary)]">{status}</strong>
+            </div>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <AppStatCard
-              label="Valor"
-              value={`${brl(nextChargeValue)} / ${meta.periodicity}`}
-              helper="Valor mensal/anual da assinatura."
-            />
-            <AppStatCard
-              label="Renovação"
+              label="Próxima renovação"
               value={formatDate(nextRenewal)}
-              helper="Próximo ciclo contratado."
+              helper="Próximo ciclo da assinatura."
             />
             <AppStatCard
-              label="Cobrança"
+              label="Próxima cobrança"
               value={formatDate(nextChargeAt)}
               helper="Próxima tentativa de cobrança."
             />
             <AppStatCard
-              label="Pagamento"
+              label="Método"
               value={paymentMethod}
-              helper="Método da assinatura."
+              helper="Método de pagamento."
             />
             <AppStatCard
               label="Usuários ativos"
               value={String(activeUsers)}
               helper="Uso atual na empresa."
             />
-            <AppStatCard
-              label="Plano"
-              value={meta.title}
-              helper="Capacidade contratada."
-            />
           </div>
         </AppSectionCard>
 
-        {paymentFailed ? (
-          <AppSectionCard className="order-3 space-y-3 border-[color-mix(in_srgb,var(--warning)_45%,var(--border-subtle))] bg-[color-mix(in_srgb,var(--warning)_8%,var(--surface-primary))] md:order-none">
-            <AppStatusBadge label="RISCO DE BILLING" tone="warning" />
-            <h2 className="text-lg font-semibold text-[var(--text-primary)]">
-              Não conseguimos processar seu pagamento.
-            </h2>
-            <div className="grid gap-3 md:grid-cols-4 text-sm text-[var(--text-secondary)]">
+        <AppSectionCard className="space-y-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                Ações rápidas
+              </h2>
+              <p className="text-sm text-[var(--text-secondary)]">
+                Próxima melhor ação e demais controles disponíveis para a
+                assinatura atual.
+              </p>
+            </div>
+            <AppStatusBadge
+              label={`CTA principal: ${primaryActionLabel}`}
+              tone={governanceTone(governanceStatus)}
+            />
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <Button
+              onClick={() => startCheckout(currentPlan)}
+              disabled={currentPlan === "FREE"}
+              variant={
+                primaryActionLabel === "Atualizar pagamento"
+                  ? "default"
+                  : "outline"
+              }
+            >
+              Atualizar pagamento
+            </Button>
+            <Button
+              onClick={() =>
+                setSelectedPlan(currentPlan === "BUSINESS" ? "PRO" : "BUSINESS")
+              }
+              variant={
+                primaryActionLabel === "Trocar plano" ? "default" : "outline"
+              }
+            >
+              Trocar plano
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() =>
+                document
+                  .getElementById("billing-history")
+                  ?.scrollIntoView({ behavior: "smooth" })
+              }
+            >
+              Ver histórico
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => cancelMutation.mutate()}
+              disabled={cancelMutation.isPending || currentPlan === "FREE"}
+            >
+              Cancelar assinatura
+            </Button>
+          </div>
+        </AppSectionCard>
+
+        <AppSectionCard
+          className={`space-y-3 ${governanceStatus === "NORMAL" ? "" : "border-[color-mix(in_srgb,var(--warning)_45%,var(--border-subtle))] bg-[color-mix(in_srgb,var(--warning)_8%,var(--surface-primary))]"}`}
+        >
+          <AppStatusBadge
+            label={
+              governanceStatus === "NORMAL"
+                ? "Sem risco crítico"
+                : "Atenção na assinatura"
+            }
+            tone={governanceTone(governanceStatus)}
+          />
+          <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+            {governanceStatus === "NORMAL"
+              ? "Sem risco crítico de Billing"
+              : "Atenção na assinatura"}
+          </h2>
+          {governanceStatus === "NORMAL" ? (
+            <p className="text-sm text-[var(--text-secondary)]">
+              Sua assinatura está ativa e sem falhas de pagamento retornadas.
+            </p>
+          ) : (
+            <div className="grid gap-3 text-sm text-[var(--text-secondary)] md:grid-cols-2 xl:grid-cols-4">
               <p>
-                <strong className="text-[var(--text-primary)]">Impacto:</strong>{" "}
-                a assinatura poderá entrar em restrição.
+                <strong className="text-[var(--text-primary)]">Motivo:</strong>{" "}
+                renovação pendente ou dados de pagamento incompletos.
               </p>
               <p>
-                <strong className="text-[var(--text-primary)]">
-                  Consequência:
-                </strong>{" "}
-                acesso ao Nexo pode ser limitado.
+                <strong className="text-[var(--text-primary)]">Impacto:</strong>{" "}
+                a assinatura pode entrar em restrição se o pagamento não for
+                processado.
               </p>
               <p>
                 <strong className="text-[var(--text-primary)]">Prazo:</strong>{" "}
-                regularizar antes da próxima retentativa.
+                próxima tentativa{" "}
+                {riskDays === null
+                  ? "em data não informada"
+                  : `em ${riskDays} dias`}
+                .
               </p>
               <p>
-                <strong className="text-[var(--text-primary)]">Ação:</strong>{" "}
+                <strong className="text-[var(--text-primary)]">
+                  Ação recomendada:
+                </strong>{" "}
                 atualizar método de pagamento.
               </p>
             </div>
+          )}
+          {governanceStatus === "NORMAL" ? null : (
             <Button
               className="w-full sm:w-fit"
               onClick={() => startCheckout(currentPlan)}
             >
-              Atualizar método de pagamento
+              Atualizar pagamento
             </Button>
-          </AppSectionCard>
-        ) : null}
+          )}
+        </AppSectionCard>
 
-        <div className="order-2 grid gap-4 lg:grid-cols-3 md:order-none">
-          {VISIBLE_PLANS.map(plan => {
-            const planMeta = PLAN_META[plan];
-            const isCurrent = plan === currentPlan;
-            const relation =
-              PLAN_ORDER[plan] > PLAN_ORDER[currentPlan]
-                ? "upgrade"
-                : PLAN_ORDER[plan] < PLAN_ORDER[currentPlan]
-                  ? "downgrade"
-                  : "plano atual";
-            return (
-              <AppSectionCard key={plan} className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h2 className="text-lg font-semibold text-[var(--text-primary)]">
-                      {planMeta.title}
-                    </h2>
-                    <p className="text-2xl font-semibold text-[var(--text-primary)]">
-                      {brl(planMeta.priceCents)}
-                    </p>
-                  </div>
-                  <AppStatusBadge
-                    label={isCurrent ? "PLANO ATUAL" : relation}
-                    tone={
-                      isCurrent
-                        ? "success"
-                        : relation === "upgrade"
-                          ? "info"
-                          : "warning"
-                    }
-                  />
-                </div>
-                <div className="space-y-2 text-sm text-[var(--text-secondary)]">
-                  <p>
-                    Usuários:{" "}
-                    <strong className="text-[var(--text-primary)]">
-                      {planMeta.users}
-                    </strong>
-                  </p>
-                  <p>
-                    Clientes:{" "}
-                    <strong className="text-[var(--text-primary)]">
-                      {planMeta.customers}
-                    </strong>
-                  </p>
-                  {planMeta.features.map(feature => (
-                    <p key={feature}>• {feature}</p>
-                  ))}
-                </div>
-                <Button
-                  className="w-full"
-                  variant={isCurrent ? "outline" : "default"}
-                  onClick={() => setSelectedPlan(plan)}
-                >
-                  {isCurrent
-                    ? "Revisar plano atual"
-                    : relation === "upgrade"
-                      ? "Fazer upgrade"
-                      : "Fazer downgrade"}
-                </Button>
-              </AppSectionCard>
-            );
-          })}
-        </div>
+        <AppSectionCard className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+              Governança do Billing
+            </h2>
+            <AppStatusBadge
+              label={`${governanceStatus} — ${GOVERNANCE_STATUS_LABEL[governanceStatus]}`}
+              tone={governanceTone(governanceStatus)}
+            />
+          </div>
+          <p className="text-sm text-[var(--text-secondary)]">
+            <strong className="text-[var(--text-primary)]">Motivo:</strong>{" "}
+            {governanceStatus === "NORMAL"
+              ? "assinatura ativa e pagamento sem falha retornada"
+              : governanceStatus === "WARNING"
+                ? "renovação pendente ou dados de pagamento incompletos"
+                : paymentFailed
+                  ? "pagamento falhou ou está pendente"
+                  : "assinatura sem acesso operacional regular"}
+            .
+          </p>
+          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-3 text-sm text-[var(--text-secondary)]">
+            <strong className="text-[var(--text-primary)]">
+              Próximos passos automáticos:
+            </strong>
+            <ul className="mt-2 space-y-1">
+              <li>• manter acesso quando a assinatura estiver regular</li>
+              <li>• enviar lembrete administrativo quando houver atenção</li>
+              <li>• revalidar método de pagamento</li>
+              <li>• aplicar restrição, se necessário</li>
+              <li>• registrar evento na timeline</li>
+            </ul>
+          </div>
+        </AppSectionCard>
 
-        <AppSectionCard
-          id="billing-invoices"
-          className="order-4 space-y-3 md:order-none"
-        >
+        <AppSectionCard id="billing-invoices" className="space-y-3">
           <div>
             <h2 className="text-lg font-semibold text-[var(--text-primary)]">
               Faturas e pagamentos
@@ -538,7 +612,10 @@ export default function BillingPage() {
                         {brl(invoiceAmount(event, meta.priceCents))}
                       </td>
                       <td className="px-3 py-3">
-                        <AppStatusBadge label={st} tone={invoiceTone(st)} />
+                        <AppStatusBadge
+                          label={INVOICE_STATUS_LABEL[st]}
+                          tone={invoiceTone(st)}
+                        />
                       </td>
                       <td className="px-3 py-3">
                         {String(event?.method ?? paymentMethod)}
@@ -575,11 +652,36 @@ export default function BillingPage() {
                 })
               ) : (
                 <tr>
-                  <td
-                    colSpan={7}
-                    className="px-3 py-4 text-[var(--text-muted)]"
-                  >
-                    Sem faturas retornadas pela fonte de Billing.
+                  <td colSpan={7} className="px-3 py-6">
+                    <div className="space-y-3 text-[var(--text-secondary)]">
+                      <p className="font-medium text-[var(--text-primary)]">
+                        Nenhuma fatura retornada pela fonte de Billing.
+                      </p>
+                      <p className="text-sm">
+                        Quando a primeira cobrança da plataforma for gerada, ela
+                        aparecerá aqui.
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => void statusQuery.refetch()}
+                        >
+                          Atualizar leitura
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            document
+                              .getElementById("billing-history")
+                              ?.scrollIntoView({ behavior: "smooth" })
+                          }
+                        >
+                          Ver histórico
+                        </Button>
+                      </div>
+                    </div>
                   </td>
                 </tr>
               )}
@@ -587,113 +689,137 @@ export default function BillingPage() {
           </AppDataTable>
         </AppSectionCard>
 
-        <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-          <AppSectionCard className="order-5 space-y-3 md:order-none">
-            <div>
-              <h2 className="text-lg font-semibold text-[var(--text-primary)]">
-                Histórico de assinatura
-              </h2>
-              <p className="text-sm text-[var(--text-secondary)]">
-                Timeline oficial de eventos de Billing.
-              </p>
-            </div>
-            <AppTimeline>
-              {timelineEvents.length ? (
-                timelineEvents.map((event: any, index: number) => (
-                  <AppTimelineItem key={String(event?.id ?? index)}>
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <AppStatusBadge
-                          label={String(
-                            event?.type ?? event?.status ?? "FATURA_GERADA"
-                          ).toUpperCase()}
-                          tone={invoiceTone(invoiceStatus(event))}
-                        />
-                        <p className="mt-2 font-medium text-[var(--text-primary)]">
-                          {String(
-                            event?.description ?? "Evento da assinatura do Nexo"
-                          )}
-                        </p>
-                        <p className="text-sm text-[var(--text-secondary)]">
-                          Responsável:{" "}
-                          {String(
-                            event?.actor ?? event?.user ?? "Sistema Billing"
-                          )}{" "}
-                          • Origem:{" "}
-                          {String(
-                            event?.provider ?? event?.source ?? "Nexo Billing"
-                          )}
-                        </p>
-                      </div>
-                      <p className="text-sm text-[var(--text-muted)]">
-                        {formatDate(
-                          event?.createdAt ?? event?.date ?? event?.paidAt
+        <AppSectionCard id="billing-history" className="space-y-3">
+          <div>
+            <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+              Histórico da assinatura
+            </h2>
+            <p className="text-sm text-[var(--text-secondary)]">
+              Timeline oficial de eventos de Billing.
+            </p>
+          </div>
+          <AppTimeline>
+            {timelineEvents.length ? (
+              timelineEvents.map((event: any, index: number) => (
+                <AppTimelineItem key={String(event?.id ?? index)}>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <AppStatusBadge
+                        label={timelineLabel(event)}
+                        tone={invoiceTone(invoiceStatus(event))}
+                      />
+                      <p className="mt-2 font-medium text-[var(--text-primary)]">
+                        {String(event?.description ?? timelineLabel(event))}
+                      </p>
+                      <p className="text-sm text-[var(--text-secondary)]">
+                        Responsável:{" "}
+                        {String(
+                          event?.actor ?? event?.user ?? "Sistema Billing"
+                        )}{" "}
+                        • Origem:{" "}
+                        {String(
+                          event?.provider ?? event?.source ?? "Nexo Billing"
                         )}
                       </p>
                     </div>
-                  </AppTimelineItem>
-                ))
-              ) : (
-                <AppTimelineItem>
-                  <p className="text-sm text-[var(--text-muted)]">
-                    Nenhum evento oficial retornado. Nenhum histórico fictício
-                    foi criado.
-                  </p>
+                    <p className="text-sm text-[var(--text-muted)]">
+                      {formatDate(
+                        event?.createdAt ?? event?.date ?? event?.paidAt
+                      )}
+                    </p>
+                  </div>
                 </AppTimelineItem>
-              )}
-            </AppTimeline>
-          </AppSectionCard>
-          <AppSectionCard className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold text-[var(--text-primary)]">
-                Governança do Billing
-              </h2>
-              <AppStatusBadge
-                label={governanceStatus}
-                tone={
-                  governanceStatus === "ACTIVE"
-                    ? "success"
-                    : governanceStatus === "WARNING"
-                      ? "warning"
-                      : "danger"
-                }
-              />
-            </div>
+              ))
+            ) : (
+              <AppTimelineItem>
+                <div className="space-y-1">
+                  <p className="font-medium text-[var(--text-primary)]">
+                    Histórico ainda não disponível para esta assinatura.
+                  </p>
+                  <p className="text-sm text-[var(--text-secondary)]">
+                    Nenhum evento oficial foi retornado pela fonte de Billing.
+                    Nenhum histórico fictício foi criado.
+                  </p>
+                </div>
+              </AppTimelineItem>
+            )}
+          </AppTimeline>
+        </AppSectionCard>
+
+        <AppSectionCard className="space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+              Trocar plano
+            </h2>
             <p className="text-sm text-[var(--text-secondary)]">
-              <strong className="text-[var(--text-primary)]">Motivo:</strong>{" "}
-              {governanceStatus === "ACTIVE"
-                ? "tudo saudável"
-                : governanceStatus === "WARNING"
-                  ? "renovação pendente ou dados de pagamento incompletos"
-                  : paymentFailed
-                    ? "pagamento falhou"
-                    : "assinatura cancelada"}
-              .
+              Compare limites e recursos antes de alterar sua assinatura.
             </p>
-            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-3 text-sm text-[var(--text-secondary)]">
-              <strong className="text-[var(--text-primary)]">
-                O sistema fará automaticamente:
-              </strong>
-              <ul className="mt-2 space-y-1">
-                <li>
-                  • {paymentFailed ? "reenviar cobrança" : "manter acesso"}
-                </li>
-                <li>
-                  •{" "}
-                  {governanceStatus === "ACTIVE"
-                    ? "registrar próxima renovação"
-                    : "enviar lembrete administrativo"}
-                </li>
-                <li>
-                  •{" "}
-                  {governanceStatus === "RESTRICTED"
-                    ? "aplicar restrição se a cobrança permanecer sem pagamento"
-                    : "preservar governança da assinatura"}
-                </li>
-              </ul>
-            </div>
-          </AppSectionCard>
-        </div>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-3">
+            {VISIBLE_PLANS.map(plan => {
+              const planMeta = PLAN_META[plan];
+              const isCurrent = plan === currentPlan;
+              const relation =
+                PLAN_ORDER[plan] > PLAN_ORDER[currentPlan]
+                  ? "Upgrade"
+                  : PLAN_ORDER[plan] < PLAN_ORDER[currentPlan]
+                    ? "Downgrade"
+                    : "Plano atual";
+              return (
+                <AppSectionCard key={plan} className="space-y-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-lg font-semibold text-[var(--text-primary)]">
+                        {planMeta.title}
+                      </h3>
+                      <p className="text-2xl font-semibold text-[var(--text-primary)]">
+                        {brl(planMeta.priceCents)}
+                      </p>
+                    </div>
+                    <AppStatusBadge
+                      label={isCurrent ? "Plano atual" : relation}
+                      tone={
+                        isCurrent
+                          ? "success"
+                          : relation === "Upgrade"
+                            ? "info"
+                            : "warning"
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2 text-sm text-[var(--text-secondary)]">
+                    <p>
+                      Usuários:{" "}
+                      <strong className="text-[var(--text-primary)]">
+                        {planMeta.users}
+                      </strong>
+                    </p>
+                    <p>
+                      Clientes:{" "}
+                      <strong className="text-[var(--text-primary)]">
+                        {planMeta.customers}
+                      </strong>
+                    </p>
+                    {planMeta.features.map(feature => (
+                      <p key={feature}>• {feature}</p>
+                    ))}
+                  </div>
+                  <Button
+                    className="w-full"
+                    variant={isCurrent ? "outline" : "default"}
+                    onClick={() => setSelectedPlan(plan)}
+                  >
+                    {isCurrent
+                      ? "Revisar plano atual"
+                      : relation === "Upgrade"
+                        ? "Fazer upgrade"
+                        : "Fazer downgrade"}
+                  </Button>
+                </AppSectionCard>
+              );
+            })}
+          </div>
+        </AppSectionCard>
 
         <BaseModal
           open={Boolean(selectedPlan)}
@@ -714,7 +840,7 @@ export default function BillingPage() {
             </div>
           }
         >
-          {selectedPlanMeta ? (
+          {selectedPlanMeta && selectedPlan ? (
             <div className="space-y-3 text-sm text-[var(--text-secondary)]">
               <AppStatusBadge
                 label={
