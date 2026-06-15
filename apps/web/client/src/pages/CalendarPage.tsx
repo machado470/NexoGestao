@@ -696,18 +696,23 @@ export default function CalendarPage() {
       calendarCommand.unassignedCount > 0
         ? `${calendarCommand.unassignedCount} sem responsável`
         : null,
-      `${executiveRead.possibleFits} janelas livres`,
-      `${executiveRead.conflicts} conflitos`,
+      executiveRead.possibleFits > 0
+        ? `${executiveRead.possibleFits} janelas livres`
+        : null,
+      executiveRead.conflicts > 0
+        ? `${executiveRead.conflicts} conflito detectado`
+        : null,
       distribution.cancelled > 0
         ? `${distribution.cancelled} cancelados`
         : null,
       executiveRead.confirmed > 0
-        ? `${executiveRead.confirmed} evento(s) confirmado(s)`
+        ? `${executiveRead.confirmed} preparado para executar`
         : null,
     ].filter(Boolean) as string[];
+    const uniqueSignals = Array.from(new Set(signals));
 
-    return signals.length > 0
-      ? signals.slice(0, 4)
+    return uniqueSignals.length > 0
+      ? uniqueSignals.slice(0, 4)
       : ["Operação do tempo monitorada"];
   }, [
     calendarCommand.unassignedCount,
@@ -896,17 +901,17 @@ export default function CalendarPage() {
                 </p>
               </div>
               {immediateAttention.length > 0 ? (
-                <div className="grid gap-3 md:grid-cols-3">
+                <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(18rem,1fr))]">
                   {immediateAttention
                     .slice(0, 3)
                     .map(({ item, tone, label }) => (
                       <article
                         key={item.id}
-                        className="min-w-0 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-3"
+                        className="min-w-[18rem] rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-4"
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
+                            <p className="text-sm font-semibold leading-snug text-[var(--text-primary)]">
                               {item.customer?.name ??
                                 "Cliente não identificado"}
                             </p>
@@ -916,12 +921,12 @@ export default function CalendarPage() {
                           </div>
                           <AppStatusBadge label={label} />
                         </div>
-                        <p className="mt-2 text-xs text-[var(--text-secondary)]">
+                        <p className="mt-3 text-sm leading-5 text-[var(--text-secondary)]">
                           {tone === "critical"
                             ? "Conflito de agenda no mesmo responsável."
                             : "Serviço passou do horário planejado."}
                         </p>
-                        <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                        <p className="mt-1 text-sm leading-5 text-[var(--text-secondary)]">
                           Consequência: pode impactar O.S. e prova operacional.
                         </p>
                         <div className="mt-3 flex flex-wrap gap-2">
@@ -1117,15 +1122,15 @@ export default function CalendarPage() {
                         setSelectedId(arg.event.id);
                       }}
                       eventContent={eventInfo => (
-                        <div className="rounded-md border-l-4 border-[var(--accent-primary)] bg-[var(--surface-primary)]/90 p-1.5 text-[11px] leading-tight shadow-sm">
-                          <p className="truncate text-xs font-bold text-[var(--text-primary)]">
+                        <div className="rounded-lg border border-[var(--border-strong)] border-l-4 border-l-[var(--accent-primary)] bg-[var(--surface-primary)] p-2 text-[11px] leading-tight shadow-md ring-1 ring-black/5">
+                          <p className="truncate text-[12px] font-black text-[var(--text-primary)]">
                             {eventInfo.event.extendedProps.timeLabel} ·{" "}
                             {eventInfo.event.extendedProps.customerName}
                           </p>
-                          <p className="truncate font-medium text-[var(--text-secondary)]">
+                          <p className="truncate font-semibold text-[var(--text-primary)]">
                             {eventInfo.event.extendedProps.serviceName}
                           </p>
-                          <p className="truncate font-semibold text-[var(--text-primary)]">
+                          <p className="truncate text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">
                             {eventInfo.event.extendedProps.signal}
                           </p>
                         </div>
