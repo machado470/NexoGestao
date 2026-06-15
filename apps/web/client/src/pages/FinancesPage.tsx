@@ -222,8 +222,10 @@ function humanizeFinancialTimelineEvent(item: Record<string, any>) {
     return "Lembrete preparado";
   if (source.includes("updated") || source.includes("atualiz"))
     return "Cobrança atualizada";
+  if (source.includes("followup") || source.includes("acompanh"))
+    return "Cobrança acompanhada";
   if (source.includes("charge") || source.includes("cobran"))
-    return "Evento financeiro registrado";
+    return "Cobrança acompanhada";
   return "Evento financeiro registrado";
 }
 
@@ -1082,7 +1084,7 @@ export default function FinancesPage() {
     if (selectedFinancialRecord?.id) {
       contextualEvents.push({
         id: "charge-contextual",
-        type: "Cobrança contextual",
+        type: "Cobrança acompanhada",
         occurredAt: formatDate(
           selectedFinancialRecord.createdAt ?? selectedFinancialRecord.dueDate
         ),
@@ -1096,7 +1098,7 @@ export default function FinancesPage() {
     for (const payment of payments.slice(0, 3)) {
       contextualEvents.push({
         id: `payment-contextual-${contextualEvents.length}`,
-        type: "Pagamento contextual",
+        type: "Pagamento registrado",
         occurredAt: formatDate(payment?.paidAt ?? payment?.createdAt),
         entity: `${safeText(selectedFinancialRecord.customerName, "Cliente")} · ${formatCurrency(Number(payment?.amountCents ?? 0))}`,
         summary: `Pagamento retornado no detalhe da cobrança com método ${safeText(payment?.method)}.`,
@@ -1526,14 +1528,15 @@ export default function FinancesPage() {
             <div key={item.stage} className="flex flex-1 items-stretch gap-3">
               <AppInfoCard
                 className={cn(
-                  "min-h-full flex-1 border-l-4",
+                  "min-h-full flex-1 border-l-4 transition-all",
                   item.bottleneck
-                    ? "border-l-[var(--accent-primary)] bg-[var(--accent-soft)]"
+                    ? "scale-[1.02] border-[var(--accent-primary)] bg-[var(--accent-soft)]"
                     : "border-l-[var(--border-subtle)]"
                 )}
               >
                 <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                   {index + 1}. {item.stage}
+                  {item.bottleneck ? " · Gargalo" : ""}
                 </p>
                 <p className="mt-1 text-xs text-[var(--text-secondary)]">
                   {item.represents}
@@ -1559,68 +1562,8 @@ export default function FinancesPage() {
       </AppSectionBlock>
 
       <AppSectionBlock
-        title="Conversão de receita"
-        subtitle="Faixa compacta: execução → cobrança → pagamento → recebimento."
-        compact
-      >
-        <div className="grid gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-2 md:grid-cols-4">
-          {[
-            ["Recebido", health.received],
-            ["Pendente", health.receivable],
-            ["Em risco", health.overdue],
-            [
-              "Previsto total",
-              health.received + health.receivable + health.overdue,
-            ],
-          ].map(([label, value]) => (
-            <div
-              key={String(label)}
-              className="rounded-lg bg-[var(--surface-base)] px-3 py-2"
-            >
-              <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
-                {label}
-              </p>
-              <p className="text-sm font-semibold text-[var(--text-primary)]">
-                {formatCurrency(Number(value))}
-              </p>
-            </div>
-          ))}
-        </div>
-      </AppSectionBlock>
-
-      <AppSectionBlock
-        title="Radar financeiro"
-        subtitle={`Alertas densos para proteger caixa, cobrança e conversão da execução em receita. ${highlightedFinancialSummary.hidden > 0 ? highlightedFinancialSummary.hiddenMessage : ""}`}
-        compact
-      >
-        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
-          {immediateAttentionItems.slice(0, 5).map(item => (
-            <AppInfoCard key={item.key} className="px-3 py-2">
-              <div className="flex items-start justify-between gap-2">
-                <p className="text-sm font-semibold text-[var(--text-primary)]">
-                  {item.title}
-                </p>
-                <AppStatusBadge label={item.value} tone="neutral" />
-              </div>
-              <p className="mt-1 min-h-10 text-xs leading-5 text-[var(--text-secondary)]">
-                {item.consequence}
-              </p>
-              <Button
-                className="mt-2 w-full"
-                size="sm"
-                variant="outline"
-                onClick={item.onAction}
-              >
-                {item.actionLabel}
-              </Button>
-            </AppInfoCard>
-          ))}
-        </div>
-      </AppSectionBlock>
-
-      <AppSectionBlock
         title="Carteira operacional"
-        subtitle="Cobranças reais com risco, origem e ação primária antes da navegação."
+        subtitle="Fila real de trabalho: cliente, valor, vencimento, origem, prioridade, próxima ação e CTA real."
       >
         <AppFiltersBar className="shrink-0 gap-2 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2">
           <div className="min-w-[220px] flex-1">
@@ -1731,7 +1674,7 @@ export default function FinancesPage() {
                     )}
                     onClick={() => setSelectedChargeId(String(row?.id ?? ""))}
                   >
-                    <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr_1fr_1fr_auto] lg:items-center">
+                    <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr_1fr_1.2fr_auto] lg:items-center">
                       <div>
                         <p className="text-sm font-semibold text-[var(--text-primary)]">
                           {safeFinancialEntityName(row.customerName)}
@@ -1854,6 +1797,66 @@ export default function FinancesPage() {
             />
           </>
         ) : null}
+      </AppSectionBlock>
+
+      <AppSectionBlock
+        title="Conversão de receita"
+        subtitle="Faixa compacta: execução → cobrança → pagamento → recebimento."
+        compact
+      >
+        <div className="grid gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-2 md:grid-cols-4">
+          {[
+            ["Recebido", health.received],
+            ["Pendente", health.receivable],
+            ["Em risco", health.overdue],
+            [
+              "Previsto total",
+              health.received + health.receivable + health.overdue,
+            ],
+          ].map(([label, value]) => (
+            <div
+              key={String(label)}
+              className="rounded-lg bg-[var(--surface-base)] px-3 py-2"
+            >
+              <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
+                {label}
+              </p>
+              <p className="text-sm font-semibold text-[var(--text-primary)]">
+                {formatCurrency(Number(value))}
+              </p>
+            </div>
+          ))}
+        </div>
+      </AppSectionBlock>
+
+      <AppSectionBlock
+        title="Radar financeiro"
+        subtitle={`Alertas densos para proteger caixa, cobrança e conversão da execução em receita. ${highlightedFinancialSummary.hidden > 0 ? highlightedFinancialSummary.hiddenMessage : ""}`}
+        compact
+      >
+        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+          {immediateAttentionItems.slice(0, 5).map(item => (
+            <AppInfoCard key={item.key} className="px-3 py-2">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-sm font-semibold text-[var(--text-primary)]">
+                  {item.title}
+                </p>
+                <AppStatusBadge label={item.value} tone="neutral" />
+              </div>
+              <p className="mt-1 min-h-10 text-xs leading-5 text-[var(--text-secondary)]">
+                {item.consequence}
+              </p>
+              <Button
+                className="mt-2 w-full"
+                size="sm"
+                variant="outline"
+                onClick={item.onAction}
+              >
+                {item.actionLabel}
+              </Button>
+            </AppInfoCard>
+          ))}
+        </div>
       </AppSectionBlock>
 
       <AppSectionBlock
@@ -1997,6 +2000,7 @@ export default function FinancesPage() {
             </AppActionBar>
 
             <div className="grid gap-3 lg:grid-cols-3">
+              <p className="sr-only">Ações reais</p>
               <EntityTimelineCard
                 className="lg:col-span-2"
                 title="Prova operacional financeira"

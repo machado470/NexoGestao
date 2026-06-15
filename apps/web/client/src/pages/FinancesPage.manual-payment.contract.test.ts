@@ -40,6 +40,9 @@ describe("FinancesPage manual payment contract", () => {
     expect(financesPage).not.toContain("Maior cobrança em atraso");
     expect(financesPage).not.toContain("Cliente prioritário");
     expect(financesPage).not.toContain("Próxima ação financeira");
+    const heroMetrics =
+      financesPage.match(/\["Dinheiro (?:recebido|pendente|em risco)"/g) ?? [];
+    expect(heroMetrics).toHaveLength(3);
   });
 
   it("mantém FAÇA AGORA como comando financeiro dominante com CTAs reais", () => {
@@ -62,9 +65,14 @@ describe("FinancesPage manual payment contract", () => {
       financesPage.indexOf("Pipeline Financeiro")
     );
     expect(financesPage.indexOf("Pipeline Financeiro")).toBeLessThan(
+      financesPage.indexOf("Carteira operacional")
+    );
+    expect(financesPage.indexOf("Carteira operacional")).toBeLessThan(
+      financesPage.indexOf("Conversão de receita")
+    );
+    expect(financesPage.indexOf("Conversão de receita")).toBeLessThan(
       financesPage.indexOf("Radar financeiro")
     );
-    expect(financesPage).toContain("Conversão de receita");
   });
 
   it("humaniza Timeline e protege contra vazamentos técnicos na experiência renderizada", () => {
@@ -77,6 +85,7 @@ describe("FinancesPage manual payment contract", () => {
     expect(financesPage).toContain("Lembrete enviado");
     expect(financesPage).toContain("Pagamento registrado");
     expect(financesPage).toContain("Cobrança atualizada");
+    expect(financesPage).toContain("Cobrança acompanhada");
     expect(financesPage).toContain("Ação financeira registrada");
     expect(financesPage).toContain("Evento financeiro registrado");
     for (const leak of [
@@ -100,6 +109,10 @@ describe("FinancesPage manual payment contract", () => {
     expect(financesPage).toContain("O.S. vinculada");
     expect(financesPage).toContain("Sem O.S. vinculada");
     expect(financesPage).toContain("Origem não informada pela fonte atual");
+    expect(financesPage).toContain("Fila real de trabalho");
+    expect(financesPage).toContain(
+      "Fila real de trabalho: cliente, valor, vencimento"
+    );
     expect(financesPage).toContain("Detalhe financeiro de cobrança");
     expect(financesPage).toContain("Decisão operacional");
     expect(financesPage.indexOf("Cliente vinculado")).toBeLessThan(
@@ -109,6 +122,9 @@ describe("FinancesPage manual payment contract", () => {
       financesPage.indexOf("Decisão operacional")
     );
     expect(financesPage.indexOf("Decisão operacional")).toBeLessThan(
+      financesPage.indexOf("Ações reais")
+    );
+    expect(financesPage.indexOf("Ações reais")).toBeLessThan(
       financesPage.indexOf("Prova operacional financeira")
     );
     expect(financesPage.indexOf("Prova operacional financeira")).toBeLessThan(
