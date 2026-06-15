@@ -315,7 +315,7 @@ export function NexoOperationalPipeline({
           {subtitle}
         </p>
       </div>
-      <div className="grid gap-2 lg:grid-cols-5">
+      <div className="grid gap-2 lg:grid-cols-5 xl:gap-3">
         {primaryStages.map((stage, index) => {
           const tone = flowStageTone[stage.state];
           const isBottleneck =
@@ -324,7 +324,7 @@ export function NexoOperationalPipeline({
             <article
               key={stage.id}
               className={cn(
-                "relative min-w-0 rounded-xl border p-2.5 shadow-sm",
+                "relative min-w-[9.5rem] rounded-xl border p-2.5 shadow-sm",
                 tone.container,
                 isBottleneck
                   ? "ring-1 ring-[var(--accent-primary)]/25"
@@ -339,7 +339,7 @@ export function NexoOperationalPipeline({
               <div className="flex items-center justify-between gap-2">
                 <span className="flex min-w-0 items-center gap-2">
                   {tone.icon}
-                  <span className="truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-secondary)]">
+                  <span className="whitespace-normal text-[10px] font-semibold uppercase leading-4 tracking-[0.06em] text-[var(--text-secondary)] xl:text-[11px]">
                     {stage.label}
                   </span>
                 </span>
