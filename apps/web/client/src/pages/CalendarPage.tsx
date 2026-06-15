@@ -8,19 +8,13 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock3,
-  MessageSquare,
   Plus,
   RefreshCcw,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/design-system";
-import {
-  AppSectionCard,
-  AppStatCard,
-  AppTimeline,
-  AppTimelineItem,
-} from "@/components/app-system";
+import { AppSectionCard, AppStatCard } from "@/components/app-system";
 import { CreateAppointmentModal } from "@/components/CreateAppointmentModal";
 import {
   EntityTimelineCard,
@@ -167,7 +161,6 @@ export default function CalendarPage() {
     enabled: isAuthenticated,
     retry: false,
   });
-  const updateAppointment = trpc.nexo.appointments.update.useMutation();
 
   const appointments = useMemo(
     () => normalizeArrayPayload<Appointment>(appointmentsQuery.data),
@@ -270,7 +263,7 @@ export default function CalendarPage() {
           : isDelayed
             ? "var(--warning)"
             : STATUS_COLOR[item.status],
-        textColor: "var(--surface-primary)",
+        textColor: "var(--text-primary)",
         extendedProps: {
           status: item.status,
           customerName: item.customer?.name ?? "Cliente",
@@ -435,7 +428,7 @@ export default function CalendarPage() {
           reason: `${conflictSample.customer?.name ?? "Cliente"} disputa horário com outro evento do mesmo responsável.`,
           impact:
             "A equipe pode perder a janela de execução e empurrar O.S., Timeline e governança para tratamento corretivo.",
-          ctaLabel: "Resolver conflito de horário",
+          ctaLabel: "Ver conflitos",
           appointmentId: conflictSample.id,
           action: "reschedule" as const,
         }
@@ -445,7 +438,7 @@ export default function CalendarPage() {
             reason: `${getPersonName(people, overloadedOwner.ownerId)} concentra ${overloadedOwner.count} agendamentos ativos no recorte.`,
             impact:
               "A distribuição desigual aumenta chance de atraso, remarcação e execução sem prova operacional no tempo certo.",
-            ctaLabel: "Rebalancear agenda",
+            ctaLabel: "Ver responsáveis",
             appointmentId: overloadedOwner.group[0]?.id,
             action: "rebalance" as const,
           }
@@ -454,7 +447,7 @@ export default function CalendarPage() {
               title: "Risco de atrasar execução",
               reason: `${delayedSample.customer?.name ?? "Cliente"} já passou do horário planejado e segue ativo.`,
               impact:
-                "Atraso no calendário reduz previsibilidade de O.S. e compromete a trilha de Timeline/Governança.",
+                "Atraso no calendário reduz previsibilidade de O.S. e compromete a trilha de Timeline e governança.",
               ctaLabel: "Revisar agenda do dia",
               appointmentId: delayedSample.id,
               action: "review" as const,
@@ -465,7 +458,7 @@ export default function CalendarPage() {
                 reason: `${unconfirmed.length} evento(s) ainda estão como agendado, sem confirmação operacional.`,
                 impact:
                   "Janelas não confirmadas podem virar ociosidade, remarcação ou conflito de última hora.",
-                ctaLabel: "Confirmar agendamento",
+                ctaLabel: "Revisar agendamento",
                 appointmentId: unconfirmedSample.id,
                 action: "confirm" as const,
               }
@@ -475,7 +468,7 @@ export default function CalendarPage() {
                   reason: `${possibleFits} janelas úteis permanecem disponíveis no recorte filtrado.`,
                   impact:
                     "Capacidade sem ocupação reduz previsibilidade de produção e pode ocultar demanda fora do calendário.",
-                  ctaLabel: "Preencher janela operacional",
+                  ctaLabel: "Ver janelas livres",
                   appointmentId: activeAppointments[0]?.id,
                   action: "fill" as const,
                 }
@@ -546,11 +539,11 @@ export default function CalendarPage() {
         },
         {
           id: "appointment",
-          label: "Agendamento",
+          label: "Agenda",
           summary:
             calendarCommand.unconfirmedCount > 0
               ? `${calendarCommand.unconfirmedCount} aguardando confirmação.`
-              : "Eventos confirmados/concluídos sem pendência crítica.",
+              : "Eventos preparados para execução.",
           state: calendarCommand.unconfirmedCount > 0 ? "warning" : "done",
           countOrValue: String(activeAppointments.length),
           hrefLabel: "Abrir Agendamentos",
@@ -558,13 +551,13 @@ export default function CalendarPage() {
         },
         {
           id: "owner",
-          label: "Responsável",
+          label: "Equipe",
           summary:
             calendarCommand.overloadedOwners.length > 0
               ? `${getPersonName(people, calendarCommand.overloadedOwners[0].ownerId)} está sobrecarregado.`
               : calendarCommand.unassignedCount > 0
                 ? `${calendarCommand.unassignedCount} sem responsável.`
-                : "Responsáveis sem sobrecarga relevante.",
+                : "Responsáveis alocados ou pendentes.",
           state:
             calendarCommand.overloadedOwners.length > 0
               ? "warning"
@@ -594,20 +587,19 @@ export default function CalendarPage() {
         },
         {
           id: "timeline",
-          label: "Timeline",
-          summary:
-            "Prova oficial não é fabricada; eventos abaixo vêm de datas reais do calendário.",
+          label: "Prova",
+          summary: "Eventos reais enviados para leitura operacional.",
           state: filteredAppointments.length > 0 ? "active" : "idle",
-          hrefLabel: "Abrir Timeline",
+          hrefLabel: "Abrir Timeline oficial",
           onClick: () => navigate("/timeline?source=calendar"),
         },
         {
           id: "risk",
-          label: "Risco/Governança",
+          label: "Risco",
           summary:
             calendarCommand.level === "NORMAL"
-              ? "Sem risco crítico para governança do tempo."
-              : "Sinal exige decisão antes de impactar governança.",
+              ? "Sinais antes de afetar governança."
+              : "Sinais antes de afetar governança.",
           state:
             calendarCommand.level === "RESTRICTED"
               ? "blocked"
@@ -681,6 +673,36 @@ export default function CalendarPage() {
 
   const selectedOrCritical = selected ?? immediateAttention[0]?.item ?? null;
 
+  const heroSignals = useMemo(() => {
+    const signals = [
+      delayedIds.size > 0 ? `${delayedIds.size} atraso(s) detectado(s)` : null,
+      calendarCommand.unassignedCount > 0
+        ? `${calendarCommand.unassignedCount} sem responsável`
+        : null,
+      `${executiveRead.possibleFits} janelas livres`,
+      `${executiveRead.conflicts} conflitos`,
+      distribution.cancelled > 0
+        ? `${distribution.cancelled} cancelados`
+        : null,
+      executiveRead.confirmed > 0
+        ? `${executiveRead.confirmed} evento(s) confirmado(s)`
+        : null,
+    ].filter(Boolean) as string[];
+
+    return signals.length > 0
+      ? signals.slice(0, 4)
+      : ["Operação do tempo monitorada"];
+  }, [
+    calendarCommand.unassignedCount,
+    delayedIds.size,
+    distribution.cancelled,
+    executiveRead.conflicts,
+    executiveRead.confirmed,
+    executiveRead.possibleFits,
+  ]);
+
+  const periodSummary = `${filteredAppointments.length} eventos no período · ${delayedIds.size} atraso(s) · ${executiveRead.possibleFits} janelas livres`;
+
   const operationalEvidence = useMemo(() => {
     return [...filteredAppointments]
       .sort(
@@ -741,16 +763,6 @@ export default function CalendarPage() {
     ]);
   };
 
-  const handleConfirm = async (appointmentId: string) => {
-    const appointment = appointments.find(item => item.id === appointmentId);
-    await updateAppointment.mutateAsync({
-      id: appointmentId,
-      status: "CONFIRMED",
-      expectedUpdatedAt: appointment?.updatedAt ?? undefined,
-    });
-    refetchAll();
-  };
-
   return (
     <AppPageShell>
       <AppOperationalHeader
@@ -768,9 +780,9 @@ export default function CalendarPage() {
         }
         contextChips={
           <>
-            <AppStatusBadge label="Sincronizado" />
-            <AppStatusBadge label="Leitura carregada" />
-            <AppPriorityBadge label="Última atualização: agora" />
+            {heroSignals.map(signal => (
+              <AppStatusBadge key={signal} label={signal} />
+            ))}
           </>
         }
       >
@@ -799,13 +811,13 @@ export default function CalendarPage() {
               icon={<Clock3 className="h-4 w-4" />}
             />
             <AppStatCard
-              label="Janela livre"
+              label="Janelas livres"
               value={String(executiveRead.possibleFits)}
               helper="Oportunidades disponíveis para encaixe seguro."
               icon={<Plus className="h-4 w-4" />}
             />
             <AppStatCard
-              label="Confirmados hoje"
+              label="Preparados para executar"
               value={String(executiveRead.confirmed)}
               helper="Agendamentos prontos para execução."
               icon={<CheckCircle2 className="h-4 w-4" />}
@@ -819,7 +831,7 @@ export default function CalendarPage() {
           </section>
 
           <OperationalFlowCard
-            title="Tempo → Agendamento → Responsável → O.S. → Execução → Timeline → Risco/Governança"
+            title="Tempo → Agenda → Equipe → O.S. → Execução → Prova → Risco"
             subtitle="Pipeline operacional do tempo: leitura macro de distribuição, conflitos, capacidade, vazios e sobrecarga; Agendamentos segue como ação/lista operacional."
             stages={flowStages}
           />
@@ -910,12 +922,15 @@ export default function CalendarPage() {
               </div>
               <div className="grid grid-cols-2 gap-2 text-sm">
                 {[
-                  ["Total", distribution.total],
-                  ["Confirmados", distribution.confirmed],
-                  ["Pendentes", distribution.pending],
-                  ["Concluídos", distribution.completed],
+                  ["Eventos no período", distribution.total],
+                  ["Preparados para executar", distribution.confirmed],
+                  [
+                    "Precisam de atenção",
+                    distribution.pending + distribution.waiting,
+                  ],
+                  ["Finalizados", distribution.completed],
                   ["Cancelados", distribution.cancelled],
-                  ["Aguardando", distribution.waiting],
+                  ["Janelas livres", distribution.availableTime],
                 ].map(([label, value]) => (
                   <div
                     key={label}
@@ -931,11 +946,11 @@ export default function CalendarPage() {
                 ))}
               </div>
               <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-3 text-sm text-[var(--text-secondary)]">
-                Capacidade hoje:{" "}
+                Capacidade do período:{" "}
                 <strong className="text-[var(--text-primary)]">
                   {distribution.capacityUsed}/{distribution.capacityTotal}
                 </strong>{" "}
-                · Tempo disponível:{" "}
+                · Janelas livres:{" "}
                 <strong className="text-[var(--text-primary)]">
                   {distribution.availableTime}
                 </strong>{" "}
@@ -1030,7 +1045,10 @@ export default function CalendarPage() {
                   subtitle="Grade de leitura com evento legível: cliente, horário, serviço e status."
                   className="xl:col-span-8"
                 >
-                  <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-2">
+                  <div className="mb-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-3 text-sm font-medium text-[var(--text-primary)]">
+                    {periodSummary}
+                  </div>
+                  <div className="hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-2 shadow-sm xl:block">
                     <FullCalendar
                       plugins={[
                         dayGridPlugin,
@@ -1047,15 +1065,15 @@ export default function CalendarPage() {
                         setSelectedId(arg.event.id)
                       }
                       eventContent={eventInfo => (
-                        <div className="space-y-0.5 p-0.5 text-[11px] leading-tight">
-                          <p className="truncate font-semibold">
+                        <div className="rounded-md border-l-4 border-[var(--accent-primary)] bg-[var(--surface-primary)]/90 p-1.5 text-[11px] leading-tight shadow-sm">
+                          <p className="truncate text-xs font-bold text-[var(--text-primary)]">
                             {eventInfo.event.extendedProps.timeLabel} ·{" "}
                             {eventInfo.event.extendedProps.customerName}
                           </p>
-                          <p className="truncate">
+                          <p className="truncate font-medium text-[var(--text-secondary)]">
                             {eventInfo.event.extendedProps.serviceName}
                           </p>
-                          <p className="truncate opacity-90">
+                          <p className="truncate font-semibold text-[var(--text-primary)]">
                             {eventInfo.event.extendedProps.signal}
                           </p>
                         </div>
@@ -1066,10 +1084,29 @@ export default function CalendarPage() {
                       allDaySlot={false}
                     />
                   </div>
+                  <div className="space-y-2 xl:hidden">
+                    {filteredAppointments.slice(0, 8).map(item => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-3 text-left"
+                        onClick={() => setSelectedId(item.id)}
+                      >
+                        <span className="block text-sm font-semibold text-[var(--text-primary)]">
+                          {formatDateTime(item.startsAt)} ·{" "}
+                          {item.customer?.name ?? "Cliente não identificado"}
+                        </span>
+                        <span className="block text-xs text-[var(--text-secondary)]">
+                          {item.title ?? "Serviço não informado"} ·{" "}
+                          {STATUS_LABEL[item.status]}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
                 </AppSectionBlock>
 
                 <AppSectionBlock
-                  title="Painel lateral do evento"
+                  title="Ficha operacional do evento"
                   subtitle="Contexto mínimo para decidir e acionar rápido."
                   className="xl:col-span-4"
                 >
@@ -1081,52 +1118,81 @@ export default function CalendarPage() {
                           crítico para orientar a decisão.
                         </div>
                       ) : null}
-                      <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
-                        <p className="text-sm font-semibold text-[var(--text-primary)]">
-                          {selectedOrCritical.customer?.name ??
-                            "Cliente não identificado"}
-                        </p>
-                        <p className="text-xs text-[var(--text-muted)]">
-                          {selectedOrCritical.title ?? "Serviço não informado"}
-                        </p>
-                        <p className="mt-2 text-xs text-[var(--text-muted)]">
-                          {new Date(selectedOrCritical.startsAt).toLocaleString(
-                            "pt-BR"
-                          )}
-                        </p>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <AppStatusBadge
-                            label={STATUS_LABEL[selectedOrCritical.status]}
-                          />
-                          <AppPriorityBadge
-                            label={
-                              new Date(selectedOrCritical.startsAt).getTime() -
-                                Date.now() <
-                              45 * 60 * 1000
-                                ? "Alta"
-                                : "Média"
-                            }
-                          />
-                          <AppStatusBadge
-                            label={
-                              conflictIds.has(selectedOrCritical.id)
-                                ? "Conflito"
-                                : delayedIds.has(selectedOrCritical.id)
-                                  ? "Atraso"
-                                  : "Programado"
-                            }
-                          />
-                        </div>
+                      <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-3">
+                        {[
+                          [
+                            "Cliente",
+                            selectedOrCritical.customer?.name ??
+                              "Cliente não identificado",
+                          ],
+                          [
+                            "Serviço",
+                            selectedOrCritical.title ?? "Serviço não informado",
+                          ],
+                          [
+                            "Horário",
+                            `${formatDateTime(selectedOrCritical.startsAt)}–${selectedOrCritical.endsAt ? formatDateTime(selectedOrCritical.endsAt) : "término não informado"}`,
+                          ],
+                          [
+                            "Duração",
+                            `${Math.max(1, Math.round((getAppointmentEndMs(selectedOrCritical) - new Date(selectedOrCritical.startsAt).getTime()) / 60000))} min`,
+                          ],
+                          [
+                            "Responsável",
+                            selectedOrCritical.assignedToPersonId
+                              ? getPersonName(
+                                  people,
+                                  selectedOrCritical.assignedToPersonId
+                                )
+                              : "Não informado",
+                          ],
+                          [
+                            "Status",
+                            normalizeEventStatus(selectedOrCritical.status),
+                          ],
+                          [
+                            "O.S.",
+                            selectedOrCritical.serviceOrderId ||
+                            selectedOrCritical.serviceOrder?.id ||
+                            selectedOrCritical.serviceOrders?.some(order =>
+                              Boolean(order?.id)
+                            )
+                              ? "Vínculo retornado"
+                              : "Sem vínculo retornado",
+                          ],
+                          [
+                            "Risco",
+                            conflictIds.has(selectedOrCritical.id)
+                              ? "Conflito detectado"
+                              : delayedIds.has(selectedOrCritical.id)
+                                ? "Atraso detectado"
+                                : "Sem risco crítico no recorte",
+                          ],
+                          ["Próxima ação", "Abrir agendamento"],
+                        ].map(([label, value]) => (
+                          <div
+                            key={label}
+                            className="border-b border-[var(--border-subtle)] py-2 last:border-b-0"
+                          >
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                              {label}
+                            </p>
+                            <p className="text-sm font-medium text-[var(--text-primary)]">
+                              {value}
+                            </p>
+                          </div>
+                        ))}
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <Button
                           size="sm"
                           onClick={() =>
-                            void handleConfirm(selectedOrCritical.id)
+                            navigate(
+                              `/appointments?id=${selectedOrCritical.id}&source=calendar&mode=operational_list`
+                            )
                           }
                         >
-                          <CheckCircle2 className="mr-1 h-3.5 w-3.5" />{" "}
-                          Confirmar
+                          Abrir agendamento
                         </Button>
                         <Button
                           size="sm"
@@ -1143,21 +1209,10 @@ export default function CalendarPage() {
                           size="sm"
                           variant="outline"
                           onClick={() =>
-                            navigate(
-                              `/appointments?id=${selectedOrCritical.id}&source=calendar&mode=operational_list`
-                            )
-                          }
-                        >
-                          Abrir agendamento
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() =>
                             navigate(getServiceOrderLink(selectedOrCritical))
                           }
                         >
-                          Abrir O.S.
+                          Abrir O.S. se existir
                         </Button>
                         <Button
                           size="sm"
@@ -1169,46 +1224,25 @@ export default function CalendarPage() {
                             )
                           }
                         >
-                          Abrir cliente
+                          Abrir cliente se existir
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() =>
-                            navigate(
-                              `/whatsapp?customerId=${selectedOrCritical.customerId}&appointmentId=${selectedOrCritical.id}&source=calendar`
-                            )
-                          }
+                          onClick={() => navigate("/timeline?source=calendar")}
                         >
-                          <MessageSquare className="mr-1 h-3.5 w-3.5" />{" "}
-                          Mensagem
+                          Abrir Timeline oficial
                         </Button>
                       </div>
-                      <AppTimeline>
-                        <AppTimelineItem>
-                          <p className="text-sm text-[var(--text-primary)]">
-                            Status atual:{" "}
-                            {normalizeEventStatus(selectedOrCritical.status)}
-                          </p>
-                        </AppTimelineItem>
-                        <AppTimelineItem>
-                          <p className="text-sm text-[var(--text-primary)]">
-                            Conexão direta com Agendamentos para execução
-                            detalhada.
-                          </p>
-                        </AppTimelineItem>
-                        <AppTimelineItem>
-                          <p className="text-sm text-[var(--text-primary)]">
-                            Calendário mantém leitura de distribuição e não
-                            substitui a fila operacional.
-                          </p>
-                        </AppTimelineItem>
-                      </AppTimeline>
+                      <p className="text-xs text-[var(--text-secondary)]">
+                        Ações seguras são navegação para fluxos existentes;
+                        nenhuma execução automática é disparada pelo calendário.
+                      </p>
                     </div>
                   ) : (
                     <AppPageEmptyState
-                      title="Selecione um evento"
-                      description="Selecione um evento para ver cliente, horário, status, O.S. e ações seguras. Próximo evento crítico aparece como referência quando existir."
+                      title="Nenhum evento crítico no período"
+                      description="Use os filtros ou crie um novo agendamento."
                     />
                   )}
                 </AppSectionBlock>
@@ -1280,7 +1314,7 @@ export default function CalendarPage() {
                       variant="outline"
                       onClick={() => setStatusFilter("all")}
                     >
-                      Encontrar janela livre
+                      Ver janelas livres
                     </Button>
                     <Button
                       size="sm"
@@ -1292,21 +1326,21 @@ export default function CalendarPage() {
                         )
                       }
                     >
-                      Resolver conflitos
+                      Ver conflitos
                     </Button>
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={() => setTeamFilter("all")}
                     >
-                      Rebalancear equipe
+                      Ver responsáveis
                     </Button>
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={() => navigate("/timeline?source=calendar")}
                     >
-                      Abrir timeline oficial
+                      Abrir Timeline oficial
                     </Button>
                   </div>
                 </div>
