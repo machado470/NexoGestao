@@ -15,7 +15,12 @@ import {
 import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/design-system";
-import { AppTimeline, AppTimelineItem } from "@/components/app-system";
+import {
+  AppSectionCard,
+  AppStatCard,
+  AppTimeline,
+  AppTimelineItem,
+} from "@/components/app-system";
 import { CreateAppointmentModal } from "@/components/CreateAppointmentModal";
 import {
   EntityTimelineCard,
@@ -29,7 +34,6 @@ import {
 import {
   AppOperationalHeader,
   AppFiltersBar,
-  AppKpiRow,
   AppPageEmptyState,
   AppPageErrorState,
   AppPageLoadingState,
@@ -61,11 +65,11 @@ type Appointment = {
 };
 
 const STATUS_COLOR: Record<Appointment["status"], string> = {
-  SCHEDULED: "#f59e0b",
-  CONFIRMED: "#22c55e",
-  DONE: "#10b981",
-  CANCELED: "#ef4444",
-  NO_SHOW: "#71717a",
+  SCHEDULED: "var(--warning)",
+  CONFIRMED: "var(--success)",
+  DONE: "var(--success)",
+  CANCELED: "var(--danger)",
+  NO_SHOW: "var(--text-secondary)",
 };
 
 const STATUS_LABEL: Record<Appointment["status"], string> = {
@@ -257,16 +261,16 @@ export default function CalendarPage() {
         start: item.startsAt,
         end: item.endsAt ?? undefined,
         backgroundColor: hasConflict
-          ? "#ef4444"
+          ? "var(--danger)"
           : isDelayed
-            ? "#ea580c"
+            ? "var(--warning)"
             : STATUS_COLOR[item.status],
         borderColor: hasConflict
-          ? "#b91c1c"
+          ? "var(--danger)"
           : isDelayed
-            ? "#c2410c"
+            ? "var(--warning)"
             : STATUS_COLOR[item.status],
-        textColor: "#ffffff",
+        textColor: "var(--surface-primary)",
         extendedProps: {
           status: item.status,
           customerName: item.customer?.name ?? "Cliente",
@@ -574,7 +578,7 @@ export default function CalendarPage() {
           summary:
             calendarCommand.withServiceOrderCount > 0
               ? `${calendarCommand.withServiceOrderCount} agendamento(s) indicam vínculo com O.S.`
-              : "Sem vínculo de O.S. retornado no payload do calendário.",
+              : "Sem vínculo de O.S. retornado para o calendário.",
           state: calendarCommand.withServiceOrderCount > 0 ? "active" : "idle",
           hrefLabel: "Ver O.S.",
           onClick: () => navigate("/service-orders?source=calendar"),
@@ -630,6 +634,52 @@ export default function CalendarPage() {
       people,
     ]
   );
+
+  const distribution = useMemo(() => {
+    const total = filteredAppointments.length;
+    const confirmed = filteredAppointments.filter(
+      item => item.status === "CONFIRMED"
+    ).length;
+    const pending = filteredAppointments.filter(
+      item => item.status === "SCHEDULED"
+    ).length;
+    const completed = filteredAppointments.filter(
+      item => item.status === "DONE"
+    ).length;
+    const cancelled = filteredAppointments.filter(
+      item => item.status === "CANCELED"
+    ).length;
+    const waiting = filteredAppointments.filter(
+      item => item.status === "NO_SHOW"
+    ).length;
+    const activePeople = teamFilter === "all" ? Math.max(people.length, 1) : 1;
+    const capacityTotal = activePeople * 12;
+    const capacityUsed = activeAppointments.length;
+    const capacityPercent =
+      capacityTotal > 0
+        ? Math.min(100, Math.round((capacityUsed / capacityTotal) * 100))
+        : 0;
+    const availableTime = Math.max(0, capacityTotal - capacityUsed);
+    return {
+      total,
+      confirmed,
+      pending,
+      completed,
+      cancelled,
+      waiting,
+      capacityTotal,
+      capacityUsed,
+      capacityPercent,
+      availableTime,
+    };
+  }, [
+    activeAppointments.length,
+    filteredAppointments,
+    people.length,
+    teamFilter,
+  ]);
+
+  const selectedOrCritical = selected ?? immediateAttention[0]?.item ?? null;
 
   const operationalEvidence = useMemo(() => {
     return [...filteredAppointments]
@@ -705,7 +755,7 @@ export default function CalendarPage() {
     <AppPageShell>
       <AppOperationalHeader
         title="Calendário operacional"
-        description="Visualização estratégica do tempo para enxergar conflito, atraso e capacidade sem virar tela de execução."
+        description="Centro de controle do tempo da operação."
         primaryAction={
           <Button type="button" onClick={() => setShowCreateModal(true)}>
             <Plus className="mr-1.5 h-4 w-4" /> Novo agendamento
@@ -718,15 +768,9 @@ export default function CalendarPage() {
         }
         contextChips={
           <>
-            <AppStatusBadge label={`${executiveRead.conflicts} conflitos`} />
-            <AppStatusBadge label={`${executiveRead.overload} próximos (1h)`} />
-            <AppPriorityBadge
-              label={
-                executiveRead.inProgress > 0
-                  ? `${executiveRead.inProgress} em andamento`
-                  : "Sem execução ativa"
-              }
-            />
+            <AppStatusBadge label="Sincronizado" />
+            <AppStatusBadge label="Leitura carregada" />
+            <AppPriorityBadge label="Última atualização: agora" />
           </>
         }
       >
@@ -738,60 +782,167 @@ export default function CalendarPage() {
 
       {!isLoading && !hasError ? (
         <div className="mt-4 space-y-4">
-          <div className="grid gap-4 xl:grid-cols-3">
-            <OperationalStateCard
-              title="Estado do tempo operacional"
-              level={calendarCommand.level}
-              reason={calendarCommand.stateReason}
-              impact={calendarCommand.stateImpact}
-              detailsLabel="Ver calendário"
-              onDetails={() => setViewMode("timeGridWeek")}
+          <section
+            aria-label="Visão estratégica do tempo"
+            className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5"
+          >
+            <AppStatCard
+              label="Conflitos agora"
+              value={String(executiveRead.conflicts)}
+              helper="Precisam de decisão para não travar execução."
+              icon={<AlertTriangle className="h-4 w-4" />}
             />
-            <OperationalRiskCard
-              title={calendarCommand.risk.title}
-              reason={calendarCommand.risk.reason}
-              impact={calendarCommand.risk.impact}
-              ctaLabel={calendarCommand.risk.ctaLabel}
-              onClick={() =>
-                runCalendarAction(
-                  calendarCommand.risk.appointmentId,
-                  calendarCommand.risk.action
-                )
-              }
+            <AppStatCard
+              label="Sobrecarga"
+              value={String(calendarCommand.overloadedOwners.length)}
+              helper="Pessoas acima do limite operacional do recorte."
+              icon={<Clock3 className="h-4 w-4" />}
             />
-            <NextBestActionCard
-              title={calendarCommand.nextAction.title}
-              entity={calendarCommand.nextAction.entity}
-              reason={calendarCommand.nextAction.reason}
-              impact={calendarCommand.nextAction.impact}
-              safetyNote="A camada orienta e navega; não executa confirmação, remarcação, comunicação ou automação automaticamente."
-              primaryActionLabel={calendarCommand.nextAction.primaryActionLabel}
-              onPrimaryAction={() =>
-                runCalendarAction(
-                  calendarCommand.nextAction.appointmentId,
-                  calendarCommand.nextAction.action
-                )
-              }
-              secondaryActionLabel="Abrir Agendamentos"
-              onSecondaryAction={() =>
-                navigate("/appointments?source=calendar")
-              }
+            <AppStatCard
+              label="Janela livre"
+              value={String(executiveRead.possibleFits)}
+              helper="Oportunidades disponíveis para encaixe seguro."
+              icon={<Plus className="h-4 w-4" />}
             />
-          </div>
+            <AppStatCard
+              label="Confirmados hoje"
+              value={String(executiveRead.confirmed)}
+              helper="Agendamentos prontos para execução."
+              icon={<CheckCircle2 className="h-4 w-4" />}
+            />
+            <AppStatCard
+              label="Capacidade da equipe"
+              value={`${distribution.capacityPercent}%`}
+              helper="Uso do tempo disponível no período filtrado."
+              icon={<RefreshCcw className="h-4 w-4" />}
+            />
+          </section>
 
           <OperationalFlowCard
             title="Tempo → Agendamento → Responsável → O.S. → Execução → Timeline → Risco/Governança"
-            subtitle="Calendário não substitui Agendamentos; ele mostra como o tempo impacta execução, prova operacional e governança."
+            subtitle="Pipeline operacional do tempo: leitura macro de distribuição, conflitos, capacidade, vazios e sobrecarga; Agendamentos segue como ação/lista operacional."
             stages={flowStages}
           />
 
-          <EntityTimelineCard
-            title="Prova operacional do tempo"
-            subtitle="Fallback seguro: eventos derivados de agendamentos com datas reais do calendário; não substitui Timeline oficial."
-            events={operationalEvidence}
-            fullTimelineLabel="Abrir Timeline oficial"
-            onFullTimeline={() => navigate("/timeline?source=calendar")}
-          />
+          <div className="grid gap-4 xl:grid-cols-12">
+            <AppSectionCard className="space-y-3 xl:col-span-7">
+              <div>
+                <p className="nexo-overline">Alertas e distribuição</p>
+                <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                  Atenções que pedem decisão agora
+                </h2>
+                <p className="text-sm text-[var(--text-secondary)]">
+                  Até três sinais de atraso, conflito ou risco que podem
+                  impactar O.S. e governança.
+                </p>
+              </div>
+              {immediateAttention.length > 0 ? (
+                <div className="grid gap-3 md:grid-cols-3">
+                  {immediateAttention
+                    .slice(0, 3)
+                    .map(({ item, tone, label }) => (
+                      <article
+                        key={item.id}
+                        className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-3"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="text-sm font-semibold text-[var(--text-primary)]">
+                              {item.customer?.name ??
+                                "Cliente não identificado"}
+                            </p>
+                            <p className="text-xs text-[var(--text-secondary)]">
+                              {formatDateTime(item.startsAt)}
+                            </p>
+                          </div>
+                          <AppStatusBadge label={label} />
+                        </div>
+                        <p className="mt-2 text-xs text-[var(--text-secondary)]">
+                          {tone === "critical"
+                            ? "Conflito de agenda no mesmo responsável."
+                            : "Serviço passou do horário planejado."}
+                        </p>
+                        <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                          Impacto: pode empurrar execução, O.S. e prova
+                          operacional.
+                        </p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              navigate(
+                                `/appointments?id=${item.id}&source=calendar`
+                              )
+                            }
+                          >
+                            Abrir agendamento
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              navigate(
+                                `/appointments?id=${item.id}&action=reschedule&source=calendar`
+                              )
+                            }
+                          >
+                            Remarcar
+                          </Button>
+                        </div>
+                      </article>
+                    ))}
+                </div>
+              ) : (
+                <AppPageEmptyState
+                  title="Sem decisão urgente"
+                  description="Nenhum atraso ou conflito crítico no recorte atual."
+                />
+              )}
+            </AppSectionCard>
+
+            <AppSectionCard className="space-y-3 xl:col-span-5">
+              <div>
+                <p className="nexo-overline">Distribuição do tempo</p>
+                <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                  Carga do período
+                </h2>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                {[
+                  ["Total", distribution.total],
+                  ["Confirmados", distribution.confirmed],
+                  ["Pendentes", distribution.pending],
+                  ["Concluídos", distribution.completed],
+                  ["Cancelados", distribution.cancelled],
+                  ["Aguardando", distribution.waiting],
+                ].map(([label, value]) => (
+                  <div
+                    key={label}
+                    className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-2"
+                  >
+                    <p className="text-xs text-[var(--text-secondary)]">
+                      {label}
+                    </p>
+                    <p className="text-lg font-semibold text-[var(--text-primary)]">
+                      {value}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-3 text-sm text-[var(--text-secondary)]">
+                Capacidade hoje:{" "}
+                <strong className="text-[var(--text-primary)]">
+                  {distribution.capacityUsed}/{distribution.capacityTotal}
+                </strong>{" "}
+                · Tempo disponível:{" "}
+                <strong className="text-[var(--text-primary)]">
+                  {distribution.availableTime}
+                </strong>{" "}
+                janelas.
+              </div>
+            </AppSectionCard>
+          </div>
         </div>
       ) : null}
 
@@ -873,103 +1024,9 @@ export default function CalendarPage() {
             />
           ) : (
             <>
-              <AppSectionBlock
-                title="1) Atenção imediata"
-                subtitle="Sinais operacionais que pedem decisão agora."
-              >
-                {immediateAttention.length > 0 ? (
-                  <div className="grid gap-3 md:grid-cols-2">
-                    {immediateAttention.map(({ item, tone, label }) => (
-                      <div
-                        key={item.id}
-                        className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-sm font-semibold text-[var(--text-primary)]">
-                            {item.customer?.name ?? "Cliente"}
-                          </p>
-                          <AppStatusBadge label={label} />
-                        </div>
-                        <p className="mt-1 text-xs text-[var(--text-muted)]">
-                          {item.title ?? "Serviço não informado"} ·{" "}
-                          {new Date(item.startsAt).toLocaleString("pt-BR")}
-                        </p>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => void handleConfirm(item.id)}
-                          >
-                            Confirmar
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() =>
-                              navigate(
-                                `/appointments?id=${item.id}&action=reschedule&source=calendar`
-                              )
-                            }
-                          >
-                            Remarcar
-                          </Button>
-                        </div>
-                        <div className="mt-2 flex items-center gap-1 text-xs text-[var(--text-muted)]">
-                          {tone === "critical" ? (
-                            <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
-                          ) : (
-                            <Clock3 className="h-3.5 w-3.5 text-amber-500" />
-                          )}
-                          <span>
-                            {tone === "critical"
-                              ? "Conflito visível para a equipe."
-                              : "Atraso detectado no horário planejado."}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <AppPageEmptyState
-                    title="Sem pontos críticos"
-                    description="Nenhum conflito ou atraso no recorte atual do calendário."
-                  />
-                )}
-              </AppSectionBlock>
-
-              <AppSectionBlock
-                title="2) KPIs leves"
-                subtitle="Pulso rápido da distribuição de carga."
-              >
-                <AppKpiRow
-                  items={[
-                    {
-                      title: "Conflitos detectados",
-                      value: String(executiveRead.conflicts),
-                      hint: "Choques de agenda no recorte.",
-                    },
-                    {
-                      title: "Sobrecarga próxima (1h)",
-                      value: String(executiveRead.overload),
-                      hint: "Capacidade pressionada no curto prazo.",
-                    },
-                    {
-                      title: "Confirmados",
-                      value: String(executiveRead.confirmed),
-                      hint: "Eventos preparados para execução.",
-                    },
-                    {
-                      title: "Capacidade de encaixe",
-                      value: String(executiveRead.possibleFits),
-                      hint: "Janelas úteis para reorganização.",
-                    },
-                  ]}
-                />
-              </AppSectionBlock>
-
               <div className="grid gap-4 xl:grid-cols-12">
                 <AppSectionBlock
-                  title="3) Calendário visual"
+                  title="Calendário visual interativo"
                   subtitle="Grade de leitura com evento legível: cliente, horário, serviço e status."
                   className="xl:col-span-8"
                 >
@@ -1012,30 +1069,38 @@ export default function CalendarPage() {
                 </AppSectionBlock>
 
                 <AppSectionBlock
-                  title="4) Ação sem troca de tela"
+                  title="Painel lateral do evento"
                   subtitle="Contexto mínimo para decidir e acionar rápido."
                   className="xl:col-span-4"
                 >
-                  {selected ? (
+                  {selectedOrCritical ? (
                     <div className="space-y-3">
+                      {!selected ? (
+                        <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-3 text-xs text-[var(--text-secondary)]">
+                          Nenhum evento selecionado. Exibindo próximo evento
+                          crítico para orientar a decisão.
+                        </div>
+                      ) : null}
                       <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3">
                         <p className="text-sm font-semibold text-[var(--text-primary)]">
-                          {selected.customer?.name ??
+                          {selectedOrCritical.customer?.name ??
                             "Cliente não identificado"}
                         </p>
                         <p className="text-xs text-[var(--text-muted)]">
-                          {selected.title ?? "Serviço não informado"}
+                          {selectedOrCritical.title ?? "Serviço não informado"}
                         </p>
                         <p className="mt-2 text-xs text-[var(--text-muted)]">
-                          {new Date(selected.startsAt).toLocaleString("pt-BR")}
+                          {new Date(selectedOrCritical.startsAt).toLocaleString(
+                            "pt-BR"
+                          )}
                         </p>
                         <div className="mt-2 flex flex-wrap gap-2">
                           <AppStatusBadge
-                            label={STATUS_LABEL[selected.status]}
+                            label={STATUS_LABEL[selectedOrCritical.status]}
                           />
                           <AppPriorityBadge
                             label={
-                              new Date(selected.startsAt).getTime() -
+                              new Date(selectedOrCritical.startsAt).getTime() -
                                 Date.now() <
                               45 * 60 * 1000
                                 ? "Alta"
@@ -1044,9 +1109,9 @@ export default function CalendarPage() {
                           />
                           <AppStatusBadge
                             label={
-                              conflictIds.has(selected.id)
+                              conflictIds.has(selectedOrCritical.id)
                                 ? "Conflito"
-                                : delayedIds.has(selected.id)
+                                : delayedIds.has(selectedOrCritical.id)
                                   ? "Atraso"
                                   : "Programado"
                             }
@@ -1056,7 +1121,9 @@ export default function CalendarPage() {
                       <div className="flex flex-wrap gap-2">
                         <Button
                           size="sm"
-                          onClick={() => void handleConfirm(selected.id)}
+                          onClick={() =>
+                            void handleConfirm(selectedOrCritical.id)
+                          }
                         >
                           <CheckCircle2 className="mr-1 h-3.5 w-3.5" />{" "}
                           Confirmar
@@ -1066,7 +1133,7 @@ export default function CalendarPage() {
                           variant="outline"
                           onClick={() =>
                             navigate(
-                              `/appointments?id=${selected.id}&action=reschedule&source=calendar`
+                              `/appointments?id=${selectedOrCritical.id}&action=reschedule&source=calendar`
                             )
                           }
                         >
@@ -1077,7 +1144,7 @@ export default function CalendarPage() {
                           variant="outline"
                           onClick={() =>
                             navigate(
-                              `/appointments?id=${selected.id}&source=calendar&mode=operational_list`
+                              `/appointments?id=${selectedOrCritical.id}&source=calendar&mode=operational_list`
                             )
                           }
                         >
@@ -1087,7 +1154,7 @@ export default function CalendarPage() {
                           size="sm"
                           variant="outline"
                           onClick={() =>
-                            navigate(getServiceOrderLink(selected))
+                            navigate(getServiceOrderLink(selectedOrCritical))
                           }
                         >
                           Abrir O.S.
@@ -1096,9 +1163,9 @@ export default function CalendarPage() {
                           size="sm"
                           variant="outline"
                           onClick={() =>
-                            selected.customerId &&
+                            selectedOrCritical.customerId &&
                             navigate(
-                              `/customers?id=${selected.customerId}&source=calendar`
+                              `/customers?id=${selectedOrCritical.customerId}&source=calendar`
                             )
                           }
                         >
@@ -1109,7 +1176,7 @@ export default function CalendarPage() {
                           variant="outline"
                           onClick={() =>
                             navigate(
-                              `/whatsapp?customerId=${selected.customerId}&appointmentId=${selected.id}&source=calendar`
+                              `/whatsapp?customerId=${selectedOrCritical.customerId}&appointmentId=${selectedOrCritical.id}&source=calendar`
                             )
                           }
                         >
@@ -1121,7 +1188,7 @@ export default function CalendarPage() {
                         <AppTimelineItem>
                           <p className="text-sm text-[var(--text-primary)]">
                             Status atual:{" "}
-                            {normalizeEventStatus(selected.status)}
+                            {normalizeEventStatus(selectedOrCritical.status)}
                           </p>
                         </AppTimelineItem>
                         <AppTimelineItem>
@@ -1141,11 +1208,138 @@ export default function CalendarPage() {
                   ) : (
                     <AppPageEmptyState
                       title="Selecione um evento"
-                      description="Clique em um agendamento na grade para abrir contexto, ação rápida e links de execução."
+                      description="Selecione um evento para ver cliente, horário, status, O.S. e ações seguras. Próximo evento crítico aparece como referência quando existir."
                     />
                   )}
                 </AppSectionBlock>
               </div>
+
+              <div className="grid gap-4 xl:grid-cols-3">
+                <OperationalStateCard
+                  title="Leitura macro do tempo"
+                  level={calendarCommand.level}
+                  reason={calendarCommand.stateReason}
+                  impact={calendarCommand.stateImpact}
+                  detailsLabel="Ver semana"
+                  onDetails={() => setViewMode("timeGridWeek")}
+                />
+                <OperationalRiskCard
+                  title={calendarCommand.risk.title}
+                  reason={calendarCommand.risk.reason}
+                  impact={calendarCommand.risk.impact}
+                  ctaLabel={calendarCommand.risk.ctaLabel}
+                  onClick={() =>
+                    runCalendarAction(
+                      calendarCommand.risk.appointmentId,
+                      calendarCommand.risk.action
+                    )
+                  }
+                />
+                <NextBestActionCard
+                  title="Próxima melhor ação"
+                  entity="Calendário operacional"
+                  reason={calendarCommand.nextAction.reason}
+                  impact={calendarCommand.nextAction.impact}
+                  safetyNote="CTAs navegam para fluxos existentes ou ajustam filtros; o calendário não executa automação falsa."
+                  primaryActionLabel={
+                    calendarCommand.nextAction.primaryActionLabel
+                  }
+                  onPrimaryAction={() =>
+                    runCalendarAction(
+                      calendarCommand.nextAction.appointmentId,
+                      calendarCommand.nextAction.action
+                    )
+                  }
+                  secondaryActionLabel="Abrir Timeline oficial"
+                  onSecondaryAction={() =>
+                    navigate("/timeline?source=calendar")
+                  }
+                />
+              </div>
+
+              <AppSectionCard className="space-y-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="nexo-overline">
+                      Ações rápidas e inteligência
+                    </p>
+                    <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                      Ações seguras para reorganizar o tempo
+                    </h2>
+                    <p className="text-sm text-[var(--text-secondary)]">
+                      Calendário orienta; Agendamentos executa criação,
+                      confirmação e remarcação.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" onClick={() => setShowCreateModal(true)}>
+                      Novo agendamento
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setStatusFilter("all")}
+                    >
+                      Encontrar janela livre
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        runCalendarAction(
+                          calendarCommand.risk.appointmentId,
+                          calendarCommand.risk.action
+                        )
+                      }
+                    >
+                      Resolver conflitos
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setTeamFilter("all")}
+                    >
+                      Rebalancear equipe
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => navigate("/timeline?source=calendar")}
+                    >
+                      Abrir timeline oficial
+                    </Button>
+                  </div>
+                </div>
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-3 text-sm text-[var(--text-secondary)]">
+                    Insight:{" "}
+                    {executiveRead.possibleFits > 0
+                      ? "existem janelas livres para reduzir conflito ou antecipar demanda."
+                      : "a capacidade está ocupada; evite novos encaixes sem rebalancear."}
+                  </div>
+                  <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-3 text-sm text-[var(--text-secondary)]">
+                    Equipe hoje: {distribution.capacityPercent}% de uso,{" "}
+                    {activeAppointments.length} agendamentos ativos.
+                  </div>
+                  <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-3 text-sm text-[var(--text-secondary)]">
+                    Eventos sem vínculo de O.S.:{" "}
+                    {Math.max(
+                      0,
+                      activeAppointments.length -
+                        calendarCommand.withServiceOrderCount
+                    )}{" "}
+                    · CTA seguro: Ver e vincular.
+                  </div>
+                </div>
+              </AppSectionCard>
+
+              <EntityTimelineCard
+                title="Prova operacional / Timeline do tempo"
+                subtitle="Fallback seguro: eventos derivados de agendamentos com datas reais; não substitui Timeline oficial."
+                events={operationalEvidence}
+                fullTimelineLabel="Abrir Timeline oficial"
+                onFullTimeline={() => navigate("/timeline?source=calendar")}
+              />
             </>
           )}
         </>
