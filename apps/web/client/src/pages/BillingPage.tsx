@@ -1,29 +1,23 @@
-// OperationalTopCard lint contract: actions are rendered with AppOperationalHeader in this module.
-import { useMemo } from "react";
+// OperationalTopCard lint contract: quick actions are visible in the AppPageHeader and plan cards use AppSectionCard.
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
-  EntityTimelineCard,
-  NextBestActionCard,
-  OperationalFlowCard,
-  OperationalRiskCard,
-  OperationalStateCard,
-  type OperationalFlowStageState,
-  type OperationalStateLevel,
-} from "@/components/app/OperationalCommandLayer";
-import { PageWrapper } from "@/components/operating-system/Wrappers";
-import {
   AppDataTable,
-  AppFiltersBar,
-  AppKpiRow,
-  AppOperationalHeader,
+  AppPageHeader,
   AppPageShell,
-  AppSectionBlock,
+  AppSectionCard,
+  AppStatCard,
   AppStatusBadge,
-} from "@/components/internal-page-system";
+  AppTimeline,
+  AppTimelineItem,
+} from "@/components/app-system";
+import { BaseModal } from "@/components/app-modal-system";
+import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { trpc } from "@/lib/trpc";
 
 type PlanName = "FREE" | "STARTER" | "PRO" | "BUSINESS";
+type VisiblePlan = "STARTER" | "PRO" | "BUSINESS";
 type AccountStatus =
   | "ACTIVE"
   | "TRIAL"
@@ -31,6 +25,8 @@ type AccountStatus =
   | "CANCELED"
   | "NO_SUBSCRIPTION"
   | "SUSPENDED";
+type InvoiceStatus = "PAID" | "PENDING" | "FAILED" | "REFUNDED";
+type GovernanceStatus = "ACTIVE" | "WARNING" | "RESTRICTED";
 
 const PLAN_PRICE_ID: Record<PlanName, string | null> = {
   FREE: null,
@@ -41,12 +37,63 @@ const PLAN_PRICE_ID: Record<PlanName, string | null> = {
 
 const PLAN_META: Record<
   PlanName,
-  { title: string; priceCents: number; periodicity: string }
+  {
+    title: string;
+    priceCents: number;
+    periodicity: string;
+    users: string;
+    customers: string;
+    features: string[];
+  }
 > = {
-  FREE: { title: "Essencial", priceCents: 0, periodicity: "mensal" },
-  STARTER: { title: "Starter", priceCents: 19900, periodicity: "mensal" },
-  PRO: { title: "Pro", priceCents: 49900, periodicity: "mensal" },
-  BUSINESS: { title: "Scale", priceCents: 99900, periodicity: "mensal" },
+  FREE: {
+    title: "Essencial",
+    priceCents: 0,
+    periodicity: "mensal",
+    users: "1 usuário",
+    customers: "50 clientes",
+    features: ["Operação inicial", "Histórico básico"],
+  },
+  STARTER: {
+    title: "Starter",
+    priceCents: 19900,
+    periodicity: "mensal",
+    users: "3 usuários",
+    customers: "500 clientes",
+    features: ["Agenda e clientes", "Faturas da plataforma", "Suporte padrão"],
+  },
+  PRO: {
+    title: "Pro",
+    priceCents: 49900,
+    periodicity: "mensal",
+    users: "10 usuários",
+    customers: "2.000 clientes",
+    features: [
+      "Governança operacional",
+      "Timeline oficial",
+      "Automações essenciais",
+    ],
+  },
+  BUSINESS: {
+    title: "Business",
+    priceCents: 99900,
+    periodicity: "mensal",
+    users: "Ilimitados",
+    customers: "Ilimitados",
+    features: [
+      "Limites avançados",
+      "Prioridade operacional",
+      "Controles de acesso",
+    ],
+  },
+};
+
+const VISIBLE_PLANS: VisiblePlan[] = ["STARTER", "PRO", "BUSINESS"];
+const PLAN_ORDER: Record<PlanName, number> = {
+  FREE: 0,
+  STARTER: 1,
+  PRO: 2,
+  BUSINESS: 3,
 };
 
 function brl(valueCents: number) {
@@ -68,18 +115,16 @@ function accountStatus(value: unknown): AccountStatus {
   const status = String(value ?? "ACTIVE").toUpperCase();
   if (status === "TRIALING") return "TRIAL";
   if (status === "UNPAID") return "PAST_DUE";
-  if (
-    [
-      "ACTIVE",
-      "TRIAL",
-      "PAST_DUE",
-      "CANCELED",
-      "NO_SUBSCRIPTION",
-      "SUSPENDED",
-    ].includes(status)
-  )
-    return status as AccountStatus;
-  return "ACTIVE";
+  return [
+    "ACTIVE",
+    "TRIAL",
+    "PAST_DUE",
+    "CANCELED",
+    "NO_SUBSCRIPTION",
+    "SUSPENDED",
+  ].includes(status)
+    ? (status as AccountStatus)
+    : "ACTIVE";
 }
 
 function formatDate(value: unknown) {
@@ -93,26 +138,11 @@ function formatDate(value: unknown) {
   });
 }
 
-function parseDate(value: unknown) {
-  if (!value) return null;
-  const date = new Date(String(value));
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function daysUntil(value: unknown) {
-  const date = parseDate(value);
-  if (!date) return null;
-  return Math.ceil((date.getTime() - Date.now()) / 86400000);
-}
-
-function scrollToBillingActions() {
-  document
-    .getElementById("billing-actions")
-    ?.scrollIntoView({ behavior: "smooth", block: "start" });
-}
-
-function refreshBilling(refetchers: Array<() => Promise<unknown>>) {
-  void Promise.all(refetchers.map(refetch => refetch()));
+function invoiceAmount(event: any, fallbackCents: number) {
+  const amount = Number(
+    event?.amountCents ?? event?.amount ?? event?.totalCents ?? fallbackCents
+  );
+  return Number.isFinite(amount) ? amount : fallbackCents;
 }
 
 function hasPaymentFailure(events: any[]) {
@@ -125,74 +155,44 @@ function hasPaymentFailure(events: any[]) {
   });
 }
 
-function hasOpenOverdueInvoice(events: any[]) {
-  return events.some(event => {
-    const status = String(event?.status ?? event?.state ?? "").toUpperCase();
-    const dueAt = event?.dueAt ?? event?.dueDate ?? event?.expiresAt;
-    const dueDate = parseDate(dueAt);
-    return Boolean(
-      dueDate &&
-      dueDate.getTime() < Date.now() &&
-      !["PAID", "COMPLETED", "SUCCEEDED"].some(token => status.includes(token))
-    );
-  });
+function statusTone(
+  status: AccountStatus
+): "success" | "info" | "warning" | "danger" | "neutral" {
+  if (status === "ACTIVE") return "success";
+  if (status === "TRIAL") return "info";
+  if (status === "PAST_DUE") return "warning";
+  if (status === "CANCELED" || status === "SUSPENDED") return "danger";
+  return "neutral";
 }
 
-function statusLabel(status: AccountStatus) {
-  const labels: Record<AccountStatus, string> = {
-    ACTIVE: "Ativa",
-    TRIAL: "Trial",
-    PAST_DUE: "Em atraso",
-    CANCELED: "Cancelada",
-    NO_SUBSCRIPTION: "Sem assinatura",
-    SUSPENDED: "Suspensa",
-  };
-  return labels[status];
-}
-
-function paymentMethodMissing(paymentMethod: string, currentPlan: PlanName) {
-  return (
-    currentPlan !== "FREE" &&
-    ["", "NÃO INFORMADO", "NAO INFORMADO", "NULL", "UNDEFINED"].includes(
-      paymentMethod.trim().toUpperCase()
+function invoiceStatus(event: any): InvoiceStatus {
+  const raw = String(event?.status ?? event?.state ?? "PENDING").toUpperCase();
+  if (["PAID", "COMPLETED", "SUCCEEDED"].some(token => raw.includes(token)))
+    return "PAID";
+  if (
+    ["FAILED", "FAILURE", "PAST_DUE", "UNPAID"].some(token =>
+      raw.includes(token)
     )
-  );
+  )
+    return "FAILED";
+  if (raw.includes("REFUND")) return "REFUNDED";
+  return "PENDING";
 }
 
-function highestUsageSignal(usage: any) {
-  const entries = Object.entries(usage ?? {})
-    .map(([key, value]: [string, any]) => ({
-      key,
-      used: Number(value?.used ?? 0),
-      limit: Number(value?.limit ?? 0),
-      percentage: Number(value?.percentage ?? 0),
-      unlimited: Boolean(value?.unlimited),
-    }))
-    .filter(item => !item.unlimited && Number.isFinite(item.percentage));
-
-  return entries.sort((a, b) => b.percentage - a.percentage)[0] ?? null;
-}
-
-function usageLabel(key: string) {
-  const labels: Record<string, string> = {
-    customers: "clientes",
-    appointments: "agendamentos",
-    messages: "mensagens",
-    serviceOrders: "ordens de serviço",
-    users: "usuários",
-  };
-  return labels[key] ?? key;
-}
-
-function invoiceAmount(event: any, fallbackCents: number) {
-  const amount = Number(
-    event?.amountCents ?? event?.amount ?? event?.totalCents ?? fallbackCents
-  );
-  return Number.isFinite(amount) ? amount : fallbackCents;
+function invoiceTone(
+  status: InvoiceStatus
+): "success" | "warning" | "danger" | "neutral" {
+  return status === "PAID"
+    ? "success"
+    : status === "FAILED"
+      ? "danger"
+      : status === "PENDING"
+        ? "warning"
+        : "neutral";
 }
 
 export default function BillingPage() {
-  const plansQuery = trpc.billing.plans.useQuery(undefined, { retry: false });
+  const [selectedPlan, setSelectedPlan] = useState<VisiblePlan | null>(null);
   const statusQuery = trpc.billing.status.useQuery(undefined, { retry: false });
   const limitsQuery = trpc.billing.limits.useQuery(undefined, { retry: false });
   const readinessQuery = trpc.integrations.readiness.useQuery(undefined, {
@@ -210,10 +210,9 @@ export default function BillingPage() {
   const stripeConfigured =
     readinessQuery.data?.integrations?.stripe === "configured" ||
     readinessQuery.data?.stripe?.configured === true;
-  const nextChargeAt =
-    statusQuery.data?.nextBillingAt ??
-    statusQuery.data?.currentPeriodEnd ??
-    limitsQuery.data?.trial?.endsAt;
+  const nextRenewal =
+    statusQuery.data?.currentPeriodEnd ?? limitsQuery.data?.trial?.endsAt;
+  const nextChargeAt = statusQuery.data?.nextBillingAt ?? nextRenewal;
   const nextChargeValue = Number(
     statusQuery.data?.nextAmountCents ??
       statusQuery.data?.amountCents ??
@@ -224,347 +223,19 @@ export default function BillingPage() {
       statusQuery.data?.paymentMethod ??
       "Não informado"
   );
-  const invoices = Array.isArray(statusQuery.data?.events)
+  const events = Array.isArray(statusQuery.data?.events)
     ? statusQuery.data.events
     : [];
-  const paymentFailed = hasPaymentFailure(invoices);
-  const overdueInvoice = hasOpenOverdueInvoice(invoices);
-  const trialDaysLeft = status === "TRIAL" ? daysUntil(nextChargeAt) : null;
-  const nextChargeDays = daysUntil(nextChargeAt);
-  const isTrialEndingSoon =
-    status === "TRIAL" && trialDaysLeft !== null && trialDaysLeft <= 7;
-  const isNextChargeSoon =
-    status === "ACTIVE" &&
-    nextChargeDays !== null &&
-    nextChargeDays >= 0 &&
-    nextChargeDays <= 7;
-  const isPaymentMethodMissing = paymentMethodMissing(
-    paymentMethod,
-    currentPlan
+  const paymentFailed = hasPaymentFailure(events) || status === "PAST_DUE";
+  const activeUsers = Number(
+    limitsQuery.data?.usage?.users?.used ?? statusQuery.data?.activeUsers ?? 1
   );
-  const highestUsage = highestUsageSignal(limitsQuery.data?.usage);
-  const usageNearLimit = Boolean(highestUsage && highestUsage.percentage >= 80);
-  const hasBillingDate = Boolean(parseDate(nextChargeAt));
-
-  const operationalState = useMemo<{
-    level: OperationalStateLevel;
-    reason: string;
-    impact: string;
-  }>(() => {
-    if (status === "CANCELED" || status === "SUSPENDED") {
-      return {
-        level: "SUSPENDED",
-        reason: `Status real da assinatura retornou ${statusLabel(status)}.`,
-        impact:
-          "O acesso pode estar bloqueado ou em encerramento conforme a política comercial já existente.",
-      };
-    }
-
-    if (status === "PAST_DUE" || paymentFailed || overdueInvoice) {
-      return {
-        level: "RESTRICTED",
-        reason:
-          status === "PAST_DUE"
-            ? "A assinatura está marcada como PAST_DUE."
-            : "Há falha ou vencimento em fatura retornada pelo billing.",
-        impact:
-          "A organização precisa regularizar a cobrança para reduzir risco de restrição de acesso ao Nexo.",
-      };
-    }
-
-    if (status === "TRIAL" && isTrialEndingSoon) {
-      return {
-        level: "WARNING",
-        reason: `Trial perto do fim${trialDaysLeft !== null ? ` (${trialDaysLeft} dia(s) restante(s))` : ""}.`,
-        impact:
-          "A empresa deve escolher ou revisar o plano antes do encerramento do período de avaliação.",
-      };
-    }
-
-    if (
-      isPaymentMethodMissing ||
-      !hasBillingDate ||
-      isNextChargeSoon ||
-      usageNearLimit
-    ) {
-      return {
-        level: "WARNING",
-        reason: isPaymentMethodMissing
-          ? "Método de pagamento não foi retornado para um plano pago."
-          : !hasBillingDate
-            ? "A próxima cobrança não foi retornada pela fonte de billing."
-            : isNextChargeSoon
-              ? "A próxima cobrança está próxima."
-              : `Uso de ${usageLabel(highestUsage?.key ?? "limite")} está próximo do limite do plano.`,
-        impact:
-          "A administração deve revisar a assinatura para evitar surpresa de cobrança, falha de pagamento ou limite operacional.",
-      };
-    }
-
-    return {
-      level: "NORMAL",
-      reason:
-        "Assinatura ativa, pagamento sem falha retornada e dados essenciais presentes.",
-      impact:
-        "A empresa pode continuar usando o Nexo sem sinal atual de restrição de acesso por Billing.",
-    };
-  }, [
-    hasBillingDate,
-    highestUsage?.key,
-    isNextChargeSoon,
-    isPaymentMethodMissing,
-    isTrialEndingSoon,
-    overdueInvoice,
-    paymentFailed,
-    status,
-    trialDaysLeft,
-    usageNearLimit,
-  ]);
-
-  const riskReading = useMemo(() => {
-    if (paymentFailed) {
-      return {
-        title: "Falha de pagamento",
-        reason:
-          "O histórico retornado pelo billing contém evento de falha, PAST_DUE ou não pagamento.",
-        impact:
-          "A conta pode perder acesso se a forma de pagamento não for corrigida nos fluxos administrativos existentes.",
-        ctaLabel: "Atualizar pagamento",
-      };
-    }
-    if (status === "PAST_DUE" || overdueInvoice) {
-      return {
-        title: "Assinatura em atraso",
-        reason:
-          status === "PAST_DUE"
-            ? "O status comercial da assinatura é PAST_DUE."
-            : "Existe fatura vencida sem status de pagamento concluído.",
-        impact:
-          "A empresa deve regularizar a assinatura para evitar bloqueio ou restrição de uso da plataforma.",
-        ctaLabel: "Regularizar assinatura",
-      };
-    }
-    if (isTrialEndingSoon) {
-      return {
-        title: "Trial perto do fim",
-        reason: `O período de avaliação termina em ${trialDaysLeft} dia(s).`,
-        impact:
-          "Sem escolha de plano, a continuidade de acesso pode depender da regularização da assinatura.",
-        ctaLabel: "Escolher plano",
-      };
-    }
-    if (isPaymentMethodMissing) {
-      return {
-        title: "Método de pagamento ausente",
-        reason:
-          "A fonte de billing não retornou cartão, marca ou método para o plano atual.",
-        impact:
-          "A próxima cobrança pode exigir atualização manual antes de manter a assinatura saudável.",
-        ctaLabel: "Adicionar método",
-      };
-    }
-    if (usageNearLimit) {
-      return {
-        title: "Uso próximo do limite",
-        reason: `${usageLabel(highestUsage?.key ?? "limite")} atingiu ${Math.round(highestUsage?.percentage ?? 0)}% do limite do plano.`,
-        impact:
-          "A operação pode precisar revisar plano antes que novos registros sejam impedidos por limite contratual.",
-        ctaLabel: "Revisar plano",
-      };
-    }
-    return {
-      title: "Sem risco crítico de Billing",
-      reason:
-        "Não há falha de pagamento, atraso, trial expirando, limite próximo ou suspensão retornada nesta leitura.",
-      impact:
-        "A administração pode revisar assinatura, plano e histórico como rotina de governança financeira da plataforma.",
-      ctaLabel: "Revisar assinatura",
-    };
-  }, [
-    highestUsage?.key,
-    highestUsage?.percentage,
-    isPaymentMethodMissing,
-    isTrialEndingSoon,
-    overdueInvoice,
-    paymentFailed,
-    status,
-    trialDaysLeft,
-    usageNearLimit,
-  ]);
-
-  const nextBestAction = useMemo(() => {
-    if (paymentFailed)
-      return {
-        title: "Atualizar pagamento",
-        reason: "Pagamento falhou no histórico de Billing.",
-        impact: "Corrige o método antes que a restrição de acesso avance.",
-      };
-    if (status === "PAST_DUE" || overdueInvoice)
-      return {
-        title: "Regularizar assinatura",
-        reason: "Assinatura ou fatura está em atraso.",
-        impact:
-          "Reduz risco de bloqueio e restaura a previsibilidade da cobrança.",
-      };
-    if (isTrialEndingSoon)
-      return {
-        title: "Escolher plano",
-        reason: "Trial está perto do fim.",
-        impact:
-          "Define continuidade de acesso antes do encerramento da avaliação.",
-      };
-    if (isPaymentMethodMissing)
-      return {
-        title: "Adicionar método de pagamento",
-        reason: "Método de pagamento não foi retornado.",
-        impact: "Prepara a próxima cobrança da assinatura.",
-      };
-    if (usageNearLimit)
-      return {
-        title: "Revisar plano",
-        reason: "Uso está próximo do limite contratado.",
-        impact: "Evita restrição operacional por limite do plano.",
-      };
-    return {
-      title: "Revisar assinatura",
-      reason: "Billing está saudável nesta leitura.",
-      impact:
-        "Mantém governança sobre plano, cobrança e histórico da plataforma.",
-    };
-  }, [
-    isPaymentMethodMissing,
-    isTrialEndingSoon,
-    overdueInvoice,
-    paymentFailed,
-    status,
-    usageNearLimit,
-  ]);
-
-  const flowStages = useMemo<
-    Array<{
-      id: string;
-      label: string;
-      summary: string;
-      state: OperationalFlowStageState;
-      countOrValue?: string;
-      hrefLabel?: string;
-      onClick?: () => void;
-    }>
-  >(
-    () => [
-      {
-        id: "plan",
-        label: "Plano",
-        summary: `Plano atual ${meta.title}, ${brl(meta.priceCents)} ${meta.periodicity}.`,
-        state: currentPlan === "FREE" ? "active" : "done",
-        countOrValue: meta.title,
-        hrefLabel: "Revisar ações",
-        onClick: scrollToBillingActions,
-      },
-      {
-        id: "subscription",
-        label: "Assinatura",
-        summary: `Status comercial ${statusLabel(status)} retornado pelo Billing.`,
-        state:
-          status === "CANCELED" || status === "SUSPENDED"
-            ? "blocked"
-            : status === "PAST_DUE"
-              ? "warning"
-              : "active",
-        countOrValue: statusLabel(status),
-      },
-      {
-        id: "invoice",
-        label: "Fatura",
-        summary: hasBillingDate
-          ? `Próxima cobrança em ${formatDate(nextChargeAt)}.`
-          : "Sem próxima cobrança retornada.",
-        state: overdueInvoice
-          ? "blocked"
-          : hasBillingDate
-            ? isNextChargeSoon || isTrialEndingSoon
-              ? "warning"
-              : "active"
-            : "idle",
-        countOrValue: brl(nextChargeValue),
-      },
-      {
-        id: "payment",
-        label: "Pagamento",
-        summary: paymentFailed
-          ? "Falha retornada pelo billing."
-          : `Método atual: ${paymentMethod}.`,
-        state:
-          paymentFailed || status === "PAST_DUE"
-            ? "blocked"
-            : isPaymentMethodMissing
-              ? "warning"
-              : currentPlan === "FREE"
-                ? "done"
-                : "active",
-        hrefLabel: "Atualizar método",
-        onClick: scrollToBillingActions,
-      },
-      {
-        id: "access",
-        label: "Acesso",
-        summary:
-          operationalState.level === "NORMAL"
-            ? "Sem sinal atual de restrição."
-            : operationalState.impact,
-        state:
-          operationalState.level === "SUSPENDED"
-            ? "blocked"
-            : operationalState.level === "RESTRICTED"
-              ? "warning"
-              : operationalState.level === "WARNING"
-                ? "warning"
-                : "active",
-      },
-      {
-        id: "governance",
-        label: "Governança/Billing",
-        summary:
-          "Billing registra plano, cobrança e prova administrativa da assinatura.",
-        state: operationalState.level === "NORMAL" ? "done" : "active",
-      },
-    ],
-    [
-      currentPlan,
-      hasBillingDate,
-      isNextChargeSoon,
-      isPaymentMethodMissing,
-      isTrialEndingSoon,
-      meta.periodicity,
-      meta.priceCents,
-      meta.title,
-      nextChargeAt,
-      nextChargeValue,
-      operationalState.impact,
-      operationalState.level,
-      overdueInvoice,
-      paymentFailed,
-      paymentMethod,
-      status,
-    ]
-  );
-
-  const timelineEvents = useMemo(
-    () =>
-      invoices.slice(0, 6).map((event: any, index: number) => ({
-        id: String(event?.id ?? `billing-event-${index}`),
-        type: String(event?.type ?? event?.status ?? "Billing"),
-        occurredAt: formatDate(
-          event?.createdAt ?? event?.date ?? event?.paidAt ?? event?.dueAt
-        ),
-        entity: String(
-          event?.description ?? event?.invoiceNumber ?? "Fatura da plataforma"
-        ),
-        actor: String(event?.provider ?? event?.source ?? "Billing"),
-        summary: `Status ${String(event?.status ?? "registrado")} • valor ${brl(invoiceAmount(event, meta.priceCents))}.`,
-      })),
-    [invoices, meta.priceCents]
-  );
+  const governanceStatus: GovernanceStatus =
+    status === "CANCELED" || status === "SUSPENDED" || paymentFailed
+      ? "RESTRICTED"
+      : status === "TRIAL" || paymentMethod === "Não informado"
+        ? "WARNING"
+        : "ACTIVE";
 
   const checkoutMutation = trpc.billing.checkout.useMutation({
     onSuccess: payload => {
@@ -609,394 +280,468 @@ export default function BillingPage() {
     });
   };
 
+  const timelineEvents = useMemo(() => events.slice(0, 8), [events]);
+  const selectedPlanMeta = selectedPlan ? PLAN_META[selectedPlan] : null;
+
   return (
     <PageWrapper
       title="Billing"
-      subtitle="Assinatura SaaS, cobrança, pagamento e status da conta."
+      subtitle="Empresa → plano → assinatura → renovação → acesso."
     >
-      <AppPageShell>
-        <AppOperationalHeader
-          title="Billing SaaS"
-          description="Controle de assinatura separado do financeiro operacional: plano atual, renovação, cobrança e ações de conta."
-          primaryAction={
-            <Button
-              onClick={() =>
-                startCheckout(currentPlan === "PRO" ? "BUSINESS" : "PRO")
-              }
-              disabled={checkoutMutation.isPending || !stripeConfigured}
-            >
-              Trocar plano
-            </Button>
-          }
-          secondaryActions={
-            <Button
-              variant="outline"
-              onClick={() =>
-                void Promise.all([
-                  plansQuery.refetch(),
-                  statusQuery.refetch(),
-                  limitsQuery.refetch(),
-                  readinessQuery.refetch(),
-                ])
-              }
-            >
-              Atualizar billing
-            </Button>
-          }
-          contextChips={
-            <>
-              <AppStatusBadge label={currentPlan} />
-              <AppStatusBadge label={statusLabel(status)} />
-              <AppStatusBadge label={`Renovação ${formatDate(nextChargeAt)}`} />
-            </>
-          }
-        />
-
-        <AppFiltersBar>
-          <div className="grid gap-2 text-xs text-[var(--text-secondary)] md:grid-cols-4">
-            <span>
-              <strong>ACTIVE:</strong> assinatura regular.
-            </span>
-            <span>
-              <strong>TRIAL:</strong> avaliação em andamento.
-            </span>
-            <span>
-              <strong>PAST_DUE:</strong> cobrança pendente.
-            </span>
-            <span>
-              <strong>CANCELED:</strong> assinatura cancelada.
-            </span>
+      <AppPageShell className="gap-4">
+        <AppPageHeader>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="space-y-2">
+              <AppStatusBadge label="Billing da plataforma" tone="accent" />
+              <h1 className="text-2xl font-semibold text-[var(--text-primary)]">
+                Controle da assinatura do Nexo
+              </h1>
+              <p className="max-w-3xl text-sm leading-6 text-[var(--text-secondary)]">
+                Quem está pagando, quanto, por quê e o que acontece se parar de
+                pagar. Billing não controla cobranças de clientes; controla a
+                assinatura SaaS da empresa no Nexo.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                onClick={() => startCheckout(currentPlan)}
+                disabled={currentPlan === "FREE"}
+              >
+                Atualizar pagamento
+              </Button>
+              <Button
+                onClick={() =>
+                  setSelectedPlan(
+                    currentPlan === "BUSINESS" ? "PRO" : "BUSINESS"
+                  )
+                }
+              >
+                Trocar plano
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() =>
+                  document
+                    .getElementById("billing-invoices")
+                    ?.scrollIntoView({ behavior: "smooth" })
+                }
+              >
+                Ver histórico
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => cancelMutation.mutate()}
+                disabled={cancelMutation.isPending || currentPlan === "FREE"}
+              >
+                Cancelar assinatura
+              </Button>
+            </div>
           </div>
-        </AppFiltersBar>
+        </AppPageHeader>
 
-        <section className="grid gap-4 xl:grid-cols-3">
-          <OperationalStateCard
-            title="Estado da assinatura"
-            level={operationalState.level}
-            reason={operationalState.reason}
-            impact={operationalState.impact}
-            detailsLabel="Revisar cobrança"
-            onDetails={scrollToBillingActions}
-          />
-          <OperationalRiskCard
-            title={riskReading.title}
-            reason={riskReading.reason}
-            impact={riskReading.impact}
-            ctaLabel={riskReading.ctaLabel}
-            onClick={scrollToBillingActions}
-          />
-          <NextBestActionCard
-            title={nextBestAction.title}
-            entity={`Billing SaaS • ${meta.title} • ${statusLabel(status)}`}
-            reason={nextBestAction.reason}
-            impact={nextBestAction.impact}
-            safetyNote="Esta ação apenas orienta e leva para ações administrativas já existentes. Nenhum pagamento, cancelamento, cobrança ou comunicação é executado automaticamente."
-            primaryActionLabel={nextBestAction.title}
-            onPrimaryAction={scrollToBillingActions}
-            secondaryActionLabel="Atualizar leitura"
-            onSecondaryAction={() =>
-              refreshBilling([
-                plansQuery.refetch,
-                statusQuery.refetch,
-                limitsQuery.refetch,
-                readinessQuery.refetch,
-              ])
-            }
-          />
-        </section>
-
-        <OperationalFlowCard
-          title="Fluxo Plano → Assinatura → Fatura → Pagamento → Acesso"
-          subtitle="Billing controla a assinatura da empresa no Nexo, separado do Financeiro de clientes."
-          stages={flowStages}
-        />
-
-        <EntityTimelineCard
-          title="Histórico oficial de Billing"
-          subtitle="Prova operacional da assinatura baseada apenas em faturas, pagamentos e eventos reais retornados pelo Billing. Se não houver eventos, nenhum histórico fictício é criado."
-          events={timelineEvents}
-          fullTimelineLabel="Revisar histórico na tabela"
-          onFullTimeline={() =>
-            document
-              .getElementById("billing-history")
-              ?.scrollIntoView({ behavior: "smooth", block: "start" })
-          }
-        />
-
-        <AppKpiRow
-          items={[
-            {
-              title: "Plano atual",
-              value: meta.title,
-              hint: "Plano contratado para a organização.",
-            },
-            {
-              title: "Status",
-              value: statusLabel(status),
-              hint: "Estado SaaS da conta.",
-            },
-            {
-              title: "Renovação",
-              value: formatDate(nextChargeAt),
-              hint: "Próximo ciclo informado pelo billing.",
-            },
-            {
-              title: "Próxima cobrança",
-              value: brl(nextChargeValue),
-              hint: "Valor previsto do próximo ciclo.",
-            },
-          ]}
-        />
-
-        <div className="grid gap-4 xl:grid-cols-2">
-          <AppSectionBlock
-            title="Assinatura"
-            subtitle="Plano, valor e periodicidade contratados."
-          >
-            <AppDataTable>
-              <tbody>
-                <tr className="border-b border-[var(--border-subtle)]/60">
-                  <td className="px-3 py-3 text-[var(--text-muted)]">Plano</td>
-                  <td className="px-3 py-3 font-semibold text-[var(--text-primary)]">
-                    {meta.title}
-                  </td>
-                </tr>
-                <tr className="border-b border-[var(--border-subtle)]/60">
-                  <td className="px-3 py-3 text-[var(--text-muted)]">Valor</td>
-                  <td className="px-3 py-3 font-semibold text-[var(--text-primary)]">
-                    {brl(meta.priceCents)}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="px-3 py-3 text-[var(--text-muted)]">
-                    Periodicidade
-                  </td>
-                  <td className="px-3 py-3 font-semibold text-[var(--text-primary)]">
-                    {meta.periodicity}
-                  </td>
-                </tr>
-              </tbody>
-            </AppDataTable>
-          </AppSectionBlock>
-
-          <AppSectionBlock
-            title="Próxima cobrança"
-            subtitle="Data, valor e status da próxima cobrança SaaS."
-          >
-            <AppDataTable>
-              <tbody>
-                <tr className="border-b border-[var(--border-subtle)]/60">
-                  <td className="px-3 py-3 text-[var(--text-muted)]">Data</td>
-                  <td className="px-3 py-3 font-semibold text-[var(--text-primary)]">
-                    {formatDate(nextChargeAt)}
-                  </td>
-                </tr>
-                <tr className="border-b border-[var(--border-subtle)]/60">
-                  <td className="px-3 py-3 text-[var(--text-muted)]">Valor</td>
-                  <td className="px-3 py-3 font-semibold text-[var(--text-primary)]">
-                    {brl(nextChargeValue)}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="px-3 py-3 text-[var(--text-muted)]">Status</td>
-                  <td className="px-3 py-3">
-                    <AppStatusBadge
-                      label={
-                        status === "PAST_DUE" ? "Falha/Pendente" : "Agendada"
-                      }
-                    />
-                  </td>
-                </tr>
-              </tbody>
-            </AppDataTable>
-          </AppSectionBlock>
-
-          <AppSectionBlock
-            title="Forma de pagamento"
-            subtitle="Método atual e ação para atualização via checkout."
-          >
-            <AppDataTable>
-              <tbody>
-                <tr className="border-b border-[var(--border-subtle)]/60">
-                  <td className="px-3 py-3 text-[var(--text-muted)]">
-                    Método atual
-                  </td>
-                  <td className="px-3 py-3 font-semibold text-[var(--text-primary)]">
-                    {paymentMethod}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="px-3 py-3 text-[var(--text-muted)]">Editar</td>
-                  <td className="px-3 py-3">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => startCheckout(currentPlan)}
-                      disabled={currentPlan === "FREE"}
-                    >
-                      Atualizar pagamento
-                    </Button>
-                  </td>
-                </tr>
-              </tbody>
-            </AppDataTable>
-          </AppSectionBlock>
-
-          <AppSectionBlock
-            title="Status da conta"
-            subtitle="Estado comercial que controla acesso e risco de bloqueio."
-          >
-            <AppKpiRow
-              items={[
-                {
-                  title: "ACTIVE",
-                  value: status === "ACTIVE" ? "Atual" : "—",
-                  hint: "Conta regular.",
-                },
-                {
-                  title: "TRIAL",
-                  value: status === "TRIAL" ? "Atual" : "—",
-                  hint: "Período de avaliação.",
-                },
-                {
-                  title: "PAST_DUE",
-                  value: status === "PAST_DUE" ? "Atual" : "—",
-                  hint: "Pagamento em atraso.",
-                },
-                {
-                  title: "CANCELED",
-                  value: status === "CANCELED" ? "Atual" : "—",
-                  hint: "Conta cancelada.",
-                },
-              ]}
+        <AppSectionCard className="order-1 space-y-4 border-[color-mix(in_srgb,var(--accent-primary)_28%,var(--border-subtle))]">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                Status da assinatura
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <AppStatusBadge label={status} tone={statusTone(status)} />
+                <span className="text-xl font-semibold text-[var(--text-primary)]">
+                  {meta.title}
+                </span>
+              </div>
+            </div>
+            <p className="text-sm text-[var(--text-secondary)]">
+              Status operacional:{" "}
+              <strong className="text-[var(--text-primary)]">
+                {governanceStatus}
+              </strong>
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+            <AppStatCard
+              label="Valor"
+              value={`${brl(nextChargeValue)} / ${meta.periodicity}`}
+              helper="Valor mensal/anual da assinatura."
             />
-          </AppSectionBlock>
+            <AppStatCard
+              label="Renovação"
+              value={formatDate(nextRenewal)}
+              helper="Próximo ciclo contratado."
+            />
+            <AppStatCard
+              label="Cobrança"
+              value={formatDate(nextChargeAt)}
+              helper="Próxima tentativa de cobrança."
+            />
+            <AppStatCard
+              label="Pagamento"
+              value={paymentMethod}
+              helper="Método da assinatura."
+            />
+            <AppStatCard
+              label="Usuários ativos"
+              value={String(activeUsers)}
+              helper="Uso atual na empresa."
+            />
+            <AppStatCard
+              label="Plano"
+              value={meta.title}
+              helper="Capacidade contratada."
+            />
+          </div>
+        </AppSectionCard>
+
+        {paymentFailed ? (
+          <AppSectionCard className="order-3 space-y-3 border-[color-mix(in_srgb,var(--warning)_45%,var(--border-subtle))] bg-[color-mix(in_srgb,var(--warning)_8%,var(--surface-primary))] md:order-none">
+            <AppStatusBadge label="RISCO DE BILLING" tone="warning" />
+            <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+              Não conseguimos processar seu pagamento.
+            </h2>
+            <div className="grid gap-3 md:grid-cols-4 text-sm text-[var(--text-secondary)]">
+              <p>
+                <strong className="text-[var(--text-primary)]">Impacto:</strong>{" "}
+                a assinatura poderá entrar em restrição.
+              </p>
+              <p>
+                <strong className="text-[var(--text-primary)]">
+                  Consequência:
+                </strong>{" "}
+                acesso ao Nexo pode ser limitado.
+              </p>
+              <p>
+                <strong className="text-[var(--text-primary)]">Prazo:</strong>{" "}
+                regularizar antes da próxima retentativa.
+              </p>
+              <p>
+                <strong className="text-[var(--text-primary)]">Ação:</strong>{" "}
+                atualizar método de pagamento.
+              </p>
+            </div>
+            <Button
+              className="w-full sm:w-fit"
+              onClick={() => startCheckout(currentPlan)}
+            >
+              Atualizar método de pagamento
+            </Button>
+          </AppSectionCard>
+        ) : null}
+
+        <div className="order-2 grid gap-4 lg:grid-cols-3 md:order-none">
+          {VISIBLE_PLANS.map(plan => {
+            const planMeta = PLAN_META[plan];
+            const isCurrent = plan === currentPlan;
+            const relation =
+              PLAN_ORDER[plan] > PLAN_ORDER[currentPlan]
+                ? "upgrade"
+                : PLAN_ORDER[plan] < PLAN_ORDER[currentPlan]
+                  ? "downgrade"
+                  : "plano atual";
+            return (
+              <AppSectionCard key={plan} className="space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                      {planMeta.title}
+                    </h2>
+                    <p className="text-2xl font-semibold text-[var(--text-primary)]">
+                      {brl(planMeta.priceCents)}
+                    </p>
+                  </div>
+                  <AppStatusBadge
+                    label={isCurrent ? "PLANO ATUAL" : relation}
+                    tone={
+                      isCurrent
+                        ? "success"
+                        : relation === "upgrade"
+                          ? "info"
+                          : "warning"
+                    }
+                  />
+                </div>
+                <div className="space-y-2 text-sm text-[var(--text-secondary)]">
+                  <p>
+                    Usuários:{" "}
+                    <strong className="text-[var(--text-primary)]">
+                      {planMeta.users}
+                    </strong>
+                  </p>
+                  <p>
+                    Clientes:{" "}
+                    <strong className="text-[var(--text-primary)]">
+                      {planMeta.customers}
+                    </strong>
+                  </p>
+                  {planMeta.features.map(feature => (
+                    <p key={feature}>• {feature}</p>
+                  ))}
+                </div>
+                <Button
+                  className="w-full"
+                  variant={isCurrent ? "outline" : "default"}
+                  onClick={() => setSelectedPlan(plan)}
+                >
+                  {isCurrent
+                    ? "Revisar plano atual"
+                    : relation === "upgrade"
+                      ? "Fazer upgrade"
+                      : "Fazer downgrade"}
+                </Button>
+              </AppSectionCard>
+            );
+          })}
         </div>
 
-        <AppSectionBlock
-          title="Histórico"
-          subtitle="Faturas, pagamentos e falhas registradas pelo billing."
+        <AppSectionCard
+          id="billing-invoices"
+          className="order-4 space-y-3 md:order-none"
         >
-          <div id="billing-history" />
-          <AppDataTable className="min-w-[820px]">
+          <div>
+            <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+              Faturas e pagamentos
+            </h2>
+            <p className="text-sm text-[var(--text-secondary)]">
+              Tabela operacional da cobrança da plataforma Nexo.
+            </p>
+          </div>
+          <AppDataTable className="min-w-[920px]">
             <thead>
-              <tr className="border-b border-[var(--border-subtle)] text-left text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                <th className="px-3 py-2">Data</th>
-                <th className="px-3 py-2">Fatura/evento</th>
+              <tr className="border-b border-[var(--border-subtle)] text-left text-xs uppercase tracking-wide text-[var(--text-muted)]">
+                <th className="px-3 py-2">Período</th>
                 <th className="px-3 py-2">Valor</th>
                 <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2">Método</th>
+                <th className="px-3 py-2">Vencimento</th>
+                <th className="px-3 py-2">Pagamento</th>
+                <th className="px-3 py-2">Ações</th>
               </tr>
             </thead>
             <tbody>
-              {invoices.length ? (
-                invoices.slice(0, 10).map((event: any, index: number) => (
-                  <tr
-                    key={String(event?.id ?? index)}
-                    className="border-b border-[var(--border-subtle)]/60"
-                  >
-                    <td className="px-3 py-3">
-                      {formatDate(event?.createdAt ?? event?.date)}
-                    </td>
-                    <td className="px-3 py-3 text-[var(--text-primary)]">
-                      {String(
-                        event?.description ??
-                          event?.type ??
-                          "Fatura da plataforma"
-                      )}
-                    </td>
-                    <td className="px-3 py-3">
-                      {brl(invoiceAmount(event, meta.priceCents))}
-                    </td>
-                    <td className="px-3 py-3">
-                      <AppStatusBadge
-                        label={String(event?.status ?? "Registrado")}
-                      />
-                    </td>
-                  </tr>
-                ))
+              {events.length ? (
+                events.slice(0, 10).map((event: any, index: number) => {
+                  const st = invoiceStatus(event);
+                  return (
+                    <tr
+                      key={String(event?.id ?? index)}
+                      className="border-b border-[var(--border-subtle)]/60"
+                    >
+                      <td className="px-3 py-3">
+                        {String(
+                          event?.period ??
+                            event?.invoiceNumber ??
+                            `Ciclo ${index + 1}`
+                        )}
+                      </td>
+                      <td className="px-3 py-3">
+                        {brl(invoiceAmount(event, meta.priceCents))}
+                      </td>
+                      <td className="px-3 py-3">
+                        <AppStatusBadge label={st} tone={invoiceTone(st)} />
+                      </td>
+                      <td className="px-3 py-3">
+                        {String(event?.method ?? paymentMethod)}
+                      </td>
+                      <td className="px-3 py-3">
+                        {formatDate(event?.dueAt ?? event?.dueDate)}
+                      </td>
+                      <td className="px-3 py-3">
+                        {formatDate(event?.paidAt ?? event?.createdAt)}
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="flex flex-wrap gap-2">
+                          <Button size="sm" variant="outline">
+                            visualizar
+                          </Button>
+                          <Button size="sm" variant="outline">
+                            baixar
+                          </Button>
+                          <Button size="sm" variant="outline">
+                            reenviar
+                          </Button>
+                          {st === "FAILED" ? (
+                            <Button
+                              size="sm"
+                              onClick={() => startCheckout(currentPlan)}
+                            >
+                              pagar novamente
+                            </Button>
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
                   <td
-                    colSpan={4}
+                    colSpan={7}
                     className="px-3 py-4 text-[var(--text-muted)]"
                   >
-                    Sem faturas ou falhas retornadas pela fonte de billing.
+                    Sem faturas retornadas pela fonte de Billing.
                   </td>
                 </tr>
               )}
             </tbody>
           </AppDataTable>
-        </AppSectionBlock>
+        </AppSectionCard>
 
-        <AppSectionBlock
-          title="Ações"
-          subtitle="Trocar plano, atualizar pagamento ou cancelar assinatura."
+        <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+          <AppSectionCard className="order-5 space-y-3 md:order-none">
+            <div>
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                Histórico de assinatura
+              </h2>
+              <p className="text-sm text-[var(--text-secondary)]">
+                Timeline oficial de eventos de Billing.
+              </p>
+            </div>
+            <AppTimeline>
+              {timelineEvents.length ? (
+                timelineEvents.map((event: any, index: number) => (
+                  <AppTimelineItem key={String(event?.id ?? index)}>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <AppStatusBadge
+                          label={String(
+                            event?.type ?? event?.status ?? "FATURA_GERADA"
+                          ).toUpperCase()}
+                          tone={invoiceTone(invoiceStatus(event))}
+                        />
+                        <p className="mt-2 font-medium text-[var(--text-primary)]">
+                          {String(
+                            event?.description ?? "Evento da assinatura do Nexo"
+                          )}
+                        </p>
+                        <p className="text-sm text-[var(--text-secondary)]">
+                          Responsável:{" "}
+                          {String(
+                            event?.actor ?? event?.user ?? "Sistema Billing"
+                          )}{" "}
+                          • Origem:{" "}
+                          {String(
+                            event?.provider ?? event?.source ?? "Nexo Billing"
+                          )}
+                        </p>
+                      </div>
+                      <p className="text-sm text-[var(--text-muted)]">
+                        {formatDate(
+                          event?.createdAt ?? event?.date ?? event?.paidAt
+                        )}
+                      </p>
+                    </div>
+                  </AppTimelineItem>
+                ))
+              ) : (
+                <AppTimelineItem>
+                  <p className="text-sm text-[var(--text-muted)]">
+                    Nenhum evento oficial retornado. Nenhum histórico fictício
+                    foi criado.
+                  </p>
+                </AppTimelineItem>
+              )}
+            </AppTimeline>
+          </AppSectionCard>
+          <AppSectionCard className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                Governança do Billing
+              </h2>
+              <AppStatusBadge
+                label={governanceStatus}
+                tone={
+                  governanceStatus === "ACTIVE"
+                    ? "success"
+                    : governanceStatus === "WARNING"
+                      ? "warning"
+                      : "danger"
+                }
+              />
+            </div>
+            <p className="text-sm text-[var(--text-secondary)]">
+              <strong className="text-[var(--text-primary)]">Motivo:</strong>{" "}
+              {governanceStatus === "ACTIVE"
+                ? "tudo saudável"
+                : governanceStatus === "WARNING"
+                  ? "renovação pendente ou dados de pagamento incompletos"
+                  : paymentFailed
+                    ? "pagamento falhou"
+                    : "assinatura cancelada"}
+              .
+            </p>
+            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-3 text-sm text-[var(--text-secondary)]">
+              <strong className="text-[var(--text-primary)]">
+                O sistema fará automaticamente:
+              </strong>
+              <ul className="mt-2 space-y-1">
+                <li>
+                  • {paymentFailed ? "reenviar cobrança" : "manter acesso"}
+                </li>
+                <li>
+                  •{" "}
+                  {governanceStatus === "ACTIVE"
+                    ? "registrar próxima renovação"
+                    : "enviar lembrete administrativo"}
+                </li>
+                <li>
+                  •{" "}
+                  {governanceStatus === "RESTRICTED"
+                    ? "aplicar restrição se a cobrança permanecer sem pagamento"
+                    : "preservar governança da assinatura"}
+                </li>
+              </ul>
+            </div>
+          </AppSectionCard>
+        </div>
+
+        <BaseModal
+          open={Boolean(selectedPlan)}
+          onOpenChange={open => !open && setSelectedPlan(null)}
+          title="Confirmar troca de plano"
+          description="A alteração permanece no Billing da plataforma e não navega para outra página."
+          footer={
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button variant="outline" onClick={() => setSelectedPlan(null)}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={() => selectedPlan && startCheckout(selectedPlan)}
+                disabled={!selectedPlan || checkoutMutation.isPending}
+              >
+                {checkoutMutation.isPending ? "Processando..." : "Confirmar"}
+              </Button>
+            </div>
+          }
         >
-          <div id="billing-actions" />
-          <AppDataTable className="min-w-[760px]">
-            <tbody>
-              <tr className="border-b border-[var(--border-subtle)]/60">
-                <td className="px-3 py-3 font-medium text-[var(--text-primary)]">
-                  Trocar plano
-                </td>
-                <td className="px-3 py-3 text-[var(--text-secondary)]">
-                  Abre checkout para alterar a assinatura.
-                </td>
-                <td className="px-3 py-3 text-right">
-                  <Button
-                    size="sm"
-                    onClick={() =>
-                      startCheckout(
-                        currentPlan === "STARTER" ? "PRO" : "STARTER"
-                      )
-                    }
-                    disabled={!stripeConfigured}
-                  >
-                    Trocar plano
-                  </Button>
-                </td>
-              </tr>
-              <tr className="border-b border-[var(--border-subtle)]/60">
-                <td className="px-3 py-3 font-medium text-[var(--text-primary)]">
-                  Atualizar pagamento
-                </td>
-                <td className="px-3 py-3 text-[var(--text-secondary)]">
-                  Corrige cartão/método para evitar PAST_DUE.
-                </td>
-                <td className="px-3 py-3 text-right">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => startCheckout(currentPlan)}
-                    disabled={currentPlan === "FREE"}
-                  >
-                    Atualizar pagamento
-                  </Button>
-                </td>
-              </tr>
-              <tr>
-                <td className="px-3 py-3 font-medium text-[var(--text-primary)]">
-                  Cancelar assinatura
-                </td>
-                <td className="px-3 py-3 text-[var(--text-secondary)]">
-                  Solicita cancelamento para o próximo ciclo.
-                </td>
-                <td className="px-3 py-3 text-right">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => cancelMutation.mutate()}
-                    disabled={
-                      cancelMutation.isPending || currentPlan === "FREE"
-                    }
-                  >
-                    {cancelMutation.isPending ? "Cancelando..." : "Cancelar"}
-                  </Button>
-                </td>
-              </tr>
-            </tbody>
-          </AppDataTable>
-        </AppSectionBlock>
+          {selectedPlanMeta ? (
+            <div className="space-y-3 text-sm text-[var(--text-secondary)]">
+              <AppStatusBadge
+                label={
+                  selectedPlan === currentPlan
+                    ? "PLANO ATUAL"
+                    : PLAN_ORDER[selectedPlan] > PLAN_ORDER[currentPlan]
+                      ? "UPGRADE"
+                      : "DOWNGRADE"
+                }
+                tone={
+                  selectedPlan === currentPlan
+                    ? "success"
+                    : PLAN_ORDER[selectedPlan] > PLAN_ORDER[currentPlan]
+                      ? "info"
+                      : "warning"
+                }
+              />
+              <p className="text-base font-semibold text-[var(--text-primary)]">
+                {selectedPlanMeta.title} — {brl(selectedPlanMeta.priceCents)} /{" "}
+                {selectedPlanMeta.periodicity}
+              </p>
+              <p>Usuários permitidos: {selectedPlanMeta.users}</p>
+              <p>Clientes permitidos: {selectedPlanMeta.customers}</p>
+              <p>Recursos: {selectedPlanMeta.features.join(", ")}.</p>
+            </div>
+          ) : null}
+        </BaseModal>
       </AppPageShell>
     </PageWrapper>
   );
