@@ -14,31 +14,85 @@ describe("CalendarPage operational time-control contract", () => {
     expect(calendar).not.toContain("Google Calendar");
   });
 
-  it("mostra KPIs de tempo, pipeline operacional e leitura macro diferente de Agendamentos", () => {
+  it("remove chips genéricos e mostra sinais reais no hero", () => {
+    const calendar = source();
+
+    expect(calendar).not.toContain("AGUARDANDO AÇÃO");
+    expect(calendar).toContain("heroSignals");
+    expect(calendar).toContain("atraso(s) detectado(s)");
+    expect(calendar).toContain("sem responsável");
+    expect(calendar).toContain("janelas livres");
+    expect(calendar).toContain("conflitos");
+    expect(calendar).toContain("Operação do tempo monitorada");
+  });
+
+  it("usa pipeline humanizado e helpers sem alterar o significado técnico", () => {
     const calendar = source();
     const normalized = compact(calendar);
 
-    expect(calendar).toContain("Conflitos agora");
-    expect(calendar).toContain("Sobrecarga");
-    expect(calendar).toContain("Janela livre");
-    expect(calendar).toContain("Capacidade da equipe");
     expect(normalized).toContain(
-      "Tempo → Agendamento → Responsável → O.S. → Execução → Timeline → Risco/Governança"
+      "Tempo → Agenda → Equipe → O.S. → Execução → Prova → Risco"
     );
-    expect(compact(calendar)).toContain(
-      "Calendário orienta; Agendamentos executa criação, confirmação e remarcação."
+    for (const label of [
+      'label: "Tempo"',
+      'label: "Agenda"',
+      'label: "Equipe"',
+      'label: "O.S."',
+      'label: "Execução"',
+      'label: "Prova"',
+      'label: "Risco"',
+    ]) {
+      expect(calendar).toContain(label);
+    }
+    expect(calendar).toContain("Eventos preparados para execução");
+    expect(calendar).toContain("Responsáveis alocados ou pendentes");
+    expect(calendar).toContain(
+      "Eventos reais enviados para leitura operacional"
     );
+    expect(calendar).toContain("Sinais antes de afetar governança");
   });
 
-  it("mantém grade visual/fallback, painel lateral vivo e CTAs seguros", () => {
+  it("mantém grade visual/fallback, painel lateral vivo e ficha operacional", () => {
     const calendar = source();
 
     expect(calendar).toContain("Calendário visual interativo");
-    expect(calendar).toContain("Sem eventos para este recorte");
-    expect(calendar).toContain("Painel lateral do evento");
+    expect(calendar).toContain("periodSummary");
+    expect(calendar).toContain("Ficha operacional do evento");
+    expect(calendar).toContain("Cliente");
+    expect(calendar).toContain("Serviço");
+    expect(calendar).toContain("Horário");
+    expect(calendar).toContain("Duração");
+    expect(calendar).toContain("Responsável");
+    expect(calendar).toContain("Próxima ação");
     expect(compact(calendar)).toContain("Exibindo próximo evento crítico");
-    expect(calendar).toContain("CTAs navegam para fluxos existentes");
-    expect(calendar).toContain("não executa automação falsa");
+  });
+
+  it("usa CTAs seguros e não promete automação falsa", () => {
+    const calendar = source();
+
+    expect(calendar).toContain("Abrir agendamento");
+    expect(calendar).toContain("Revisar agenda");
+    expect(calendar).toContain("Ver semana");
+    expect(calendar).toContain("Ver e vincular");
+    expect(calendar).toContain("Abrir Timeline oficial");
+    expect(calendar).toContain("Ver responsáveis");
+    expect(calendar).toContain("Ver conflitos");
+    expect(calendar).toContain("Ver janelas livres");
+    expect(calendar).not.toContain("Confirmar");
+    expect(calendar).not.toContain("Executar");
+    expect(calendar).not.toContain("Automatizar");
+    expect(calendar).not.toContain("Rebalancear equipe");
+  });
+
+  it("transforma distribuição em leitura operacional", () => {
+    const calendar = source();
+
+    expect(calendar).toContain("Eventos no período");
+    expect(calendar).toContain("Preparados para executar");
+    expect(calendar).toContain("Precisam de atenção");
+    expect(calendar).toContain("Finalizados");
+    expect(calendar).toContain("Cancelados");
+    expect(calendar).toContain("Janelas livres");
   });
 
   it("não fabrica prova operacional nem expõe metadados técnicos na leitura principal", () => {
@@ -47,6 +101,7 @@ describe("CalendarPage operational time-control contract", () => {
     expect(calendar).toContain(
       "Fallback seguro: eventos derivados de agendamentos com datas reais; não substitui Timeline oficial."
     );
+    expect(calendar).toContain(".slice(0, 5)");
     expect(calendar).not.toContain("eventType");
     expect(calendar).not.toContain("payload");
     expect(calendar).not.toContain("metadata");
