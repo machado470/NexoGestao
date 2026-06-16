@@ -37,22 +37,24 @@ describe("Timeline V2 — Centro de Evidências Operacionais", () => {
     );
     expect(humanizeTimelineAction("CHARGE_CREATED")).toBe("Cobrança criada");
     expect(humanizeTimelineAction("EXECUTION_BLOCKED")).toBe(
-      "Ação bloqueada por segurança"
+      "Bloqueio operacional registrado"
     );
     expect(humanizeTimelineAction("action-send-overdue-charge-reminder")).toBe(
-      "Lembrete de cobrança vencida bloqueado"
+      "Lembrete de cobrança bloqueado"
     );
     expect(humanizeTimelineAction("SERVICE_ORDER_COMPLETED")).toBe(
-      "O.S. concluída"
+      "Ordem de serviço concluída"
     );
     expect(humanizeTimelineAction("APPOINTMENT_CONFIRMED")).toBe(
       "Agendamento confirmado"
     );
     expect(humanizeTimelineAction("MESSAGE_SENT")).toBe("Mensagem enviada");
     expect(humanizeTimelineAction("GOVERNANCE_RUN_COMPLETED")).toBe(
-      "Governança executada"
+      "Verificação de governança concluída"
     );
-    expect(humanizeTimelineAction("RISK_UPDATED")).toBe("Risco atualizado");
+    expect(humanizeTimelineAction("RISK_UPDATED")).toBe(
+      "Sinal de risco atualizado"
+    );
   });
 
   it("organiza feed, contexto e resumo técnico secundário", () => {
