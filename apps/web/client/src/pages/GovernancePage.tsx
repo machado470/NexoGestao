@@ -163,7 +163,9 @@ function buildNextBestAction({
 
   if (state === "SUSPENDED" || state === "RESTRICTED") {
     return {
-      title: "Revisar intervenção crítica",
+      title: financialSignal
+        ? "Priorize a cobrança vencida."
+        : "Revisar intervenção crítica",
       entity: dominant?.title ?? "Governança operacional",
       reason:
         dominant?.reason ??
@@ -171,10 +173,15 @@ function buildNextBestAction({
       impact:
         "Reduzir risco antes que o fluxo Cliente → Agendamento → O.S. → Cobrança → Pagamento seja comprometido.",
       safetyNote:
-        "A ação apenas navega para análise; nenhuma política é executada automaticamente.",
-      primaryActionLabel: dominant?.cta ?? "Abrir histórico de governança",
-      primaryPath: dominant?.path ?? "/timeline?module=governance",
-      secondaryActionLabel: "Ver Timeline",
+        "A ação apenas navega para análise; nenhuma política é aplicada pela página.",
+      primaryActionLabel: financialSignal
+        ? "Abrir financeiro"
+        : (dominant?.cta ?? "Abrir histórico de governança"),
+      primaryPath:
+        financialSignal?.path ??
+        dominant?.path ??
+        "/timeline?module=governance",
+      secondaryActionLabel: "Ver todas as ações",
       secondaryPath: "/timeline?module=governance",
     };
   }
@@ -405,12 +412,15 @@ export default function GovernancePage() {
     if (overdueCharges.length > 0) {
       items.push({
         id: "overdue",
-        title: "Cobranças vencidas sem resolução",
+        title:
+          overdueCharges.length === 1
+            ? "Cobrança vencida sem resolução"
+            : "Cobranças vencidas sem resolução",
         reason: `${overdueCharges.length} cobrança(s) vencida(s) aparecem na fonte financeira.`,
         impact: "Pressiona caixa e pode bloquear continuidade comercial.",
         priority: overdueCharges.length >= 3 ? "critical" : "high",
         count: overdueCharges.length,
-        cta: "Priorizar cobrança",
+        cta: "Abrir cobrança",
         path: "/finances?status=OVERDUE&source=governance",
       });
     }
@@ -422,7 +432,7 @@ export default function GovernancePage() {
         impact: "Aumenta retrabalho, reclamação e perda de previsibilidade.",
         priority: delayedOrders.length >= 3 ? "critical" : "high",
         count: delayedOrders.length,
-        cta: "Reorganizar execução",
+        cta: "Ver O.S. atrasadas",
         path: "/service-orders?filter=late&source=governance",
       });
     }
@@ -441,12 +451,15 @@ export default function GovernancePage() {
     if (staleAppointments.length > 0) {
       items.push({
         id: "appointments",
-        title: "Agendamentos pendentes no passado",
+        title:
+          staleAppointments.length === 1
+            ? "Agendamento não confirmado"
+            : "Agendamentos não confirmados",
         reason: `${staleAppointments.length} agenda(s) não foram concluídas nem canceladas.`,
         impact: "Deixa a agenda pouco confiável para decisão diária.",
         priority: "medium",
         count: staleAppointments.length,
-        cta: "Revisar agenda",
+        cta: "Abrir agendamento",
         path: "/appointments?source=governance",
       });
     }
@@ -497,6 +510,9 @@ export default function GovernancePage() {
       0
     )
   );
+  const riskLevel =
+    riskScore >= 55 ? "alto" : riskScore >= 30 ? "médio" : "baixo";
+  const humanRiskLabel = `Risco ${riskLevel} — ${riskScore}`;
   const state = stateFromSignals({ signals, riskScore, summary, runs });
   const dominantSignal = signals[0];
   const stateReason =
@@ -533,7 +549,7 @@ export default function GovernancePage() {
   }> = [
     {
       id: "event",
-      label: "Evento",
+      label: "Sinal",
       summary: signals.length
         ? "Sinais operacionais foram detectados nas fontes carregadas."
         : "Sem evento crítico nesta leitura.",
@@ -541,8 +557,8 @@ export default function GovernancePage() {
       countOrValue: String(signals.length),
     },
     {
-      id: "timeline",
-      label: "Timeline",
+      id: "evidence",
+      label: "Evidência",
       summary: runs.length
         ? "Há histórico real de governança para sustentar a decisão."
         : "Sem prova oficial retornada; abrir Timeline completa.",
@@ -552,8 +568,8 @@ export default function GovernancePage() {
       onClick: () => navigate("/timeline?module=governance"),
     },
     {
-      id: "risk",
-      label: "Risco",
+      id: "impact",
+      label: "Impacto",
       summary: dominantSignal
         ? dominantSignal.title
         : "Risco sem sinal dominante.",
@@ -563,11 +579,11 @@ export default function GovernancePage() {
           : state === "RESTRICTED" || state === "WARNING"
             ? "warning"
             : "done",
-      countOrValue: `Score ${riskScore}`,
+      countOrValue: humanRiskLabel,
     },
     {
-      id: "governance",
-      label: "Governança",
+      id: "decision",
+      label: "Decisão",
       summary: hasRecentRun
         ? "Execução recente disponível."
         : "Decisão depende da leitura atual e do histórico carregado.",
@@ -653,12 +669,19 @@ export default function GovernancePage() {
         : "Nenhum alerta necessário agora.",
     },
     {
-      label: "Ações automáticas",
+      label: "Ações automáticas registradas",
       value: String(
         metric(summary, "automaticActions", "actionsExecuted", "autoActions")
       ),
       detail:
-        "Execuções registradas pela governança quando disponíveis no backend.",
+        metric(
+          summary,
+          "automaticActions",
+          "actionsExecuted",
+          "autoActions"
+        ) === 0
+          ? "Sem execução oficial retornada."
+          : "Execuções registradas pela governança quando disponíveis no backend.",
     },
     {
       label: "Restrições aplicadas",
@@ -672,25 +695,36 @@ export default function GovernancePage() {
 
   const policyRows = [
     {
-      name: "Políticas aplicadas",
-      value: String(policyAppliedCount),
-      detail: policyAppliedCount
-        ? "Metadado de política aplicada retornado pela governança."
-        : "Nenhuma política aplicada retornada nesta leitura.",
+      name: "Cobrança vencida",
+      condition: "Condição: cobrança vencida sem resolução.",
+      effect: "Efeito: eleva risco de caixa e orienta prioridade financeira.",
+      status: overdueCharges.length > 0 ? "Ativa" : "Sem política retornada",
     },
     {
-      name: "Políticas pendentes",
-      value: String(policyPendingCount),
-      detail: policyPendingCount
-        ? "Há política pendente para revisão operacional."
-        : "Nenhuma política pendente retornada nesta leitura.",
+      name: "O.S. atrasada",
+      condition: "Condição: ordem de serviço aberta com prazo ultrapassado.",
+      effect: "Efeito: eleva perda de previsibilidade operacional.",
+      status: delayedOrders.length > 0 ? "Ativa" : "Sem política retornada",
     },
     {
-      name: "Última execução",
-      value: formatDateTime(lastRunAt),
-      detail: runs.length
-        ? "Data real do histórico de governança."
-        : "Sem execução oficial retornada; não foi criado histórico fictício.",
+      name: "Falhas operacionais",
+      condition:
+        "Condição: agenda pendente, O.S. sem responsável ou alerta de risco.",
+      effect: "Efeito: exige conferência manual e prova na Timeline.",
+      status:
+        staleAppointments.length > 0 || unassignedOrders.length > 0
+          ? "Ativa"
+          : "Sem política retornada",
+    },
+    {
+      name: "Governança contínua",
+      condition:
+        "Condição: execução ou estado oficial retornado pela governança.",
+      effect: "Efeito: registra leitura de estado sem inventar histórico.",
+      status:
+        runs.length > 0 || policyAppliedCount > 0
+          ? "Ativa"
+          : "Sem política retornada",
     },
   ];
 
@@ -702,7 +736,7 @@ export default function GovernancePage() {
       <AppPageShell>
         <AppOperationalHeader
           title="Governança operacional"
-          description={stateCopy(state)}
+          description="Centro de decisão da operação. Monitora risco, aplica políticas e orienta intervenção."
           primaryAction={
             <Button onClick={() => navigate("/timeline?module=governance")}>
               Abrir trilha de decisões
@@ -727,8 +761,20 @@ export default function GovernancePage() {
           contextChips={
             <>
               <AppStatusBadge label={state} />
-              <AppStatusBadge label={`Score ${riskScore}`} />
-              <AppStatusBadge label={`${signals.length} sinal(is)`} />
+              <AppStatusBadge label={humanRiskLabel} />
+              <AppStatusBadge
+                label={
+                  signals.length
+                    ? signals
+                        .slice(0, 4)
+                        .map(
+                          signal =>
+                            `${signal.count} ${signal.title.toLowerCase()}`
+                        )
+                        .join(" • ")
+                    : "Operação governada sem restrição."
+                }
+              />
             </>
           }
         />
@@ -750,6 +796,136 @@ export default function GovernancePage() {
             </span>
           </div>
         </AppFiltersBar>
+
+        <AppKpiRow
+          items={[
+            {
+              title: "Estado operacional atual",
+              value: state,
+              hint: "Estado definido pela leitura de risco e histórico retornado.",
+            },
+            {
+              title: "Cobranças vencidas",
+              value: String(overdueCharges.length),
+              hint: "Pendências financeiras vencidas sem resolução nesta leitura.",
+            },
+            {
+              title: "O.S. atrasadas",
+              value: String(delayedOrders.length),
+              hint: "Ordens abertas com prazo ultrapassado.",
+            },
+            {
+              title: "Agendamentos pendentes",
+              value: String(staleAppointments.length),
+              hint: "Agendas sem confirmação/conclusão.",
+            },
+            {
+              title: "Última execução",
+              value: formatDateTime(lastRunAt),
+              hint: runs.length
+                ? "Registro oficial retornado pela governança."
+                : "Sem execução recente registrada.",
+            },
+          ]}
+        />
+
+        <AppSectionBlock
+          title={
+            state === "RESTRICTED"
+              ? "Por que a operação está RESTRICTED?"
+              : `Por que a operação está ${state}?`
+          }
+          subtitle="Motivo centralizado da restrição operacional, sem espalhar explicações pela página."
+          compact
+        >
+          {signals.length ? (
+            <div className="grid gap-3 md:grid-cols-2">
+              {signals.slice(0, 4).map(signal => (
+                <div
+                  key={signal.id}
+                  className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-3"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <strong className="text-sm text-[var(--text-primary)]">
+                      {signal.reason}
+                    </strong>
+                    <AppStatusBadge label={priorityLabel(signal.priority)} />
+                  </div>
+                  <p className="mt-2 text-xs text-[var(--text-secondary)]">
+                    Impacto: {signal.impact}
+                  </p>
+                  <p className="mt-1 text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                    Origem do sinal: {signal.title}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-3 text-sm text-[var(--text-secondary)]">
+              Operação governada sem restrição.
+            </div>
+          )}
+        </AppSectionBlock>
+
+        <AppSectionBlock
+          title="Impactos identificados"
+          subtitle="Consequências operacionais dos sinais atuais, com severidade explícita."
+          compact
+        >
+          <div className="grid gap-4 lg:grid-cols-4">
+            {[
+              {
+                title: "Risco de caixa",
+                consequence:
+                  overdueCharges.length > 0
+                    ? "Cobrança vencida pode pressionar caixa."
+                    : "Sem cobrança vencida retornada.",
+                severity: overdueCharges.length ? "Alta" : "Baixa",
+              },
+              {
+                title: "Perda de previsibilidade",
+                consequence:
+                  delayedOrders.length > 0
+                    ? "O.S. atrasadas reduzem confiança no prazo."
+                    : "Sem atraso de O.S. retornado.",
+                severity: delayedOrders.length ? "Alta" : "Baixa",
+              },
+              {
+                title: "Bloqueio de automações",
+                consequence:
+                  state === "RESTRICTED" || state === "SUSPENDED"
+                    ? "Estado restritivo orienta limitar ações."
+                    : "Sem bloqueio indicado pelo estado atual.",
+                severity:
+                  state === "RESTRICTED" || state === "SUSPENDED"
+                    ? "Alta"
+                    : "Baixa",
+              },
+              {
+                title: "Risco de governança",
+                consequence: hasRecentRun
+                  ? "Há execução recente para sustentar decisão."
+                  : "Sem execução recente registrada.",
+                severity: hasRecentRun ? "Média" : "Alta",
+              },
+            ].map(item => (
+              <div
+                key={item.title}
+                className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-4"
+              >
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+                  {item.title}
+                </h3>
+                <p className="mt-2 text-xs text-[var(--text-secondary)]">
+                  {item.consequence}
+                </p>
+                <div className="mt-3">
+                  <AppStatusBadge label={`Severidade ${item.severity}`} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </AppSectionBlock>
 
         <section className="grid gap-4 xl:grid-cols-3">
           <OperationalStateCard
@@ -787,7 +963,7 @@ export default function GovernancePage() {
         </section>
 
         <OperationalFlowCard
-          title="Evento → Timeline → Risco → Governança → Política → Ação"
+          title="Sinal → Evidência → Impacto → Decisão → Política → Ação"
           subtitle="Cadeia de decisão que transforma sinais operacionais em intervenção orientada, sem executar ações automaticamente."
           stages={flowStages}
         />
@@ -800,49 +976,22 @@ export default function GovernancePage() {
           onFullTimeline={() => navigate("/timeline?module=governance")}
         />
 
-        <AppKpiRow
-          items={[
-            {
-              title: "Estado atual",
-              value: state,
-              hint: "Estado operacional consolidado.",
-            },
-            {
-              title: "Sinais detectados",
-              value: String(signals.length),
-              hint: "Problemas relevantes nesta leitura.",
-            },
-            {
-              title: "Impacto crítico",
-              value: String(
-                signals.filter(item => item.priority === "critical").length
-              ),
-              hint: "Itens que restringem a operação; suspensão só com dado real.",
-            },
-            {
-              title: "Execuções",
-              value: String(runs.length),
-              hint: "Rodadas/eventos reais de governança.",
-            },
-          ]}
-        />
-
         <AppSectionBlock
-          title="Sinais detectados"
-          subtitle="Sinais, motivos e impacto operacional que explicam a decisão de governança."
+          title="Sinais críticos no momento"
+          subtitle="Lista operacional limitada aos quatro principais sinais da leitura atual."
         >
           <AppDataTable className="min-w-[820px]">
             <thead>
               <tr className="border-b border-[var(--border-subtle)] text-left text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
                 <th className="px-3 py-2">Sinal</th>
-                <th className="px-3 py-2">Motivo</th>
                 <th className="px-3 py-2">Impacto</th>
-                <th className="px-3 py-2">Prioridade</th>
+                <th className="px-3 py-2">Detectado há</th>
+                <th className="px-3 py-2">Ação</th>
               </tr>
             </thead>
             <tbody>
               {signals.length ? (
-                signals.map(signal => (
+                signals.slice(0, 4).map(signal => (
                   <tr
                     key={signal.id}
                     className="border-b border-[var(--border-subtle)]/60"
@@ -851,13 +1000,19 @@ export default function GovernancePage() {
                       {signal.title}
                     </td>
                     <td className="px-3 py-3 text-[var(--text-secondary)]">
-                      {signal.reason}
+                      {priorityLabel(signal.priority)} — {signal.impact}
                     </td>
                     <td className="px-3 py-3 text-[var(--text-secondary)]">
-                      {signal.impact}
+                      Nesta leitura
                     </td>
                     <td className="px-3 py-3">
-                      <AppStatusBadge label={priorityLabel(signal.priority)} />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => navigate(signal.path)}
+                      >
+                        {signal.cta}
+                      </Button>
                     </td>
                   </tr>
                 ))
@@ -873,6 +1028,81 @@ export default function GovernancePage() {
               )}
             </tbody>
           </AppDataTable>
+        </AppSectionBlock>
+
+        <AppSectionBlock
+          title="Prova operacional"
+          subtitle="Extrato oficial das evidências que sustentam decisões de governança."
+        >
+          <AppKpiRow
+            items={[
+              {
+                title: "Total de eventos",
+                value: String(runs.length),
+                hint: "Eventos oficiais retornados pela governança.",
+              },
+              {
+                title: "Eventos críticos",
+                value: String(
+                  signals.filter(item => item.priority === "critical").length
+                ),
+                hint: "Sinais com impacto crítico na operação.",
+              },
+              {
+                title: "Impactam receita",
+                value: String(overdueCharges.length),
+                hint: "Cobranças vencidas ligadas a risco de caixa.",
+              },
+              {
+                title: "Decisões tomadas",
+                value: String(runs.length),
+                hint: runs.length
+                  ? "Decisões retornadas pelo histórico."
+                  : "Nenhuma decisão oficial retornada nesta leitura.",
+              },
+            ]}
+          />
+          {timelineEvents.length ? (
+            <div className="mt-4">
+              <AppDataTable className="min-w-[860px]">
+                <thead>
+                  <tr className="border-b border-[var(--border-subtle)] text-left text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                    <th className="px-3 py-2">Data/hora</th>
+                    <th className="px-3 py-2">Módulo</th>
+                    <th className="px-3 py-2">Evento humano</th>
+                    <th className="px-3 py-2">Entidade/cliente</th>
+                    <th className="px-3 py-2">Impacto</th>
+                    <th className="px-3 py-2">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {timelineEvents.map(event => (
+                    <tr
+                      key={event.id}
+                      className="border-b border-[var(--border-subtle)]/60"
+                    >
+                      <td className="px-3 py-3">{event.occurredAt}</td>
+                      <td className="px-3 py-3">Governança</td>
+                      <td className="px-3 py-3 text-[var(--text-primary)]">
+                        {event.summary}
+                      </td>
+                      <td className="px-3 py-3 text-[var(--text-secondary)]">
+                        {event.entity}
+                      </td>
+                      <td className="px-3 py-3">{humanRiskLabel}</td>
+                      <td className="px-3 py-3">
+                        <AppStatusBadge label={state} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </AppDataTable>
+            </div>
+          ) : (
+            <div className="mt-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-3 text-sm text-[var(--text-secondary)]">
+              Nenhuma decisão oficial retornada nesta leitura.
+            </div>
+          )}
         </AppSectionBlock>
 
         <AppSectionBlock
@@ -950,17 +1180,30 @@ export default function GovernancePage() {
         </AppSectionBlock>
 
         <AppSectionBlock
-          title="Regras e políticas existentes"
-          subtitle="Metadados de política reaproveitados da governança quando disponíveis."
+          title="Políticas ativas"
+          subtitle="Condição, efeito e status das políticas retornadas ou derivadas dos sinais disponíveis."
         >
-          <AppKpiRow
-            items={policyRows.map(item => ({
-              title: item.name,
-              value: item.value,
-              hint: item.detail,
-            }))}
-            gridClassName="xl:grid-cols-3"
-          />
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {policyRows.map(item => (
+              <div
+                key={item.name}
+                className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-3"
+              >
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+                  {item.name}
+                </h3>
+                <p className="mt-2 text-xs text-[var(--text-secondary)]">
+                  {item.condition}
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                  {item.effect}
+                </p>
+                <div className="mt-3">
+                  <AppStatusBadge label={item.status} />
+                </div>
+              </div>
+            ))}
+          </div>
         </AppSectionBlock>
       </AppPageShell>
     </PageWrapper>
