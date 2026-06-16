@@ -2,19 +2,13 @@
 import { useMemo } from "react";
 import { useLocation } from "wouter";
 import {
-  EntityTimelineCard,
-  NextBestActionCard,
   OperationalFlowCard,
-  OperationalRiskCard,
-  OperationalStateCard,
   type OperationalFlowStageState,
 } from "@/components/app/OperationalCommandLayer";
 import { Button } from "@/components/ui/button";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import {
   AppDataTable,
-  AppFiltersBar,
-  AppKpiRow,
   AppOperationalHeader,
   AppPageShell,
   AppSectionBlock,
@@ -132,155 +126,48 @@ function stateFromSignals({
   return "NORMAL";
 }
 
-function stateCopy(state: GovernanceState) {
-  if (state === "SUSPENDED")
-    return "A operação tem suspensão registrada pela governança e exige contenção imediata antes de novas decisões.";
-  if (state === "RESTRICTED")
-    return "A operação pode seguir com limite: sinais críticos ou política restritiva pedem intervenção prioritária.";
-  if (state === "WARNING")
-    return "A operação está funcionando, porém há desvios que precisam de ação antes que virem bloqueio.";
-  return "Operação estável: nenhum sinal relevante exige intervenção neste momento.";
-}
-
-function buildNextBestAction({
-  state,
-  signals,
-  policyAppliedCount,
-  policyPendingCount,
-}: {
-  state: GovernanceState;
-  signals: Signal[];
-  policyAppliedCount: number;
-  policyPendingCount: number;
-}): NextBestAction {
-  const dominant = signals[0];
-  const financialSignal = signals.find(item => item.id === "overdue");
-  const orderSignal = signals.find(
-    item => item.id === "late-orders" || item.id === "unassigned"
-  );
-  const appointmentSignal = signals.find(item => item.id === "appointments");
-  const criticalSignal = signals.find(item => item.priority === "critical");
-
-  if (state === "SUSPENDED" || state === "RESTRICTED") {
-    return {
-      title: financialSignal
-        ? "Priorize a cobrança vencida."
-        : "Revisar intervenção crítica",
-      entity: dominant?.title ?? "Governança operacional",
-      reason:
-        dominant?.reason ??
-        "A governança indica estado restrito ou suspenso com impacto transversal.",
-      impact:
-        "Reduzir risco antes que o fluxo Cliente → Agendamento → O.S. → Cobrança → Pagamento seja comprometido.",
-      safetyNote:
-        "A ação apenas navega para análise; nenhuma política é aplicada pela página.",
-      primaryActionLabel: financialSignal
-        ? "Abrir financeiro"
-        : (dominant?.cta ?? "Abrir histórico de governança"),
-      primaryPath:
-        financialSignal?.path ??
-        dominant?.path ??
-        "/timeline?module=governance",
-      secondaryActionLabel: "Ver todas as ações",
-      secondaryPath: "/timeline?module=governance",
-    };
-  }
-
-  if (state === "WARNING") {
-    return {
-      title: "Analisar sinais de risco",
-      entity: dominant?.title ?? "Sinais de governança",
-      reason:
-        dominant?.reason ??
-        "Há sinais iniciais que ainda não bloqueiam a operação.",
-      impact:
-        "Tratar o desvio cedo preserva previsibilidade operacional e evita restrição futura.",
-      safetyNote:
-        "A recomendação depende somente dos sinais já carregados nesta página.",
-      primaryActionLabel: dominant?.cta ?? "Ver sinais",
-      primaryPath: dominant?.path ?? "/timeline?module=governance",
-      secondaryActionLabel: "Ver histórico",
-      secondaryPath: "/timeline?module=governance",
-    };
-  }
-
-  if (policyPendingCount > 0 || policyAppliedCount > 0) {
-    return {
-      title: "Revisar política aplicada",
-      entity: "Políticas de governança",
-      reason: `${policyPendingCount || policyAppliedCount} política(s) aparecem nos metadados de governança.`,
-      impact:
-        "Confirmar a política evita intervenção divergente da regra operacional vigente.",
-      safetyNote: "Sem criar regra nova: apenas revisar o registro disponível.",
-      primaryActionLabel: "Ver histórico",
-      primaryPath: "/timeline?module=governance",
-    };
-  }
-
-  if (criticalSignal) {
-    return {
-      title: "Investigar evento crítico",
-      entity: criticalSignal.title,
-      reason: criticalSignal.reason,
-      impact: criticalSignal.impact,
-      safetyNote:
-        "Investigação manual; nenhum evento adicional é gravado pela página.",
-      primaryActionLabel: criticalSignal.cta,
-      primaryPath: criticalSignal.path,
-      secondaryActionLabel: "Ver Timeline",
-      secondaryPath: "/timeline?module=governance",
-    };
-  }
-
-  if (financialSignal) {
-    return {
-      title: "Abrir Financeiro",
-      entity: financialSignal.title,
-      reason: financialSignal.reason,
-      impact: financialSignal.impact,
-      safetyNote:
-        "A governança apenas direciona a cobrança; não envia comunicação nem altera pagamento.",
-      primaryActionLabel: financialSignal.cta,
-      primaryPath: financialSignal.path,
-    };
-  }
-
-  if (orderSignal) {
-    return {
-      title: "Abrir O.S.",
-      entity: orderSignal.title,
-      reason: orderSignal.reason,
-      impact: orderSignal.impact,
-      safetyNote: "A navegação leva ao contexto operacional existente de O.S.",
-      primaryActionLabel: orderSignal.cta,
-      primaryPath: orderSignal.path,
-    };
-  }
-
-  if (appointmentSignal) {
-    return {
-      title: "Abrir Agendamentos",
-      entity: appointmentSignal.title,
-      reason: appointmentSignal.reason,
-      impact: appointmentSignal.impact,
-      safetyNote: "A recomendação não cria novo fluxo de comunicação.",
-      primaryActionLabel: appointmentSignal.cta,
-      primaryPath: appointmentSignal.path,
-    };
-  }
-
-  return {
-    title: "Revisar histórico de governança",
-    entity: "Governança operacional",
-    reason:
-      "Não há pendência dominante nesta leitura; manter prova e histórico sob observação.",
-    impact:
-      "Preserva rastreabilidade das decisões oficiais sem criar intervenção desnecessária.",
-    safetyNote:
-      "Fallback seguro: sem dados críticos, a página orienta leitura histórica.",
-    primaryActionLabel: "Ver Timeline",
-    primaryPath: "/timeline?module=governance",
-  };
+function buildPriorityActions(signals: Signal[]): NextBestAction[] {
+  const order = ["overdue", "late-orders", "appointments"];
+  return order
+    .map(id => signals.find(signal => signal.id === id))
+    .filter(Boolean)
+    .slice(0, 3)
+    .map(signal => {
+      if (!signal) throw new Error("Invalid signal");
+      if (signal.id === "overdue") {
+        return {
+          title: "Priorizar cobrança vencida",
+          entity: signal.title,
+          reason: `${signal.count} cobrança vencida sem resolução.`,
+          impact: "Reduzir risco de caixa.",
+          safetyNote: "CTA seguro: apenas navega para financeiro.",
+          primaryActionLabel: "Abrir financeiro",
+          primaryPath: signal.path,
+          secondaryActionLabel: "Abrir cobrança",
+          secondaryPath: signal.path,
+        };
+      }
+      if (signal.id === "late-orders") {
+        return {
+          title: "Resolver O.S. atrasadas",
+          entity: signal.title,
+          reason: `${signal.count} O.S. passaram do prazo.`,
+          impact: "Recuperar previsibilidade da execução.",
+          safetyNote: "CTA seguro: apenas navega para O.S. atrasadas.",
+          primaryActionLabel: "Ver O.S. atrasadas",
+          primaryPath: signal.path,
+        };
+      }
+      return {
+        title: "Confirmar agendamento pendente",
+        entity: signal.title,
+        reason: `${signal.count} agendamento não foi concluído nem cancelado.`,
+        impact: "Limpar risco da agenda.",
+        safetyNote: "CTA seguro: apenas navega para agendamentos.",
+        primaryActionLabel: "Abrir agendamento",
+        primaryPath: signal.path,
+      };
+    });
 }
 
 export default function GovernancePage() {
@@ -416,7 +303,7 @@ export default function GovernancePage() {
           overdueCharges.length === 1
             ? "Cobrança vencida sem resolução"
             : "Cobranças vencidas sem resolução",
-        reason: `${overdueCharges.length} cobrança(s) vencida(s) aparecem na fonte financeira.`,
+        reason: `${overdueCharges.length} cobrança vencida sem resolução.`,
         impact: "Pressiona caixa e pode bloquear continuidade comercial.",
         priority: overdueCharges.length >= 3 ? "critical" : "high",
         count: overdueCharges.length,
@@ -428,7 +315,7 @@ export default function GovernancePage() {
       items.push({
         id: "late-orders",
         title: "O.S. atrasadas",
-        reason: `${delayedOrders.length} O.S. aberta(s) passaram do prazo informado.`,
+        reason: `${delayedOrders.length} O.S. passaram do prazo.`,
         impact: "Aumenta retrabalho, reclamação e perda de previsibilidade.",
         priority: delayedOrders.length >= 3 ? "critical" : "high",
         count: delayedOrders.length,
@@ -453,9 +340,9 @@ export default function GovernancePage() {
         id: "appointments",
         title:
           staleAppointments.length === 1
-            ? "Agendamento não confirmado"
-            : "Agendamentos não confirmados",
-        reason: `${staleAppointments.length} agenda(s) não foram concluídas nem canceladas.`,
+            ? "Agendamento pendente"
+            : "Agendamentos pendentes",
+        reason: `${staleAppointments.length} agendamento não foi concluído nem cancelado.`,
         impact: "Deixa a agenda pouco confiável para decisão diária.",
         priority: "medium",
         count: staleAppointments.length,
@@ -467,7 +354,7 @@ export default function GovernancePage() {
       items.push({
         id: "risk-score",
         title: "Sinal de risco consolidado",
-        reason: `Fonte de governança reporta score ${governanceRiskScore || "ativo"} e ${backendAlerts} alerta(s).`,
+        reason: `Risco consolidado ${governanceRiskScore || "ativo"} com ${backendAlerts} alerta(s).`,
         impact:
           "Indica risco transversal que deve ser acompanhado no histórico.",
         priority: governanceRiskScore >= 70 ? "critical" : "high",
@@ -480,10 +367,9 @@ export default function GovernancePage() {
       items.push({
         id: "no-recent-run",
         title: "Sem execução recente registrada",
-        reason:
-          "A página não recebeu execução oficial de governança nesta leitura.",
+        reason: "Sem execução recente registrada.",
         impact:
-          "Reduz confiança na decisão automática e pede conferência da Timeline.",
+          "Pede conferência da trilha oficial antes de expandir decisões.",
         priority: "medium",
         count: 1,
         cta: "Ver Timeline",
@@ -520,23 +406,10 @@ export default function GovernancePage() {
     textField(summary, "reason", "mainReason", "statusReason") ??
     "Sem sinal crítico retornado nas fontes carregadas.";
   const stateImpact =
-    dominantSignal?.impact ??
-    "Fluxo Cliente → Agendamento → O.S. → Cobrança → Pagamento permanece sem bloqueio detectado.";
-  const riskTitle = dominantSignal
-    ? dominantSignal.title
-    : "Risco governado sem sinal crítico";
-  const riskReason = dominantSignal
-    ? dominantSignal.reason
-    : "Cobranças vencidas, O.S. atrasadas, agendamentos pendentes e alertas de governança não apontam risco dominante.";
-  const riskImpact = dominantSignal
-    ? dominantSignal.impact
-    : "A governança permanece em observação e a Timeline deve registrar novas decisões quando houver evento real.";
-  const nextBestAction = buildNextBestAction({
-    state,
-    signals,
-    policyAppliedCount,
-    policyPendingCount,
-  });
+    signals.length > 0
+      ? "Receita em risco e execução atrasada."
+      : "Operação governada sem restrição.";
+  const priorityActions = buildPriorityActions(signals);
 
   const flowStages: Array<{
     id: string;
@@ -551,28 +424,28 @@ export default function GovernancePage() {
       id: "event",
       label: "Sinal",
       summary: signals.length
-        ? "Sinais operacionais foram detectados nas fontes carregadas."
+        ? "Sinais ativos nesta leitura."
         : "Sem evento crítico nesta leitura.",
       state: signals.length ? "done" : "idle",
-      countOrValue: String(signals.length),
+      countOrValue: `${signals.length} ativos`,
     },
     {
       id: "evidence",
       label: "Evidência",
       summary: runs.length
-        ? "Há histórico real de governança para sustentar a decisão."
-        : "Sem prova oficial retornada; abrir Timeline completa.",
+        ? "Timeline disponível."
+        : "Sem execução recente registrada.",
       state: runs.length ? (hasRecentRun ? "active" : "done") : "idle",
-      countOrValue: String(runs.length),
+      countOrValue: runs.length
+        ? "Timeline disponível"
+        : "Sem execução recente",
       hrefLabel: "Abrir Timeline",
       onClick: () => navigate("/timeline?module=governance"),
     },
     {
       id: "impact",
       label: "Impacto",
-      summary: dominantSignal
-        ? dominantSignal.title
-        : "Risco sem sinal dominante.",
+      summary: dominantSignal ? dominantSignal.title : "Sem impacto dominante.",
       state:
         state === "SUSPENDED"
           ? "blocked"
@@ -584,9 +457,7 @@ export default function GovernancePage() {
     {
       id: "decision",
       label: "Decisão",
-      summary: hasRecentRun
-        ? "Execução recente disponível."
-        : "Decisão depende da leitura atual e do histórico carregado.",
+      summary: stateReason,
       state:
         state === "SUSPENDED"
           ? "blocked"
@@ -610,15 +481,21 @@ export default function GovernancePage() {
         : policyAppliedCount
           ? "done"
           : "idle",
-      countOrValue: String(policyPendingCount || policyAppliedCount || 0),
+      countOrValue:
+        policyPendingCount || policyAppliedCount
+          ? String(policyPendingCount || policyAppliedCount)
+          : "Sem política específica",
     },
     {
       id: "action",
       label: "Ação",
-      summary: nextBestAction.title,
-      state: state === "NORMAL" && signals.length === 0 ? "idle" : "active",
-      hrefLabel: nextBestAction.primaryActionLabel,
-      onClick: () => navigate(nextBestAction.primaryPath),
+      summary: priorityActions.length
+        ? `${priorityActions.length} intervenções sugeridas`
+        : "Nenhuma intervenção prioritária.",
+      state: priorityActions.length ? "active" : "idle",
+      countOrValue: priorityActions.length
+        ? `${priorityActions.length} intervenções sugeridas`
+        : "Sem ação crítica",
     },
   ];
 
@@ -660,74 +537,6 @@ export default function GovernancePage() {
     summary: string;
   }>;
 
-  const executedActions = [
-    {
-      label: "Alertas gerados",
-      value: String(signals.length),
-      detail: signals.length
-        ? "Alertas derivados de cobrança, execução, agenda e metadados de governança."
-        : "Nenhum alerta necessário agora.",
-    },
-    {
-      label: "Ações automáticas registradas",
-      value: String(
-        metric(summary, "automaticActions", "actionsExecuted", "autoActions")
-      ),
-      detail:
-        metric(
-          summary,
-          "automaticActions",
-          "actionsExecuted",
-          "autoActions"
-        ) === 0
-          ? "Sem execução oficial retornada."
-          : "Execuções registradas pela governança quando disponíveis no backend.",
-    },
-    {
-      label: "Restrições aplicadas",
-      value: state === "SUSPENDED" || state === "RESTRICTED" ? "Sim" : "Não",
-      detail:
-        state === "NORMAL"
-          ? "Sem restrição operacional."
-          : "Revisar prioridades antes de expandir novas ações.",
-    },
-  ];
-
-  const policyRows = [
-    {
-      name: "Cobrança vencida",
-      condition: "Condição: cobrança vencida sem resolução.",
-      effect: "Efeito: eleva risco de caixa e orienta prioridade financeira.",
-      status: overdueCharges.length > 0 ? "Ativa" : "Sem política retornada",
-    },
-    {
-      name: "O.S. atrasada",
-      condition: "Condição: ordem de serviço aberta com prazo ultrapassado.",
-      effect: "Efeito: eleva perda de previsibilidade operacional.",
-      status: delayedOrders.length > 0 ? "Ativa" : "Sem política retornada",
-    },
-    {
-      name: "Falhas operacionais",
-      condition:
-        "Condição: agenda pendente, O.S. sem responsável ou alerta de risco.",
-      effect: "Efeito: exige conferência manual e prova na Timeline.",
-      status:
-        staleAppointments.length > 0 || unassignedOrders.length > 0
-          ? "Ativa"
-          : "Sem política retornada",
-    },
-    {
-      name: "Governança contínua",
-      condition:
-        "Condição: execução ou estado oficial retornado pela governança.",
-      effect: "Efeito: registra leitura de estado sem inventar histórico.",
-      status:
-        runs.length > 0 || policyAppliedCount > 0
-          ? "Ativa"
-          : "Sem política retornada",
-    },
-  ];
-
   return (
     <PageWrapper
       title="Governança"
@@ -764,228 +573,118 @@ export default function GovernancePage() {
               <AppStatusBadge label={humanRiskLabel} />
               <AppStatusBadge
                 label={
-                  signals.length
-                    ? signals
-                        .slice(0, 4)
-                        .map(
-                          signal =>
-                            `${signal.count} ${signal.title.toLowerCase()}`
-                        )
-                        .join(" • ")
-                    : "Operação governada sem restrição."
+                  runs.length
+                    ? `Última avaliação: ${formatDateTime(lastRunAt)}`
+                    : "Última avaliação: sem execução recente"
                 }
               />
             </>
           }
         />
 
-        <AppFiltersBar>
-          <div className="grid gap-2 text-xs text-[var(--text-secondary)] md:grid-cols-4">
-            <span>
-              <strong>NORMAL:</strong> operação controlada.
-            </span>
-            <span>
-              <strong>WARNING:</strong> desvio pede ação.
-            </span>
-            <span>
-              <strong>RESTRICTED:</strong> limitar decisões até correção.
-            </span>
-            <span>
-              <strong>SUSPENDED:</strong> apenas quando o backend/histórico
-              registra suspensão.
-            </span>
-          </div>
-        </AppFiltersBar>
-
-        <AppKpiRow
-          items={[
-            {
-              title: "Estado operacional atual",
-              value: state,
-              hint: "Estado definido pela leitura de risco e histórico retornado.",
-            },
-            {
-              title: "Cobranças vencidas",
-              value: String(overdueCharges.length),
-              hint: "Pendências financeiras vencidas sem resolução nesta leitura.",
-            },
-            {
-              title: "O.S. atrasadas",
-              value: String(delayedOrders.length),
-              hint: "Ordens abertas com prazo ultrapassado.",
-            },
-            {
-              title: "Agendamentos pendentes",
-              value: String(staleAppointments.length),
-              hint: "Agendas sem confirmação/conclusão.",
-            },
-            {
-              title: "Última execução",
-              value: formatDateTime(lastRunAt),
-              hint: runs.length
-                ? "Registro oficial retornado pela governança."
-                : "Sem execução recente registrada.",
-            },
-          ]}
-        />
-
         <AppSectionBlock
-          title={
-            state === "RESTRICTED"
-              ? "Por que a operação está RESTRICTED?"
-              : `Por que a operação está ${state}?`
-          }
-          subtitle="Motivo centralizado da restrição operacional, sem espalhar explicações pela página."
+          title="Estado operacional"
+          subtitle="Leitura imediata do controle da operação."
           compact
         >
-          {signals.length ? (
-            <div className="grid gap-3 md:grid-cols-2">
-              {signals.slice(0, 4).map(signal => (
+          <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-5">
+              <div className="flex flex-wrap items-center gap-2">
+                <AppStatusBadge label={state} />
+                <AppStatusBadge label={humanRiskLabel} />
+              </div>
+              <h2 className="mt-4 text-2xl font-semibold text-[var(--text-primary)]">
+                {signals.length
+                  ? `${signals.length} sinais ativos`
+                  : "Operação governada sem restrição."}
+              </h2>
+              <p className="mt-2 text-sm text-[var(--text-secondary)]">
+                {stateImpact}
+              </p>
+              <p className="mt-2 text-xs text-[var(--text-muted)]">
+                Última avaliação:{" "}
+                {runs.length
+                  ? formatDateTime(lastRunAt)
+                  : "sem execução recente"}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-5">
+              <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+                Sinais do estado
+              </h3>
+              <ul className="mt-3 space-y-2 text-sm text-[var(--text-secondary)]">
+                {signals.length ? (
+                  signals
+                    .slice(0, 4)
+                    .map(signal => <li key={signal.id}>• {signal.reason}</li>)
+                ) : (
+                  <li>Operação governada sem restrição.</li>
+                )}
+              </ul>
+            </div>
+          </div>
+        </AppSectionBlock>
+
+        <AppSectionBlock
+          title="FAÇA AGORA"
+          subtitle="Intervenções seguras para reduzir restrição operacional."
+        >
+          {priorityActions.length ? (
+            <div className="grid gap-3 lg:grid-cols-3">
+              {priorityActions.map(action => (
                 <div
-                  key={signal.id}
-                  className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-3"
+                  key={action.title}
+                  className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-4"
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <strong className="text-sm text-[var(--text-primary)]">
-                      {signal.reason}
-                    </strong>
-                    <AppStatusBadge label={priorityLabel(signal.priority)} />
+                  <h3 className="text-base font-semibold text-[var(--text-primary)]">
+                    {action.title}
+                  </h3>
+                  <p className="mt-3 text-sm text-[var(--text-secondary)]">
+                    <strong>Problema:</strong> {action.reason}
+                  </p>
+                  <p className="mt-2 text-sm text-[var(--text-secondary)]">
+                    <strong>Resultado esperado:</strong> {action.impact}
+                  </p>
+                  <p className="mt-2 text-xs text-[var(--text-muted)]">
+                    {action.safetyNote}
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => navigate(action.primaryPath)}
+                    >
+                      {action.primaryActionLabel}
+                    </Button>
+                    {action.secondaryActionLabel && action.secondaryPath ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => navigate(action.secondaryPath!)}
+                      >
+                        {action.secondaryActionLabel}
+                      </Button>
+                    ) : null}
                   </div>
-                  <p className="mt-2 text-xs text-[var(--text-secondary)]">
-                    Impacto: {signal.impact}
-                  </p>
-                  <p className="mt-1 text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                    Origem do sinal: {signal.title}
-                  </p>
                 </div>
               ))}
             </div>
           ) : (
             <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-3 text-sm text-[var(--text-secondary)]">
-              Operação governada sem restrição.
+              Nenhuma intervenção prioritária nesta leitura.
             </div>
           )}
         </AppSectionBlock>
 
         <AppSectionBlock
-          title="Impactos identificados"
-          subtitle="Consequências operacionais dos sinais atuais, com severidade explícita."
-          compact
+          title="Sinais críticos"
+          subtitle="Sinal | Severidade | Origem | Ação. Máximo de quatro sinais principais."
         >
-          <div className="grid gap-4 lg:grid-cols-4">
-            {[
-              {
-                title: "Risco de caixa",
-                consequence:
-                  overdueCharges.length > 0
-                    ? "Cobrança vencida pode pressionar caixa."
-                    : "Sem cobrança vencida retornada.",
-                severity: overdueCharges.length ? "Alta" : "Baixa",
-              },
-              {
-                title: "Perda de previsibilidade",
-                consequence:
-                  delayedOrders.length > 0
-                    ? "O.S. atrasadas reduzem confiança no prazo."
-                    : "Sem atraso de O.S. retornado.",
-                severity: delayedOrders.length ? "Alta" : "Baixa",
-              },
-              {
-                title: "Bloqueio de automações",
-                consequence:
-                  state === "RESTRICTED" || state === "SUSPENDED"
-                    ? "Estado restritivo orienta limitar ações."
-                    : "Sem bloqueio indicado pelo estado atual.",
-                severity:
-                  state === "RESTRICTED" || state === "SUSPENDED"
-                    ? "Alta"
-                    : "Baixa",
-              },
-              {
-                title: "Risco de governança",
-                consequence: hasRecentRun
-                  ? "Há execução recente para sustentar decisão."
-                  : "Sem execução recente registrada.",
-                severity: hasRecentRun ? "Média" : "Alta",
-              },
-            ].map(item => (
-              <div
-                key={item.title}
-                className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-4"
-              >
-                <h3 className="text-sm font-semibold text-[var(--text-primary)]">
-                  {item.title}
-                </h3>
-                <p className="mt-2 text-xs text-[var(--text-secondary)]">
-                  {item.consequence}
-                </p>
-                <div className="mt-3">
-                  <AppStatusBadge label={`Severidade ${item.severity}`} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </AppSectionBlock>
-
-        <section className="grid gap-4 xl:grid-cols-3">
-          <OperationalStateCard
-            level={state}
-            title="Estado operacional governado"
-            reason={stateReason}
-            impact={stateImpact}
-            detailsLabel="Ver histórico"
-            onDetails={() => navigate("/timeline?module=governance")}
-          />
-          <OperationalRiskCard
-            title={riskTitle}
-            reason={riskReason}
-            impact={riskImpact}
-            ctaLabel={dominantSignal?.cta ?? "Abrir Timeline"}
-            onClick={() =>
-              navigate(dominantSignal?.path ?? "/timeline?module=governance")
-            }
-          />
-          <NextBestActionCard
-            title={nextBestAction.title}
-            entity={nextBestAction.entity}
-            reason={nextBestAction.reason}
-            impact={nextBestAction.impact}
-            safetyNote={nextBestAction.safetyNote}
-            primaryActionLabel={nextBestAction.primaryActionLabel}
-            onPrimaryAction={() => navigate(nextBestAction.primaryPath)}
-            secondaryActionLabel={nextBestAction.secondaryActionLabel}
-            onSecondaryAction={
-              nextBestAction.secondaryPath
-                ? () => navigate(nextBestAction.secondaryPath!)
-                : undefined
-            }
-          />
-        </section>
-
-        <OperationalFlowCard
-          title="Sinal → Evidência → Impacto → Decisão → Política → Ação"
-          subtitle="Cadeia de decisão que transforma sinais operacionais em intervenção orientada, sem executar ações automaticamente."
-          stages={flowStages}
-        />
-
-        <EntityTimelineCard
-          title="Últimas decisões oficiais de governança"
-          subtitle="Prova operacional derivada somente do histórico real retornado por governança; não substitui a Timeline oficial."
-          events={timelineEvents}
-          fullTimelineLabel="Abrir Timeline completa"
-          onFullTimeline={() => navigate("/timeline?module=governance")}
-        />
-
-        <AppSectionBlock
-          title="Sinais críticos no momento"
-          subtitle="Lista operacional limitada aos quatro principais sinais da leitura atual."
-        >
-          <AppDataTable className="min-w-[820px]">
+          <AppDataTable className="min-w-[760px]">
             <thead>
               <tr className="border-b border-[var(--border-subtle)] text-left text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
                 <th className="px-3 py-2">Sinal</th>
-                <th className="px-3 py-2">Impacto</th>
-                <th className="px-3 py-2">Detectado há</th>
+                <th className="px-3 py-2">Severidade</th>
+                <th className="px-3 py-2">Origem</th>
                 <th className="px-3 py-2">Ação</th>
               </tr>
             </thead>
@@ -1000,10 +699,17 @@ export default function GovernancePage() {
                       {signal.title}
                     </td>
                     <td className="px-3 py-3 text-[var(--text-secondary)]">
-                      {priorityLabel(signal.priority)} — {signal.impact}
+                      {priorityLabel(signal.priority)}
                     </td>
                     <td className="px-3 py-3 text-[var(--text-secondary)]">
-                      Nesta leitura
+                      {signal.id === "overdue"
+                        ? "Financeiro"
+                        : signal.id === "late-orders" ||
+                            signal.id === "unassigned"
+                          ? "Ordens de Serviço"
+                          : signal.id === "appointments"
+                            ? "Agendamentos"
+                            : "Timeline/Governança"}
                     </td>
                     <td className="px-3 py-3">
                       <Button
@@ -1022,7 +728,7 @@ export default function GovernancePage() {
                     colSpan={4}
                     className="px-3 py-4 text-[var(--text-muted)]"
                   >
-                    Nenhum sinal relevante detectado nesta janela.
+                    Nenhum sinal crítico nesta leitura.
                   </td>
                 </tr>
               )}
@@ -1030,180 +736,85 @@ export default function GovernancePage() {
           </AppDataTable>
         </AppSectionBlock>
 
+        <OperationalFlowCard
+          title="Sinal → Evidência → Impacto → Decisão → Política → Ação"
+          subtitle="Fluxo compacto da decisão; CTAs apenas navegam, sem executar ações automaticamente."
+          stages={flowStages}
+        />
+
         <AppSectionBlock
-          title="Prova operacional"
-          subtitle="Extrato oficial das evidências que sustentam decisões de governança."
+          title="Evidências oficiais"
+          subtitle="Eventos e decisões retornados pela Timeline/Governança que sustentam o estado atual."
         >
-          <AppKpiRow
-            items={[
-              {
-                title: "Total de eventos",
-                value: String(runs.length),
-                hint: "Eventos oficiais retornados pela governança.",
-              },
-              {
-                title: "Eventos críticos",
-                value: String(
-                  signals.filter(item => item.priority === "critical").length
-                ),
-                hint: "Sinais com impacto crítico na operação.",
-              },
-              {
-                title: "Impactam receita",
-                value: String(overdueCharges.length),
-                hint: "Cobranças vencidas ligadas a risco de caixa.",
-              },
-              {
-                title: "Decisões tomadas",
-                value: String(runs.length),
-                hint: runs.length
-                  ? "Decisões retornadas pelo histórico."
-                  : "Nenhuma decisão oficial retornada nesta leitura.",
-              },
-            ]}
-          />
           {timelineEvents.length ? (
-            <div className="mt-4">
-              <AppDataTable className="min-w-[860px]">
-                <thead>
-                  <tr className="border-b border-[var(--border-subtle)] text-left text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                    <th className="px-3 py-2">Data/hora</th>
-                    <th className="px-3 py-2">Módulo</th>
-                    <th className="px-3 py-2">Evento humano</th>
-                    <th className="px-3 py-2">Entidade/cliente</th>
-                    <th className="px-3 py-2">Impacto</th>
-                    <th className="px-3 py-2">Status</th>
+            <AppDataTable className="min-w-[820px]">
+              <thead>
+                <tr className="border-b border-[var(--border-subtle)] text-left text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                  <th className="px-3 py-2">Data/hora</th>
+                  <th className="px-3 py-2">Módulo</th>
+                  <th className="px-3 py-2">Evento humano</th>
+                  <th className="px-3 py-2">Entidade</th>
+                  <th className="px-3 py-2">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {timelineEvents.map(event => (
+                  <tr
+                    key={event.id}
+                    className="border-b border-[var(--border-subtle)]/60"
+                  >
+                    <td className="px-3 py-3">{event.occurredAt}</td>
+                    <td className="px-3 py-3">Governança</td>
+                    <td className="px-3 py-3 text-[var(--text-primary)]">
+                      {event.summary}
+                    </td>
+                    <td className="px-3 py-3 text-[var(--text-secondary)]">
+                      {event.entity}
+                    </td>
+                    <td className="px-3 py-3">
+                      <AppStatusBadge label={state} />
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {timelineEvents.map(event => (
-                    <tr
-                      key={event.id}
-                      className="border-b border-[var(--border-subtle)]/60"
-                    >
-                      <td className="px-3 py-3">{event.occurredAt}</td>
-                      <td className="px-3 py-3">Governança</td>
-                      <td className="px-3 py-3 text-[var(--text-primary)]">
-                        {event.summary}
-                      </td>
-                      <td className="px-3 py-3 text-[var(--text-secondary)]">
-                        {event.entity}
-                      </td>
-                      <td className="px-3 py-3">{humanRiskLabel}</td>
-                      <td className="px-3 py-3">
-                        <AppStatusBadge label={state} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </AppDataTable>
-            </div>
+                ))}
+              </tbody>
+            </AppDataTable>
           ) : (
-            <div className="mt-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-3 text-sm text-[var(--text-secondary)]">
-              Nenhuma decisão oficial retornada nesta leitura.
+            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-3 text-sm text-[var(--text-secondary)]">
+              Nenhuma decisão oficial retornada nesta leitura. Use a Timeline
+              para investigar a trilha completa.
             </div>
           )}
         </AppSectionBlock>
 
         <AppSectionBlock
-          title="Ações do sistema"
-          subtitle="Alertas, automações e restrições que o sistema já aplicou ou registrou."
+          title="Detalhes de governança"
+          subtitle="O que o sistema fez, sem inferir política ou automação não retornada."
+          compact
         >
-          <AppKpiRow
-            items={executedActions.map(item => ({
-              title: item.label,
-              value: item.value,
-              hint: item.detail,
-            }))}
-            gridClassName="xl:grid-cols-3"
-          />
-        </AppSectionBlock>
-
-        <AppSectionBlock
-          title="Histórico de execuções"
-          subtitle="Mudanças de estado, execuções anteriores e eventos relevantes retornados pela governança."
-        >
-          <AppDataTable className="min-w-[760px]">
-            <thead>
-              <tr className="border-b border-[var(--border-subtle)] text-left text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                <th className="px-3 py-2">Quando</th>
-                <th className="px-3 py-2">Evento</th>
-                <th className="px-3 py-2">Estado</th>
-                <th className="px-3 py-2">Resumo</th>
-              </tr>
-            </thead>
-            <tbody>
-              {runs.length ? (
-                runs.slice(0, 12).map((run: any, index: number) => (
-                  <tr
-                    key={String(run?.id ?? index)}
-                    className="border-b border-[var(--border-subtle)]/60"
-                  >
-                    <td className="px-3 py-3">
-                      {formatDateTime(
-                        run?.createdAt ??
-                          run?.startedAt ??
-                          run?.occurredAt ??
-                          run?.finishedAt ??
-                          run?.completedAt
-                      )}
-                    </td>
-                    <td className="px-3 py-3 text-[var(--text-primary)]">
-                      {String(
-                        run?.event ?? run?.type ?? "Execução de governança"
-                      )}
-                    </td>
-                    <td className="px-3 py-3">
-                      <AppStatusBadge
-                        label={String(run?.state ?? run?.status ?? state)}
-                      />
-                    </td>
-                    <td className="px-3 py-3 text-[var(--text-secondary)]">
-                      {String(run?.summary ?? run?.message ?? stateCopy(state))}
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td
-                    colSpan={4}
-                    className="px-3 py-4 text-[var(--text-muted)]"
-                  >
-                    Nenhuma execução oficial retornada. A página não cria
-                    histórico fictício; use a Timeline completa ou aguarde uma
-                    execução real.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </AppDataTable>
-        </AppSectionBlock>
-
-        <AppSectionBlock
-          title="Políticas ativas"
-          subtitle="Condição, efeito e status das políticas retornadas ou derivadas dos sinais disponíveis."
-        >
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            {policyRows.map(item => (
-              <div
-                key={item.name}
-                className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-3"
-              >
-                <h3 className="text-sm font-semibold text-[var(--text-primary)]">
-                  {item.name}
-                </h3>
-                <p className="mt-2 text-xs text-[var(--text-secondary)]">
-                  {item.condition}
-                </p>
-                <p className="mt-1 text-xs text-[var(--text-secondary)]">
-                  {item.effect}
-                </p>
-                <div className="mt-3">
-                  <AppStatusBadge label={item.status} />
-                </div>
-              </div>
-            ))}
-          </div>
+          <ul className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-4 text-sm text-[var(--text-secondary)]">
+            <li>Alerta gerado: {signals.length > 0 ? "sim" : "não"}</li>
+            <li>
+              Restrição aplicada:{" "}
+              {state === "SUSPENDED" || state === "RESTRICTED" ? "sim" : "não"}
+            </li>
+            <li>
+              Ação automática registrada:{" "}
+              {metric(
+                summary,
+                "automaticActions",
+                "actionsExecuted",
+                "autoActions"
+              ) > 0
+                ? "sim"
+                : "não retornada"}
+            </li>
+            <li>
+              Política específica:{" "}
+              {policyPendingCount || policyAppliedCount
+                ? "retornada"
+                : "não retornada"}
+            </li>
+          </ul>
         </AppSectionBlock>
       </AppPageShell>
     </PageWrapper>
