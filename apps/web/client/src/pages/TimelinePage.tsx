@@ -181,17 +181,17 @@ export function humanizeTimelineAction(action: string) {
   const labels: Record<string, string> = {
     PAYMENT_RECEIVED: "Pagamento recebido",
     CHARGE_CREATED: "Cobrança criada",
-    EXECUTION_BLOCKED: "Ação bloqueada por segurança",
-    SERVICE_ORDER_COMPLETED: "O.S. concluída",
+    EXECUTION_BLOCKED: "Bloqueio operacional registrado",
+    SERVICE_ORDER_COMPLETED: "Ordem de serviço concluída",
     APPOINTMENT_CONFIRMED: "Agendamento confirmado",
     MESSAGE_SENT: "Mensagem enviada",
-    GOVERNANCE_RUN_COMPLETED: "Governança executada",
-    RISK_UPDATED: "Risco atualizado",
+    GOVERNANCE_RUN_COMPLETED: "Verificação de governança concluída",
+    RISK_UPDATED: "Sinal de risco atualizado",
     MESSAGE_FAILED: "Mensagem com falha",
   };
   const slugLabels: Record<string, string> = {
-    "action-send-overdue-charge-reminder":
-      "Lembrete de cobrança vencida bloqueado",
+    "action-send-overdue-charge-reminder": "Lembrete de cobrança bloqueado",
+    "action-create-charge-followup": "Acompanhamento de cobrança bloqueado",
   };
   const raw = String(action ?? "").trim();
   if (slugLabels[raw]) return slugLabels[raw];
@@ -200,6 +200,38 @@ export function humanizeTimelineAction(action: string) {
     return "Evento operacional registrado";
   }
   return raw || "Evento operacional registrado";
+}
+
+function eventAutomationSlug(event: TimelineEvent) {
+  const metadata = metadataRecord(event);
+  return [
+    event?.automationSlug,
+    event?.workflowSlug,
+    event?.executionSlug,
+    event?.actionSlug,
+    event?.actionKey,
+    event?.automationAction,
+    metadata.automationSlug,
+    metadata.workflowSlug,
+    metadata.executionSlug,
+    metadata.actionSlug,
+    metadata.actionKey,
+    metadata.automationAction,
+    metadata.action,
+    metadata.reason,
+    metadata.command,
+  ]
+    .map(value => text(value, ""))
+    .find(value => value.startsWith("action-"));
+}
+
+function eventHumanTitle(event: TimelineEvent) {
+  const action = eventAction(event);
+  const slug = eventAutomationSlug(event);
+  if (action === "EXECUTION_BLOCKED" && slug) {
+    return humanizeTimelineAction(slug);
+  }
+  return humanizeTimelineAction(text(event?.action ?? event?.type, action));
 }
 
 function isTechnicalEventText(value: string) {
@@ -213,31 +245,14 @@ function isTechnicalEventText(value: string) {
 }
 
 function eventHumanFallback(event: TimelineEvent) {
-  const action = eventAction(event);
-  const entity = eventEntityLabel(event);
-  const entityId = eventEntityId(event);
+  const entity = eventPrimarySubject(event);
   const when = formatDateTime(event?.createdAt);
 
-  if (event?.chargeId || eventModule(event) === "finance") {
-    return `${humanizeTimelineAction(action)} registrado para ${entity} #${entityId} em ${when}`;
-  }
-  if (event?.serviceOrderId || eventModule(event) === "service_order") {
-    return `${humanizeTimelineAction(action)} vinculado à O.S. #${entityId} em ${when}`;
-  }
-  if (event?.appointmentId || eventModule(event) === "appointment") {
-    return `${humanizeTimelineAction(action)} vinculado ao agendamento #${entityId} em ${when}`;
-  }
-  if (event?.customerId || eventModule(event) === "customer") {
-    return `${humanizeTimelineAction(action)} vinculado ao cliente #${entityId} em ${when}`;
-  }
-  return `${humanizeTimelineAction(action)} registrado para ${entity} #${entityId} em ${when}`;
+  return `${eventHumanTitle(event)} registrado para ${entity} em ${when}`;
 }
 
 function eventDisplayTitle(event: TimelineEvent) {
-  const action = eventAction(event);
-  const actionLabel = humanizeTimelineAction(
-    text(event?.action ?? event?.type, action)
-  );
+  const actionLabel = eventHumanTitle(event);
   if (actionLabel !== "Evento operacional registrado") return actionLabel;
   const explicit = text(
     event?.summary ?? event?.title ?? event?.description,
@@ -286,6 +301,65 @@ export function eventEntityId(event: TimelineEvent) {
 export function eventCustomerId(event: TimelineEvent) {
   const metadata = metadataRecord(event);
   return text(event?.customerId ?? metadata.customerId, "");
+}
+
+function eventCustomerName(event: TimelineEvent) {
+  const metadata = metadataRecord(event);
+  return text(
+    event?.customerName ??
+      event?.personName ??
+      metadata.customerName ??
+      metadata.clientName ??
+      metadata.personName,
+    ""
+  );
+}
+
+function eventPrimarySubject(event: TimelineEvent) {
+  const customerName = eventCustomerName(event);
+  if (customerName) return customerName;
+
+  const metadata = metadataRecord(event);
+  const chargeReference = text(
+    event?.chargeNumber ?? event?.chargeCode ?? metadata.chargeNumber,
+    ""
+  );
+  if (event?.chargeId || chargeReference) {
+    return chargeReference ? `Cobrança ${chargeReference}` : "Cobrança";
+  }
+
+  const serviceOrderReference = text(
+    event?.serviceOrderNumber ??
+      event?.serviceOrderCode ??
+      metadata.serviceOrderNumber,
+    ""
+  );
+  if (event?.serviceOrderId || serviceOrderReference) {
+    return serviceOrderReference
+      ? `O.S. ${serviceOrderReference}`
+      : "Ordem de serviço";
+  }
+
+  const appointmentReference = text(
+    event?.appointmentNumber ??
+      event?.appointmentCode ??
+      metadata.appointmentNumber,
+    ""
+  );
+  if (event?.appointmentId || appointmentReference) {
+    return appointmentReference
+      ? `Agendamento ${appointmentReference}`
+      : "Agendamento";
+  }
+
+  const entityId = eventEntityId(event);
+  if (entityId !== "—") return `ID ${entityId}`;
+  return "Entidade não informada";
+}
+
+function eventTechnicalIdSummary(event: TimelineEvent) {
+  const id = eventEntityId(event);
+  return id === "—" ? "ID não informado" : `ID: ${id}`;
 }
 
 export function eventModule(event: TimelineEvent): ModuleFilter {
@@ -427,6 +501,30 @@ function eventReason(event: TimelineEvent) {
   return eventHumanFallback(event);
 }
 
+function eventOperationalConsequence(event: TimelineEvent) {
+  const title = eventDisplayTitle(event).toLowerCase();
+  const module = eventModule(event);
+  if (title.includes("lembrete de cobrança bloqueado"))
+    return "Receita permanece sem contato enquanto o bloqueio não for revisado.";
+  if (title.includes("acompanhamento de cobrança bloqueado"))
+    return "Cobrança vencida fica sem acompanhamento operacional seguro.";
+  if (module === "finance" && eventSeverity(event) !== "low")
+    return "Pode afetar caixa, cobrança e governança de receita.";
+  if (module === "service_order" && eventSeverity(event) !== "low")
+    return "Pode gerar atraso de execução, retrabalho ou ruptura de SLA.";
+  if (module === "appointment" && eventSeverity(event) !== "low")
+    return "Pode comprometer agenda, capacidade operacional e continuidade.";
+  if (module === "whatsapp" && eventSeverity(event) !== "low")
+    return "Comunicação pode ficar sem resposta ou exigir diagnóstico.";
+  if (module === "governance")
+    return "Evidência orienta decisão, auditoria ou restrição operacional.";
+  return "Histórico operacional preservado para auditoria e consulta.";
+}
+
+function eventRecommendedAction(event: TimelineEvent) {
+  return eventRealCtas(event)[0]?.label ?? "Ver no feed";
+}
+
 function eventRoute(event: TimelineEvent) {
   if (event?.customerId) return "/customers";
   if (event?.appointmentId) return "/appointments";
@@ -533,11 +631,44 @@ function eventRealCtas(event: TimelineEvent) {
   return ctas;
 }
 
+function eventTone(event: TimelineEvent) {
+  const action = eventAction(event);
+  const title = eventDisplayTitle(event).toLowerCase();
+  if (
+    action === "EXECUTION_BLOCKED" ||
+    title.includes("falha") ||
+    title.includes("bloque") ||
+    title.includes("restri")
+  )
+    return "critical";
+  if (
+    action === "PAYMENT_RECEIVED" ||
+    action === "SERVICE_ORDER_COMPLETED" ||
+    action === "APPOINTMENT_CONFIRMED"
+  )
+    return "success";
+  if (
+    action === "CHARGE_CREATED" ||
+    action === "MESSAGE_SENT" ||
+    action === "RISK_UPDATED"
+  )
+    return "attention";
+  if (eventModule(event) === "governance") return "info";
+  return eventSeverity(event) === "critical" ? "critical" : "info";
+}
+
 function severityColorClass(severity: Exclude<SeverityFilter, "all">) {
   if (severity === "critical") return "text-[var(--danger)]";
   if (severity === "high") return "text-[var(--warning)]";
   if (severity === "medium") return "text-[var(--accent-primary)]";
   return "text-[var(--text-muted)]";
+}
+
+function toneColorClass(tone: ReturnType<typeof eventTone>) {
+  if (tone === "critical") return "text-[var(--danger)]";
+  if (tone === "success") return "text-[var(--success)]";
+  if (tone === "attention") return "text-[var(--warning)]";
+  return "text-[var(--accent-primary)]";
 }
 
 function timelineItemClass({
@@ -562,16 +693,12 @@ function timelineItemClass({
   return "cursor-pointer border border-l-4 border-[var(--border-subtle)] bg-[var(--surface-base)]/70";
 }
 
-function EventIcon({
-  module,
-  severity,
-}: {
-  module: ModuleFilter;
-  severity: Exclude<SeverityFilter, "all">;
-}) {
-  const colorClass = severityColorClass(severity);
-  if (severity === "critical")
-    return <Siren className={`h-4 w-4 ${colorClass}`} />;
+function EventIcon({ event }: { event: TimelineEvent }) {
+  const module = eventModule(event);
+  const severity = eventSeverity(event);
+  const tone = eventTone(event);
+  const colorClass = toneColorClass(tone);
+  if (tone === "critical") return <Siren className={`h-4 w-4 ${colorClass}`} />;
   if (module === "governance") {
     const Icon = severity === "high" ? ShieldAlert : ShieldCheck;
     return <Icon className={`h-4 w-4 ${colorClass}`} />;
@@ -610,6 +737,25 @@ function eventEvidenceBucket(event: TimelineEvent) {
   ]
     .join(" ")
     .toLowerCase();
+}
+
+function eventGroupKey(event: TimelineEvent) {
+  return `${eventModule(event)}:${eventDisplayTitle(event)}`;
+}
+
+function summarizeEvidenceGroups(events: TimelineEvent[]) {
+  const groups = new Map<string, TimelineEvent[]>();
+  events.forEach(event => {
+    const key = eventGroupKey(event);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)?.push(event);
+  });
+  return Array.from(groups.entries()).map(([key, items]) => ({
+    key,
+    module: eventModule(items[0]),
+    title: eventDisplayTitle(items[0]),
+    items,
+  }));
 }
 
 function isFinancialRiskEvent(event: TimelineEvent) {
@@ -773,6 +919,9 @@ export default function TimelinePage() {
   const [responsibleFilter, setResponsibleFilter] = useState("all");
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("all");
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [expandedEvidenceGroups, setExpandedEvidenceGroups] = useState<
+    Record<string, boolean>
+  >({});
   const [currentPage, setCurrentPage] = useState(1);
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [cursor, setCursor] = useState<string | undefined>(undefined);
@@ -832,7 +981,7 @@ export default function TimelinePage() {
     );
     return values
       .slice(0, 30)
-      .map(value => ({ value, label: `Cliente #${value}` }));
+      .map(value => ({ value, label: `Cliente ${value}` }));
   }, [events]);
 
   const responsibleOptions = useMemo(() => {
@@ -1129,7 +1278,7 @@ export default function TimelinePage() {
     }
 
     const module = eventModule(selected);
-    const entity = `${eventEntityLabel(selected)} #${eventEntityId(selected)}`;
+    const entity = eventPrimarySubject(selected);
     const when = formatDateTime(selected?.createdAt);
 
     if (isFinancialRiskEvent(selected)) {
@@ -1225,7 +1374,7 @@ export default function TimelinePage() {
       };
     }
 
-    const entity = `${eventEntityLabel(selected)} #${eventEntityId(selected)}`;
+    const entity = eventPrimarySubject(selected);
     const reason = `${eventReason(selected)} Evidência registrada em ${formatDateTime(selected?.createdAt)} por ${eventActorLabel(selected)}.`;
     const base = {
       entity,
@@ -1426,9 +1575,9 @@ export default function TimelinePage() {
           ),
           type: eventSeverityLabel(eventSeverity(event)),
           occurredAt: formatDateTime(event?.createdAt),
-          entity: `${eventEntityLabel(event)} #${eventEntityId(event)}`,
+          entity: eventPrimarySubject(event),
           actor: eventActorLabel(event),
-          summary: eventReason(event),
+          summary: eventOperationalConsequence(event),
         })),
     [filteredEvents]
   );
@@ -1452,7 +1601,7 @@ export default function TimelinePage() {
 
   function exportCsv() {
     const headers = [
-      "tipo",
+      "evento_humano",
       "descricao",
       "entidade",
       "entidade_id",
@@ -1464,7 +1613,7 @@ export default function TimelinePage() {
     ];
 
     const rows = filteredEvents.map(item => [
-      eventAction(item),
+      eventDisplayTitle(item),
       text(eventReason(item), ""),
       eventEntityLabel(item),
       eventEntityId(item),
@@ -1767,84 +1916,139 @@ export default function TimelinePage() {
                     {dateLabel}
                   </p>
                   <AppTimeline>
-                    {dayEvents.map(event => {
-                      const module = eventModule(event);
-                      const severity = eventSeverity(event);
-                      const isSelected =
-                        String(event?.id) === String(selectedEvent?.id ?? "");
+                    {summarizeEvidenceGroups(dayEvents).map(group => {
+                      const isExpanded =
+                        expandedEvidenceGroups[group.key] ??
+                        group.items.length <= 2;
+                      const countsByTitle = `${group.items.length} evidência(s) de ${group.title.toLowerCase()}`;
 
                       return (
-                        <AppTimelineItem
-                          key={String(
-                            event?.id ??
-                              `${eventEntityId(event)}-${event?.createdAt}`
-                          )}
-                          className={timelineItemClass({
-                            isSelected,
-                            severity,
-                            module,
-                          })}
-                          onClick={() => setSelectedEventId(String(event?.id))}
-                        >
-                          <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2">
-                                <EventIcon
-                                  module={module}
-                                  severity={severity}
-                                />
-                                <span className="text-xs font-semibold text-[var(--text-muted)]">
-                                  {formatEventTime(event?.createdAt)}
-                                </span>
-                                <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
-                                  {eventDisplayTitle(event)}
-                                </p>
-                              </div>
-                              <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                                {eventReason(event)}
-                              </p>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <AppPriorityBadge
-                                label={eventSeverityLabel(severity)}
-                              />
-                              <AppStatusBadge
-                                label={eventModuleLabel(module)}
-                              />
-                            </div>
-                          </div>
+                        <div key={group.key} className="space-y-2">
+                          {group.items.length > 2 ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExpandedEvidenceGroups(prev => ({
+                                  ...prev,
+                                  [group.key]: !isExpanded,
+                                }))
+                              }
+                              className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-3 text-left"
+                            >
+                              <span className="text-xs font-semibold text-[var(--text-muted)]">
+                                {eventModuleLabel(group.module)}
+                              </span>
+                              <strong className="mt-1 block text-sm text-[var(--text-primary)]">
+                                {group.items.length} evidências
+                              </strong>
+                              <span className="mt-1 block text-xs text-[var(--text-secondary)]">
+                                {countsByTitle}.{" "}
+                                {isExpanded
+                                  ? "Ocultar detalhes"
+                                  : "Expandir detalhes"}
+                                .
+                              </span>
+                            </button>
+                          ) : null}
 
-                          <div className="mt-2 grid gap-1 text-xs text-[var(--text-muted)] md:grid-cols-2">
-                            <p>
-                              Entidade: {eventEntityLabel(event)} #
-                              {eventEntityId(event)}
-                            </p>
-                            <p>Quem: {eventActorLabel(event)}</p>
-                            <p>Quando: {formatDateTime(event?.createdAt)}</p>
-                            <p>Ação segura: Ver no feed</p>
-                            <p>Módulo: {eventModuleLabel(module)}</p>
-                          </div>
-                          {usefulMetadataPairs(event).length > 0 ? (
-                            <div className="mt-2 flex flex-wrap gap-1">
-                              {usefulMetadataPairs(event)
-                                .slice(0, 3)
-                                .map(pair => (
-                                  <span
-                                    key={pair.key}
-                                    className="rounded-md border border-[var(--border-subtle)] px-2 py-1 text-[11px] text-[var(--text-muted)]"
-                                  >
-                                    {pair.key}: {pair.value}
-                                  </span>
-                                ))}
-                            </div>
-                          ) : null}
-                          {eventAuditFallbacks(event).length > 0 ? (
-                            <p className="mt-2 text-xs text-[var(--text-muted)]">
-                              Fallback honesto:{" "}
-                              {eventAuditFallbacks(event).join("; ")}.
-                            </p>
-                          ) : null}
-                        </AppTimelineItem>
+                          {(isExpanded
+                            ? group.items
+                            : group.items.slice(0, 1)
+                          ).map(event => {
+                            const module = eventModule(event);
+                            const severity = eventSeverity(event);
+                            const isSelected =
+                              String(event?.id) ===
+                              String(selectedEvent?.id ?? "");
+
+                            return (
+                              <AppTimelineItem
+                                key={String(
+                                  event?.id ??
+                                    `${eventEntityId(event)}-${event?.createdAt}`
+                                )}
+                                className={timelineItemClass({
+                                  isSelected,
+                                  severity,
+                                  module,
+                                })}
+                                onClick={() =>
+                                  setSelectedEventId(String(event?.id))
+                                }
+                              >
+                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <EventIcon event={event} />
+                                      <span className="text-xs font-semibold text-[var(--text-muted)]">
+                                        {formatEventTime(event?.createdAt)}
+                                      </span>
+                                      <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
+                                        {eventDisplayTitle(event)}
+                                      </p>
+                                    </div>
+                                    <div className="mt-2 grid gap-2 text-xs text-[var(--text-secondary)] md:grid-cols-2">
+                                      <p>
+                                        <strong>Consequência:</strong>{" "}
+                                        {eventOperationalConsequence(event)}
+                                      </p>
+                                      <p>
+                                        <strong>Impactado:</strong>{" "}
+                                        {eventPrimarySubject(event)}
+                                      </p>
+                                      <p>
+                                        <strong>Módulo:</strong>{" "}
+                                        {eventModuleLabel(module)}
+                                      </p>
+                                      <p>
+                                        <strong>Ação segura:</strong>{" "}
+                                        {eventRecommendedAction(event)}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <AppPriorityBadge
+                                      label={eventSeverityLabel(severity)}
+                                    />
+                                    <AppStatusBadge
+                                      label={eventModuleLabel(module)}
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="mt-2 grid gap-1 text-xs text-[var(--text-muted)] md:grid-cols-2">
+                                  <p>Quem: {eventActorLabel(event)}</p>
+                                  <p>
+                                    Quando: {formatDateTime(event?.createdAt)}
+                                  </p>
+                                  <p>
+                                    Entidade: {eventTechnicalIdSummary(event)}
+                                  </p>
+                                </div>
+                                {usefulMetadataPairs(event).length > 0 ? (
+                                  <div className="mt-2 flex flex-wrap gap-1">
+                                    {usefulMetadataPairs(event)
+                                      .slice(0, 3)
+                                      .map(pair => (
+                                        <span
+                                          key={pair.key}
+                                          className="rounded-md border border-[var(--border-subtle)] px-2 py-1 text-[11px] text-[var(--text-muted)]"
+                                        >
+                                          {pair.key}: {pair.value}
+                                        </span>
+                                      ))}
+                                  </div>
+                                ) : null}
+                                {eventAuditFallbacks(event).length > 0 ? (
+                                  <p className="mt-2 text-xs text-[var(--text-muted)]">
+                                    Fallback honesto:{" "}
+                                    {eventAuditFallbacks(event).join("; ")}.
+                                  </p>
+                                ) : null}
+                              </AppTimelineItem>
+                            );
+                          })}
+                        </div>
                       );
                     })}
                   </AppTimeline>
@@ -1902,15 +2106,21 @@ export default function TimelinePage() {
                 </p>
               </div>
 
+              <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/60 p-3 text-sm">
+                <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                  Consequência operacional
+                </p>
+                <p className="mt-1 text-[var(--text-secondary)]">
+                  {eventOperationalConsequence(selectedEvent)}
+                </p>
+              </div>
+
               <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)]/60 p-3">
                 <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
                   Quem foi impactado
                 </p>
                 <ul className="mt-2 space-y-1 text-xs text-[var(--text-secondary)]">
-                  <li>
-                    Entidade: {eventEntityLabel(selectedEvent)} #
-                    {eventEntityId(selectedEvent)}
-                  </li>
+                  <li>Impactado: {eventPrimarySubject(selectedEvent)}</li>
                   <li>Responsável: {eventActorLabel(selectedEvent)}</li>
                   <li>Data/hora: {formatDateTime(selectedEvent?.createdAt)}</li>
                   <li>
@@ -1927,6 +2137,9 @@ export default function TimelinePage() {
                   <div className="mt-3 border-t border-[var(--border-subtle)] pt-3">
                     <p className="text-xs font-semibold text-[var(--text-primary)]">
                       Resumo técnico
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--text-muted)]">
+                      {eventTechnicalIdSummary(selectedEvent)}
                     </p>
                     <dl className="mt-2 grid gap-1 text-xs text-[var(--text-secondary)]">
                       {usefulMetadataPairs(selectedEvent).map(pair => (
@@ -2090,10 +2303,7 @@ export default function TimelinePage() {
                     {eventDisplayTitle(event)}
                   </td>
                   <td className="p-3 text-[var(--text-secondary)]">
-                    {eventEntityLabel(event)} #{eventEntityId(event)}{" "}
-                    {eventCustomerId(event)
-                      ? `· Cliente #${eventCustomerId(event)}`
-                      : ""}
+                    {eventPrimarySubject(event)}
                   </td>
                   <td className="p-3">
                     {eventSeverityLabel(eventSeverity(event))}
