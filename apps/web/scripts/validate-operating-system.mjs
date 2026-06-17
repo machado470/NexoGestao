@@ -59,11 +59,23 @@ function stripDarkScopedClassTokens(line) {
 
 const forbiddenClasses = [
   "bg-zinc-900",
+  "bg-slate-950",
   "bg-slate-900",
   "bg-black",
   "dark:bg-black",
   "dark:bg-zinc-900",
+  "dark:bg-slate-950",
   "dark:bg-slate-900",
+];
+
+const operatingSystemVisualWarnings = [
+  "text-white",
+  "border-white",
+  "bg-zinc-900",
+  "bg-slate-950",
+  "bg-black",
+  "dark:bg",
+  "dark:border",
 ];
 
 const suspiciousVisualTokens = [
@@ -158,7 +170,9 @@ for (const page of pages) {
     /\bOperationalTopCard\b/.test(source) ||
     /\bNexoActionGroup\b/.test(source) ||
     (/\bAppSectionCard\b/.test(source) &&
-      /Próxima decisão financeira|Próxima decisão da carteira|Próxima melhor ação/.test(source));
+      /Próxima decisão financeira|Próxima decisão da carteira|Próxima melhor ação/.test(
+        source
+      ));
   if (!hasLegacyActionBar && !hasNexoActionContract) {
     errors.push(
       `${page}: contrato de ações ausente (esperado ActionBarWrapper legado, OperationalTopCard/NexoActionGroup ou bloco oficial AppSectionCard do Nexo).`
@@ -206,6 +220,23 @@ for (const page of pages) {
 
 for (const file of styleScopeFiles) {
   const source = readFileSync(join(root, file), "utf8");
+  for (const token of operatingSystemVisualWarnings) {
+    if (source.includes(token)) {
+      warnings.push(
+        `${file}: revisar hardcode visual (${token}); prefira tokens --app-* ou componentes AppSectionCard/AppActionCard.`
+      );
+    }
+  }
+
+  if (
+    /className=[{]?['"`][^'"`]*(rounded-(?:xl|2xl)|p-[468])/.test(source) &&
+    !/AppSectionCard|AppActionCard|NexoOperationalState/.test(source)
+  ) {
+    warnings.push(
+      `${file}: possível card direto em página sem componente operacional oficial.`
+    );
+  }
+
   for (const forbidden of forbiddenClasses) {
     if (source.includes(forbidden)) {
       errors.push(
@@ -265,7 +296,10 @@ for (const file of modalContrastScopeFiles) {
   });
 }
 
-const serviceOrdersSource = readFileSync(join(root, "client/src/pages/ServiceOrdersPage.tsx"), "utf8");
+const serviceOrdersSource = readFileSync(
+  join(root, "client/src/pages/ServiceOrdersPage.tsx"),
+  "utf8"
+);
 const serviceOrdersExecutionContract = [
   "Centro real de execução operacional",
   "Alertas compactos: atraso, parada, responsável e cobrança.",

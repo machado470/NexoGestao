@@ -84,17 +84,16 @@ export function MainLayout({ children }: MainLayoutProps) {
   // KPI/top-metrics são definidos por página (dashboard forte, módulos contextuais).
   // O layout principal não deve injetar cards globais para evitar regressão estrutural.
   const [location, navigate] = useLocation();
-  const { role, user, logout, isLoggingOut, loading, isAuthenticated } = useAuth();
+  const { role, user, logout, isLoggingOut, loading, isAuthenticated } =
+    useAuth();
   const { theme, toggleTheme } = useTheme();
   const notifications = useNotificationStore(state => state.notifications);
   const clearNotifications = useNotificationStore(state => state.clear);
   const removeNotification = useNotificationStore(state => state.remove);
 
   const isMobile = useIsMobile();
-  const [sidebarCollapsed, setSidebarCollapsed] = useOperationalMemoryState<boolean>(
-    SIDEBAR_COLLAPSED_STORAGE_KEY,
-    true
-  );
+  const [sidebarCollapsed, setSidebarCollapsed] =
+    useOperationalMemoryState<boolean>(SIDEBAR_COLLAPSED_STORAGE_KEY, true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useAutomationRunner({ navigate, enabled: isAuthenticated });
@@ -111,7 +110,11 @@ export function MainLayout({ children }: MainLayoutProps) {
   }
 
   useEffect(() => {
-    if (!import.meta.env.DEV || import.meta.env.VITE_BOOT_DIAGNOSTICS !== "true") return;
+    if (
+      !import.meta.env.DEV ||
+      import.meta.env.VITE_BOOT_DIAGNOSTICS !== "true"
+    )
+      return;
     // eslint-disable-next-line no-console
     console.log("[boot] MainLayout mounted");
     return () => {
@@ -152,17 +155,11 @@ export function MainLayout({ children }: MainLayoutProps) {
           icon: Briefcase,
           permissions: ["orders:read"],
         },
-        {
-          id: "whatsapp",
-          label: "WhatsApp",
-          route: "/whatsapp",
-          icon: MessageCircle,
-        },
       ],
     },
     {
-      id: "financeiro",
-      label: "Financeiro",
+      id: "controle",
+      label: "Controle",
       items: [
         {
           id: "finances",
@@ -172,11 +169,17 @@ export function MainLayout({ children }: MainLayoutProps) {
           permissions: ["finance:read"],
         },
         {
-          id: "billing",
-          label: "Planos",
-          route: "/billing",
-          icon: CreditCard,
-          permissions: ["settings:manage"],
+          id: "whatsapp",
+          label: "WhatsApp",
+          route: "/whatsapp",
+          icon: MessageCircle,
+        },
+        {
+          id: "timeline",
+          label: "Timeline",
+          route: "/timeline",
+          icon: History,
+          permissions: ["reports:read"],
         },
       ],
     },
@@ -192,31 +195,31 @@ export function MainLayout({ children }: MainLayoutProps) {
           permissions: ["appointments:read"],
         },
         {
-          id: "timeline",
-          label: "Timeline",
-          route: "/timeline",
-          icon: History,
-          permissions: ["reports:read"],
-        },
-        {
           id: "governance",
           label: "Governança",
           route: "/governance",
           icon: Shield,
           permissions: ["governance:read"],
         },
-      ],
-    },
-    {
-      id: "administracao",
-      label: "Administração",
-      items: [
         {
           id: "people",
           label: "Pessoas",
           route: "/people",
           icon: Building2,
           permissions: ["people:manage"],
+        },
+      ],
+    },
+    {
+      id: "sistema",
+      label: "Sistema",
+      items: [
+        {
+          id: "billing",
+          label: "Planos",
+          route: "/billing",
+          icon: CreditCard,
+          permissions: ["settings:manage"],
         },
         {
           id: "audit",
@@ -247,7 +250,11 @@ export function MainLayout({ children }: MainLayoutProps) {
         .map(section => ({
           ...section,
           items: section.items.filter(item => {
-            if (item.requiredRoles?.length && (!role || !item.requiredRoles.includes(role))) return false;
+            if (
+              item.requiredRoles?.length &&
+              (!role || !item.requiredRoles.includes(role))
+            )
+              return false;
             if (!item.permissions?.length) return true;
             if (!role) return false;
             return canAny(role, item.permissions);
@@ -355,8 +362,16 @@ export function MainLayout({ children }: MainLayoutProps) {
                   <button
                     type="button"
                     onClick={() => setSidebarCollapsed(prev => !prev)}
-                    aria-label={sidebarCollapsed ? "Expandir menu lateral" : "Recolher menu lateral"}
-                    title={sidebarCollapsed ? "Expandir menu lateral" : "Recolher menu lateral"}
+                    aria-label={
+                      sidebarCollapsed
+                        ? "Expandir menu lateral"
+                        : "Recolher menu lateral"
+                    }
+                    title={
+                      sidebarCollapsed
+                        ? "Expandir menu lateral"
+                        : "Recolher menu lateral"
+                    }
                     className={`rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-muted)] transition hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/35 ${
                       isDesktopCollapsedSidebar
                         ? "absolute right-1.5 top-1/2 -translate-y-1/2"
@@ -434,8 +449,12 @@ export function MainLayout({ children }: MainLayoutProps) {
               <button
                 type="button"
                 onClick={toggleTheme}
-                title={theme === "dark" ? "Ativar tema claro" : "Ativar tema escuro"}
-                aria-label={theme === "dark" ? "Ativar tema claro" : "Ativar tema escuro"}
+                title={
+                  theme === "dark" ? "Ativar tema claro" : "Ativar tema escuro"
+                }
+                aria-label={
+                  theme === "dark" ? "Ativar tema claro" : "Ativar tema escuro"
+                }
                 className={`nexo-sidebar-item w-full ${sidebarCollapsed && !isMobile ? "h-11 justify-center px-0" : ""}`}
               >
                 {theme === "dark" ? (
@@ -451,8 +470,12 @@ export function MainLayout({ children }: MainLayoutProps) {
           </NexoSidebar>
 
           <div
-            data-sidebar-collapsed={!isMobile && sidebarCollapsed ? "true" : "false"}
-            data-sidebar-expanded={!isMobile && !sidebarCollapsed ? "true" : "false"}
+            data-sidebar-collapsed={
+              !isMobile && sidebarCollapsed ? "true" : "false"
+            }
+            data-sidebar-expanded={
+              !isMobile && !sidebarCollapsed ? "true" : "false"
+            }
             className="flex min-w-0 flex-1 flex-col"
             style={
               !isMobile

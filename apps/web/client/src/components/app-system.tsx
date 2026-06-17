@@ -42,7 +42,13 @@ import {
   NexoStatCard,
   DataTable,
 } from "@/components/design-system";
-import { MoreHorizontal } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Lock,
+  MoreHorizontal,
+  ShieldAlert,
+} from "lucide-react";
 import { useActionHandler } from "@/hooks/useActionHandler";
 import type { AppAction } from "@/lib/actions/types";
 
@@ -99,16 +105,40 @@ export function AppToolbar({ className, ...props }: ComponentProps<"div">) {
 
 export const AppFiltersBar = AppToolbar;
 
+const appSectionCardVariants = cva(
+  "nexo-card-kpi rounded-2xl border p-4 md:p-5",
+  {
+    variants: {
+      variant: {
+        default:
+          "border-[var(--app-border-subtle)]/85 bg-[var(--app-surface-1)]",
+        decision:
+          "border-[var(--app-border-strong)] bg-[linear-gradient(135deg,var(--app-surface-2),var(--app-surface-1))] shadow-[var(--app-shadow-elevated)]",
+        action:
+          "border-[color-mix(in_srgb,var(--app-accent)_34%,var(--app-border-subtle))] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--app-accent)_10%,var(--app-surface-1)),var(--app-surface-1))]",
+        context: "border-[var(--app-border-subtle)] bg-[var(--app-surface-1)]",
+        evidence:
+          "border-[color-mix(in_srgb,var(--app-border-subtle)_78%,transparent)] bg-[var(--app-surface-1)] shadow-none",
+        critical:
+          "border-[var(--app-border-critical)] bg-[var(--app-surface-critical)] shadow-[var(--app-glow-critical)]",
+        warning:
+          "border-[var(--app-border-warning)] bg-[var(--app-surface-warning)]",
+        success:
+          "border-[color-mix(in_srgb,var(--app-success)_42%,var(--app-border-subtle))] bg-[var(--app-surface-success)]",
+      },
+    },
+    defaultVariants: { variant: "default" },
+  }
+);
+
 export function AppSectionCard({
   className,
+  variant,
   ...props
-}: ComponentProps<"section">) {
+}: ComponentProps<"section"> & VariantProps<typeof appSectionCardVariants>) {
   return (
     <section
-      className={cn(
-        "nexo-card-kpi rounded-2xl border border-[var(--border-subtle)]/85 p-4 md:p-5",
-        className
-      )}
+      className={cn(appSectionCardVariants({ variant }), className)}
       {...props}
     />
   );
@@ -516,7 +546,38 @@ export function AppTimeline({ className, ...props }: ComponentProps<"ol">) {
 }
 
 export function AppTimelineItem({ className, ...props }: ComponentProps<"li">) {
-  return <li className={cn("nexo-card-timeline p-3", className)} {...props} />;
+  return (
+    <li
+      className={cn(
+        "nexo-card-timeline rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-surface-1)] p-3 shadow-none",
+        className
+      )}
+      {...props}
+    />
+  );
+}
+
+export function AppTrendHint({
+  label,
+  tone = "neutral",
+  className,
+}: {
+  label?: string | null;
+  tone?: "success" | "warning" | "danger" | "neutral";
+  className?: string;
+}) {
+  if (!label) return null;
+  const toneClass = {
+    success: "text-[var(--app-success)]",
+    warning: "text-[var(--app-warning)]",
+    danger: "text-[var(--app-danger)]",
+    neutral: "text-[var(--app-text-muted)]",
+  }[tone];
+  return (
+    <span className={cn("text-xs font-medium", toneClass, className)}>
+      {label}
+    </span>
+  );
 }
 
 export const AppActivityFeed = AppTimeline;
@@ -542,6 +603,250 @@ const operationalStateTone: Record<
   RESTRICTED: { badgeTone: "accent", borderClass: "border-[var(--accent)]/35" },
   SUSPENDED: { badgeTone: "danger", borderClass: "border-[var(--danger)]/35" },
 };
+
+export function NexoOperationalState({
+  state,
+  title,
+  description,
+  primaryMetric,
+  secondaryMetrics = [],
+  impact,
+  nextEvaluationLabel,
+  lastEvaluationLabel,
+  ctaLabel,
+  href,
+  onCtaClick,
+  compact = false,
+  showIcon = true,
+  trendLabel,
+}: {
+  state: "NORMAL" | "WARNING" | "RESTRICTED" | "SUSPENDED";
+  title: string;
+  description: string;
+  primaryMetric?: ReactNode;
+  secondaryMetrics?: Array<{ label: string; value: ReactNode }>;
+  impact?: string;
+  nextEvaluationLabel?: string;
+  lastEvaluationLabel?: string;
+  ctaLabel?: string;
+  href?: string;
+  onCtaClick?: () => void;
+  compact?: boolean;
+  showIcon?: boolean;
+  trendLabel?: string | null;
+}) {
+  const config = {
+    NORMAL: {
+      label: "NORMAL",
+      tone: "success" as const,
+      Icon: CheckCircle2,
+      variant: "success" as const,
+    },
+    WARNING: {
+      label: "ATENÇÃO",
+      tone: "warning" as const,
+      Icon: AlertTriangle,
+      variant: "warning" as const,
+    },
+    RESTRICTED: {
+      label: "RESTRITO",
+      tone: "accent" as const,
+      Icon: ShieldAlert,
+      variant: "critical" as const,
+    },
+    SUSPENDED: {
+      label: "SUSPENSO",
+      tone: "danger" as const,
+      Icon: Lock,
+      variant: "critical" as const,
+    },
+  }[state];
+  const Icon = config.Icon;
+  const cta = ctaLabel ? (
+    <Button
+      asChild={Boolean(href)}
+      onClick={href ? undefined : onCtaClick}
+      className="w-full sm:w-auto"
+    >
+      {href ? <a href={href}>{ctaLabel}</a> : ctaLabel}
+    </Button>
+  ) : null;
+
+  return (
+    <AppSectionCard
+      variant={config.variant}
+      className={cn("overflow-hidden", compact ? "p-4" : "p-5 md:p-6")}
+    >
+      <div className="grid gap-4 lg:grid-cols-[1.35fr_0.65fr] lg:items-end">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            {showIcon ? (
+              <span className="rounded-2xl border border-[var(--app-border-subtle)] bg-[var(--app-surface-2)] p-2 text-[var(--app-accent)]">
+                <Icon className="h-5 w-5" />
+              </span>
+            ) : null}
+            <AppStatusBadge label={config.label} tone={config.tone} />
+            <AppTrendHint
+              label={trendLabel}
+              tone={
+                state === "NORMAL"
+                  ? "success"
+                  : state === "WARNING"
+                    ? "warning"
+                    : "danger"
+              }
+            />
+          </div>
+          <h2
+            className={cn(
+              "mt-3 font-bold tracking-tight text-[var(--app-text-primary)]",
+              compact ? "text-2xl" : "text-4xl md:text-6xl"
+            )}
+          >
+            {title}
+          </h2>
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--app-text-secondary)] md:text-base">
+            {description}
+          </p>
+          {impact ? (
+            <p className="mt-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-surface-2)] p-3 text-sm text-[var(--app-text-secondary)]">
+              <strong className="text-[var(--app-text-primary)]">
+                Impacto:{" "}
+              </strong>
+              {impact}
+            </p>
+          ) : null}
+        </div>
+        <div className="rounded-2xl border border-[var(--app-border-subtle)] bg-[var(--app-surface-2)] p-4">
+          {primaryMetric ? (
+            <div className="text-3xl font-bold text-[var(--app-text-primary)]">
+              {primaryMetric}
+            </div>
+          ) : null}
+          {secondaryMetrics.length ? (
+            <div className="mt-3 grid gap-2">
+              {secondaryMetrics.map(metric => (
+                <div
+                  key={metric.label}
+                  className="flex items-center justify-between gap-3 text-sm"
+                >
+                  <span className="text-[var(--app-text-muted)]">
+                    {metric.label}
+                  </span>
+                  <strong className="text-right text-[var(--app-text-primary)]">
+                    {metric.value}
+                  </strong>
+                </div>
+              ))}
+            </div>
+          ) : null}
+          {lastEvaluationLabel || nextEvaluationLabel ? (
+            <div className="mt-3 space-y-1 border-t border-[var(--app-border-subtle)] pt-3 text-xs text-[var(--app-text-muted)]">
+              {lastEvaluationLabel ? (
+                <p>Última: {lastEvaluationLabel}</p>
+              ) : null}
+              {nextEvaluationLabel ? (
+                <p>Próxima: {nextEvaluationLabel}</p>
+              ) : null}
+            </div>
+          ) : null}
+          {cta ? <div className="mt-4">{cta}</div> : null}
+        </div>
+      </div>
+    </AppSectionCard>
+  );
+}
+
+export function AppActionCard({
+  priority,
+  title,
+  problem,
+  impact,
+  recommendation,
+  ctaLabel,
+  href,
+  onClick,
+  status,
+  severity = "info",
+}: {
+  priority?: string | number;
+  title: string;
+  problem?: string;
+  impact?: string;
+  recommendation?: string;
+  ctaLabel?: string;
+  href?: string;
+  onClick?: () => void;
+  status?: string;
+  severity?: "critical" | "warning" | "info" | "success";
+}) {
+  const variant =
+    severity === "critical"
+      ? "critical"
+      : severity === "warning"
+        ? "warning"
+        : severity === "success"
+          ? "success"
+          : "action";
+  return (
+    <AppSectionCard
+      variant={variant}
+      className="flex h-full flex-col gap-3 p-4"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          {priority ? (
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--app-accent)]">
+              Prioridade {priority}
+            </p>
+          ) : null}
+          <h3 className="mt-1 text-base font-bold text-[var(--app-text-primary)]">
+            {title}
+          </h3>
+        </div>
+        {status ? (
+          <AppStatusBadge
+            label={status}
+            tone={
+              severity === "critical"
+                ? "danger"
+                : severity === "warning"
+                  ? "warning"
+                  : "info"
+            }
+          />
+        ) : null}
+      </div>
+      {problem ? (
+        <p className="text-sm text-[var(--app-text-secondary)]">{problem}</p>
+      ) : null}
+      {impact ? (
+        <p className="text-sm text-[var(--app-text-secondary)]">
+          <strong className="text-[var(--app-text-primary)]">Impacto: </strong>
+          {impact}
+        </p>
+      ) : null}
+      {recommendation ? (
+        <p className="text-sm text-[var(--app-text-secondary)]">
+          <strong className="text-[var(--app-text-primary)]">
+            Recomendação:{" "}
+          </strong>
+          {recommendation}
+        </p>
+      ) : null}
+      {ctaLabel ? (
+        <Button
+          asChild={Boolean(href)}
+          onClick={href ? undefined : onClick}
+          size="sm"
+          className="mt-auto w-full"
+        >
+          {href ? <a href={href}>{ctaLabel}</a> : ctaLabel}
+        </Button>
+      ) : null}
+    </AppSectionCard>
+  );
+}
 
 export function AppOperationalStateBadge({
   state,
@@ -657,8 +962,10 @@ export function AppNextActionButton({
       }}
     >
       {action.action && isExecuting(action.action.id)
-        ? "Executando..."
-        : "Executar"}
+        ? "Abrindo ação..."
+        : action.href
+          ? "Abrir caminho"
+          : "Resolver agora"}
     </Button>
   );
 }

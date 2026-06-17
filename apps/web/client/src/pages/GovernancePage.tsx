@@ -2,11 +2,13 @@ import { useMemo } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/design-system";
 import {
+  AppActionCard,
   AppEmptyState,
   AppPageHeader,
   AppPageShell,
   AppSectionCard,
   AppStatusBadge,
+  NexoOperationalState,
   AppTimeline,
   AppTimelineItem,
 } from "@/components/app-system";
@@ -39,6 +41,7 @@ type NextBestAction = {
   recommendation: string;
   primaryActionLabel: string;
   primaryPath: string;
+  priority: Priority;
 };
 
 type OfficialEvidence = {
@@ -169,6 +172,7 @@ function buildPriorityActions(signals: Signal[]): NextBestAction[] {
             "Abrir a fila de cobranças vencidas e priorizar contato.",
           primaryActionLabel: "Abrir cobrança",
           primaryPath: signal.path,
+          priority: signal.priority,
         };
       }
       if (signal.id === "late-orders") {
@@ -179,6 +183,7 @@ function buildPriorityActions(signals: Signal[]): NextBestAction[] {
             "Abrir O.S. atrasadas e atualizar responsável ou prazo.",
           primaryActionLabel: "Abrir O.S.",
           primaryPath: signal.path,
+          priority: signal.priority,
         };
       }
       if (signal.id === "appointments") {
@@ -189,6 +194,7 @@ function buildPriorityActions(signals: Signal[]): NextBestAction[] {
             "Abrir agendamentos e confirmar, concluir ou cancelar.",
           primaryActionLabel: "Abrir agendamento",
           primaryPath: signal.path,
+          priority: signal.priority,
         };
       }
       return {
@@ -197,6 +203,7 @@ function buildPriorityActions(signals: Signal[]): NextBestAction[] {
         recommendation: "Definir responsável para cada O.S. aberta.",
         primaryActionLabel: "Abrir O.S.",
         primaryPath: signal.path,
+        priority: signal.priority,
       };
     });
 }
@@ -206,8 +213,7 @@ function consequenceForSignal(signal: Signal) {
   if (signal.id === "late-orders")
     return "Perda de previsibilidade da execução.";
   if (signal.id === "appointments") return "Agenda menos confiável.";
-  if (signal.id === "no-recent-run")
-    return "Trilha operacional incompleta.";
+  if (signal.id === "no-recent-run") return "Trilha operacional incompleta.";
   if (signal.id === "unassigned") return "Fila sem responsável claro.";
   return "Decisão operacional exige acompanhamento.";
 }
@@ -549,57 +555,41 @@ export default function GovernancePage() {
         </div>
       </AppPageHeader>
 
-      <AppSectionCard className="border-[var(--border-strong)] p-4 md:p-6">
-        <div className="grid gap-4 lg:grid-cols-[1.4fr_0.6fr] lg:items-end">
-          <div>
-            <AppStatusBadge label={state} />
-            <h2 className="mt-3 text-4xl font-semibold tracking-tight text-[var(--text-primary)] md:text-6xl">
-              {state}
-            </h2>
-            <p className="mt-3 text-lg font-medium text-[var(--text-primary)]">
-              {signals.length
-                ? "A operação exige intervenção."
-                : "A operação está sob controle."}
-            </p>
-            <div className="mt-3 grid gap-2 text-sm text-[var(--text-secondary)] sm:grid-cols-3">
-              <p>
-                <strong className="block text-[var(--text-primary)]">
-                  {signals.length} sinais precisam de atenção
-                </strong>
-                Leitura operacional atual
-              </p>
-              <p>
-                <strong className="block text-[var(--text-primary)]">
-                  {mainRisk ? mainRisk.impact : "Sem impacto crítico"}
-                </strong>
-                {riskLevel === "baixo" ? "Risco controlado" : `Risco ${riskLevel}`}
-              </p>
-              <p>
-                <strong className="block text-[var(--text-primary)]">
-                  {nextReevaluation}
-                </strong>
-                Ciclo de governança
-              </p>
-            </div>
-          </div>
-          <div className="rounded-2xl bg-[var(--surface-secondary)] p-4 text-sm text-[var(--text-secondary)]">
-            <p className="font-medium text-[var(--text-primary)]">
-              Última avaliação
-            </p>
-            <p className="mt-1">
-              {runs.length ? formatDateTime(lastRunAt) : "Sem execução recente"}
-            </p>
-            <p className="mt-3">
-              {signals.length
-                ? "A operação exige intervenção direcionada."
-                : "Nenhuma restrição operacional foi detectada."}
-            </p>
-          </div>
-        </div>
-      </AppSectionCard>
+      <NexoOperationalState
+        state={state}
+        title={state}
+        description={
+          signals.length
+            ? "A operação exige intervenção direcionada nos sinais críticos desta leitura."
+            : "A operação está sob controle nesta leitura de governança."
+        }
+        primaryMetric={`${signals.length} sinais`}
+        secondaryMetrics={[
+          {
+            label: "Risco",
+            value: riskLevel === "baixo" ? "Controlado" : riskLevel,
+          },
+          {
+            label: "Impacto",
+            value: mainRisk ? mainRisk.impact : "Sem impacto crítico",
+          },
+          { label: "Ciclo", value: nextReevaluation },
+        ]}
+        impact={
+          signals.length
+            ? "Intervenção operacional necessária para reduzir risco atual."
+            : "Nenhuma restrição operacional foi detectada."
+        }
+        lastEvaluationLabel={
+          runs.length ? formatDateTime(lastRunAt) : "Sem execução recente"
+        }
+        nextEvaluationLabel={nextReevaluation}
+        ctaLabel={mainRisk ? mainRisk.cta : undefined}
+        onCtaClick={mainRisk ? () => navigate(mainRisk.path) : undefined}
+      />
 
       {mainRisk ? (
-        <AppSectionCard className="p-4">
+        <AppSectionCard variant="critical" className="p-4">
           <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
@@ -610,7 +600,9 @@ export default function GovernancePage() {
               </h2>
               <div className="mt-2 grid gap-2 text-sm text-[var(--text-secondary)] md:grid-cols-2">
                 <p>
-                  <strong className="text-[var(--text-primary)]">Impacto: </strong>
+                  <strong className="text-[var(--text-primary)]">
+                    Impacto:{" "}
+                  </strong>
                   {consequenceForSignal(mainRisk)}
                 </p>
                 <p>
@@ -628,7 +620,7 @@ export default function GovernancePage() {
         </AppSectionCard>
       ) : null}
 
-      <AppSectionCard>
+      <AppSectionCard variant="context">
         <h2 className="text-lg font-semibold text-[var(--text-primary)]">
           Por que a operação está nesse estado?
         </h2>
@@ -656,7 +648,7 @@ export default function GovernancePage() {
         )}
       </AppSectionCard>
 
-      <AppSectionCard>
+      <AppSectionCard variant="action">
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-[var(--text-primary)]">
@@ -672,27 +664,18 @@ export default function GovernancePage() {
         {priorityActions.length ? (
           <div className="mt-4 grid gap-3 lg:grid-cols-3">
             {priorityActions.map(action => (
-              <article
+              <AppActionCard
                 key={action.problem}
-                className="rounded-xl bg-[var(--surface-secondary)] p-4"
-              >
-                <h3 className="font-semibold text-[var(--text-primary)]">
-                  {action.problem}
-                </h3>
-                <p className="mt-2 text-sm text-[var(--text-secondary)]">
-                  {action.consequence}
-                </p>
-                <p className="mt-2 text-sm text-[var(--text-secondary)]">
-                  {action.recommendation}
-                </p>
-                <Button
-                  className="mt-4"
-                  size="sm"
-                  onClick={() => navigate(action.primaryPath)}
-                >
-                  {action.primaryActionLabel}
-                </Button>
-              </article>
+                priority={action.priority}
+                title={action.problem}
+                impact={action.consequence}
+                recommendation={action.recommendation}
+                ctaLabel={action.primaryActionLabel}
+                onClick={() => navigate(action.primaryPath)}
+                severity={
+                  action.priority === "critical" ? "critical" : "warning"
+                }
+              />
             ))}
           </div>
         ) : (
@@ -703,7 +686,7 @@ export default function GovernancePage() {
         )}
       </AppSectionCard>
 
-      <AppSectionCard>
+      <AppSectionCard variant="evidence">
         <h2 className="text-lg font-semibold text-[var(--text-primary)]">
           O que o sistema já fez
         </h2>
@@ -717,7 +700,7 @@ export default function GovernancePage() {
         </ul>
       </AppSectionCard>
 
-      <AppSectionCard>
+      <AppSectionCard variant="evidence">
         <h2 className="text-lg font-semibold text-[var(--text-primary)]">
           Evidências oficiais
         </h2>
@@ -762,7 +745,7 @@ export default function GovernancePage() {
         )}
       </AppSectionCard>
 
-      <AppSectionCard>
+      <AppSectionCard variant="evidence">
         <h2 className="text-lg font-semibold text-[var(--text-primary)]">
           Histórico de governança
         </h2>
@@ -794,7 +777,7 @@ export default function GovernancePage() {
         )}
       </AppSectionCard>
 
-      <AppSectionCard>
+      <AppSectionCard variant="evidence">
         <h2 className="text-lg font-semibold text-[var(--text-primary)]">
           Políticas ativas
         </h2>
@@ -808,7 +791,9 @@ export default function GovernancePage() {
                 {policy.name}
               </p>
               <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                <strong className="text-[var(--text-primary)]">Objetivo: </strong>
+                <strong className="text-[var(--text-primary)]">
+                  Objetivo:{" "}
+                </strong>
                 {policy.objective}.
               </p>
               <div className="mt-3">
