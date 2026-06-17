@@ -201,6 +201,17 @@ function buildPriorityActions(signals: Signal[]): NextBestAction[] {
     });
 }
 
+function consequenceForSignal(signal: Signal) {
+  if (signal.id === "overdue") return "Receita parada.";
+  if (signal.id === "late-orders")
+    return "Perda de previsibilidade da execução.";
+  if (signal.id === "appointments") return "Agenda menos confiável.";
+  if (signal.id === "no-recent-run")
+    return "Trilha operacional incompleta.";
+  if (signal.id === "unassigned") return "Fila sem responsável claro.";
+  return "Decisão operacional exige acompanhamento.";
+}
+
 export default function GovernancePage() {
   setBootPhase("PAGE:Governança");
   useRenderWatchdog("GovernancePage");
@@ -434,7 +445,7 @@ export default function GovernancePage() {
   const riskLevel =
     riskScore >= 55 ? "alto" : riskScore >= 30 ? "médio" : "baixo";
   const state = stateFromSignals({ signals, riskScore, summary, runs });
-  const dominantImpact = signals[0]?.impact ?? "Operação sem restrição";
+  const mainRisk = signals[0];
   const nextReevaluation = formatRelativeReevaluation(
     summary.nextEvaluationAt ?? summary.nextRunAt ?? latestRun?.nextEvaluationAt
   );
@@ -506,9 +517,9 @@ export default function GovernancePage() {
   ];
 
   return (
-    <AppPageShell className="p-4 md:p-6">
+    <AppPageShell className="gap-3 p-3 md:gap-4 md:p-5">
       <AppPageHeader>
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-sm font-medium text-[var(--text-muted)]">
               Governança
@@ -516,7 +527,7 @@ export default function GovernancePage() {
             <h1 className="text-2xl font-semibold text-[var(--text-primary)] md:text-3xl">
               Centro de supervisão operacional
             </h1>
-            <p className="mt-2 max-w-3xl text-sm text-[var(--text-secondary)]">
+            <p className="mt-1 max-w-3xl text-sm text-[var(--text-secondary)]">
               Detecta sinais, interpreta impacto e orienta a intervenção sem
               expor logs técnicos.
             </p>
@@ -538,25 +549,30 @@ export default function GovernancePage() {
         </div>
       </AppPageHeader>
 
-      <AppSectionCard className="border-[var(--border-strong)] p-5 md:p-7">
-        <div className="grid gap-5 lg:grid-cols-[1.4fr_0.6fr] lg:items-end">
+      <AppSectionCard className="border-[var(--border-strong)] p-4 md:p-6">
+        <div className="grid gap-4 lg:grid-cols-[1.4fr_0.6fr] lg:items-end">
           <div>
             <AppStatusBadge label={state} />
-            <h2 className="mt-4 text-4xl font-semibold tracking-tight text-[var(--text-primary)] md:text-6xl">
+            <h2 className="mt-3 text-4xl font-semibold tracking-tight text-[var(--text-primary)] md:text-6xl">
               {state}
             </h2>
-            <div className="mt-5 grid gap-3 text-base text-[var(--text-secondary)] sm:grid-cols-3">
+            <p className="mt-3 text-lg font-medium text-[var(--text-primary)]">
+              {signals.length
+                ? "A operação exige intervenção."
+                : "A operação está sob controle."}
+            </p>
+            <div className="mt-3 grid gap-2 text-sm text-[var(--text-secondary)] sm:grid-cols-3">
               <p>
                 <strong className="block text-[var(--text-primary)]">
-                  {signals.length} sinais ativos
+                  {signals.length} sinais precisam de atenção
                 </strong>
-                Nível de risco {riskLevel}
+                Leitura operacional atual
               </p>
               <p>
                 <strong className="block text-[var(--text-primary)]">
-                  {dominantImpact}
+                  {mainRisk ? mainRisk.impact : "Sem impacto crítico"}
                 </strong>
-                Principal impacto
+                {riskLevel === "baixo" ? "Risco controlado" : `Risco ${riskLevel}`}
               </p>
               <p>
                 <strong className="block text-[var(--text-primary)]">
@@ -582,6 +598,36 @@ export default function GovernancePage() {
         </div>
       </AppSectionCard>
 
+      {mainRisk ? (
+        <AppSectionCard className="p-4">
+          <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                Principal risco
+              </p>
+              <h2 className="mt-1 text-xl font-semibold text-[var(--text-primary)]">
+                {mainRisk.reason}
+              </h2>
+              <div className="mt-2 grid gap-2 text-sm text-[var(--text-secondary)] md:grid-cols-2">
+                <p>
+                  <strong className="text-[var(--text-primary)]">Impacto: </strong>
+                  {consequenceForSignal(mainRisk)}
+                </p>
+                <p>
+                  <strong className="text-[var(--text-primary)]">
+                    Ação recomendada:{" "}
+                  </strong>
+                  {mainRisk.cta}.
+                </p>
+              </div>
+            </div>
+            <Button onClick={() => navigate(mainRisk.path)}>
+              {mainRisk.cta}
+            </Button>
+          </div>
+        </AppSectionCard>
+      ) : null}
+
       <AppSectionCard>
         <h2 className="text-lg font-semibold text-[var(--text-primary)]">
           Por que a operação está nesse estado?
@@ -597,7 +643,7 @@ export default function GovernancePage() {
                   {signal.reason}
                 </p>
                 <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                  Impacto: {signal.impact}
+                  Consequência: {consequenceForSignal(signal)}
                 </p>
               </div>
             ))}
@@ -662,9 +708,9 @@ export default function GovernancePage() {
           O que o sistema já fez
         </h2>
         <ul className="mt-4 grid gap-2 text-sm text-[var(--text-secondary)] md:grid-cols-3">
-          <li>✓ Atualizou estado para {state}</li>
-          <li>✓ Registrou {signals.length} sinal(is) ativo(s)</li>
-          <li>✓ Recalculou risco {riskLevel}</li>
+          <li>✓ Operação marcada como {state}</li>
+          <li>✓ Sinais críticos registrados</li>
+          <li>✓ Avaliação de risco atualizada</li>
           {automaticActionCount > 0 ? (
             <li>✓ Registrou {automaticActionCount} ação(ões) automática(s)</li>
           ) : null}
@@ -697,18 +743,22 @@ export default function GovernancePage() {
             ))}
           </AppTimeline>
         ) : (
-          <AppEmptyState
-            title="Sem evidência oficial retornada"
-            description="A Timeline não retornou eventos de governança nesta leitura. Abra a Timeline para investigar a trilha completa."
-            action={
-              <Button
-                variant="outline"
-                onClick={() => navigate("/timeline?module=governance")}
-              >
-                Abrir Timeline
-              </Button>
-            }
-          />
+          <div className="mt-3 rounded-xl bg-[var(--surface-secondary)] p-4 text-sm text-[var(--text-secondary)]">
+            <p className="font-semibold text-[var(--text-primary)]">
+              Nenhuma evidência oficial encontrada.
+            </p>
+            <p className="mt-1">
+              Abrir Timeline para investigar a trilha completa.
+            </p>
+            <Button
+              className="mt-3"
+              size="sm"
+              variant="outline"
+              onClick={() => navigate("/timeline?module=governance")}
+            >
+              Abrir Timeline
+            </Button>
+          </div>
         )}
       </AppSectionCard>
 
@@ -733,10 +783,14 @@ export default function GovernancePage() {
             ))}
           </AppTimeline>
         ) : (
-          <AppEmptyState
-            title="Sem histórico auditável"
-            description="Nenhuma mudança de governança foi retornada pelas fontes oficiais carregadas."
-          />
+          <div className="mt-3 rounded-xl bg-[var(--surface-secondary)] p-4 text-sm text-[var(--text-secondary)]">
+            <p className="font-semibold text-[var(--text-primary)]">
+              Nenhuma mudança de governança encontrada.
+            </p>
+            <p className="mt-1">
+              As fontes oficiais carregadas não retornaram alterações de estado.
+            </p>
+          </div>
         )}
       </AppSectionCard>
 
@@ -754,7 +808,8 @@ export default function GovernancePage() {
                 {policy.name}
               </p>
               <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                {policy.objective}
+                <strong className="text-[var(--text-primary)]">Objetivo: </strong>
+                {policy.objective}.
               </p>
               <div className="mt-3">
                 <AppStatusBadge label={policy.active ? "Ativa" : "Sem sinal"} />
