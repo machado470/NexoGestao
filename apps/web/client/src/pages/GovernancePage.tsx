@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/design-system";
+import { Activity, Clock3, FileCheck2, ShieldCheck } from "lucide-react";
 import {
   AppActionCard,
   AppEmptyState,
@@ -9,8 +10,6 @@ import {
   AppSectionCard,
   AppStatusBadge,
   NexoOperationalState,
-  AppTimeline,
-  AppTimelineItem,
 } from "@/components/app-system";
 import { trpc } from "@/lib/trpc";
 import {
@@ -50,6 +49,8 @@ type OfficialEvidence = {
   source: string;
   occurredAt: string;
   impact: string;
+  entity: string;
+  actionPath?: string;
 };
 
 type GovernanceHistoryItem = {
@@ -58,6 +59,13 @@ type GovernanceHistoryItem = {
   currentState: string;
   reason: string;
   occurredAt: string;
+};
+
+type ActivePolicy = {
+  name: string;
+  objective: string;
+  status: "ATIVA" | "SEM SINAL" | "INATIVA";
+  description: string;
 };
 
 function metric(source: Record<string, any>, ...keys: string[]) {
@@ -132,6 +140,21 @@ function isRecentDate(value: unknown, hours = 48) {
   const time = new Date(String(value)).getTime();
   if (!Number.isFinite(time)) return false;
   return Date.now() - time <= hours * 60 * 60 * 1000;
+}
+
+function normalizeGovernanceReason(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed === "—") {
+    return "Motivo não retornado pelas fontes oficiais.";
+  }
+  return trimmed;
+}
+
+function evidenceIconFor(event: OfficialEvidence) {
+  const text = `${event.event} ${event.source}`.toLowerCase();
+  if (text.includes("pagamento") || text.includes("cobran")) return FileCheck2;
+  if (text.includes("risco") || text.includes("govern")) return ShieldCheck;
+  return Activity;
 }
 
 function stateFromSignals({
@@ -477,6 +500,16 @@ export default function GovernancePage() {
         impact:
           textField(run, "impact", "result", "status") ||
           "Sustenta o estado operacional atual",
+        entity:
+          textField(
+            run,
+            "entityName",
+            "customerName",
+            "chargeNumber",
+            "serviceOrderCode",
+            "reference"
+          ) || "Leitura oficial",
+        actionPath: textField(run, "href", "url", "path") || undefined,
       };
     })
     .filter(Boolean)
@@ -495,9 +528,9 @@ export default function GovernancePage() {
         id: String(run?.id ?? `governance-history-${index}`),
         previousState: textField(run, "previousState", "fromState") || "—",
         currentState: readState(run, state),
-        reason:
-          textField(run, "reason", "summary", "message") ||
-          "Avaliação oficial registrada pela governança.",
+        reason: normalizeGovernanceReason(
+          textField(run, "reason", "summary", "message")
+        ),
         occurredAt: formatDateTime(occurredAt),
       };
     })
@@ -508,19 +541,34 @@ export default function GovernancePage() {
     {
       name: "Cobrança vencida > 3 dias",
       objective: "Reduzir receita parada",
-      active: overdueCharges.length > 0 || policyAppliedCount > 0,
+      status:
+        overdueCharges.length > 0 || policyAppliedCount > 0
+          ? "ATIVA"
+          : "SEM SINAL",
+      description:
+        overdueCharges.length > 0
+          ? `${overdueCharges.length} cobrança(s) vencida(s) sustentam este controle.`
+          : "Controle informativo sem acionamento nesta leitura.",
     },
     {
       name: "Priorização automática",
       objective: "Ordenar intervenção por risco",
-      active: signals.length > 0 || automaticActionCount > 0,
+      status:
+        signals.length > 0 || automaticActionCount > 0 ? "ATIVA" : "SEM SINAL",
+      description:
+        signals.length > 0
+          ? `${signals.length} sinal(is) ordenado(s) por risco operacional.`
+          : "Sem sinal prioritário retornado pelas fontes oficiais.",
     },
     {
       name: "Reavaliação operacional",
       objective: "Manter estado atualizado",
-      active: hasRecentRun || runs.length > 0,
+      status: hasRecentRun || runs.length > 0 ? "ATIVA" : "SEM SINAL",
+      description: hasRecentRun
+        ? "Execução recente usada para manter o estado atualizado."
+        : "Aguardando próxima execução registrada pela governança.",
     },
-  ];
+  ] satisfies ActivePolicy[];
 
   return (
     <AppPageShell className="gap-3 p-3 md:gap-4 md:p-5">
@@ -700,105 +748,160 @@ export default function GovernancePage() {
         </ul>
       </AppSectionCard>
 
-      <AppSectionCard variant="evidence">
+      <AppSectionCard variant="evidence" className="p-4 md:p-5">
         <h2 className="text-lg font-semibold text-[var(--text-primary)]">
           Evidências oficiais
         </h2>
         {officialEvidence.length ? (
-          <AppTimeline className="mt-4">
-            {officialEvidence.map(event => (
-              <AppTimelineItem key={event.id}>
-                <div className="grid gap-2 md:grid-cols-[1fr_0.7fr_0.7fr_1fr]">
-                  <p className="font-medium text-[var(--text-primary)]">
-                    {event.event}
-                  </p>
-                  <p className="text-sm text-[var(--text-secondary)]">
-                    {event.source}
-                  </p>
-                  <p className="text-sm text-[var(--text-secondary)]">
-                    {event.occurredAt}
-                  </p>
-                  <p className="text-sm text-[var(--text-secondary)]">
-                    {event.impact}
-                  </p>
-                </div>
-              </AppTimelineItem>
-            ))}
-          </AppTimeline>
+          <div className="mt-3 grid gap-3">
+            {officialEvidence.map(event => {
+              const EvidenceIcon = evidenceIconFor(event);
+              return (
+                <article
+                  key={event.id}
+                  className="rounded-2xl border border-[var(--app-border-subtle)] bg-[var(--app-surface-2)] p-4"
+                >
+                  <div className="grid gap-3 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-start">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-surface-3)] text-[var(--app-accent)]">
+                      <EvidenceIcon className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0">
+                      <h3 className="font-semibold text-[var(--text-primary)]">
+                        {event.event}
+                      </h3>
+                      <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                        {event.source} · {event.entity}
+                      </p>
+                      <p className="mt-2 text-sm text-[var(--text-secondary)]">
+                        <strong className="text-[var(--text-primary)]">
+                          Impacto: {""}
+                        </strong>
+                        {event.impact}
+                      </p>
+                    </div>
+                    <div className="flex flex-col gap-2 md:items-end">
+                      <span className="text-sm text-[var(--text-muted)]">
+                        {event.occurredAt}
+                      </span>
+                      {event.actionPath ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => navigate(event.actionPath!)}
+                        >
+                          Abrir prova
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
         ) : (
-          <div className="mt-3 rounded-xl bg-[var(--surface-secondary)] p-4 text-sm text-[var(--text-secondary)]">
-            <p className="font-semibold text-[var(--text-primary)]">
-              Nenhuma evidência oficial encontrada.
-            </p>
-            <p className="mt-1">
-              Abrir Timeline para investigar a trilha completa.
-            </p>
-            <Button
-              className="mt-3"
-              size="sm"
-              variant="outline"
-              onClick={() => navigate("/timeline?module=governance")}
-            >
-              Abrir Timeline
-            </Button>
+          <div className="mt-3 rounded-2xl border border-[var(--app-border-subtle)] bg-[var(--app-surface-2)] p-4 text-sm text-[var(--text-secondary)]">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-semibold text-[var(--text-primary)]">
+                  Nenhuma evidência oficial encontrada nesta leitura.
+                </p>
+                <p className="mt-1">
+                  Use a Timeline para investigar a origem do estado atual.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => navigate("/timeline?module=governance")}
+              >
+                Abrir Timeline
+              </Button>
+            </div>
           </div>
         )}
       </AppSectionCard>
 
-      <AppSectionCard variant="evidence">
+      <AppSectionCard variant="evidence" className="p-4 md:p-5">
         <h2 className="text-lg font-semibold text-[var(--text-primary)]">
           Histórico de governança
         </h2>
         {history.length ? (
-          <AppTimeline className="mt-4">
+          <div className="mt-3 grid gap-3">
             {history.map(item => (
-              <AppTimelineItem key={item.id}>
-                <p className="font-medium text-[var(--text-primary)]">
-                  {item.previousState} → {item.currentState}
-                </p>
-                <p className="mt-2 text-sm text-[var(--text-secondary)]">
-                  Motivo: {item.reason}
-                </p>
-                <p className="mt-1 text-sm text-[var(--text-muted)]">
-                  Data: {item.occurredAt}
-                </p>
-              </AppTimelineItem>
+              <article
+                key={item.id}
+                className="rounded-2xl border border-[var(--app-border-subtle)] bg-[var(--app-surface-2)] p-4"
+              >
+                <div className="grid gap-3 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-surface-3)] text-[var(--app-accent)]">
+                    <Clock3 className="h-4 w-4" />
+                  </span>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <AppStatusBadge
+                        label={item.previousState}
+                        tone="neutral"
+                      />
+                      <span className="text-sm text-[var(--text-muted)]">→</span>
+                      <AppStatusBadge label={item.currentState} tone="accent" />
+                    </div>
+                    <p className="mt-2 text-sm text-[var(--text-secondary)]">
+                      <strong className="text-[var(--text-primary)]">
+                        Motivo: {""}
+                      </strong>
+                      {item.reason}
+                    </p>
+                  </div>
+                  <span className="text-sm text-[var(--text-muted)] md:text-right">
+                    {item.occurredAt}
+                  </span>
+                </div>
+              </article>
             ))}
-          </AppTimeline>
+          </div>
         ) : (
-          <div className="mt-3 rounded-xl bg-[var(--surface-secondary)] p-4 text-sm text-[var(--text-secondary)]">
+          <div className="mt-3 rounded-2xl border border-[var(--app-border-subtle)] bg-[var(--app-surface-2)] p-4 text-sm text-[var(--text-secondary)]">
             <p className="font-semibold text-[var(--text-primary)]">
-              Nenhuma mudança de governança encontrada.
+              Nenhuma mudança de governança encontrada nesta leitura.
             </p>
             <p className="mt-1">
-              As fontes oficiais carregadas não retornaram alterações de estado.
+              A próxima execução registrada aparecerá aqui.
             </p>
           </div>
         )}
       </AppSectionCard>
 
-      <AppSectionCard variant="evidence">
+      <AppSectionCard variant="evidence" className="p-4 md:p-5">
         <h2 className="text-lg font-semibold text-[var(--text-primary)]">
           Políticas ativas
         </h2>
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {policies.map(policy => (
             <article
               key={policy.name}
-              className="rounded-xl bg-[var(--surface-secondary)] p-4"
+              className="flex min-h-full flex-col rounded-2xl border border-[var(--app-border-subtle)] bg-[var(--app-surface-2)] p-4"
             >
-              <p className="font-medium text-[var(--text-primary)]">
+              <div className="flex items-start justify-between gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-surface-3)] text-[var(--app-accent)]">
+                  <ShieldCheck className="h-4 w-4" />
+                </span>
+                <AppStatusBadge
+                  label={policy.status}
+                  tone={policy.status === "ATIVA" ? "success" : "neutral"}
+                />
+              </div>
+              <h3 className="mt-3 font-semibold text-[var(--text-primary)]">
                 {policy.name}
-              </p>
-              <p className="mt-1 text-sm text-[var(--text-secondary)]">
+              </h3>
+              <p className="mt-2 text-sm text-[var(--text-secondary)]">
                 <strong className="text-[var(--text-primary)]">
-                  Objetivo:{" "}
+                  Objetivo: {""}
                 </strong>
                 {policy.objective}.
               </p>
-              <div className="mt-3">
-                <AppStatusBadge label={policy.active ? "Ativa" : "Sem sinal"} />
-              </div>
+              <p className="mt-3 text-sm text-[var(--text-muted)]">
+                {policy.description}
+              </p>
             </article>
           ))}
         </div>

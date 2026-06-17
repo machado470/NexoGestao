@@ -677,7 +677,7 @@ export function NexoOperationalState({
       variant={config.variant}
       className={cn("overflow-hidden", compact ? "p-4" : "p-5 md:p-6")}
     >
-      <div className="grid gap-4 lg:grid-cols-[1.35fr_0.65fr] lg:items-end">
+      <div className="grid gap-4 lg:grid-cols-[1.35fr_0.65fr] lg:items-stretch">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             {showIcon ? (
@@ -709,7 +709,7 @@ export function NexoOperationalState({
             {description}
           </p>
           {impact ? (
-            <p className="mt-3 rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-surface-2)] p-3 text-sm text-[var(--app-text-secondary)]">
+            <p className="mt-3 rounded-xl border border-[color-mix(in_srgb,var(--app-border-subtle)_70%,transparent)] bg-[var(--app-surface-2)] p-3 text-sm text-[var(--app-text-secondary)]">
               <strong className="text-[var(--app-text-primary)]">
                 Impacto:{" "}
               </strong>
@@ -717,7 +717,7 @@ export function NexoOperationalState({
             </p>
           ) : null}
         </div>
-        <div className="rounded-2xl border border-[var(--app-border-subtle)] bg-[var(--app-surface-2)] p-4">
+        <div className="flex flex-col justify-between rounded-2xl border border-[color-mix(in_srgb,var(--app-border-subtle)_68%,transparent)] bg-[var(--app-surface-2)] p-4">
           {primaryMetric ? (
             <div className="text-3xl font-bold text-[var(--app-text-primary)]">
               {primaryMetric}
