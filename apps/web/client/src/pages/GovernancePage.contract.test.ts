@@ -6,90 +6,64 @@ const source = readFileSync(
   "utf8"
 );
 
-describe("GovernancePage operational decision center contract", () => {
-  it("consolidates the operational state hero without generic waiting chips", () => {
-    expect(source).toContain("Governança operacional");
+describe("GovernancePage operational supervision center contract", () => {
+  it("keeps governance as an operational supervision center without changing data contracts", () => {
+    expect(source).toContain("Centro de supervisão operacional");
     expect(source).toContain(
-      "Centro de decisão da operação. Monitora risco, aplica políticas e orienta intervenção."
+      "Detecta sinais, interpreta impacto e orienta a intervenção"
     );
-    expect(source).toContain("Estado operacional");
-    expect(source).toContain("Última avaliação: sem execução recente");
-    expect(source).toContain("Operação governada sem restrição.");
+    expect(source).toContain("NexoOperationalState");
+    expect(source).toContain("lastEvaluationLabel");
     expect(source).not.toContain("AGUARDANDO AÇÃO");
   });
 
-  it("creates the dominant FAÇA AGORA block with up to three safe navigational interventions", () => {
-    expect(source).toContain('title="FAÇA AGORA"');
-    expect(source).toContain(
-      "Intervenções seguras para reduzir restrição operacional."
-    );
+  it("renders the FAÇA AGORA matrix with impact, recommendation, priority and action", () => {
+    expect(source).toContain("Matriz de intervenção");
+    expect(source).toContain("Faça agora");
+    expect(source).toContain("Impacto");
+    expect(source).toContain("Recomendação");
+    expect(source).toContain("Prioridade");
+    expect(source).toContain("Ação ·");
     expect(source).toContain("buildPriorityActions(signals)");
     expect(source).toContain(".slice(0, 3)");
-    expect(source).toContain("Priorizar cobrança vencida");
-    expect(source).toContain("Resolver O.S. atrasadas");
-    expect(source).toContain("Confirmar agendamento pendente");
-    expect(source).toContain("CTA seguro: apenas navega");
-    expect(source).toContain("Nenhuma intervenção prioritária nesta leitura.");
+    expect(source).toContain("Nenhuma ação prioritária");
   });
 
-  it("keeps critical signals in a single compact block", () => {
-    expect(source).toContain('title="Sinais críticos"');
-    expect(source).toContain("Sinal | Severidade | Origem | Ação");
-    expect(source).toContain("signals.slice(0, 4)");
-    expect(source).toContain("Financeiro");
-    expect(source).toContain("Ordens de Serviço");
-    expect(source).toContain("Agendamentos");
-    expect(source).toContain("Timeline/Governança");
-    expect(source).toContain("onClick={() => navigate(signal.path)}");
-    expect(source).not.toContain("Impactos identificados");
-    expect(source).not.toContain("Por que a operação está RESTRICTED?");
+  it("turns official evidence empty state into an audit panel with reserved future area", () => {
+    expect(source).toContain("Evidências oficiais");
+    expect(source).toContain("Painel de auditoria");
+    expect(source).toContain("Área reservada para anexar a próxima prova");
+    expect(source).toContain("Trilha auditável · Abrir Timeline");
+    expect(source).toContain("Timeline/Governança sem fabricar histórico");
   });
 
-  it("uses the compact human decision pipeline", () => {
-    expect(source).toContain(
-      "Sinal → Evidência → Impacto → Decisão → Política → Ação"
-    );
-    ["Sinal", "Evidência", "Impacto", "Decisão", "Política", "Ação"].forEach(
-      label => expect(source).toContain(`label: "${label}"`)
-    );
-    expect(source).toContain("Timeline disponível");
-    expect(source).toContain("Sem política específica");
-    expect(source).toContain("intervenções sugeridas");
-    expect(source).not.toContain(
-      "Evento → Timeline → Risco → Governança → Política → Ação"
-    );
-  });
-
-  it("humanizes risk score and never renders raw Score 56", () => {
-    expect(source).toContain("humanRiskLabel");
-    expect(source).toContain("Risco ${riskLevel} — ${riskScore}");
-    expect(source).not.toContain("Score 56");
-    expect(source).not.toContain("label={`Score ${riskScore}`}");
-  });
-
-  it("renders official evidence without contradictory empty KPI cards", () => {
-    expect(source).toContain('title="Evidências oficiais"');
-    expect(source).toContain(
-      "Eventos e decisões retornados pela Timeline/Governança que sustentam o estado atual."
-    );
-    expect(source).toContain(
-      "Nenhuma decisão oficial retornada nesta leitura."
-    );
-    expect(source).toContain("para investigar a trilha completa.");
-    expect(source).not.toContain("Total de eventos");
-    expect(source).not.toContain("Decisões tomadas");
-    expect(source).not.toContain("Impactam receita");
-  });
-
-  it("keeps system details compact and avoids fake automation or invented history", () => {
-    expect(source).toContain('title="Detalhes de governança"');
-    expect(source).toContain("Ação automática registrada:");
-    expect(source).toContain("não retornada");
-    expect(source).toContain("Política específica:");
-    expect(source).toContain("sem executar ações automaticamente");
-    expect(source).not.toContain("executada automaticamente");
+  it("keeps governance history alive as a decision container even when empty", () => {
+    expect(source).toContain("Histórico de governança");
+    expect(source).toContain("Container de decisões");
+    expect(source).toContain("preparada para receber evento, transição de");
+    expect(source).toContain("próxima execução oficial");
     expect(source).not.toContain("histórico fictício");
-    expect(source).not.toContain("Histórico de execuções");
-    expect(source).not.toContain("Políticas ativas");
+  });
+
+  it("turns policies into operational entities with active and neutral status badges", () => {
+    expect(source).toContain("Políticas ativas");
+    expect(source).toContain("type ActivePolicy");
+    expect(source).toContain("objective: string");
+    expect(source).toContain("impactando: string");
+    expect(source).toContain("lastEvaluation: string");
+    expect(source).toContain("Objetivo:");
+    expect(source).toContain("Status:");
+    expect(source).toContain("Impactando:");
+    expect(source).toContain("Última avaliação:");
+    expect(source).toContain("var(--app-success)_26%");
+    expect(source).toContain("var(--app-accent)_12%");
+  });
+
+  it("does not introduce fake data, endpoints or business-rule mutations", () => {
+    expect(source).toContain("trpc.governance.summary.useQuery");
+    expect(source).toContain("trpc.governance.runs.useQuery");
+    expect(source).toContain("trpc.finance.charges.list.useQuery");
+    expect(source).not.toContain("mutation");
+    expect(source).not.toContain("mock");
   });
 });
