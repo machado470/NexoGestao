@@ -17,6 +17,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { useRenderWatchdog } from "@/hooks/useRenderWatchdog";
+import { presentationStatusLabel } from "@/lib/presentation-status";
 import {
   AppContextChip,
   AppOperationalHeader,
@@ -1091,7 +1092,7 @@ export default function ExecutiveDashboard() {
             title: `${firstQueueItem.ctaLabel} — ${firstQueueItem.entity}`,
             entity: firstQueueItem.entity,
             reason: `${firstQueueItem.type}: ${firstQueueItem.context}`,
-            impact: `${firstQueueItem.responsibleMissing ? "Responsável não informado" : `Responsável: ${firstQueueItem.responsible}`}. Status atual: ${firstQueueItem.status}.`,
+            impact: `${firstQueueItem.responsibleMissing ? "Responsável não informado" : `Responsável: ${firstQueueItem.responsible}`}. Status atual: ${presentationStatusLabel(firstQueueItem.status)}.`,
             path: firstQueueItem.path,
             ctaLabel: firstQueueItem.ctaLabel,
             safetyNote:
@@ -1607,7 +1608,7 @@ export default function ExecutiveDashboard() {
                               {item.type}
                             </span>
                             <span className="text-[var(--text-muted)]">
-                              · {item.status}
+                              · {presentationStatusLabel(item.status)}
                             </span>
                           </div>
                           <strong className="mt-1 block truncate text-sm text-[var(--text-primary)]">

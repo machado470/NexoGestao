@@ -120,9 +120,9 @@ export function getOperationalMomentum(input: OperationalHealthInput) {
 }
 
 const STATE_META = {
-  HEALTHY: { label: "Saudável", summary: "Operação fluindo com baixa fricção.", explanation: "Poucos alertas ativos, atrasos controlados e comunicação estável.", recommendedFocus: "Manter rotina e prevenir novos atrasos." },
-  ATTENTION: { label: "Atenção", summary: "Pendências pedem acompanhamento.", explanation: "Há sinais de atraso, pendências ou confirmações faltantes.", recommendedFocus: "Reduzir backlog e antecipar follow-ups." },
-  CRITICAL: { label: "Crítico", summary: "Risco operacional elevado.", explanation: "Múltiplos sinais graves: vencimentos altos, bloqueios e falhas de comunicação.", recommendedFocus: "Atuar nos itens críticos do dia." },
+  HEALTHY: { label: "Operação saudável", summary: "Operação fluindo com baixa fricção.", explanation: "Poucos alertas ativos, atrasos controlados e comunicação estável.", recommendedFocus: "Manter rotina e prevenir novos atrasos." },
+  ATTENTION: { label: "Atenção necessária", summary: "Pendências pedem acompanhamento.", explanation: "Há sinais de atraso, pendências ou confirmações faltantes.", recommendedFocus: "Reduzir backlog e antecipar follow-ups." },
+  CRITICAL: { label: "Condição crítica", summary: "Risco operacional elevado.", explanation: "Múltiplos sinais graves: vencimentos altos, bloqueios e falhas de comunicação.", recommendedFocus: "Atuar nos itens críticos do dia." },
   STALLED: { label: "Operação travada", summary: "Fluxo interrompido por gargalo dominante.", explanation: "Há ruptura entre etapas do funil operacional, impedindo avanço natural.", recommendedFocus: "Destravar o gargalo principal imediatamente." },
   DEGRADED: { label: "Degradando", summary: "Operação piorando frente ao período anterior.", explanation: "Tendência de aumento de atrasos, falhas ou vencimentos.", recommendedFocus: "Conter deterioração e restaurar estabilidade." },
   IMPROVING: { label: "Melhorando", summary: "Operação evoluindo com redução de fricções.", explanation: "Queda de pendências, vencimentos ou falhas frente ao baseline.", recommendedFocus: "Consolidar melhorias e evitar recaída." },

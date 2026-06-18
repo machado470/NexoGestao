@@ -54,7 +54,7 @@ export function getOperationalStateSummary(input: {
   if (governance === "SUSPENDED") {
     return {
       level: "SUSPENDED",
-      label: "Suspenso",
+      label: "Operação bloqueada",
       summary: "Operação bloqueada por política crítica.",
       impact: "Execução e faturamento com bloqueios ativos.",
       recommendedAction: "Resolver pendências de governança e faturamento imediatamente.",
@@ -66,7 +66,7 @@ export function getOperationalStateSummary(input: {
   if (governance === "RESTRICTED" || criticalSignals >= 5) {
     return {
       level: "RESTRICTED",
-      label: "Restrito",
+      label: "Operação comprometida",
       summary: "Fluxo operacional degradado e suscetível a perda de receita.",
       impact: "Atrasos em cobrança e atendimento comprometem o caixa.",
       recommendedAction: "Priorizar recuperação de cobrança e destravar ordens críticas.",
@@ -81,7 +81,7 @@ export function getOperationalStateSummary(input: {
   ) {
     return {
       level: "WARNING",
-      label: "Atenção",
+      label: "Atenção necessária",
       summary: "Há sinais de risco operacional no ciclo do serviço.",
       impact: "Se não agir hoje, há tendência de acúmulo de gargalos.",
       recommendedAction: "Executar próximas ações prioritárias para estabilizar a operação.",
@@ -90,7 +90,7 @@ export function getOperationalStateSummary(input: {
 
   return {
     level: "NORMAL",
-    label: "Normal",
+    label: "Operação saudável",
     summary: "Operação estável com fluxo de execução e caixa sob controle.",
     impact: "Sem bloqueios imediatos no ciclo cliente → pagamento.",
     recommendedAction: "Manter monitoramento e ritmo de follow-up preventivo.",

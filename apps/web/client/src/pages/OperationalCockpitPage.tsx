@@ -3,6 +3,7 @@ import { AlertTriangle, RefreshCw } from "lucide-react";
 import { AppOperationalHeader, AppPageErrorState, AppPageLoadingState } from "@/components/internal-page-system";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { presentationStatusLabel } from "@/lib/presentation-status";
 
 type Severity = "INFO" | "WARNING" | "CRITICAL";
 type DataState<T> = { data: T | null; loading: boolean; error: string | null };
@@ -91,14 +92,14 @@ export default function OperationalCockpitPage() {
       {(summary.error && incidents.error) ? <AppPageErrorState description="Falha ao carregar cockpit operacional." onAction={() => void load()} /> : null}
 
       <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-        <MiniCard title="Status geral" value={summary.error ? "DEGRADED" : "OK"} tone={summary.error ? "WARNING" : "INFO"} />
+        <MiniCard title="Status geral" value={presentationStatusLabel(summary.error ? "DEGRADED" : "OK")} tone={summary.error ? "WARNING" : "INFO"} />
         <MiniCard title="Incidentes ativos" value={String((incidents.data ?? []).length)} tone={criticalIncidents.length ? "CRITICAL" : "INFO"} />
         <MiniCard title="Filas degradadas" value={String(degradedQueues.length)} tone={degradedQueues.length ? "WARNING" : "INFO"} />
       </section>
 
       <section className="grid grid-cols-1 gap-3 xl:grid-cols-2">
         <ListCard title="Incidentes ativos" empty="Nenhum incidente ativo.">
-          {(incidents.data ?? []).map((item, idx) => <Row key={item.id ?? idx} label={item.title ?? item.message ?? "Incidente"} meta={item.status ?? "aberto"} severity={item.severity ?? "WARNING"} />)}
+          {(incidents.data ?? []).map((item, idx) => <Row key={item.id ?? idx} label={item.title ?? item.message ?? "Incidente"} meta={presentationStatusLabel(item.status, "Aberto")} severity={item.severity ?? "WARNING"} />)}
         </ListCard>
         <ListCard title="Filas degradadas" empty="Nenhuma fila degradada.">
           {degradedQueues.map((item, idx) => <Row key={item.name ?? idx} label={item.name ?? "queue"} meta={`backlog ${item.backlog ?? 0}`} severity="WARNING" />)}
@@ -126,7 +127,7 @@ export default function OperationalCockpitPage() {
           ))}
         </ListCard>
         <ListCard title="Failures recentes" empty="Sem failures recentes.">
-          {(failures.data ?? []).map((item, idx) => <Row key={item.id ?? idx} label={item.message ?? "Falha"} meta={item.source ?? "worker"} severity={item.severity ?? "WARNING"} action={item.id ? <Button size="sm" variant="outline" disabled={shouldBlockOperationalAction(actionState[`replay-${item.id}`], isAnyActionLoading)} onClick={() => void runAction(`replay-${item.id}`, `Replay seguro da entrega webhook FAILED ${item.id}.`, async () => {
+          {(failures.data ?? []).map((item, idx) => <Row key={item.id ?? idx} label={item.message ?? "Falha"} meta={item.source ?? "worker"} severity={item.severity ?? "WARNING"} action={item.id ? <Button size="sm" variant="outline" disabled={shouldBlockOperationalAction(actionState[`replay-${item.id}`], isAnyActionLoading)} onClick={() => void runAction(`replay-${item.id}`, `Replay seguro da entrega webhook com falha ${item.id}.`, async () => {
             const res = await fetch(`/webhooks/deliveries/${item.id}/replay`, { method: "POST", credentials: "include" });
             if (!res.ok) throw new Error(`Replay falhou (${res.status}).`);
           })}>{actionState[`replay-${item.id}`] === "loading" ? "Replay..." : "Replay"}</Button> : null} />)}
@@ -142,7 +143,7 @@ export default function OperationalCockpitPage() {
 }
 
 function Badge({ severity }: { severity: Severity }) {
-  return <span className={cn("rounded px-2 py-0.5 text-[10px] font-semibold", severity === "CRITICAL" ? "bg-rose-500/15 text-rose-600" : severity === "WARNING" ? "bg-amber-500/15 text-amber-600" : "bg-zinc-500/10 text-zinc-600")}>{severity}</span>;
+  return <span className={cn("rounded px-2 py-0.5 text-[10px] font-semibold", severity === "CRITICAL" ? "bg-rose-500/15 text-rose-600" : severity === "WARNING" ? "bg-amber-500/15 text-amber-600" : "bg-zinc-500/10 text-zinc-600")}>{presentationStatusLabel(severity)}</span>;
 }
 function MiniCard({ title, value, tone }: { title: string; value: string; tone: Severity }) {
   return <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3"><p className="text-xs text-[var(--text-secondary)]">{title}</p><div className="mt-2 flex items-center justify-between"><p className="text-lg font-semibold">{value}</p><Badge severity={tone} /></div></div>;

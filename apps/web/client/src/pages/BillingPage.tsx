@@ -100,15 +100,15 @@ const ACCOUNT_STATUS_LABEL: Record<AccountStatus, string> = {
 };
 
 const GOVERNANCE_STATUS_LABEL: Record<GovernanceStatus, string> = {
-  NORMAL: "Saudável",
-  WARNING: "Atenção",
-  RESTRICTED: "Restrito",
-  SUSPENDED: "Suspenso",
+  NORMAL: "Operação saudável",
+  WARNING: "Atenção necessária",
+  RESTRICTED: "Operação comprometida",
+  SUSPENDED: "Operação bloqueada",
 };
 
 const INVOICE_STATUS_LABEL: Record<InvoiceStatus, string> = {
   PAID: "Pago",
-  PENDING: "Pendente",
+  PENDING: "Aguardando pagamento",
   FAILED: "Falhou",
   REFUNDED: "Reembolsado",
 };

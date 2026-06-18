@@ -4,7 +4,10 @@ export type OperationalSeverity =
   | "ATTENTION"
   | "NORMAL"
   | "SUCCESS"
-  | "INACTIVE";
+  | "INACTIVE"
+  | "RESTRICTED"
+  | "SUSPENDED"
+  | "LOW";
 
 export type OperationalActionIntent =
   | "primary"
@@ -25,6 +28,11 @@ export type OperationalEventType =
   | "automation";
 
 const severityAliases: Record<string, OperationalSeverity> = {
+  restricted: "RESTRICTED",
+  restrito: "RESTRICTED",
+  suspenso: "SUSPENDED",
+  suspended: "SUSPENDED",
+
   critical: "CRITICAL",
   crítico: "CRITICAL",
   em_risco: "CRITICAL",
@@ -51,6 +59,10 @@ const severityAliases: Record<string, OperationalSeverity> = {
   pending: "ATTENTION",
   pendente: "ATTENTION",
 
+  low: "LOW",
+  baixa: "LOW",
+  baixo: "LOW",
+
   normal: "NORMAL",
   info: "NORMAL",
   confirmado: "NORMAL",
@@ -71,12 +83,15 @@ const severityAliases: Record<string, OperationalSeverity> = {
 };
 
 const severityLabelMap: Record<OperationalSeverity, string> = {
-  CRITICAL: "Risco crítico",
-  WARNING: "Atenção imediata",
+  CRITICAL: "Condição crítica",
+  WARNING: "Atenção necessária",
   ATTENTION: "Aguardando ação",
-  NORMAL: "Operação normal",
+  NORMAL: "Operação saudável",
   SUCCESS: "Concluído",
-  INACTIVE: "Sem atividade recente",
+  INACTIVE: "Operação inativa",
+  RESTRICTED: "Operação comprometida",
+  SUSPENDED: "Operação bloqueada",
+  LOW: "Baixa prioridade",
 };
 
 const severityToneMap: Record<
@@ -89,6 +104,9 @@ const severityToneMap: Record<
   NORMAL: "info",
   SUCCESS: "success",
   INACTIVE: "neutral",
+  RESTRICTED: "accent",
+  SUSPENDED: "danger",
+  LOW: "neutral",
 };
 
 export function normalizeOperationalSeverity(input: string | null | undefined): OperationalSeverity {

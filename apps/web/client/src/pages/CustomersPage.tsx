@@ -22,6 +22,7 @@ import {
 } from "@/lib/query-helpers";
 import { usePageDiagnostics } from "@/hooks/usePageDiagnostics";
 import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
+import { presentationStatusLabel } from "@/lib/presentation-status";
 import { Button } from "@/components/design-system";
 import {
   NexoEvidenceTimeline,
@@ -701,7 +702,7 @@ export default function CustomersPage() {
           key: `${profile.customerId}-open-os`,
           title: String(profile.customer.name ?? "Cliente sem nome"),
           context: profile.lastService
-            ? `O.S. ${String(profile.lastService.title ?? profile.lastService.id ?? "aberta")} em ${String(profile.lastService.status ?? "andamento")}.`
+            ? `O.S. ${String(profile.lastService.title ?? profile.lastService.id ?? "aberta")} em ${presentationStatusLabel(profile.lastService.status, "em andamento")}.`
             : "O.S. aberta exige acompanhamento.",
           status: "Atenção",
           actionLabel: "Ver O.S.",
@@ -1865,7 +1866,7 @@ export default function CustomersPage() {
                                     profile.nextAppointment.startsAt
                                   )
                                 : profile.lastService
-                                  ? `Última O.S.: ${String(profile.lastService.status ?? "-")}`
+                                  ? `Última O.S.: ${presentationStatusLabel(profile.lastService.status, "-")}`
                                   : "Sem agenda futura"}
                             </p>
                           </div>
@@ -2334,7 +2335,7 @@ export default function CustomersPage() {
                             {formatCurrency(
                               Number(charge.amountCents ?? charge.amount ?? 0)
                             )}{" "}
-                            · {String(charge.status ?? "PENDING")}
+                            · {presentationStatusLabel(charge.status, "Aguardando ação")}
                           </p>
                           <p className="text-[11px] text-[var(--text-muted)]">
                             Vencimento:{" "}
