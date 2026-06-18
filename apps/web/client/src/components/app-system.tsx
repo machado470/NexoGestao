@@ -677,7 +677,7 @@ export function NexoOperationalState({
   return (
     <AppSectionCard
       variant={config.variant}
-      className={cn("overflow-hidden", compact ? "p-4" : "p-5 md:p-6")}
+      className={cn("overflow-hidden shadow-none", compact ? "p-4" : "p-5 md:p-6")}
     >
       <div className="grid gap-4 lg:grid-cols-[1.35fr_0.65fr] lg:items-stretch">
         <div className="min-w-0">
@@ -720,7 +720,7 @@ export function NexoOperationalState({
             </p>
           ) : null}
         </div>
-        <div className="flex flex-col justify-between rounded-2xl border border-[color-mix(in_srgb,var(--app-border-subtle)_68%,transparent)] bg-[var(--app-surface-2)] p-4">
+        <div className="flex flex-col justify-between border-t border-[color-mix(in_srgb,var(--app-border-subtle)_58%,transparent)] bg-[color-mix(in_srgb,var(--app-surface-2)_72%,transparent)] pt-4 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
           {primaryMetric ? (
             <div className="text-3xl font-bold text-[var(--app-text-primary)]">
               {primaryMetric}
