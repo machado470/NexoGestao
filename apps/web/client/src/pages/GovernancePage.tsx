@@ -1,7 +1,13 @@
 import { useMemo } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/design-system";
-import { Activity, Clock3, FileCheck2, ShieldCheck } from "lucide-react";
+import {
+  Activity,
+  CheckCircle2,
+  Clock3,
+  FileCheck2,
+  ShieldCheck,
+} from "lucide-react";
 import {
   AppActionCard,
   AppEmptyState,
@@ -67,6 +73,22 @@ type ActivePolicy = {
   status: "ATIVA" | "SEM SINAL" | "INATIVA";
   description: string;
 };
+
+function pluralizePt(count: number, singular: string, plural: string) {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function priorityLabel(priority: Priority) {
+  if (priority === "critical") return "CRITICAL";
+  if (priority === "high") return "HIGH";
+  return "MEDIUM";
+}
+
+function severityForPriority(priority: Priority) {
+  if (priority === "critical") return "critical" as const;
+  if (priority === "high") return "warning" as const;
+  return "subtle" as const;
+}
 
 function metric(source: Record<string, any>, ...keys: string[]) {
   for (const key of keys) {
@@ -190,7 +212,7 @@ function buildPriorityActions(signals: Signal[]): NextBestAction[] {
       if (signal.id === "overdue") {
         return {
           problem: "Cobrar clientes em atraso",
-          consequence: `${signal.count} cobrança(s) vencida(s). Impacto: receita parada.`,
+          consequence: `${pluralizePt(signal.count, "cobrança vencida", "cobranças vencidas")}. Impacto: receita parada.`,
           recommendation:
             "Abrir a fila de cobranças vencidas e priorizar contato.",
           primaryActionLabel: "Abrir cobrança",
@@ -201,7 +223,7 @@ function buildPriorityActions(signals: Signal[]): NextBestAction[] {
       if (signal.id === "late-orders") {
         return {
           problem: "Resolver O.S. atrasadas",
-          consequence: `${signal.count} O.S. fora do prazo. Impacto: previsibilidade em queda.`,
+          consequence: `${pluralizePt(signal.count, "O.S. atrasada", "O.S. atrasadas")}. Impacto: previsibilidade em queda.`,
           recommendation:
             "Abrir O.S. atrasadas e atualizar responsável ou prazo.",
           primaryActionLabel: "Abrir O.S.",
@@ -212,7 +234,7 @@ function buildPriorityActions(signals: Signal[]): NextBestAction[] {
       if (signal.id === "appointments") {
         return {
           problem: "Confirmar agendamentos pendentes",
-          consequence: `${signal.count} agendamento(s) sem fechamento. Impacto: agenda pouco confiável.`,
+          consequence: `${pluralizePt(signal.count, "agendamento pendente", "agendamentos pendentes")}. Impacto: agenda pouco confiável.`,
           recommendation:
             "Abrir agendamentos e confirmar, concluir ou cancelar.",
           primaryActionLabel: "Abrir agendamento",
@@ -222,7 +244,7 @@ function buildPriorityActions(signals: Signal[]): NextBestAction[] {
       }
       return {
         problem: "Atribuir responsáveis",
-        consequence: `${signal.count} O.S. sem dono. Impacto: fila invisível.`,
+        consequence: `${pluralizePt(signal.count, "O.S. sem responsável", "O.S. sem responsáveis")}. Impacto: fila invisível.`,
         recommendation: "Definir responsável para cada O.S. aberta.",
         primaryActionLabel: "Abrir O.S.",
         primaryPath: signal.path,
@@ -377,7 +399,11 @@ export default function GovernancePage() {
       items.push({
         id: "overdue",
         title: "Cobranças vencidas",
-        reason: `${overdueCharges.length} cobrança(s) vencida(s)`,
+        reason: pluralizePt(
+          overdueCharges.length,
+          "cobrança vencida",
+          "cobranças vencidas"
+        ),
         impact: "Risco financeiro crescente",
         priority: overdueCharges.length >= 3 ? "critical" : "high",
         count: overdueCharges.length,
@@ -390,7 +416,11 @@ export default function GovernancePage() {
       items.push({
         id: "late-orders",
         title: "O.S. atrasadas",
-        reason: `${delayedOrders.length} O.S. atrasada(s)`,
+        reason: pluralizePt(
+          delayedOrders.length,
+          "O.S. atrasada",
+          "O.S. atrasadas"
+        ),
         impact: "Aumento do risco operacional",
         priority: delayedOrders.length >= 3 ? "critical" : "high",
         count: delayedOrders.length,
@@ -403,7 +433,11 @@ export default function GovernancePage() {
       items.push({
         id: "appointments",
         title: "Agendamentos sem fechamento",
-        reason: `${staleAppointments.length} agendamento(s) pendente(s)`,
+        reason: pluralizePt(
+          staleAppointments.length,
+          "agendamento pendente",
+          "agendamentos pendentes"
+        ),
         impact: "Perda de previsibilidade",
         priority: "medium",
         count: staleAppointments.length,
@@ -429,7 +463,11 @@ export default function GovernancePage() {
       items.push({
         id: "risk-score",
         title: "Risco consolidado",
-        reason: `${backendAlerts || 1} alerta(s) de risco`,
+        reason: pluralizePt(
+          backendAlerts || 1,
+          "alerta de risco",
+          "alertas de risco"
+        ),
         impact: "Risco transversal em acompanhamento",
         priority: governanceRiskScore >= 70 ? "critical" : "high",
         count: Math.max(backendAlerts, 1),
@@ -547,7 +585,7 @@ export default function GovernancePage() {
           : "SEM SINAL",
       description:
         overdueCharges.length > 0
-          ? `${overdueCharges.length} cobrança(s) vencida(s) sustentam este controle.`
+          ? `${pluralizePt(overdueCharges.length, "cobrança vencida sustenta", "cobranças vencidas sustentam")} este controle.`
           : "Controle informativo sem acionamento nesta leitura.",
     },
     {
@@ -557,7 +595,7 @@ export default function GovernancePage() {
         signals.length > 0 || automaticActionCount > 0 ? "ATIVA" : "SEM SINAL",
       description:
         signals.length > 0
-          ? `${signals.length} sinal(is) ordenado(s) por risco operacional.`
+          ? `${pluralizePt(signals.length, "sinal ordenado", "sinais ordenados")} por risco operacional.`
           : "Sem sinal prioritário retornado pelas fontes oficiais.",
     },
     {
@@ -606,9 +644,10 @@ export default function GovernancePage() {
       <NexoOperationalState
         state={state}
         title={state}
+        titleClassName="text-4xl md:text-5xl"
         description={
           signals.length
-            ? "A operação exige intervenção direcionada nos sinais críticos desta leitura."
+            ? "A operação exige intervenção nos sinais críticos identificados."
             : "A operação está sob controle nesta leitura de governança."
         }
         primaryMetric={`${signals.length} sinais`}
@@ -637,7 +676,10 @@ export default function GovernancePage() {
       />
 
       {mainRisk ? (
-        <AppSectionCard variant="critical" className="p-4">
+        <AppSectionCard
+          variant="default"
+          className="border-[color-mix(in_srgb,var(--app-border-critical)_58%,var(--app-border-subtle))] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--app-surface-critical)_48%,var(--app-surface-1)),var(--app-surface-1))] p-4 shadow-none"
+        >
           <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
@@ -696,7 +738,7 @@ export default function GovernancePage() {
         )}
       </AppSectionCard>
 
-      <AppSectionCard variant="action">
+      <AppSectionCard variant="default">
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-[var(--text-primary)]">
@@ -714,15 +756,15 @@ export default function GovernancePage() {
             {priorityActions.map(action => (
               <AppActionCard
                 key={action.problem}
-                priority={action.priority}
+                priority={priorityLabel(action.priority)}
                 title={action.problem}
                 impact={action.consequence}
                 recommendation={action.recommendation}
                 ctaLabel={action.primaryActionLabel}
                 onClick={() => navigate(action.primaryPath)}
-                severity={
-                  action.priority === "critical" ? "critical" : "warning"
-                }
+                severity={severityForPriority(action.priority)}
+                status={priorityLabel(action.priority)}
+                className="shadow-[var(--app-shadow-elevated)]"
               />
             ))}
           </div>
@@ -739,11 +781,23 @@ export default function GovernancePage() {
           O que o sistema já fez
         </h2>
         <ul className="mt-4 grid gap-2 text-sm text-[var(--text-secondary)] md:grid-cols-3">
-          <li>✓ Operação marcada como {state}</li>
-          <li>✓ Sinais críticos registrados</li>
-          <li>✓ Avaliação de risco atualizada</li>
+          <li className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-[var(--app-success)]" />{" "}
+            Estado atualizado
+          </li>
+          <li className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-[var(--app-success)]" />{" "}
+            Sinais processados
+          </li>
+          <li className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-[var(--app-success)]" />{" "}
+            Avaliação recalculada
+          </li>
           {automaticActionCount > 0 ? (
-            <li>✓ Registrou {automaticActionCount} ação(ões) automática(s)</li>
+            <li className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-[var(--app-success)]" />{" "}
+              Ações automáticas registradas
+            </li>
           ) : null}
         </ul>
       </AppSectionCard>
@@ -842,7 +896,9 @@ export default function GovernancePage() {
                         label={item.previousState}
                         tone="neutral"
                       />
-                      <span className="text-sm text-[var(--text-muted)]">→</span>
+                      <span className="text-sm text-[var(--text-muted)]">
+                        →
+                      </span>
                       <AppStatusBadge label={item.currentState} tone="accent" />
                     </div>
                     <p className="mt-2 text-sm text-[var(--text-secondary)]">

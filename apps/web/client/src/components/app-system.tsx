@@ -619,6 +619,7 @@ export function NexoOperationalState({
   compact = false,
   showIcon = true,
   trendLabel,
+  titleClassName,
 }: {
   state: "NORMAL" | "WARNING" | "RESTRICTED" | "SUSPENDED";
   title: string;
@@ -634,6 +635,7 @@ export function NexoOperationalState({
   compact?: boolean;
   showIcon?: boolean;
   trendLabel?: string | null;
+  titleClassName?: string;
 }) {
   const config = {
     NORMAL: {
@@ -700,7 +702,8 @@ export function NexoOperationalState({
           <h2
             className={cn(
               "mt-3 font-bold tracking-tight text-[var(--app-text-primary)]",
-              compact ? "text-2xl" : "text-4xl md:text-6xl"
+              compact ? "text-2xl" : "text-4xl md:text-6xl",
+              titleClassName
             )}
           >
             {title}
@@ -768,6 +771,7 @@ export function AppActionCard({
   onClick,
   status,
   severity = "info",
+  className,
 }: {
   priority?: string | number;
   title: string;
@@ -778,7 +782,8 @@ export function AppActionCard({
   href?: string;
   onClick?: () => void;
   status?: string;
-  severity?: "critical" | "warning" | "info" | "success";
+  severity?: "critical" | "warning" | "info" | "success" | "subtle";
+  className?: string;
 }) {
   const variant =
     severity === "critical"
@@ -787,11 +792,13 @@ export function AppActionCard({
         ? "warning"
         : severity === "success"
           ? "success"
-          : "action";
+          : severity === "subtle"
+            ? "default"
+            : "action";
   return (
     <AppSectionCard
       variant={variant}
-      className="flex h-full flex-col gap-3 p-4"
+      className={cn("flex h-full flex-col gap-3 p-4", className)}
     >
       <div className="flex items-start justify-between gap-3">
         <div>
