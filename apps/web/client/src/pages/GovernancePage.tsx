@@ -4,6 +4,7 @@ import { Button } from "@/components/design-system";
 import {
   Activity,
   CheckCircle2,
+  ChevronRight,
   Clock3,
   FileCheck2,
   ShieldCheck,
@@ -14,7 +15,6 @@ import {
   AppPageShell,
   AppSectionCard,
   AppStatusBadge,
-  NexoOperationalState,
 } from "@/components/app-system";
 import { trpc } from "@/lib/trpc";
 import {
@@ -79,10 +79,20 @@ function pluralizePt(count: number, singular: string, plural: string) {
   return `${count} ${count === 1 ? singular : plural}`;
 }
 
-function priorityLabel(priority: Priority) {
-  if (priority === "critical") return "CRITICAL";
-  if (priority === "high") return "HIGH";
-  return "MEDIUM";
+function operationalPriorityLabel(action: NextBestAction) {
+  if (action.primaryPath.includes("finances")) return "Impacto financeiro";
+  if (action.primaryPath.includes("service-orders"))
+    return "Impacto operacional";
+  if (action.primaryPath.includes("appointments"))
+    return "Impacto de planejamento";
+  return "Impacto operacional";
+}
+
+function actionTitle(action: NextBestAction) {
+  if (action.primaryPath.includes("finances")) return "Cobrar agora";
+  if (action.primaryPath.includes("service-orders")) return "Resolver execução";
+  if (action.primaryPath.includes("appointments")) return "Confirmar agenda";
+  return action.problem;
 }
 
 function metric(source: Record<string, any>, ...keys: string[]) {
@@ -150,6 +160,41 @@ function formatRelativeReevaluation(value: unknown) {
   const minutes = Math.max(1, Math.round((next - Date.now()) / 60000));
   if (minutes <= 0) return "Reavaliação em andamento";
   return `Próxima reavaliação em ${minutes} minuto${minutes === 1 ? "" : "s"}`;
+}
+
+function moneyValue(source: Record<string, any>) {
+  for (const key of [
+    "amount",
+    "total",
+    "value",
+    "totalAmount",
+    "amountDue",
+    "balance",
+  ]) {
+    const value = Number(source?.[key]);
+    if (Number.isFinite(value) && value > 0) return value;
+  }
+  return 0;
+}
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(value);
+}
+
+function relativeLastAnalysis(value: unknown) {
+  if (!value) return "Sem execução recente";
+  const time = new Date(String(value)).getTime();
+  if (!Number.isFinite(time)) return "Sem execução recente";
+  const minutes = Math.max(1, Math.round((Date.now() - time) / 60000));
+  if (minutes < 60)
+    return `Última análise há ${minutes} minuto${minutes === 1 ? "" : "s"}`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 48)
+    return `Última análise há ${hours} hora${hours === 1 ? "" : "s"}`;
+  return `Última análise em ${formatDateTime(value)}`;
 }
 
 function isRecentDate(value: unknown, hours = 48) {
@@ -495,6 +540,10 @@ export default function GovernancePage() {
     unassignedOrders.length,
   ]);
 
+  const overdueAmount = overdueCharges.reduce(
+    (total, charge) => total + moneyValue(charge),
+    0
+  );
   const riskScore = Math.max(
     metric(summary, "riskScore", "score", "operationalRiskScore"),
     signals.reduce(
@@ -508,6 +557,39 @@ export default function GovernancePage() {
     riskScore >= 55 ? "alto" : riskScore >= 30 ? "médio" : "baixo";
   const state = stateFromSignals({ signals, riskScore, summary, runs });
   const mainRisk = signals[0];
+  const mainImpactParts = [
+    overdueAmount > 0 ? `${formatCurrency(overdueAmount)} em atraso` : null,
+    delayedOrders.length > 0
+      ? pluralizePt(
+          delayedOrders.length,
+          "O.S. comprometida",
+          "O.S. comprometidas"
+        )
+      : null,
+    staleAppointments.length > 0
+      ? pluralizePt(
+          staleAppointments.length,
+          "agendamento pendente",
+          "agendamentos pendentes"
+        )
+      : null,
+    mainRisk ? consequenceForSignal(mainRisk) : null,
+  ].filter(Boolean);
+  const decisionFlow = mainRisk
+    ? [
+        mainRisk.reason,
+        consequenceForSignal(mainRisk).replace(/\.$/, ""),
+        mainRisk.impact,
+        `Estado ${state}`,
+        mainRisk.cta,
+      ]
+    : [
+        "Sem sinal crítico",
+        "Risco controlado",
+        "Governança sem restrição",
+        `Estado ${state}`,
+        "Monitorar próxima leitura",
+      ];
   const nextReevaluation = formatRelativeReevaluation(
     summary.nextEvaluationAt ?? summary.nextRunAt ?? latestRun?.nextEvaluationAt
   );
@@ -572,8 +654,8 @@ export default function GovernancePage() {
 
   const policies = [
     {
-      name: "Cobrança vencida > 3 dias",
-      objective: "Reduzir receita parada",
+      name: "Cobranças vencidas recebem prioridade máxima",
+      objective: "Destravar receita afetada",
       status:
         overdueCharges.length > 0 || policyAppliedCount > 0
           ? "ATIVA"
@@ -591,12 +673,12 @@ export default function GovernancePage() {
         : "Sem execução recente",
       description:
         overdueCharges.length > 0
-          ? `${pluralizePt(overdueCharges.length, "cobrança vencida sustenta", "cobranças vencidas sustentam")} este controle.`
-          : "Controle informativo sem acionamento nesta leitura.",
+          ? "Cobranças vencidas recebem prioridade máxima para destravar receita."
+          : "Sem cobrança vencida retornada, a política não cria ação nesta leitura.",
     },
     {
-      name: "Priorização automática",
-      objective: "Ordenar intervenção por risco",
+      name: "Sinais críticos são ordenados por impacto",
+      objective: "Mostrar o que muda a operação primeiro",
       status:
         signals.length > 0 || automaticActionCount > 0 ? "ATIVA" : "SEM SINAL",
       impactando:
@@ -612,12 +694,12 @@ export default function GovernancePage() {
         : "Sem execução recente",
       description:
         signals.length > 0
-          ? `${pluralizePt(signals.length, "sinal ordenado", "sinais ordenados")} por risco operacional.`
+          ? "Sinais críticos são ordenados por impacto antes da fila de ação."
           : "Sem sinal prioritário retornado pelas fontes oficiais.",
     },
     {
-      name: "Reavaliação operacional",
-      objective: "Manter estado atualizado",
+      name: "Estado operacional é recalculado automaticamente",
+      objective: "Manter a decisão atualizada",
       status: hasRecentRun || runs.length > 0 ? "ATIVA" : "SEM SINAL",
       impactando:
         hasRecentRun || runs.length > 0
@@ -627,7 +709,7 @@ export default function GovernancePage() {
         ? formatDateTime(lastRunAt)
         : "Sem execução recente",
       description: hasRecentRun
-        ? "Execução recente usada para manter o estado atualizado."
+        ? "Estado operacional é recalculado automaticamente com a última leitura."
         : "Aguardando próxima execução registrada pela governança.",
     },
   ] satisfies ActivePolicy[];
@@ -667,200 +749,219 @@ export default function GovernancePage() {
 
       <AppSectionCard
         variant="default"
-        className="overflow-hidden border-[color-mix(in_srgb,var(--app-accent)_18%,var(--app-border-subtle))] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--app-surface-1)_88%,var(--app-accent)_12%),var(--app-surface-1)_42%,var(--app-surface-2))] p-0 shadow-[0_24px_80px_rgba(15,23,42,0.08)]"
+        className="overflow-hidden border-[color-mix(in_srgb,var(--app-accent)_18%,var(--app-border-subtle))] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--app-surface-1)_90%,var(--app-accent)_10%),var(--app-surface-1))] p-0 shadow-[0_18px_54px_rgba(15,23,42,0.07)]"
       >
-        <div className="border-b border-[var(--app-border-subtle)] px-4 py-3 md:px-5">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[var(--app-accent)]">
-            Painel operacional
-          </p>
-          <h2 className="mt-1 text-lg font-semibold text-[var(--text-primary)]">
-            Estado, risco, diagnóstico e intervenção
-          </h2>
-        </div>
-        <div className="space-y-4 p-3 md:p-4">
-          <NexoOperationalState
-            state={state}
-            title={state}
-            titleClassName="text-4xl md:text-5xl"
-            description={
-              signals.length
-                ? "A operação exige intervenção nos sinais críticos identificados."
-                : "A operação está sob controle nesta leitura de governança."
-            }
-            primaryMetric={`${signals.length} sinais`}
-            secondaryMetrics={[
-              {
-                label: "Risco",
-                value: riskLevel === "baixo" ? "Controlado" : riskLevel,
-              },
-              {
-                label: "Impacto",
-                value: mainRisk ? mainRisk.impact : "Sem impacto crítico",
-              },
-              { label: "Ciclo", value: nextReevaluation },
-            ]}
-            impact={
-              signals.length
-                ? "Intervenção operacional necessária para reduzir risco atual."
-                : "Nenhuma restrição operacional foi detectada."
-            }
-            lastEvaluationLabel={
-              runs.length ? formatDateTime(lastRunAt) : "Sem execução recente"
-            }
-            nextEvaluationLabel={nextReevaluation}
-            ctaLabel={mainRisk ? mainRisk.cta : undefined}
-            onCtaClick={mainRisk ? () => navigate(mainRisk.path) : undefined}
-          />
-
-          {mainRisk ? (
-            <div className="rounded-2xl border border-[color-mix(in_srgb,var(--app-border-critical)_34%,var(--app-border-subtle))] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--app-surface-critical)_28%,var(--app-surface-2)),var(--app-surface-2))] p-4">
-              <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                    Principal risco
+        <div className="grid gap-0 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+          <div className="p-4 md:p-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[var(--app-accent)]">
+                Estado operacional
+              </p>
+              <AppStatusBadge
+                label={`${signals.length} sinais ativos`}
+                tone={signals.length ? "warning" : "success"}
+              />
+            </div>
+            <div className="mt-3 grid gap-4 md:grid-cols-[auto_minmax(0,1fr)] md:items-start">
+              <div>
+                <h2 className="text-3xl font-semibold leading-none text-[var(--text-primary)] md:text-4xl">
+                  {state}
+                </h2>
+                <p className="mt-2 text-sm text-[var(--text-secondary)]">
+                  {runs.length
+                    ? relativeLastAnalysis(lastRunAt)
+                    : "Sem execução recente registrada"}
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-2xl border border-[var(--app-border-subtle)] bg-[var(--app-surface-2)] p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+                    Motivo principal
                   </p>
-                  <h3 className="mt-1 text-xl font-semibold text-[var(--text-primary)]">
-                    {mainRisk.reason}
-                  </h3>
-                  <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm text-[var(--text-secondary)]">
-                    <p>
-                      <strong className="text-[var(--text-primary)]">
-                        Impacto: {" "}
-                      </strong>
-                      {consequenceForSignal(mainRisk)}
-                    </p>
-                    <p>
-                      <strong className="text-[var(--text-primary)]">
-                        Ação recomendada: {" "}
-                      </strong>
-                      {mainRisk.cta}.
-                    </p>
-                  </div>
+                  <p className="mt-1 font-semibold text-[var(--text-primary)]">
+                    {mainRisk ? mainRisk.reason : "Sem risco principal"}
+                  </p>
                 </div>
+                <div className="rounded-2xl border border-[var(--app-border-subtle)] bg-[var(--app-surface-2)] p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+                    Impacto
+                  </p>
+                  <p className="mt-1 font-semibold text-[var(--text-primary)]">
+                    {mainImpactParts.length
+                      ? mainImpactParts.join(" · ")
+                      : "Sem impacto crítico"}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-[var(--app-border-subtle)] bg-[var(--app-surface-2)] p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+                    Próxima ação
+                  </p>
+                  <p className="mt-1 font-semibold text-[var(--text-primary)]">
+                    {mainRisk ? mainRisk.cta : "Monitorar"}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <p className="text-sm text-[var(--text-secondary)]">
+                {signals.length
+                  ? "Por que estou nesse estado e o que fazer agora está consolidado nesta leitura."
+                  : "A operação está sob controle nas fontes carregadas."}
+              </p>
+              {mainRisk ? (
                 <Button onClick={() => navigate(mainRisk.path)}>
                   {mainRisk.cta}
                 </Button>
-              </div>
-            </div>
-          ) : null}
-
-          <div className="rounded-2xl bg-[color-mix(in_srgb,var(--app-surface-2)_82%,transparent)] p-4">
-            <h2 className="text-lg font-semibold text-[var(--text-primary)]">
-              Por que a operação está nesse estado?
-            </h2>
-            {signals.length ? (
-              <div className="mt-4 grid gap-0 overflow-hidden rounded-2xl border border-[var(--app-border-subtle)] md:grid-cols-2">
-                {signals.slice(0, 4).map(signal => (
-                  <div
-                    key={signal.id}
-                    className="border-b border-[var(--app-border-subtle)] p-4 last:border-b-0 md:border-r md:even:border-r-0 md:[&:nth-last-child(-n+2)]:border-b-0"
-                  >
-                    <p className="font-medium text-[var(--text-primary)]">
-                      {signal.reason}
-                    </p>
-                    <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                      Consequência: {consequenceForSignal(signal)}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <AppEmptyState
-                title="Nenhum problema principal nesta leitura"
-                description="As fontes carregadas não retornaram cobrança vencida, O.S. atrasada ou agendamento pendente."
-              />
-            )}
-          </div>
-
-          <div className="overflow-hidden rounded-2xl border border-[color-mix(in_srgb,var(--app-accent)_18%,var(--app-border-subtle))] bg-[var(--app-surface-1)]">
-            <div className="border-b border-[var(--app-border-subtle)] px-4 py-3 md:px-5">
-              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[var(--app-accent)]">
-                    Matriz de intervenção
-                  </p>
-                  <h2 className="mt-1 text-lg font-semibold text-[var(--text-primary)]">
-                    Faça agora
-                  </h2>
-                  <p className="text-sm text-[var(--text-secondary)]">
-                    Próxima melhor ação: navegação priorizada pela leitura operacional atual.
-                  </p>
-                </div>
-                <AppStatusBadge label={`${priorityActions.length} ações`} />
-              </div>
-            </div>
-            {priorityActions.length ? (
-              <div className="grid gap-3 p-3 md:grid-cols-2 lg:grid-cols-3">
-                {priorityActions.map(action => (
-                  <article
-                    key={action.problem}
-                    className="flex min-h-full flex-col rounded-2xl border border-[var(--app-border-subtle)] bg-[linear-gradient(180deg,var(--app-surface-2),var(--app-surface-1))] p-4"
-                  >
-                    <AppStatusBadge
-                      label={priorityLabel(action.priority)}
-                      tone={
-                        action.priority === "critical"
-                          ? "danger"
-                          : action.priority === "high"
-                            ? "warning"
-                            : "neutral"
-                      }
-                    />
-                    <h3 className="mt-3 font-semibold text-[var(--text-primary)]">
-                      {action.problem}
-                    </h3>
-                    <p className="mt-2 text-sm text-[var(--text-secondary)]">
-                      {action.consequence}
-                    </p>
-                    <p className="mt-2 text-sm text-[var(--text-muted)]">
-                      {action.recommendation}
-                    </p>
-                    <Button
-                      className="mt-3 w-full justify-center"
-                      variant="outline"
-                      onClick={() => navigate(action.primaryPath)}
-                    >
-                      {action.primaryActionLabel}
-                    </Button>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <div className="p-4 md:p-5">
-                <AppEmptyState
-                  title="Nenhuma ação prioritária"
-                  description="A governança não encontrou intervenção operacional urgente nesta leitura."
-                />
-              </div>
-            )}
-          </div>
-
-          <div className="rounded-2xl border border-[color-mix(in_srgb,var(--app-success)_22%,var(--app-border-subtle))] bg-[color-mix(in_srgb,var(--app-success)_6%,var(--app-surface-2))] px-4 py-3">
-            <h2 className="text-sm font-semibold text-[var(--text-primary)]">
-              O que o sistema já fez
-            </h2>
-            <ul className="mt-3 grid gap-2 text-sm text-[var(--text-secondary)] md:grid-cols-3">
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-[var(--app-success)]" />{" "}
-                Estado atualizado
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-[var(--app-success)]" />{" "}
-                Sinais processados
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-[var(--app-success)]" />{" "}
-                Avaliação recalculada
-              </li>
-              {automaticActionCount > 0 ? (
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-[var(--app-success)]" />{" "}
-                  Ações automáticas registradas
-                </li>
               ) : null}
-            </ul>
+            </div>
+          </div>
+          <div className="border-t border-[var(--app-border-subtle)] bg-[color-mix(in_srgb,var(--app-surface-2)_82%,transparent)] p-4 md:p-5 lg:border-l lg:border-t-0">
+            <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+              Sinais que sustentam a decisão
+            </h3>
+            {signals.length ? (
+              <ul className="mt-3 grid gap-2 text-sm text-[var(--text-secondary)]">
+                {signals.slice(0, 5).map(signal => (
+                  <li key={signal.id} className="flex items-start gap-2">
+                    <span className="mt-2 h-1.5 w-1.5 rounded-full bg-[var(--app-accent)]" />
+                    <span>{signal.reason}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-3 text-sm text-[var(--text-secondary)]">
+                Nenhum sinal ativo retornado pelas fontes oficiais.
+              </p>
+            )}
           </div>
         </div>
+      </AppSectionCard>
+
+      <AppSectionCard variant="default" className="p-4 md:p-5">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[var(--app-accent)]">
+              Matriz de intervenção
+            </p>
+            <h2 className="mt-1 text-lg font-semibold text-[var(--text-primary)]">
+              Faça agora
+            </h2>
+            <p className="text-sm text-[var(--text-secondary)]">
+              Ações priorizadas em linguagem operacional, mantendo a severidade
+              apenas como critério interno.
+            </p>
+          </div>
+          <AppStatusBadge label={`${priorityActions.length} ações`} />
+        </div>
+        {priorityActions.length ? (
+          <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+            {priorityActions.map(action => (
+              <article
+                key={action.problem}
+                className="flex min-h-full flex-col rounded-2xl border border-[var(--app-border-subtle)] bg-[linear-gradient(180deg,var(--app-surface-2),var(--app-surface-1))] p-4"
+              >
+                <AppStatusBadge
+                  label={operationalPriorityLabel(action)}
+                  tone={
+                    action.priority === "critical"
+                      ? "danger"
+                      : action.priority === "high"
+                        ? "warning"
+                        : "neutral"
+                  }
+                />
+                <h3 className="mt-3 font-semibold text-[var(--text-primary)]">
+                  {actionTitle(action)}
+                </h3>
+                <p className="mt-2 text-sm text-[var(--text-secondary)]">
+                  {action.consequence}
+                </p>
+                <p className="mt-2 text-sm text-[var(--text-muted)]">
+                  {action.recommendation}
+                </p>
+                <Button
+                  className="mt-3 w-full justify-center"
+                  variant="outline"
+                  onClick={() => navigate(action.primaryPath)}
+                >
+                  {action.primaryActionLabel}
+                </Button>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-3">
+            <AppEmptyState
+              title="Nenhuma ação prioritária"
+              description="A governança não encontrou intervenção operacional urgente nesta leitura."
+            />
+          </div>
+        )}
+      </AppSectionCard>
+
+      <AppSectionCard variant="evidence" className="p-4 md:p-5">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[var(--app-accent)]">
+          Como chegamos nessa decisão
+        </p>
+        <div className="mt-3 grid gap-2 md:grid-cols-5 md:items-stretch">
+          {decisionFlow.map((item, index) => (
+            <div
+              key={`${item}-${index}`}
+              className="flex items-center gap-2 rounded-2xl border border-[var(--app-border-subtle)] bg-[var(--app-surface-2)] p-3 text-sm text-[var(--text-secondary)]"
+            >
+              <span className="font-semibold text-[var(--text-primary)]">
+                {item}
+              </span>
+              {index < decisionFlow.length - 1 ? (
+                <ChevronRight className="ml-auto hidden h-4 w-4 text-[var(--app-accent)] md:block" />
+              ) : null}
+            </div>
+          ))}
+        </div>
+      </AppSectionCard>
+
+      <AppSectionCard variant="default" className="p-4 md:p-5">
+        <h2 className="text-sm font-semibold text-[var(--text-primary)]">
+          O que o sistema já fez
+        </h2>
+        <ul className="mt-3 grid gap-2 text-sm text-[var(--text-secondary)] md:grid-cols-4">
+          {runs.length ? (
+            <li className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-[var(--app-success)]" />
+              {relativeLastAnalysis(lastRunAt)}
+            </li>
+          ) : null}
+          <li className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-[var(--app-success)]" />
+            {pluralizePt(
+              signals.length,
+              "sinal interpretado",
+              "sinais interpretados"
+            )}
+          </li>
+          <li className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-[var(--app-success)]" />
+            {pluralizePt(
+              priorityActions.length,
+              "prioridade criada",
+              "prioridades criadas"
+            )}
+          </li>
+          <li className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-[var(--app-success)]" />
+            Estado alterado para {state}
+          </li>
+          {automaticActionCount > 0 ? (
+            <li className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-[var(--app-success)]" />
+              {pluralizePt(
+                automaticActionCount,
+                "ação automática registrada",
+                "ações automáticas registradas"
+              )}
+            </li>
+          ) : null}
+        </ul>
       </AppSectionCard>
 
       <AppSectionCard variant="evidence" className="p-4 md:p-5">
@@ -877,142 +978,136 @@ export default function GovernancePage() {
             <h3 className="text-base font-semibold text-[var(--text-primary)]">
               Evidências oficiais
             </h3>
-        {officialEvidence.length ? (
-          <div className="mt-3 grid gap-3">
-            {officialEvidence.map(event => {
-              const EvidenceIcon = evidenceIconFor(event);
-              return (
-                <article
-                  key={event.id}
-                  className="rounded-2xl border border-[var(--app-border-subtle)] bg-[var(--app-surface-2)] p-4"
-                >
-                  <div className="grid gap-3 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-start">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-surface-3)] text-[var(--app-accent)]">
-                      <EvidenceIcon className="h-4 w-4" />
-                    </span>
-                    <div className="min-w-0">
-                      <h3 className="font-semibold text-[var(--text-primary)]">
-                        {event.event}
-                      </h3>
-                      <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                        {event.source} · {event.entity}
-                      </p>
-                      <p className="mt-2 text-sm text-[var(--text-secondary)]">
-                        <strong className="text-[var(--text-primary)]">
-                          Impacto: {""}
-                        </strong>
-                        {event.impact}
-                      </p>
-                    </div>
-                    <div className="flex flex-col gap-2 md:items-end">
-                      <span className="text-sm text-[var(--text-muted)]">
-                        {event.occurredAt}
-                      </span>
-                      {event.actionPath ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => navigate(event.actionPath!)}
-                        >
-                          Abrir prova
-                        </Button>
-                      ) : null}
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="mt-3 overflow-hidden rounded-2xl border border-dashed border-[color-mix(in_srgb,var(--app-accent)_32%,var(--app-border-subtle))] bg-[linear-gradient(135deg,var(--app-surface-2),color-mix(in_srgb,var(--app-accent)_7%,var(--app-surface-1)))] text-sm text-[var(--text-secondary)]">
-            <div className="grid gap-0 md:grid-cols-[1fr_auto]">
-              <div className="p-4">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-[var(--app-accent)]">
-                  Painel de auditoria
-                </p>
-                <p className="mt-2 font-semibold text-[var(--text-primary)]">
-                  Nenhuma evidência oficial encontrada nesta leitura.
+            {officialEvidence.length ? (
+              <div className="mt-3 grid gap-3">
+                {officialEvidence.map(event => {
+                  const EvidenceIcon = evidenceIconFor(event);
+                  return (
+                    <article
+                      key={event.id}
+                      className="rounded-2xl border border-[var(--app-border-subtle)] bg-[var(--app-surface-2)] p-4"
+                    >
+                      <div className="grid gap-3 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-start">
+                        <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-surface-3)] text-[var(--app-accent)]">
+                          <EvidenceIcon className="h-4 w-4" />
+                        </span>
+                        <div className="min-w-0">
+                          <h3 className="font-semibold text-[var(--text-primary)]">
+                            {event.event}
+                          </h3>
+                          <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                            {event.source} · {event.entity}
+                          </p>
+                          <p className="mt-2 text-sm text-[var(--text-secondary)]">
+                            <strong className="text-[var(--text-primary)]">
+                              Impacto: {""}
+                            </strong>
+                            {event.impact}
+                          </p>
+                        </div>
+                        <div className="flex flex-col gap-2 md:items-end">
+                          <span className="text-sm text-[var(--text-muted)]">
+                            {event.occurredAt}
+                          </span>
+                          {event.actionPath ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => navigate(event.actionPath!)}
+                            >
+                              Abrir prova
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="mt-3 rounded-2xl border border-dashed border-[color-mix(in_srgb,var(--app-accent)_32%,var(--app-border-subtle))] bg-[color-mix(in_srgb,var(--app-accent)_6%,var(--app-surface-1))] p-4 text-sm text-[var(--text-secondary)]">
+                <p className="font-semibold text-[var(--text-primary)]">
+                  Nenhuma evidência registrada nesta leitura.
                 </p>
                 <p className="mt-1">
-                  Área reservada para anexar a próxima prova retornada pela
-                  Timeline/Governança sem fabricar histórico.
+                  A próxima execução de governança adicionará provas
+                  operacionais aqui.
                 </p>
-              </div>
-              <div className="border-t border-[var(--app-border-subtle)] p-4 md:border-l md:border-t-0">
-                <div className="mb-3 h-10 rounded-xl border border-dashed border-[var(--app-border-subtle)] bg-[var(--app-surface-1)]" />
                 <Button
+                  className="mt-3"
                   size="sm"
                   variant="outline"
                   onClick={() => navigate("/timeline?module=governance")}
                 >
-                  Trilha auditável · Abrir Timeline
+                  Abrir Timeline
                 </Button>
               </div>
-            </div>
-          </div>
-        )}
+            )}
           </section>
 
           <section className="rounded-2xl bg-[color-mix(in_srgb,var(--app-surface-2)_78%,transparent)] p-4">
             <h3 className="text-base font-semibold text-[var(--text-primary)]">
               Histórico de governança
             </h3>
-        {history.length ? (
-          <div className="mt-3 grid gap-3">
-            {history.map(item => (
-              <article
-                key={item.id}
-                className="rounded-2xl border border-[var(--app-border-subtle)] bg-[var(--app-surface-2)] p-4"
-              >
-                <div className="grid gap-3 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center">
+            {history.length ? (
+              <div className="mt-3 grid gap-3">
+                {history.map(item => (
+                  <article
+                    key={item.id}
+                    className="rounded-2xl border border-[var(--app-border-subtle)] bg-[var(--app-surface-2)] p-4"
+                  >
+                    <div className="grid gap-3 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center">
+                      <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-surface-3)] text-[var(--app-accent)]">
+                        <Clock3 className="h-4 w-4" />
+                      </span>
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <AppStatusBadge
+                            label={item.previousState}
+                            tone="neutral"
+                          />
+                          <span className="text-sm text-[var(--text-muted)]">
+                            →
+                          </span>
+                          <AppStatusBadge
+                            label={item.currentState}
+                            tone="accent"
+                          />
+                        </div>
+                        <p className="mt-2 text-sm text-[var(--text-secondary)]">
+                          <strong className="text-[var(--text-primary)]">
+                            Motivo: {""}
+                          </strong>
+                          {item.reason}
+                        </p>
+                      </div>
+                      <span className="text-sm text-[var(--text-muted)] md:text-right">
+                        {item.occurredAt}
+                      </span>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-3 rounded-2xl border border-[var(--app-border-subtle)] bg-[linear-gradient(180deg,var(--app-surface-2),var(--app-surface-1))] p-4 text-sm text-[var(--text-secondary)]">
+                <div className="grid gap-3 md:grid-cols-[auto_1fr] md:items-center">
                   <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-surface-3)] text-[var(--app-accent)]">
                     <Clock3 className="h-4 w-4" />
                   </span>
                   <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <AppStatusBadge
-                        label={item.previousState}
-                        tone="neutral"
-                      />
-                      <span className="text-sm text-[var(--text-muted)]">
-                        →
-                      </span>
-                      <AppStatusBadge label={item.currentState} tone="accent" />
-                    </div>
-                    <p className="mt-2 text-sm text-[var(--text-secondary)]">
-                      <strong className="text-[var(--text-primary)]">
-                        Motivo: {""}
-                      </strong>
-                      {item.reason}
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--text-muted)]">
+                      Container de decisões
+                    </p>
+                    <p className="mt-1 font-semibold text-[var(--text-primary)]">
+                      Nenhuma mudança de governança encontrada nesta leitura.
+                    </p>
+                    <p className="mt-1">
+                      A próxima execução registrada aparecerá aqui.
                     </p>
                   </div>
-                  <span className="text-sm text-[var(--text-muted)] md:text-right">
-                    {item.occurredAt}
-                  </span>
                 </div>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <div className="mt-3 rounded-2xl border border-[var(--app-border-subtle)] bg-[linear-gradient(180deg,var(--app-surface-2),var(--app-surface-1))] p-4 text-sm text-[var(--text-secondary)]">
-            <div className="grid gap-3 md:grid-cols-[auto_1fr] md:items-center">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-surface-3)] text-[var(--app-accent)]">
-                <Clock3 className="h-4 w-4" />
-              </span>
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--text-muted)]">
-                  Container de decisões
-                </p>
-                <p className="mt-1 font-semibold text-[var(--text-primary)]">
-                  Nenhuma mudança de governança encontrada nesta leitura.
-                </p>
-                <p className="mt-1">
-                  A próxima execução registrada aparecerá aqui.
-                </p>
               </div>
-            </div>
-          </div>
-        )}
+            )}
           </section>
         </div>
       </AppSectionCard>
