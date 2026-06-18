@@ -609,28 +609,28 @@ export function getTimelineEventSummary(event: TimelineEventLike) {
     pieces.push(`Via ${method}`);
   }
 
-  if (status) {
-    const statusLabels: Record<string, string> = {
-      PENDING: "Pendente",
-      PAID: "Pago",
-      OVERDUE: "Vencida",
-      CANCELED: "Cancelada",
-      CANCELLED: "Cancelada",
-      OPEN: "Aberta",
-      ASSIGNED: "Atribuída",
-      IN_PROGRESS: "Em andamento",
-      DONE: "Concluída",
-      WARNING: "Atenção",
-      RESTRICTED: "Restrito",
-      SUSPENDED: "Suspenso",
-      NORMAL: "Normal",
-    };
+  const statusLabels: Record<string, string> = {
+    PENDING: "Aguardando ação",
+    PAID: "Pago",
+    OVERDUE: "Em atraso",
+    CANCELED: "Cancelada",
+    CANCELLED: "Cancelada",
+    OPEN: "Aberta",
+    ASSIGNED: "Atribuída",
+    IN_PROGRESS: "Em andamento",
+    DONE: "Concluída",
+    WARNING: "Atenção necessária",
+    RESTRICTED: "Operação comprometida",
+    SUSPENDED: "Operação bloqueada",
+    NORMAL: "Operação saudável",
+  };
 
+  if (status) {
     pieces.push(`Status ${statusLabels[status] ?? status}`);
   }
 
   if (previousState && nextState) {
-    pieces.push(`Estado ${previousState} → ${nextState}`);
+    pieces.push(`Estado ${statusLabels[previousState] ?? previousState} → ${statusLabels[nextState] ?? nextState}`);
   }
 
   if (dueDate) {

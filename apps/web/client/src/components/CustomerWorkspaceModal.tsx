@@ -7,6 +7,7 @@ import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload, normalizeObjectPayload } from "@/lib/query-helpers";
 import { useOperationalDecisions } from "@/lib/decision-engine/useOperationalDecisions";
 import { executeDecision } from "@/lib/decision-engine/execution.handler";
+import { presentationStatusLabel } from "@/lib/presentation-status";
 import { getCustomerSeverity, getNextActionCustomer, getOperationalSeverityLabel } from "@/lib/operations/operational-intelligence";
 
 function listOf(input: unknown) {
@@ -154,7 +155,7 @@ export function CustomerWorkspaceModal({ open, customerId, customerName, onOpenC
                   {appointments.slice(0, 5).map((item) => (
                     <li key={String(item?.id)} className="rounded-md border border-[var(--border-subtle)] p-2 text-sm">
                       <p className="font-medium text-[var(--text-primary)]">{item?.startsAt ? new Date(String(item.startsAt)).toLocaleString("pt-BR") : "Sem data"}</p>
-                      <AppStatusBadge label={String(item?.status ?? "SCHEDULED")} />
+                      <AppStatusBadge label={presentationStatusLabel(item?.status, "Agendado")} />
                     </li>
                   ))}
                 </ul>
@@ -167,7 +168,7 @@ export function CustomerWorkspaceModal({ open, customerId, customerName, onOpenC
                   {serviceOrders.slice(0, 5).map((item) => (
                     <li key={String(item?.id)} className="rounded-md border border-[var(--border-subtle)] p-2 text-sm">
                       <p className="font-medium text-[var(--text-primary)]">{String(item?.title ?? `O.S. ${item?.id ?? ""}`)}</p>
-                      <AppStatusBadge label={String(item?.status ?? "PENDING")} />
+                      <AppStatusBadge label={presentationStatusLabel(item?.status, "Aguardando ação")} />
                     </li>
                   ))}
                 </ul>
@@ -182,7 +183,7 @@ export function CustomerWorkspaceModal({ open, customerId, customerName, onOpenC
                   {charges.slice(0, 5).map((item) => (
                     <li key={String(item?.id)} className="rounded-md border border-[var(--border-subtle)] p-2 text-sm">
                       <p className="font-medium text-[var(--text-primary)]">R$ {(Number(item?.amountCents ?? 0) / 100).toFixed(2)}</p>
-                      <AppStatusBadge label={String(item?.status ?? "PENDING")} />
+                      <AppStatusBadge label={presentationStatusLabel(item?.status, "Aguardando ação")} />
                     </li>
                   ))}
                 </ul>

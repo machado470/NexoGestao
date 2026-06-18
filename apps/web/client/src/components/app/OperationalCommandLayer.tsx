@@ -41,22 +41,22 @@ const operationalStateTone: Record<
   }
 > = {
   NORMAL: {
-    label: "Normal",
+    label: "Operação saudável",
     badgeTone: "success",
     className: "border-[var(--success)]/30",
   },
   WARNING: {
-    label: "Atenção",
+    label: "Atenção necessária",
     badgeTone: "warning",
     className: "border-[var(--warning)]/35",
   },
   RESTRICTED: {
-    label: "Restrita",
+    label: "Operação comprometida",
     badgeTone: "accent",
     className: "border-[var(--accent-primary)]/35 bg-[var(--accent-soft)]/35",
   },
   SUSPENDED: {
-    label: "Suspensa",
+    label: "Operação bloqueada",
     badgeTone: "danger",
     className: "border-[var(--danger)]/40 bg-[var(--danger)]/8",
   },

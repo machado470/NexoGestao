@@ -639,25 +639,25 @@ export function NexoOperationalState({
 }) {
   const config = {
     NORMAL: {
-      label: "NORMAL",
+      label: "Operação saudável",
       tone: "success" as const,
       Icon: CheckCircle2,
       variant: "success" as const,
     },
     WARNING: {
-      label: "ATENÇÃO",
+      label: "Atenção necessária",
       tone: "warning" as const,
       Icon: AlertTriangle,
       variant: "warning" as const,
     },
     RESTRICTED: {
-      label: "RESTRITO",
+      label: "Operação comprometida",
       tone: "accent" as const,
       Icon: ShieldAlert,
       variant: "critical" as const,
     },
     SUSPENDED: {
-      label: "SUSPENSO",
+      label: "Operação bloqueada",
       tone: "danger" as const,
       Icon: Lock,
       variant: "critical" as const,

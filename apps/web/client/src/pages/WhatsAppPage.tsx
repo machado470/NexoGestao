@@ -34,6 +34,7 @@ import {
 import { trpc } from "@/lib/trpc";
 import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
 import { cn } from "@/lib/utils";
+import { presentationStatusLabel } from "@/lib/presentation-status";
 import {
   priorityRank,
   resolveInboxPriority,
@@ -962,7 +963,7 @@ function buildTemplateText(template: string, context?: WhatsAppContext | null) {
     return `Olá ${customerName}, sua cobrança (${chargeAmount}) segue pendente. Vencimento: ${chargeDueDate}.`;
   }
   if (template === "Atualização de O.S.") {
-    return `Olá ${customerName}, atualizando sua ordem de serviço: status ${context?.activeServiceOrder?.status ?? "em andamento"}.`;
+    return `Olá ${customerName}, atualizando sua ordem de serviço: status ${presentationStatusLabel(context?.activeServiceOrder?.status, "em andamento")}.`;
   }
   if (template === "Confirmação de pagamento") {
     return `Olá ${customerName}, pagamento confirmado com sucesso.`;
@@ -1641,7 +1642,7 @@ function ExecutionChatColumn({
                   >
                     <p>{message.content}</p>
                     <p className="mt-2 flex items-center justify-end gap-1 text-[10px] text-[var(--text-muted)]/85">
-                      {fmtTime(message.createdAt)} · Operação: {message.status}
+                      {fmtTime(message.createdAt)} · Operação: {presentationStatusLabel(message.status)}
                       {message.messageType ? ` · ${message.messageType}` : ""}
                       {outgoing &&
                       ["DELIVERED", "READ"].includes(message.status) ? (
@@ -1910,7 +1911,7 @@ function OperationalContextColumn({
                 : NO_APPOINTMENT_TEXT}
             </p>
             <span className="mt-2 inline-flex whitespace-nowrap rounded-full bg-[color-mix(in_srgb,var(--warning)_14%,var(--app-surface))] px-2 py-0.5 text-[10px] text-[var(--warning)]">
-              {context?.nextAppointment?.status ?? "--"}
+              {presentationStatusLabel(context?.nextAppointment?.status)}
             </span>
             {highlightedAppointmentId &&
             context?.nextAppointment?.id === highlightedAppointmentId ? (
@@ -1945,7 +1946,7 @@ function OperationalContextColumn({
                 : NO_SERVICE_ORDER_TEXT}
             </p>
             <p className="text-[11px] text-[var(--text-muted)]">
-              Status: {context?.activeServiceOrder?.status ?? "--"}
+              Status: {presentationStatusLabel(context?.activeServiceOrder?.status)}
             </p>
             <p className="text-[11px] text-[var(--text-muted)]">
               Técnico: {context?.activeServiceOrder?.technician ?? "--"}
@@ -1992,7 +1993,7 @@ function OperationalContextColumn({
                 : "--"}
             </p>
             <span className="mt-2 inline-flex whitespace-nowrap rounded-full bg-[color-mix(in_srgb,var(--danger)_12%,var(--app-surface))] px-2 py-0.5 text-[10px] text-[var(--danger)]">
-              {context?.openCharge?.status ?? "--"}
+              {presentationStatusLabel(context?.openCharge?.status)}
             </span>
             {highlightedChargeId &&
             context?.openCharge?.id === highlightedChargeId ? (
@@ -2023,7 +2024,7 @@ function OperationalContextColumn({
               <>
                 <p className="mt-1">
                   {context?.lastInteraction?.direction ?? "--"} ·{" "}
-                  {context?.lastInteraction?.status ?? "--"}
+                  {presentationStatusLabel(context?.lastInteraction?.status)}
                 </p>
                 <p className="text-[11px] text-[var(--text-muted)]">
                   {fmtDateTime(context?.lastInteraction?.createdAt)}
