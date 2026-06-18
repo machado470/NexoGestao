@@ -9,7 +9,6 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import {
-  AppActionCard,
   AppEmptyState,
   AppPageHeader,
   AppPageShell,
@@ -71,6 +70,8 @@ type ActivePolicy = {
   name: string;
   objective: string;
   status: "ATIVA" | "SEM SINAL" | "INATIVA";
+  impactando: string;
+  lastEvaluation: string;
   description: string;
 };
 
@@ -82,12 +83,6 @@ function priorityLabel(priority: Priority) {
   if (priority === "critical") return "CRITICAL";
   if (priority === "high") return "HIGH";
   return "MEDIUM";
-}
-
-function severityForPriority(priority: Priority) {
-  if (priority === "critical") return "critical" as const;
-  if (priority === "high") return "warning" as const;
-  return "subtle" as const;
 }
 
 function metric(source: Record<string, any>, ...keys: string[]) {
@@ -583,6 +578,17 @@ export default function GovernancePage() {
         overdueCharges.length > 0 || policyAppliedCount > 0
           ? "ATIVA"
           : "SEM SINAL",
+      impactando:
+        overdueCharges.length > 0
+          ? pluralizePt(
+              overdueCharges.length,
+              "cobrança vencida",
+              "cobranças vencidas"
+            )
+          : "Sem impacto ativo",
+      lastEvaluation: runs.length
+        ? formatDateTime(lastRunAt)
+        : "Sem execução recente",
       description:
         overdueCharges.length > 0
           ? `${pluralizePt(overdueCharges.length, "cobrança vencida sustenta", "cobranças vencidas sustentam")} este controle.`
@@ -593,6 +599,17 @@ export default function GovernancePage() {
       objective: "Ordenar intervenção por risco",
       status:
         signals.length > 0 || automaticActionCount > 0 ? "ATIVA" : "SEM SINAL",
+      impactando:
+        signals.length > 0
+          ? pluralizePt(
+              signals.length,
+              "sinal operacional",
+              "sinais operacionais"
+            )
+          : "Sem impacto ativo",
+      lastEvaluation: runs.length
+        ? formatDateTime(lastRunAt)
+        : "Sem execução recente",
       description:
         signals.length > 0
           ? `${pluralizePt(signals.length, "sinal ordenado", "sinais ordenados")} por risco operacional.`
@@ -602,6 +619,13 @@ export default function GovernancePage() {
       name: "Reavaliação operacional",
       objective: "Manter estado atualizado",
       status: hasRecentRun || runs.length > 0 ? "ATIVA" : "SEM SINAL",
+      impactando:
+        hasRecentRun || runs.length > 0
+          ? "Estado operacional"
+          : "Sem impacto ativo",
+      lastEvaluation: runs.length
+        ? formatDateTime(lastRunAt)
+        : "Sem execução recente",
       description: hasRecentRun
         ? "Execução recente usada para manter o estado atualizado."
         : "Aguardando próxima execução registrada pela governança.",
@@ -738,41 +762,90 @@ export default function GovernancePage() {
         )}
       </AppSectionCard>
 
-      <AppSectionCard variant="default">
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-[var(--text-primary)]">
-              Faça agora
-            </h2>
-            <p className="text-sm text-[var(--text-secondary)]">
-              Próxima melhor ação: no máximo três ações operacionais para
-              reduzir o risco atual.
-            </p>
+      <AppSectionCard
+        variant="default"
+        className="overflow-hidden border-[color-mix(in_srgb,var(--app-accent)_22%,var(--app-border-subtle))] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--app-accent)_8%,var(--app-surface-1)),var(--app-surface-1)_46%,var(--app-surface-2))] p-0 shadow-[0_22px_70px_rgba(15,23,42,0.08)]"
+      >
+        <div className="border-b border-[var(--app-border-subtle)] bg-[linear-gradient(90deg,color-mix(in_srgb,var(--app-accent)_12%,transparent),transparent)] px-4 py-3 md:px-5">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[var(--app-accent)]">
+                Matriz de intervenção
+              </p>
+              <h2 className="mt-1 text-lg font-semibold text-[var(--text-primary)]">
+                Faça agora
+              </h2>
+              <p className="text-sm text-[var(--text-secondary)]">
+                Próxima melhor ação: impacto, recomendação, prioridade e ação
+                conectados na mesma trilha operacional.
+              </p>
+            </div>
+            <AppStatusBadge label={`${priorityActions.length} ações`} />
           </div>
-          <AppStatusBadge label={`${priorityActions.length} ações`} />
         </div>
         {priorityActions.length ? (
-          <div className="mt-4 grid gap-3 lg:grid-cols-3">
+          <div className="grid gap-0 divide-y divide-[var(--app-border-subtle)] lg:grid-cols-3 lg:divide-x lg:divide-y-0">
             {priorityActions.map(action => (
-              <AppActionCard
+              <article
                 key={action.problem}
-                priority={priorityLabel(action.priority)}
-                title={action.problem}
-                impact={action.consequence}
-                recommendation={action.recommendation}
-                ctaLabel={action.primaryActionLabel}
-                onClick={() => navigate(action.primaryPath)}
-                severity={severityForPriority(action.priority)}
-                status={priorityLabel(action.priority)}
-                className="shadow-[var(--app-shadow-elevated)]"
-              />
+                className="group relative min-h-full bg-[linear-gradient(180deg,var(--app-surface-1),var(--app-surface-2))] p-4 transition-colors hover:bg-[var(--app-surface-2)]"
+              >
+                <div className="absolute inset-x-4 top-0 h-px bg-[linear-gradient(90deg,transparent,var(--app-accent),transparent)] opacity-30" />
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--text-muted)]">
+                      Prioridade
+                    </p>
+                    <h3 className="mt-1 font-semibold text-[var(--text-primary)]">
+                      {action.problem}
+                    </h3>
+                  </div>
+                  <AppStatusBadge
+                    label={priorityLabel(action.priority)}
+                    tone={
+                      action.priority === "critical"
+                        ? "danger"
+                        : action.priority === "high"
+                          ? "warning"
+                          : "neutral"
+                    }
+                  />
+                </div>
+                <div className="mt-3 grid gap-2 text-sm">
+                  <div className="rounded-xl border border-[var(--app-border-subtle)] bg-[color-mix(in_srgb,var(--app-surface-3)_70%,transparent)] p-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+                      Impacto
+                    </p>
+                    <p className="mt-1 text-[var(--text-secondary)]">
+                      {action.consequence}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-[var(--app-border-subtle)] bg-[color-mix(in_srgb,var(--app-surface-3)_52%,transparent)] p-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+                      Recomendação
+                    </p>
+                    <p className="mt-1 text-[var(--text-secondary)]">
+                      {action.recommendation}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  className="mt-3 w-full justify-center"
+                  variant="outline"
+                  onClick={() => navigate(action.primaryPath)}
+                >
+                  Ação · {action.primaryActionLabel}
+                </Button>
+              </article>
             ))}
           </div>
         ) : (
-          <AppEmptyState
-            title="Nenhuma ação prioritária"
-            description="A governança não encontrou intervenção operacional urgente nesta leitura."
-          />
+          <div className="p-4 md:p-5">
+            <AppEmptyState
+              title="Nenhuma ação prioritária"
+              description="A governança não encontrou intervenção operacional urgente nesta leitura."
+            />
+          </div>
         )}
       </AppSectionCard>
 
@@ -853,23 +926,30 @@ export default function GovernancePage() {
             })}
           </div>
         ) : (
-          <div className="mt-3 rounded-2xl border border-[var(--app-border-subtle)] bg-[var(--app-surface-2)] p-4 text-sm text-[var(--text-secondary)]">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="font-semibold text-[var(--text-primary)]">
+          <div className="mt-3 overflow-hidden rounded-2xl border border-dashed border-[color-mix(in_srgb,var(--app-accent)_32%,var(--app-border-subtle))] bg-[linear-gradient(135deg,var(--app-surface-2),color-mix(in_srgb,var(--app-accent)_7%,var(--app-surface-1)))] text-sm text-[var(--text-secondary)]">
+            <div className="grid gap-0 md:grid-cols-[1fr_auto]">
+              <div className="p-4">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-[var(--app-accent)]">
+                  Painel de auditoria
+                </p>
+                <p className="mt-2 font-semibold text-[var(--text-primary)]">
                   Nenhuma evidência oficial encontrada nesta leitura.
                 </p>
                 <p className="mt-1">
-                  Use a Timeline para investigar a origem do estado atual.
+                  Área reservada para anexar a próxima prova retornada pela
+                  Timeline/Governança sem fabricar histórico.
                 </p>
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => navigate("/timeline?module=governance")}
-              >
-                Abrir Timeline
-              </Button>
+              <div className="border-t border-[var(--app-border-subtle)] p-4 md:border-l md:border-t-0">
+                <div className="mb-3 h-10 rounded-xl border border-dashed border-[var(--app-border-subtle)] bg-[var(--app-surface-1)]" />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => navigate("/timeline?module=governance")}
+                >
+                  Trilha auditável · Abrir Timeline
+                </Button>
+              </div>
             </div>
           </div>
         )}
@@ -916,13 +996,24 @@ export default function GovernancePage() {
             ))}
           </div>
         ) : (
-          <div className="mt-3 rounded-2xl border border-[var(--app-border-subtle)] bg-[var(--app-surface-2)] p-4 text-sm text-[var(--text-secondary)]">
-            <p className="font-semibold text-[var(--text-primary)]">
-              Nenhuma mudança de governança encontrada nesta leitura.
-            </p>
-            <p className="mt-1">
-              A próxima execução registrada aparecerá aqui.
-            </p>
+          <div className="mt-3 rounded-2xl border border-[var(--app-border-subtle)] bg-[linear-gradient(180deg,var(--app-surface-2),var(--app-surface-1))] p-4 text-sm text-[var(--text-secondary)]">
+            <div className="grid gap-3 md:grid-cols-[auto_1fr] md:items-center">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-surface-3)] text-[var(--app-accent)]">
+                <Clock3 className="h-4 w-4" />
+              </span>
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--text-muted)]">
+                  Container de decisões
+                </p>
+                <p className="mt-1 font-semibold text-[var(--text-primary)]">
+                  Nenhuma mudança de governança encontrada nesta leitura.
+                </p>
+                <p className="mt-1">
+                  A seção permanece preparada para receber evento, transição de
+                  estado, motivo e horário da próxima execução oficial.
+                </p>
+              </div>
+            </div>
           </div>
         )}
       </AppSectionCard>
@@ -935,27 +1026,53 @@ export default function GovernancePage() {
           {policies.map(policy => (
             <article
               key={policy.name}
-              className="flex min-h-full flex-col rounded-2xl border border-[var(--app-border-subtle)] bg-[var(--app-surface-2)] p-4"
+              className="relative flex min-h-full flex-col overflow-hidden rounded-2xl border border-[color-mix(in_srgb,var(--app-accent)_18%,var(--app-border-subtle))] bg-[linear-gradient(180deg,var(--app-surface-1),var(--app-surface-2))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
             >
+              <div className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,transparent,var(--app-accent),transparent)] opacity-40" />
               <div className="flex items-start justify-between gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-surface-3)] text-[var(--app-accent)]">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-surface-3)] text-[var(--app-accent)] shadow-inner">
                   <ShieldCheck className="h-4 w-4" />
                 </span>
-                <AppStatusBadge
-                  label={policy.status}
-                  tone={policy.status === "ATIVA" ? "success" : "neutral"}
-                />
+                <span
+                  className={
+                    policy.status === "ATIVA"
+                      ? "rounded-full border border-[color-mix(in_srgb,var(--app-success)_45%,transparent)] bg-[color-mix(in_srgb,var(--app-success)_14%,transparent)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--app-success)] shadow-[0_0_18px_color-mix(in_srgb,var(--app-success)_26%,transparent)]"
+                      : "rounded-full border border-[color-mix(in_srgb,var(--app-accent)_35%,transparent)] bg-[color-mix(in_srgb,var(--app-accent)_12%,transparent)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--app-accent)]"
+                  }
+                >
+                  {policy.status}
+                </span>
               </div>
               <h3 className="mt-3 font-semibold text-[var(--text-primary)]">
                 {policy.name}
               </h3>
-              <p className="mt-2 text-sm text-[var(--text-secondary)]">
-                <strong className="text-[var(--text-primary)]">
-                  Objetivo: {""}
-                </strong>
-                {policy.objective}.
-              </p>
-              <p className="mt-3 text-sm text-[var(--text-muted)]">
+              <div className="mt-3 grid gap-2 text-xs text-[var(--text-secondary)]">
+                <p>
+                  <strong className="text-[var(--text-primary)]">
+                    Objetivo:
+                  </strong>{" "}
+                  {policy.objective}.
+                </p>
+                <p>
+                  <strong className="text-[var(--text-primary)]">
+                    Status:
+                  </strong>{" "}
+                  {policy.status}.
+                </p>
+                <p>
+                  <strong className="text-[var(--text-primary)]">
+                    Impactando:
+                  </strong>{" "}
+                  {policy.impactando}.
+                </p>
+                <p>
+                  <strong className="text-[var(--text-primary)]">
+                    Última avaliação:
+                  </strong>{" "}
+                  {policy.lastEvaluation}.
+                </p>
+              </div>
+              <p className="mt-3 border-t border-[var(--app-border-subtle)] pt-3 text-sm text-[var(--text-muted)]">
                 {policy.description}
               </p>
             </article>
