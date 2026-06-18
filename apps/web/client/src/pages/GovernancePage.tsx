@@ -665,220 +665,218 @@ export default function GovernancePage() {
         </div>
       </AppPageHeader>
 
-      <NexoOperationalState
-        state={state}
-        title={state}
-        titleClassName="text-4xl md:text-5xl"
-        description={
-          signals.length
-            ? "A operação exige intervenção nos sinais críticos identificados."
-            : "A operação está sob controle nesta leitura de governança."
-        }
-        primaryMetric={`${signals.length} sinais`}
-        secondaryMetrics={[
-          {
-            label: "Risco",
-            value: riskLevel === "baixo" ? "Controlado" : riskLevel,
-          },
-          {
-            label: "Impacto",
-            value: mainRisk ? mainRisk.impact : "Sem impacto crítico",
-          },
-          { label: "Ciclo", value: nextReevaluation },
-        ]}
-        impact={
-          signals.length
-            ? "Intervenção operacional necessária para reduzir risco atual."
-            : "Nenhuma restrição operacional foi detectada."
-        }
-        lastEvaluationLabel={
-          runs.length ? formatDateTime(lastRunAt) : "Sem execução recente"
-        }
-        nextEvaluationLabel={nextReevaluation}
-        ctaLabel={mainRisk ? mainRisk.cta : undefined}
-        onCtaClick={mainRisk ? () => navigate(mainRisk.path) : undefined}
-      />
-
-      {mainRisk ? (
-        <AppSectionCard
-          variant="default"
-          className="border-[color-mix(in_srgb,var(--app-border-critical)_58%,var(--app-border-subtle))] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--app-surface-critical)_48%,var(--app-surface-1)),var(--app-surface-1))] p-4 shadow-none"
-        >
-          <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                Principal risco
-              </p>
-              <h2 className="mt-1 text-xl font-semibold text-[var(--text-primary)]">
-                {mainRisk.reason}
-              </h2>
-              <div className="mt-2 grid gap-2 text-sm text-[var(--text-secondary)] md:grid-cols-2">
-                <p>
-                  <strong className="text-[var(--text-primary)]">
-                    Impacto:{" "}
-                  </strong>
-                  {consequenceForSignal(mainRisk)}
-                </p>
-                <p>
-                  <strong className="text-[var(--text-primary)]">
-                    Ação recomendada:{" "}
-                  </strong>
-                  {mainRisk.cta}.
-                </p>
-              </div>
-            </div>
-            <Button onClick={() => navigate(mainRisk.path)}>
-              {mainRisk.cta}
-            </Button>
-          </div>
-        </AppSectionCard>
-      ) : null}
-
-      <AppSectionCard variant="context">
-        <h2 className="text-lg font-semibold text-[var(--text-primary)]">
-          Por que a operação está nesse estado?
-        </h2>
-        {signals.length ? (
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
-            {signals.slice(0, 4).map(signal => (
-              <div
-                key={signal.id}
-                className="rounded-xl bg-[var(--surface-secondary)] p-4"
-              >
-                <p className="font-medium text-[var(--text-primary)]">
-                  {signal.reason}
-                </p>
-                <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                  Consequência: {consequenceForSignal(signal)}
-                </p>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <AppEmptyState
-            title="Nenhum problema principal nesta leitura"
-            description="As fontes carregadas não retornaram cobrança vencida, O.S. atrasada ou agendamento pendente."
-          />
-        )}
-      </AppSectionCard>
-
       <AppSectionCard
         variant="default"
-        className="overflow-hidden border-[color-mix(in_srgb,var(--app-accent)_22%,var(--app-border-subtle))] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--app-accent)_8%,var(--app-surface-1)),var(--app-surface-1)_46%,var(--app-surface-2))] p-0 shadow-[0_22px_70px_rgba(15,23,42,0.08)]"
+        className="overflow-hidden border-[color-mix(in_srgb,var(--app-accent)_18%,var(--app-border-subtle))] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--app-surface-1)_88%,var(--app-accent)_12%),var(--app-surface-1)_42%,var(--app-surface-2))] p-0 shadow-[0_24px_80px_rgba(15,23,42,0.08)]"
       >
-        <div className="border-b border-[var(--app-border-subtle)] bg-[linear-gradient(90deg,color-mix(in_srgb,var(--app-accent)_12%,transparent),transparent)] px-4 py-3 md:px-5">
-          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[var(--app-accent)]">
-                Matriz de intervenção
-              </p>
-              <h2 className="mt-1 text-lg font-semibold text-[var(--text-primary)]">
-                Faça agora
-              </h2>
-              <p className="text-sm text-[var(--text-secondary)]">
-                Próxima melhor ação: impacto, recomendação, prioridade e ação
-                conectados na mesma trilha operacional.
-              </p>
-            </div>
-            <AppStatusBadge label={`${priorityActions.length} ações`} />
-          </div>
+        <div className="border-b border-[var(--app-border-subtle)] px-4 py-3 md:px-5">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[var(--app-accent)]">
+            Painel operacional
+          </p>
+          <h2 className="mt-1 text-lg font-semibold text-[var(--text-primary)]">
+            Estado, risco, diagnóstico e intervenção
+          </h2>
         </div>
-        {priorityActions.length ? (
-          <div className="grid gap-0 divide-y divide-[var(--app-border-subtle)] lg:grid-cols-3 lg:divide-x lg:divide-y-0">
-            {priorityActions.map(action => (
-              <article
-                key={action.problem}
-                className="group relative min-h-full bg-[linear-gradient(180deg,var(--app-surface-1),var(--app-surface-2))] p-4 transition-colors hover:bg-[var(--app-surface-2)]"
-              >
-                <div className="absolute inset-x-4 top-0 h-px bg-[linear-gradient(90deg,transparent,var(--app-accent),transparent)] opacity-30" />
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--text-muted)]">
-                      Prioridade
+        <div className="space-y-4 p-3 md:p-4">
+          <NexoOperationalState
+            state={state}
+            title={state}
+            titleClassName="text-4xl md:text-5xl"
+            description={
+              signals.length
+                ? "A operação exige intervenção nos sinais críticos identificados."
+                : "A operação está sob controle nesta leitura de governança."
+            }
+            primaryMetric={`${signals.length} sinais`}
+            secondaryMetrics={[
+              {
+                label: "Risco",
+                value: riskLevel === "baixo" ? "Controlado" : riskLevel,
+              },
+              {
+                label: "Impacto",
+                value: mainRisk ? mainRisk.impact : "Sem impacto crítico",
+              },
+              { label: "Ciclo", value: nextReevaluation },
+            ]}
+            impact={
+              signals.length
+                ? "Intervenção operacional necessária para reduzir risco atual."
+                : "Nenhuma restrição operacional foi detectada."
+            }
+            lastEvaluationLabel={
+              runs.length ? formatDateTime(lastRunAt) : "Sem execução recente"
+            }
+            nextEvaluationLabel={nextReevaluation}
+            ctaLabel={mainRisk ? mainRisk.cta : undefined}
+            onCtaClick={mainRisk ? () => navigate(mainRisk.path) : undefined}
+          />
+
+          {mainRisk ? (
+            <div className="rounded-2xl border border-[color-mix(in_srgb,var(--app-border-critical)_34%,var(--app-border-subtle))] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--app-surface-critical)_28%,var(--app-surface-2)),var(--app-surface-2))] p-4">
+              <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                    Principal risco
+                  </p>
+                  <h3 className="mt-1 text-xl font-semibold text-[var(--text-primary)]">
+                    {mainRisk.reason}
+                  </h3>
+                  <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm text-[var(--text-secondary)]">
+                    <p>
+                      <strong className="text-[var(--text-primary)]">
+                        Impacto: {" "}
+                      </strong>
+                      {consequenceForSignal(mainRisk)}
                     </p>
-                    <h3 className="mt-1 font-semibold text-[var(--text-primary)]">
+                    <p>
+                      <strong className="text-[var(--text-primary)]">
+                        Ação recomendada: {" "}
+                      </strong>
+                      {mainRisk.cta}.
+                    </p>
+                  </div>
+                </div>
+                <Button onClick={() => navigate(mainRisk.path)}>
+                  {mainRisk.cta}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="rounded-2xl bg-[color-mix(in_srgb,var(--app-surface-2)_82%,transparent)] p-4">
+            <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+              Por que a operação está nesse estado?
+            </h2>
+            {signals.length ? (
+              <div className="mt-4 grid gap-0 overflow-hidden rounded-2xl border border-[var(--app-border-subtle)] md:grid-cols-2">
+                {signals.slice(0, 4).map(signal => (
+                  <div
+                    key={signal.id}
+                    className="border-b border-[var(--app-border-subtle)] p-4 last:border-b-0 md:border-r md:even:border-r-0 md:[&:nth-last-child(-n+2)]:border-b-0"
+                  >
+                    <p className="font-medium text-[var(--text-primary)]">
+                      {signal.reason}
+                    </p>
+                    <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                      Consequência: {consequenceForSignal(signal)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <AppEmptyState
+                title="Nenhum problema principal nesta leitura"
+                description="As fontes carregadas não retornaram cobrança vencida, O.S. atrasada ou agendamento pendente."
+              />
+            )}
+          </div>
+
+          <div className="overflow-hidden rounded-2xl border border-[color-mix(in_srgb,var(--app-accent)_18%,var(--app-border-subtle))] bg-[var(--app-surface-1)]">
+            <div className="border-b border-[var(--app-border-subtle)] px-4 py-3 md:px-5">
+              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[var(--app-accent)]">
+                    Matriz de intervenção
+                  </p>
+                  <h2 className="mt-1 text-lg font-semibold text-[var(--text-primary)]">
+                    Faça agora
+                  </h2>
+                  <p className="text-sm text-[var(--text-secondary)]">
+                    Próxima melhor ação: navegação priorizada pela leitura operacional atual.
+                  </p>
+                </div>
+                <AppStatusBadge label={`${priorityActions.length} ações`} />
+              </div>
+            </div>
+            {priorityActions.length ? (
+              <div className="grid gap-3 p-3 md:grid-cols-2 lg:grid-cols-3">
+                {priorityActions.map(action => (
+                  <article
+                    key={action.problem}
+                    className="flex min-h-full flex-col rounded-2xl border border-[var(--app-border-subtle)] bg-[linear-gradient(180deg,var(--app-surface-2),var(--app-surface-1))] p-4"
+                  >
+                    <AppStatusBadge
+                      label={priorityLabel(action.priority)}
+                      tone={
+                        action.priority === "critical"
+                          ? "danger"
+                          : action.priority === "high"
+                            ? "warning"
+                            : "neutral"
+                      }
+                    />
+                    <h3 className="mt-3 font-semibold text-[var(--text-primary)]">
                       {action.problem}
                     </h3>
-                  </div>
-                  <AppStatusBadge
-                    label={priorityLabel(action.priority)}
-                    tone={
-                      action.priority === "critical"
-                        ? "danger"
-                        : action.priority === "high"
-                          ? "warning"
-                          : "neutral"
-                    }
-                  />
-                </div>
-                <div className="mt-3 grid gap-2 text-sm">
-                  <div className="rounded-xl border border-[var(--app-border-subtle)] bg-[color-mix(in_srgb,var(--app-surface-3)_70%,transparent)] p-3">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
-                      Impacto
-                    </p>
-                    <p className="mt-1 text-[var(--text-secondary)]">
+                    <p className="mt-2 text-sm text-[var(--text-secondary)]">
                       {action.consequence}
                     </p>
-                  </div>
-                  <div className="rounded-xl border border-[var(--app-border-subtle)] bg-[color-mix(in_srgb,var(--app-surface-3)_52%,transparent)] p-3">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
-                      Recomendação
-                    </p>
-                    <p className="mt-1 text-[var(--text-secondary)]">
+                    <p className="mt-2 text-sm text-[var(--text-muted)]">
                       {action.recommendation}
                     </p>
-                  </div>
-                </div>
-                <Button
-                  className="mt-3 w-full justify-center"
-                  variant="outline"
-                  onClick={() => navigate(action.primaryPath)}
-                >
-                  Ação · {action.primaryActionLabel}
-                </Button>
-              </article>
-            ))}
+                    <Button
+                      className="mt-3 w-full justify-center"
+                      variant="outline"
+                      onClick={() => navigate(action.primaryPath)}
+                    >
+                      {action.primaryActionLabel}
+                    </Button>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="p-4 md:p-5">
+                <AppEmptyState
+                  title="Nenhuma ação prioritária"
+                  description="A governança não encontrou intervenção operacional urgente nesta leitura."
+                />
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="p-4 md:p-5">
-            <AppEmptyState
-              title="Nenhuma ação prioritária"
-              description="A governança não encontrou intervenção operacional urgente nesta leitura."
-            />
-          </div>
-        )}
-      </AppSectionCard>
 
-      <AppSectionCard variant="evidence">
-        <h2 className="text-lg font-semibold text-[var(--text-primary)]">
-          O que o sistema já fez
-        </h2>
-        <ul className="mt-4 grid gap-2 text-sm text-[var(--text-secondary)] md:grid-cols-3">
-          <li className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-[var(--app-success)]" />{" "}
-            Estado atualizado
-          </li>
-          <li className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-[var(--app-success)]" />{" "}
-            Sinais processados
-          </li>
-          <li className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-[var(--app-success)]" />{" "}
-            Avaliação recalculada
-          </li>
-          {automaticActionCount > 0 ? (
-            <li className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-[var(--app-success)]" />{" "}
-              Ações automáticas registradas
-            </li>
-          ) : null}
-        </ul>
+          <div className="rounded-2xl border border-[color-mix(in_srgb,var(--app-success)_22%,var(--app-border-subtle))] bg-[color-mix(in_srgb,var(--app-success)_6%,var(--app-surface-2))] px-4 py-3">
+            <h2 className="text-sm font-semibold text-[var(--text-primary)]">
+              O que o sistema já fez
+            </h2>
+            <ul className="mt-3 grid gap-2 text-sm text-[var(--text-secondary)] md:grid-cols-3">
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-[var(--app-success)]" />{" "}
+                Estado atualizado
+              </li>
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-[var(--app-success)]" />{" "}
+                Sinais processados
+              </li>
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-[var(--app-success)]" />{" "}
+                Avaliação recalculada
+              </li>
+              {automaticActionCount > 0 ? (
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-[var(--app-success)]" />{" "}
+                  Ações automáticas registradas
+                </li>
+              ) : null}
+            </ul>
+          </div>
+        </div>
       </AppSectionCard>
 
       <AppSectionCard variant="evidence" className="p-4 md:p-5">
-        <h2 className="text-lg font-semibold text-[var(--text-primary)]">
-          Evidências oficiais
-        </h2>
+        <div className="border-b border-[var(--app-border-subtle)] pb-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[var(--app-accent)]">
+            Painel de auditoria
+          </p>
+          <h2 className="mt-1 text-lg font-semibold text-[var(--text-primary)]">
+            Evidências e histórico na mesma trilha
+          </h2>
+        </div>
+        <div className="mt-4 grid gap-4 xl:grid-cols-[1.08fr_0.92fr]">
+          <section className="rounded-2xl bg-[color-mix(in_srgb,var(--app-surface-2)_78%,transparent)] p-4">
+            <h3 className="text-base font-semibold text-[var(--text-primary)]">
+              Evidências oficiais
+            </h3>
         {officialEvidence.length ? (
           <div className="mt-3 grid gap-3">
             {officialEvidence.map(event => {
@@ -953,12 +951,12 @@ export default function GovernancePage() {
             </div>
           </div>
         )}
-      </AppSectionCard>
+          </section>
 
-      <AppSectionCard variant="evidence" className="p-4 md:p-5">
-        <h2 className="text-lg font-semibold text-[var(--text-primary)]">
-          Histórico de governança
-        </h2>
+          <section className="rounded-2xl bg-[color-mix(in_srgb,var(--app-surface-2)_78%,transparent)] p-4">
+            <h3 className="text-base font-semibold text-[var(--text-primary)]">
+              Histórico de governança
+            </h3>
         {history.length ? (
           <div className="mt-3 grid gap-3">
             {history.map(item => (
@@ -1009,17 +1007,21 @@ export default function GovernancePage() {
                   Nenhuma mudança de governança encontrada nesta leitura.
                 </p>
                 <p className="mt-1">
-                  A seção permanece preparada para receber evento, transição de
-                  estado, motivo e horário da próxima execução oficial.
+                  A próxima execução registrada aparecerá aqui.
                 </p>
               </div>
             </div>
           </div>
         )}
+          </section>
+        </div>
       </AppSectionCard>
 
       <AppSectionCard variant="evidence" className="p-4 md:p-5">
-        <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[var(--app-accent)]">
+          Painel de controle
+        </p>
+        <h2 className="mt-1 text-lg font-semibold text-[var(--text-primary)]">
           Políticas ativas
         </h2>
         <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -1046,31 +1048,12 @@ export default function GovernancePage() {
               <h3 className="mt-3 font-semibold text-[var(--text-primary)]">
                 {policy.name}
               </h3>
-              <div className="mt-3 grid gap-2 text-xs text-[var(--text-secondary)]">
-                <p>
-                  <strong className="text-[var(--text-primary)]">
-                    Objetivo:
-                  </strong>{" "}
-                  {policy.objective}.
+              <div className="mt-3 space-y-1 text-sm text-[var(--text-secondary)]">
+                <p className="font-medium text-[var(--text-primary)]">
+                  {policy.objective}
                 </p>
-                <p>
-                  <strong className="text-[var(--text-primary)]">
-                    Status:
-                  </strong>{" "}
-                  {policy.status}.
-                </p>
-                <p>
-                  <strong className="text-[var(--text-primary)]">
-                    Impactando:
-                  </strong>{" "}
-                  {policy.impactando}.
-                </p>
-                <p>
-                  <strong className="text-[var(--text-primary)]">
-                    Última avaliação:
-                  </strong>{" "}
-                  {policy.lastEvaluation}.
-                </p>
+                <p>{policy.impactando}</p>
+                <p>{policy.lastEvaluation}</p>
               </div>
               <p className="mt-3 border-t border-[var(--app-border-subtle)] pt-3 text-sm text-[var(--text-muted)]">
                 {policy.description}

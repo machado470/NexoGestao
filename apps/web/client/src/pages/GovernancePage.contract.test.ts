@@ -20,10 +20,10 @@ describe("GovernancePage operational supervision center contract", () => {
   it("renders the FAÇA AGORA matrix with impact, recommendation, priority and action", () => {
     expect(source).toContain("Matriz de intervenção");
     expect(source).toContain("Faça agora");
-    expect(source).toContain("Impacto");
-    expect(source).toContain("Recomendação");
-    expect(source).toContain("Prioridade");
-    expect(source).toContain("Ação ·");
+    expect(source).toContain("action.consequence");
+    expect(source).toContain("action.recommendation");
+    expect(source).toContain("priorityLabel(action.priority)");
+    expect(source).toContain("action.primaryActionLabel");
     expect(source).toContain("buildPriorityActions(signals)");
     expect(source).toContain(".slice(0, 3)");
     expect(source).toContain("Nenhuma ação prioritária");
@@ -32,6 +32,7 @@ describe("GovernancePage operational supervision center contract", () => {
   it("turns official evidence empty state into an audit panel with reserved future area", () => {
     expect(source).toContain("Evidências oficiais");
     expect(source).toContain("Painel de auditoria");
+    expect(source).toContain("Evidências e histórico na mesma trilha");
     expect(source).toContain("Área reservada para anexar a próxima prova");
     expect(source).toContain("Trilha auditável · Abrir Timeline");
     expect(source).toContain("Timeline/Governança sem fabricar histórico");
@@ -40,8 +41,7 @@ describe("GovernancePage operational supervision center contract", () => {
   it("keeps governance history alive as a decision container even when empty", () => {
     expect(source).toContain("Histórico de governança");
     expect(source).toContain("Container de decisões");
-    expect(source).toContain("preparada para receber evento, transição de");
-    expect(source).toContain("próxima execução oficial");
+    expect(source).toContain("A próxima execução registrada aparecerá aqui.");
     expect(source).not.toContain("histórico fictício");
   });
 
@@ -51,10 +51,10 @@ describe("GovernancePage operational supervision center contract", () => {
     expect(source).toContain("objective: string");
     expect(source).toContain("impactando: string");
     expect(source).toContain("lastEvaluation: string");
-    expect(source).toContain("Objetivo:");
-    expect(source).toContain("Status:");
-    expect(source).toContain("Impactando:");
-    expect(source).toContain("Última avaliação:");
+    expect(source).toContain("Painel de controle");
+    expect(source).toContain("{policy.objective}");
+    expect(source).toContain("{policy.impactando}");
+    expect(source).toContain("{policy.lastEvaluation}");
     expect(source).toContain("var(--app-success)_26%");
     expect(source).toContain("var(--app-accent)_12%");
   });
