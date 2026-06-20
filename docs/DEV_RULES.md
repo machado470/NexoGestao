@@ -24,10 +24,13 @@ Regras obrigatórias para o boot local do NexoGestao.
 
 - Por padrão, `pnpm dev:full` não roda seed.
 - Em banco vazio, rode exatamente `NEXO_DEV_SEED=1 pnpm dev:full` para criar usuários de desenvolvimento.
-- O modo padrão do seed Prisma é `pilot`.
+- Variáveis passadas na linha de comando têm precedência sobre `.env`; portanto `NEXO_DEV_SEED=1 pnpm dev:full` habilita o seed mesmo que o `.env` tenha `NEXO_DEV_SEED=0`.
+- Sem `NEXO_DEV_SEED=1`, o script informa que banco vazio não terá login disponível.
+- O modo padrão do seed Prisma/dev local é `pilot` (`SEED_MODE=pilot`).
 - Credenciais locais padrão do seed piloto:
   - Admin: `admin.piloto@nexogestao.local` / `Admin123!`
   - Operação: `operador.piloto@nexogestao.local` / `Piloto@Operador123`
   - Financeiro: `financeiro.piloto@nexogestao.local` / `Piloto@Finance123`
 - Credencial do seed básico (`SEED_MODE=basic`): `admin@nexogestao.local` / `123456`.
+- Com `NEXO_DEV_SEED=1`, o `dev:full` imprime as credenciais efetivamente aplicadas ao final do seed.
 - Essas credenciais são somente para desenvolvimento local/piloto e não devem ser usadas em produção.

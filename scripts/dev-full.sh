@@ -39,6 +39,41 @@ ensure_env_file() {
   log "[BOOT] .env ausente; criado automaticamente a partir de .env.example"
 }
 
+load_env_file_preserving_shell() {
+  # Carrega .env sem sobrescrever variáveis passadas na linha de comando.
+  # Ex.: NEXO_DEV_SEED=1 pnpm dev:full deve vencer NEXO_DEV_SEED=0 do .env.
+  local line key
+  while IFS= read -r line || [ -n "$line" ]; do
+    line="${line#${line%%[![:space:]]*}}"
+    line="${line%${line##*[![:space:]]}}"
+    [[ -z "$line" || "$line" == \#* ]] && continue
+    [[ "$line" == export[[:space:]]* ]] && line="${line#export }"
+    key="${line%%=*}"
+    key="${key%${key##*[![:space:]]}}"
+    if [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] && [ -z "${!key+x}" ]; then
+      eval "export $line"
+    fi
+  done < .env
+}
+
+seed_mode() {
+  echo "${SEED_MODE:-pilot}" | tr '[:upper:]' '[:lower:]'
+}
+
+print_seed_credentials() {
+  local mode
+  mode="$(seed_mode)"
+  if [ "$mode" = "basic" ]; then
+    log "[BOOT] credencial seed basic: admin@nexogestao.local / 123456"
+    return 0
+  fi
+
+  log "[BOOT] credenciais seed pilot:"
+  log "[BOOT] - Admin: ${PILOT_ADMIN_EMAIL:-admin.piloto@nexogestao.local} / ${PILOT_ADMIN_PASSWORD:-Admin123!}"
+  log "[BOOT] - Operação: ${PILOT_OPERATOR_EMAIL:-operador.piloto@nexogestao.local} / ${PILOT_OPERATOR_PASSWORD:-Piloto@Operador123}"
+  log "[BOOT] - Financeiro: ${PILOT_FINANCE_EMAIL:-financeiro.piloto@nexogestao.local} / ${PILOT_FINANCE_PASSWORD:-Piloto@Finance123}"
+}
+
 validate_required_env() {
   local required=(DATABASE_URL REDIS_URL API_PORT WEB_PORT NEXO_API_URL)
   local missing=()
@@ -322,9 +357,7 @@ main() {
 
   # 1) checar portas
   ensure_env_file
-  set -a
-  source ./.env
-  set +a
+  load_env_file_preserving_shell
   validate_required_env
 
   assert_port_available 5432 "Postgres"
@@ -368,10 +401,12 @@ main() {
   pnpm --filter @nexogestao/api prisma generate
 
   if [ "${NEXO_DEV_SEED:-0}" = "1" ]; then
-    log "[BOOT] NEXO_DEV_SEED=1 -> rodando seed Prisma..."
+    log "[BOOT] NEXO_DEV_SEED=1 -> rodando seed Prisma (SEED_MODE=$(seed_mode))..."
     pnpm --filter @nexogestao/api prisma db seed
+    print_seed_credentials
   else
-    log "[BOOT] seed Prisma desabilitado. Para criar usuários de desenvolvimento em banco vazio, rode: NEXO_DEV_SEED=1 pnpm dev:full"
+    log "[BOOT] seed Prisma desabilitado. Banco vazio não terá login disponível."
+    log "[BOOT] Para criar usuários de desenvolvimento, rode: NEXO_DEV_SEED=1 pnpm dev:full"
   fi
 
   # 6) subir API
@@ -405,7 +440,7 @@ main() {
   # 10) status geral
   log ""
   if [ "${NEXO_DEV_SEED:-0}" = "1" ]; then
-    log "[BOOT] credenciais de desenvolvimento seedadas/documentadas em docs/DEV_RULES.md"
+    log "[BOOT] credenciais de desenvolvimento seedadas e documentadas em docs/DEV_RULES.md"
   fi
 
   log "[SUCCESS] ambiente pronto:"
