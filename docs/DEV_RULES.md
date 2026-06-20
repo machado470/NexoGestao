@@ -14,10 +14,11 @@ Regras obrigatórias para o boot local do NexoGestao.
 - Use `pnpm dev:full` para subir o ambiente local completo.
 - O script sobe somente `postgres` e `redis` pelo Docker Compose; a API e a WEB rodam via `pnpm` na máquina local.
 - O container `nexogestao_api` não faz parte do fluxo `dev:full`.
-- Se houver conflito nas portas 3000/3010, rode `pnpm dev:ports` para diagnosticar.
-- Para limpar apenas processos antigos do próprio NexoGestão nas portas da API/WEB, rode exatamente: `NEXO_DEV_KILL_PORTS=1 pnpm dev:full`.
-- Processos externos nas portas da API/WEB não devem ser encerrados automaticamente.
-- A variável antiga `NEXO_KILL_STALE_DEV_PROCESSES=1` continua aceita apenas por compatibilidade; prefira `NEXO_DEV_KILL_PORTS=1`.
+- Se houver conflito nas portas 3000/3010 causado por processo antigo claramente pertencente a este repositório, `pnpm dev:full` encerra esse processo automaticamente e reinicia o ambiente local.
+- A validação segura de pertencimento exige `cwd` dentro do repositório ou comando contendo caminho absoluto dentro do repositório; strings genéricas como `apps/api` ou `apps/web` não bastam.
+- Processos externos nas portas da API/WEB, containers externos ou casos ambíguos não devem ser encerrados automaticamente; rode `pnpm dev:ports` para diagnosticar e libere a porta manualmente ou ajuste `API_PORT/WEB_PORT`.
+- Para desabilitar a limpeza automática segura, rode exatamente: `NEXO_DEV_KILL_PORTS=0 pnpm dev:full`.
+- A variável antiga `NEXO_KILL_STALE_DEV_PROCESSES=1` continua aceita por compatibilidade quando `NEXO_DEV_KILL_PORTS` não estiver definida.
 - Para recriar a infraestrutura local, rode `pnpm dev:reset`; ele usa `NEXO_DEV_RESET=1 NEXO_DEV_KILL_PORTS=1 ./scripts/dev-full.sh`.
 
 ## Seed local de desenvolvimento

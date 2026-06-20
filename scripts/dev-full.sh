@@ -7,7 +7,20 @@ cd "$ROOT_DIR"
 API_PORT="${API_PORT:-3000}"
 WEB_PORT="${WEB_PORT:-${PORT:-3010}}"
 NEXO_API_URL="${NEXO_API_URL:-http://localhost:${API_PORT}}"
-ALLOW_KILL="${NEXO_DEV_KILL_PORTS:-${NEXO_KILL_STALE_DEV_PROCESSES:-0}}"
+determine_allow_kill() {
+  # Por padrão, o fluxo local limpa apenas processos antigos do próprio repositório
+  # nas portas da API/WEB. NEXO_DEV_KILL_PORTS=0 desabilita explicitamente;
+  # NEXO_KILL_STALE_DEV_PROCESSES permanece como alias legado.
+  if [ "${NEXO_DEV_KILL_PORTS+x}" = "x" ]; then
+    echo "$NEXO_DEV_KILL_PORTS"
+  elif [ "${NEXO_KILL_STALE_DEV_PROCESSES+x}" = "x" ]; then
+    echo "$NEXO_KILL_STALE_DEV_PROCESSES"
+  else
+    echo "1"
+  fi
+}
+
+ALLOW_KILL="$(determine_allow_kill)"
 RESET_MODE="${NEXO_DEV_RESET:-0}"
 NEXO_DEV_SEED_SET_IN_SHELL="${NEXO_DEV_SEED+x}"
 
@@ -21,10 +34,10 @@ fail() { echo "[ERROR] $1"; exit 1; }
 
 kill_hint() {
   local port="$1"
-  echo "Se for processo antigo do NexoGestão: NEXO_DEV_KILL_PORTS=1 pnpm dev:full"
-  echo "Se for outro aplicativo, libere a porta manualmente ou ajuste API_PORT/WEB_PORT no .env."
   echo "Diagnóstico: pnpm dev:ports"
   echo "Inspeção manual: lsof -nP -iTCP:${port} -sTCP:LISTEN"
+  echo "Se for outro aplicativo, libere a porta manualmente ou ajuste API_PORT/WEB_PORT no .env."
+  echo "Para desabilitar a limpeza segura de processos antigos do NexoGestão: NEXO_DEV_KILL_PORTS=0 pnpm dev:full"
 }
 
 ensure_env_file() {
@@ -196,13 +209,35 @@ container_on_port() {
   return 1
 }
 
+path_is_inside_root() {
+  local path="$1"
+  [ "$path" = "$ROOT_DIR" ] || [[ "$path" == "$ROOT_DIR/"* ]]
+}
+
+cmd_contains_root_path() {
+  local cmd="$1"
+  [[ "$cmd" == *"$ROOT_DIR"* ]] || return 1
+  [[ "$cmd" == *"$ROOT_DIR/"* || "$cmd" == *"$ROOT_DIR "* || "$cmd" == *"$ROOT_DIR" ]]
+}
+
 is_nexo_pid() {
   local pid="$1"
   local cmd
   cmd="$(ps -p "$pid" -o args= 2>/dev/null || true)"
   local cwd=""
   cwd="$(readlink "/proc/$pid/cwd" 2>/dev/null || true)"
-  [[ "$cwd" == "$ROOT_DIR"* ]] || [[ "$cmd" == *"$ROOT_DIR"* ]]
+
+  if [ -n "$cwd" ] && path_is_inside_root "$cwd"; then
+    return 0
+  fi
+
+  # Exige caminho absoluto do repositório no comando. Strings genéricas como
+  # apps/api ou apps/web não são suficientes para validar pertencimento.
+  if [ -n "$cmd" ] && cmd_contains_root_path "$cmd"; then
+    return 0
+  fi
+
+  return 1
 }
 
 port_pids() {
@@ -301,8 +336,8 @@ kill_nexo_pids_on_port_if_opt_in() {
   while read -r pid; do
     [ -n "$pid" ] || continue
     if is_nexo_pid "$pid"; then
-      log "[BOOT] porta $port ocupada por processo antigo do NexoGestão: $(describe_pid "$pid")"
-      log "[BOOT] NEXO_DEV_KILL_PORTS=1 ativo; encerrando processo antigo com segurança."
+      log "[BOOT] porta $port ocupada por processo antigo do NexoGestão; encerrando para reiniciar o ambiente local."
+      log "[BOOT] processo encerrado: $(describe_pid "$pid")"
       stop_pid_gracefully "$pid"
       killed_any=1
     else
@@ -349,7 +384,7 @@ assert_port_available() {
     fi
   fi
 
-  fail "$label: porta $port ocupada. ${owner:+Processo: $owner}. Não matei automaticamente porque o processo não foi validado como NexoGestão ou NEXO_DEV_KILL_PORTS não está ativo. $(kill_hint "$port")"
+  fail "$label: porta $port ocupada. ${owner:+Processo: $owner}. Não encerrei automaticamente porque o processo não foi validado com segurança como pertencente a $ROOT_DIR ou porque NEXO_DEV_KILL_PORTS=0 desabilitou a limpeza. $(kill_hint "$port")"
 }
 
 wait_tcp() {
