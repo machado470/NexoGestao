@@ -9,6 +9,7 @@ WEB_PORT="${WEB_PORT:-${PORT:-3010}}"
 NEXO_API_URL="${NEXO_API_URL:-http://localhost:${API_PORT}}"
 ALLOW_KILL="${NEXO_DEV_KILL_PORTS:-${NEXO_KILL_STALE_DEV_PROCESSES:-0}}"
 RESET_MODE="${NEXO_DEV_RESET:-0}"
+NEXO_DEV_SEED_SET_IN_SHELL="${NEXO_DEV_SEED+x}"
 
 API_LOG_FILE="$(mktemp -t nexogestao-api.XXXX.log)"
 WEB_LOG_FILE="$(mktemp -t nexogestao-web.XXXX.log)"
@@ -60,6 +61,34 @@ seed_mode() {
   echo "${SEED_MODE:-pilot}" | tr '[:upper:]' '[:lower:]'
 }
 
+
+ensure_not_production_seed() {
+  local node_env="${NODE_ENV:-}"
+  if [ "${node_env,,}" = "production" ]; then
+    fail "Seed automático/forçado bloqueado: NODE_ENV=production. O dev:full só pode seedar banco local/desenvolvimento."
+  fi
+}
+
+database_user_count() {
+  DATABASE_URL="$DATABASE_URL" pnpm exec tsx -e '
+    import { PrismaClient } from "@prisma/client";
+    const prisma = new PrismaClient();
+    try {
+      const count = await prisma.user.count();
+      console.log(count);
+    } finally {
+      await prisma.$disconnect();
+    }
+  ' | tail -n 1 | tr -d "[:space:]"
+}
+
+run_prisma_seed() {
+  ensure_not_production_seed
+  local mode
+  mode="$(seed_mode)"
+  SEED_MODE="$mode" pnpm --filter @nexogestao/api prisma db seed
+  print_seed_credentials
+}
 print_seed_credentials() {
   local mode
   mode="$(seed_mode)"
@@ -400,13 +429,30 @@ main() {
   log "[BOOT] gerando Prisma Client real..."
   pnpm --filter @nexogestao/api prisma generate
 
-  if [ "${NEXO_DEV_SEED:-0}" = "1" ]; then
-    log "[BOOT] NEXO_DEV_SEED=1 -> rodando seed Prisma (SEED_MODE=$(seed_mode))..."
-    pnpm --filter @nexogestao/api prisma db seed
-    print_seed_credentials
+  user_count="$(database_user_count)"
+  if ! [[ "$user_count" =~ ^[0-9]+$ ]]; then
+    fail "Não foi possível verificar usuários no banco local usando DATABASE_URL. Valor retornado: ${user_count:-vazio}"
+  fi
+
+  if [ "${NEXO_DEV_SEED:-}" = "1" ]; then
+    log "[BOOT] NEXO_DEV_SEED=1 -> rodando seed Prisma forçado (SEED_MODE=$(seed_mode))..."
+    run_prisma_seed
+  elif [ "${NEXO_DEV_SEED_SET_IN_SHELL:-}" = "x" ] && [ "${NEXO_DEV_SEED:-}" = "0" ]; then
+    if [ "$user_count" = "0" ]; then
+      log "[BOOT] banco vazio e seed desabilitado; login não estará disponível."
+      log "[BOOT] Para criar usuários piloto de desenvolvimento, rode: NEXO_DEV_SEED=1 pnpm dev:full"
+    else
+      log "[BOOT] banco já possui ${user_count} usuário(s); seed automático desabilitado por NEXO_DEV_SEED=0."
+      log "[BOOT] use as credenciais já existentes ou rode NEXO_DEV_SEED=1 pnpm dev:full para reaplicar o seed idempotente."
+      print_seed_credentials
+    fi
+  elif [ "$user_count" = "0" ]; then
+    log "[BOOT] banco sem usuários; rodando seed piloto automaticamente para ambiente local."
+    SEED_MODE="${SEED_MODE:-pilot}" run_prisma_seed
   else
-    log "[BOOT] seed Prisma desabilitado. Banco vazio não terá login disponível."
-    log "[BOOT] Para criar usuários de desenvolvimento, rode: NEXO_DEV_SEED=1 pnpm dev:full"
+    log "[BOOT] banco já possui ${user_count} usuário(s); seed automático não será executado para preservar dados locais."
+    log "[BOOT] use as credenciais já existentes ou consulte docs/DEV_RULES.md; para reaplicar seed idempotente: NEXO_DEV_SEED=1 pnpm dev:full"
+    print_seed_credentials
   fi
 
   # 6) subir API
@@ -439,8 +485,8 @@ main() {
 
   # 10) status geral
   log ""
-  if [ "${NEXO_DEV_SEED:-0}" = "1" ]; then
-    log "[BOOT] credenciais de desenvolvimento seedadas e documentadas em docs/DEV_RULES.md"
+  if ! { [ "${NEXO_DEV_SEED_SET_IN_SHELL:-}" = "x" ] && [ "${NEXO_DEV_SEED:-}" = "0" ]; }; then
+    log "[BOOT] credenciais de desenvolvimento documentadas em docs/DEV_RULES.md"
   fi
 
   log "[SUCCESS] ambiente pronto:"

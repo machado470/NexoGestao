@@ -16,7 +16,7 @@ function env(name: string, fallback: string) {
 function shouldRunDevSeed() {
   const nodeEnv = (process.env.NODE_ENV ?? '').toLowerCase().trim()
   const seedEnabled = (process.env.NEXO_DEV_SEED ?? '').trim() === '1'
-  const seedMode = (process.env.SEED_MODE ?? 'basic').trim().toLowerCase()
+  const seedMode = (process.env.SEED_MODE ?? 'pilot').trim().toLowerCase()
 
   return seedEnabled && nodeEnv !== 'production' && ['basic', 'pilot'].includes(seedMode)
 }
@@ -29,7 +29,7 @@ export class DevSeedService implements OnModuleInit {
 
   async onModuleInit() {
     if (!shouldRunDevSeed()) {
-      this.logger.log('[BOOT][DevSeed] seed explícito desabilitado (NEXO_DEV_SEED=1 SEED_MODE=basic para habilitar).')
+      this.logger.log('[BOOT][DevSeed] seed explícito desabilitado (NEXO_DEV_SEED=1 para habilitar; SEED_MODE=pilot é o padrão local).')
       return
     }
 
