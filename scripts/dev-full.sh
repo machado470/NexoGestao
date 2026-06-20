@@ -7,7 +7,7 @@ cd "$ROOT_DIR"
 API_PORT="${API_PORT:-3000}"
 WEB_PORT="${WEB_PORT:-${PORT:-3010}}"
 NEXO_API_URL="${NEXO_API_URL:-http://localhost:${API_PORT}}"
-ALLOW_KILL="${NEXO_KILL_STALE_DEV_PROCESSES:-0}"
+ALLOW_KILL="${NEXO_DEV_KILL_PORTS:-${NEXO_KILL_STALE_DEV_PROCESSES:-1}}"
 RESET_MODE="${NEXO_DEV_RESET:-0}"
 
 API_LOG_FILE="$(mktemp -t nexogestao-api.XXXX.log)"
@@ -17,6 +17,13 @@ WEB_PID=""
 
 log() { echo "$1"; }
 fail() { echo "[ERROR] $1"; exit 1; }
+
+kill_hint() {
+  local port="$1"
+  echo "Correção segura: NEXO_DEV_KILL_PORTS=1 pnpm dev:full"
+  echo "Diagnóstico: pnpm dev:ports"
+  echo "Inspeção manual: lsof -nP -iTCP:${port} -sTCP:LISTEN"
+}
 
 ensure_env_file() {
   if [ -f .env ]; then
@@ -57,8 +64,6 @@ cleanup() {
   fi
   exit "$code"
 }
-trap cleanup EXIT
-
 port_in_use() {
   local port="$1"
 
@@ -130,25 +135,96 @@ is_nexo_pid() {
   local pid="$1"
   local cmd
   cmd="$(ps -p "$pid" -o args= 2>/dev/null || true)"
-  [[ "$cmd" == *"$ROOT_DIR"* ]] || [[ "$cmd" == *"apps/api"* ]] || [[ "$cmd" == *"apps/web"* ]]
+  local cwd=""
+  cwd="$(readlink "/proc/$pid/cwd" 2>/dev/null || true)"
+  [[ "$cwd" == "$ROOT_DIR"* ]] || [[ "$cmd" == *"$ROOT_DIR"* ]] || [[ "$cmd" == *"apps/api"* ]] || [[ "$cmd" == *"apps/web"* ]]
 }
 
-kill_nexo_node_fallback() {
-  local label="$1"
-  local killed_any=0
+port_pids() {
+  local port="$1"
 
-  while read -r pid _; do
-    [ -n "$pid" ] || continue
-    if is_nexo_pid "$pid"; then
-      kill "$pid" >/dev/null 2>&1 || true
-      sleep 1
-      kill -9 "$pid" >/dev/null 2>&1 || true
-      killed_any=1
-    fi
-  done < <(ps -eo pid=,args= | awk '/[n]ode/ {print $1" "$0}')
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -t -nP -iTCP:"$port" -sTCP:LISTEN 2>/dev/null | sort -u
+    return 0
+  fi
 
-  if [ "$killed_any" = "1" ]; then
-    log "[BOOT] limpeza fallback aplicada: processos node do projeto finalizados ($label)."
+  if command -v ss >/dev/null 2>&1; then
+    ss -ltnp 2>/dev/null \
+      | awk -v p=":$port" '$4 ~ p {print}' \
+      | sed -nE 's/.*pid=([0-9]+).*/\1/p' \
+      | sort -u
+    return 0
+  fi
+
+  if command -v python3 >/dev/null 2>&1 && [ -r /proc/net/tcp ]; then
+    python3 - "$port" <<'PY'
+import os
+import sys
+
+port = int(sys.argv[1])
+inodes = set()
+
+for table in ("/proc/net/tcp", "/proc/net/tcp6"):
+    try:
+        lines = open(table, encoding="utf-8").read().splitlines()[1:]
+    except OSError:
+        continue
+    for line in lines:
+        parts = line.split()
+        if len(parts) < 10 or parts[3] != "0A":
+            continue
+        local_address = parts[1]
+        try:
+            local_port = int(local_address.rsplit(":", 1)[1], 16)
+        except (IndexError, ValueError):
+            continue
+        if local_port == port:
+            inodes.add(parts[9])
+
+pids = set()
+for name in os.listdir("/proc"):
+    if not name.isdigit():
+        continue
+    fd_dir = f"/proc/{name}/fd"
+    try:
+        fds = os.listdir(fd_dir)
+    except OSError:
+        continue
+    for fd in fds:
+        try:
+            target = os.readlink(f"{fd_dir}/{fd}")
+        except OSError:
+            continue
+        if target.startswith("socket:[") and target[8:-1] in inodes:
+            pids.add(int(name))
+            break
+
+for pid in sorted(pids):
+    print(pid)
+PY
+    return 0
+  fi
+
+  return 1
+}
+
+describe_pid() {
+  local pid="$1"
+  local cmd
+  cmd="$(ps -p "$pid" -o args= 2>/dev/null || true)"
+  if [ -n "$cmd" ]; then
+    echo "PID $pid ($cmd)"
+  else
+    echo "PID $pid"
+  fi
+}
+
+stop_pid_gracefully() {
+  local pid="$1"
+  kill "$pid" >/dev/null 2>&1 || true
+  sleep 1
+  if kill -0 "$pid" >/dev/null 2>&1; then
+    kill -9 "$pid" >/dev/null 2>&1 || true
   fi
 }
 
@@ -156,26 +232,23 @@ kill_nexo_pids_on_port_if_opt_in() {
   local port="$1"
   [ "$ALLOW_KILL" = "1" ] || return 0
 
-  if command -v lsof >/dev/null 2>&1; then
-    local killed_any=0
-    while read -r pid; do
-      [ -n "$pid" ] || continue
-      if is_nexo_pid "$pid"; then
-        kill "$pid" >/dev/null 2>&1 || true
-        sleep 1
-        kill -9 "$pid" >/dev/null 2>&1 || true
-        killed_any=1
-      fi
-    done < <(lsof -t -nP -iTCP:"$port" -sTCP:LISTEN 2>/dev/null | sort -u)
-
-    if [ "$killed_any" = "1" ]; then
-      log "[BOOT] limpeza opt-in aplicada na porta $port"
+  local killed_any=0
+  while read -r pid; do
+    [ -n "$pid" ] || continue
+    if is_nexo_pid "$pid"; then
+      log "[BOOT] porta $port ocupada por processo antigo do NexoGestão: $(describe_pid "$pid")"
+      log "[BOOT] NEXO_DEV_KILL_PORTS=1 ativo; encerrando processo antigo com segurança."
+      stop_pid_gracefully "$pid"
+      killed_any=1
+    else
+      log "[BOOT] porta $port ocupada por processo não identificado como NexoGestão: $(describe_pid "$pid")"
+      log "[BOOT] Por segurança, este processo não será encerrado automaticamente."
     fi
+  done < <(port_pids "$port" || true)
 
-    return 0
+  if [ "$killed_any" = "1" ]; then
+    log "[BOOT] limpeza aplicada na porta $port"
   fi
-
-  kill_nexo_node_fallback "porta $port"
 }
 
 assert_port_available() {
@@ -211,7 +284,7 @@ assert_port_available() {
     fi
   fi
 
-  fail "$label: porta $port ocupada. ${owner:+Processo: $owner}. Dica: rode 'pnpm dev:ports' para detalhes."
+  fail "$label: porta $port ocupada. ${owner:+Processo: $owner}. Não matei automaticamente porque o processo não foi validado como NexoGestão ou NEXO_DEV_KILL_PORTS=0. $(kill_hint "$port")"
 }
 
 wait_tcp() {
@@ -243,104 +316,112 @@ wait_http() {
   return 1
 }
 
-# 1) checar portas
-ensure_env_file
-set -a
-source ./.env
-set +a
-validate_required_env
+main() {
+  trap cleanup EXIT
 
-assert_port_available 5432 "Postgres"
-assert_port_available 6379 "Redis"
-assert_port_available "$API_PORT" "API"
-assert_port_available "$WEB_PORT" "WEB"
+  # 1) checar portas
+  ensure_env_file
+  set -a
+  source ./.env
+  set +a
+  validate_required_env
 
-# 2) (opcional) limpar processos do próprio Nexo
-if [ "$ALLOW_KILL" = "1" ]; then
-  kill_nexo_pids_on_port_if_opt_in "$API_PORT"
-  kill_nexo_pids_on_port_if_opt_in "$WEB_PORT"
-fi
+  assert_port_available 5432 "Postgres"
+  assert_port_available 6379 "Redis"
+  assert_port_available "$API_PORT" "API"
+  assert_port_available "$WEB_PORT" "WEB"
 
-# 3) subir containers
-if ! docker info >/dev/null 2>&1; then
-  fail "Docker indisponível no ambiente atual. No WSL, abra o Docker Desktop e habilite a integração da distro em Settings > Resources > WSL Integration; depois valide com 'docker --version' e 'docker info'."
-fi
-
-if [ "$RESET_MODE" = "1" ]; then
-  log "[BOOT] reset de infraestrutura (postgres/redis)..."
-  docker compose down --volumes --remove-orphans >/dev/null 2>&1 || true
-fi
-
-log "[BOOT] subindo infraestrutura (postgres/redis) via docker-compose.yml..."
-docker compose -f docker-compose.yml up -d postgres redis >/dev/null
-
-# 4) validar infra
-wait_tcp 127.0.0.1 5432 60 || fail "Banco PostgreSQL não disponível na porta 5432. Verifique: pnpm dev:logs"
-wait_tcp 127.0.0.1 6379 60 || fail "Redis não disponível na porta 6379. Verifique: pnpm dev:logs"
-echo "[BOOT] aguardando postgres aceitar conexões..."
-until docker exec nexogestao_postgres pg_isready -U postgres >/dev/null 2>&1; do
-  sleep 2
-done
-echo "[BOOT] postgres pronto"
-
-# 5) sincronizar Prisma (migrations -> generate -> seed opcional)
-log "[BOOT] aplicando migrations Prisma..."
-pnpm --filter @nexogestao/api prisma migrate deploy
-
-log "[BOOT] gerando Prisma Client real..."
-pnpm --filter @nexogestao/api prisma generate
-
-if [ "${NEXO_DEV_SEED:-0}" = "1" ]; then
-  log "[BOOT] NEXO_DEV_SEED=1 -> rodando seed Prisma..."
-  pnpm --filter @nexogestao/api prisma db seed
-else
-  log "[BOOT] seed Prisma desabilitado (defina NEXO_DEV_SEED=1 para habilitar)."
-fi
-
-# 6) subir API
-log "[BOOT] iniciando API..."
-API_PORT="$API_PORT" PORT="$API_PORT" pnpm --filter ./apps/api run dev > "$API_LOG_FILE" 2>&1 &
-API_PID=$!
-
-# 7) esperar processo vivo + porta + /health
-kill -0 "$API_PID" >/dev/null 2>&1 || fail "API falhou no boot. Veja logs: $API_LOG_FILE"
-wait_tcp 127.0.0.1 "$API_PORT" 120 || fail "API não abriu porta $API_PORT. Veja logs: $API_LOG_FILE"
-log "[READY] API porta OK"
-wait_http "http://127.0.0.1:${API_PORT}/v1/health" 120 || fail "API falhou no /v1/health. Veja logs: $API_LOG_FILE"
-log "[READY] API /v1/health OK"
-
-# 8) subir WEB
-log "[BOOT] iniciando WEB..."
-WEB_PORT="$WEB_PORT" PORT="$WEB_PORT" NEXO_API_URL="$NEXO_API_URL" pnpm --filter ./apps/web run dev > "$WEB_LOG_FILE" 2>&1 &
-WEB_PID=$!
-
-# 9) validar root web
-kill -0 "$WEB_PID" >/dev/null 2>&1 || fail "WEB falhou no boot. Veja logs: $WEB_LOG_FILE"
-wait_http "http://127.0.0.1:${WEB_PORT}/" 120 || fail "WEB não respondeu /. Veja logs: $WEB_LOG_FILE"
-log "[READY] WEB OK"
-
-# Optional integrations (non-blocking)
-[ -n "${STRIPE_SECRET_KEY:-}" ] || log "[OPTIONAL] Stripe não configurado"
-[ -n "${GOOGLE_CLIENT_ID:-}" ] || log "[OPTIONAL] Google OAuth não configurado"
-[ -n "${WHATSAPP_PROVIDER:-}${ZAPI_INSTANCE_ID:-}" ] || log "[OPTIONAL] WhatsApp não configurado"
-[ -n "${SENTRY_DSN:-}" ] || log "[OPTIONAL] Sentry não configurado"
-
-# 10) status geral
-log ""
-log "[SUCCESS] ambiente pronto:"
-log "- API: http://localhost:${API_PORT}"
-log "- WEB: http://localhost:${WEB_PORT}"
-log ""
-log "[BOOT] logs: API=${API_LOG_FILE} WEB=${WEB_LOG_FILE}"
-
-set +e
-while true; do
-  wait -n "$API_PID" "$WEB_PID"
-  status=$?
-  if ! kill -0 "$API_PID" >/dev/null 2>&1; then
-    fail "API encerrou (status=$status). Logs: $API_LOG_FILE"
+  # 2) (opcional) limpar processos do próprio Nexo
+  if [ "$ALLOW_KILL" = "1" ]; then
+    kill_nexo_pids_on_port_if_opt_in "$API_PORT"
+    kill_nexo_pids_on_port_if_opt_in "$WEB_PORT"
   fi
-  if ! kill -0 "$WEB_PID" >/dev/null 2>&1; then
-    fail "WEB encerrou (status=$status). Logs: $WEB_LOG_FILE"
+
+  # 3) subir containers
+  if ! docker info >/dev/null 2>&1; then
+    fail "Docker indisponível no ambiente atual. No WSL, abra o Docker Desktop e habilite a integração da distro em Settings > Resources > WSL Integration; depois valide com 'docker --version' e 'docker info'."
   fi
-done
+
+  if [ "$RESET_MODE" = "1" ]; then
+    log "[BOOT] reset de infraestrutura (postgres/redis)..."
+    docker compose down --volumes --remove-orphans >/dev/null 2>&1 || true
+  fi
+
+  log "[BOOT] subindo infraestrutura (postgres/redis) via docker-compose.yml..."
+  docker compose -f docker-compose.yml up -d postgres redis >/dev/null
+
+  # 4) validar infra
+  wait_tcp 127.0.0.1 5432 60 || fail "Banco PostgreSQL não disponível na porta 5432. Verifique: pnpm dev:logs"
+  wait_tcp 127.0.0.1 6379 60 || fail "Redis não disponível na porta 6379. Verifique: pnpm dev:logs"
+  echo "[BOOT] aguardando postgres aceitar conexões..."
+  until docker exec nexogestao_postgres pg_isready -U postgres >/dev/null 2>&1; do
+    sleep 2
+  done
+  echo "[BOOT] postgres pronto"
+
+  # 5) sincronizar Prisma (migrations -> generate -> seed opcional)
+  log "[BOOT] aplicando migrations Prisma..."
+  pnpm --filter @nexogestao/api prisma migrate deploy
+
+  log "[BOOT] gerando Prisma Client real..."
+  pnpm --filter @nexogestao/api prisma generate
+
+  if [ "${NEXO_DEV_SEED:-0}" = "1" ]; then
+    log "[BOOT] NEXO_DEV_SEED=1 -> rodando seed Prisma..."
+    pnpm --filter @nexogestao/api prisma db seed
+  else
+    log "[BOOT] seed Prisma desabilitado (defina NEXO_DEV_SEED=1 para habilitar)."
+  fi
+
+  # 6) subir API
+  log "[BOOT] iniciando API..."
+  API_PORT="$API_PORT" PORT="$API_PORT" pnpm --filter ./apps/api run dev > "$API_LOG_FILE" 2>&1 &
+  API_PID=$!
+
+  # 7) esperar processo vivo + porta + /health
+  kill -0 "$API_PID" >/dev/null 2>&1 || fail "API falhou no boot. Veja logs: $API_LOG_FILE"
+  wait_tcp 127.0.0.1 "$API_PORT" 120 || fail "API não abriu porta $API_PORT. Veja logs: $API_LOG_FILE"
+  log "[READY] API porta OK"
+  wait_http "http://127.0.0.1:${API_PORT}/v1/health" 120 || fail "API falhou no /v1/health. Veja logs: $API_LOG_FILE"
+  log "[READY] API /v1/health OK"
+
+  # 8) subir WEB
+  log "[BOOT] iniciando WEB..."
+  WEB_PORT="$WEB_PORT" PORT="$WEB_PORT" NEXO_API_URL="$NEXO_API_URL" pnpm --filter ./apps/web run dev > "$WEB_LOG_FILE" 2>&1 &
+  WEB_PID=$!
+
+  # 9) validar root web
+  kill -0 "$WEB_PID" >/dev/null 2>&1 || fail "WEB falhou no boot. Veja logs: $WEB_LOG_FILE"
+  wait_http "http://127.0.0.1:${WEB_PORT}/" 120 || fail "WEB não respondeu /. Veja logs: $WEB_LOG_FILE"
+  log "[READY] WEB OK"
+
+  # Optional integrations (non-blocking)
+  [ -n "${STRIPE_SECRET_KEY:-}" ] || log "[OPTIONAL] Stripe não configurado"
+  [ -n "${GOOGLE_CLIENT_ID:-}" ] || log "[OPTIONAL] Google OAuth não configurado"
+  [ -n "${WHATSAPP_PROVIDER:-}${ZAPI_INSTANCE_ID:-}" ] || log "[OPTIONAL] WhatsApp não configurado"
+  [ -n "${SENTRY_DSN:-}" ] || log "[OPTIONAL] Sentry não configurado"
+
+  # 10) status geral
+  log ""
+  log "[SUCCESS] ambiente pronto:"
+  log "- API: http://localhost:${API_PORT}"
+  log "- WEB: http://localhost:${WEB_PORT}"
+  log ""
+  log "[BOOT] logs: API=${API_LOG_FILE} WEB=${WEB_LOG_FILE}"
+
+  set +e
+  while true; do
+    wait -n "$API_PID" "$WEB_PID"
+    status=$?
+    if ! kill -0 "$API_PID" >/dev/null 2>&1; then
+      fail "API encerrou (status=$status). Logs: $API_LOG_FILE"
+    fi
+    if ! kill -0 "$WEB_PID" >/dev/null 2>&1; then
+      fail "WEB encerrou (status=$status). Logs: $WEB_LOG_FILE"
+    fi
+  done
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi
