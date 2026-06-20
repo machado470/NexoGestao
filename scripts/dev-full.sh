@@ -7,7 +7,7 @@ cd "$ROOT_DIR"
 API_PORT="${API_PORT:-3000}"
 WEB_PORT="${WEB_PORT:-${PORT:-3010}}"
 NEXO_API_URL="${NEXO_API_URL:-http://localhost:${API_PORT}}"
-ALLOW_KILL="${NEXO_DEV_KILL_PORTS:-${NEXO_KILL_STALE_DEV_PROCESSES:-1}}"
+ALLOW_KILL="${NEXO_DEV_KILL_PORTS:-${NEXO_KILL_STALE_DEV_PROCESSES:-0}}"
 RESET_MODE="${NEXO_DEV_RESET:-0}"
 
 API_LOG_FILE="$(mktemp -t nexogestao-api.XXXX.log)"
@@ -20,7 +20,8 @@ fail() { echo "[ERROR] $1"; exit 1; }
 
 kill_hint() {
   local port="$1"
-  echo "Correção segura: NEXO_DEV_KILL_PORTS=1 pnpm dev:full"
+  echo "Se for processo antigo do NexoGestão: NEXO_DEV_KILL_PORTS=1 pnpm dev:full"
+  echo "Se for outro aplicativo, libere a porta manualmente ou ajuste API_PORT/WEB_PORT no .env."
   echo "Diagnóstico: pnpm dev:ports"
   echo "Inspeção manual: lsof -nP -iTCP:${port} -sTCP:LISTEN"
 }
@@ -137,7 +138,7 @@ is_nexo_pid() {
   cmd="$(ps -p "$pid" -o args= 2>/dev/null || true)"
   local cwd=""
   cwd="$(readlink "/proc/$pid/cwd" 2>/dev/null || true)"
-  [[ "$cwd" == "$ROOT_DIR"* ]] || [[ "$cmd" == *"$ROOT_DIR"* ]] || [[ "$cmd" == *"apps/api"* ]] || [[ "$cmd" == *"apps/web"* ]]
+  [[ "$cwd" == "$ROOT_DIR"* ]] || [[ "$cmd" == *"$ROOT_DIR"* ]]
 }
 
 port_pids() {
@@ -284,7 +285,7 @@ assert_port_available() {
     fi
   fi
 
-  fail "$label: porta $port ocupada. ${owner:+Processo: $owner}. Não matei automaticamente porque o processo não foi validado como NexoGestão ou NEXO_DEV_KILL_PORTS=0. $(kill_hint "$port")"
+  fail "$label: porta $port ocupada. ${owner:+Processo: $owner}. Não matei automaticamente porque o processo não foi validado como NexoGestão ou NEXO_DEV_KILL_PORTS não está ativo. $(kill_hint "$port")"
 }
 
 wait_tcp() {
@@ -370,7 +371,7 @@ main() {
     log "[BOOT] NEXO_DEV_SEED=1 -> rodando seed Prisma..."
     pnpm --filter @nexogestao/api prisma db seed
   else
-    log "[BOOT] seed Prisma desabilitado (defina NEXO_DEV_SEED=1 para habilitar)."
+    log "[BOOT] seed Prisma desabilitado. Para criar usuários de desenvolvimento em banco vazio, rode: NEXO_DEV_SEED=1 pnpm dev:full"
   fi
 
   # 6) subir API
@@ -403,6 +404,10 @@ main() {
 
   # 10) status geral
   log ""
+  if [ "${NEXO_DEV_SEED:-0}" = "1" ]; then
+    log "[BOOT] credenciais de desenvolvimento seedadas/documentadas em docs/DEV_RULES.md"
+  fi
+
   log "[SUCCESS] ambiente pronto:"
   log "- API: http://localhost:${API_PORT}"
   log "- WEB: http://localhost:${WEB_PORT}"
