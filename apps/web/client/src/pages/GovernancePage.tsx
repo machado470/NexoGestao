@@ -5,6 +5,7 @@ import {
   Activity,
   AlertTriangle,
   ArrowRight,
+  CheckCircle2,
   Clock3,
   Eye,
   FileCheck2,
@@ -26,6 +27,7 @@ import { setBootPhase } from "@/lib/bootPhase";
 
 type GovernanceState = "NORMAL" | "WARNING" | "RESTRICTED" | "SUSPENDED";
 type Priority = "critical" | "high" | "medium";
+type ActionType = "Automática" | "Recomendada" | "Bloqueada" | "Manual";
 
 type Signal = {
   id: string;
@@ -46,6 +48,9 @@ type NextBestAction = {
   primaryActionLabel: string;
   primaryPath: string;
   priority: Priority;
+  type: ActionType;
+  status: string;
+  motive: string;
 };
 
 type OfficialEvidence = {
@@ -72,7 +77,6 @@ type ActivePolicy = {
   status: "ATIVA" | "SEM SINAL" | "BLOQUEADA";
   impactando: string;
   lastEvaluation: string;
-  description: string;
 };
 
 const stateCopy: Record<
@@ -282,6 +286,9 @@ function buildPriorityActions(signals: Signal[]): NextBestAction[] {
           primaryActionLabel: "Abrir cobrança",
           primaryPath: signal.path,
           priority: signal.priority,
+          type: "Recomendada",
+          status: "Aguardando operador",
+          motive: "Cobrança vencida afeta caixa.",
         };
       }
       if (signal.id === "late-orders") {
@@ -293,6 +300,9 @@ function buildPriorityActions(signals: Signal[]): NextBestAction[] {
           primaryActionLabel: "Abrir O.S.",
           primaryPath: signal.path,
           priority: signal.priority,
+          type: "Recomendada",
+          status: "Fila crítica",
+          motive: "O.S. atrasada reduz previsibilidade.",
         };
       }
       if (signal.id === "appointments") {
@@ -304,6 +314,9 @@ function buildPriorityActions(signals: Signal[]): NextBestAction[] {
           primaryActionLabel: "Abrir agendamento",
           primaryPath: signal.path,
           priority: signal.priority,
+          type: "Manual",
+          status: "Confirmação pendente",
+          motive: "Agenda sem confirmação pode travar execução.",
         };
       }
       return {
@@ -313,6 +326,9 @@ function buildPriorityActions(signals: Signal[]): NextBestAction[] {
         primaryActionLabel: "Abrir O.S.",
         primaryPath: signal.path,
         priority: signal.priority,
+        type: "Manual",
+        status: "Sem responsável",
+        motive: "Fila sem dono precisa de atribuição.",
       };
     });
 }
@@ -348,6 +364,9 @@ export default function GovernancePage() {
     { retry: false }
   );
   const appointmentsQuery = trpc.nexo.appointments.list.useQuery(undefined, {
+    retry: false,
+  });
+  const dashboardKpisQuery = trpc.dashboard.kpis.useQuery(undefined, {
     retry: false,
   });
 
@@ -386,6 +405,24 @@ export default function GovernancePage() {
   const appointments = useMemo(
     () => normalizeArrayPayload<any>(appointmentsQuery.data),
     [appointmentsQuery.data]
+  );
+  const dashboardKpis = useMemo(
+    () => normalizeObjectPayload<any>(dashboardKpisQuery.data) ?? {},
+    [dashboardKpisQuery.data]
+  );
+  const whatsappSignals =
+    normalizeObjectPayload<any>(dashboardKpis.whatsappSignals) ?? {};
+  const failedWhatsAppMessages = metric(
+    whatsappSignals,
+    "failedMessages",
+    "failed",
+    "failedMessagesCount"
+  );
+  const customersNoResponse = metric(
+    whatsappSignals,
+    "customersNoResponse",
+    "waitingOperator",
+    "waitingConversations"
   );
 
   const openOrders = serviceOrders.filter(
@@ -523,6 +560,40 @@ export default function GovernancePage() {
         source: "Ordens de Serviço",
       });
     }
+    if (failedWhatsAppMessages > 0) {
+      items.push({
+        id: "whatsapp-failures",
+        title: "Falhas WhatsApp",
+        reason: pluralizePt(
+          failedWhatsAppMessages,
+          "mensagem com falha",
+          "mensagens com falha"
+        ),
+        impact: "Contato operacional interrompido",
+        priority: failedWhatsAppMessages >= 3 ? "critical" : "high",
+        count: failedWhatsAppMessages,
+        cta: "Revisar WhatsApp",
+        path: "/whatsapp?source=governance",
+        source: "WhatsApp",
+      });
+    }
+    if (customersNoResponse > 0) {
+      items.push({
+        id: "customers-no-response",
+        title: "Clientes sem resposta",
+        reason: pluralizePt(
+          customersNoResponse,
+          "cliente/responsável sem resposta",
+          "clientes/responsáveis sem resposta"
+        ),
+        impact: "Decisões dependentes de contato podem atrasar",
+        priority: "medium",
+        count: customersNoResponse,
+        cta: "Responder conversas",
+        path: "/whatsapp?source=governance",
+        source: "WhatsApp",
+      });
+    }
     if (backendAlerts > 0 || governanceRiskScore >= 30) {
       items.push({
         id: "risk-score",
@@ -561,6 +632,8 @@ export default function GovernancePage() {
     runs.length,
     staleAppointments.length,
     summary,
+    failedWhatsAppMessages,
+    customersNoResponse,
     unassignedOrders.length,
   ]);
 
@@ -620,6 +693,11 @@ export default function GovernancePage() {
           : "success",
     },
     {
+      label: "WhatsApp com falha",
+      value: String(failedWhatsAppMessages),
+      tone: failedWhatsAppMessages > 0 ? "warning" : "success",
+    },
+    {
       label: "Agendamentos afetados",
       value: String(staleAppointments.length),
       tone: staleAppointments.length > 0 ? "warning" : "success",
@@ -646,18 +724,28 @@ export default function GovernancePage() {
       icon: Activity,
       title: "Impacto calculado",
       description:
-        overdueAmount > 0 || delayedOrders.length || staleAppointments.length
-          ? `${formatCurrency(overdueAmount)} · ${delayedOrders.length + unassignedOrders.length} O.S. · ${staleAppointments.length} agendas`
+        overdueAmount > 0 ||
+        delayedOrders.length ||
+        staleAppointments.length ||
+        failedWhatsAppMessages
+          ? `${formatCurrency(overdueAmount)} · ${delayedOrders.length + unassignedOrders.length} O.S. · ${staleAppointments.length} agendas · ${failedWhatsAppMessages} WhatsApp`
           : "Sem impacto crítico",
       status: riskLevel,
       tone: riskScore >= 30 ? "warning" : "success",
     },
     {
       icon: ShieldCheck,
-      title: "Estado definido",
+      title: "Decisão tomada",
       description: statePresentation.title,
       status: statePresentation.label,
       tone: statePresentation.tone,
+    },
+    {
+      icon: CheckCircle2,
+      title: "Ação sugerida",
+      description: mainRisk ? mainRisk.cta : "Acompanhar próxima leitura",
+      status: mainRisk ? mainRisk.source : "Sem intervenção",
+      tone: mainRisk ? "warning" : "success",
     },
   ];
   const nextReevaluation = formatRelativeReevaluation(
@@ -741,10 +829,6 @@ export default function GovernancePage() {
       lastEvaluation: runs.length
         ? formatDateTime(lastRunAt)
         : "Aguardando execução oficial",
-      description:
-        overdueCharges.length > 0
-          ? "Cobranças vencidas recebem prioridade máxima para destravar receita."
-          : "Sem cobrança vencida retornada, a política não cria ação nesta leitura.",
     },
     {
       name: "Sinais críticos são ordenados por impacto",
@@ -762,10 +846,6 @@ export default function GovernancePage() {
       lastEvaluation: runs.length
         ? formatDateTime(lastRunAt)
         : "Aguardando execução oficial",
-      description:
-        signals.length > 0
-          ? "Sinais críticos são ordenados por impacto antes da fila de ação."
-          : "Sem sinal prioritário retornado pelas fontes oficiais.",
     },
     {
       name: "Estado operacional é recalculado automaticamente",
@@ -778,13 +858,10 @@ export default function GovernancePage() {
       lastEvaluation: runs.length
         ? formatDateTime(lastRunAt)
         : "Aguardando execução oficial",
-      description: hasRecentRun
-        ? "Estado operacional é recalculado automaticamente com a última leitura."
-        : "Aguardando próxima execução registrada pela governança.",
     },
     {
       name: "Evidências são registradas em Timeline",
-      objective: "Preservar prova operacional",
+      objective: "Preservar prova operacional; a regra não fabrica provas",
       status: runs.length > 0 ? "ATIVA" : "SEM SINAL",
       impactando:
         runs.length > 0
@@ -793,10 +870,6 @@ export default function GovernancePage() {
       lastEvaluation: runs.length
         ? formatDateTime(lastRunAt)
         : "Aguardando execução oficial",
-      description:
-        runs.length > 0
-          ? "Histórico oficial usado como trilha de auditoria."
-          : "A regra não fabrica provas; aguarda registros oficiais.",
     },
   ] satisfies ActivePolicy[];
 
@@ -825,6 +898,7 @@ export default function GovernancePage() {
                 overdueChargesQuery.refetch(),
                 serviceOrdersQuery.refetch(),
                 appointmentsQuery.refetch(),
+                dashboardKpisQuery.refetch(),
               ])
             }
           >
@@ -941,14 +1015,14 @@ export default function GovernancePage() {
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[var(--app-accent)]">
-              Intervenções e ações prioritárias
+              Ações e políticas ativas
             </p>
             <h2 className="mt-1 text-lg font-semibold text-[var(--text-primary)]">
-              Faça agora
+              Ações que o sistema fará
             </h2>
             <p className="text-sm text-[var(--text-secondary)]">
-              Ações priorizadas em linguagem operacional, mantendo a severidade
-              apenas como critério interno.
+              A fila mostra o que será automático, recomendado, manual ou
+              bloqueado conforme evidências reais.
             </p>
           </div>
           <AppStatusBadge label={`${priorityActions.length} ações`} />
@@ -984,6 +1058,26 @@ export default function GovernancePage() {
                 <p className="mt-2 text-sm text-[var(--text-muted)]">
                   {action.recommendation}
                 </p>
+                <div className="mt-3 grid gap-2 text-xs text-[var(--text-secondary)]">
+                  <span>
+                    <strong className="text-[var(--text-primary)]">
+                      Tipo:
+                    </strong>{" "}
+                    {action.type}
+                  </span>
+                  <span>
+                    <strong className="text-[var(--text-primary)]">
+                      Status:
+                    </strong>{" "}
+                    {action.status}
+                  </span>
+                  <span>
+                    <strong className="text-[var(--text-primary)]">
+                      Motivo:
+                    </strong>{" "}
+                    {action.motive}
+                  </span>
+                </div>
                 <span className="mt-3 w-fit rounded-full border border-white/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
                   Prioridade {priorityLabel(action.priority)}
                 </span>
@@ -1011,16 +1105,57 @@ export default function GovernancePage() {
             </p>
           </div>
         )}
+        <div className="mt-5 border-t border-[var(--app-border-subtle)] pt-4">
+          <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--app-accent)]">
+                Políticas ativas
+              </p>
+              <p className="text-sm text-[var(--text-secondary)]">
+                Controles compactos usados nesta leitura, sem manual técnico.
+              </p>
+            </div>
+            <AppStatusBadge
+              label={`${policies.filter(policy => policy.status === "ATIVA").length} ativas`}
+              tone="accent"
+            />
+          </div>
+          <div className="mt-3 grid gap-2 md:grid-cols-2">
+            {policies.map(policy => (
+              <div
+                key={policy.name}
+                className="rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-surface-2)] p-3"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-sm font-semibold text-[var(--text-primary)]">
+                    {policy.name}
+                  </p>
+                  <AppStatusBadge
+                    label={policy.status}
+                    tone={policy.status === "ATIVA" ? "success" : "neutral"}
+                  />
+                </div>
+                <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                  {policy.objective} · {policy.impactando}
+                </p>
+                <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+                  {policy.lastEvaluation}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
       </AppSectionCard>
 
       <AppSectionCard variant="evidence" className="p-4 md:p-5">
         <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[var(--app-accent)]">
-          Fluxo de decisão da governança
+          Diagnóstico da decisão
         </p>
         <h2 className="mt-1 text-lg font-semibold text-[var(--text-primary)]">
-          Sinal → Impacto → Decisão → Ação → Evidência
+          Sinal detectado → Evidência encontrada → Impacto calculado → Decisão
+          tomada → Ação sugerida
         </h2>
-        <div className="mt-4 grid gap-3 lg:grid-cols-4">
+        <div className="mt-4 grid gap-3 lg:grid-cols-5">
           {decisionFlow.map((step, index) => {
             const StepIcon = step.icon;
             return (
@@ -1090,7 +1225,7 @@ export default function GovernancePage() {
       <AppSectionCard variant="evidence" className="p-4 md:p-5">
         <div className="border-b border-[var(--app-border-subtle)] pb-3">
           <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[var(--app-accent)]">
-            Painel de auditoria
+            Histórico e evidências
           </p>
           <h2 className="mt-1 text-lg font-semibold text-[var(--text-primary)]">
             Evidências e histórico na mesma trilha
@@ -1232,52 +1367,6 @@ export default function GovernancePage() {
               </div>
             )}
           </section>
-        </div>
-      </AppSectionCard>
-
-      <AppSectionCard variant="evidence" className="p-4 md:p-5">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[var(--app-accent)]">
-          Painel de controle
-        </p>
-        <h2 className="mt-1 text-lg font-semibold text-[var(--text-primary)]">
-          Regras que influenciaram a decisão
-        </h2>
-        <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {policies.map(policy => (
-            <article
-              key={policy.name}
-              className="relative flex min-h-full flex-col overflow-hidden rounded-2xl border border-[color-mix(in_srgb,var(--app-accent)_18%,var(--app-border-subtle))] bg-[linear-gradient(180deg,var(--app-surface-1),var(--app-surface-2))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
-            >
-              <div className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,transparent,var(--app-accent),transparent)] opacity-40" />
-              <div className="flex items-start justify-between gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--app-border-subtle)] bg-[var(--app-surface-3)] text-[var(--app-accent)] shadow-inner">
-                  <ShieldCheck className="h-4 w-4" />
-                </span>
-                <span
-                  className={
-                    policy.status === "ATIVA"
-                      ? "rounded-full border border-[color-mix(in_srgb,var(--app-success)_45%,transparent)] bg-[color-mix(in_srgb,var(--app-success)_14%,transparent)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--app-success)] shadow-[0_0_18px_color-mix(in_srgb,var(--app-success)_26%,transparent)]"
-                      : "rounded-full border border-[color-mix(in_srgb,var(--app-accent)_35%,transparent)] bg-[color-mix(in_srgb,var(--app-accent)_12%,transparent)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--app-accent)]"
-                  }
-                >
-                  {policy.status}
-                </span>
-              </div>
-              <h3 className="mt-3 font-semibold text-[var(--text-primary)]">
-                {policy.name}
-              </h3>
-              <div className="mt-3 space-y-1 text-sm text-[var(--text-secondary)]">
-                <p className="font-medium text-[var(--text-primary)]">
-                  {policy.objective}
-                </p>
-                <p>{policy.impactando}</p>
-                <p>{policy.lastEvaluation}</p>
-              </div>
-              <p className="mt-3 border-t border-[var(--app-border-subtle)] pt-3 text-sm text-[var(--text-muted)]">
-                {policy.description}
-              </p>
-            </article>
-          ))}
         </div>
       </AppSectionCard>
     </AppPageShell>
