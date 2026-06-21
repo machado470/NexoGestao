@@ -6,12 +6,16 @@ import {
   AppDataTable,
   AppPageShell,
   AppSectionCard,
-  AppStatCard,
   AppStatusBadge,
-  AppTimeline,
-  AppTimelineItem,
 } from "@/components/app-system";
 import { BaseModal } from "@/components/app-modal-system";
+import {
+  OperationalActionPanel,
+  OperationalKpiCard,
+  OperationalPanel,
+  OperationalPriorityItem,
+  OperationalTimelineItem,
+} from "@/components/operational";
 import { PageWrapper } from "@/components/operating-system/Wrappers";
 import { trpc } from "@/lib/trpc";
 
@@ -406,7 +410,11 @@ export default function BillingPage() {
       subtitle="Empresa → plano → assinatura → renovação → acesso."
     >
       <AppPageShell className="gap-3">
-        <AppSectionCard className="space-y-4 border-[color-mix(in_srgb,var(--accent-primary)_28%,var(--border-subtle))]">
+        <OperationalPanel
+          title="Controle da assinatura do Nexo"
+          subtitle="Qual plano eu tenho, quanto pago, quando renova e o que acontece se houver problema?"
+          variant="hero"
+        >
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div className="space-y-2">
               <div>
@@ -438,12 +446,12 @@ export default function BillingPage() {
             </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <AppStatCard
+            <OperationalKpiCard
               label="Próxima renovação"
               value={formatDate(nextRenewal)}
               helper="Renovação automática da assinatura."
             />
-            <AppStatCard
+            <OperationalKpiCard
               label="Próxima cobrança"
               value={formatDate(nextChargeAt)}
               helper={
@@ -451,19 +459,71 @@ export default function BillingPage() {
                   ? "Falha recente registrada."
                   : "Nenhuma falha registrada."
               }
+              tone={paymentFailed ? "warning" : "default"}
             />
-            <AppStatCard
+            <OperationalKpiCard
               label="Método"
               value={paymentMethod}
               helper={hasPaymentMethod ? "Método em uso." : "Ação necessária."}
+              tone={hasPaymentMethod ? "default" : "warning"}
             />
-            <AppStatCard
+            <OperationalKpiCard
               label="Usuários ativos"
               value={String(activeUsers)}
               helper="Uso atual da empresa."
             />
           </div>
-        </AppSectionCard>
+          <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,0.8fr)_minmax(280px,0.4fr)]">
+            <OperationalPriorityItem
+              tone={paymentFailed || !hasPaymentMethod ? "high" : "low"}
+              title={
+                paymentFailed
+                  ? "Pagamento exige atenção"
+                  : hasPaymentMethod
+                    ? "Assinatura sem bloqueio de pagamento"
+                    : "Método de pagamento pendente"
+              }
+              description={
+                paymentFailed
+                  ? "Há falha recente registrada; atualize o pagamento para evitar restrição de acesso."
+                  : hasPaymentMethod
+                    ? "Plano, renovação e método estão legíveis para a empresa."
+                    : "Adicione um método para manter a renovação previsível."
+              }
+            />
+            <OperationalActionPanel
+              title="Ação principal da assinatura"
+              description={
+                paymentFailed || !hasPaymentMethod
+                  ? "Atualize o pagamento antes da próxima tentativa."
+                  : "Gerencie plano e faturas sem misturar Billing com financeiro operacional."
+              }
+              tone={paymentFailed || !hasPaymentMethod ? "warning" : "success"}
+              display="compactHealthy"
+              primaryAction={{
+                label:
+                  paymentFailed || !hasPaymentMethod
+                    ? "Atualizar pagamento"
+                    : "Ver faturas",
+                onClick: () =>
+                  document
+                    .getElementById(
+                      paymentFailed || !hasPaymentMethod
+                        ? "billing-payment"
+                        : "billing-invoices"
+                    )
+                    ?.scrollIntoView({ behavior: "smooth" }),
+              }}
+              secondaryAction={{
+                label: "Trocar plano",
+                onClick: () =>
+                  document
+                    .getElementById("billing-plans")
+                    ?.scrollIntoView({ behavior: "smooth" }),
+              }}
+            />
+          </div>
+        </OperationalPanel>
 
         <AppSectionCard className="space-y-3">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -738,64 +798,39 @@ export default function BillingPage() {
           </AppDataTable>
         </AppSectionCard>
 
-        <AppSectionCard id="billing-history" className="space-y-3">
-          <div>
-            <h2 className="text-lg font-semibold text-[var(--text-primary)]">
-              Histórico da assinatura
-            </h2>
-            <p className="text-sm text-[var(--text-secondary)]">
-              Timeline oficial de eventos de Billing.
-            </p>
-          </div>
-          <AppTimeline>
+        <OperationalPanel
+          id="billing-history"
+          title="Histórico da assinatura"
+          subtitle="Timeline oficial de eventos de Billing."
+        >
+          <div className="space-y-3">
             {timelineEvents.length ? (
               timelineEvents.map((event: any, index: number) => (
-                <AppTimelineItem key={String(event?.id ?? index)}>
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <AppStatusBadge
-                        label={timelineLabel(event)}
-                        tone={invoiceTone(invoiceStatus(event))}
-                      />
-                      <p className="mt-2 font-medium text-[var(--text-primary)]">
-                        {String(event?.description ?? timelineLabel(event))}
-                      </p>
-                      <p className="text-sm text-[var(--text-secondary)]">
-                        Responsável:{" "}
-                        {String(
-                          event?.actor ?? event?.user ?? "Sistema Billing"
-                        )}{" "}
-                        • Origem:{" "}
-                        {String(
-                          event?.provider ?? event?.source ?? "Nexo Billing"
-                        )}
-                      </p>
-                    </div>
-                    <p className="text-sm text-[var(--text-muted)]">
-                      {formatDate(
-                        event?.createdAt ?? event?.date ?? event?.paidAt
-                      )}
-                    </p>
-                  </div>
-                </AppTimelineItem>
+                <OperationalTimelineItem
+                  key={String(event?.id ?? index)}
+                  title={String(event?.description ?? timelineLabel(event))}
+                  description={`Responsável: ${String(event?.actor ?? event?.user ?? "Sistema Billing")} • Origem: ${String(event?.provider ?? event?.source ?? "Nexo Billing")}`}
+                  entityLabel={timelineLabel(event)}
+                  time={formatDate(
+                    event?.createdAt ?? event?.date ?? event?.paidAt
+                  )}
+                  tone={
+                    invoiceStatus(event) === "FAILED" ? "warning" : "default"
+                  }
+                  withLine={index < timelineEvents.length - 1}
+                />
               ))
             ) : (
-              <AppTimelineItem>
-                <div className="space-y-1">
-                  <p className="font-medium text-[var(--text-primary)]">
-                    Histórico ainda não disponível para esta assinatura.
-                  </p>
-                  <p className="text-sm text-[var(--text-secondary)]">
-                    Nenhum evento oficial foi retornado pela fonte de Billing.
-                    Nenhum histórico fictício foi criado.
-                  </p>
-                </div>
-              </AppTimelineItem>
+              <OperationalPriorityItem
+                tone="neutral"
+                title="Histórico ainda não disponível para esta assinatura."
+                description="Nenhum evento oficial foi retornado pela fonte de Billing. Nenhum histórico fictício foi criado."
+              />
             )}
-          </AppTimeline>
-        </AppSectionCard>
+          </div>
+        </OperationalPanel>
 
-        <AppSectionCard className="space-y-4">
+        <AppSectionCard id="billing-plans" className="space-y-4">
           <div>
             <h2 className="text-lg font-semibold text-[var(--text-primary)]">
               Trocar plano

@@ -15,6 +15,9 @@ describe("Timeline V2 — Centro de Evidências Operacionais", () => {
   });
 
   it("mostra KPIs, panorama por módulo e estados humanos", () => {
+    expect(source).toContain("Leitura do período");
+    expect(source).toContain("<OperationalPanel");
+    expect(source).toContain("<OperationalKpiCard");
     expect(source).toContain("Eventos registrados");
     expect(source).toContain("Exigem atenção");
     expect(source).toContain("Impactam receita");
