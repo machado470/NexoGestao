@@ -1,15 +1,15 @@
 import { useMemo, useState } from "react";
-import { Plus, Trash2, Users } from "lucide-react";
+import { Clock3, Plus, Trash2, Users } from "lucide-react";
 import { useLocation } from "wouter";
 import CreatePersonModal from "@/components/CreatePersonModal";
 import EditPersonModal from "@/components/EditPersonModal";
 import { NextBestActionCard } from "@/components/app/OperationalCommandLayer";
 import {
-  AppDataTable,
   AppInput,
+  AppTimeline,
+  AppTimelineItem,
   AppOperationalStatusBadge,
   AppPageShell,
-  AppRowActionsDropdown,
   AppSectionCard,
   AppStatCard,
   type AppOperationalStatus,
@@ -37,6 +37,7 @@ import { trpc } from "@/lib/trpc";
 // createAvailabilityException.mutate({ personId: selectedPersonId
 // deleteAvailabilityException.mutate({ personId: selectedPerson.personId, exceptionId: exception.id })
 // {isAdmin ? <AppSectionBlock title="Sinais de atribuição"
+// trpc.nexo.timeline.listByOrg.useQuery({ limit: 5 })
 // Próxima melhor ação
 type LoadStatus = "IDLE" | "NORMAL" | "BUSY" | "OVERLOADED";
 type CapacityStatus = "UNDER_CAPACITY" | "AT_CAPACITY" | "OVER_CAPACITY";
@@ -68,6 +69,24 @@ type AssigneeWarningSummary = {
     shown: number;
     confirmed: number;
   }>;
+};
+
+type TeamTimelineEvent = {
+  id?: string;
+  action?: string | null;
+  type?: string | null;
+  title?: string | null;
+  description?: string | null;
+  entityType?: string | null;
+  entityName?: string | null;
+  serviceOrderId?: string | null;
+  customerName?: string | null;
+  actorName?: string | null;
+  personName?: string | null;
+  responsibleName?: string | null;
+  createdAt?: string | null;
+  occurredAt?: string | null;
+  timestamp?: string | null;
 };
 type OperationalPerson = {
   personId: string;
@@ -126,6 +145,50 @@ const peopleFilters: Array<{ key: PeopleFilter; label: string }> = [
   { key: "inactive", label: "Inativos" },
   { key: "available", label: "Disponíveis" },
 ];
+
+const compactChipClass =
+  "rounded-full border border-[var(--nexo-border-subtle,var(--border-subtle))] bg-[var(--nexo-control-bg,var(--surface-subtle))] px-2.5 py-1 text-xs text-[var(--nexo-text-muted,var(--text-muted))]";
+
+const personInitials = (name: string) =>
+  name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(part => part[0]?.toUpperCase())
+    .join("") || "?";
+
+const timelineActionLabels: Record<string, string> = {
+  SERVICE_ORDER_STARTED: "iniciou O.S.",
+  SERVICE_ORDER_COMPLETED: "concluiu O.S.",
+  APPOINTMENT_CONFIRMED: "confirmou agendamento",
+  CHARGE_CREATED: "criou cobrança",
+  PAYMENT_RECEIVED: "recebeu pagamento",
+  MESSAGE_SENT: "enviou mensagem",
+  AVAILABILITY_CHANGED: "alterou disponibilidade",
+};
+
+const getTimelineEventDate = (event: TeamTimelineEvent) =>
+  event.occurredAt ?? event.createdAt ?? event.timestamp ?? null;
+
+const getTimelineActor = (event: TeamTimelineEvent) =>
+  event.responsibleName ?? event.personName ?? event.actorName ?? "Equipe";
+
+const getTimelineAction = (event: TeamTimelineEvent) => {
+  const key = String(event.action ?? event.type ?? "").toUpperCase();
+  return (
+    timelineActionLabels[key] ??
+    event.title ??
+    event.description ??
+    "registrou uma ação"
+  );
+};
+
+const getTimelineContext = (event: TeamTimelineEvent) =>
+  event.entityName ??
+  event.customerName ??
+  event.entityType ??
+  event.serviceOrderId ??
+  "operação";
 
 const formatDateTime = (value?: string | null) =>
   value
@@ -239,28 +302,31 @@ const hasNoRecentActivitySignal = (person: OperationalPerson) =>
 function sortByOperationalIntervention(
   people: OperationalPerson[]
 ): OperationalPerson[] {
-  const order: Record<AppPriorityLevel, number> = {
-    P0: 0,
-    P1: 1,
-    P2: 2,
-    P3: 3,
-  };
+  const score = (person: OperationalPerson) => ({
+    overdue: person.overdueServiceOrdersCount,
+    overloaded: isPersonOverloaded(person) ? 1 : 0,
+    unavailable: person.availabilityStatus !== "AVAILABLE" ? 1 : 0,
+    usage: Math.max(
+      person.serviceOrderCapacityUsagePct ?? 0,
+      person.appointmentCapacityUsagePct ?? 0
+    ),
+    assigned:
+      person.openServiceOrdersCount +
+      person.todayAppointmentsCount +
+      person.futureAppointmentsCount,
+    healthy: derivePersonOperationalStatus(person) === "NORMAL" ? 1 : 0,
+  });
   return [...people].sort((a, b) => {
-    const priorityA = derivePersonPriority(a) ?? "P3";
-    const priorityB = derivePersonPriority(b) ?? "P3";
-    if (order[priorityA] !== order[priorityB]) {
-      return order[priorityA] - order[priorityB];
-    }
-    if (b.overdueServiceOrdersCount !== a.overdueServiceOrdersCount) {
-      return b.overdueServiceOrdersCount - a.overdueServiceOrdersCount;
-    }
+    const scoreA = score(a);
+    const scoreB = score(b);
     return (
-      b.openServiceOrdersCount +
-      b.todayAppointmentsCount +
-      b.futureAppointmentsCount -
-      (a.openServiceOrdersCount +
-        a.todayAppointmentsCount +
-        a.futureAppointmentsCount)
+      scoreB.overdue - scoreA.overdue ||
+      scoreB.overloaded - scoreA.overloaded ||
+      scoreB.unavailable - scoreA.unavailable ||
+      scoreB.usage - scoreA.usage ||
+      scoreB.assigned - scoreA.assigned ||
+      scoreA.healthy - scoreB.healthy ||
+      a.name.localeCompare(b.name)
     );
   });
 }
@@ -445,6 +511,14 @@ export default function PeoplePage() {
     { personId: selectedPersonId ?? "" },
     { enabled: isAuthenticated && Boolean(selectedPersonId), retry: false }
   );
+  const timelineQuery = trpc.nexo.timeline.listByOrg.useQuery(
+    { limit: 5 },
+    {
+      enabled: isAuthenticated,
+      retry: false,
+      refetchOnWindowFocus: false,
+    }
+  );
   const createAvailabilityException =
     trpc.people.createAvailabilityException.useMutation({
       onSuccess: async () => {
@@ -474,6 +548,19 @@ export default function PeoplePage() {
   );
   const selectedPerson =
     people.find(person => person.personId === selectedPersonId) ?? null;
+  const timelinePayload = normalizeObjectPayload<{
+    events?: TeamTimelineEvent[];
+    items?: TeamTimelineEvent[];
+    timeline?: TeamTimelineEvent[];
+    data?: TeamTimelineEvent[];
+  }>(timelineQuery.data);
+  const teamTimelineEvents = normalizeArrayPayload<TeamTimelineEvent>(
+    timelinePayload?.events ??
+      timelinePayload?.items ??
+      timelinePayload?.timeline ??
+      timelinePayload?.data ??
+      timelineQuery.data
+  ).slice(0, 5);
   const exceptions = normalizeArrayPayload<AvailabilityException>(
     exceptionsQuery.data
   );
@@ -669,62 +756,53 @@ export default function PeoplePage() {
       </AppSectionCard>
 
       <AppSectionBlock
-        title="Visão executiva da equipe"
-        subtitle="Situação da equipe agora"
+        title="Visão executiva compacta"
+        subtitle="Leitura rápida da sustentação da operação agora"
       >
         <AppSectionCard
-          className="space-y-3"
+          className={`border p-4 ${teamHealth.status === "CRÍTICO" ? "border-[var(--danger,var(--status-critical))]" : "border-[var(--nexo-border-subtle,var(--border-subtle))]"}`}
           data-testid="people-operational-header"
         >
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
-                Saúde da equipe: {teamHealth.label}
-              </p>
-              <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
+            <div className="min-w-0 space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-base font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
+                  {teamHealth.label}
+                </p>
+                <AppOperationalStatusBadge status={teamHealth.status} />
+              </div>
+              <p className="text-sm text-[var(--nexo-text-muted,var(--text-muted))]">
                 {teamHealth.reading}{" "}
                 {people.length === 0
-                  ? "Cadastre responsáveis para acompanhar carga, execução e indisponibilidade."
-                  : `Carga acima da capacidade em ${header.overloadedPeople} pessoa(s).`}
+                  ? "Cadastre responsáveis para acompanhar a operação."
+                  : `${header.activePeople} responsável(is) ativo(s) · ${header.overloadedPeople} sobrecarga(s) · ${header.overdueServiceOrders} atraso(s) · ${header.unavailablePeople} indisponibilidade(s).`}
               </p>
             </div>
-            <AppOperationalStatusBadge status={teamHealth.status} />
-          </div>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-            <AppStatCard
-              label="Responsáveis ativos"
-              value={`${header.activePeople}`}
-              helper="Responsáveis executando a operação."
-            />
-            <AppStatCard
-              label="Sobrecarregados"
-              value={`${header.overloadedPeople}`}
-              helper="Carga acima da capacidade."
-            />
-            <AppStatCard
-              label="Indisponíveis"
-              value={`${header.unavailablePeople}`}
-              helper="Agora ou em breve."
-            />
-            <AppStatCard
-              label="O.S. atrasadas"
-              value={`${header.overdueServiceOrders}`}
-              helper="Atrasos atribuídos."
-            />
-            <AppStatCard
-              label="Agenda hoje"
-              value={`${header.todayAppointments}`}
-              helper="Agendamentos atribuídos hoje."
-            />
-            <AppStatCard
-              label="Receita gerada"
-              value="—"
-              helper="A equipe ainda não possui execução financeira suficiente para análise."
-            />
+            <div
+              className="flex flex-wrap gap-2"
+              aria-label="Métricas executivas compactas"
+            >
+              <span className={compactChipClass}>
+                Ativos {header.activePeople}
+              </span>
+              <span className={compactChipClass}>
+                Sobrecarregados {header.overloadedPeople}
+              </span>
+              <span className={compactChipClass}>
+                Indisponíveis {header.unavailablePeople}
+              </span>
+              <span className={compactChipClass}>
+                O.S. atrasadas {header.overdueServiceOrders}
+              </span>
+              <span className={compactChipClass}>
+                Agenda hoje {header.todayAppointments}
+              </span>
+              <span className={compactChipClass}>{formatMoneyFallback()}</span>
+            </div>
           </div>
           {summaryQuery.isError ? (
             <AppSectionCard
-              className="p-3 text-sm"
+              className="mt-3 p-3 text-sm"
               data-testid="people-summary-partial-error"
             >
               <p className="font-semibold">
@@ -742,34 +820,9 @@ export default function PeoplePage() {
         </AppSectionCard>
       </AppSectionBlock>
 
-      <NextBestActionCard
-        title={nextBestAction.title}
-        entity={nextBestAction.entity}
-        reason={nextBestAction.reason}
-        impact={nextBestAction.impact}
-        safetyNote={nextBestAction.safetyNote}
-        primaryActionLabel={nextBestAction.primaryActionLabel}
-        onPrimaryAction={nextBestAction.onPrimaryAction}
-        secondaryActionLabel={nextBestAction.secondaryActionLabel}
-        onSecondaryAction={nextBestAction.onSecondaryAction}
-      />
-
-      <AppFiltersBar className="gap-2 border border-[var(--nexo-border-subtle,var(--border-subtle))] bg-[var(--nexo-card-bg,var(--surface-base))] px-3 py-3">
-        {peopleFilters.map(filter => (
-          <button
-            key={filter.key}
-            type="button"
-            onClick={() => setPeopleFilter(filter.key)}
-            className={`h-8 rounded-md px-3 text-xs font-medium transition-colors ${peopleFilter === filter.key ? "bg-[var(--accent-soft)] text-[var(--accent-primary)]" : "bg-[var(--nexo-control-bg,var(--surface-subtle))] text-[var(--nexo-text-muted,var(--text-muted))]"}`}
-          >
-            {filter.label}
-          </button>
-        ))}
-      </AppFiltersBar>
-
       <AppSectionBlock
-        title="Responsáveis-chave"
-        subtitle="Pessoas que sustentam a operação agora."
+        title="Quem sustenta a operação agora"
+        subtitle="Responsáveis-chave em ordem de relevância operacional."
       >
         {people.length === 0 ? (
           <AppSectionCard className="flex flex-wrap items-center justify-between gap-3 p-4">
@@ -786,13 +839,18 @@ export default function PeoplePage() {
             {keyPeople.map(person => (
               <AppSectionCard key={person.personId} className="space-y-3 p-4">
                 <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
-                      {person.name}
-                    </p>
-                    <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-                      {person.role}
-                    </p>
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-sm font-semibold text-[var(--accent-primary)]">
+                      {personInitials(person.name)}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-base font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
+                        {person.name}
+                      </p>
+                      <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
+                        {person.role}
+                      </p>
+                    </div>
                   </div>
                   <AppOperationalStatusBadge
                     status={derivePersonOperationalStatus(person)}
@@ -842,10 +900,96 @@ export default function PeoplePage() {
         )}
       </AppSectionBlock>
 
+      <NextBestActionCard
+        title={nextBestAction.title}
+        entity={nextBestAction.entity}
+        reason={nextBestAction.reason}
+        impact={nextBestAction.impact}
+        safetyNote={nextBestAction.safetyNote}
+        primaryActionLabel={nextBestAction.primaryActionLabel}
+        onPrimaryAction={nextBestAction.onPrimaryAction}
+        secondaryActionLabel={nextBestAction.secondaryActionLabel}
+        onSecondaryAction={nextBestAction.onSecondaryAction}
+      />
+
+      <AppSectionBlock
+        title="Atividade recente da equipe"
+        subtitle="Últimas ações reais registradas na Timeline."
+      >
+        <AppSectionCard className="p-4" data-testid="people-team-activity">
+          {timelineQuery.isLoading ? (
+            <AppPageLoadingState description="Carregando ações recentes da equipe..." />
+          ) : teamTimelineEvents.length > 0 ? (
+            <AppTimeline className="space-y-2">
+              {teamTimelineEvents.map((event, index) => (
+                <AppTimelineItem
+                  key={
+                    event.id ??
+                    `${getTimelineEventDate(event) ?? "event"}-${index}`
+                  }
+                  className="flex items-start justify-between gap-3 p-3"
+                >
+                  <div className="flex gap-3">
+                    <Clock3 className="mt-0.5 h-4 w-4 text-[var(--nexo-text-muted,var(--text-muted))]" />
+                    <div>
+                      <p className="text-sm font-medium text-[var(--nexo-text-primary,var(--text-primary))]">
+                        {getTimelineActor(event)} · {getTimelineAction(event)}
+                      </p>
+                      <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
+                        {getTimelineContext(event)} ·{" "}
+                        {formatDateTime(getTimelineEventDate(event))}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => navigate("/timeline")}
+                  >
+                    Abrir Timeline
+                  </Button>
+                </AppTimelineItem>
+              ))}
+            </AppTimeline>
+          ) : (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold">
+                  Aguardando eventos da equipe.
+                </p>
+                <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
+                  Quando responsáveis executarem O.S., agenda, cobrança ou
+                  mensagens, as ações aparecerão aqui.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => navigate("/timeline")}
+              >
+                Abrir Timeline
+              </Button>
+            </div>
+          )}
+        </AppSectionCard>
+      </AppSectionBlock>
+
       <AppSectionBlock
         title="Ranking operacional da equipe"
         subtitle="Quem exige atenção primeiro: sobrecarga, indisponibilidade, atraso, saudáveis e inativos."
       >
+        <AppFiltersBar className="gap-2 border border-[var(--nexo-border-subtle,var(--border-subtle))] bg-[var(--nexo-card-bg,var(--surface-base))] px-3 py-3">
+          {peopleFilters.map(filter => (
+            <button
+              key={filter.key}
+              type="button"
+              onClick={() => setPeopleFilter(filter.key)}
+              className={`h-8 rounded-md px-3 text-xs font-medium transition-colors ${peopleFilter === filter.key ? "bg-[var(--accent-soft)] text-[var(--accent-primary)]" : "bg-[var(--nexo-control-bg,var(--surface-subtle))] text-[var(--nexo-text-muted,var(--text-muted))]"}`}
+            >
+              {filter.label}
+            </button>
+          ))}
+        </AppFiltersBar>
         {summaryQuery.isLoading ? (
           <AppPageLoadingState title="Consolidando ranking operacional" />
         ) : null}
@@ -871,92 +1015,88 @@ export default function PeoplePage() {
             description="Nenhuma pessoa corresponde aos filtros operacionais atuais."
           />
         ) : !summaryQuery.isLoading ? (
-          <AppDataTable
-            className="min-w-[1180px]"
-            data-testid="people-workload-table"
-          >
-            <thead>
-              <tr>
-                <th>Responsável</th>
-                <th>Estado</th>
-                <th>Carga atual</th>
-                <th>Capacidade planejada</th>
-                <th>O.S. ativas</th>
-                <th>O.S. atrasadas</th>
-                <th>Agenda hoje</th>
-                <th>Valor 7 dias</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredPeople.map(person => {
-                const operationalStatus = derivePersonOperationalStatus(person);
-                return (
-                  <tr key={person.personId}>
-                    <td>
-                      <div className="space-y-1">
-                        <p className="font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
-                          {person.name}
-                        </p>
-                        <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-                          {person.role}
-                        </p>
-                      </div>
-                    </td>
-                    <td>
-                      <div className="space-y-1">
-                        <AppOperationalStatusBadge status={operationalStatus} />
-                        <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-                          {personOperationalStateLabel(person)} ·{" "}
-                          {personStatusLabel(person.status)}
-                        </p>
-                      </div>
-                    </td>
-                    <td>
-                      {loadLabels[person.loadStatus]} · O.S.{" "}
-                      {formatUsage(person.serviceOrderCapacityUsagePct)} ·
-                      Agenda {formatUsage(person.appointmentCapacityUsagePct)}
-                    </td>
-                    <td>
-                      O.S. {formatCapacity(person.dailyServiceOrderCapacity)} ·
-                      Agenda {formatCapacity(person.dailyAppointmentCapacity)}
-                    </td>
-                    <td>{person.openServiceOrdersCount}</td>
-                    <td>{person.overdueServiceOrdersCount}</td>
-                    <td>{person.todayAppointmentsCount}</td>
-                    <td className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-                      Aguardando vínculo
-                    </td>
-                    <td>
-                      <AppRowActionsDropdown
-                        triggerLabel="Ações da pessoa"
-                        items={[
-                          {
-                            label: "Ver detalhe",
-                            onSelect: () =>
-                              setSelectedPersonId(person.personId),
-                            tone: "primary",
-                          },
-                          {
-                            label: "Abrir Timeline",
-                            onSelect: () => navigate("/timeline"),
-                          },
-                          {
-                            label: "Filtrar atribuições",
-                            onSelect: () => navigate("/service-orders"),
-                          },
-                          {
-                            label: "Editar",
-                            onSelect: () => setEditPersonId(person.personId),
-                          },
-                        ]}
-                      />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </AppDataTable>
+          <div className="space-y-3" data-testid="people-workload-list">
+            {filteredPeople.map(person => {
+              const operationalStatus = derivePersonOperationalStatus(person);
+              return (
+                <AppSectionCard
+                  key={person.personId}
+                  className="grid gap-3 p-4 lg:grid-cols-[minmax(220px,1.3fr)_minmax(260px,2fr)_auto] lg:items-center"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-sm font-semibold text-[var(--accent-primary)]">
+                      {personInitials(person.name)}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
+                        {person.name}
+                      </p>
+                      <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
+                        {person.role}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <AppOperationalStatusBadge status={operationalStatus} />
+                      <span className={compactChipClass}>
+                        {personOperationalStateLabel(person)} ·{" "}
+                        {personStatusLabel(person.status)}
+                      </span>
+                      <span className={compactChipClass}>
+                        Carga {loadLabels[person.loadStatus]}
+                      </span>
+                      <span className={compactChipClass}>
+                        Capacidade O.S.{" "}
+                        {formatCapacity(person.dailyServiceOrderCapacity)} ·
+                        Agenda {formatCapacity(person.dailyAppointmentCapacity)}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <span className={compactChipClass}>
+                        O.S. ativas {person.openServiceOrdersCount}
+                      </span>
+                      <span className={compactChipClass}>
+                        Atrasadas {person.overdueServiceOrdersCount}
+                      </span>
+                      <span className={compactChipClass}>
+                        Agenda hoje {person.todayAppointmentsCount}
+                      </span>
+                      <span className={compactChipClass}>
+                        {availabilityLabels[person.availabilityStatus]}
+                      </span>
+                      <span className={compactChipClass}>
+                        Impacto: {formatMoneyFallback()}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2 lg:justify-end">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setSelectedPersonId(person.personId)}
+                    >
+                      Detalhe
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => navigate("/timeline")}
+                    >
+                      Timeline
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => navigate("/service-orders")}
+                    >
+                      Atribuições
+                    </Button>
+                  </div>
+                </AppSectionCard>
+              );
+            })}
+          </div>
         ) : null}
       </AppSectionBlock>
 
