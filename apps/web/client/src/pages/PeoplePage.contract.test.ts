@@ -16,16 +16,12 @@ describe("PeoplePage premium operational cockpit contract", () => {
     expect(source).toContain("Cockpit humano da equipe");
     expect(source).toContain("Centro de Responsáveis da Operação");
     expect(source).toContain("teamHeroNarrative(people, header)");
-    expect(source).toContain("sustenta 100% da operação atual");
+    expect(source).toContain("é a responsável ativa pela execução");
     expect(source).toContain(
-      "Nenhum atraso, sobrecarga ou indisponibilidade foi detectado"
+      "Nenhum atraso, sobrecarga ou indisponibilidade exige intervenção"
     );
-    expect(source).toContain('aria-label="Métricas executivas compactas"');
-    expect(source).toContain("Ativos {header.activePeople}");
-    expect(source).toContain("Sobrecarga {header.overloadedPeople}");
-    expect(source).toContain("O.S. atrasadas {header.overdueServiceOrders}");
-    expect(source).toContain("Agenda hoje {header.todayAppointments}");
-    expect(source).toContain("Indisponíveis {header.unavailablePeople}");
+    expect(source).not.toContain('aria-label="Métricas executivas compactas"');
+    expect(source).not.toContain("Ativos {header.activePeople}");
     expect(source).toContain('data-testid="people-operational-header"');
     expect(source).not.toContain(
       'title="Topo — Centro de Responsáveis da Operação"'
@@ -39,10 +35,8 @@ describe("PeoplePage premium operational cockpit contract", () => {
   });
 
   it("protege visão executiva com narrativa humana e sem saúde enganosa sem pessoas", () => {
-    expect(source).toContain("Equipe saudável");
-    expect(source).toContain(
-      "sem sobrecarga, atrasos ou indisponibilidades registradas"
-    );
+    expect(source).toContain("Operação estável");
+    expect(source).toContain("sem intervenção necessária");
     expect(source).toContain("Equipe exige atenção");
     expect(source).toContain("podem comprometer a execução");
     expect(source).toContain("Sem responsáveis operacionais");
@@ -96,6 +90,7 @@ describe("PeoplePage premium operational cockpit contract", () => {
   });
 
   it("renderiza ranking com frases humanas e sem labels rígidos excessivos", () => {
+    expect(source).toContain("people.length > 1 ?");
     expect(source).toContain("sortByOperationalIntervention(people).filter");
     expect(source).toContain('data-testid="people-workload-list"');
     expect(source).not.toContain("<AppDataTable");
@@ -130,8 +125,9 @@ describe("PeoplePage premium operational cockpit contract", () => {
     );
     expect(source).toContain("sem inventar métricas");
     expect(source).toContain("Abrir Timeline");
-    expect(source).toContain("Não houve alertas de atribuição recentemente.");
-    expect(source).toContain("0 alertas exibidos · 0 confirmações após alerta");
+    expect(source).toContain(
+      "Nenhum alerta de atribuição registrado recentemente."
+    );
   });
 
   it("preserva fallbacks honestos, ausência de dados falsos e tokens", () => {

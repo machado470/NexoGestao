@@ -432,10 +432,8 @@ function buildPeopleNextBestAction(
     impact: "Mantenha a distribuição sob acompanhamento.",
     safetyNote:
       "Sem pendência crítica, a recomendação é somente acompanhar; nada é executado automaticamente.",
-    primaryActionLabel: "Ver ranking",
-    onPrimaryAction: actions.focusAttention,
-    secondaryActionLabel: "Abrir Timeline",
-    onSecondaryAction: actions.openTimeline,
+    primaryActionLabel: "Abrir Timeline",
+    onPrimaryAction: actions.openTimeline,
   };
 }
 
@@ -484,9 +482,9 @@ function deriveTeamHealth(header: {
     };
   }
   return {
-    label: "Equipe saudável",
+    label: "Operação estável",
     status: "NORMAL",
-    reading: `${header.activePeople} responsável(is) ativo(s), sem sobrecarga, atrasos ou indisponibilidades registradas.`,
+    reading: `${header.activePeople} responsável(is) ativo(s), sem intervenção necessária.`,
   };
 }
 
@@ -536,10 +534,10 @@ function teamHeroNarrative(
     header.overdueServiceOrders > 0 ||
     header.unavailablePeople > 0;
   if (people.length === 1 && lead && !hasSignals) {
-    return `${lead.name} sustenta 100% da operação atual. Nenhum atraso, sobrecarga ou indisponibilidade foi detectado.`;
+    return `${lead.name} é a responsável ativa pela execução. Nenhum atraso, sobrecarga ou indisponibilidade exige intervenção.`;
   }
   if (!hasSignals) {
-    return `${header.activePeople} responsáveis sustentam a operação atual sem gargalos detectados.`;
+    return `${header.activePeople} responsáveis sustentam a execução agora. Nenhum atraso, sobrecarga ou indisponibilidade exige intervenção.`;
   }
   return `${lead?.name ?? "A equipe"} concentra o sinal mais relevante agora; revise atrasos, sobrecarga ou indisponibilidade antes de redistribuir a operação.`;
 }
@@ -826,74 +824,32 @@ export default function PeoplePage() {
         className="overflow-hidden border border-[var(--nexo-border-subtle,var(--border-subtle))] bg-[linear-gradient(135deg,var(--nexo-card-bg,var(--surface-base)),var(--nexo-control-bg,var(--surface-subtle)))] p-5 shadow-sm md:p-6"
         data-testid="people-operational-header"
       >
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(300px,420px)] lg:items-start">
-          <div className="min-w-0 space-y-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="nexo-overline">Cockpit humano da equipe</p>
-                <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--nexo-text-primary,var(--text-primary))] md:text-3xl">
-                  Centro de Responsáveis da Operação
-                </h1>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <AppOperationalStatusBadge status={teamHealth.status} />
-                  <span className="text-sm font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
-                    {teamHealth.label}
-                  </span>
-                  <span className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-                    Permissões em Configurações
-                  </span>
-                </div>
+        <div className="min-w-0 space-y-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="nexo-overline">Cockpit humano da equipe</p>
+              <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--nexo-text-primary,var(--text-primary))] md:text-3xl">
+                Centro de Responsáveis da Operação
+              </h1>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <AppOperationalStatusBadge status={teamHealth.status} />
+                <span className="text-sm font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
+                  {teamHealth.label}
+                </span>
+                <span className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
+                  Permissões em Configurações
+                </span>
               </div>
-              <Button onClick={() => setCreateOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Nova pessoa
-              </Button>
             </div>
-
-            <p className="max-w-4xl text-base leading-7 text-[var(--nexo-text-primary,var(--text-primary))] md:text-lg">
-              {heroNarrative}
-            </p>
-
-            <div
-              className="flex flex-wrap gap-2"
-              aria-label="Métricas executivas compactas"
-            >
-              <span className={compactChipClass}>
-                Ativos {header.activePeople}
-              </span>
-              <span className={compactChipClass}>
-                Sobrecarga {header.overloadedPeople}
-              </span>
-              <span className={compactChipClass}>
-                O.S. atrasadas {header.overdueServiceOrders}
-              </span>
-              <span className={compactChipClass}>
-                Agenda hoje {header.todayAppointments}
-              </span>
-              <span className={compactChipClass}>
-                Indisponíveis {header.unavailablePeople}
-              </span>
-            </div>
+            <Button onClick={() => setCreateOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Nova pessoa
+            </Button>
           </div>
 
-          <div className="space-y-3">
-            <AppInput
-              value={queryText}
-              onChange={event => setQueryText(event.target.value)}
-              placeholder="Buscar responsável, função ou nota operacional"
-              className="h-10"
-            />
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-[var(--nexo-control-bg,var(--surface-subtle))] px-3 py-2 text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-              <span>{filteredPeople.length} pessoa(s) na leitura atual</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate("/settings")}
-              >
-                Configurações
-              </Button>
-            </div>
-          </div>
+          <p className="max-w-4xl text-base leading-7 text-[var(--nexo-text-primary,var(--text-primary))] md:text-lg">
+            {heroNarrative}
+          </p>
         </div>
         {summaryQuery.isError ? (
           <div
@@ -912,6 +868,25 @@ export default function PeoplePage() {
             </Button>
           </div>
         ) : null}
+      </AppSectionCard>
+
+      <AppSectionCard className="flex flex-col gap-3 p-3 md:flex-row md:items-center md:justify-between">
+        <AppInput
+          value={queryText}
+          onChange={event => setQueryText(event.target.value)}
+          placeholder="Buscar responsável, função ou nota operacional"
+          className="h-10 md:max-w-md"
+        />
+        <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
+          <span>{filteredPeople.length} pessoa(s) na leitura atual</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate("/settings")}
+          >
+            Configurações
+          </Button>
+        </div>
       </AppSectionCard>
 
       <AppSectionBlock
@@ -1010,61 +985,65 @@ export default function PeoplePage() {
       </AppSectionBlock>
 
       <AppSectionBlock
-        title="Ação e atividade"
-        subtitle="Onde agir agora e o que aconteceu recentemente na equipe."
+        title="O que fazer agora"
+        subtitle="Ação recomendada conectada ao último acontecimento relevante."
       >
-        <div className="grid gap-3 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] xl:items-start">
-          {hasOperationalProblem ? (
-            <NextBestActionCard
-              title={nextBestAction.title}
-              entity={nextBestAction.entity}
-              reason={nextBestAction.reason}
-              impact={nextBestAction.impact}
-              safetyNote={nextBestAction.safetyNote}
-              primaryActionLabel={nextBestAction.primaryActionLabel}
-              onPrimaryAction={nextBestAction.onPrimaryAction}
-              secondaryActionLabel={nextBestAction.secondaryActionLabel}
-              onSecondaryAction={nextBestAction.onSecondaryAction}
-            />
-          ) : (
-            <AppSectionCard
-              className="flex h-full flex-col justify-between gap-3 border-[var(--success,var(--status-normal))]/25 bg-[var(--success-soft,var(--surface-subtle))]/40 p-4"
-              data-testid="people-healthy-next-action"
-            >
-              <div className="flex items-start gap-3">
-                <CheckCircle2 className="mt-0.5 h-5 w-5 text-[var(--success,var(--status-normal))]" />
-                <div>
-                  <p className="text-base font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
-                    Equipe equilibrada
-                  </p>
-                  <p className="mt-1 text-sm text-[var(--nexo-text-muted,var(--text-muted))]">
-                    Nenhuma intervenção necessária neste momento.
-                  </p>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={nextBestAction.onPrimaryAction}
+        <AppSectionCard className="p-4">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] xl:items-start">
+            <div className="space-y-3">
+              <p className="nexo-overline">O que fazer agora</p>
+              {hasOperationalProblem ? (
+                <NextBestActionCard
+                  title={nextBestAction.title}
+                  entity={nextBestAction.entity}
+                  reason={nextBestAction.reason}
+                  impact={nextBestAction.impact}
+                  safetyNote={nextBestAction.safetyNote}
+                  primaryActionLabel={nextBestAction.primaryActionLabel}
+                  onPrimaryAction={nextBestAction.onPrimaryAction}
+                  secondaryActionLabel={nextBestAction.secondaryActionLabel}
+                  onSecondaryAction={nextBestAction.onSecondaryAction}
+                />
+              ) : (
+                <div
+                  className="flex h-full flex-col justify-between gap-3 rounded-xl border border-[var(--success,var(--status-normal))]/25 bg-[var(--success-soft,var(--surface-subtle))]/40 p-4"
+                  data-testid="people-healthy-next-action"
                 >
-                  Ver ranking
-                </Button>
-                {nextBestAction.onSecondaryAction ? (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={nextBestAction.onSecondaryAction}
-                  >
-                    Abrir Timeline
-                  </Button>
-                ) : null}
-              </div>
-            </AppSectionCard>
-          )}
+                  <div className="flex items-start gap-3">
+                    <CheckCircle2 className="mt-0.5 h-5 w-5 text-[var(--success,var(--status-normal))]" />
+                    <div>
+                      <p className="text-base font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
+                        Equipe equilibrada
+                      </p>
+                      <p className="mt-1 text-sm text-[var(--nexo-text-muted,var(--text-muted))]">
+                        Nenhuma intervenção necessária neste momento.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={nextBestAction.onPrimaryAction}
+                    >
+                      Abrir Timeline
+                    </Button>
+                    {nextBestAction.onSecondaryAction ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={nextBestAction.onSecondaryAction}
+                      >
+                        Abrir Timeline
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              )}
+            </div>
 
-          <div>
-            <AppSectionCard className="p-4" data-testid="people-team-activity">
+            <div className="space-y-3" data-testid="people-team-activity">
+              <p className="nexo-overline">Último acontecimento relevante</p>
               {timelineQuery.isLoading ? (
                 <AppPageLoadingState description="Carregando ações recentes da equipe..." />
               ) : teamTimelineEvents.length > 0 ? (
@@ -1123,127 +1102,132 @@ export default function PeoplePage() {
                   </Button>
                 </div>
               )}
-            </AppSectionCard>
+            </div>
           </div>
-        </div>
+        </AppSectionCard>
       </AppSectionBlock>
 
-      <AppSectionBlock
-        title="Ranking operacional — todos os responsáveis"
-        subtitle="Quem exige atenção primeiro: sobrecarga, indisponibilidade, atraso, saudáveis e inativos."
-      >
-        <AppFiltersBar className="gap-2 border border-[var(--nexo-border-subtle,var(--border-subtle))] bg-[var(--nexo-card-bg,var(--surface-base))] px-3 py-3">
-          {peopleFilters.map(filter => (
-            <button
-              key={filter.key}
-              type="button"
-              onClick={() => setPeopleFilter(filter.key)}
-              className={`h-8 rounded-md px-3 text-xs font-medium transition-colors ${peopleFilter === filter.key ? "bg-[var(--accent-soft)] text-[var(--accent-primary)]" : "bg-[var(--nexo-control-bg,var(--surface-subtle))] text-[var(--nexo-text-muted,var(--text-muted))]"}`}
-            >
-              {filter.label}
-            </button>
-          ))}
-        </AppFiltersBar>
-        {summaryQuery.isLoading ? (
-          <AppPageLoadingState title="Consolidando ranking operacional" />
-        ) : null}
-        {!summaryQuery.isLoading && people.length === 0 ? (
-          <AppSectionCard className="flex flex-col items-center justify-center gap-3 p-8 text-center">
-            <p className="text-sm font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
-              Sem responsáveis cadastrados.
-            </p>
-            <p className="max-w-xl text-sm text-[var(--nexo-text-muted,var(--text-muted))]">
-              Cadastre responsáveis para acompanhar carga, execução e
-              indisponibilidade.
-            </p>
-            <div className="flex flex-wrap justify-center gap-2">
-              <Button onClick={() => setCreateOpen(true)}>Nova pessoa</Button>
-              <Button variant="secondary" onClick={() => navigate("/settings")}>
-                Abrir Configurações
-              </Button>
-            </div>
-          </AppSectionCard>
-        ) : filteredPeople.length === 0 && !summaryQuery.isLoading ? (
-          <AppPageEmptyState
-            title="Busca sem resultado"
-            description="Nenhuma pessoa corresponde aos filtros operacionais atuais."
-          />
-        ) : !summaryQuery.isLoading ? (
-          <div className="space-y-3" data-testid="people-workload-list">
-            {filteredPeople.map(person => {
-              const operationalStatus = derivePersonOperationalStatus(person);
-              return (
-                <AppSectionCard
-                  key={person.personId}
-                  className="grid gap-3 p-4 lg:grid-cols-[minmax(220px,1.3fr)_minmax(260px,2fr)_auto] lg:items-center"
+      {people.length > 1 ? (
+        <AppSectionBlock
+          title="Ranking operacional — todos os responsáveis"
+          subtitle="Quem exige atenção primeiro: sobrecarga, indisponibilidade, atraso, saudáveis e inativos."
+        >
+          <AppFiltersBar className="gap-2 border border-[var(--nexo-border-subtle,var(--border-subtle))] bg-[var(--nexo-card-bg,var(--surface-base))] px-3 py-3">
+            {peopleFilters.map(filter => (
+              <button
+                key={filter.key}
+                type="button"
+                onClick={() => setPeopleFilter(filter.key)}
+                className={`h-8 rounded-md px-3 text-xs font-medium transition-colors ${peopleFilter === filter.key ? "bg-[var(--accent-soft)] text-[var(--accent-primary)]" : "bg-[var(--nexo-control-bg,var(--surface-subtle))] text-[var(--nexo-text-muted,var(--text-muted))]"}`}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </AppFiltersBar>
+          {summaryQuery.isLoading ? (
+            <AppPageLoadingState title="Consolidando ranking operacional" />
+          ) : null}
+          {!summaryQuery.isLoading && people.length === 0 ? (
+            <AppSectionCard className="flex flex-col items-center justify-center gap-3 p-8 text-center">
+              <p className="text-sm font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
+                Sem responsáveis cadastrados.
+              </p>
+              <p className="max-w-xl text-sm text-[var(--nexo-text-muted,var(--text-muted))]">
+                Cadastre responsáveis para acompanhar carga, execução e
+                indisponibilidade.
+              </p>
+              <div className="flex flex-wrap justify-center gap-2">
+                <Button onClick={() => setCreateOpen(true)}>Nova pessoa</Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => navigate("/settings")}
                 >
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-sm font-semibold text-[var(--accent-primary)]">
-                      {personInitials(person.name)}
+                  Abrir Configurações
+                </Button>
+              </div>
+            </AppSectionCard>
+          ) : filteredPeople.length === 0 && !summaryQuery.isLoading ? (
+            <AppPageEmptyState
+              title="Busca sem resultado"
+              description="Nenhuma pessoa corresponde aos filtros operacionais atuais."
+            />
+          ) : !summaryQuery.isLoading ? (
+            <div className="space-y-3" data-testid="people-workload-list">
+              {filteredPeople.map(person => {
+                const operationalStatus = derivePersonOperationalStatus(person);
+                return (
+                  <AppSectionCard
+                    key={person.personId}
+                    className="grid gap-3 p-4 lg:grid-cols-[minmax(220px,1.3fr)_minmax(260px,2fr)_auto] lg:items-center"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-sm font-semibold text-[var(--accent-primary)]">
+                        {personInitials(person.name)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
+                          {person.name}
+                        </p>
+                        <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
+                          {person.role}
+                        </p>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="truncate font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
-                        {person.name}
-                      </p>
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <AppOperationalStatusBadge status={operationalStatus} />
+                        <span className="text-sm font-medium text-[var(--nexo-text-primary,var(--text-primary))]">
+                          {personHumanReading(person)}
+                        </span>
+                        <span className={compactChipClass}>
+                          {personStatusLabel(person.status)}
+                        </span>
+                      </div>
+                      <div className="space-y-1 text-sm text-[var(--nexo-text-muted,var(--text-muted))]">
+                        <p>{rankingNarrative(person)}</p>
+                        <p>
+                          O.S. {person.openServiceOrdersCount} · Agenda{" "}
+                          {person.todayAppointmentsCount} · Atrasos{" "}
+                          {person.overdueServiceOrdersCount} · Capacidade{" "}
+                          {formatCapacity(person.dailyServiceOrderCapacity)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="space-y-2 lg:text-right">
                       <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-                        {person.role}
+                        {formatMoneyFallback()}
                       </p>
+                      <div className="flex flex-wrap gap-2 lg:justify-end">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => setSelectedPersonId(person.personId)}
+                        >
+                          Detalhe
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => navigate("/timeline")}
+                        >
+                          Timeline
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => navigate("/service-orders")}
+                        >
+                          Atribuições
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <AppOperationalStatusBadge status={operationalStatus} />
-                      <span className="text-sm font-medium text-[var(--nexo-text-primary,var(--text-primary))]">
-                        {personHumanReading(person)}
-                      </span>
-                      <span className={compactChipClass}>
-                        {personStatusLabel(person.status)}
-                      </span>
-                    </div>
-                    <div className="space-y-1 text-sm text-[var(--nexo-text-muted,var(--text-muted))]">
-                      <p>{rankingNarrative(person)}</p>
-                      <p>
-                        O.S. {person.openServiceOrdersCount} · Agenda{" "}
-                        {person.todayAppointmentsCount} · Atrasos{" "}
-                        {person.overdueServiceOrdersCount} · Capacidade{" "}
-                        {formatCapacity(person.dailyServiceOrderCapacity)}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="space-y-2 lg:text-right">
-                    <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-                      {formatMoneyFallback()}
-                    </p>
-                    <div className="flex flex-wrap gap-2 lg:justify-end">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => setSelectedPersonId(person.personId)}
-                      >
-                        Detalhe
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => navigate("/timeline")}
-                      >
-                        Timeline
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => navigate("/service-orders")}
-                      >
-                        Atribuições
-                      </Button>
-                    </div>
-                  </div>
-                </AppSectionCard>
-              );
-            })}
-          </div>
-        ) : null}
-      </AppSectionBlock>
+                  </AppSectionCard>
+                );
+              })}
+            </div>
+          ) : null}
+        </AppSectionBlock>
+      ) : null}
 
       <div className="space-y-4">
         <AppSectionBlock
@@ -1485,10 +1469,7 @@ export default function PeoplePage() {
                   data-testid="assignee-warning-summary"
                 >
                   <p className="font-medium">
-                    Não houve alertas de atribuição recentemente.
-                  </p>
-                  <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-                    0 alertas exibidos · 0 confirmações após alerta
+                    ✓ Nenhum alerta de atribuição registrado recentemente.
                   </p>
                 </AppSectionCard>
               ) : (
