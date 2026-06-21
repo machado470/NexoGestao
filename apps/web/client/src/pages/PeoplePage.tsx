@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Clock3, Plus, Trash2, Users } from "lucide-react";
+import { CheckCircle2, Clock3, Plus, Trash2, Users } from "lucide-react";
 import { useLocation } from "wouter";
 import CreatePersonModal from "@/components/CreatePersonModal";
 import EditPersonModal from "@/components/EditPersonModal";
@@ -18,7 +18,6 @@ import {
 import { Button } from "@/components/design-system";
 import {
   AppFiltersBar,
-  AppOperationalHeader,
   AppPageEmptyState,
   AppPageErrorState,
   AppPageLoadingState,
@@ -518,6 +517,59 @@ function capacityNarrative(header: {
   return `Uso médio O.S. ${header.averageServiceOrderUsage} · agenda ${header.averageAppointmentUsage}.`;
 }
 
+function teamHeroNarrative(
+  people: OperationalPerson[],
+  header: {
+    activePeople: number;
+    overloadedPeople: number;
+    overdueServiceOrders: number;
+    todayAppointments: number;
+    unavailablePeople: number;
+  }
+) {
+  if (people.length === 0) {
+    return "A operação ainda não tem responsáveis cadastrados para sustentar O.S., agenda e carga.";
+  }
+  const lead = sortByOperationalIntervention(people)[0];
+  const hasSignals =
+    header.overloadedPeople > 0 ||
+    header.overdueServiceOrders > 0 ||
+    header.unavailablePeople > 0;
+  if (people.length === 1 && lead && !hasSignals) {
+    return `${lead.name} sustenta 100% da operação atual. Nenhum atraso, sobrecarga ou indisponibilidade foi detectado.`;
+  }
+  if (!hasSignals) {
+    return `${header.activePeople} responsáveis sustentam a operação atual sem gargalos detectados.`;
+  }
+  return `${lead?.name ?? "A equipe"} concentra o sinal mais relevante agora; revise atrasos, sobrecarga ou indisponibilidade antes de redistribuir a operação.`;
+}
+
+function personOperationalSentence(person: OperationalPerson) {
+  if (!hasAssignedItems(person)) {
+    return "Capacidade disponível. Nenhum atraso registrado.";
+  }
+  if (person.overdueServiceOrdersCount > 0) {
+    return `${person.overdueServiceOrdersCount} O.S. atrasada(s) exigem acompanhamento.`;
+  }
+  if (isPersonOverloaded(person)) {
+    return "Carga acima do planejado; acompanhe antes de novas atribuições.";
+  }
+  return "Execução em andamento sem atraso registrado.";
+}
+
+function rankingNarrative(person: OperationalPerson) {
+  if (!hasAssignedItems(person)) {
+    return "Sem carga atribuída atualmente. Capacidade totalmente disponível. Nenhum atraso registrado.";
+  }
+  if (person.overdueServiceOrdersCount > 0) {
+    return `${person.overdueServiceOrdersCount} atraso(s) registrado(s). Priorize desbloqueio antes de ampliar a agenda.`;
+  }
+  if (isPersonOverloaded(person)) {
+    return "Carga operacional acima do planejado. Redistribuição pode reduzir risco de atraso.";
+  }
+  return "Operação em andamento dentro do esperado, sem atraso registrado.";
+}
+
 function personOperationalStateLabel(person: OperationalPerson) {
   if (person.status !== "ACTIVE") return "Inativo";
   if (person.availabilityStatus === "UNAVAILABLE_NOW") return "Indisponível";
@@ -715,6 +767,12 @@ export default function PeoplePage() {
     [people]
   );
   const teamHealth = deriveTeamHealth(header);
+  const heroNarrative = teamHeroNarrative(people, header);
+  const hasOperationalProblem =
+    people.length === 0 ||
+    header.overloadedPeople > 0 ||
+    header.overdueServiceOrders > 0 ||
+    header.unavailablePeople > 0;
   const commandTarget = useMemo(
     () => ({ person: selectedPerson, people, warningSummary }),
     [selectedPerson, people, warningSummary]
@@ -764,50 +822,38 @@ export default function PeoplePage() {
 
   return (
     <AppPageShell>
-      <AppOperationalHeader
-        title="Centro de Responsáveis da Operação"
-        description="Responsáveis, capacidade e execução que sustentam o negócio."
-        primaryAction={
-          <Button onClick={() => setCreateOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Nova pessoa
-          </Button>
-        }
-        density="compact"
+      <AppSectionCard
+        className="overflow-hidden border border-[var(--nexo-border-subtle,var(--border-subtle))] bg-[linear-gradient(135deg,var(--nexo-card-bg,var(--surface-base)),var(--nexo-control-bg,var(--surface-subtle)))] p-5 shadow-sm md:p-6"
+        data-testid="people-operational-header"
       >
-        <div className="grid gap-2 md:grid-cols-[1fr_auto]">
-          <AppInput
-            value={queryText}
-            onChange={event => setQueryText(event.target.value)}
-            placeholder="Buscar responsável, função ou nota operacional"
-            className="h-9"
-          />
-          <div className="flex h-9 items-center rounded-md border border-[var(--nexo-border-subtle,var(--border-subtle))] bg-[var(--nexo-control-bg,var(--surface-subtle))] px-3 text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-            {filteredPeople.length} pessoa(s)
-          </div>
-        </div>
-      </AppOperationalHeader>
-
-      <AppSectionBlock
-        title="Topo — Centro de Responsáveis da Operação"
-        subtitle="Leitura rápida da sustentação da operação agora, com permissões discretas fora do protagonismo."
-      >
-        <AppSectionCard
-          className={`border p-4 ${teamHealth.status === "CRÍTICO" ? "border-[var(--danger,var(--status-critical))]" : "border-[var(--nexo-border-subtle,var(--border-subtle))]"}`}
-          data-testid="people-operational-header"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="min-w-0 space-y-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="text-base font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
-                  {teamHealth.label}
-                </p>
-                <AppOperationalStatusBadge status={teamHealth.status} />
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(300px,420px)] lg:items-start">
+          <div className="min-w-0 space-y-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="nexo-overline">Cockpit humano da equipe</p>
+                <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--nexo-text-primary,var(--text-primary))] md:text-3xl">
+                  Centro de Responsáveis da Operação
+                </h1>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <AppOperationalStatusBadge status={teamHealth.status} />
+                  <span className="text-sm font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
+                    {teamHealth.label}
+                  </span>
+                  <span className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
+                    Permissões em Configurações
+                  </span>
+                </div>
               </div>
-              <p className="text-sm text-[var(--nexo-text-muted,var(--text-muted))]">
-                {teamHealth.reading}
-              </p>
+              <Button onClick={() => setCreateOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Nova pessoa
+              </Button>
             </div>
+
+            <p className="max-w-4xl text-base leading-7 text-[var(--nexo-text-primary,var(--text-primary))] md:text-lg">
+              {heroNarrative}
+            </p>
+
             <div
               className="flex flex-wrap gap-2"
               aria-label="Métricas executivas compactas"
@@ -816,10 +862,7 @@ export default function PeoplePage() {
                 Ativos {header.activePeople}
               </span>
               <span className={compactChipClass}>
-                Sobrecarregados {header.overloadedPeople}
-              </span>
-              <span className={compactChipClass}>
-                Indisponíveis {header.unavailablePeople}
+                Sobrecarga {header.overloadedPeople}
               </span>
               <span className={compactChipClass}>
                 O.S. atrasadas {header.overdueServiceOrders}
@@ -827,37 +870,49 @@ export default function PeoplePage() {
               <span className={compactChipClass}>
                 Agenda hoje {header.todayAppointments}
               </span>
-              <span className={compactChipClass}>{formatMoneyFallback()}</span>
+              <span className={compactChipClass}>
+                Indisponíveis {header.unavailablePeople}
+              </span>
             </div>
           </div>
-          <div className="mt-3 flex justify-end">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate("/settings")}
-            >
-              Permissões em Configurações
+
+          <div className="space-y-3">
+            <AppInput
+              value={queryText}
+              onChange={event => setQueryText(event.target.value)}
+              placeholder="Buscar responsável, função ou nota operacional"
+              className="h-10"
+            />
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-[var(--nexo-control-bg,var(--surface-subtle))] px-3 py-2 text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
+              <span>{filteredPeople.length} pessoa(s) na leitura atual</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate("/settings")}
+              >
+                Configurações
+              </Button>
+            </div>
+          </div>
+        </div>
+        {summaryQuery.isError ? (
+          <div
+            className="mt-4 rounded-xl border border-[var(--nexo-border-subtle,var(--border-subtle))] bg-[var(--nexo-control-bg,var(--surface-subtle))] p-3 text-sm"
+            data-testid="people-summary-partial-error"
+          >
+            <p className="font-semibold">
+              Resumo operacional indisponível agora.
+            </p>
+            <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
+              A página continua exibindo ações e fallbacks sem inventar carga,
+              agenda ou O.S.
+            </p>
+            <Button size="sm" variant="secondary" onClick={refresh}>
+              Tentar novamente
             </Button>
           </div>
-          {summaryQuery.isError ? (
-            <AppSectionCard
-              className="mt-3 p-3 text-sm"
-              data-testid="people-summary-partial-error"
-            >
-              <p className="font-semibold">
-                Resumo operacional indisponível agora.
-              </p>
-              <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-                A página continua exibindo ações e fallbacks sem inventar carga,
-                agenda ou O.S.
-              </p>
-              <Button size="sm" variant="secondary" onClick={refresh}>
-                Tentar novamente
-              </Button>
-            </AppSectionCard>
-          ) : null}
-        </AppSectionCard>
-      </AppSectionBlock>
+        ) : null}
+      </AppSectionCard>
 
       <AppSectionBlock
         title="Quem sustenta a operação agora"
@@ -878,11 +933,11 @@ export default function PeoplePage() {
             {keyPeople.map(person => (
               <AppSectionCard
                 key={person.personId}
-                className={`space-y-3 p-4 ${keyPeople.length === 1 ? "md:p-5" : ""}`}
+                className={`p-4 ${keyPeople.length === 1 ? "grid gap-4 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center md:p-6" : "space-y-3"}`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-base font-semibold text-[var(--accent-primary)]">
+                    <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-base font-semibold text-[var(--accent-primary)]">
                       {personInitials(person.name)}
                     </div>
                     <div className="min-w-0">
@@ -904,15 +959,18 @@ export default function PeoplePage() {
                   </p>
                   <p className="mt-1 text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
                     {person.workloadNotes ||
-                      "Responsável pela execução operacional da equipe."}
+                      "Responsável principal pela execução operacional da equipe."}
+                  </p>
+                  <p className="mt-2 text-sm text-[var(--nexo-text-primary,var(--text-primary))]">
+                    {personOperationalSentence(person)}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2 text-xs">
                   <span className="rounded-full bg-[var(--nexo-control-bg,var(--surface-subtle))] px-2 py-1">
-                    Estado: {personOperationalStateLabel(person)}
+                    {personOperationalStateLabel(person)}
                   </span>
                   <span className="rounded-full bg-[var(--nexo-control-bg,var(--surface-subtle))] px-2 py-1">
-                    Carga: {loadLabels[person.loadStatus]}
+                    {loadLabels[person.loadStatus]}
                   </span>
                   <span className="rounded-full bg-[var(--nexo-control-bg,var(--surface-subtle))] px-2 py-1">
                     O.S. {person.openServiceOrdersCount}
@@ -921,7 +979,7 @@ export default function PeoplePage() {
                     Atrasadas {person.overdueServiceOrdersCount}
                   </span>
                   <span className="rounded-full bg-[var(--nexo-control-bg,var(--surface-subtle))] px-2 py-1">
-                    Hoje {person.todayAppointmentsCount}
+                    Agenda {person.todayAppointmentsCount}
                   </span>
                 </div>
                 <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
@@ -956,17 +1014,54 @@ export default function PeoplePage() {
         subtitle="Onde agir agora e o que aconteceu recentemente na equipe."
       >
         <div className="grid gap-3 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] xl:items-start">
-          <NextBestActionCard
-            title={nextBestAction.title}
-            entity={nextBestAction.entity}
-            reason={nextBestAction.reason}
-            impact={nextBestAction.impact}
-            safetyNote={nextBestAction.safetyNote}
-            primaryActionLabel={nextBestAction.primaryActionLabel}
-            onPrimaryAction={nextBestAction.onPrimaryAction}
-            secondaryActionLabel={nextBestAction.secondaryActionLabel}
-            onSecondaryAction={nextBestAction.onSecondaryAction}
-          />
+          {hasOperationalProblem ? (
+            <NextBestActionCard
+              title={nextBestAction.title}
+              entity={nextBestAction.entity}
+              reason={nextBestAction.reason}
+              impact={nextBestAction.impact}
+              safetyNote={nextBestAction.safetyNote}
+              primaryActionLabel={nextBestAction.primaryActionLabel}
+              onPrimaryAction={nextBestAction.onPrimaryAction}
+              secondaryActionLabel={nextBestAction.secondaryActionLabel}
+              onSecondaryAction={nextBestAction.onSecondaryAction}
+            />
+          ) : (
+            <AppSectionCard
+              className="flex h-full flex-col justify-between gap-3 border-[var(--success,var(--status-normal))]/25 bg-[var(--success-soft,var(--surface-subtle))]/40 p-4"
+              data-testid="people-healthy-next-action"
+            >
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="mt-0.5 h-5 w-5 text-[var(--success,var(--status-normal))]" />
+                <div>
+                  <p className="text-base font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
+                    Equipe equilibrada
+                  </p>
+                  <p className="mt-1 text-sm text-[var(--nexo-text-muted,var(--text-muted))]">
+                    Nenhuma intervenção necessária neste momento.
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={nextBestAction.onPrimaryAction}
+                >
+                  Ver ranking
+                </Button>
+                {nextBestAction.onSecondaryAction ? (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={nextBestAction.onSecondaryAction}
+                  >
+                    Abrir Timeline
+                  </Button>
+                ) : null}
+              </div>
+            </AppSectionCard>
+          )}
 
           <div>
             <AppSectionCard className="p-4" data-testid="people-team-activity">
@@ -986,12 +1081,15 @@ export default function PeoplePage() {
                         <Clock3 className="mt-0.5 h-4 w-4 text-[var(--nexo-text-muted,var(--text-muted))]" />
                         <div>
                           <p className="text-sm font-medium text-[var(--nexo-text-primary,var(--text-primary))]">
-                            {getTimelineActor(event)} ·{" "}
                             {getTimelineAction(event)}
                           </p>
                           <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-                            {getTimelineContext(event)} ·{" "}
-                            {formatDateTime(getTimelineEventDate(event))}
+                            Governança reavaliou a equipe e manteve a leitura em{" "}
+                            {getTimelineContext(event)}.
+                            <span className="ml-1">
+                              {getTimelineActor(event)} ·{" "}
+                              {formatDateTime(getTimelineEventDate(event))}
+                            </span>
                           </p>
                         </div>
                       </div>
@@ -1103,18 +1201,12 @@ export default function PeoplePage() {
                       </span>
                     </div>
                     <div className="space-y-1 text-sm text-[var(--nexo-text-muted,var(--text-muted))]">
+                      <p>{rankingNarrative(person)}</p>
                       <p>
-                        Operação: O.S. {person.openServiceOrdersCount} · Agenda{" "}
-                        {person.todayAppointmentsCount}
-                      </p>
-                      <p>
-                        Risco: Atrasos {person.overdueServiceOrdersCount} ·
-                        Sobrecarga {isPersonOverloaded(person) ? "sim" : "não"}
-                      </p>
-                      <p>
-                        Capacidade: O.S.{" "}
-                        {formatCapacity(person.dailyServiceOrderCapacity)} ·
-                        Agenda {formatCapacity(person.dailyAppointmentCapacity)}
+                        O.S. {person.openServiceOrdersCount} · Agenda{" "}
+                        {person.todayAppointmentsCount} · Atrasos{" "}
+                        {person.overdueServiceOrdersCount} · Capacidade{" "}
+                        {formatCapacity(person.dailyServiceOrderCapacity)}
                       </p>
                     </div>
                   </div>
@@ -1153,10 +1245,7 @@ export default function PeoplePage() {
         ) : null}
       </AppSectionBlock>
 
-      <AppSectionBlock
-        title="Capacidade, evolução e sinais"
-        subtitle="Capacidade consolidada, histórico confiável e sinais de atribuição sem inflar números."
-      >
+      <div className="space-y-4">
         <AppSectionBlock
           title="Capacidade da operação"
           subtitle={
@@ -1299,24 +1388,33 @@ export default function PeoplePage() {
                   {capacityNarrative(header)}
                 </p>
               </div>
-              <div className="grid gap-2 text-sm md:grid-cols-4">
-                <span>
-                  Capacidade utilizada: O.S. {header.averageServiceOrderUsage} ·
-                  Agenda {header.averageAppointmentUsage}
-                </span>
-                <span>Disponíveis agora: {header.availablePeople}</span>
-                <span>
-                  Gargalos atuais:{" "}
-                  {header.overloadedPeople + header.overdueServiceOrders}
-                </span>
-                <span>
-                  Próximas indisponibilidades:{" "}
-                  {
-                    people.filter(person => person.nextAvailabilityException)
-                      .length
-                  }
-                </span>
-              </div>
+              {header.overloadedPeople === 0 &&
+              header.unavailablePeople === 0 &&
+              header.overdueServiceOrders === 0 ? (
+                <p className="text-sm text-[var(--nexo-text-muted,var(--text-muted))]">
+                  ✓ {header.availablePeople} responsável(is) disponível(is) ·
+                  sem gargalos · sem indisponibilidades previstas
+                </p>
+              ) : (
+                <div className="grid gap-2 text-sm md:grid-cols-4">
+                  <span>
+                    Capacidade utilizada: O.S. {header.averageServiceOrderUsage}{" "}
+                    · Agenda {header.averageAppointmentUsage}
+                  </span>
+                  <span>Disponíveis agora: {header.availablePeople}</span>
+                  <span>
+                    Gargalos atuais:{" "}
+                    {header.overloadedPeople + header.overdueServiceOrders}
+                  </span>
+                  <span>
+                    Próximas indisponibilidades:{" "}
+                    {
+                      people.filter(person => person.nextAvailabilityException)
+                        .length
+                    }
+                  </span>
+                </div>
+              )}
             </AppSectionCard>
           )}
         </AppSectionBlock>
@@ -1432,7 +1530,7 @@ export default function PeoplePage() {
             ) : null}
           </AppSectionBlock>
         ) : null}
-      </AppSectionBlock>
+      </div>
 
       <CreatePersonModal
         open={createOpen}
