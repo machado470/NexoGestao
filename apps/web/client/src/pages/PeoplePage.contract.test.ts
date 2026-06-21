@@ -13,12 +13,16 @@ const compactSource = source.replace(/\s+/g, " ");
 
 describe("PeoplePage premium operational cockpit contract", () => {
   it("protege os blocos principais premium", () => {
-    expect(source).toContain('title="Visão executiva compacta"');
+    expect(source).toContain(
+      'title="Topo — Centro de Responsáveis da Operação"'
+    );
     expect(source).toContain('title="Quem sustenta a operação agora"');
-    expect(source).toContain('title="Atividade recente da equipe"');
-    expect(source).toContain('title="Ranking operacional da equipe"');
+    expect(source).toContain('title="Ação e atividade"');
+    expect(source).toContain(
+      'title="Ranking operacional — todos os responsáveis"'
+    );
     expect(source).toContain('title="Capacidade da operação"');
-    expect(source).toContain('title="Desempenho e impacto da equipe"');
+    expect(source).toContain('title="Evolução da equipe"');
     expect(source).toContain('data-testid="people-operational-header"');
     expect(source).toContain('data-testid="people-key-responsibles"');
     expect(source).toContain('data-testid="people-team-activity"');
@@ -31,7 +35,7 @@ describe("PeoplePage premium operational cockpit contract", () => {
 
   it("mantém a página como responsabilidade operacional, não permissões", () => {
     expect(source).toContain(
-      "Equipe operacional · Responsáveis, carga e disponibilidade."
+      "Responsáveis, capacidade e execução que sustentam o negócio."
     );
     expect(source).toContain("Permissões em Configurações");
     expect(source).not.toContain("Detail-legacy mantido");
@@ -147,16 +151,22 @@ describe("PeoplePage premium operational cockpit contract", () => {
   });
 
   it("mantém nova ordem dos blocos", () => {
-    const executiveIndex = source.indexOf('title="Visão executiva compacta"');
+    const executiveIndex = source.indexOf(
+      'title="Topo — Centro de Responsáveis da Operação"'
+    );
     const keyIndex = source.indexOf('title="Quem sustenta a operação agora"');
-    const actionIndex = source.indexOf("<NextBestActionCard");
-    const activityIndex = source.indexOf('title="Atividade recente da equipe"');
+    const actionIndex = source.indexOf(
+      "<NextBestActionCard\n            title"
+    );
+    const activityIndex = source.indexOf('data-testid="people-team-activity"');
+    const actionSectionIndex = source.indexOf('title="Ação e atividade"');
     const rankingIndex = source.indexOf(
-      'title="Ranking operacional da equipe"'
+      'title="Ranking operacional — todos os responsáveis"'
     );
     const capacityIndex = source.indexOf('title="Capacidade da operação"');
     expect(executiveIndex).toBeLessThan(keyIndex);
-    expect(keyIndex).toBeLessThan(actionIndex);
+    expect(keyIndex).toBeLessThan(actionSectionIndex);
+    expect(actionSectionIndex).toBeLessThan(actionIndex);
     expect(actionIndex).toBeLessThan(activityIndex);
     expect(activityIndex).toBeLessThan(rankingIndex);
     expect(rankingIndex).toBeLessThan(capacityIndex);
