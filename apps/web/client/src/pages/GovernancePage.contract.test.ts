@@ -10,9 +10,9 @@ describe("GovernancePage operational supervision center contract", () => {
   it("keeps governance as a four-part operational supervision center without changing data contracts", () => {
     expect(source).toContain("Centro de supervisão operacional");
     expect(source).toContain("Visão executiva");
-    expect(source).toContain("Fluxo de decisão da governança");
-    expect(source).toContain("Intervenções e ações prioritárias");
-    expect(source).toContain("Painel de auditoria");
+    expect(source).toContain("Diagnóstico da decisão");
+    expect(source).toContain("Ações e políticas ativas");
+    expect(source).toContain("Histórico e evidências");
     expect(source).toContain("trpc.governance.summary.useQuery");
     expect(source).toContain("trpc.governance.runs.useQuery");
   });
@@ -32,18 +32,21 @@ describe("GovernancePage operational supervision center contract", () => {
     expect(source).toContain("Sinal detectado");
     expect(source).toContain("Evidência avaliada");
     expect(source).toContain("Impacto calculado");
-    expect(source).toContain("Estado definido");
+    expect(source).toContain("Decisão tomada");
     expect(source).toContain("Sinais que sustentam a decisão");
     expect(source).toContain("O que isso significa?");
     expect(source).toContain("Recomendação operacional");
   });
 
   it("keeps interventions compact with priority, impact, recommendation and real CTA", () => {
-    expect(source).toContain("Faça agora");
+    expect(source).toContain("Ações que o sistema fará");
     expect(source).toContain("action.consequence");
     expect(source).toContain("action.recommendation");
     expect(source).toContain("priorityLabel(action.priority)");
     expect(source).toContain("action.primaryActionLabel");
+    expect(source).toContain("action.type");
+    expect(source).toContain("action.status");
+    expect(source).toContain("action.motive");
     expect(source).toContain("buildPriorityActions(signals)");
     expect(source).toContain(".slice(0, 3)");
     expect(source).toContain("Nenhuma intervenção urgente");
@@ -60,11 +63,13 @@ describe("GovernancePage operational supervision center contract", () => {
   });
 
   it("turns policies into decision rules without fake data or mutations", () => {
-    expect(source).toContain("Regras que influenciaram a decisão");
+    expect(source).toContain("Políticas ativas");
     expect(source).toContain("type ActivePolicy");
     expect(source).toContain("Evidências são registradas em Timeline");
-    expect(source).toContain("A regra não fabrica provas");
+    expect(source).toContain("a regra não fabrica provas");
     expect(source).toContain("trpc.finance.charges.list.useQuery");
+    expect(source).toContain("trpc.dashboard.kpis.useQuery");
+    expect(source).toContain("Falhas WhatsApp");
     expect(source).not.toContain("mutation");
     expect(source).not.toContain("mock");
   });
