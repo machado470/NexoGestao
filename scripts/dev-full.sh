@@ -84,14 +84,21 @@ ensure_not_production_seed() {
 
 database_user_count() {
   DATABASE_URL="$DATABASE_URL" pnpm exec tsx -e '
-    import { PrismaClient } from "@prisma/client";
-    const prisma = new PrismaClient();
-    try {
-      const count = await prisma.user.count();
-      console.log(count);
-    } finally {
-      await prisma.$disconnect();
+    async function main() {
+      const { PrismaClient } = await import("@prisma/client");
+      const prisma = new PrismaClient();
+      try {
+        const count = await prisma.user.count();
+        console.log(count);
+      } finally {
+        await prisma.$disconnect();
+      }
     }
+
+    main().catch((error) => {
+      console.error(error);
+      process.exit(1);
+    });
   ' | tail -n 1 | tr -d "[:space:]"
 }
 
