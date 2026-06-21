@@ -16,6 +16,15 @@ describe("operational visual components contract", () => {
     );
   });
 
+  it("expõe variantes para hierarquia compacta, rail e hero", () => {
+    expect(source).toContain('| "hero"');
+    expect(source).toContain('| "compact"');
+    expect(source).toContain('| "rail"');
+    expect(source).toContain('variant?: "rail" | "card" | "compact"');
+    expect(source).toContain('display?: "compactHealthy" | "expandedProblem"');
+    expect(source).toContain("compact?: boolean");
+  });
+
   it("mantém namespace visual, tokens e acessibilidade básica", () => {
     expect(source).toContain("nexo-operational-workload");
     expect(source).toContain("nexo-operational-flow");
