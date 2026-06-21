@@ -765,8 +765,8 @@ export default function PeoplePage() {
   return (
     <AppPageShell>
       <AppOperationalHeader
-        title="Pessoas"
-        description="Centro de execução da equipe: carga, O.S., agenda, atrasos e indisponibilidades. Usuários, acesso e permissões ficam em Configurações."
+        title="Centro de Responsáveis da Operação"
+        description="Responsáveis, capacidade e execução que sustentam o negócio."
         primaryAction={
           <Button onClick={() => setCreateOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
@@ -788,20 +788,9 @@ export default function PeoplePage() {
         </div>
       </AppOperationalHeader>
 
-      <AppSectionCard className="border border-[var(--accent-soft)] p-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
-            Equipe operacional · Responsáveis, carga e disponibilidade.
-          </p>
-          <Button variant="secondary" onClick={() => navigate("/settings")}>
-            Permissões em Configurações
-          </Button>
-        </div>
-      </AppSectionCard>
-
       <AppSectionBlock
-        title="Visão executiva compacta"
-        subtitle="Leitura rápida da sustentação da operação agora"
+        title="Topo — Centro de Responsáveis da Operação"
+        subtitle="Leitura rápida da sustentação da operação agora, com permissões discretas fora do protagonismo."
       >
         <AppSectionCard
           className={`border p-4 ${teamHealth.status === "CRÍTICO" ? "border-[var(--danger,var(--status-critical))]" : "border-[var(--nexo-border-subtle,var(--border-subtle))]"}`}
@@ -840,6 +829,15 @@ export default function PeoplePage() {
               </span>
               <span className={compactChipClass}>{formatMoneyFallback()}</span>
             </div>
+          </div>
+          <div className="mt-3 flex justify-end">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/settings")}
+            >
+              Permissões em Configurações
+            </Button>
           </div>
           {summaryQuery.isError ? (
             <AppSectionCard
@@ -900,9 +898,15 @@ export default function PeoplePage() {
                     status={derivePersonOperationalStatus(person)}
                   />
                 </div>
-                <p className="text-sm font-medium text-[var(--nexo-text-primary,var(--text-primary))]">
-                  {personHumanReading(person)}
-                </p>
+                <div>
+                  <p className="text-sm font-medium text-[var(--nexo-text-primary,var(--text-primary))]">
+                    {personHumanReading(person)}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
+                    {person.workloadNotes ||
+                      "Responsável pela execução operacional da equipe."}
+                  </p>
+                </div>
                 <div className="flex flex-wrap gap-2 text-xs">
                   <span className="rounded-full bg-[var(--nexo-control-bg,var(--surface-subtle))] px-2 py-1">
                     Estado: {personOperationalStateLabel(person)}
@@ -947,82 +951,87 @@ export default function PeoplePage() {
         )}
       </AppSectionBlock>
 
-      <NextBestActionCard
-        title={nextBestAction.title}
-        entity={nextBestAction.entity}
-        reason={nextBestAction.reason}
-        impact={nextBestAction.impact}
-        safetyNote={nextBestAction.safetyNote}
-        primaryActionLabel={nextBestAction.primaryActionLabel}
-        onPrimaryAction={nextBestAction.onPrimaryAction}
-        secondaryActionLabel={nextBestAction.secondaryActionLabel}
-        onSecondaryAction={nextBestAction.onSecondaryAction}
-      />
-
       <AppSectionBlock
-        title="Atividade recente da equipe"
-        subtitle="Últimas ações reais registradas na Timeline."
+        title="Ação e atividade"
+        subtitle="Onde agir agora e o que aconteceu recentemente na equipe."
       >
-        <AppSectionCard className="p-4" data-testid="people-team-activity">
-          {timelineQuery.isLoading ? (
-            <AppPageLoadingState description="Carregando ações recentes da equipe..." />
-          ) : teamTimelineEvents.length > 0 ? (
-            <AppTimeline className="space-y-2">
-              {teamTimelineEvents.map((event, index) => (
-                <AppTimelineItem
-                  key={
-                    event.id ??
-                    `${getTimelineEventDate(event) ?? "event"}-${index}`
-                  }
-                  className="flex items-start justify-between gap-3 p-3"
-                >
-                  <div className="flex gap-3">
-                    <Clock3 className="mt-0.5 h-4 w-4 text-[var(--nexo-text-muted,var(--text-muted))]" />
-                    <div>
-                      <p className="text-sm font-medium text-[var(--nexo-text-primary,var(--text-primary))]">
-                        {getTimelineActor(event)} · {getTimelineAction(event)}
-                      </p>
-                      <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-                        {getTimelineContext(event)} ·{" "}
-                        {formatDateTime(getTimelineEventDate(event))}
-                      </p>
-                    </div>
+        <div className="grid gap-3 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] xl:items-start">
+          <NextBestActionCard
+            title={nextBestAction.title}
+            entity={nextBestAction.entity}
+            reason={nextBestAction.reason}
+            impact={nextBestAction.impact}
+            safetyNote={nextBestAction.safetyNote}
+            primaryActionLabel={nextBestAction.primaryActionLabel}
+            onPrimaryAction={nextBestAction.onPrimaryAction}
+            secondaryActionLabel={nextBestAction.secondaryActionLabel}
+            onSecondaryAction={nextBestAction.onSecondaryAction}
+          />
+
+          <div>
+            <AppSectionCard className="p-4" data-testid="people-team-activity">
+              {timelineQuery.isLoading ? (
+                <AppPageLoadingState description="Carregando ações recentes da equipe..." />
+              ) : teamTimelineEvents.length > 0 ? (
+                <AppTimeline className="space-y-2">
+                  {teamTimelineEvents.map((event, index) => (
+                    <AppTimelineItem
+                      key={
+                        event.id ??
+                        `${getTimelineEventDate(event) ?? "event"}-${index}`
+                      }
+                      className="flex items-start justify-between gap-3 p-3"
+                    >
+                      <div className="flex gap-3">
+                        <Clock3 className="mt-0.5 h-4 w-4 text-[var(--nexo-text-muted,var(--text-muted))]" />
+                        <div>
+                          <p className="text-sm font-medium text-[var(--nexo-text-primary,var(--text-primary))]">
+                            {getTimelineActor(event)} ·{" "}
+                            {getTimelineAction(event)}
+                          </p>
+                          <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
+                            {getTimelineContext(event)} ·{" "}
+                            {formatDateTime(getTimelineEventDate(event))}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => navigate("/timeline")}
+                      >
+                        Abrir Timeline
+                      </Button>
+                    </AppTimelineItem>
+                  ))}
+                </AppTimeline>
+              ) : (
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold">
+                      Aguardando eventos da equipe.
+                    </p>
+                    <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
+                      Quando responsáveis executarem O.S., agenda, cobrança ou
+                      mensagens, as ações aparecerão aqui.
+                    </p>
                   </div>
                   <Button
                     size="sm"
-                    variant="ghost"
+                    variant="secondary"
                     onClick={() => navigate("/timeline")}
                   >
                     Abrir Timeline
                   </Button>
-                </AppTimelineItem>
-              ))}
-            </AppTimeline>
-          ) : (
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold">
-                  Aguardando eventos da equipe.
-                </p>
-                <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-                  Quando responsáveis executarem O.S., agenda, cobrança ou
-                  mensagens, as ações aparecerão aqui.
-                </p>
-              </div>
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => navigate("/timeline")}
-              >
-                Abrir Timeline
-              </Button>
-            </div>
-          )}
-        </AppSectionCard>
+                </div>
+              )}
+            </AppSectionCard>
+          </div>
+        </div>
       </AppSectionBlock>
 
       <AppSectionBlock
-        title="Ranking operacional da equipe"
+        title="Ranking operacional — todos os responsáveis"
         subtitle="Quem exige atenção primeiro: sobrecarga, indisponibilidade, atraso, saudáveis e inativos."
       >
         <AppFiltersBar className="gap-2 border border-[var(--nexo-border-subtle,var(--border-subtle))] bg-[var(--nexo-card-bg,var(--surface-base))] px-3 py-3">
@@ -1109,28 +1118,33 @@ export default function PeoplePage() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-2 lg:justify-end">
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => setSelectedPersonId(person.personId)}
-                    >
-                      Detalhe
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => navigate("/timeline")}
-                    >
-                      Timeline
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => navigate("/service-orders")}
-                    >
-                      Atribuições
-                    </Button>
+                  <div className="space-y-2 lg:text-right">
+                    <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
+                      {formatMoneyFallback()}
+                    </p>
+                    <div className="flex flex-wrap gap-2 lg:justify-end">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => setSelectedPersonId(person.personId)}
+                      >
+                        Detalhe
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => navigate("/timeline")}
+                      >
+                        Timeline
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => navigate("/service-orders")}
+                      >
+                        Atribuições
+                      </Button>
+                    </div>
                   </div>
                 </AppSectionCard>
               );
@@ -1140,276 +1154,285 @@ export default function PeoplePage() {
       </AppSectionBlock>
 
       <AppSectionBlock
-        title="Capacidade da operação"
-        subtitle={
-          selectedPerson
-            ? `Detalhe operacional de ${selectedPerson.name}`
-            : "Visão agregada da equipe sem exigir seleção."
-        }
+        title="Capacidade, evolução e sinais"
+        subtitle="Capacidade consolidada, histórico confiável e sinais de atribuição sem inflar números."
       >
-        {selectedPerson ? (
-          <div className="space-y-4">
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <AppSectionCard className="p-4">
-                <Users className="mb-2 h-4 w-4" />
-                <p className="font-semibold">{selectedPerson.name}</p>
-                <p className="text-sm text-[var(--nexo-text-muted,var(--text-muted))]">
-                  {selectedPerson.role} ·{" "}
-                  {personStatusLabel(selectedPerson.status)}
-                </p>
-              </AppSectionCard>
-              <AppStatCard
-                label="O.S. atribuídas"
-                value={`${selectedPerson.openServiceOrdersCount}`}
-                helper={`${selectedPerson.overdueServiceOrdersCount} atrasada(s).`}
-              />
-              <AppStatCard
-                label="Agenda de hoje"
-                value={`${selectedPerson.todayAppointmentsCount}`}
-                helper={`${selectedPerson.futureAppointmentsCount} futura(s).`}
-              />
-              <AppStatCard
-                label="Capacidade planejada"
-                value={`O.S. ${formatCapacity(selectedPerson.dailyServiceOrderCapacity)}`}
-                helper={`Agenda ${formatCapacity(selectedPerson.dailyAppointmentCapacity)}.`}
-              />
-            </div>
-            {isAdmin ? (
-              <AppSectionCard
-                className="grid gap-2 p-4 md:grid-cols-4"
-                data-testid="availability-exception-form"
-              >
-                <label className="text-sm">
-                  Início
-                  <input
-                    aria-label="Início"
-                    type="datetime-local"
-                    value={startsAt}
-                    onChange={event => setStartsAt(event.target.value)}
-                    className="mt-1 w-full rounded-md border border-[var(--nexo-border-subtle,var(--border-subtle))] bg-[var(--nexo-control-bg,var(--surface-subtle))] p-2 text-[var(--nexo-text-primary,var(--text-primary))]"
-                  />
-                </label>
-                <label className="text-sm">
-                  Fim
-                  <input
-                    aria-label="Fim"
-                    type="datetime-local"
-                    value={endsAt}
-                    onChange={event => setEndsAt(event.target.value)}
-                    className="mt-1 w-full rounded-md border border-[var(--nexo-border-subtle,var(--border-subtle))] bg-[var(--nexo-control-bg,var(--surface-subtle))] p-2 text-[var(--nexo-text-primary,var(--text-primary))]"
-                  />
-                </label>
-                <label className="text-sm">
-                  Motivo
-                  <input
-                    aria-label="Motivo"
-                    value={reason}
-                    maxLength={200}
-                    onChange={event => setReason(event.target.value)}
-                    className="mt-1 w-full rounded-md border border-[var(--nexo-border-subtle,var(--border-subtle))] bg-[var(--nexo-control-bg,var(--surface-subtle))] p-2 text-[var(--nexo-text-primary,var(--text-primary))]"
-                  />
-                </label>
-                <Button
-                  className="self-end"
-                  disabled={
-                    !startsAt ||
-                    !endsAt ||
-                    createAvailabilityException.isPending
-                  }
-                  onClick={submitAvailability}
+        <AppSectionBlock
+          title="Capacidade da operação"
+          subtitle={
+            selectedPerson
+              ? `Detalhe operacional de ${selectedPerson.name}`
+              : "Visão agregada da equipe sem exigir seleção."
+          }
+        >
+          {selectedPerson ? (
+            <div className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <AppSectionCard className="p-4">
+                  <Users className="mb-2 h-4 w-4" />
+                  <p className="font-semibold">{selectedPerson.name}</p>
+                  <p className="text-sm text-[var(--nexo-text-muted,var(--text-muted))]">
+                    {selectedPerson.role} ·{" "}
+                    {personStatusLabel(selectedPerson.status)}
+                  </p>
+                </AppSectionCard>
+                <AppStatCard
+                  label="O.S. atribuídas"
+                  value={`${selectedPerson.openServiceOrdersCount}`}
+                  helper={`${selectedPerson.overdueServiceOrdersCount} atrasada(s).`}
+                />
+                <AppStatCard
+                  label="Agenda de hoje"
+                  value={`${selectedPerson.todayAppointmentsCount}`}
+                  helper={`${selectedPerson.futureAppointmentsCount} futura(s).`}
+                />
+                <AppStatCard
+                  label="Capacidade planejada"
+                  value={`O.S. ${formatCapacity(selectedPerson.dailyServiceOrderCapacity)}`}
+                  helper={`Agenda ${formatCapacity(selectedPerson.dailyAppointmentCapacity)}.`}
+                />
+              </div>
+              {isAdmin ? (
+                <AppSectionCard
+                  className="grid gap-2 p-4 md:grid-cols-4"
+                  data-testid="availability-exception-form"
                 >
-                  Adicionar indisponibilidade
+                  <label className="text-sm">
+                    Início
+                    <input
+                      aria-label="Início"
+                      type="datetime-local"
+                      value={startsAt}
+                      onChange={event => setStartsAt(event.target.value)}
+                      className="mt-1 w-full rounded-md border border-[var(--nexo-border-subtle,var(--border-subtle))] bg-[var(--nexo-control-bg,var(--surface-subtle))] p-2 text-[var(--nexo-text-primary,var(--text-primary))]"
+                    />
+                  </label>
+                  <label className="text-sm">
+                    Fim
+                    <input
+                      aria-label="Fim"
+                      type="datetime-local"
+                      value={endsAt}
+                      onChange={event => setEndsAt(event.target.value)}
+                      className="mt-1 w-full rounded-md border border-[var(--nexo-border-subtle,var(--border-subtle))] bg-[var(--nexo-control-bg,var(--surface-subtle))] p-2 text-[var(--nexo-text-primary,var(--text-primary))]"
+                    />
+                  </label>
+                  <label className="text-sm">
+                    Motivo
+                    <input
+                      aria-label="Motivo"
+                      value={reason}
+                      maxLength={200}
+                      onChange={event => setReason(event.target.value)}
+                      className="mt-1 w-full rounded-md border border-[var(--nexo-border-subtle,var(--border-subtle))] bg-[var(--nexo-control-bg,var(--surface-subtle))] p-2 text-[var(--nexo-text-primary,var(--text-primary))]"
+                    />
+                  </label>
+                  <Button
+                    className="self-end"
+                    disabled={
+                      !startsAt ||
+                      !endsAt ||
+                      createAvailabilityException.isPending
+                    }
+                    onClick={submitAvailability}
+                  >
+                    Adicionar indisponibilidade
+                  </Button>
+                </AppSectionCard>
+              ) : null}
+              <AppSectionCard className="p-4">
+                <p className="mb-2 text-sm font-semibold">
+                  Indisponibilidades recentes e futuras
+                </p>
+                {exceptionsQuery.isLoading ? (
+                  <AppPageLoadingState description="Carregando indisponibilidades..." />
+                ) : exceptions.length === 0 ? (
+                  <AppPageEmptyState
+                    title="Sem indisponibilidade"
+                    description="Nenhuma indisponibilidade registrada para a pessoa selecionada."
+                  />
+                ) : (
+                  <div className="space-y-2">
+                    {exceptions.map(exception => (
+                      <AppSectionCard
+                        key={exception.id}
+                        className="flex items-center justify-between gap-3 p-3 text-sm"
+                      >
+                        <span>
+                          {formatDateTime(exception.startsAt)} até{" "}
+                          {formatDateTime(exception.endsAt)} ·{" "}
+                          {exception.reason || "Sem motivo informado"}
+                        </span>
+                        {isAdmin ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() =>
+                              deleteAvailabilityException.mutate({
+                                personId: selectedPerson.personId,
+                                exceptionId: exception.id,
+                              })
+                            }
+                          >
+                            <Trash2 className="h-4 w-4" /> Remover
+                          </Button>
+                        ) : null}
+                      </AppSectionCard>
+                    ))}
+                  </div>
+                )}
+              </AppSectionCard>
+            </div>
+          ) : (
+            <AppSectionCard
+              className="space-y-3 p-4"
+              data-testid="people-capacity-availability-assignments"
+            >
+              <div>
+                <p className="font-semibold">
+                  {header.overloadedPeople === 0 &&
+                  header.unavailablePeople === 0
+                    ? "Capacidade sob controle"
+                    : "Gargalos atuais de capacidade"}
+                </p>
+                <p className="mt-1 text-sm text-[var(--nexo-text-muted,var(--text-muted))]">
+                  {capacityNarrative(header)}
+                </p>
+              </div>
+              <div className="grid gap-2 text-sm md:grid-cols-4">
+                <span>
+                  Capacidade utilizada: O.S. {header.averageServiceOrderUsage} ·
+                  Agenda {header.averageAppointmentUsage}
+                </span>
+                <span>Disponíveis agora: {header.availablePeople}</span>
+                <span>
+                  Gargalos atuais:{" "}
+                  {header.overloadedPeople + header.overdueServiceOrders}
+                </span>
+                <span>
+                  Próximas indisponibilidades:{" "}
+                  {
+                    people.filter(person => person.nextAvailabilityException)
+                      .length
+                  }
+                </span>
+              </div>
+            </AppSectionCard>
+          )}
+        </AppSectionBlock>
+
+        <AppSectionBlock
+          title="Evolução da equipe"
+          subtitle="Leituras que amadurecem conforme O.S., cobranças e eventos forem registrados."
+        >
+          <AppSectionCard
+            className="p-4"
+            data-testid="people-performance-impact"
+          >
+            <p className="font-semibold">Evolução da equipe</p>
+            <p className="mt-2 text-sm font-medium">
+              Ainda não existe histórico suficiente para gerar indicadores
+              confiáveis.
+            </p>
+            <p className="text-sm text-[var(--nexo-text-muted,var(--text-muted))]">
+              Assim que houver O.S. concluídas, cobranças vinculadas e eventos
+              reais, esta área deixa de ser compacta sem inventar métricas.
+            </p>
+            <Button
+              className="mt-3"
+              size="sm"
+              variant="secondary"
+              onClick={() => navigate("/timeline")}
+            >
+              Abrir Timeline
+            </Button>
+          </AppSectionCard>
+        </AppSectionBlock>
+
+        {isAdmin ? (
+          <AppSectionBlock
+            title="Sinais de atribuição"
+            subtitle="Resumo compacto de alertas em atribuições."
+          >
+            {warningSummaryQuery.isLoading ? (
+              <AppPageLoadingState description="Consolidando sinais dos últimos 30 dias..." />
+            ) : null}
+            {warningSummaryQuery.isError ? (
+              <AppSectionCard
+                className="p-4 text-sm"
+                data-testid="assignee-warning-summary-error"
+              >
+                <p className="font-semibold">
+                  Sinais de atribuição indisponíveis agora.
+                </p>
+                <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
+                  A visão principal continua usando carga, agenda e O.S.
+                </p>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => void warningSummaryQuery.refetch()}
+                >
+                  Tentar novamente
                 </Button>
               </AppSectionCard>
             ) : null}
-            <AppSectionCard className="p-4">
-              <p className="mb-2 text-sm font-semibold">
-                Indisponibilidades recentes e futuras
-              </p>
-              {exceptionsQuery.isLoading ? (
-                <AppPageLoadingState description="Carregando indisponibilidades..." />
-              ) : exceptions.length === 0 ? (
-                <AppPageEmptyState
-                  title="Sem indisponibilidade"
-                  description="Nenhuma indisponibilidade registrada para a pessoa selecionada."
-                />
-              ) : (
-                <div className="space-y-2">
-                  {exceptions.map(exception => (
-                    <AppSectionCard
-                      key={exception.id}
-                      className="flex items-center justify-between gap-3 p-3 text-sm"
-                    >
-                      <span>
-                        {formatDateTime(exception.startsAt)} até{" "}
-                        {formatDateTime(exception.endsAt)} ·{" "}
-                        {exception.reason || "Sem motivo informado"}
-                      </span>
-                      {isAdmin ? (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() =>
-                            deleteAvailabilityException.mutate({
-                              personId: selectedPerson.personId,
-                              exceptionId: exception.id,
-                            })
-                          }
-                        >
-                          <Trash2 className="h-4 w-4" /> Remover
-                        </Button>
-                      ) : null}
-                    </AppSectionCard>
-                  ))}
-                </div>
-              )}
-            </AppSectionCard>
-          </div>
-        ) : (
-          <AppSectionCard
-            className="space-y-3 p-4"
-            data-testid="people-capacity-availability-assignments"
-          >
-            <div>
-              <p className="font-semibold">
-                {header.overloadedPeople === 0 && header.unavailablePeople === 0
-                  ? "Capacidade sob controle"
-                  : "Gargalos atuais de capacidade"}
-              </p>
-              <p className="mt-1 text-sm text-[var(--nexo-text-muted,var(--text-muted))]">
-                {capacityNarrative(header)}
-              </p>
-            </div>
-            <div className="grid gap-2 text-sm md:grid-cols-4">
-              <span>
-                Capacidade utilizada: O.S. {header.averageServiceOrderUsage} ·
-                Agenda {header.averageAppointmentUsage}
-              </span>
-              <span>Disponíveis agora: {header.availablePeople}</span>
-              <span>
-                Gargalos atuais:{" "}
-                {header.overloadedPeople + header.overdueServiceOrders}
-              </span>
-              <span>
-                Próximas indisponibilidades:{" "}
-                {
-                  people.filter(person => person.nextAvailabilityException)
-                    .length
-                }
-              </span>
-            </div>
-          </AppSectionCard>
-        )}
-      </AppSectionBlock>
-
-      <AppSectionBlock
-        title="Desempenho e impacto da equipe"
-        subtitle="Leituras que amadurecem conforme O.S., cobranças e eventos forem registrados."
-      >
-        <AppSectionCard className="p-4" data-testid="people-performance-impact">
-          <p className="font-semibold">Evolução da equipe</p>
-          <p className="mt-2 text-sm font-medium">
-            Ainda não existe histórico suficiente para gerar indicadores
-            confiáveis.
-          </p>
-          <p className="text-sm text-[var(--nexo-text-muted,var(--text-muted))]">
-            Assim que houver O.S. concluídas, cobranças vinculadas e eventos
-            reais, esta área deixa de ser compacta sem inventar métricas.
-          </p>
-          <Button
-            className="mt-3"
-            size="sm"
-            variant="secondary"
-            onClick={() => navigate("/timeline")}
-          >
-            Abrir Timeline
-          </Button>
-        </AppSectionCard>
-      </AppSectionBlock>
-
-      {isAdmin ? (
-        <AppSectionBlock
-          title="Sinais de atribuição"
-          subtitle="Resumo compacto de alertas em atribuições."
-        >
-          {warningSummaryQuery.isLoading ? (
-            <AppPageLoadingState description="Consolidando sinais dos últimos 30 dias..." />
-          ) : null}
-          {warningSummaryQuery.isError ? (
-            <AppSectionCard
-              className="p-4 text-sm"
-              data-testid="assignee-warning-summary-error"
-            >
-              <p className="font-semibold">
-                Sinais de atribuição indisponíveis agora.
-              </p>
-              <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-                A visão principal continua usando carga, agenda e O.S.
-              </p>
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => void warningSummaryQuery.refetch()}
-              >
-                Tentar novamente
-              </Button>
-            </AppSectionCard>
-          ) : null}
-          {warningSummary ? (
-            warningSummary.totals.shown === 0 &&
-            warningSummary.totals.confirmed === 0 &&
-            (!mostFrequentWarningType ||
-              mostFrequentWarningType.shown === 0) ? (
-              <AppSectionCard
-                className="flex flex-wrap items-center justify-between gap-3 p-3 text-sm"
-                data-testid="assignee-warning-summary"
-              >
-                <p className="font-medium">
-                  Não houve alertas de atribuição recentemente.
-                </p>
-                <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-                  0 alertas exibidos · 0 confirmações após alerta
-                </p>
-              </AppSectionCard>
-            ) : (
-              <div
-                className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
-                data-testid="assignee-warning-summary"
-              >
-                <AppStatCard
-                  label="Alertas exibidos"
-                  value={`${warningSummary.totals.shown}`}
-                  helper="Sinais críticos ativos."
-                />
-                <AppStatCard
-                  label="Confirmações após alerta"
-                  value={`${warningSummary.totals.confirmed}`}
-                  helper="Confirmações após alerta."
-                />
-                <AppStatCard
-                  label="Taxa de confirmação"
-                  value={
-                    warningSummary.totals.confirmationRatePct == null
-                      ? "Sem exibições"
-                      : `${warningSummary.totals.confirmationRatePct}%`
-                  }
-                  helper="Confirmações divididas por alertas."
-                />
-                <AppSectionCard className="p-4 text-sm">
-                  <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-                    Sinal mais frequente
+            {warningSummary ? (
+              warningSummary.totals.shown === 0 &&
+              warningSummary.totals.confirmed === 0 &&
+              (!mostFrequentWarningType ||
+                mostFrequentWarningType.shown === 0) ? (
+                <AppSectionCard
+                  className="flex flex-wrap items-center justify-between gap-3 p-3 text-sm"
+                  data-testid="assignee-warning-summary"
+                >
+                  <p className="font-medium">
+                    Não houve alertas de atribuição recentemente.
                   </p>
-                  <p className="font-semibold">
-                    {mostFrequentWarningType
-                      ? warningTypeLabels[mostFrequentWarningType.warningType]
-                      : "Nenhum sinal registrado"}
+                  <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
+                    0 alertas exibidos · 0 confirmações após alerta
                   </p>
                 </AppSectionCard>
-              </div>
-            )
-          ) : null}
-        </AppSectionBlock>
-      ) : null}
+              ) : (
+                <div
+                  className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
+                  data-testid="assignee-warning-summary"
+                >
+                  <AppStatCard
+                    label="Alertas exibidos"
+                    value={`${warningSummary.totals.shown}`}
+                    helper="Sinais críticos ativos."
+                  />
+                  <AppStatCard
+                    label="Confirmações após alerta"
+                    value={`${warningSummary.totals.confirmed}`}
+                    helper="Confirmações após alerta."
+                  />
+                  <AppStatCard
+                    label="Taxa de confirmação"
+                    value={
+                      warningSummary.totals.confirmationRatePct == null
+                        ? "Sem exibições"
+                        : `${warningSummary.totals.confirmationRatePct}%`
+                    }
+                    helper="Confirmações divididas por alertas."
+                  />
+                  <AppSectionCard className="p-4 text-sm">
+                    <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
+                      Sinal mais frequente
+                    </p>
+                    <p className="font-semibold">
+                      {mostFrequentWarningType
+                        ? warningTypeLabels[mostFrequentWarningType.warningType]
+                        : "Nenhum sinal registrado"}
+                    </p>
+                  </AppSectionCard>
+                </div>
+              )
+            ) : null}
+          </AppSectionBlock>
+        ) : null}
+      </AppSectionBlock>
 
       <CreatePersonModal
         open={createOpen}
