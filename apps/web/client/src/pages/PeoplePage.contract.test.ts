@@ -12,6 +12,22 @@ const editModal = readFileSync(
 const compactSource = source.replace(/\s+/g, " ");
 
 describe("PeoplePage premium operational cockpit contract", () => {
+  it("usa a nova camada operacional reutilizável em /people", () => {
+    expect(source).toContain('from "@/components/operational"');
+    [
+      "OperationalPanel",
+      "OperationalInnerCard",
+      "OperationalWorkloadBar",
+      "OperationalTimelineItem",
+      "OperationalFlow",
+      "OperationalHealthRing",
+      "OperationalActionPanel",
+      "OperationalSectionGrid",
+    ].forEach(component => expect(source).toContain(component));
+    expect(source).toContain("Responsáveis");
+    expect(source).toContain("Agendamentos");
+    expect(source).toContain("Cobranças");
+  });
   it("protege hero dominante fundido com narrativa operacional", () => {
     expect(source).toContain("Cockpit humano da equipe");
     expect(source).toContain("Centro de Responsáveis da Operação");
@@ -68,7 +84,8 @@ describe("PeoplePage premium operational cockpit contract", () => {
     expect(source).toContain('data-testid="people-healthy-next-action"');
     expect(source).toContain("Equipe equilibrada");
     expect(source).toContain("Nenhuma intervenção necessária neste momento.");
-    expect(source).toContain("border-[var(--success,var(--status-normal))]/25");
+    expect(source).toContain("<OperationalActionPanel");
+    expect(source).toContain('tone="success"');
     expect(source).toContain("<NextBestActionCard");
     expect(source).toContain("reason={nextBestAction.reason}");
     expect(source).toContain("impact={nextBestAction.impact}");
