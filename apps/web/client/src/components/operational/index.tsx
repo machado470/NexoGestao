@@ -10,7 +10,11 @@ type OperationalTone =
   | "success"
   | "warning"
   | "muted"
-  | "selected";
+  | "selected"
+  | "hero"
+  | "compact"
+  | "rail"
+  | "ghost";
 type PriorityTone = "high" | "medium" | "low" | "neutral";
 
 const toneClasses: Record<string, string> = {
@@ -29,6 +33,11 @@ const toneClasses: Record<string, string> = {
     "border-[var(--success,var(--status-normal))]/30 bg-[var(--success-soft,var(--surface-subtle))]/35",
   warning:
     "border-[var(--warning,var(--status-warning))]/35 bg-[var(--warning-soft,var(--surface-subtle))]/35",
+  hero: "border-[var(--accent-primary)]/25 bg-[linear-gradient(135deg,var(--nexo-card-bg,var(--surface-base)),var(--accent-soft),var(--nexo-control-bg,var(--surface-subtle)))] shadow-sm",
+  compact:
+    "border-[var(--nexo-border-subtle,var(--border-subtle))] bg-[var(--nexo-card-bg,var(--surface-base))]/80",
+  rail: "border-transparent bg-transparent",
+  ghost: "border-transparent bg-transparent",
 };
 
 const barClasses: Record<string, string> = {
@@ -64,14 +73,22 @@ export function OperationalPanel({
   return (
     <section
       className={cn(
-        "nexo-operational-panel rounded-2xl border p-4 transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 md:p-5",
+        "nexo-operational-panel rounded-2xl border p-4 transition-[border-color,box-shadow,transform] duration-200 md:p-5",
+        variant === "hero" ? "p-5 md:p-7" : "hover:-translate-y-0.5",
+        variant === "compact" ? "p-3 md:p-3" : null,
+        variant === "ghost" ? "p-0 md:p-0" : null,
         toneClasses[variant],
         className
       )}
       {...props}
     >
       {title || subtitle || icon || action ? (
-        <div className="mb-4 flex items-start justify-between gap-3">
+        <div
+          className={cn(
+            "mb-4 flex items-start justify-between gap-3",
+            variant === "compact" && "mb-2"
+          )}
+        >
           <div className="flex min-w-0 gap-3">
             {icon ? (
               <div className="mt-0.5 text-[var(--accent-primary)]">{icon}</div>
@@ -265,6 +282,7 @@ export function OperationalTimelineItem({
 export function OperationalFlow({
   stages,
   className,
+  variant = "card",
 }: {
   stages: Array<{
     label: ReactNode;
@@ -275,11 +293,16 @@ export function OperationalFlow({
     bottleneck?: boolean;
   }>;
   className?: string;
+  variant?: "rail" | "card" | "compact";
 }) {
   return (
     <div
       className={cn(
-        "nexo-operational-flow relative grid gap-0 overflow-hidden rounded-2xl border border-[var(--nexo-border-subtle,var(--border-subtle))] bg-[var(--nexo-card-bg,var(--surface-base))] p-2 md:grid-cols-5",
+        "nexo-operational-flow relative grid gap-0 overflow-hidden rounded-2xl border bg-[var(--nexo-card-bg,var(--surface-base))] md:grid-cols-5",
+        variant === "rail"
+          ? "nexo-operational-flow-rail border-transparent bg-transparent p-0 before:absolute before:left-8 before:right-8 before:top-1/2 before:hidden before:h-0.5 before:-translate-y-1/2 before:bg-[var(--nexo-border-subtle,var(--border-subtle))] md:before:block"
+          : "border-[var(--nexo-border-subtle,var(--border-subtle))] p-2",
+        variant === "compact" && "p-1",
         className
       )}
     >
@@ -287,10 +310,11 @@ export function OperationalFlow({
         <div key={index} className="relative min-w-0 p-1">
           <div
             className={cn(
-              "flow-stage relative min-h-24 rounded-xl p-3 text-sm transition-[border-color,box-shadow,transform] duration-200",
-              toneClasses[
-                stage.tone ?? (stage.active ? "selected" : "subtle")
-              ],
+              "flow-stage relative rounded-xl p-3 text-sm transition-[border-color,box-shadow,transform] duration-200",
+              variant === "rail"
+                ? "min-h-20 border bg-[var(--nexo-card-bg,var(--surface-base))]/95 shadow-sm"
+                : "min-h-24",
+              toneClasses[stage.tone ?? (stage.active ? "selected" : "subtle")],
               stage.bottleneck &&
                 "bottleneck shadow-[0_0_0_3px_var(--warning-soft,var(--surface-subtle))]"
             )}
@@ -368,16 +392,26 @@ export function OperationalHealthRing({
   value,
   label,
   tone = "default",
+  compact = false,
 }: {
   value?: number | null;
   label: ReactNode;
   tone?: keyof typeof barClasses;
+  compact?: boolean;
 }) {
   const pct = clampPct(value, 100);
   return (
-    <div className="nexo-operational-health-ring flex items-center gap-3">
+    <div
+      className={cn(
+        "nexo-operational-health-ring flex items-center gap-3",
+        compact && "text-sm"
+      )}
+    >
       <div
-        className="grid h-16 w-16 place-items-center rounded-full"
+        className={cn(
+          "grid place-items-center rounded-full",
+          compact ? "h-10 w-10" : "h-16 w-16"
+        )}
         style={{
           background:
             pct == null
@@ -385,7 +419,12 @@ export function OperationalHealthRing({
               : `conic-gradient(var(--accent-primary) ${pct * 3.6}deg, var(--nexo-control-bg,var(--surface-subtle)) 0deg)`,
         }}
       >
-        <div className="grid h-12 w-12 place-items-center rounded-full bg-[var(--nexo-card-bg,var(--surface-base))] text-xs font-semibold">
+        <div
+          className={cn(
+            "grid place-items-center rounded-full bg-[var(--nexo-card-bg,var(--surface-base))] text-xs font-semibold",
+            compact ? "h-8 w-8" : "h-12 w-12"
+          )}
+        >
           {pct == null ? "—" : `${pct}%`}
         </div>
       </div>
@@ -413,6 +452,7 @@ export function OperationalActionPanel({
   primaryAction,
   secondaryAction,
   tone = "success",
+  display = "expandedProblem",
   className,
   ...props
 }: Omit<ComponentProps<"div">, "title"> & {
@@ -423,19 +463,27 @@ export function OperationalActionPanel({
   primaryAction?: { label: string; onClick: () => void };
   secondaryAction?: { label: string; onClick: () => void };
   tone?: OperationalTone;
+  display?: "compactHealthy" | "expandedProblem";
 }) {
   return (
     <OperationalInnerCard
       variant={tone}
-      className={cn("nexo-operational-action-panel", className)}
+      className={cn(
+        "nexo-operational-action-panel",
+        display === "compactHealthy" &&
+          "flex flex-wrap items-center justify-between gap-3 border-0 bg-transparent p-0",
+        className
+      )}
       {...props}
     >
-      <p className="text-base font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
-        {title}
-      </p>
-      <p className="mt-1 text-sm text-[var(--nexo-text-muted,var(--text-muted))]">
-        {description}
-      </p>
+      <div>
+        <p className="text-base font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
+          {title}
+        </p>
+        <p className="mt-1 text-sm text-[var(--nexo-text-muted,var(--text-muted))]">
+          {description}
+        </p>
+      </div>
       {impact ? (
         <p className="mt-3 text-sm font-medium text-[var(--nexo-text-primary,var(--text-primary))]">
           Impacto: {impact}
@@ -446,9 +494,18 @@ export function OperationalActionPanel({
           Segurança: {safety}
         </p>
       ) : null}
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div
+        className={cn(
+          "flex flex-wrap gap-2",
+          display === "compactHealthy" ? "mt-0" : "mt-3"
+        )}
+      >
         {primaryAction ? (
-          <Button size="sm" onClick={primaryAction.onClick}>
+          <Button
+            size="sm"
+            variant={display === "compactHealthy" ? "ghost" : undefined}
+            onClick={primaryAction.onClick}
+          >
             {primaryAction.label}
           </Button>
         ) : null}

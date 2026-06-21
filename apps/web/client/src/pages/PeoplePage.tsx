@@ -784,6 +784,13 @@ export default function PeoplePage() {
     header.overloadedPeople > 0 ||
     header.overdueServiceOrders > 0 ||
     header.unavailablePeople > 0;
+  const hasCompactTeamHealth =
+    !selectedPerson &&
+    !hasOperationalProblem &&
+    (!warningSummary ||
+      (warningSummary.totals.shown === 0 &&
+        warningSummary.totals.confirmed === 0 &&
+        (!mostFrequentWarningType || mostFrequentWarningType.shown === 0)));
   const commandTarget = useMemo(
     () => ({ person: selectedPerson, people, warningSummary }),
     [selectedPerson, people, warningSummary]
@@ -834,8 +841,8 @@ export default function PeoplePage() {
   return (
     <AppPageShell>
       <OperationalPanel
-        variant="elevated"
-        className="overflow-hidden bg-[linear-gradient(135deg,var(--nexo-card-bg,var(--surface-base)),var(--nexo-control-bg,var(--surface-subtle)))]"
+        variant="hero"
+        className="overflow-hidden"
         data-testid="people-operational-header"
       >
         <div className="min-w-0 space-y-4">
@@ -847,76 +854,94 @@ export default function PeoplePage() {
               </h1>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <AppOperationalStatusBadge status={teamHealth.status} />
-                <span className="text-sm font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
+                <span className="text-base font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
                   {teamHealth.label}
-                </span>
-                <span className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-                  Permissões em Configurações
                 </span>
               </div>
             </div>
-            <Button onClick={() => setCreateOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Nova pessoa
-            </Button>
           </div>
 
-          <p className="max-w-4xl text-base leading-7 text-[var(--nexo-text-primary,var(--text-primary))] md:text-lg">
+          <p className="max-w-3xl text-sm leading-6 text-[var(--nexo-text-muted,var(--text-muted))] md:text-base">
             {heroNarrative}
           </p>
 
           {people.length === 1 && leadPerson ? (
-            <div className="mt-5 grid gap-5 rounded-2xl border border-[var(--accent-primary)]/20 bg-[var(--accent-soft)]/10 p-5 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center" data-testid="people-single-responsible-hero">
-              <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-2xl font-semibold text-[var(--accent-primary)] shadow-sm">
+            <div
+              className="mt-5 grid gap-5 rounded-3xl bg-[var(--nexo-card-bg,var(--surface-base))]/70 p-5 shadow-sm md:grid-cols-[auto_minmax(0,1fr)] md:p-6"
+              data-testid="people-single-responsible-hero"
+            >
+              <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-3xl font-semibold text-[var(--accent-primary)] shadow-md ring-4 ring-[var(--nexo-card-bg,var(--surface-base))] md:h-32 md:w-32">
                 {personInitials(leadPerson.name)}
               </div>
-              <div className="min-w-0 space-y-3">
-                <div>
-                  <p className="text-2xl font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
-                    {leadPerson.name}
-                  </p>
-                  <p className="text-sm text-[var(--nexo-text-muted,var(--text-muted))]">
-                    {leadPerson.role} · Responsável principal pela execução operacional da equipe.
-                  </p>
+              <div className="min-w-0 space-y-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-3xl font-semibold tracking-tight text-[var(--nexo-text-primary,var(--text-primary))] md:text-4xl">
+                      {leadPerson.name}
+                    </p>
+                    <p className="mt-1 text-base font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
+                      {leadPerson.role} · Responsável ativa pela execução
+                    </p>
+                  </div>
+                  <span className={compactChipClass}>
+                    {personOperationalStateLabel(leadPerson)}
+                  </span>
                 </div>
-                <div className="flex flex-wrap gap-2 text-xs">
-                  <span className={compactChipClass}>{personOperationalStateLabel(leadPerson)}</span>
-                  <span className={compactChipClass}>{loadLabels[leadPerson.loadStatus]}</span>
-                  <span className={compactChipClass}>{capacityLabels[leadPerson.capacityStatus]}</span>
-                  <span className={compactChipClass}>{availabilityLabels[leadPerson.availabilityStatus]}</span>
-                </div>
-                <OperationalWorkloadBar
-                  label="Carga/capacidade"
-                  value={leadPerson.serviceOrderCapacityUsagePct}
-                  tone={isPersonOverloaded(leadPerson) ? "warning" : "success"}
-                  className="max-w-xl"
-                />
-                <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-                  {leadPerson.lastActivityAt
-                    ? `Última atividade: ${formatDateTime(leadPerson.lastActivityAt)}`
-                    : "Última atividade: não registrada"}
+                <p className="max-w-2xl text-sm text-[var(--nexo-text-muted,var(--text-muted))]">
+                  {personOperationalSentence(leadPerson)}
                 </p>
-              </div>
-              <div className="flex flex-wrap gap-2 md:flex-col">
-                <Button size="sm" variant="secondary" onClick={() => setSelectedPersonId(leadPerson.personId)}>
-                  Ver detalhe
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => navigate("/timeline")}>
-                  Timeline
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => setCreateOpen(true)}>
-                  Nova pessoa
-                </Button>
+                <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
+                  <span>
+                    Carga {leadPerson.serviceOrderCapacityUsagePct ?? 0}%
+                  </span>
+                  <span>O.S. {leadPerson.openServiceOrdersCount}</span>
+                  <span>Agenda {leadPerson.todayAppointmentsCount}</span>
+                  <span>{loadLabels[leadPerson.loadStatus]}</span>
+                  <span>
+                    {leadPerson.lastActivityAt
+                      ? `Última atividade ${formatDateTime(leadPerson.lastActivityAt)}`
+                      : "Última atividade não registrada"}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => setSelectedPersonId(leadPerson.personId)}
+                  >
+                    Ver detalhe
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => navigate("/timeline")}
+                  >
+                    Timeline
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setCreateOpen(true)}
+                  >
+                    Nova pessoa
+                  </Button>
+                </div>
               </div>
             </div>
           ) : null}
 
           {people.length === 0 ? (
-            <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--warning,var(--status-warning))]/30 bg-[var(--warning-soft,var(--surface-subtle))]/30 p-5" data-testid="people-empty-hero">
+            <div
+              className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--warning,var(--status-warning))]/30 bg-[var(--warning-soft,var(--surface-subtle))]/30 p-5"
+              data-testid="people-empty-hero"
+            >
               <div>
-                <p className="text-lg font-semibold">Sem responsáveis operacionais</p>
+                <p className="text-lg font-semibold">
+                  Sem responsáveis operacionais
+                </p>
                 <p className="text-sm text-[var(--nexo-text-muted,var(--text-muted))]">
-                  Cadastre responsáveis para que O.S., agendamentos e execução tenham dono.
+                  Cadastre responsáveis para que O.S., agendamentos e execução
+                  tenham dono.
                 </p>
               </div>
               <Button onClick={() => setCreateOpen(true)}>Nova pessoa</Button>
@@ -967,116 +992,129 @@ export default function PeoplePage() {
       ) : null}
 
       {shouldShowSupportingPeople ? (
-      <AppSectionBlock
-        title="Quem sustenta a operação agora"
-        subtitle="Responsáveis-chave em ordem de relevância operacional."
-      >
-        {people.length === 0 ? (
-          <OperationalInnerCard className="flex flex-wrap items-center justify-between gap-3 p-4">
-            <p className="text-sm font-semibold">
-              Sem responsáveis operacionais cadastrados.
-            </p>
-            <Button onClick={() => setCreateOpen(true)}>Nova pessoa</Button>
-          </OperationalInnerCard>
-        ) : (
-          <div
-            className={`grid gap-3 ${keyPeople.length === 1 ? "xl:grid-cols-1" : keyPeople.length === 2 ? "xl:grid-cols-2" : "xl:grid-cols-3"}`}
-            data-testid="people-key-responsibles"
-          >
-            {keyPeople.map(person => (
-              <OperationalInnerCard
-                key={person.personId}
-                interactive
-                className={`p-4 ${keyPeople.length === 1 ? "grid gap-4 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center md:p-6" : "space-y-3"}`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-base font-semibold text-[var(--accent-primary)]">
-                      {personInitials(person.name)}
+        <AppSectionBlock
+          title="Quem sustenta a operação agora"
+          subtitle="Responsáveis-chave em ordem de relevância operacional."
+        >
+          {people.length === 0 ? (
+            <OperationalInnerCard className="flex flex-wrap items-center justify-between gap-3 p-4">
+              <p className="text-sm font-semibold">
+                Sem responsáveis operacionais cadastrados.
+              </p>
+              <Button onClick={() => setCreateOpen(true)}>Nova pessoa</Button>
+            </OperationalInnerCard>
+          ) : (
+            <div
+              className={`grid gap-3 ${keyPeople.length === 1 ? "xl:grid-cols-1" : keyPeople.length === 2 ? "xl:grid-cols-2" : "xl:grid-cols-3"}`}
+              data-testid="people-key-responsibles"
+            >
+              {keyPeople.map(person => (
+                <OperationalInnerCard
+                  key={person.personId}
+                  interactive
+                  className={`p-4 ${keyPeople.length === 1 ? "grid gap-4 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center md:p-6" : "space-y-3"}`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-base font-semibold text-[var(--accent-primary)]">
+                        {personInitials(person.name)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-base font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
+                          {person.name}
+                        </p>
+                        <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
+                          {person.role}
+                        </p>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-base font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
-                        {person.name}
-                      </p>
-                      <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-                        {person.role}
-                      </p>
-                    </div>
+                    <AppOperationalStatusBadge
+                      status={derivePersonOperationalStatus(person)}
+                    />
                   </div>
-                  <AppOperationalStatusBadge
-                    status={derivePersonOperationalStatus(person)}
+                  <div>
+                    <p className="text-sm font-medium text-[var(--nexo-text-primary,var(--text-primary))]">
+                      {personHumanReading(person)}
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
+                      {person.workloadNotes ||
+                        "Responsável principal pela execução operacional da equipe."}
+                    </p>
+                    <p className="mt-2 text-sm text-[var(--nexo-text-primary,var(--text-primary))]">
+                      {personOperationalSentence(person)}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    <span className="rounded-full bg-[var(--nexo-control-bg,var(--surface-subtle))] px-2 py-1">
+                      {personOperationalStateLabel(person)}
+                    </span>
+                    <span className="rounded-full bg-[var(--nexo-control-bg,var(--surface-subtle))] px-2 py-1">
+                      {loadLabels[person.loadStatus]}
+                    </span>
+                    <span className="rounded-full bg-[var(--nexo-control-bg,var(--surface-subtle))] px-2 py-1">
+                      O.S. {person.openServiceOrdersCount}
+                    </span>
+                    <span className="rounded-full bg-[var(--nexo-control-bg,var(--surface-subtle))] px-2 py-1">
+                      Atrasadas {person.overdueServiceOrdersCount}
+                    </span>
+                    <span className="rounded-full bg-[var(--nexo-control-bg,var(--surface-subtle))] px-2 py-1">
+                      Agenda {person.todayAppointmentsCount}
+                    </span>
+                  </div>
+                  <OperationalWorkloadBar
+                    label="Carga O.S."
+                    value={person.serviceOrderCapacityUsagePct}
+                    tone={isPersonOverloaded(person) ? "warning" : "success"}
                   />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-[var(--nexo-text-primary,var(--text-primary))]">
-                    {personHumanReading(person)}
+                  <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
+                    {person.lastActivityAt
+                      ? `Última atividade: ${formatDateTime(person.lastActivityAt)}`
+                      : "Sem atividade recente registrada"}
                   </p>
-                  <p className="mt-1 text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-                    {person.workloadNotes ||
-                      "Responsável principal pela execução operacional da equipe."}
-                  </p>
-                  <p className="mt-2 text-sm text-[var(--nexo-text-primary,var(--text-primary))]">
-                    {personOperationalSentence(person)}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2 text-xs">
-                  <span className="rounded-full bg-[var(--nexo-control-bg,var(--surface-subtle))] px-2 py-1">
-                    {personOperationalStateLabel(person)}
-                  </span>
-                  <span className="rounded-full bg-[var(--nexo-control-bg,var(--surface-subtle))] px-2 py-1">
-                    {loadLabels[person.loadStatus]}
-                  </span>
-                  <span className="rounded-full bg-[var(--nexo-control-bg,var(--surface-subtle))] px-2 py-1">
-                    O.S. {person.openServiceOrdersCount}
-                  </span>
-                  <span className="rounded-full bg-[var(--nexo-control-bg,var(--surface-subtle))] px-2 py-1">
-                    Atrasadas {person.overdueServiceOrdersCount}
-                  </span>
-                  <span className="rounded-full bg-[var(--nexo-control-bg,var(--surface-subtle))] px-2 py-1">
-                    Agenda {person.todayAppointmentsCount}
-                  </span>
-                </div>
-                <OperationalWorkloadBar
-                  label="Carga O.S."
-                  value={person.serviceOrderCapacityUsagePct}
-                  tone={isPersonOverloaded(person) ? "warning" : "success"}
-                />
-                <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-                  {person.lastActivityAt
-                    ? `Última atividade: ${formatDateTime(person.lastActivityAt)}`
-                    : "Sem atividade recente registrada"}
-                </p>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => setSelectedPersonId(person.personId)}
-                  >
-                    Ver detalhe
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => navigate("/timeline")}
-                  >
-                    Timeline
-                  </Button>
-                </div>
-              </OperationalInnerCard>
-            ))}
-          </div>
-        )}
-      </AppSectionBlock>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setSelectedPersonId(person.personId)}
+                    >
+                      Ver detalhe
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => navigate("/timeline")}
+                    >
+                      Timeline
+                    </Button>
+                  </div>
+                </OperationalInnerCard>
+              ))}
+            </div>
+          )}
+        </AppSectionBlock>
       ) : null}
 
       <AppSectionBlock
         title="Agora na operação"
         subtitle="Ação recomendada conectada ao último acontecimento relevante."
       >
-        <OperationalPanel variant="default" className="p-4">
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] xl:items-start">
-            <div className="space-y-3">
-              <p className="nexo-overline">O que fazer agora</p>
+        <OperationalPanel
+          variant={hasOperationalProblem ? "default" : "compact"}
+          className="p-3"
+        >
+          <div
+            className={
+              hasOperationalProblem
+                ? "grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] xl:items-start"
+                : "flex flex-wrap items-center justify-between gap-3"
+            }
+          >
+            <div
+              className={hasOperationalProblem ? "space-y-3" : "min-w-0 flex-1"}
+            >
+              {hasOperationalProblem ? (
+                <p className="nexo-overline">O que fazer agora</p>
+              ) : null}
               {hasOperationalProblem ? (
                 <NextBestActionCard
                   title={nextBestAction.title}
@@ -1092,10 +1130,11 @@ export default function PeoplePage() {
               ) : (
                 <OperationalActionPanel
                   tone="success"
+                  display="compactHealthy"
                   data-testid="people-healthy-next-action"
-                  title="Equipe equilibrada"
+                  title="✓ Equipe equilibrada"
                   description="Nenhuma intervenção necessária neste momento."
-                  safety="Sem pendência crítica; nada é executado automaticamente."
+                  safety={null}
                   primaryAction={{
                     label: "Abrir Timeline",
                     onClick: nextBestAction.onPrimaryAction,
@@ -1112,36 +1151,55 @@ export default function PeoplePage() {
               )}
             </div>
 
-            <div className="space-y-3" data-testid="people-team-activity">
-              <p className="nexo-overline">Último acontecimento relevante</p>
+            <div
+              className={
+                hasOperationalProblem ? "space-y-3" : "min-w-0 text-sm"
+              }
+              data-testid="people-team-activity"
+            >
+              {hasOperationalProblem ? (
+                <p className="nexo-overline">Último acontecimento relevante</p>
+              ) : null}
               {timelineQuery.isLoading ? (
                 <AppPageLoadingState description="Carregando ações recentes da equipe..." />
               ) : teamTimelineEvents.length > 0 ? (
-                <div className="space-y-2">
-                  {teamTimelineEvents.map((event, index) => (
-                    <OperationalTimelineItem
-                      key={
-                        event.id ??
-                        `${getTimelineEventDate(event) ?? "event"}-${index}`
-                      }
-                      icon={<Clock3 className="h-4 w-4" />}
-                      title={getTimelineAction(event)}
-                      description={`Governança reavaliou a equipe e manteve a leitura em ${getTimelineContext(event)}.`}
-                      actor={getTimelineActor(event)}
-                      time={formatDateTime(getTimelineEventDate(event))}
-                      entityLabel={getTimelineContext(event)}
-                      action={
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => navigate("/timeline")}
-                        >
-                          Abrir Timeline
-                        </Button>
-                      }
-                    />
-                  ))}
-                </div>
+                hasOperationalProblem ? (
+                  <div className="space-y-2">
+                    {teamTimelineEvents.map((event, index) => (
+                      <OperationalTimelineItem
+                        key={
+                          event.id ??
+                          `${getTimelineEventDate(event) ?? "event"}-${index}`
+                        }
+                        icon={<Clock3 className="h-4 w-4" />}
+                        title={getTimelineAction(event)}
+                        description={`Governança reavaliou a equipe e manteve a leitura em ${getTimelineContext(event)}.`}
+                        actor={getTimelineActor(event)}
+                        time={formatDateTime(getTimelineEventDate(event))}
+                        entityLabel={getTimelineContext(event)}
+                        action={
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => navigate("/timeline")}
+                          >
+                            Abrir Timeline
+                          </Button>
+                        }
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center justify-end gap-2 text-[var(--nexo-text-muted,var(--text-muted))]">
+                    <span>
+                      Último evento: {getTimelineAction(teamTimelineEvents[0])}{" "}
+                      ·{" "}
+                      {formatDateTime(
+                        getTimelineEventDate(teamTimelineEvents[0])
+                      )}
+                    </span>
+                  </div>
+                )
               ) : (
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
@@ -1172,18 +1230,48 @@ export default function PeoplePage() {
         subtitle="Como as pessoas sustentam agenda, O.S., cobranças e evidências do Nexo."
       >
         <OperationalFlow
+          variant="rail"
           stages={[
-            { label: "Responsáveis", value: header.activePeople, state: people.length === 0 ? "sem dono operacional" : "sustentando execução", tone: people.length === 0 ? "warning" : "success" },
-            { label: "Agendamentos", value: `${header.todayAppointments} hoje`, state: header.todayAppointments === 0 ? "sem agenda para hoje" : "em execução" },
+            {
+              label: "Responsáveis",
+              value: header.activePeople,
+              state:
+                people.length === 0
+                  ? "sem dono operacional"
+                  : "sustentando execução",
+              tone: people.length === 0 ? "warning" : "success",
+            },
+            {
+              label: "Agendamentos",
+              value: `${header.todayAppointments} hoje`,
+              state:
+                header.todayAppointments === 0
+                  ? "sem agenda para hoje"
+                  : "em execução",
+            },
             {
               label: "O.S.",
               value: `${header.openServiceOrders} ativas`,
-              state: header.overdueServiceOrders > 0 ? `${header.overdueServiceOrders} atraso(s)` : "sem atraso",
+              state:
+                header.overdueServiceOrders > 0
+                  ? `${header.overdueServiceOrders} atraso(s)`
+                  : "sem atraso",
               bottleneck: header.overdueServiceOrders > 0,
               tone: header.overdueServiceOrders > 0 ? "warning" : "success",
             },
-            { label: "Cobranças", value: formatMoneyFallback(), state: "sem dado financeiro inventado" },
-            { label: "Timeline", value: `${teamTimelineEvents.length} evento(s)`, state: teamTimelineEvents.length === 0 ? "aguardando evidência" : "evidência recente" },
+            {
+              label: "Cobranças",
+              value: formatMoneyFallback(),
+              state: "sem dado financeiro inventado",
+            },
+            {
+              label: "Timeline",
+              value: `${teamTimelineEvents.length} evento(s)`,
+              state:
+                teamTimelineEvents.length === 0
+                  ? "aguardando evidência"
+                  : "evidência recente",
+            },
           ]}
         />
       </AppSectionBlock>
@@ -1445,6 +1533,27 @@ export default function PeoplePage() {
                 )}
               </AppSectionCard>
             </div>
+          ) : hasCompactTeamHealth ? (
+            <OperationalPanel
+              variant="compact"
+              className="flex flex-wrap items-center justify-between gap-3 p-3"
+              data-testid="people-compact-team-health"
+            >
+              <p className="text-sm text-[var(--nexo-text-muted,var(--text-muted))]">
+                <span className="font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
+                  ✓ Capacidade sob controle
+                </span>{" "}
+                · histórico ainda em formação · nenhum alerta recente · sem
+                inventar métricas
+              </p>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => navigate("/timeline")}
+              >
+                Abrir Timeline
+              </Button>
+            </OperationalPanel>
           ) : (
             <OperationalPanel
               variant="subtle"
@@ -1473,6 +1582,7 @@ export default function PeoplePage() {
                   }
                   label="Saúde da equipe"
                   tone={header.overloadedPeople > 0 ? "warning" : "success"}
+                  compact={header.overloadedPeople === 0}
                 />
               </div>
               {header.overloadedPeople === 0 &&
@@ -1506,40 +1616,47 @@ export default function PeoplePage() {
           )}
         </AppSectionBlock>
 
-        <div className="rounded-xl border border-[var(--nexo-border-subtle,var(--border-subtle))] bg-[var(--nexo-control-bg,var(--surface-subtle))]/60 p-4">
-          <div className="mb-3">
-            <p className="font-semibold">Evolução</p>
-            <p className="text-sm text-[var(--nexo-text-muted,var(--text-muted))]">Leituras que amadurecem conforme O.S., cobranças e eventos forem registrados.</p>
-          </div>
-          <AppSectionCard
-            className="p-4"
-            data-testid="people-performance-impact"
-          >
-            <p className="font-semibold">Evolução da equipe</p>
-            <p className="mt-2 text-sm font-medium">
-              Ainda não existe histórico suficiente para gerar indicadores
-              confiáveis.
-            </p>
-            <p className="text-sm text-[var(--nexo-text-muted,var(--text-muted))]">
-              Assim que houver O.S. concluídas, cobranças vinculadas e eventos
-              reais, esta área deixa de ser compacta sem inventar métricas.
-            </p>
-            <Button
-              className="mt-3"
-              size="sm"
-              variant="secondary"
-              onClick={() => navigate("/timeline")}
+        {!hasCompactTeamHealth ? (
+          <div className="rounded-xl border border-[var(--nexo-border-subtle,var(--border-subtle))] bg-[var(--nexo-control-bg,var(--surface-subtle))]/60 p-4">
+            <div className="mb-3">
+              <p className="font-semibold">Evolução</p>
+              <p className="text-sm text-[var(--nexo-text-muted,var(--text-muted))]">
+                Leituras que amadurecem conforme O.S., cobranças e eventos forem
+                registrados.
+              </p>
+            </div>
+            <AppSectionCard
+              className="p-4"
+              data-testid="people-performance-impact"
             >
-              Abrir Timeline
-            </Button>
-          </AppSectionCard>
-        </div>
+              <p className="font-semibold">Evolução da equipe</p>
+              <p className="mt-2 text-sm font-medium">
+                Ainda não existe histórico suficiente para gerar indicadores
+                confiáveis.
+              </p>
+              <p className="text-sm text-[var(--nexo-text-muted,var(--text-muted))]">
+                Assim que houver O.S. concluídas, cobranças vinculadas e eventos
+                reais, esta área deixa de ser compacta sem inventar métricas.
+              </p>
+              <Button
+                className="mt-3"
+                size="sm"
+                variant="secondary"
+                onClick={() => navigate("/timeline")}
+              >
+                Abrir Timeline
+              </Button>
+            </AppSectionCard>
+          </div>
+        ) : null}
 
-        {isAdmin ? (
+        {isAdmin && !hasCompactTeamHealth ? (
           <div className="rounded-xl border border-[var(--nexo-border-subtle,var(--border-subtle))] bg-[var(--nexo-control-bg,var(--surface-subtle))]/60 p-4">
             <div className="mb-3">
               <p className="font-semibold">Sinais</p>
-              <p className="text-sm text-[var(--nexo-text-muted,var(--text-muted))]">Resumo compacto de alertas em atribuições.</p>
+              <p className="text-sm text-[var(--nexo-text-muted,var(--text-muted))]">
+                Resumo compacto de alertas em atribuições.
+              </p>
             </div>
             {warningSummaryQuery.isLoading ? (
               <AppPageLoadingState description="Consolidando sinais dos últimos 30 dias..." />
