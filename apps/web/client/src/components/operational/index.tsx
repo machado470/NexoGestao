@@ -269,6 +269,7 @@ export function OperationalFlow({
   stages: Array<{
     label: ReactNode;
     value?: ReactNode;
+    state?: ReactNode;
     tone?: OperationalTone;
     active?: boolean;
     bottleneck?: boolean;
@@ -278,20 +279,17 @@ export function OperationalFlow({
   return (
     <div
       className={cn(
-        "nexo-operational-flow flex flex-wrap items-stretch gap-2",
+        "nexo-operational-flow relative grid gap-0 overflow-hidden rounded-2xl border border-[var(--nexo-border-subtle,var(--border-subtle))] bg-[var(--nexo-card-bg,var(--surface-base))] p-2 md:grid-cols-5",
         className
       )}
     >
       {stages.map((stage, index) => (
-        <div
-          key={index}
-          className="flex min-w-[130px] flex-1 items-center gap-2"
-        >
+        <div key={index} className="relative min-w-0 p-1">
           <div
             className={cn(
-              "flow-stage min-h-20 flex-1 rounded-xl border p-3 text-sm transition-[border-color,box-shadow,transform] duration-200",
+              "flow-stage relative min-h-24 rounded-xl p-3 text-sm transition-[border-color,box-shadow,transform] duration-200",
               toneClasses[
-                stage.tone ?? (stage.active ? "selected" : "default")
+                stage.tone ?? (stage.active ? "selected" : "subtle")
               ],
               stage.bottleneck &&
                 "bottleneck shadow-[0_0_0_3px_var(--warning-soft,var(--surface-subtle))]"
@@ -300,14 +298,19 @@ export function OperationalFlow({
             <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
               {stage.label}
             </p>
-            {stage.value ? (
-              <p className="mt-1 font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
+            {stage.value != null ? (
+              <p className="mt-1 text-lg font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
                 {stage.value}
+              </p>
+            ) : null}
+            {stage.state ? (
+              <p className="mt-2 text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
+                {stage.state}
               </p>
             ) : null}
           </div>
           {index < stages.length - 1 ? (
-            <span className="flow-connector hidden h-px w-6 bg-[var(--nexo-border-subtle,var(--border-subtle))] sm:block" />
+            <span className="flow-connector pointer-events-none absolute right-[-0.45rem] top-1/2 z-10 hidden h-0.5 w-5 -translate-y-1/2 bg-[var(--accent-primary)]/45 after:absolute after:right-0 after:top-1/2 after:h-2 after:w-2 after:-translate-y-1/2 after:rotate-45 after:border-r after:border-t after:border-[var(--accent-primary)]/60 md:block" />
           ) : null}
         </div>
       ))}

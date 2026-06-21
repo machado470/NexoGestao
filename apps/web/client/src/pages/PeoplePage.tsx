@@ -774,6 +774,9 @@ export default function PeoplePage() {
     () => sortByOperationalIntervention(people).slice(0, 3),
     [people]
   );
+  const leadPerson = keyPeople[0] ?? null;
+  const shouldShowSupportingPeople = people.length > 1;
+  const shouldShowPeopleFilters = people.length > 3;
   const teamHealth = deriveTeamHealth(header);
   const heroNarrative = teamHeroNarrative(people, header);
   const hasOperationalProblem =
@@ -861,6 +864,64 @@ export default function PeoplePage() {
           <p className="max-w-4xl text-base leading-7 text-[var(--nexo-text-primary,var(--text-primary))] md:text-lg">
             {heroNarrative}
           </p>
+
+          {people.length === 1 && leadPerson ? (
+            <div className="mt-5 grid gap-5 rounded-2xl border border-[var(--accent-primary)]/20 bg-[var(--accent-soft)]/10 p-5 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center" data-testid="people-single-responsible-hero">
+              <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-2xl font-semibold text-[var(--accent-primary)] shadow-sm">
+                {personInitials(leadPerson.name)}
+              </div>
+              <div className="min-w-0 space-y-3">
+                <div>
+                  <p className="text-2xl font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
+                    {leadPerson.name}
+                  </p>
+                  <p className="text-sm text-[var(--nexo-text-muted,var(--text-muted))]">
+                    {leadPerson.role} · Responsável principal pela execução operacional da equipe.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <span className={compactChipClass}>{personOperationalStateLabel(leadPerson)}</span>
+                  <span className={compactChipClass}>{loadLabels[leadPerson.loadStatus]}</span>
+                  <span className={compactChipClass}>{capacityLabels[leadPerson.capacityStatus]}</span>
+                  <span className={compactChipClass}>{availabilityLabels[leadPerson.availabilityStatus]}</span>
+                </div>
+                <OperationalWorkloadBar
+                  label="Carga/capacidade"
+                  value={leadPerson.serviceOrderCapacityUsagePct}
+                  tone={isPersonOverloaded(leadPerson) ? "warning" : "success"}
+                  className="max-w-xl"
+                />
+                <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
+                  {leadPerson.lastActivityAt
+                    ? `Última atividade: ${formatDateTime(leadPerson.lastActivityAt)}`
+                    : "Última atividade: não registrada"}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2 md:flex-col">
+                <Button size="sm" variant="secondary" onClick={() => setSelectedPersonId(leadPerson.personId)}>
+                  Ver detalhe
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => navigate("/timeline")}>
+                  Timeline
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setCreateOpen(true)}>
+                  Nova pessoa
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
+          {people.length === 0 ? (
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--warning,var(--status-warning))]/30 bg-[var(--warning-soft,var(--surface-subtle))]/30 p-5" data-testid="people-empty-hero">
+              <div>
+                <p className="text-lg font-semibold">Sem responsáveis operacionais</p>
+                <p className="text-sm text-[var(--nexo-text-muted,var(--text-muted))]">
+                  Cadastre responsáveis para que O.S., agendamentos e execução tenham dono.
+                </p>
+              </div>
+              <Button onClick={() => setCreateOpen(true)}>Nova pessoa</Button>
+            </div>
+          ) : null}
         </div>
         {summaryQuery.isError ? (
           <div
@@ -881,28 +942,31 @@ export default function PeoplePage() {
         ) : null}
       </OperationalPanel>
 
-      <OperationalPanel
-        variant="subtle"
-        className="flex flex-col gap-3 p-3 md:flex-row md:items-center md:justify-between"
-      >
-        <AppInput
-          value={queryText}
-          onChange={event => setQueryText(event.target.value)}
-          placeholder="Buscar responsável, função ou nota operacional"
-          className="h-10 md:max-w-md"
-        />
-        <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-          <span>{filteredPeople.length} pessoa(s) na leitura atual</span>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate("/settings")}
-          >
-            Configurações
-          </Button>
-        </div>
-      </OperationalPanel>
+      {shouldShowPeopleFilters ? (
+        <OperationalPanel
+          variant="subtle"
+          className="flex flex-col gap-3 p-3 md:flex-row md:items-center md:justify-between"
+        >
+          <AppInput
+            value={queryText}
+            onChange={event => setQueryText(event.target.value)}
+            placeholder="Buscar responsável, função ou nota operacional"
+            className="h-10 md:max-w-md"
+          />
+          <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
+            <span>{filteredPeople.length} pessoa(s) na leitura atual</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/settings")}
+            >
+              Configurações
+            </Button>
+          </div>
+        </OperationalPanel>
+      ) : null}
 
+      {shouldShowSupportingPeople ? (
       <AppSectionBlock
         title="Quem sustenta a operação agora"
         subtitle="Responsáveis-chave em ordem de relevância operacional."
@@ -1003,9 +1067,10 @@ export default function PeoplePage() {
           </div>
         )}
       </AppSectionBlock>
+      ) : null}
 
       <AppSectionBlock
-        title="O que fazer agora"
+        title="Agora na operação"
         subtitle="Ação recomendada conectada ao último acontecimento relevante."
       >
         <OperationalPanel variant="default" className="p-4">
@@ -1102,20 +1167,26 @@ export default function PeoplePage() {
         </OperationalPanel>
       </AppSectionBlock>
 
-      <OperationalFlow
-        stages={[
-          { label: "Responsáveis", value: header.activePeople },
-          { label: "Agendamentos", value: header.todayAppointments },
-          {
-            label: "O.S.",
-            value: header.openServiceOrders,
-            bottleneck: header.overdueServiceOrders > 0,
-            tone: header.overdueServiceOrders > 0 ? "warning" : "default",
-          },
-          { label: "Cobranças", value: formatMoneyFallback() },
-          { label: "Timeline", value: teamTimelineEvents.length },
-        ]}
-      />
+      <AppSectionBlock
+        title="Fluxo humano-operacional"
+        subtitle="Como as pessoas sustentam agenda, O.S., cobranças e evidências do Nexo."
+      >
+        <OperationalFlow
+          stages={[
+            { label: "Responsáveis", value: header.activePeople, state: people.length === 0 ? "sem dono operacional" : "sustentando execução", tone: people.length === 0 ? "warning" : "success" },
+            { label: "Agendamentos", value: `${header.todayAppointments} hoje`, state: header.todayAppointments === 0 ? "sem agenda para hoje" : "em execução" },
+            {
+              label: "O.S.",
+              value: `${header.openServiceOrders} ativas`,
+              state: header.overdueServiceOrders > 0 ? `${header.overdueServiceOrders} atraso(s)` : "sem atraso",
+              bottleneck: header.overdueServiceOrders > 0,
+              tone: header.overdueServiceOrders > 0 ? "warning" : "success",
+            },
+            { label: "Cobranças", value: formatMoneyFallback(), state: "sem dado financeiro inventado" },
+            { label: "Timeline", value: `${teamTimelineEvents.length} evento(s)`, state: teamTimelineEvents.length === 0 ? "aguardando evidência" : "evidência recente" },
+          ]}
+        />
+      </AppSectionBlock>
 
       {people.length > 1 ? (
         <AppSectionBlock
@@ -1249,7 +1320,7 @@ export default function PeoplePage() {
 
       <div className="space-y-4">
         <AppSectionBlock
-          title="Capacidade da operação"
+          title="Saúde da equipe"
           subtitle={
             selectedPerson
               ? `Detalhe operacional de ${selectedPerson.name}`
@@ -1435,10 +1506,11 @@ export default function PeoplePage() {
           )}
         </AppSectionBlock>
 
-        <AppSectionBlock
-          title="Evolução da equipe"
-          subtitle="Leituras que amadurecem conforme O.S., cobranças e eventos forem registrados."
-        >
+        <div className="rounded-xl border border-[var(--nexo-border-subtle,var(--border-subtle))] bg-[var(--nexo-control-bg,var(--surface-subtle))]/60 p-4">
+          <div className="mb-3">
+            <p className="font-semibold">Evolução</p>
+            <p className="text-sm text-[var(--nexo-text-muted,var(--text-muted))]">Leituras que amadurecem conforme O.S., cobranças e eventos forem registrados.</p>
+          </div>
           <AppSectionCard
             className="p-4"
             data-testid="people-performance-impact"
@@ -1461,13 +1533,14 @@ export default function PeoplePage() {
               Abrir Timeline
             </Button>
           </AppSectionCard>
-        </AppSectionBlock>
+        </div>
 
         {isAdmin ? (
-          <AppSectionBlock
-            title="Sinais de atribuição"
-            subtitle="Resumo compacto de alertas em atribuições."
-          >
+          <div className="rounded-xl border border-[var(--nexo-border-subtle,var(--border-subtle))] bg-[var(--nexo-control-bg,var(--surface-subtle))]/60 p-4">
+            <div className="mb-3">
+              <p className="font-semibold">Sinais</p>
+              <p className="text-sm text-[var(--nexo-text-muted,var(--text-muted))]">Resumo compacto de alertas em atribuições.</p>
+            </div>
             {warningSummaryQuery.isLoading ? (
               <AppPageLoadingState description="Consolidando sinais dos últimos 30 dias..." />
             ) : null}
@@ -1540,7 +1613,7 @@ export default function PeoplePage() {
                 </div>
               )
             ) : null}
-          </AppSectionBlock>
+          </div>
         ) : null}
       </div>
 
