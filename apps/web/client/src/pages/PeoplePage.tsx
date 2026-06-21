@@ -9,11 +9,9 @@ import {
   AppInput,
   AppOperationalStatusBadge,
   AppPageShell,
-  AppPriorityBadge,
   AppRowActionsDropdown,
   AppSectionCard,
   AppStatCard,
-  AppStatusBadge,
   type AppOperationalStatus,
   type AppPriorityLevel,
 } from "@/components/app-system";
@@ -121,10 +119,6 @@ const warningTypeLabels: Record<AssigneeWarningType, string> = {
   OVER_CAPACITY: "Capacidade planejada excedida",
   OVERLOADED: "Carga operacional alta",
 };
-const contextLabels = {
-  APPOINTMENT: "Agendamentos",
-  SERVICE_ORDER: "O.S.",
-} as const;
 const peopleFilters: Array<{ key: PeopleFilter; label: string }> = [
   { key: "all", label: "Todos" },
   { key: "attention", label: "Atenção" },
@@ -144,6 +138,12 @@ const formatCapacity = (value: number | null) =>
   value == null ? "Não configurada" : `${value}/dia`;
 const formatUsage = (value: number | null) =>
   value == null ? "Uso indisponível" : `${value}% usado`;
+const formatMoneyFallback = () => "Sem fonte financeira vinculada";
+const formatAverageUsage = (values: Array<number | null>) => {
+  const usable = values.filter((value): value is number => value != null);
+  if (!usable.length) return "Uso indisponível";
+  return `${Math.round(usable.reduce((total, value) => total + value, 0) / usable.length)}%`;
+};
 const formatDifference = (current: number, capacity: number | null) =>
   capacity == null
     ? "Diferença indisponível"
@@ -387,18 +387,55 @@ function buildPeopleNextBestAction(
   };
 }
 
-function getPersonRiskSignals(person: OperationalPerson): string[] {
-  const signals: string[] = [];
-  if (isInactiveWithAssignedItems(person))
-    signals.push("status sem execução ativa com itens");
-  if (person.overdueServiceOrdersCount > 0)
-    signals.push(`${person.overdueServiceOrdersCount} O.S. atrasada(s)`);
-  if (isPersonOverloaded(person)) signals.push("carga acima da capacidade");
-  if (person.availabilityStatus !== "AVAILABLE")
-    signals.push(availabilityLabels[person.availabilityStatus].toLowerCase());
-  if (hasNoRecentActivitySignal(person))
-    signals.push("sem última atividade carregada");
-  return signals;
+function deriveTeamHealth(header: {
+  totalPeople: number;
+  activePeople: number;
+  overloadedPeople: number;
+  overdueServiceOrders: number;
+  unavailablePeople: number;
+}): { label: string; status: AppOperationalStatus; reading: string } {
+  if (header.totalPeople === 0) {
+    return {
+      label: "Sem equipe cadastrada",
+      status: "ATENÇÃO",
+      reading: "Sem responsáveis operacionais cadastrados.",
+    };
+  }
+  if (header.overdueServiceOrders >= 5 || header.overloadedPeople >= 2) {
+    return {
+      label: "Crítica",
+      status: "CRÍTICO",
+      reading: `${header.overloadedPeople} responsável(is) sobrecarregado(s) e ${header.overdueServiceOrders} O.S. atrasada(s).`,
+    };
+  }
+  if (
+    header.overdueServiceOrders > 0 ||
+    header.overloadedPeople > 0 ||
+    header.unavailablePeople > 0
+  ) {
+    const attention = header.overloadedPeople + header.unavailablePeople;
+    return {
+      label: "Atenção",
+      status: "ATENÇÃO",
+      reading:
+        attention > 0
+          ? `${attention} responsável(is) exigem atenção.`
+          : "Atrasos atribuídos exigem intervenção.",
+    };
+  }
+  return {
+    label: "Saudável",
+    status: "NORMAL",
+    reading: "Equipe saudável.",
+  };
+}
+
+function personOperationalStateLabel(person: OperationalPerson) {
+  if (person.status !== "ACTIVE") return "Inativo";
+  if (person.availabilityStatus === "UNAVAILABLE_NOW") return "Indisponível";
+  if (isPersonOverloaded(person)) return "Sobrecarregado";
+  if (derivePersonOperationalStatus(person) !== "NORMAL") return "Atenção";
+  return "Saudável";
 }
 
 export default function PeoplePage() {
@@ -496,6 +533,7 @@ export default function PeoplePage() {
     : null;
   const header = useMemo(
     () => ({
+      totalPeople: people.length,
       activePeople: people.filter(person => person.status === "ACTIVE").length,
       overloadedPeople: people.filter(
         person => person.loadStatus === "OVERLOADED"
@@ -511,12 +549,38 @@ export default function PeoplePage() {
       unavailablePeople: people.filter(
         person => person.availabilityStatus !== "AVAILABLE"
       ).length,
+      availablePeople: people.filter(
+        person =>
+          person.status === "ACTIVE" &&
+          person.availabilityStatus === "AVAILABLE"
+      ).length,
+      busyPeople: people.filter(person => person.loadStatus === "BUSY").length,
+      openServiceOrders: people.reduce(
+        (total, person) => total + person.openServiceOrdersCount,
+        0
+      ),
+      averageServiceOrderUsage: formatAverageUsage(
+        people.map(person => person.serviceOrderCapacityUsagePct)
+      ),
+      averageAppointmentUsage: formatAverageUsage(
+        people.map(person => person.appointmentCapacityUsagePct)
+      ),
+      healthyPeople: people.filter(
+        person =>
+          person.status === "ACTIVE" &&
+          derivePersonOperationalStatus(person) === "NORMAL"
+      ).length,
+      attentionPeople: people.filter(
+        person =>
+          person.status === "ACTIVE" &&
+          derivePersonOperationalStatus(person) === "ATENÇÃO"
+      ).length,
     }),
     [people]
   );
   const filteredPeople = useMemo(() => {
     const search = queryText.trim().toLowerCase();
-    return people.filter(person => {
+    return sortByOperationalIntervention(people).filter(person => {
       if (
         peopleFilter === "attention" &&
         derivePersonOperationalStatus(person) === "NORMAL"
@@ -537,6 +601,7 @@ export default function PeoplePage() {
         .includes(search);
     });
   }, [people, peopleFilter, queryText]);
+  const teamHealth = deriveTeamHealth(header);
   const commandTarget = useMemo(
     () => ({ person: selectedPerson, people, warningSummary }),
     [selectedPerson, people, warningSummary]
@@ -613,10 +678,8 @@ export default function PeoplePage() {
               Equipe operacional, não permissões administrativas
             </p>
             <p className="mt-1 max-w-3xl text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-              Pessoas mostra responsáveis que executam O.S. e agendamentos.
-              Criação/edição aqui mantém o cadastro operacional existente;
-              convites, acessos, papéis administrativos e políticas do sistema
-              devem ser tratados em Configurações.
+              Pessoas controla quem executa O.S., agenda e indisponibilidades.
+              Acessos e permissões continuam em Configurações.
             </p>
           </div>
           <Button variant="secondary" onClick={() => navigate("/settings")}>
@@ -625,57 +688,79 @@ export default function PeoplePage() {
         </div>
       </AppSectionCard>
 
-      <AppSectionCard
-        className="space-y-3"
-        data-testid="people-operational-header"
+      <AppSectionBlock
+        title="Visão executiva da equipe"
+        subtitle="Situação da equipe agora"
       >
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
-              Saúde da equipe
-            </p>
-            <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-              Carga real, atrasos e indisponibilidade como sinais separados.
-            </p>
+        <AppSectionCard
+          className="space-y-3"
+          data-testid="people-operational-header"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
+                Saúde da equipe: {teamHealth.label}
+              </p>
+              <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
+                {teamHealth.reading}{" "}
+                {people.length === 0
+                  ? "Cadastre responsáveis para acompanhar carga, execução e indisponibilidade."
+                  : `Carga acima da capacidade em ${header.overloadedPeople} pessoa(s).`}
+              </p>
+            </div>
+            <AppOperationalStatusBadge status={teamHealth.status} />
           </div>
-          <AppOperationalStatusBadge
-            status={
-              header.overdueServiceOrders > 0 || header.overloadedPeople > 0
-                ? "RISCO"
-                : header.unavailablePeople > 0
-                  ? "ATENÇÃO"
-                  : "NORMAL"
-            }
-          />
-        </div>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          <AppStatCard
-            label="Pessoas ativas"
-            value={`${header.activePeople}`}
-            helper="Responsáveis cadastrados na operação."
-          />
-          <AppStatCard
-            label="Sobrecarregados"
-            value={`${header.overloadedPeople}`}
-            helper="Carga operacional atual alta ou com atraso."
-          />
-          <AppStatCard
-            label="O.S. atrasadas atribuídas"
-            value={`${header.overdueServiceOrders}`}
-            helper="O.S. abertas vencidas com responsável."
-          />
-          <AppStatCard
-            label="Agendamentos hoje"
-            value={`${header.todayAppointments}`}
-            helper="Agenda ativa de hoje por responsável."
-          />
-          <AppStatCard
-            label="Indisponibilidades"
-            value={`${header.unavailablePeople}`}
-            helper="Pessoas indisponíveis agora ou em breve."
-          />
-        </div>
-      </AppSectionCard>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+            <AppStatCard
+              label="Responsáveis ativos"
+              value={`${header.activePeople}`}
+              helper="Responsáveis executando a operação."
+            />
+            <AppStatCard
+              label="Sobrecarregados"
+              value={`${header.overloadedPeople}`}
+              helper="Carga acima da capacidade."
+            />
+            <AppStatCard
+              label="Indisponíveis"
+              value={`${header.unavailablePeople}`}
+              helper="Agora ou em breve."
+            />
+            <AppStatCard
+              label="O.S. atrasadas"
+              value={`${header.overdueServiceOrders}`}
+              helper="Atrasos atribuídos."
+            />
+            <AppStatCard
+              label="Agenda hoje"
+              value={`${header.todayAppointments}`}
+              helper="Agendamentos atribuídos hoje."
+            />
+            <AppStatCard
+              label="Receita gerada"
+              value={formatMoneyFallback()}
+              helper="Sem vínculo financeiro confiável nesta fonte."
+            />
+          </div>
+          {summaryQuery.isError ? (
+            <AppSectionCard
+              className="p-3 text-sm"
+              data-testid="people-summary-partial-error"
+            >
+              <p className="font-semibold">
+                Resumo operacional indisponível agora.
+              </p>
+              <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
+                A página continua exibindo ações e fallbacks sem inventar carga,
+                agenda ou O.S.
+              </p>
+              <Button size="sm" variant="secondary" onClick={refresh}>
+                Tentar novamente
+              </Button>
+            </AppSectionCard>
+          ) : null}
+        </AppSectionCard>
+      </AppSectionBlock>
 
       <NextBestActionCard
         title={nextBestAction.title}
@@ -702,202 +787,124 @@ export default function PeoplePage() {
         ))}
       </AppFiltersBar>
 
-      {isAdmin ? (
-        <AppSectionBlock
-          title="Sinais de atribuição"
-          subtitle="Leitura agregada dos alertas passivos exibidos durante atribuições manuais. Serve somente para observação operacional das decisões manuais."
-        >
-          {warningSummaryQuery.isLoading ? (
-            <AppPageLoadingState description="Consolidando sinais dos últimos 30 dias..." />
-          ) : null}
-          {warningSummaryQuery.isError ? (
-            <AppPageErrorState
-              description="Não foi possível carregar os sinais agregados agora."
-              onAction={() => void warningSummaryQuery.refetch()}
-            />
-          ) : null}
-          {warningSummary ? (
-            <div
-              className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
-              data-testid="assignee-warning-summary"
-            >
-              <AppStatCard
-                label="Alertas exibidos"
-                value={`${warningSummary.totals.shown}`}
-                helper="Avisos passivos durante atribuições manuais."
-              />
-              <AppStatCard
-                label="Confirmações após alerta"
-                value={`${warningSummary.totals.confirmed}`}
-                helper="Decisões manuais mantidas após o aviso."
-              />
-              <AppStatCard
-                label="Taxa de confirmação"
-                value={
-                  warningSummary.totals.confirmationRatePct == null
-                    ? "Sem exibições"
-                    : `${warningSummary.totals.confirmationRatePct}%`
-                }
-                helper="Confirmações divididas por alertas exibidos."
-              />
-              <AppSectionCard className="p-4 text-sm">
-                <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-                  Contextos observados
-                </p>
-                {warningSummary.byContext.map(context => (
-                  <p key={context.context} className="mt-1">
-                    <span className="font-semibold">
-                      {contextLabels[context.context]}
-                    </span>
-                    : {context.shown} exibidos · {context.confirmed} confirmados
-                  </p>
-                ))}
-                <p className="mt-3 text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-                  Sinal mais frequente
-                </p>
-                <p className="font-semibold">
-                  {mostFrequentWarningType && mostFrequentWarningType.shown > 0
-                    ? warningTypeLabels[mostFrequentWarningType.warningType]
-                    : "Nenhum sinal registrado"}
-                </p>
-              </AppSectionCard>
+      <AppSectionBlock
+        title="Ranking operacional da equipe"
+        subtitle="Quem exige atenção primeiro: sobrecarga, indisponibilidade, atraso, saudáveis e inativos."
+      >
+        {summaryQuery.isLoading ? (
+          <AppPageLoadingState title="Consolidando ranking operacional" />
+        ) : null}
+        {!summaryQuery.isLoading && people.length === 0 ? (
+          <AppSectionCard className="flex flex-col items-center justify-center gap-3 p-8 text-center">
+            <p className="text-sm font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
+              Sem responsáveis cadastrados.
+            </p>
+            <p className="max-w-xl text-sm text-[var(--nexo-text-muted,var(--text-muted))]">
+              Cadastre responsáveis para acompanhar carga, execução e
+              indisponibilidade.
+            </p>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button onClick={() => setCreateOpen(true)}>Nova pessoa</Button>
+              <Button variant="secondary" onClick={() => navigate("/settings")}>
+                Abrir Configurações
+              </Button>
             </div>
-          ) : null}
-        </AppSectionBlock>
-      ) : null}
-
-      {summaryQuery.isLoading ? (
-        <AppPageLoadingState title="Consolidando carga por responsável" />
-      ) : null}
-      {summaryQuery.isError ? (
-        <AppPageErrorState
-          description="Não foi possível carregar people.operationalSummary. Sem essa fonte, a página não infere carga, atrasos ou disponibilidade da equipe."
-          onAction={refresh}
-        />
-      ) : null}
-      {!summaryQuery.isLoading && !summaryQuery.isError ? (
-        <AppSectionBlock
-          title="Equipe operacional"
-          subtitle="Lista de responsáveis com status, carga atual, O.S./agendamentos atribuídos, atrasos e sinais de risco entregues pela fonte operacional."
-        >
-          {people.length === 0 ? (
-            <AppPageEmptyState
-              title="Nenhuma pessoa cadastrada"
-              description="Cadastre responsáveis para transformar a execução em capacidade operacional visível."
-            />
-          ) : filteredPeople.length === 0 ? (
-            <AppPageEmptyState
-              title="Busca sem resultado"
-              description="Nenhuma pessoa corresponde aos filtros operacionais atuais."
-            />
-          ) : (
-            <AppDataTable
-              className="min-w-[1480px]"
-              data-testid="people-workload-table"
-            >
-              <thead>
-                <tr>
-                  <th>Nome</th>
-                  <th>Função</th>
-                  <th>Status</th>
-                  <th>Carga atual</th>
-                  <th>O.S. atribuídas</th>
-                  <th>Agendamentos atribuídos</th>
-                  <th>Atrasos</th>
-                  <th>Sinais de risco</th>
-                  <th>Última atividade</th>
-                  <th>Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredPeople.map(person => {
-                  const operationalStatus =
-                    derivePersonOperationalStatus(person);
-                  const priority = derivePersonPriority(person);
-                  return (
-                    <tr key={person.personId}>
-                      <td className="font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
-                        {person.name}
-                      </td>
-                      <td>{person.role}</td>
-                      <td>
-                        <AppStatusBadge
-                          label={personStatusLabel(person.status)}
-                        />
-                      </td>
-                      <td>
-                        <div className="space-y-1">
-                          <AppOperationalStatusBadge
-                            status={operationalStatus}
-                          />
-                          <div className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-                            {loadLabels[person.loadStatus]} · O.S.{" "}
-                            {formatUsage(person.serviceOrderCapacityUsagePct)} ·
-                            Agenda{" "}
-                            {formatUsage(person.appointmentCapacityUsagePct)}
-                          </div>
-                        </div>
-                      </td>
-                      <td>{person.openServiceOrdersCount}</td>
-                      <td>
-                        {person.todayAppointmentsCount} hoje ·{" "}
-                        {person.futureAppointmentsCount} futuros
-                      </td>
-                      <td>{person.overdueServiceOrdersCount}</td>
-                      <td>
-                        {getPersonRiskSignals(person).length > 0 ? (
-                          <div className="flex max-w-[260px] flex-wrap gap-1">
-                            {getPersonRiskSignals(person).map(signal => (
-                              <AppStatusBadge key={signal} label={signal} />
-                            ))}
-                          </div>
-                        ) : priority ? (
-                          <AppPriorityBadge
-                            priority={priority}
-                            label={personPriorityLabel(priority)}
-                          />
-                        ) : (
-                          "Sem sinal carregado"
-                        )}
-                      </td>
-                      <td>{formatDateTime(person.lastActivityAt)}</td>
-                      <td>
-                        <AppRowActionsDropdown
-                          triggerLabel="Ações da pessoa"
-                          items={[
-                            {
-                              label: "Ver detalhe",
-                              onSelect: () =>
-                                setSelectedPersonId(person.personId),
-                              tone: "primary",
-                            },
-                            {
-                              label: "Ver O.S. atribuídas",
-                              onSelect: () => navigate("/service-orders"),
-                            },
-                            {
-                              label: "Ver agendamentos",
-                              onSelect: () => navigate("/appointments"),
-                            },
-                            {
-                              label: "Editar",
-                              onSelect: () => setEditPersonId(person.personId),
-                            },
-                          ]}
-                        />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </AppDataTable>
-          )}
-        </AppSectionBlock>
-      ) : null}
+          </AppSectionCard>
+        ) : filteredPeople.length === 0 && !summaryQuery.isLoading ? (
+          <AppPageEmptyState
+            title="Busca sem resultado"
+            description="Nenhuma pessoa corresponde aos filtros operacionais atuais."
+          />
+        ) : !summaryQuery.isLoading ? (
+          <AppDataTable
+            className="min-w-[1560px]"
+            data-testid="people-workload-table"
+          >
+            <thead>
+              <tr>
+                <th>Responsável</th>
+                <th>Função operacional</th>
+                <th>Estado</th>
+                <th>Carga atual</th>
+                <th>Capacidade planejada</th>
+                <th>O.S. ativas</th>
+                <th>O.S. atrasadas</th>
+                <th>Agenda hoje</th>
+                <th>Valor 7 dias</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredPeople.map(person => {
+                const operationalStatus = derivePersonOperationalStatus(person);
+                return (
+                  <tr key={person.personId}>
+                    <td className="font-semibold text-[var(--nexo-text-primary,var(--text-primary))]">
+                      {person.name}
+                    </td>
+                    <td>{person.role}</td>
+                    <td>
+                      <div className="space-y-1">
+                        <AppOperationalStatusBadge status={operationalStatus} />
+                        <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
+                          {personOperationalStateLabel(person)} ·{" "}
+                          {personStatusLabel(person.status)}
+                        </p>
+                      </div>
+                    </td>
+                    <td>
+                      {loadLabels[person.loadStatus]} · O.S.{" "}
+                      {formatUsage(person.serviceOrderCapacityUsagePct)} ·
+                      Agenda {formatUsage(person.appointmentCapacityUsagePct)}
+                    </td>
+                    <td>
+                      O.S. {formatCapacity(person.dailyServiceOrderCapacity)} ·
+                      Agenda {formatCapacity(person.dailyAppointmentCapacity)}
+                    </td>
+                    <td>{person.openServiceOrdersCount}</td>
+                    <td>{person.overdueServiceOrdersCount}</td>
+                    <td>{person.todayAppointmentsCount}</td>
+                    <td>{formatMoneyFallback()}</td>
+                    <td>
+                      <AppRowActionsDropdown
+                        triggerLabel="Ações da pessoa"
+                        items={[
+                          {
+                            label: "Ver detalhe",
+                            onSelect: () =>
+                              setSelectedPersonId(person.personId),
+                            tone: "primary",
+                          },
+                          {
+                            label: "Abrir Timeline",
+                            onSelect: () => navigate("/timeline"),
+                          },
+                          {
+                            label: "Filtrar atribuições",
+                            onSelect: () => navigate("/service-orders"),
+                          },
+                          {
+                            label: "Editar",
+                            onSelect: () => setEditPersonId(person.personId),
+                          },
+                        ]}
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </AppDataTable>
+        ) : null}
+      </AppSectionBlock>
 
       <AppSectionBlock
-        title="Responsabilidade e carga"
-        subtitle="Detail-legacy mantido: disponibilidade temporária é um sinal separado da capacidade; não é escala completa."
+        title="Capacidade, disponibilidade e atribuições"
+        subtitle={
+          selectedPerson
+            ? `Detalhe operacional de ${selectedPerson.name}`
+            : "Visão agregada da equipe sem exigir seleção."
+        }
       >
         {selectedPerson ? (
           <div className="space-y-4">
@@ -910,50 +917,21 @@ export default function PeoplePage() {
                   {personStatusLabel(selectedPerson.status)}
                 </p>
               </AppSectionCard>
-              <AppSectionCard className="p-4">
-                <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-                  Carga atual de O.S. / capacidade
-                </p>
-                <p className="mt-1 text-2xl font-semibold">
-                  {selectedPerson.openServiceOrdersCount} /{" "}
-                  {formatCapacity(selectedPerson.dailyServiceOrderCapacity)}
-                </p>
-                <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-                  {formatDifference(
-                    selectedPerson.openServiceOrdersCount,
-                    selectedPerson.dailyServiceOrderCapacity
-                  )}
-                </p>
-              </AppSectionCard>
-              <AppSectionCard className="p-4">
-                <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-                  Disponibilidade atual
-                </p>
-                <p className="mt-1 font-semibold">
-                  {availabilityLabels[selectedPerson.availabilityStatus]}
-                </p>
-                <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-                  Próxima indisponibilidade:{" "}
-                  {formatDateTime(
-                    selectedPerson.nextAvailabilityException?.startsAt
-                  )}
-                </p>
-              </AppSectionCard>
-              <AppSectionCard className="p-4">
-                <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-                  Capacidade planejada
-                </p>
-                <AppStatusBadge
-                  label={capacityLabels[selectedPerson.capacityStatus]}
-                />
-                <p className="mt-2 text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-                  {selectedPerson.workloadNotes || "Sem nota operacional."}
-                </p>
-                <p className="mt-2 text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
-                  Última atividade:{" "}
-                  {formatDateTime(selectedPerson.lastActivityAt)}
-                </p>
-              </AppSectionCard>
+              <AppStatCard
+                label="O.S. atribuídas"
+                value={`${selectedPerson.openServiceOrdersCount}`}
+                helper={`${selectedPerson.overdueServiceOrdersCount} atrasada(s).`}
+              />
+              <AppStatCard
+                label="Agenda de hoje"
+                value={`${selectedPerson.todayAppointmentsCount}`}
+                helper={`${selectedPerson.futureAppointmentsCount} futura(s).`}
+              />
+              <AppStatCard
+                label="Capacidade planejada"
+                value={`O.S. ${formatCapacity(selectedPerson.dailyServiceOrderCapacity)}`}
+                helper={`Agenda ${formatCapacity(selectedPerson.dailyAppointmentCapacity)}.`}
+              />
             </div>
             {isAdmin ? (
               <AppSectionCard
@@ -1003,7 +981,7 @@ export default function PeoplePage() {
                 </Button>
               </AppSectionCard>
             ) : null}
-            <div>
+            <AppSectionCard className="p-4">
               <p className="mb-2 text-sm font-semibold">
                 Indisponibilidades recentes e futuras
               </p>
@@ -1044,15 +1022,181 @@ export default function PeoplePage() {
                   ))}
                 </div>
               )}
-            </div>
+            </AppSectionCard>
           </div>
         ) : (
-          <AppPageEmptyState
-            title="Selecione uma pessoa"
-            description="Abra o detalhe para comparar atribuições reais, capacidade planejada e indisponibilidades temporárias."
-          />
+          <div
+            className="grid gap-3 xl:grid-cols-3"
+            data-testid="people-capacity-availability-assignments"
+          >
+            <AppSectionCard className="p-4">
+              <p className="font-semibold">Capacidade da equipe</p>
+              <p className="mt-2 text-sm">
+                Média O.S.: {header.averageServiceOrderUsage}
+              </p>
+              <p className="text-sm">
+                Média agenda: {header.averageAppointmentUsage}
+              </p>
+              <p className="mt-2 text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
+                Saudável {header.healthyPeople} · Atenção{" "}
+                {header.attentionPeople} · Sobrecarregado{" "}
+                {header.overloadedPeople} · Indisponível{" "}
+                {header.unavailablePeople}
+              </p>
+            </AppSectionCard>
+            <AppSectionCard className="p-4">
+              <p className="font-semibold">Atribuições ativas</p>
+              <p className="mt-2 text-sm">
+                O.S. abertas atribuídas: {header.openServiceOrders}
+              </p>
+              <p className="text-sm">
+                O.S. vencidas/atrasadas: {header.overdueServiceOrders}
+              </p>
+              <p className="text-sm">
+                Agendamentos hoje: {header.todayAppointments}
+              </p>
+              <p className="text-sm">
+                Agendamentos não confirmados: sem fonte confiável
+              </p>
+              <p className="text-sm">
+                Cobranças pendentes atribuídas: sem fonte vinculada
+              </p>
+            </AppSectionCard>
+            <AppSectionCard className="p-4">
+              <p className="font-semibold">Disponibilidade</p>
+              <p className="mt-2 text-sm">
+                Disponíveis agora: {header.availablePeople}
+              </p>
+              <p className="text-sm">Em atendimento: {header.busyPeople}</p>
+              <p className="text-sm">
+                Indisponíveis: {header.unavailablePeople}
+              </p>
+              <p className="text-sm">
+                Próximas indisponibilidades:{" "}
+                {
+                  people.filter(person => person.nextAvailabilityException)
+                    .length
+                }
+              </p>
+            </AppSectionCard>
+          </div>
         )}
       </AppSectionBlock>
+
+      <AppSectionBlock
+        title="Desempenho e impacto da equipe"
+        subtitle="Conclusão, valor movimentado e histórico recente quando houver fonte operacional confiável."
+      >
+        <div
+          className="grid gap-3 xl:grid-cols-3"
+          data-testid="people-performance-impact"
+        >
+          <AppSectionCard className="p-4">
+            <p className="font-semibold">Desempenho</p>
+            <p className="mt-2 text-sm">
+              O.S. concluídas nos últimos 7 dias: sem fonte confiável
+            </p>
+            <p className="text-sm">
+              Atrasos atuais: {header.overdueServiceOrders}
+            </p>
+            <p className="text-sm">
+              Taxa de conclusão: sem histórico operacional suficiente
+            </p>
+          </AppSectionCard>
+          <AppSectionCard className="p-4">
+            <p className="font-semibold">Impacto financeiro</p>
+            <p className="mt-2 text-sm">
+              Valor gerado pela equipe nos últimos 7 dias:{" "}
+              {formatMoneyFallback()}
+            </p>
+            <p className="text-sm">
+              Responsáveis com maior valor movimentado: sem vínculo financeiro
+              confiável
+            </p>
+          </AppSectionCard>
+          <AppSectionCard className="p-4">
+            <p className="font-semibold">Histórico da equipe</p>
+            <p className="mt-2 text-sm">
+              Sem histórico operacional suficiente para medir desempenho ainda.
+            </p>
+            <Button
+              className="mt-3"
+              size="sm"
+              variant="secondary"
+              onClick={() => navigate("/timeline")}
+            >
+              Abrir Timeline
+            </Button>
+          </AppSectionCard>
+        </div>
+      </AppSectionBlock>
+
+      {isAdmin ? (
+        <AppSectionBlock
+          title="Sinais de atribuição"
+          subtitle="Painel compacto dos alertas exibidos em atribuições manuais."
+        >
+          {warningSummaryQuery.isLoading ? (
+            <AppPageLoadingState description="Consolidando sinais dos últimos 30 dias..." />
+          ) : null}
+          {warningSummaryQuery.isError ? (
+            <AppSectionCard
+              className="p-4 text-sm"
+              data-testid="assignee-warning-summary-error"
+            >
+              <p className="font-semibold">
+                Sinais de atribuição indisponíveis agora.
+              </p>
+              <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
+                A página continua usando carga, agenda e O.S. disponíveis.
+              </p>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => void warningSummaryQuery.refetch()}
+              >
+                Tentar novamente
+              </Button>
+            </AppSectionCard>
+          ) : null}
+          {warningSummary ? (
+            <div
+              className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
+              data-testid="assignee-warning-summary"
+            >
+              <AppStatCard
+                label="Alertas exibidos"
+                value={`${warningSummary.totals.shown}`}
+                helper="Sinais críticos ativos em atribuições."
+              />
+              <AppStatCard
+                label="Confirmações após alerta"
+                value={`${warningSummary.totals.confirmed}`}
+                helper="Decisões mantidas após aviso."
+              />
+              <AppStatCard
+                label="Taxa de confirmação"
+                value={
+                  warningSummary.totals.confirmationRatePct == null
+                    ? "Sem exibições"
+                    : `${warningSummary.totals.confirmationRatePct}%`
+                }
+                helper="Confirmações divididas por alertas."
+              />
+              <AppSectionCard className="p-4 text-sm">
+                <p className="text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
+                  Sinal mais frequente
+                </p>
+                <p className="font-semibold">
+                  {mostFrequentWarningType && mostFrequentWarningType.shown > 0
+                    ? warningTypeLabels[mostFrequentWarningType.warningType]
+                    : "Nenhum sinal registrado"}
+                </p>
+              </AppSectionCard>
+            </div>
+          ) : null}
+        </AppSectionBlock>
+      ) : null}
 
       <CreatePersonModal
         open={createOpen}
