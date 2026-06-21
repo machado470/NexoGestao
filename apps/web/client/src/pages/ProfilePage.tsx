@@ -5,12 +5,21 @@ import { PageWrapper } from "@/components/operating-system/Wrappers";
 import {
   AppDataTable,
   AppFiltersBar,
-  AppKpiRow,
   AppOperationalHeader,
   AppPageShell,
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
+import {
+  OperationalActionPanel,
+  OperationalHealthRing,
+  OperationalInnerCard,
+  OperationalKpiCard,
+  OperationalPanel,
+  OperationalPriorityItem,
+  OperationalTimelineItem,
+  OperationalWorkloadBar,
+} from "@/components/operational";
 import { trpc } from "@/lib/trpc";
 import {
   normalizeArrayPayload,
@@ -473,56 +482,129 @@ export default function ProfilePage() {
           </div>
         </AppFiltersBar>
 
-        <AppSectionBlock
+        <OperationalPanel
+          title="Identidade operacional"
+          subtitle="Quem sou dentro da operação, minha carga atual e a próxima ação pessoal."
+          variant="hero"
+          action={<AppStatusBadge label={String(availability)} />}
+        >
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
+            <OperationalInnerCard
+              variant={criticalPendingCount ? "warning" : "success"}
+            >
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-xl font-semibold text-[var(--text-primary)]">
+                    {name}
+                  </p>
+                  <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                    {role} em {organization}. Última atividade:{" "}
+                    {formatDateTime(lastActivity)}.
+                  </p>
+                </div>
+                <OperationalHealthRing
+                  value={
+                    assignedWorkload
+                      ? Math.min(100, assignedWorkload * 18)
+                      : hasRecentActivity
+                        ? 72
+                        : 35
+                  }
+                  label="Atividade pessoal"
+                  tone={criticalPendingCount ? "warning" : "success"}
+                  compact
+                />
+              </div>
+              <OperationalWorkloadBar
+                className="mt-4"
+                label="Carga atribuída"
+                value={assignedWorkload}
+                max={Math.max(5, assignedWorkload + completedOrders.length)}
+                tone={criticalPendingCount ? "warning" : "success"}
+              />
+            </OperationalInnerCard>
+
+            <OperationalActionPanel
+              title={nextAction.label}
+              description={nextAction.detail}
+              impact={
+                criticalPendingCount
+                  ? "minha fila tem pendências que podem atrasar a operação"
+                  : "fila individual sem bloqueio crítico"
+              }
+              safety="usa somente dados carregados da minha fila, sem alterar permissões ou automações"
+              tone={criticalPendingCount ? "warning" : "success"}
+              primaryAction={{
+                label: "Abrir ação",
+                onClick: () => navigate(nextAction.path),
+              }}
+              secondaryAction={{
+                label: "Atualizar",
+                onClick: () =>
+                  void Promise.all([
+                    meQuery.refetch(),
+                    appointmentsQuery.refetch(),
+                    serviceOrdersQuery.refetch(),
+                    chargesQuery.refetch(),
+                    timelineQuery.refetch(),
+                  ]),
+              }}
+            />
+          </div>
+        </OperationalPanel>
+
+        <OperationalPanel
           title="Minha fila agora"
           subtitle="Somente o que está comigo neste momento. Sem contadores vazios espalhados."
+          variant="default"
         >
           {assignedWorkload === 0 && criticalPendingCount === 0 ? (
-            <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-4 text-sm text-[var(--text-secondary)]">
-              <strong className="text-[var(--text-primary)]">
-                Nenhuma pendência atribuída agora.
-              </strong>{" "}
-              Sua fila individual está saudável no recorte carregado.
-            </div>
+            <OperationalPriorityItem
+              tone="low"
+              title="Nenhuma pendência atribuída agora."
+              description="Sua fila individual está saudável no recorte carregado."
+            />
           ) : (
             <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
               {queueItems.slice(0, 4).map(item => (
-                <button
+                <OperationalKpiCard
                   key={item.label}
-                  type="button"
-                  onClick={() => navigate(item.path)}
-                  className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-4 text-left transition hover:border-[var(--color-primary)]/60"
-                >
-                  <span className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                    {item.label}
-                  </span>
-                  <strong className="mt-2 block text-lg text-[var(--text-primary)]">
-                    {item.value}
-                  </strong>
-                  <span className="mt-1 block text-xs text-[var(--text-secondary)]">
-                    {item.detail}
-                  </span>
-                </button>
+                  label={item.label}
+                  value={item.value}
+                  helper={item.detail}
+                  tone={item.label.includes("crítica") ? "warning" : "default"}
+                />
               ))}
             </div>
           )}
-        </AppSectionBlock>
+        </OperationalPanel>
 
         {hasAnyExecutionSignal && operationRows.length > 0 && (
-          <AppSectionBlock
+          <OperationalPanel
             title="Minha operação"
             subtitle="Resumo compacto de O.S., agendamentos e pendências reais atribuídas a mim."
+            variant="compact"
           >
-            <AppKpiRow
-              items={operationRows.map(item => ({
-                title: item.label,
-                value: item.value,
-                hint: item.detail,
-                onClick: () => navigate(item.path),
-              }))}
-              gridClassName="xl:grid-cols-3"
-            />
-          </AppSectionBlock>
+            <div className="grid gap-3 md:grid-cols-3">
+              {operationRows.map(item => (
+                <OperationalPriorityItem
+                  key={item.label}
+                  tone={item.label.includes("pendência") ? "medium" : "neutral"}
+                  title={`${item.label}: ${item.value}`}
+                  description={item.detail}
+                  action={
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => navigate(item.path)}
+                    >
+                      Abrir
+                    </Button>
+                  }
+                />
+              ))}
+            </div>
+          </OperationalPanel>
         )}
 
         {pendingOrders.length > 0 && (
@@ -603,74 +685,74 @@ export default function ProfilePage() {
           </AppSectionBlock>
         )}
 
-        <AppSectionBlock
+        <OperationalPanel
           title="Minha atividade recente"
           subtitle="Eventos oficiais individuais, limitados ao que ajuda a leitura rápida."
+          variant="default"
+          action={
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate("/timeline?scope=mine")}
+            >
+              Abrir Timeline oficial
+            </Button>
+          }
         >
           {timelineEvents.length > 0 ? (
             <div className="space-y-3">
-              {timelineEvents.map(event => (
-                <div
+              {timelineEvents.map((event, index) => (
+                <OperationalTimelineItem
                   key={event.id}
-                  className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-4"
-                >
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
-                    <AppStatusBadge label={event.type} />
-                    <span>{event.occurredAt}</span>
-                    <span>{event.actor}</span>
-                  </div>
-                  <strong className="mt-2 block text-sm text-[var(--text-primary)]">
-                    {event.entity}
-                  </strong>
-                  <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                    {event.summary}
-                  </p>
-                </div>
+                  title={event.entity}
+                  description={event.summary}
+                  actor={event.actor}
+                  time={event.occurredAt}
+                  entityLabel={event.type}
+                  tone={index === 0 ? "selected" : "default"}
+                  withLine={index < timelineEvents.length - 1}
+                />
               ))}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigate("/timeline?scope=mine")}
-              >
-                Abrir Timeline oficial
-              </Button>
             </div>
           ) : (
-            <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-4 text-sm text-[var(--text-secondary)]">
-              Nenhum evento individual retornado.
-            </div>
+            <OperationalPriorityItem
+              tone="neutral"
+              title="Nenhum evento individual retornado."
+              description="A timeline pessoal aparece quando há evidência associada ao usuário atual."
+            />
           )}
-        </AppSectionBlock>
+        </OperationalPanel>
 
         <AppSectionBlock
           title="Minha performance"
           subtitle="Conclusões, atrasos, falhas e tempo médio sem cartões zerados redundantes."
         >
           {hasPerformanceSignal ? (
-            <AppKpiRow
-              items={[
-                {
-                  title: "Concluídas",
-                  value: String(completedOrders.length),
-                  hint: "O.S. finalizadas por mim.",
-                },
-                {
-                  title: "Atrasos",
-                  value: String(delayedOrders.length),
-                  hint: "Pendências vencidas.",
-                },
-                {
-                  title: "Falhas",
-                  value: String(failedOrders.length),
-                  hint: "Canceladas ou marcadas como falha.",
-                },
-                {
-                  title: "Tempo médio",
-                  value: averageMinutes(completedOrders),
-                  hint: "Média entre início e conclusão.",
-                },
-              ]}
-            />
+            <div className="grid gap-3 md:grid-cols-4">
+              <OperationalKpiCard
+                label="Concluídas"
+                value={String(completedOrders.length)}
+                helper="O.S. finalizadas por mim."
+                tone="success"
+              />
+              <OperationalKpiCard
+                label="Atrasos"
+                value={String(delayedOrders.length)}
+                helper="Pendências vencidas."
+                tone={delayedOrders.length ? "warning" : "default"}
+              />
+              <OperationalKpiCard
+                label="Falhas"
+                value={String(failedOrders.length)}
+                helper="Canceladas ou marcadas como falha."
+                tone={failedOrders.length ? "critical" : "default"}
+              />
+              <OperationalKpiCard
+                label="Tempo médio"
+                value={averageMinutes(completedOrders)}
+                helper="Média entre início e conclusão."
+              />
+            </div>
           ) : (
             <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-card)] p-4 text-sm text-[var(--text-secondary)]">
               Sem execução atribuída no período.
@@ -683,21 +765,19 @@ export default function ProfilePage() {
             title="Impacto financeiro"
             subtitle="Exibido somente quando há valor pago atribuído ao usuário."
           >
-            <AppKpiRow
-              items={[
-                {
-                  title: "Serviços executados",
-                  value: String(completedOrders.length),
-                  hint: "Base de O.S. concluídas.",
-                },
-                {
-                  title: "Valor movimentado",
-                  value: currencyBRL(revenueCents),
-                  hint: "Cobranças pagas atribuídas a mim.",
-                },
-              ]}
-              gridClassName="xl:grid-cols-2"
-            />
+            <div className="grid gap-3 md:grid-cols-2">
+              <OperationalKpiCard
+                label="Serviços executados"
+                value={String(completedOrders.length)}
+                helper="Base de O.S. concluídas."
+              />
+              <OperationalKpiCard
+                label="Valor movimentado"
+                value={currencyBRL(revenueCents)}
+                helper="Cobranças pagas atribuídas a mim."
+                tone="success"
+              />
+            </div>
           </AppSectionBlock>
         )}
 

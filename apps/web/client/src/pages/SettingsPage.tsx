@@ -11,6 +11,13 @@ import {
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
+import {
+  OperationalActionPanel,
+  OperationalInnerCard,
+  OperationalPanel,
+  OperationalPriorityItem,
+  OperationalSectionGrid,
+} from "@/components/operational";
 import { trpc } from "@/lib/trpc";
 import {
   normalizeArrayPayload,
@@ -406,124 +413,123 @@ export default function SettingsPage() {
         />
 
         <div id="settings-control-center">
-          <AppSectionBlock
-            title="Centro de controle"
-            subtitle="Áreas que controlam o comportamento do sistema, com estado e ação direta."
-            compact
+          <OperationalPanel
+            title="Centro de controle do sistema"
+            subtitle="Como o Nexo deve funcionar para esta empresa: configuração com impacto claro, sem lista técnica de toggles."
+            variant="hero"
+            action={
+              <AppStatusBadge label={`${pendingSignals.length} pendência(s)`} />
+            }
           >
-            <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
+            <OperationalSectionGrid>
               {sections.map(section => (
-                <article
-                  key={section.title}
-                  className="flex min-h-[148px] flex-col rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-[var(--text-primary)]">
-                        {section.title}
-                      </p>
-                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--text-secondary)]">
-                        {section.description}
-                      </p>
+                <OperationalInnerCard key={section.title} interactive>
+                  <div className="flex min-h-[132px] flex-col">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-[var(--text-primary)]">
+                          {section.title}
+                        </p>
+                        <p className="mt-1 line-clamp-3 text-xs leading-5 text-[var(--text-secondary)]">
+                          {section.description}
+                        </p>
+                      </div>
+                      <AppStatusBadge label={section.status} />
                     </div>
-                    <AppStatusBadge label={section.status} />
+                    <Button
+                      className="mt-auto self-start"
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        section.path
+                          ? navigate(section.path)
+                          : void Promise.all([
+                              settingsQuery.refetch(),
+                              readinessQuery.refetch(),
+                            ])
+                      }
+                    >
+                      {section.action}
+                    </Button>
                   </div>
-                  <Button
-                    className="mt-auto self-start"
-                    size="sm"
-                    variant="outline"
-                    onClick={() =>
-                      section.path
-                        ? navigate(section.path)
-                        : void Promise.all([
-                            settingsQuery.refetch(),
-                            readinessQuery.refetch(),
-                          ])
-                    }
-                  >
-                    {section.action}
-                  </Button>
-                </article>
+                </OperationalInnerCard>
               ))}
-            </div>
-          </AppSectionBlock>
+            </OperationalSectionGrid>
+          </OperationalPanel>
         </div>
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.6fr)]">
-          <AppSectionBlock
-            title="Próxima ação administrativa"
+          <OperationalPanel
+            title="Próxima configuração recomendada"
             subtitle="Ação compacta; não substitui Dashboard nem Governança."
-            compact
+            variant="compact"
           >
-            <div className="flex flex-col gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4 md:flex-row md:items-center md:justify-between">
-              <div>
-                <p className="text-sm font-semibold text-[var(--text-primary)]">
-                  {nextAction?.actionLabel ??
-                    "Configurações essenciais revisadas"}
-                </p>
-                <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
-                  {nextAction?.reason ??
-                    "Nenhuma pendência administrativa foi detectada na leitura atual."}
-                </p>
-              </div>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() =>
+            <OperationalActionPanel
+              title={
+                nextAction?.actionLabel ?? "Configurações essenciais revisadas"
+              }
+              description={
+                nextAction?.reason ??
+                "Nenhuma pendência administrativa foi detectada na leitura atual."
+              }
+              impact={
+                nextAction
+                  ? "reduz inconsistência na operação da empresa"
+                  : "sistema já possui leitura administrativa suficiente"
+              }
+              safety="salva apenas empresa/fuso quando houver alteração; demais ações navegam para módulos existentes"
+              tone={nextAction?.critical ? "warning" : "success"}
+              primaryAction={{
+                label: nextAction?.actionLabel ?? "Revisar empresa",
+                onClick: () =>
                   nextAction?.path
                     ? navigate(nextAction.path)
                     : document
                         .getElementById("settings-company-form")
-                        ?.scrollIntoView({ behavior: "smooth", block: "start" })
-                }
-              >
-                {nextAction?.actionLabel ?? "Revisar empresa"}
-              </Button>
-            </div>
-          </AppSectionBlock>
+                        ?.scrollIntoView({
+                          behavior: "smooth",
+                          block: "start",
+                        }),
+              }}
+            />
+          </OperationalPanel>
 
-          <AppSectionBlock
+          <OperationalPanel
             title="Pendências de configuração"
-            subtitle="Lista curta, sem múltiplos estados vazios."
-            compact
+            subtitle="Lista curta com impacto administrativo legível."
+            variant="compact"
           >
             {pendingItems.length ? (
-              <ul className="space-y-2">
+              <div className="space-y-2">
                 {pendingItems.map(item => (
-                  <li
+                  <OperationalPriorityItem
                     key={item.key}
-                    className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-xs font-semibold text-[var(--text-primary)]">
-                          {item.label}
-                        </p>
-                        <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
-                          {item.reason}
-                        </p>
-                      </div>
+                    tone={item.critical ? "high" : "medium"}
+                    title={item.label}
+                    description={item.reason}
+                    action={
                       <AppStatusBadge
                         label={item.critical ? "Crítico" : "Atenção"}
                       />
-                    </div>
-                  </li>
+                    }
+                  />
                 ))}
-              </ul>
+              </div>
             ) : (
-              <p className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2 text-sm text-[var(--text-secondary)]">
-                Sem alterações recentes registradas e sem pendências
-                administrativas na leitura atual.
-              </p>
+              <OperationalPriorityItem
+                tone="low"
+                title="Sem pendências administrativas"
+                description="Sem alterações recentes registradas e sem pendências administrativas na leitura atual."
+              />
             )}
-          </AppSectionBlock>
+          </OperationalPanel>
         </div>
 
         <div id="settings-company-form">
-          <AppSectionBlock
+          <OperationalPanel
             title="Empresa"
             subtitle="Dados base usados por agenda, prazos e relatórios."
-            compact
+            variant="compact"
           >
             <div className="grid gap-3 md:grid-cols-2">
               <label className="text-xs font-medium text-[var(--text-secondary)]">
@@ -545,13 +551,13 @@ export default function SettingsPage() {
                 />
               </label>
             </div>
-          </AppSectionBlock>
+          </OperationalPanel>
         </div>
 
-        <AppSectionBlock
+        <OperationalPanel
           title="Usuários e permissões"
           subtitle={sourceMessage}
-          compact
+          variant="compact"
         >
           <AppDataTable className="min-w-[720px]">
             <thead>
@@ -607,7 +613,7 @@ export default function SettingsPage() {
               Gerenciar na página Pessoas
             </Button>
           </div>
-        </AppSectionBlock>
+        </OperationalPanel>
       </AppPageShell>
     </PageWrapper>
   );

@@ -36,6 +36,7 @@ import {
   AppTimeline,
   AppTimelineItem,
 } from "@/components/app-system";
+import { OperationalKpiCard, OperationalPanel } from "@/components/operational";
 import { Button } from "@/components/design-system";
 import {
   EntityTimelineCard,
@@ -1722,55 +1723,53 @@ export default function TimelinePage() {
         }
       />
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <AppStatCard
-          label="Eventos registrados"
-          value={filteredEvents.length}
-          helper={
-            filteredEvents.length > 0
-              ? "Evidências reais no recorte."
-              : "0 eventos registrados."
-          }
-          icon={<FileClock className="h-4 w-4" />}
-        />
-        <AppStatCard
-          label="Exigem atenção"
-          value={attentionCount}
-          helper={
-            attentionCount > 0
-              ? "Sinais para diagnóstico operacional."
-              : "Sem eventos no período exigindo atenção."
-          }
-          icon={<AlertTriangle className="h-4 w-4" />}
-        />
-        <AppStatCard
-          label="Impactam receita"
-          value={revenueImpactCount}
-          helper={
-            revenueImpactCount > 0
-              ? "Eventos financeiros com consequência."
-              : "Sem impacto financeiro detectado."
-          }
-          icon={<BadgeDollarSign className="h-4 w-4" />}
-        />
-        <AppStatCard
-          label="Último evento"
-          value={latestEventLabel}
-          helper="Data/hora retornada pela fonte oficial."
-          icon={<CalendarClock className="h-4 w-4" />}
-        />
-      </div>
-
-      <AppSectionCard className="space-y-3">
-        <div>
-          <p className="text-sm font-semibold text-[var(--text-primary)]">
-            Panorama por módulo
-          </p>
-          <p className="text-xs text-[var(--text-muted)]">
-            Financeiro, Ordens de Serviço, Agendamentos, WhatsApp, Clientes e
-            Governança lidos sem fabricar histórico.
-          </p>
+      <OperationalPanel
+        title="Leitura do período"
+        subtitle="Resumo compacto para entender volume, atenção, impacto de receita e último acontecimento sem transformar auditoria em dashboard."
+        variant="default"
+      >
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <OperationalKpiCard
+            label="Eventos registrados"
+            value={filteredEvents.length}
+            helper={
+              filteredEvents.length > 0
+                ? "Evidências reais no recorte."
+                : "0 eventos registrados."
+            }
+          />
+          <OperationalKpiCard
+            label="Exigem atenção"
+            value={attentionCount}
+            helper={
+              attentionCount > 0
+                ? "Sinais para diagnóstico operacional."
+                : "Sem eventos no período exigindo atenção."
+            }
+            tone={attentionCount > 0 ? "warning" : "default"}
+          />
+          <OperationalKpiCard
+            label="Impactam receita"
+            value={revenueImpactCount}
+            helper={
+              revenueImpactCount > 0
+                ? "Eventos financeiros com consequência."
+                : "Sem impacto financeiro detectado."
+            }
+          />
+          <OperationalKpiCard
+            label="Último evento"
+            value={latestEventLabel}
+            helper="Data/hora retornada pela fonte oficial."
+          />
         </div>
+      </OperationalPanel>
+
+      <OperationalPanel
+        title="Panorama por módulo"
+        subtitle="Financeiro, Ordens de Serviço, Agendamentos, WhatsApp, Clientes e Governança lidos sem fabricar histórico."
+        variant="compact"
+      >
         <div className="grid gap-2 md:grid-cols-3 xl:grid-cols-6">
           {modulePanorama.map(item => (
             <button
@@ -1792,9 +1791,9 @@ export default function TimelinePage() {
             </button>
           ))}
         </div>
-      </AppSectionCard>
+      </OperationalPanel>
 
-      <AppSectionCard className="p-3">
+      <OperationalPanel variant="compact">
         <div className="grid gap-2 text-xs md:grid-cols-4">
           <div>
             <span className="font-semibold text-[var(--success)]">
@@ -1825,7 +1824,7 @@ export default function TimelinePage() {
             </p>
           </div>
         </div>
-      </AppSectionCard>
+      </OperationalPanel>
 
       <div className="grid gap-3 xl:grid-cols-3">
         <OperationalStateCard
