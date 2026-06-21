@@ -24,13 +24,19 @@ describe("PeoplePage operational responsibility center contract", () => {
       'data-testid="people-capacity-availability-assignments"'
     );
     expect(source).toContain('data-testid="people-performance-impact"');
+    expect(source).toContain('title="Responsáveis-chave"');
+    expect(source).toContain('data-testid="people-key-responsibles"');
   });
 
   it("mantém a página como responsabilidade operacional, não permissões", () => {
     expect(source).toContain(
+      "Equipe operacional · Responsáveis, carga e disponibilidade."
+    );
+    expect(source).toContain("Permissões em Configurações");
+    expect(source).not.toContain(
       "Equipe operacional, não permissões administrativas"
     );
-    expect(source).toContain(
+    expect(source).not.toContain(
       "Acessos e permissões continuam em Configurações."
     );
     expect(source).not.toContain("Detail-legacy mantido");
@@ -51,7 +57,7 @@ describe("PeoplePage operational responsibility center contract", () => {
   it("renderiza ranking com pessoa, estado, carga, O.S., atrasos, agenda e ações", () => {
     expect(source).toContain("sortByOperationalIntervention(people).filter");
     expect(source).toContain("Responsável");
-    expect(source).toContain("Função operacional");
+    expect(source).toContain("Pessoa");
     expect(source).toContain("Estado");
     expect(source).toContain("Carga atual");
     expect(source).toContain("Capacidade planejada");
@@ -70,9 +76,12 @@ describe("PeoplePage operational responsibility center contract", () => {
     expect(source).toContain('value == null ? "Não configurada"');
     expect(source).toContain('value == null ? "Uso indisponível"');
     expect(source).toContain('capacity == null ? "Diferença indisponível"');
-    expect(source).toContain("Sem fonte financeira vinculada");
-    expect(source).toContain("sem fonte confiável");
-    expect(source).toContain(
+    expect(source).toContain("Aguardando vínculo financeiro");
+    expect(source).toContain("sem leitura confiável disponível");
+    expect(source).toContain("Aguardando histórico suficiente");
+    expect(source).not.toContain("Sem fonte financeira vinculada");
+    expect(source).not.toContain("sem fonte confiável");
+    expect(source).not.toContain(
       "Sem histórico operacional suficiente para medir desempenho ainda."
     );
   });
@@ -88,9 +97,11 @@ describe("PeoplePage operational responsibility center contract", () => {
     expect(source).toContain(
       "secondaryActionLabel={nextBestAction.secondaryActionLabel}"
     );
-    expect(source).toContain("Redistribuir responsabilidades");
-    expect(source).toContain("Destravar execução");
-    expect(source).toContain("Rebalancear carga");
+    expect(source).toContain("Cadastrar responsáveis");
+    expect(source).toContain("Resolver atrasos atribuídos");
+    expect(source).toContain("Redistribuir carga");
+    expect(source).toContain("Revisar disponibilidade");
+    expect(source).toContain("Equipe equilibrada");
   });
 
   it("compacta erro parcial dos sinais de atribuição", () => {
@@ -98,11 +109,22 @@ describe("PeoplePage operational responsibility center contract", () => {
     expect(source).toContain('data-testid="assignee-warning-summary-error"');
     expect(source).toContain("Sinais de atribuição indisponíveis agora.");
     expect(source).toContain(
-      "A página continua usando carga, agenda e O.S. disponíveis."
+      "A visão principal continua usando carga, agenda e O.S."
     );
     expect(source).toContain("Tentar novamente");
+    expect(source).toContain("Nenhum sinal crítico registrado em atribuições.");
+    expect(source).toContain("0 alertas exibidos");
+    expect(source).toContain("0 confirmações após alerta");
     expect(source).not.toContain(
       "Não foi possível carregar people.operationalSummary"
+    );
+  });
+
+  it("protege desempenho e impacto com fallback operacional positivo", () => {
+    expect(source).toContain("Assim que houver O.S. concluídas");
+    expect(source).toContain("Quando houver cobranças vinculadas à execução");
+    expect(source).toContain(
+      "Eventos de O.S., agenda, cobrança e mensagem aparecerão aqui."
     );
   });
 
