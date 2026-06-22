@@ -3,6 +3,40 @@ import { router, protectedProcedure } from "../_core/trpc";
 import { nexoFetch } from "../_core/nexoClient";
 import { unwrapNexoApiResponse } from "../_core/nexoEnvelope";
 
+const peopleOperationalSummaryPersonSchema = z.object({
+  personId: z.string(),
+  name: z.string(),
+  role: z.string().nullable().optional(),
+  status: z.string(),
+  lastActivityAt: z.string().nullable().optional(),
+  openServiceOrdersCount: z.number().default(0),
+  overdueServiceOrdersCount: z.number().default(0),
+  todayAppointmentsCount: z.number().default(0),
+  futureAppointmentsCount: z.number().default(0),
+  dailyServiceOrderCapacity: z.number().nullable().optional(),
+  dailyAppointmentCapacity: z.number().nullable().optional(),
+  serviceOrderCapacityUsagePct: z.number().nullable().optional(),
+  appointmentCapacityUsagePct: z.number().nullable().optional(),
+  capacityStatus: z.string().optional(),
+  availabilityStatus: z.string().optional(),
+  currentAvailabilityException: z.unknown().nullable().optional(),
+  nextAvailabilityException: z.unknown().nullable().optional(),
+  loadStatus: z.string().optional(),
+  operationalStatus: z.string().optional(),
+  priority: z.string().nullable().optional(),
+  interventionReason: z.string().nullable().optional(),
+  recommendedActionLabel: z.string().nullable().optional(),
+  recommendedActionTarget: z.string().nullable().optional(),
+  operationalSummaryText: z.string().nullable().optional(),
+  capacitySummaryText: z.string().nullable().optional(),
+  riskSummaryText: z.string().nullable().optional(),
+  workloadNotes: z.string().nullable().optional(),
+}).passthrough();
+
+const peopleOperationalSummarySchema = z.object({
+  people: z.array(peopleOperationalSummaryPersonSchema).default([]),
+}).passthrough();
+
 export const peopleRouter = router({
   /**
    * Listar pessoas ativas da organização
@@ -30,7 +64,9 @@ export const peopleRouter = router({
    */
   operationalSummary: protectedProcedure.query(async ({ ctx }) => {
     const raw = await nexoFetch<any>(ctx, `/people/operational-summary`, { method: "GET" });
-    return unwrapNexoApiResponse(raw);
+    const unwrapped = Array.isArray(raw) ? { people: raw } : unwrapNexoApiResponse(raw);
+    const fallback = Array.isArray(unwrapped) ? { people: unwrapped } : (unwrapped ?? { people: [] });
+    return peopleOperationalSummarySchema.parse(fallback);
   }),
 
   /**

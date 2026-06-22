@@ -51,6 +51,11 @@ import { trpc } from "@/lib/trpc";
 type LoadStatus = "IDLE" | "NORMAL" | "BUSY" | "OVERLOADED";
 type CapacityStatus = "UNDER_CAPACITY" | "AT_CAPACITY" | "OVER_CAPACITY";
 type AvailabilityStatus = "AVAILABLE" | "UNAVAILABLE_NOW" | "UNAVAILABLE_SOON";
+type RecommendedActionTarget =
+  | "PERSON"
+  | "SERVICE_ORDERS"
+  | "APPOINTMENTS"
+  | "TIMELINE";
 type AvailabilityException = {
   id: string;
   startsAt: string;
@@ -117,6 +122,14 @@ type OperationalPerson = {
   availabilityStatus: AvailabilityStatus;
   currentAvailabilityException?: AvailabilityException | null;
   nextAvailabilityException?: AvailabilityException | null;
+  operationalStatus?: AppOperationalStatus | null;
+  priority?: AppPriorityLevel | null;
+  interventionReason?: string | null;
+  recommendedActionLabel?: string | null;
+  recommendedActionTarget?: RecommendedActionTarget | null;
+  operationalSummaryText?: string | null;
+  capacitySummaryText?: string | null;
+  riskSummaryText?: string | null;
 };
 type PeopleFilter =
   | "all"
@@ -240,6 +253,7 @@ function personStatusLabel(status: OperationalPerson["status"]) {
 function derivePersonOperationalStatus(
   person: OperationalPerson
 ): AppOperationalStatus {
+  if (person.operationalStatus) return person.operationalStatus;
   if (
     (person.status === "INACTIVE" || person.status === "SUSPENDED") &&
     (person.openServiceOrdersCount > 0 || person.todayAppointmentsCount > 0)
@@ -265,6 +279,7 @@ function derivePersonOperationalStatus(
 function derivePersonPriority(
   person: OperationalPerson
 ): AppPriorityLevel | null {
+  if (person.priority) return person.priority === "P3" ? null : person.priority;
   const status = derivePersonOperationalStatus(person);
   if (status === "CRÍTICO") return "P0";
   if (
@@ -499,6 +514,7 @@ function deriveTeamHealth(header: {
 }
 
 function personHumanReading(person: OperationalPerson) {
+  if (person.riskSummaryText) return person.riskSummaryText;
   if (person.availabilityStatus === "UNAVAILABLE_NOW")
     return "Indisponível agora";
   if (person.overdueServiceOrdersCount > 0) return "Com atrasos atribuídos";
@@ -553,6 +569,7 @@ function teamHeroNarrative(
 }
 
 function personOperationalSentence(person: OperationalPerson) {
+  if (person.operationalSummaryText) return person.operationalSummaryText;
   if (!hasAssignedItems(person)) {
     return "Capacidade disponível. Nenhum atraso registrado.";
   }
@@ -566,6 +583,9 @@ function personOperationalSentence(person: OperationalPerson) {
 }
 
 function rankingNarrative(person: OperationalPerson) {
+  if (person.capacitySummaryText || person.interventionReason) {
+    return [person.interventionReason, person.capacitySummaryText].filter(Boolean).join(" ");
+  }
   if (!hasAssignedItems(person)) {
     return "Sem carga atribuída atualmente. Capacidade totalmente disponível. Nenhum atraso registrado.";
   }
@@ -1361,6 +1381,11 @@ export default function PeoplePage() {
                           {person.overdueServiceOrdersCount} · Capacidade{" "}
                           {formatCapacity(person.dailyServiceOrderCapacity)}
                         </p>
+                        {person.recommendedActionLabel ? (
+                          <p data-testid="people-recommended-action">
+                            Ação recomendada: {person.recommendedActionLabel}
+                          </p>
+                        ) : null}
                       </div>
                       <OperationalWorkloadBar
                         label="Carga planejada"

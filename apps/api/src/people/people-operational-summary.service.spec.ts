@@ -1,6 +1,6 @@
 import { AppointmentStatus, ServiceOrderStatus } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
-import { calculatePeopleAvailability, calculatePeopleCapacityStatus, calculatePeopleLoadStatus, PeopleOperationalSummaryService } from './people-operational-summary.service'
+import { calculatePeopleAvailability, calculatePeopleCapacityStatus, calculatePeopleLoadStatus, derivePeopleOperationalIntervention, PeopleOperationalSummaryService } from './people-operational-summary.service'
 
 const mockPrisma = {
   person: { findMany: jest.fn() },
@@ -52,8 +52,22 @@ describe('PeopleOperationalSummaryService', () => {
       serviceOrderCapacityUsagePct: 40,
       appointmentCapacityUsagePct: 100,
       capacityStatus: 'AT_CAPACITY',
+      operationalStatus: 'RISCO',
+      priority: 'P1',
+      interventionReason: '1 O.S. atrasada(s) atribuída(s).',
+      recommendedActionLabel: 'Ver O.S. atrasadas',
+      recommendedActionTarget: 'SERVICE_ORDERS',
+      operationalSummaryText: 'Ana executa 2 O.S. aberta(s), com 1 atraso(s).',
+      capacitySummaryText: 'Capacidade AT_CAPACITY: O.S. 40%, agenda 100%.',
+      riskSummaryText: '1 O.S. atrasada(s) atribuída(s).',
     }))
-    expect(result.people[1]).toEqual(expect.objectContaining({ personId: 'person-idle', loadStatus: 'IDLE' }))
+    expect(result.people[1]).toEqual(expect.objectContaining({
+      personId: 'person-idle',
+      loadStatus: 'IDLE',
+      operationalStatus: 'NORMAL',
+      priority: 'P3',
+      interventionReason: 'Sem carga ativa atribuída.',
+    }))
   })
 
   it('isola todas as consultas pelo tenant recebido do contexto autenticado', async () => {
@@ -110,5 +124,31 @@ describe('PeopleOperationalSummaryService', () => {
     [{ openServiceOrdersCount: 1, overdueServiceOrdersCount: 1, futureAppointmentsCount: 1, todayAppointmentsCount: 1 }, 'OVERLOADED'],
   ])('classifica carga simples e transparente: %p -> %s', (input, expected) => {
     expect(calculatePeopleLoadStatus(input)).toBe(expected)
+  })
+
+  it('não quebra quando capacidade é null e mantém percentual indisponível', async () => {
+    mockPrisma.person.findMany.mockResolvedValue([
+      { id: 'person-null', name: 'Caio', role: 'TECH', active: true, dailyServiceOrderCapacity: null, dailyAppointmentCapacity: null, workloadNotes: null },
+    ])
+
+    const result = await service.getSummary('org-trusted', now)
+
+    expect(result.people[0]).toEqual(expect.objectContaining({
+      personId: 'person-null',
+      serviceOrderCapacityUsagePct: null,
+      appointmentCapacityUsagePct: null,
+      capacityStatus: 'AT_CAPACITY',
+      capacitySummaryText: 'Capacidade diária não configurada; uso percentual indisponível.',
+    }))
+  })
+
+  it.each([
+    [{ status: 'INACTIVE', openServiceOrdersCount: 1, overdueServiceOrdersCount: 0, todayAppointmentsCount: 0, futureAppointmentsCount: 0, loadStatus: 'NORMAL', capacityStatus: 'UNDER_CAPACITY', availabilityStatus: 'AVAILABLE' }, 'CRÍTICO', 'P0'],
+    [{ status: 'ACTIVE', openServiceOrdersCount: 1, overdueServiceOrdersCount: 1, todayAppointmentsCount: 0, futureAppointmentsCount: 0, loadStatus: 'OVERLOADED', capacityStatus: 'UNDER_CAPACITY', availabilityStatus: 'AVAILABLE' }, 'RISCO', 'P1'],
+    [{ status: 'ACTIVE', openServiceOrdersCount: 1, overdueServiceOrdersCount: 0, todayAppointmentsCount: 0, futureAppointmentsCount: 0, loadStatus: 'NORMAL', capacityStatus: 'OVER_CAPACITY', availabilityStatus: 'AVAILABLE' }, 'RISCO', 'P1'],
+    [{ status: 'ACTIVE', openServiceOrdersCount: 1, overdueServiceOrdersCount: 0, todayAppointmentsCount: 0, futureAppointmentsCount: 0, loadStatus: 'NORMAL', capacityStatus: 'UNDER_CAPACITY', availabilityStatus: 'UNAVAILABLE_NOW' }, 'RISCO', 'P2'],
+    [{ status: 'ACTIVE', openServiceOrdersCount: 0, overdueServiceOrdersCount: 0, todayAppointmentsCount: 0, futureAppointmentsCount: 0, loadStatus: 'IDLE', capacityStatus: 'UNDER_CAPACITY', availabilityStatus: 'AVAILABLE' }, 'NORMAL', 'P3'],
+  ] as const)('retorna operationalStatus e priority do backend: %p', (input, operationalStatus, priority) => {
+    expect(derivePeopleOperationalIntervention(input)).toEqual(expect.objectContaining({ operationalStatus, priority }))
   })
 })
