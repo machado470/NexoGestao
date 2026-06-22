@@ -136,6 +136,19 @@ describe("PeoplePage human operation center contract", () => {
     expect(source).not.toContain("Math.random");
   });
 
+  it("consome contrato operacional consolidado com fallback local apenas de segurança", () => {
+    expect(source).toContain("operationalStatus?: AppOperationalStatus | null");
+    expect(source).toContain("priority?: AppPriorityLevel | null");
+    expect(source).toContain("interventionReason?: string | null");
+    expect(source).toContain("recommendedActionLabel?: string | null");
+    expect(source).toContain("operationalSummaryText?: string | null");
+    expect(source).toContain("capacitySummaryText?: string | null");
+    expect(source).toContain("riskSummaryText?: string | null");
+    expect(source).toContain("if (person.operationalStatus) return person.operationalStatus");
+    expect(source).toContain("if (person.priority) return person.priority");
+    expect(source).toContain('data-testid="people-recommended-action"');
+  });
+
   it("mantém sinais de atribuição com erro parcial e retry", () => {
     expect(source).toContain('data-testid="assignee-warning-summary-error"');
     expect(source).toContain("Sinais de atribuição indisponíveis agora.");

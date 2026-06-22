@@ -113,6 +113,41 @@ describe("BFF↔API contract - lote 1", () => {
     expect(String(url)).not.toContain("orgId");
   });
 
+  it("people.operationalSummary retorna contrato operacional e aceita envelope ou array direto", async () => {
+    const person = {
+      personId: "person-1",
+      name: "Ana",
+      role: "TECH",
+      status: "ACTIVE",
+      openServiceOrdersCount: 2,
+      overdueServiceOrdersCount: 1,
+      todayAppointmentsCount: 1,
+      futureAppointmentsCount: 3,
+      dailyServiceOrderCapacity: 4,
+      dailyAppointmentCapacity: 2,
+      serviceOrderCapacityUsagePct: 50,
+      appointmentCapacityUsagePct: 50,
+      capacityStatus: "UNDER_CAPACITY",
+      availabilityStatus: "AVAILABLE",
+      loadStatus: "NORMAL",
+      operationalStatus: "RISCO",
+      priority: "P1",
+      interventionReason: "1 O.S. atrasada(s) atribuída(s).",
+      recommendedActionLabel: "Ver O.S. atrasadas",
+      recommendedActionTarget: "SERVICE_ORDERS",
+      operationalSummaryText: "Ana executa 2 O.S. aberta(s), com 1 atraso(s).",
+      capacitySummaryText: "Capacidade UNDER_CAPACITY: O.S. 50%, agenda 50%.",
+      riskSummaryText: "1 O.S. atrasada(s) atribuída(s).",
+    };
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, data: { people: [person] } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify([person]), { status: 200 }));
+    const caller = appRouter.createCaller({ req: makeReq(), res: makeRes(), user: { token: "t1", validated: true, organizationId: "org-trusted" } } as any);
+
+    await expect(caller.people.operationalSummary()).resolves.toEqual({ people: [expect.objectContaining(person)] });
+    await expect(caller.people.operationalSummary()).resolves.toEqual({ people: [expect.objectContaining(person)] });
+  });
+
   it("people availability exceptions usam endpoints tenant-scoped e rejeitam orgId do client", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }))

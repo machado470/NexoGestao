@@ -5,6 +5,8 @@ import { PrismaService } from '../prisma/prisma.service'
 export type PeopleLoadStatus = 'IDLE' | 'NORMAL' | 'BUSY' | 'OVERLOADED'
 export type PeopleCapacityStatus = 'UNDER_CAPACITY' | 'AT_CAPACITY' | 'OVER_CAPACITY'
 export type PeopleAvailabilityStatus = 'AVAILABLE' | 'UNAVAILABLE_NOW' | 'UNAVAILABLE_SOON'
+export type PeopleOperationalStatus = 'NORMAL' | 'ATENÇÃO' | 'RISCO' | 'CRÍTICO'
+export type PeoplePriority = 'P0' | 'P1' | 'P2' | 'P3'
 
 const OPEN_SERVICE_ORDER_STATUSES: ServiceOrderStatus[] = [
   ServiceOrderStatus.OPEN,
@@ -87,6 +89,101 @@ export function calculatePeopleCapacityStatus(input: {
   return 'UNDER_CAPACITY'
 }
 
+export function derivePeopleOperationalIntervention(input: {
+  status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'INVITED'
+  openServiceOrdersCount: number
+  overdueServiceOrdersCount: number
+  todayAppointmentsCount: number
+  futureAppointmentsCount: number
+  loadStatus: PeopleLoadStatus
+  capacityStatus: PeopleCapacityStatus
+  availabilityStatus: PeopleAvailabilityStatus
+}): {
+  operationalStatus: PeopleOperationalStatus
+  priority: PeoplePriority
+  interventionReason: string | null
+  recommendedActionLabel: string | null
+  recommendedActionTarget: 'PERSON' | 'SERVICE_ORDERS' | 'APPOINTMENTS' | 'TIMELINE' | null
+} {
+  const hasActiveLoad = input.openServiceOrdersCount > 0 || input.todayAppointmentsCount > 0 || input.futureAppointmentsCount > 0
+  if ((input.status === 'INACTIVE' || input.status === 'SUSPENDED') && hasActiveLoad) {
+    return {
+      operationalStatus: 'CRÍTICO',
+      priority: 'P0',
+      interventionReason: 'Pessoa inativa ou suspensa mantém O.S. ou agendamentos ativos.',
+      recommendedActionLabel: 'Revisar responsável',
+      recommendedActionTarget: 'PERSON',
+    }
+  }
+  if (input.overdueServiceOrdersCount > 0) {
+    return {
+      operationalStatus: 'RISCO',
+      priority: 'P1',
+      interventionReason: `${input.overdueServiceOrdersCount} O.S. atrasada(s) atribuída(s).`,
+      recommendedActionLabel: 'Ver O.S. atrasadas',
+      recommendedActionTarget: 'SERVICE_ORDERS',
+    }
+  }
+  if (input.loadStatus === 'OVERLOADED' || input.capacityStatus === 'OVER_CAPACITY') {
+    return {
+      operationalStatus: 'RISCO',
+      priority: 'P1',
+      interventionReason: 'Carga atual acima da capacidade planejada.',
+      recommendedActionLabel: 'Revisar atribuições',
+      recommendedActionTarget: 'SERVICE_ORDERS',
+    }
+  }
+  if (input.availabilityStatus === 'UNAVAILABLE_NOW') {
+    return {
+      operationalStatus: 'RISCO',
+      priority: 'P2',
+      interventionReason: 'Pessoa indisponível agora com impacto potencial na agenda.',
+      recommendedActionLabel: 'Ver agenda',
+      recommendedActionTarget: 'APPOINTMENTS',
+    }
+  }
+  if (!hasActiveLoad) {
+    return {
+      operationalStatus: 'NORMAL',
+      priority: 'P3',
+      interventionReason: 'Sem carga ativa atribuída.',
+      recommendedActionLabel: null,
+      recommendedActionTarget: null,
+    }
+  }
+  if (input.loadStatus === 'BUSY' || input.capacityStatus === 'AT_CAPACITY' || input.availabilityStatus === 'UNAVAILABLE_SOON') {
+    return {
+      operationalStatus: 'ATENÇÃO',
+      priority: 'P2',
+      interventionReason: 'Pessoa perto do limite operacional ou com indisponibilidade próxima.',
+      recommendedActionLabel: 'Acompanhar capacidade',
+      recommendedActionTarget: 'TIMELINE',
+    }
+  }
+  return {
+    operationalStatus: 'NORMAL',
+    priority: 'P3',
+    interventionReason: null,
+    recommendedActionLabel: null,
+    recommendedActionTarget: null,
+  }
+}
+
+function buildOperationalSummaryText(input: { name: string; openServiceOrdersCount: number; todayAppointmentsCount: number; overdueServiceOrdersCount: number }) {
+  if (input.openServiceOrdersCount === 0 && input.todayAppointmentsCount === 0) return `${input.name} está sem carga operacional ativa.`
+  if (input.overdueServiceOrdersCount > 0) return `${input.name} executa ${input.openServiceOrdersCount} O.S. aberta(s), com ${input.overdueServiceOrdersCount} atraso(s).`
+  return `${input.name} executa ${input.openServiceOrdersCount} O.S. aberta(s) e ${input.todayAppointmentsCount} agendamento(s) hoje.`
+}
+
+function buildCapacitySummaryText(input: { serviceOrderCapacityUsagePct: number | null; appointmentCapacityUsagePct: number | null; capacityStatus: PeopleCapacityStatus }) {
+  if (input.serviceOrderCapacityUsagePct == null && input.appointmentCapacityUsagePct == null) return 'Capacidade diária não configurada; uso percentual indisponível.'
+  return `Capacidade ${input.capacityStatus}: O.S. ${input.serviceOrderCapacityUsagePct ?? 'indisponível'}%, agenda ${input.appointmentCapacityUsagePct ?? 'indisponível'}%.`
+}
+
+function buildRiskSummaryText(input: { interventionReason: string | null; operationalStatus: PeopleOperationalStatus }) {
+  return input.interventionReason ?? (input.operationalStatus === 'NORMAL' ? 'Nenhum risco operacional obrigatório identificado.' : 'Sinal operacional requer acompanhamento.')
+}
+
 @Injectable()
 export class PeopleOperationalSummaryService {
   constructor(private readonly prisma: PrismaService) {}
@@ -148,34 +245,44 @@ export class PeopleOperationalSummaryService {
         const futureAppointmentsCount = assignedAppointments.filter((appointment) => appointment.startsAt > now).length
         const todayAppointmentsCount = assignedAppointments.filter((appointment) => appointment.startsAt >= todayStart && appointment.startsAt < tomorrowStart).length
         const load = { openServiceOrdersCount: assignedServiceOrders.length, overdueServiceOrdersCount, futureAppointmentsCount, todayAppointmentsCount }
+        const loadStatus = calculatePeopleLoadStatus(load)
         const availability = calculatePeopleAvailability({
           exceptions: availabilityExceptions.filter((exception) => exception.personId === person.id),
           now,
+        })
+        const serviceOrderCapacityUsagePct = calculateUsagePct(load.openServiceOrdersCount, person.dailyServiceOrderCapacity)
+        const appointmentCapacityUsagePct = calculateUsagePct(load.todayAppointmentsCount, person.dailyAppointmentCapacity)
+        const capacityStatus = calculatePeopleCapacityStatus({
+          openServiceOrdersCount: load.openServiceOrdersCount,
+          todayAppointmentsCount: load.todayAppointmentsCount,
+          dailyServiceOrderCapacity: person.dailyServiceOrderCapacity,
+          dailyAppointmentCapacity: person.dailyAppointmentCapacity,
         })
         const capacity = {
           dailyServiceOrderCapacity: person.dailyServiceOrderCapacity,
           dailyAppointmentCapacity: person.dailyAppointmentCapacity,
           workloadNotes: person.workloadNotes,
-          serviceOrderCapacityUsagePct: calculateUsagePct(load.openServiceOrdersCount, person.dailyServiceOrderCapacity),
-          appointmentCapacityUsagePct: calculateUsagePct(load.todayAppointmentsCount, person.dailyAppointmentCapacity),
-          capacityStatus: calculatePeopleCapacityStatus({
-            openServiceOrdersCount: load.openServiceOrdersCount,
-            todayAppointmentsCount: load.todayAppointmentsCount,
-            dailyServiceOrderCapacity: person.dailyServiceOrderCapacity,
-            dailyAppointmentCapacity: person.dailyAppointmentCapacity,
-          }),
+          serviceOrderCapacityUsagePct,
+          appointmentCapacityUsagePct,
+          capacityStatus,
         }
+        const status = person.active ? 'ACTIVE' : 'INACTIVE'
+        const intervention = derivePeopleOperationalIntervention({ status, ...load, loadStatus, capacityStatus, availabilityStatus: availability.availabilityStatus })
 
         return {
           personId: person.id,
           name: person.name,
           role: person.role,
-          status: person.active ? 'ACTIVE' : 'INACTIVE',
+          status,
           ...load,
           ...capacity,
           ...availability,
           lastActivityAt: lastActivityByPersonId.get(person.id)?.toISOString() ?? null,
-          loadStatus: calculatePeopleLoadStatus(load),
+          loadStatus,
+          ...intervention,
+          operationalSummaryText: buildOperationalSummaryText({ name: person.name, ...load }),
+          capacitySummaryText: buildCapacitySummaryText({ serviceOrderCapacityUsagePct, appointmentCapacityUsagePct, capacityStatus }),
+          riskSummaryText: buildRiskSummaryText(intervention),
         }
       }),
     }
