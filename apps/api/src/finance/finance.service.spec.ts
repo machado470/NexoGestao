@@ -24,6 +24,7 @@ describe('FinanceService hardening', () => {
       fail: jest.fn(),
     } as any
     const metrics = { increment: jest.fn() } as any
+    const audit = { log: jest.fn().mockResolvedValue(undefined) } as any
 
     const service = new FinanceService(
       prisma,
@@ -33,9 +34,10 @@ describe('FinanceService hardening', () => {
       requestContext,
       idempotency,
       metrics,
+      audit,
     )
 
-    return { service, prisma, idempotency, metrics }
+    return { service, prisma, idempotency, metrics, audit }
   }
 
   it('bloqueia geração de cobrança para O.S. cancelada', async () => {
@@ -379,4 +381,112 @@ describe('FinanceService hardening', () => {
     )
   })
 
+})
+
+describe('FinanceService cancelCharge', () => {
+  const buildService = () => {
+    const prisma = {
+      charge: {
+        findFirst: jest.fn(),
+        updateMany: jest.fn(),
+      },
+    } as any
+    const timeline = { log: jest.fn().mockResolvedValue(undefined) } as any
+    const audit = { log: jest.fn().mockResolvedValue(undefined) } as any
+    const service = new FinanceService(
+      prisma,
+      {} as any,
+      timeline,
+      {} as any,
+      { requestId: 'req-1', correlationId: 'corr-1' } as any,
+      {} as any,
+      { increment: jest.fn() } as any,
+      audit,
+    )
+    return { service, prisma, timeline, audit }
+  }
+
+  it('cancela cobrança sem apagar registro e registra timeline/auditoria', async () => {
+    const { service, prisma, timeline, audit } = buildService()
+    const charge = {
+      id: 'ch-1',
+      status: 'PENDING',
+      updatedAt: new Date('2026-06-23T10:00:00.000Z'),
+      customerId: 'cus-1',
+      serviceOrderId: 'os-1',
+      amountCents: 1500,
+      canceledAt: null,
+      canceledByUserId: null,
+      cancellationReason: null,
+    }
+    const canceled = { ...charge, status: 'CANCELED', cancellationReason: 'Duplicada' }
+    prisma.charge.findFirst.mockResolvedValueOnce(charge).mockResolvedValueOnce(canceled)
+    prisma.charge.updateMany.mockResolvedValue({ count: 1 })
+
+    await expect(
+      service.cancelCharge({
+        orgId: 'org-1',
+        id: 'ch-1',
+        actorUserId: 'user-1',
+        cancellationReason: 'Duplicada',
+        expectedUpdatedAt: charge.updatedAt.toISOString(),
+      }),
+    ).resolves.toEqual(canceled)
+
+    expect(prisma.charge.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: 'ch-1', orgId: 'org-1' }),
+      data: expect.objectContaining({
+        status: 'CANCELED',
+        canceledByUserId: 'user-1',
+        cancellationReason: 'Duplicada',
+      }),
+    }))
+    expect((prisma.charge as any).delete).toBeUndefined()
+    expect(timeline.log).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'CHARGE_CANCELED',
+      orgId: 'org-1',
+      chargeId: 'ch-1',
+      customerId: 'cus-1',
+      serviceOrderId: 'os-1',
+      metadata: expect.objectContaining({
+        previousStatus: 'PENDING',
+        nextStatus: 'CANCELED',
+        cancellationReason: 'Duplicada',
+      }),
+    }))
+    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'CHARGE_CANCELED',
+      entityType: 'Charge',
+      entityId: 'ch-1',
+    }))
+  })
+
+  it('não cancela cobrança paga', async () => {
+    const { service, prisma } = buildService()
+    prisma.charge.findFirst.mockResolvedValue({
+      id: 'ch-1',
+      status: 'PAID',
+      customerId: 'cus-1',
+      serviceOrderId: null,
+      amountCents: 1500,
+      updatedAt: new Date(),
+    })
+
+    await expect(
+      service.cancelCharge({ orgId: 'org-1', id: 'ch-1', cancellationReason: 'Erro operacional' }),
+    ).rejects.toBeInstanceOf(BadRequestException)
+    expect(prisma.charge.updateMany).not.toHaveBeenCalled()
+  })
+
+  it('exige motivo útil e limita tamanho', async () => {
+    const { service } = buildService()
+
+    await expect(
+      service.cancelCharge({ orgId: 'org-1', id: 'ch-1', cancellationReason: '  ' }),
+    ).rejects.toBeInstanceOf(BadRequestException)
+
+    await expect(
+      service.cancelCharge({ orgId: 'org-1', id: 'ch-1', cancellationReason: 'x'.repeat(1001) }),
+    ).rejects.toBeInstanceOf(BadRequestException)
+  })
 })

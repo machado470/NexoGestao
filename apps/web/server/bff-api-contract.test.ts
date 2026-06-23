@@ -650,6 +650,48 @@ describe("BFF↔API contract - pagamento manual", () => {
     expect(String((options as RequestInit).body)).not.toContain("orgId");
   });
 
+  it("finance.charges.cancel usa endpoint de cancelamento sem orgId do client", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ data: { id: "ch-1", status: "CANCELED" } }), {
+        status: 200,
+      })
+    );
+    const caller = appRouter.createCaller({
+      req: makeReq(),
+      res: makeRes(),
+      user: { token: "t1", validated: true, organizationId: "org-trusted" },
+    } as any);
+
+    await caller.finance.charges.cancel({
+      chargeId: "ch-1",
+      cancellationReason: "Cobrança duplicada",
+      expectedUpdatedAt: "2026-06-23T10:00:00.000Z",
+    });
+
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(String(url)).toMatch(/\/finance\/charges\/ch-1\/cancel$/);
+    expect((options as RequestInit).method).toBe("POST");
+    expect(JSON.parse(String((options as RequestInit).body))).toEqual({
+      cancellationReason: "Cobrança duplicada",
+      expectedUpdatedAt: "2026-06-23T10:00:00.000Z",
+    });
+    expect(String((options as RequestInit).body)).not.toContain("orgId");
+  });
+
+  it("finance.charges.cancel valida motivo obrigatório", async () => {
+    const caller = appRouter.createCaller({
+      req: makeReq(),
+      res: makeRes(),
+      user: { token: "t1", validated: true },
+    } as any);
+    await expect(
+      caller.finance.charges.cancel({
+        chargeId: "ch-1",
+        cancellationReason: " ",
+      })
+    ).rejects.toBeDefined();
+  });
+
   it("finance.charges.pay rejeita paidAt inválido no BFF", async () => {
     const caller = appRouter.createCaller({
       req: makeReq(),

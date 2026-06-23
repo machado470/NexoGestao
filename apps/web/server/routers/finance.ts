@@ -160,15 +160,21 @@ export const financeRouter = router({
         return unwrapData(raw);
       }),
 
-    delete: protectedProcedure
+    cancel: protectedProcedure
       .input(
         z.object({
-          id: z.union([z.string(), z.number()]).transform((v) => String(v)),
+          chargeId: z.union([z.string(), z.number()]).transform((v) => String(v)),
+          cancellationReason: z.string().trim().min(3, "Motivo do cancelamento é obrigatório").max(1000),
+          expectedUpdatedAt: z.string().datetime().optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const raw = await nexoFetch<unknown>(ctx, `/finance/charges/${input.id}`, {
-          method: "DELETE",
+        const raw = await nexoFetch<unknown>(ctx, `/finance/charges/${input.chargeId}/cancel`, {
+          method: "POST",
+          body: JSON.stringify({
+            cancellationReason: input.cancellationReason,
+            expectedUpdatedAt: input.expectedUpdatedAt,
+          }),
         });
 
         return unwrapData(raw);

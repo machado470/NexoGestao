@@ -8,51 +8,51 @@ datasource db {
 }
 
 model Organization {
-  id                      String                   @id @default(uuid())
-  name                    String
-  slug                    String                   @unique
-  requiresOnboarding      Boolean                  @default(true)
-  timezone                String                   @default("America/Sao_Paulo")
-  currency                String                   @default("BRL")
-  createdAt               DateTime                 @default(now())
-  appointments            Appointment[]
-  auditEvents             AuditEvent[]
-  charges                 Charge[]
-  customers               Customer[]
-  expenses                Expense[]
-  runs                    GovernanceRun[]
-  invoices                Invoice[]
-  launches                Launch[]
-  payments                Payment[]
-  persons                 Person[]
+  id                           String                        @id @default(uuid())
+  name                         String
+  slug                         String                        @unique
+  requiresOnboarding           Boolean                       @default(true)
+  timezone                     String                        @default("America/Sao_Paulo")
+  currency                     String                        @default("BRL")
+  createdAt                    DateTime                      @default(now())
+  appointments                 Appointment[]
+  auditEvents                  AuditEvent[]
+  charges                      Charge[]
+  customers                    Customer[]
+  expenses                     Expense[]
+  runs                         GovernanceRun[]
+  invoices                     Invoice[]
+  launches                     Launch[]
+  payments                     Payment[]
+  persons                      Person[]
   personAvailabilityExceptions PersonAvailabilityException[]
-  referrals               Referral[]
-  serviceOrders           ServiceOrder[]
-  serviceOrderAttachments ServiceOrderAttachment[]
-  timelineEvents          TimelineEvent[]
-  tracks                  Track[]
-  users                   User[]
-  usageMetrics            UsageMetric[]
-  whatsAppConversations   WhatsAppConversation[]
-  whatsAppMessages        WhatsAppMessage[]
-  whatsAppTemplates       WhatsAppTemplate[]
-  whatsAppWebhookEvents   WhatsAppWebhookEvent[]
-  whatsAppActionExecutions WhatsAppActionExecution[]
-  operationalActionExecutions OperationalActionExecution[]
+  referrals                    Referral[]
+  serviceOrders                ServiceOrder[]
+  serviceOrderAttachments      ServiceOrderAttachment[]
+  timelineEvents               TimelineEvent[]
+  tracks                       Track[]
+  users                        User[]
+  usageMetrics                 UsageMetric[]
+  whatsAppConversations        WhatsAppConversation[]
+  whatsAppMessages             WhatsAppMessage[]
+  whatsAppTemplates            WhatsAppTemplate[]
+  whatsAppWebhookEvents        WhatsAppWebhookEvent[]
+  whatsAppActionExecutions     WhatsAppActionExecution[]
+  operationalActionExecutions  OperationalActionExecution[]
 
-  subscription Subscription?
-  executionConfig OrganizationExecutionConfig?
+  subscription     Subscription?
+  executionConfig  OrganizationExecutionConfig?
   featureOverrides TenantFeatureOverride[]
 }
 
 model OrganizationExecutionConfig {
-  id        String       @id @default(uuid())
-  orgId     String       @unique
+  id        String        @id @default(uuid())
+  orgId     String        @unique
   mode      ExecutionMode @default(manual)
   policy    Json?
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
-  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  org       Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   @@index([mode, updatedAt])
 }
@@ -81,35 +81,35 @@ model User {
 }
 
 model Person {
-  id                        String                @id @default(uuid())
+  id                        String                        @id @default(uuid())
   name                      String
   email                     String?
   role                      String
-  active                    Boolean               @default(true)
+  active                    Boolean                       @default(true)
   offboardedAt              DateTime?
   offboardReason            String?
   orgId                     String
-  userId                    String?               @unique
-  riskScore                 Int                   @default(0)
-  createdAt                 DateTime              @default(now())
-  updatedAt                 DateTime              @updatedAt
-  operationalRiskScore      Int                   @default(0)
-  operationalState          OperationalStateValue @default(NORMAL)
+  userId                    String?                       @unique
+  riskScore                 Int                           @default(0)
+  createdAt                 DateTime                      @default(now())
+  updatedAt                 DateTime                      @updatedAt
+  operationalRiskScore      Int                           @default(0)
+  operationalState          OperationalStateValue         @default(NORMAL)
   operationalStateUpdatedAt DateTime?
-  dailyServiceOrderCapacity Int?                  @default(5)
-  dailyAppointmentCapacity  Int?                  @default(5)
+  dailyServiceOrderCapacity Int?                          @default(5)
+  dailyAppointmentCapacity  Int?                          @default(5)
   workloadNotes             String?
   assessments               Assessment[]
   assignments               Assignment[]
   auditEvents               AuditEvent[]
   correctiveActions         CorrectiveAction[]
-  org                       Organization          @relation(fields: [orgId], references: [id])
-  user                      User?                 @relation(fields: [userId], references: [id])
+  org                       Organization                  @relation(fields: [orgId], references: [id])
+  user                      User?                         @relation(fields: [userId], references: [id])
   exceptions                PersonException[]
   availabilityExceptions    PersonAvailabilityException[]
   riskSnapshots             RiskSnapshot[]
-  appointmentsAssigned      Appointment[]         @relation("AppointmentAssignedTo")
-  serviceOrdersAssigned     ServiceOrder[]        @relation("ServiceOrderAssignedTo")
+  appointmentsAssigned      Appointment[]                 @relation("AppointmentAssignedTo")
+  serviceOrdersAssigned     ServiceOrder[]                @relation("ServiceOrderAssignedTo")
   timelineEvents            TimelineEvent[]
   itemCompletions           TrackItemCompletion[]
 
@@ -330,31 +330,31 @@ model GovernanceRun {
 }
 
 model Customer {
-  id               String            @id @default(uuid())
-  orgId            String
-  name             String
-  phone            String
-  email            String?
-  cpfCnpj          String?
-  address          String?
-  notes            String?
-  active           Boolean           @default(true)
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  appointments     Appointment[]
-  charges          Charge[]
-  org              Organization      @relation(fields: [orgId], references: [id])
-  invoices         Invoice[]
-  serviceOrders    ServiceOrder[]
+  id                    String                 @id @default(uuid())
+  orgId                 String
+  name                  String
+  phone                 String
+  email                 String?
+  cpfCnpj               String?
+  address               String?
+  notes                 String?
+  active                Boolean                @default(true)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  appointments          Appointment[]
+  charges               Charge[]
+  org                   Organization           @relation(fields: [orgId], references: [id])
+  invoices              Invoice[]
+  serviceOrders         ServiceOrder[]
   whatsAppConversations WhatsAppConversation[]
   whatsAppMessages      WhatsAppMessage[]
   timelineEvents        TimelineEvent[]
 
+  @@unique([orgId, phone])
+  @@unique([orgId, email])
   @@index([orgId, createdAt])
   @@index([orgId, active, createdAt])
   @@index([orgId, email])
-  @@unique([orgId, phone])
-  @@unique([orgId, email])
 }
 
 model Appointment {
@@ -435,24 +435,27 @@ model ServiceOrderAttachment {
 }
 
 model Charge {
-  id             String          @id @default(uuid())
-  orgId          String
-  customerId     String
-  idempotencyKey String?         @unique
-  serviceOrderId String?
-  amountCents    Int
-  currency       String          @default("BRL")
-  status         ChargeStatus    @default(PENDING)
-  dueDate        DateTime
-  paidAt         DateTime?
-  notes          String?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  customer       Customer        @relation(fields: [customerId], references: [id])
-  org            Organization    @relation(fields: [orgId], references: [id])
-  serviceOrder   ServiceOrder?   @relation(fields: [serviceOrderId], references: [id])
-  payments       Payment[]
-  timelineEvents TimelineEvent[]
+  id                 String          @id @default(uuid())
+  orgId              String
+  customerId         String
+  idempotencyKey     String?         @unique
+  serviceOrderId     String?
+  amountCents        Int
+  currency           String          @default("BRL")
+  status             ChargeStatus    @default(PENDING)
+  dueDate            DateTime
+  paidAt             DateTime?
+  canceledAt         DateTime?
+  cancellationReason String?
+  canceledByUserId   String?
+  notes              String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  customer           Customer        @relation(fields: [customerId], references: [id])
+  org                Organization    @relation(fields: [orgId], references: [id])
+  serviceOrder       ServiceOrder?   @relation(fields: [serviceOrderId], references: [id])
+  payments           Payment[]
+  timelineEvents     TimelineEvent[]
 
   @@index([orgId, createdAt])
   @@index([customerId, createdAt])
@@ -529,7 +532,7 @@ model IdempotencyRecord {
 }
 
 model Expense {
-  id              String   @id @default(dbgenerated("gen_random_uuid()"))
+  id              String            @id @default(dbgenerated("gen_random_uuid()"))
   orgId           String
   title           String
   description     String?
@@ -543,8 +546,8 @@ model Expense {
   notes           String?
   receiptUrl      String?
   createdByUserId String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @default(now()) @updatedAt
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @default(now()) @updatedAt
 
   User User?        @relation(fields: [createdByUserId], references: [id])
   org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
@@ -628,38 +631,38 @@ model Referral {
 }
 
 model WhatsAppConversation {
-  id             String                      @id @default(uuid())
-  orgId          String
-  customerId     String?
-  provider       String?
-  providerConversationId String?
-  phone          String
-  title          String?
-  status         WhatsAppConversationStatus  @default(OPEN)
-  priority       WhatsAppConversationPriority @default(MEDIUM)
-  priorityReason String?
-  intent         WhatsAppInboundIntent        @default(GENERAL_INTENT)
-  intentReason   String?
-  intentConfidence Float?
-  assignedUserId String?
-  contextType    WhatsAppContextType         @default(GENERAL)
-  contextId      String?
-  lastMessageAt  DateTime?
-  lastInboundAt  DateTime?
-  lastOutboundAt DateTime?
-  waitingSince   DateTime?
-  responseDueAt  DateTime?
-  slaStatus      WhatsAppSlaStatus           @default(OK)
-  suggestedActions Json?
+  id                      String                       @id @default(uuid())
+  orgId                   String
+  customerId              String?
+  provider                String?
+  providerConversationId  String?
+  phone                   String
+  title                   String?
+  status                  WhatsAppConversationStatus   @default(OPEN)
+  priority                WhatsAppConversationPriority @default(MEDIUM)
+  priorityReason          String?
+  intent                  WhatsAppInboundIntent        @default(GENERAL_INTENT)
+  intentReason            String?
+  intentConfidence        Float?
+  assignedUserId          String?
+  contextType             WhatsAppContextType          @default(GENERAL)
+  contextId               String?
+  lastMessageAt           DateTime?
+  lastInboundAt           DateTime?
+  lastOutboundAt          DateTime?
+  waitingSince            DateTime?
+  responseDueAt           DateTime?
+  slaStatus               WhatsAppSlaStatus            @default(OK)
+  suggestedActions        Json?
   intelligenceExplanation Json?
-  intelligenceVersion Int                    @default(1)
-  unreadCount    Int                         @default(0)
-  createdAt      DateTime                    @default(now())
-  updatedAt      DateTime                    @updatedAt
+  intelligenceVersion     Int                          @default(1)
+  unreadCount             Int                          @default(0)
+  createdAt               DateTime                     @default(now())
+  updatedAt               DateTime                     @updatedAt
 
-  org       Organization      @relation(fields: [orgId], references: [id])
-  customer  Customer?         @relation(fields: [customerId], references: [id])
-  messages  WhatsAppMessage[]
+  org              Organization              @relation(fields: [orgId], references: [id])
+  customer         Customer?                 @relation(fields: [customerId], references: [id])
+  messages         WhatsAppMessage[]
   actionExecutions WhatsAppActionExecution[]
 
   @@index([orgId, customerId])
@@ -674,28 +677,27 @@ model WhatsAppConversation {
   @@index([orgId, slaStatus, responseDueAt])
 }
 
-
 model WhatsAppActionExecution {
-  id                String                         @id @default(uuid())
-  orgId             String
-  conversationId    String
-  suggestedAction   WhatsAppSuggestedAction
-  status            WhatsAppActionExecutionStatus @default(PENDING_APPROVAL)
-  approvalRequired  Boolean                        @default(true)
-  approvedBy        String?
-  executedBy        String?
-  cancelledBy       String?
-  executionReason   String?
-  executionResult   Json?
-  actionPayload     Json?
-  idempotencyKey    String
-  failureReason     String?
-  approvedAt        DateTime?
-  executedAt        DateTime?
-  failedAt          DateTime?
-  cancelledAt       DateTime?
-  createdAt         DateTime                       @default(now())
-  updatedAt         DateTime                       @updatedAt
+  id               String                        @id @default(uuid())
+  orgId            String
+  conversationId   String
+  suggestedAction  WhatsAppSuggestedAction
+  status           WhatsAppActionExecutionStatus @default(PENDING_APPROVAL)
+  approvalRequired Boolean                       @default(true)
+  approvedBy       String?
+  executedBy       String?
+  cancelledBy      String?
+  executionReason  String?
+  executionResult  Json?
+  actionPayload    Json?
+  idempotencyKey   String
+  failureReason    String?
+  approvedAt       DateTime?
+  executedAt       DateTime?
+  failedAt         DateTime?
+  cancelledAt      DateTime?
+  createdAt        DateTime                      @default(now())
+  updatedAt        DateTime                      @updatedAt
 
   org          Organization         @relation(fields: [orgId], references: [id], onDelete: Cascade)
   conversation WhatsAppConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
@@ -726,17 +728,17 @@ model WhatsAppTemplate {
 }
 
 model WhatsAppMessage {
-  id                String                 @id @default(uuid())
+  id                String                @id @default(uuid())
   orgId             String
   conversationId    String?
   customerId        String?
-  channel           MessageChannel         @default(WHATSAPP)
-  direction         WhatsAppDirection      @default(OUTBOUND)
+  channel           MessageChannel        @default(WHATSAPP)
+  direction         WhatsAppDirection     @default(OUTBOUND)
   entityType        WhatsAppEntityType
   entityId          String
   messageType       WhatsAppMessageType
-  messageKey        String?                @unique
-  status            WhatsAppMessageStatus  @default(QUEUED)
+  messageKey        String?               @unique
+  status            WhatsAppMessageStatus @default(QUEUED)
   toPhone           String
   fromPhone         String?
   renderedText      String
@@ -752,8 +754,8 @@ model WhatsAppMessage {
   failedAt          DateTime?
   lockedAt          DateTime?
   lockedBy          String?
-  createdAt         DateTime               @default(now())
-  updatedAt         DateTime               @updatedAt
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
 
   conversation WhatsAppConversation? @relation(fields: [conversationId], references: [id])
   customer     Customer?             @relation(fields: [customerId], references: [id])
@@ -768,7 +770,7 @@ model WhatsAppMessage {
 }
 
 model WhatsAppWebhookEvent {
-  id                String                 @id @default(uuid())
+  id                String                @id @default(uuid())
   orgId             String?
   provider          String
   eventType         String
@@ -776,10 +778,10 @@ model WhatsAppWebhookEvent {
   traceId           String?
   providerMessageId String?
   processedAt       DateTime?
-  status            WhatsAppWebhookStatus  @default(RECEIVED)
+  status            WhatsAppWebhookStatus @default(RECEIVED)
   errorMessage      String?
-  retryAttempts     Int                    @default(0)
-  createdAt         DateTime               @default(now())
+  retryAttempts     Int                   @default(0)
+  createdAt         DateTime              @default(now())
 
   org Organization? @relation(fields: [orgId], references: [id])
 
@@ -834,14 +836,14 @@ model TenantFeatureOverride {
 }
 
 model BillingEvent {
-  id             String             @id @default(uuid())
-  subscriptionId String
+  id              String             @id @default(uuid())
+  subscriptionId  String
   providerEventId String?            @unique
-  type           BillingEventType
-  amountCents    Int
-  status         BillingEventStatus
-  description    String?
-  createdAt      DateTime           @default(now())
+  type            BillingEventType
+  amountCents     Int
+  status          BillingEventStatus
+  description     String?
+  createdAt       DateTime           @default(now())
 
   subscription Subscription @relation(fields: [subscriptionId], references: [id])
 }

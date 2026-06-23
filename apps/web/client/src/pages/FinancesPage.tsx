@@ -490,7 +490,7 @@ export default function FinancesPage() {
   );
 
   const markPaidMutation = trpc.finance.charges.pay.useMutation();
-  const cancelMutation = trpc.finance.charges.delete.useMutation();
+  const cancelMutation = trpc.finance.charges.cancel.useMutation();
   const editMutation = trpc.finance.charges.update.useMutation();
 
   const charges = useMemo(
@@ -1334,10 +1334,24 @@ export default function FinancesPage() {
 
   async function handleCancelCharge(charge: ChargeRecord) {
     if (!charge?.id) return;
+    if (charge.status === "PAID") {
+      toast.error("Cobrança paga não pode ser cancelada.");
+      return;
+    }
+    const cancellationReason = window.prompt(
+      "Cancelar cobrança\n\nEsta cobrança será mantida no histórico como cancelada. Ela não será apagada.\n\nMotivo do cancelamento"
+    )?.trim();
+    if (!cancellationReason) {
+      toast.error("Motivo do cancelamento é obrigatório.");
+      return;
+    }
     try {
-      await cancelMutation.mutateAsync({ id: String(charge.id) });
+      await cancelMutation.mutateAsync({
+        chargeId: String(charge.id),
+        cancellationReason,
+        expectedUpdatedAt: charge.updatedAt ? String(charge.updatedAt) : undefined,
+      });
       toast.success("Cobrança cancelada com sucesso.");
-      if (selectedChargeId === String(charge.id)) setSelectedChargeId(null);
       await refreshAll();
     } catch (error: any) {
       toast.error(error?.message ?? "Falha ao cancelar cobrança.");
@@ -1903,6 +1917,14 @@ export default function FinancesPage() {
                 <p className="mt-1 text-xs text-[var(--text-muted)]">
                   {getChargeRisk(selectedFinancialRecord)}
                 </p>
+                {selectedFinancialRecord.status === "CANCELED" ? (
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">
+                    Cancelada em {formatDate(selectedFinancialRecord.canceledAt)}
+                    {selectedFinancialRecord.cancellationReason
+                      ? ` · Motivo: ${selectedFinancialRecord.cancellationReason}`
+                      : ""}
+                  </p>
+                ) : null}
               </AppInfoCard>
               <AppInfoCard>
                 <p className="text-xs text-[var(--text-muted)]">
