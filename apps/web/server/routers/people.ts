@@ -85,6 +85,30 @@ const peopleRiskSchema = z
   })
   .default({ riskReasons: [] });
 
+const peopleFinanceSchema = z
+  .object({
+    receivedAmountFromAssignedServiceOrders: z.number().default(0),
+    pendingAmountFromAssignedServiceOrders: z.number().default(0),
+    overdueAmountFromAssignedServiceOrders: z.number().default(0),
+    paidChargesCountFromAssignedServiceOrders: z.number().default(0),
+    pendingChargesCountFromAssignedServiceOrders: z.number().default(0),
+    overdueChargesCountFromAssignedServiceOrders: z.number().default(0),
+    financeAttributionNote: z.string().nullable().optional(),
+  })
+  .nullable()
+  .optional();
+const peopleWhatsappSchema = z
+  .object({
+    assignedConversationsCount: z.number().default(0),
+    waitingOperatorConversationsCount: z.number().nullable().optional(),
+    failedMessagesCount: z.number().default(0),
+    sentMessagesCount: z.number().default(0),
+    lastConversationAt: z.string().nullable().optional(),
+    whatsappAttributionNote: z.string().nullable().optional(),
+  })
+  .nullable()
+  .optional();
+
 const peopleOperationalSummaryPersonSchema = z
   .object({
     personId: z.string(),
@@ -119,6 +143,8 @@ const peopleOperationalSummaryPersonSchema = z
     serviceOrders: peopleServiceOrdersSchema,
     timeline: peopleTimelineSchema,
     risk: peopleRiskSchema,
+    finance: peopleFinanceSchema,
+    whatsapp: peopleWhatsappSchema,
   })
   .passthrough();
 

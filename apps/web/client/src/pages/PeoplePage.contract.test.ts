@@ -160,6 +160,21 @@ describe("PeoplePage human operation center contract", () => {
     expect(source).toContain('data-testid="people-recommended-action"');
   });
 
+  it("renderiza blocos opcionais de financeiro relacionado e comunicação atribuída sem comissão ou venda inventada", () => {
+    expect(source).toContain('data-testid="people-related-finance"');
+    expect(source).toContain('data-testid="people-related-finance-empty"');
+    expect(source).toContain('data-testid="people-attributed-communication"');
+    expect(source).toContain("receivedAmountFromAssignedServiceOrders");
+    expect(source).toContain("pendingAmountFromAssignedServiceOrders");
+    expect(source).toContain("overdueAmountFromAssignedServiceOrders");
+    expect(source).toContain("financeAttributionNote");
+    expect(source).toContain("assignedConversationsCount");
+    expect(source).toContain("failedMessagesCount");
+    expect(source).toContain("lastConversationAt");
+    expect(source).toContain("não são comissão nem venda atribuída");
+    expect(source).not.toContain("produtividade financeira individual");
+  });
+
   it("mantém sinais de atribuição com erro parcial e retry", () => {
     expect(source).toContain('data-testid="assignee-warning-summary-error"');
     expect(source).toContain("Sinais de atribuição indisponíveis agora.");
