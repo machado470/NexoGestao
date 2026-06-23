@@ -14,6 +14,7 @@ import {
   buildDeterministicMessageKey,
 } from '../whatsapp/whatsapp.service'
 import { TimelineService } from '../timeline/timeline.service'
+import { AuditService } from '../audit/audit.service'
 import { ChargesQueryDto } from './dto/charges-query.dto'
 import { AnalyticsService, UsageMetricEvent } from '../analytics/analytics.service'
 import { RequestContextService } from '../common/context/request-context.service'
@@ -34,6 +35,7 @@ export class FinanceService {
     private readonly requestContext: RequestContextService,
     private readonly idempotency: IdempotencyService,
     private readonly metrics: MetricsService,
+    private readonly audit: AuditService,
   ) {}
 
   private logCritical(params: {
@@ -497,7 +499,9 @@ export class FinanceService {
       throw new BadRequestException('Cobrança paga não pode ser cancelada')
     }
 
-    const expectedUpdatedAt = this.parseExpectedUpdatedAt(input.expectedUpdatedAt)
+    const expectedUpdatedAt = this.parseExpectedUpdatedAt(
+      input.expectedUpdatedAt,
+    )
 
     const mutation = await this.prisma.charge.updateMany({
       where: {
@@ -554,19 +558,132 @@ export class FinanceService {
     return updated
   }
 
-  async deleteCharge(input: {
+  private normalizeCancellationReason(reason: string) {
+    const normalized = String(reason ?? '').trim()
+    if (normalized.length < 3) {
+      throw new BadRequestException('Motivo do cancelamento é obrigatório')
+    }
+    if (normalized.length > 1000) {
+      throw new BadRequestException(
+        'Motivo do cancelamento deve ter no máximo 1000 caracteres',
+      )
+    }
+    return normalized
+  }
+
+  async cancelCharge(input: {
     orgId: string
     id: string
     actorUserId?: string | null
+    cancellationReason: string
+    expectedUpdatedAt?: string | null
   }) {
+    const reason = this.normalizeCancellationReason(input.cancellationReason)
     const charge = await this.prisma.charge.findFirst({
       where: { id: input.id, orgId: input.orgId },
-      select: { id: true },
+      select: {
+        id: true,
+        status: true,
+        updatedAt: true,
+        customerId: true,
+        serviceOrderId: true,
+        amountCents: true,
+        canceledAt: true,
+        canceledByUserId: true,
+        cancellationReason: true,
+      },
     })
 
     if (!charge) throw new NotFoundException('Charge não encontrada')
+    if (charge.status === 'PAID') {
+      throw new BadRequestException('Cobrança paga não pode ser cancelada')
+    }
+    if (charge.status === 'CANCELED') {
+      return { ...charge, idempotent: true }
+    }
 
-    return this.prisma.charge.delete({ where: { id: charge.id } })
+    this.assertChargeStatusTransition(charge.status, 'CANCELED')
+    const expectedUpdatedAt = this.parseExpectedUpdatedAt(
+      input.expectedUpdatedAt,
+    )
+    const canceledAt = new Date()
+
+    const mutation = await this.prisma.charge.updateMany({
+      where: {
+        id: charge.id,
+        orgId: input.orgId,
+        updatedAt: expectedUpdatedAt,
+      },
+      data: {
+        status: 'CANCELED',
+        canceledAt,
+        canceledByUserId: input.actorUserId ?? null,
+        cancellationReason: reason,
+      },
+    })
+
+    if (mutation.count !== 1) {
+      const latest = await this.prisma.charge.findFirst({
+        where: { id: charge.id, orgId: input.orgId },
+        select: { id: true, status: true, updatedAt: true },
+      })
+      throw new ConflictException({
+        code: 'CHARGE_CONCURRENT_MODIFICATION',
+        message:
+          'Cobrança foi alterada por outra operação. Recarregue antes de cancelar.',
+        details: latest ?? { chargeId: input.id },
+      })
+    }
+
+    const metadata = {
+      chargeId: charge.id,
+      customerId: charge.customerId,
+      serviceOrderId: charge.serviceOrderId ?? null,
+      amountCents: charge.amountCents,
+      previousStatus: charge.status,
+      nextStatus: 'CANCELED',
+      cancellationReason: reason,
+      canceledByUserId: input.actorUserId ?? null,
+      canceledAt: canceledAt.toISOString(),
+      actorUserId: input.actorUserId ?? null,
+    }
+
+    await this.safeTimelineLog({
+      orgId: input.orgId,
+      action: 'CHARGE_CANCELED',
+      description: `Cobrança ${charge.id} cancelada`,
+      customerId: charge.customerId,
+      serviceOrderId: charge.serviceOrderId ?? null,
+      chargeId: charge.id,
+      metadata,
+    })
+
+    try {
+      await this.audit.log({
+        orgId: input.orgId,
+        action: 'CHARGE_CANCELED',
+        actorUserId: input.actorUserId ?? null,
+        entityType: 'Charge',
+        entityId: charge.id,
+        context: 'Cobrança cancelada sem exclusão física',
+        metadata,
+      })
+    } catch (error) {
+      this.logCritical({
+        level: 'error',
+        action: 'CHARGE_CANCELED_AUDIT_FAILED',
+        entityId: charge.id,
+        message: 'Falha ao registrar auditoria de cancelamento de cobrança',
+        extra: {
+          orgId: input.orgId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      })
+    }
+
+    return this.prisma.charge.findFirst({
+      where: { id: charge.id, orgId: input.orgId },
+    })
   }
 
   private parseManualPaymentDate(value?: string | null): Date {

@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Delete,
+  MethodNotAllowedException,
   Get,
   Headers,
   Param,
@@ -25,6 +26,7 @@ import { CreatePaymentDto } from './dto/create-payment.dto'
 import { ChargesQueryDto } from './dto/charges-query.dto'
 import { CreateChargeDto } from './dto/create-charge.dto'
 import { UpdateChargeDto } from './dto/update-charge.dto'
+import { CancelChargeDto } from './dto/cancel-charge.dto'
 import { TenantOperationsService } from '../common/tenant-ops/tenant-ops.service'
 import {
   CommercialPolicyService,
@@ -187,22 +189,33 @@ export class FinanceController {
     return { ok: true, data }
   }
 
-  @Delete('charges/:id')
+  @Post('charges/:id/cancel')
   @Roles('ADMIN', 'MANAGER')
-  async deleteCharge(
+  async cancelCharge(
     @Org() orgId: string,
     @User() user: AuthUser,
     @Param('id') id: string,
+    @Body() body: CancelChargeDto,
   ) {
     const actorUserId = user?.userId ?? user?.sub ?? null
 
-    await this.finance.deleteCharge({
+    const data = await this.finance.cancelCharge({
       orgId,
       id,
       actorUserId,
+      cancellationReason: body.cancellationReason,
+      expectedUpdatedAt: body.expectedUpdatedAt,
     })
 
-    return { ok: true }
+    return { ok: true, data }
+  }
+
+  @Delete('charges/:id')
+  @Roles('ADMIN', 'MANAGER')
+  async deleteCharge() {
+    throw new MethodNotAllowedException(
+      'Exclusão física de cobrança foi desativada. Use POST /finance/charges/:id/cancel com cancellationReason.',
+    )
   }
 
   @Post('charges/:chargeId/pay')
