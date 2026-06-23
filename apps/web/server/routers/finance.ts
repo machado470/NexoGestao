@@ -39,6 +39,15 @@ export const financeRouter = router({
       }),
   }),
 
+  operationalQueue: protectedProcedure
+    .input(z.object({ limit: z.number().int().positive().max(50).default(50) }).optional())
+    .query(async ({ input, ctx }) => {
+      const params = new URLSearchParams();
+      params.set("limit", String(input?.limit ?? 50));
+      const raw = await nexoFetch<unknown>(ctx, `/finance/operational-queue?${params.toString()}`, { method: "GET" });
+      return unwrapData(raw);
+    }),
+
   charges: router({
     create: protectedProcedure
       .input(

@@ -708,3 +708,19 @@ describe("BFF↔API contract - pagamento manual", () => {
     ).rejects.toBeDefined();
   });
 });
+
+describe('finance.operationalQueue contract', () => {
+  it('repassa apenas limit e nunca orgId vindo do client', async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url: any, init?: RequestInit) => {
+      calls.push({ url: String(url), init });
+      return new Response(JSON.stringify({ success: true, data: { ok: true, data: { items: [], meta: { limit: 50, total: 0 } } } }), { status: 200, headers: { "content-type": "application/json" } });
+    });
+    const caller = appRouter.createCaller({ req: makeReq(), res: makeRes(), user: { validated: true } as any });
+
+    await caller.finance.operationalQueue({ limit: 50 });
+
+    expect(calls[0].url).toMatch(/\/finance\/operational-queue\?limit=50$/);
+    expect(calls[0].url).not.toContain('orgId=');
+  });
+});

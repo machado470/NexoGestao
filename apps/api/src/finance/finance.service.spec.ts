@@ -490,3 +490,83 @@ describe('FinanceService cancelCharge', () => {
     ).rejects.toBeInstanceOf(BadRequestException)
   })
 })
+
+describe('FinanceService operational queue', () => {
+  const buildQueueService = () => {
+    const prisma = {
+      charge: { findMany: jest.fn() },
+      timelineEvent: { findMany: jest.fn() },
+      whatsAppMessage: { findMany: jest.fn() },
+    } as any
+    const timeline = { log: jest.fn().mockResolvedValue(undefined) } as any
+    const service = new FinanceService(
+      prisma,
+      {} as any,
+      timeline,
+      {} as any,
+      { requestId: 'req-queue', correlationId: 'corr-queue' } as any,
+      {} as any,
+      { increment: jest.fn() } as any,
+      {} as any,
+    )
+    return { service, prisma, timeline }
+  }
+
+  beforeEach(() => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-06-23T12:00:00.000Z'))
+  })
+
+  afterEach(() => {
+    jest.useRealTimers()
+  })
+
+  it('ordena vencidas por impacto, risco e contato e calcula ação recomendada', async () => {
+    const { service, prisma } = buildQueueService()
+    prisma.charge.findMany.mockResolvedValue([
+      { id: 'low', orgId: 'org-a', customerId: 'c-low', amountCents: 10000, status: 'OVERDUE', dueDate: new Date('2026-06-20T00:00:00Z'), payments: [], customer: { name: 'Baixo' } },
+      { id: 'high', orgId: 'org-a', customerId: 'c-high', amountCents: 200000, status: 'OVERDUE', dueDate: new Date('2026-06-10T00:00:00Z'), payments: [], customer: { name: 'Alto' } },
+      { id: 'future', orgId: 'org-a', customerId: 'c-future', amountCents: 300000, status: 'PENDING', dueDate: new Date('2026-07-10T00:00:00Z'), payments: [], customer: { name: 'Futuro' } },
+    ])
+    prisma.timelineEvent.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ customerId: 'c-high', metadata: { nextState: 'RESTRICTED' } }])
+    prisma.whatsAppMessage.findMany.mockResolvedValue([])
+
+    const result = await service.getOperationalQueue('org-a', { limit: 50 })
+
+    expect(prisma.charge.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { orgId: 'org-a', status: { in: ['PENDING', 'OVERDUE'] } },
+      take: 200,
+    }))
+    expect(result.items.map((item: any) => item.id)).toEqual(['high', 'low', 'future'])
+    expect(result.items[0].financialOperationalSummary).toMatchObject({
+      priority: 'HIGH',
+      daysOverdue: 13,
+      riskLevel: 'RESTRICTED',
+      recommendedAction: 'CALL_CUSTOMER',
+      recommendedActionTarget: 'CUSTOMER',
+    })
+    expect(result.items[0].nextBestCollectionAction).toBe('CALL_CUSTOMER')
+  })
+
+  it('limita a fila a 50 itens e não depende de orgId do cliente', async () => {
+    const { service, prisma } = buildQueueService()
+    prisma.charge.findMany.mockResolvedValue(Array.from({ length: 55 }, (_, index) => ({
+      id: `ch-${index}`,
+      orgId: 'org-safe',
+      customerId: `c-${index}`,
+      amountCents: 1000 + index,
+      status: 'PENDING',
+      dueDate: new Date('2026-06-24T00:00:00Z'),
+      payments: [],
+      customer: { name: `Cliente ${index}` },
+    })))
+    prisma.timelineEvent.findMany.mockResolvedValue([])
+    prisma.whatsAppMessage.findMany.mockResolvedValue([])
+
+    const result = await service.getOperationalQueue('org-safe', { limit: 999 })
+
+    expect(result.items).toHaveLength(50)
+    expect(prisma.charge.findMany.mock.calls[0][0].where.orgId).toBe('org-safe')
+  })
+})
