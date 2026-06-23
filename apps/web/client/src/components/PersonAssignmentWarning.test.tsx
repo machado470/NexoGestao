@@ -76,7 +76,7 @@ describe("passive manual assignee warning UI contract", () => {
 
   it("exibe o aviso no fluxo padronizado de agendamentos sem alterar o responsável enviado", () => {
     expect(appointmentPage).toContain("<AppPageShell>");
-    expect(appointmentPage).toContain("<AppDataTable");
+    expect(appointmentPage).toContain("AppSectionCard");
     expect(appointmentPage).toContain("<AppRowActionsDropdown");
     expect(appointmentPageCompact).toContain(
       'personId={ form.assignedToPersonId === "unassigned" ? null : form.assignedToPersonId }'
@@ -129,7 +129,9 @@ describe("passive manual assignee warning UI contract", () => {
     expect(editServiceOrderModal).toContain(
       "? parsed.data.assignedToPersonId\n          : null"
     );
-    expect(createServiceOrderModal).not.toContain("getPersonAssignmentWarning(");
+    expect(createServiceOrderModal).not.toContain(
+      "getPersonAssignmentWarning("
+    );
     expect(editServiceOrderModal).not.toContain("getPersonAssignmentWarning(");
   });
 });

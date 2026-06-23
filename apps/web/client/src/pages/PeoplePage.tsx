@@ -102,6 +102,29 @@ type TeamTimelineEvent = {
   occurredAt?: string | null;
   timestamp?: string | null;
 };
+type PersonNextAppointment = {
+  id: string;
+  customerName?: string | null;
+  startsAt: string;
+  status: string;
+};
+type PersonRecentServiceOrder = {
+  id: string;
+  number?: string | null;
+  customerName?: string | null;
+  status: string;
+  dueAt?: string | null;
+  completedAt?: string | null;
+};
+type PersonTimelineEvent = {
+  id: string;
+  eventType?: string | null;
+  entityType?: string | null;
+  entityId?: string | null;
+  title?: string | null;
+  description?: string | null;
+  createdAt: string;
+};
 type OperationalPerson = {
   personId: string;
   name: string;
@@ -130,6 +153,31 @@ type OperationalPerson = {
   operationalSummaryText?: string | null;
   capacitySummaryText?: string | null;
   riskSummaryText?: string | null;
+  customers?: {
+    activeCustomersCount: number;
+    attendedCustomersCount: number;
+    customersWithOpenServiceOrdersCount: number;
+    customersWithOverdueServiceOrdersCount: number;
+  };
+  appointments?: {
+    nextAppointments: PersonNextAppointment[];
+    delayedAppointmentsCount?: number | null;
+    conflictsCount?: number | null;
+  };
+  serviceOrders?: {
+    completedServiceOrdersCount: number;
+    averageCompletionMinutes?: number | null;
+    completionRatePct?: number | null;
+    recentServiceOrders: PersonRecentServiceOrder[];
+  };
+  timeline?: { lastEvents: PersonTimelineEvent[] };
+  risk?: {
+    riskScore?: number | null;
+    operationalRiskScore?: number | null;
+    operationalState?: string | null;
+    riskTrend?: string | null;
+    riskReasons: string[];
+  };
 };
 type PeopleFilter =
   | "all"
@@ -584,7 +632,9 @@ function personOperationalSentence(person: OperationalPerson) {
 
 function rankingNarrative(person: OperationalPerson) {
   if (person.capacitySummaryText || person.interventionReason) {
-    return [person.interventionReason, person.capacitySummaryText].filter(Boolean).join(" ");
+    return [person.interventionReason, person.capacitySummaryText]
+      .filter(Boolean)
+      .join(" ");
   }
   if (!hasAssignedItems(person)) {
     return "Sem carga atribuída atualmente. Capacidade totalmente disponível. Nenhum atraso registrado.";
@@ -1467,6 +1517,173 @@ export default function PeoplePage() {
                   helper={`Agenda ${formatCapacity(selectedPerson.dailyAppointmentCapacity)}.`}
                 />
               </OperationalSectionGrid>
+
+              <OperationalSectionGrid>
+                <AppSectionCard
+                  className="p-4"
+                  data-testid="people-recent-execution"
+                >
+                  <p className="mb-2 text-sm font-semibold">Execução recente</p>
+                  <div className="grid gap-2 text-sm md:grid-cols-3">
+                    <span>
+                      O.S. concluídas:{" "}
+                      {selectedPerson.serviceOrders
+                        ?.completedServiceOrdersCount ?? 0}
+                    </span>
+                    <span>
+                      Tempo médio:{" "}
+                      {selectedPerson.serviceOrders?.averageCompletionMinutes ==
+                      null
+                        ? "sem base"
+                        : `${selectedPerson.serviceOrders.averageCompletionMinutes} min`}
+                    </span>
+                    <span>
+                      Taxa de conclusão:{" "}
+                      {selectedPerson.serviceOrders?.completionRatePct == null
+                        ? "sem base"
+                        : `${selectedPerson.serviceOrders.completionRatePct}%`}
+                    </span>
+                  </div>
+                  {(selectedPerson.serviceOrders?.recentServiceOrders?.length ??
+                    0) > 0 ? (
+                    <div className="mt-3 space-y-2">
+                      {selectedPerson.serviceOrders!.recentServiceOrders.map(
+                        order => (
+                          <OperationalTimelineItem
+                            key={order.id}
+                            title={`O.S. ${order.number ?? order.id}`}
+                            description={`${order.customerName ?? "Cliente não informado"} · ${order.status}`}
+                            time={formatDateTime(
+                              order.completedAt ?? order.dueAt ?? null
+                            )}
+                          />
+                        )
+                      )}
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-sm text-[var(--nexo-text-muted,var(--text-muted))]">
+                      Sem O.S. recente confiável para esta pessoa.
+                    </p>
+                  )}
+                </AppSectionCard>
+                <AppSectionCard
+                  className="p-4"
+                  data-testid="people-next-appointments"
+                >
+                  <p className="mb-2 text-sm font-semibold">Agenda próxima</p>
+                  {(selectedPerson.appointments?.nextAppointments?.length ??
+                    0) > 0 ? (
+                    <div className="space-y-2">
+                      {selectedPerson.appointments!.nextAppointments.map(
+                        appointment => (
+                          <OperationalTimelineItem
+                            key={appointment.id}
+                            title={
+                              appointment.customerName ??
+                              "Cliente não informado"
+                            }
+                            description={appointment.status}
+                            time={formatDateTime(appointment.startsAt)}
+                          />
+                        )
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-[var(--nexo-text-muted,var(--text-muted))]">
+                      Sem próximos compromissos vinculados.
+                    </p>
+                  )}
+                </AppSectionCard>
+                <AppSectionCard
+                  className="p-4"
+                  data-testid="people-linked-customers"
+                >
+                  <p className="mb-2 text-sm font-semibold">
+                    Clientes vinculados
+                  </p>
+                  <div className="grid gap-2 text-sm sm:grid-cols-2">
+                    <span>
+                      Ativos:{" "}
+                      {selectedPerson.customers?.activeCustomersCount ?? 0}
+                    </span>
+                    <span>
+                      Atendidos:{" "}
+                      {selectedPerson.customers?.attendedCustomersCount ?? 0}
+                    </span>
+                    <span>
+                      Com O.S. aberta:{" "}
+                      {selectedPerson.customers
+                        ?.customersWithOpenServiceOrdersCount ?? 0}
+                    </span>
+                    <span>
+                      Com atraso:{" "}
+                      {selectedPerson.customers
+                        ?.customersWithOverdueServiceOrdersCount ?? 0}
+                    </span>
+                  </div>
+                </AppSectionCard>
+                <AppSectionCard
+                  className="p-4"
+                  data-testid="people-individual-risk"
+                >
+                  <p className="mb-2 text-sm font-semibold">Risco individual</p>
+                  {selectedPerson.risk ? (
+                    <div className="space-y-2 text-sm">
+                      <p>
+                        Score: {selectedPerson.risk.riskScore ?? "sem base"} ·
+                        Operacional:{" "}
+                        {selectedPerson.risk.operationalRiskScore ?? "sem base"}
+                      </p>
+                      <p>
+                        Estado:{" "}
+                        {selectedPerson.risk.operationalState ??
+                          "sem estado confiável"}
+                      </p>
+                      {selectedPerson.risk.riskReasons.length > 0 ? (
+                        <p>
+                          Motivos: {selectedPerson.risk.riskReasons.join("; ")}
+                        </p>
+                      ) : (
+                        <p className="text-[var(--nexo-text-muted,var(--text-muted))]">
+                          Sem motivos de risco adicionais.
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-[var(--nexo-text-muted,var(--text-muted))]">
+                      Risco individual não veio no contrato.
+                    </p>
+                  )}
+                </AppSectionCard>
+              </OperationalSectionGrid>
+              <AppSectionCard
+                className="p-4"
+                data-testid="people-operational-proof"
+              >
+                <p className="mb-2 text-sm font-semibold">Prova operacional</p>
+                {(selectedPerson.timeline?.lastEvents?.length ?? 0) > 0 ? (
+                  <div className="space-y-2">
+                    {selectedPerson.timeline!.lastEvents.map(event => (
+                      <OperationalTimelineItem
+                        key={event.id}
+                        title={
+                          event.title ?? event.eventType ?? "Evento operacional"
+                        }
+                        description={
+                          event.description ??
+                          event.entityType ??
+                          "Evento da pessoa"
+                        }
+                        time={formatDateTime(event.createdAt)}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-[var(--nexo-text-muted,var(--text-muted))]">
+                    Sem eventos individuais recentes para esta pessoa.
+                  </p>
+                )}
+              </AppSectionCard>
               {isAdmin ? (
                 <AppSectionCard
                   className="grid gap-2 p-4 md:grid-cols-4"
