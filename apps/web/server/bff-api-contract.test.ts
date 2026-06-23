@@ -21,23 +21,21 @@ describe("BFF↔API contract - lote 1", () => {
   });
 
   it("session.me chama /me e normaliza dados essenciais", async () => {
-    const fetchMock = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            data: {
-              user: {
-                id: "u1",
-                orgId: "org-ctx",
-                role: "ADMIN",
-                email: "admin@nexo.dev",
-              },
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: {
+            user: {
+              id: "u1",
+              orgId: "org-ctx",
+              role: "ADMIN",
+              email: "admin@nexo.dev",
             },
-          }),
-          { status: 200 }
-        )
-      );
+          },
+        }),
+        { status: 200 }
+      )
+    );
 
     const caller = appRouter.createCaller({
       req: makeReq(),
@@ -163,16 +161,14 @@ describe("BFF↔API contract - lote 1", () => {
   });
 
   it("analytics.assigneeWarningSummary usa endpoint tenant-scoped, valida ISO e rejeita orgId do client", async () => {
-    const fetchMock = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            totals: { shown: 2, confirmed: 1, confirmationRatePct: 50 },
-          }),
-          { status: 200 }
-        )
-      );
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          totals: { shown: 2, confirmed: 1, confirmationRatePct: 50 },
+        }),
+        { status: 200 }
+      )
+    );
     const caller = appRouter.createCaller({
       req: makeReq(),
       res: makeRes(),
@@ -331,6 +327,23 @@ describe("BFF↔API contract - lote 1", () => {
         riskTrend: null,
         riskReasons: [],
       },
+      finance: {
+        receivedAmountFromAssignedServiceOrders: 1000,
+        pendingAmountFromAssignedServiceOrders: 2000,
+        overdueAmountFromAssignedServiceOrders: 3000,
+        paidChargesCountFromAssignedServiceOrders: 1,
+        pendingChargesCountFromAssignedServiceOrders: 2,
+        overdueChargesCountFromAssignedServiceOrders: 3,
+        financeAttributionNote: "não representa comissão",
+      },
+      whatsapp: {
+        assignedConversationsCount: 1,
+        waitingOperatorConversationsCount: 0,
+        failedMessagesCount: 1,
+        sentMessagesCount: 2,
+        lastConversationAt: null,
+        whatsappAttributionNote: "vínculo por assignedUserId",
+      },
     };
     vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(
@@ -352,6 +365,39 @@ describe("BFF↔API contract - lote 1", () => {
     });
     await expect(caller.people.operationalSummary()).resolves.toEqual({
       people: [expect.objectContaining(person)],
+    });
+  });
+
+  it("people.operationalSummary aceita finance e whatsapp nulos", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          people: [
+            {
+              personId: "person-1",
+              name: "Ana",
+              status: "ACTIVE",
+              customers: undefined,
+              appointments: undefined,
+              serviceOrders: undefined,
+              timeline: undefined,
+              risk: undefined,
+              finance: null,
+              whatsapp: null,
+            },
+          ],
+        }),
+        { status: 200 }
+      )
+    );
+    const caller = appRouter.createCaller({
+      req: makeReq(),
+      res: makeRes(),
+      user: { token: "t1", validated: true, organizationId: "org-trusted" },
+    } as any);
+
+    await expect(caller.people.operationalSummary()).resolves.toEqual({
+      people: [expect.objectContaining({ finance: null, whatsapp: null })],
     });
   });
 
@@ -574,13 +620,11 @@ describe("BFF↔API contract - pagamento manual", () => {
   });
 
   it("finance.charges.pay repassa paidAt e notes sem aceitar orgId do client", async () => {
-    const fetchMock = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValue(
-        new Response(JSON.stringify({ data: { paymentId: "pay-1" } }), {
-          status: 200,
-        })
-      );
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ data: { paymentId: "pay-1" } }), {
+        status: 200,
+      })
+    );
     const caller = appRouter.createCaller({
       req: makeReq(),
       res: makeRes(),

@@ -1,5 +1,11 @@
 import { Injectable } from "@nestjs/common";
-import { AppointmentStatus, ServiceOrderStatus } from "@prisma/client";
+import {
+  AppointmentStatus,
+  ChargeStatus,
+  ServiceOrderStatus,
+  WhatsAppConversationStatus,
+  WhatsAppMessageStatus,
+} from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 
 export type PeopleLoadStatus = "IDLE" | "NORMAL" | "BUSY" | "OVERLOADED";
@@ -36,7 +42,10 @@ const ACTIVE_APPOINTMENT_STATUSES: AppointmentStatus[] = [
  * - completedServiceOrdersCount: O.S. concluídas atribuídas à pessoa no período;
  * - averageCompletionMinutes: apenas O.S. concluídas com startedAt e finishedAt;
  * - completionRatePct: concluídas / (concluídas + canceladas + abertas no período);
- * - financeiro por pessoa fica fora deste contrato até existir base confiável.
+ * Fase 3 controlada:
+ * - financeiro confiável somente por Payment -> Charge -> ServiceOrder.assignedToPersonId;
+ * - WhatsApp confiável somente por Person.userId -> WhatsAppConversation.assignedUserId;
+ * - não infere comissão, venda, autoria comercial, produtividade financeira ou vínculo por cliente sem trilha auditável.
  */
 const PEOPLE_OPERATIONAL_SUMMARY_PERIOD_DAYS = 30;
 const PEOPLE_OPERATIONAL_SUMMARY_LIMITS = {
@@ -304,6 +313,7 @@ export class PeopleOperationalSummaryService {
         riskScore: true,
         operationalRiskScore: true,
         operationalState: true,
+        userId: true,
       },
       orderBy: { name: "asc" },
     });
@@ -319,6 +329,10 @@ export class PeopleOperationalSummaryService {
       nextAppointments,
       lastEvents,
       availabilityExceptions,
+      chargesForAssignedServiceOrders,
+      paymentsForAssignedServiceOrders,
+      assignedWhatsAppConversations,
+      assignedWhatsAppMessages,
     ] = await Promise.all([
       this.prisma.serviceOrder.findMany({
         where: {
@@ -410,6 +424,79 @@ export class PeopleOperationalSummaryService {
           reason: true,
         },
         orderBy: { startsAt: "asc" },
+      }),
+      this.prisma.charge.findMany({
+        where: {
+          orgId,
+          serviceOrderId: { not: null },
+          serviceOrder: { assignedToPersonId: { in: personIds }, orgId },
+          OR: [
+            { createdAt: { gte: periodStart } },
+            { dueDate: { gte: periodStart } },
+            { paidAt: { gte: periodStart } },
+          ],
+        },
+        select: {
+          id: true,
+          amountCents: true,
+          status: true,
+          dueDate: true,
+          serviceOrder: { select: { assignedToPersonId: true } },
+        },
+      }),
+      this.prisma.payment.findMany({
+        where: {
+          orgId,
+          paidAt: { gte: periodStart },
+          charge: {
+            orgId,
+            serviceOrderId: { not: null },
+            serviceOrder: { assignedToPersonId: { in: personIds }, orgId },
+          },
+        },
+        select: {
+          amountCents: true,
+          charge: {
+            select: { serviceOrder: { select: { assignedToPersonId: true } } },
+          },
+        },
+      }),
+      this.prisma.whatsAppConversation.findMany({
+        where: {
+          orgId,
+          assignedUserId: {
+            in: people
+              .map((person) => person.userId)
+              .filter((userId): userId is string => Boolean(userId)),
+          },
+          updatedAt: { gte: periodStart },
+        },
+        select: {
+          id: true,
+          assignedUserId: true,
+          status: true,
+          lastMessageAt: true,
+          updatedAt: true,
+        },
+      }),
+      this.prisma.whatsAppMessage.findMany({
+        where: {
+          orgId,
+          conversationId: { not: null },
+          createdAt: { gte: periodStart },
+          conversation: {
+            orgId,
+            assignedUserId: {
+              in: people
+                .map((person) => person.userId)
+                .filter((userId): userId is string => Boolean(userId)),
+            },
+          },
+        },
+        select: {
+          status: true,
+          conversation: { select: { assignedUserId: true } },
+        },
       }),
     ]);
 
@@ -525,6 +612,81 @@ export class PeopleOperationalSummaryService {
           capacityStatus,
           availabilityStatus: availability.availabilityStatus,
         });
+        const personCharges = chargesForAssignedServiceOrders.filter(
+          (charge) => charge.serviceOrder?.assignedToPersonId === person.id,
+        );
+        const finance = {
+          receivedAmountFromAssignedServiceOrders:
+            paymentsForAssignedServiceOrders
+              .filter(
+                (payment) =>
+                  payment.charge.serviceOrder?.assignedToPersonId === person.id,
+              )
+              .reduce((sum, payment) => sum + payment.amountCents, 0),
+          pendingAmountFromAssignedServiceOrders: personCharges
+            .filter((charge) => charge.status === ChargeStatus.PENDING)
+            .reduce((sum, charge) => sum + charge.amountCents, 0),
+          overdueAmountFromAssignedServiceOrders: personCharges
+            .filter(
+              (charge) =>
+                charge.status === ChargeStatus.OVERDUE ||
+                (charge.status === ChargeStatus.PENDING &&
+                  charge.dueDate < now),
+            )
+            .reduce((sum, charge) => sum + charge.amountCents, 0),
+          paidChargesCountFromAssignedServiceOrders: personCharges.filter(
+            (charge) => charge.status === ChargeStatus.PAID,
+          ).length,
+          pendingChargesCountFromAssignedServiceOrders: personCharges.filter(
+            (charge) => charge.status === ChargeStatus.PENDING,
+          ).length,
+          overdueChargesCountFromAssignedServiceOrders: personCharges.filter(
+            (charge) =>
+              charge.status === ChargeStatus.OVERDUE ||
+              (charge.status === ChargeStatus.PENDING && charge.dueDate < now),
+          ).length,
+          financeAttributionNote:
+            "Valores relacionados somente a cobranças e pagamentos vinculados a O.S. atribuídas; não representam comissão, venda atribuída ou produtividade financeira.",
+        };
+        const personConversations = person.userId
+          ? assignedWhatsAppConversations.filter(
+              (conversation) => conversation.assignedUserId === person.userId,
+            )
+          : [];
+        const personMessages = person.userId
+          ? assignedWhatsAppMessages.filter(
+              (message) =>
+                message.conversation?.assignedUserId === person.userId,
+            )
+          : [];
+        const lastConversationAt = personConversations
+          .map(
+            (conversation) =>
+              conversation.lastMessageAt ?? conversation.updatedAt,
+          )
+          .sort((a, b) => b.getTime() - a.getTime())[0];
+        const whatsapp = person.userId
+          ? {
+              assignedConversationsCount: personConversations.length,
+              waitingOperatorConversationsCount: personConversations.filter(
+                (conversation) =>
+                  conversation.status ===
+                  WhatsAppConversationStatus.WAITING_OPERATOR,
+              ).length,
+              failedMessagesCount: personMessages.filter(
+                (message) => message.status === WhatsAppMessageStatus.FAILED,
+              ).length,
+              sentMessagesCount: personMessages.filter(
+                (message) =>
+                  message.status === WhatsAppMessageStatus.SENT ||
+                  message.status === WhatsAppMessageStatus.DELIVERED ||
+                  message.status === WhatsAppMessageStatus.READ,
+              ).length,
+              lastConversationAt: lastConversationAt?.toISOString() ?? null,
+              whatsappAttributionNote:
+                "Conversas e mensagens contadas somente quando Person.userId corresponde ao assignedUserId da conversa.",
+            }
+          : null;
 
         return {
           personId: person.id,
@@ -620,6 +782,8 @@ export class PeopleOperationalSummaryService {
                 createdAt: event.createdAt.toISOString(),
               })),
           },
+          finance,
+          whatsapp,
           risk: {
             riskScore: person.riskScore ?? null,
             operationalRiskScore: person.operationalRiskScore ?? null,

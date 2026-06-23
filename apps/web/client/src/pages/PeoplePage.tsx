@@ -178,6 +178,23 @@ type OperationalPerson = {
     riskTrend?: string | null;
     riskReasons: string[];
   };
+  finance?: {
+    receivedAmountFromAssignedServiceOrders: number;
+    pendingAmountFromAssignedServiceOrders: number;
+    overdueAmountFromAssignedServiceOrders: number;
+    paidChargesCountFromAssignedServiceOrders: number;
+    pendingChargesCountFromAssignedServiceOrders: number;
+    overdueChargesCountFromAssignedServiceOrders: number;
+    financeAttributionNote?: string | null;
+  } | null;
+  whatsapp?: {
+    assignedConversationsCount: number;
+    waitingOperatorConversationsCount?: number | null;
+    failedMessagesCount: number;
+    sentMessagesCount: number;
+    lastConversationAt?: string | null;
+    whatsappAttributionNote?: string | null;
+  } | null;
 };
 type PeopleFilter =
   | "all"
@@ -281,6 +298,10 @@ const formatCapacity = (value: number | null) =>
 const formatUsage = (value: number | null) =>
   value == null ? "Uso indisponível" : `${value}% usado`;
 const formatMoneyFallback = () => "Aguardando vínculo financeiro";
+const formatMoneyCents = (value: number | null | undefined) =>
+  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
+    (value ?? 0) / 100
+  );
 const formatAverageUsage = (values: Array<number | null>) => {
   const usable = values.filter((value): value is number => value != null);
   if (!usable.length) return "Uso indisponível";
@@ -1622,6 +1643,113 @@ export default function PeoplePage() {
                     </span>
                   </div>
                 </AppSectionCard>
+
+                {selectedPerson.finance ? (
+                  <AppSectionCard
+                    className="p-4"
+                    data-testid="people-related-finance"
+                  >
+                    <p className="mb-2 text-sm font-semibold">
+                      Financeiro relacionado
+                    </p>
+                    <div className="grid gap-2 text-sm sm:grid-cols-2">
+                      <span>
+                        Recebido relacionado a O.S. atribuídas:{" "}
+                        {formatMoneyCents(
+                          selectedPerson.finance
+                            .receivedAmountFromAssignedServiceOrders
+                        )}
+                      </span>
+                      <span>
+                        Pendente relacionado a O.S. atribuídas:{" "}
+                        {formatMoneyCents(
+                          selectedPerson.finance
+                            .pendingAmountFromAssignedServiceOrders
+                        )}
+                      </span>
+                      <span>
+                        Vencido relacionado a O.S. atribuídas:{" "}
+                        {formatMoneyCents(
+                          selectedPerson.finance
+                            .overdueAmountFromAssignedServiceOrders
+                        )}
+                      </span>
+                      <span>
+                        Cobranças:{" "}
+                        {
+                          selectedPerson.finance
+                            .paidChargesCountFromAssignedServiceOrders
+                        }{" "}
+                        pagas ·{" "}
+                        {
+                          selectedPerson.finance
+                            .pendingChargesCountFromAssignedServiceOrders
+                        }{" "}
+                        pendentes ·{" "}
+                        {
+                          selectedPerson.finance
+                            .overdueChargesCountFromAssignedServiceOrders
+                        }{" "}
+                        vencidas
+                      </span>
+                    </div>
+                    <p className="mt-3 text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
+                      {selectedPerson.finance.financeAttributionNote ??
+                        "Valores relacionados a O.S. atribuídas; não são comissão nem venda atribuída."}
+                    </p>
+                  </AppSectionCard>
+                ) : (
+                  <AppSectionCard
+                    className="p-4"
+                    data-testid="people-related-finance-empty"
+                  >
+                    <p className="mb-2 text-sm font-semibold">
+                      Financeiro relacionado
+                    </p>
+                    <p className="text-sm text-[var(--nexo-text-muted,var(--text-muted))]">
+                      Sem vínculo financeiro auditável para esta pessoa.
+                    </p>
+                  </AppSectionCard>
+                )}
+                {selectedPerson.whatsapp ? (
+                  <AppSectionCard
+                    className="p-4"
+                    data-testid="people-attributed-communication"
+                  >
+                    <p className="mb-2 text-sm font-semibold">
+                      Comunicação atribuída
+                    </p>
+                    <div className="grid gap-2 text-sm sm:grid-cols-2">
+                      <span>
+                        Conversas atribuídas:{" "}
+                        {selectedPerson.whatsapp.assignedConversationsCount}
+                      </span>
+                      <span>
+                        Aguardando operador:{" "}
+                        {selectedPerson.whatsapp
+                          .waitingOperatorConversationsCount ?? "sem base"}
+                      </span>
+                      <span>
+                        Mensagens enviadas:{" "}
+                        {selectedPerson.whatsapp.sentMessagesCount}
+                      </span>
+                      <span>
+                        Mensagens com falha:{" "}
+                        {selectedPerson.whatsapp.failedMessagesCount}
+                      </span>
+                      <span>
+                        Última conversa:{" "}
+                        {formatDateTime(
+                          selectedPerson.whatsapp.lastConversationAt
+                        )}
+                      </span>
+                    </div>
+                    <p className="mt-3 text-xs text-[var(--nexo-text-muted,var(--text-muted))]">
+                      {selectedPerson.whatsapp.whatsappAttributionNote ??
+                        "Comunicação contada apenas por conversa atribuída ao usuário vinculado à pessoa."}
+                    </p>
+                  </AppSectionCard>
+                ) : null}
                 <AppSectionCard
                   className="p-4"
                   data-testid="people-individual-risk"
