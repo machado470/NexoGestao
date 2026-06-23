@@ -144,7 +144,18 @@ describe("PeoplePage human operation center contract", () => {
     expect(source).toContain("operationalSummaryText?: string | null");
     expect(source).toContain("capacitySummaryText?: string | null");
     expect(source).toContain("riskSummaryText?: string | null");
-    expect(source).toContain("if (person.operationalStatus) return person.operationalStatus");
+    expect(source).toContain("activeCustomersCount: number");
+    expect(source).toContain("nextAppointments: PersonNextAppointment[]");
+    expect(source).toContain("completedServiceOrdersCount: number");
+    expect(source).toContain("lastEvents: PersonTimelineEvent[]");
+    expect(source).toContain('data-testid="people-linked-customers"');
+    expect(source).toContain('data-testid="people-next-appointments"');
+    expect(source).toContain('data-testid="people-recent-execution"');
+    expect(source).toContain('data-testid="people-operational-proof"');
+    expect(source).toContain('data-testid="people-individual-risk"');
+    expect(source).toContain(
+      "if (person.operationalStatus) return person.operationalStatus"
+    );
     expect(source).toContain("if (person.priority) return person.priority");
     expect(source).toContain('data-testid="people-recommended-action"');
   });

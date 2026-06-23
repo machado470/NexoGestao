@@ -108,6 +108,53 @@ describe('PeopleOperationalSummaryService', () => {
     expect(calculatePeopleAvailability({ exceptions, now }).availabilityStatus).toBe(expected)
   })
 
+
+  it('retorna blocos opcionais auditáveis sem misturar pessoa, com limites e nulls honestos', async () => {
+    mockPrisma.person.findMany.mockResolvedValue([
+      { id: 'person-1', name: 'Ana', role: 'TECH', active: true, dailyServiceOrderCapacity: 5, dailyAppointmentCapacity: 5, workloadNotes: null, riskScore: 7, operationalRiskScore: 12, operationalState: 'WARNING' },
+      { id: 'person-2', name: 'Bia', role: 'TECH', active: true, dailyServiceOrderCapacity: 5, dailyAppointmentCapacity: 5, workloadNotes: null, riskScore: 0, operationalRiskScore: 0, operationalState: 'NORMAL' },
+    ])
+    mockPrisma.serviceOrder.findMany
+      .mockResolvedValueOnce([{ assignedToPersonId: 'person-1', dueDate: new Date('2026-05-29T12:00:00.000Z'), customerId: 'cust-1' }])
+      .mockResolvedValueOnce([
+        { assignedToPersonId: 'person-1', status: ServiceOrderStatus.DONE, startedAt: new Date('2026-05-30T10:00:00.000Z'), finishedAt: new Date('2026-05-30T11:00:00.000Z'), customerId: 'cust-1' },
+        { assignedToPersonId: 'person-1', status: ServiceOrderStatus.DONE, startedAt: null, finishedAt: new Date('2026-05-30T12:00:00.000Z'), customerId: 'cust-2' },
+        { assignedToPersonId: 'person-1', status: ServiceOrderStatus.CANCELED, startedAt: null, finishedAt: null, customerId: 'cust-3' },
+      ])
+      .mockResolvedValueOnce([
+        { id: 'so-1', assignedToPersonId: 'person-1', status: ServiceOrderStatus.DONE, dueDate: null, finishedAt: new Date('2026-05-30T11:00:00.000Z'), customer: { name: 'Cliente A' } },
+        { id: 'so-2', assignedToPersonId: 'person-1', status: ServiceOrderStatus.CANCELED, dueDate: null, finishedAt: null, customer: { name: 'Cliente B' } },
+        { id: 'so-3', assignedToPersonId: 'person-1', status: ServiceOrderStatus.OPEN, dueDate: null, finishedAt: null, customer: { name: 'Cliente C' } },
+        { id: 'so-4', assignedToPersonId: 'person-1', status: ServiceOrderStatus.OPEN, dueDate: null, finishedAt: null, customer: { name: 'Cliente D' } },
+      ])
+    mockPrisma.appointment.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { id: 'appt-1', assignedToPersonId: 'person-1', startsAt: new Date('2026-05-30T13:00:00.000Z'), status: AppointmentStatus.SCHEDULED, customer: { name: 'Cliente A' } },
+        { id: 'appt-2', assignedToPersonId: 'person-1', startsAt: new Date('2026-05-30T14:00:00.000Z'), status: AppointmentStatus.CONFIRMED, customer: { name: 'Cliente B' } },
+        { id: 'appt-3', assignedToPersonId: 'person-1', startsAt: new Date('2026-05-30T15:00:00.000Z'), status: AppointmentStatus.SCHEDULED, customer: { name: 'Cliente C' } },
+        { id: 'appt-4', assignedToPersonId: 'person-1', startsAt: new Date('2026-05-30T16:00:00.000Z'), status: AppointmentStatus.SCHEDULED, customer: { name: 'Cliente D' } },
+      ])
+    mockPrisma.timelineEvent.findMany.mockResolvedValue([
+      { id: 'evt-1', personId: 'person-1', action: 'SERVICE_ORDER_COMPLETED', description: 'O.S. concluída', customerId: null, serviceOrderId: 'so-1', appointmentId: null, chargeId: null, createdAt: new Date('2026-05-30T11:00:00.000Z') },
+      { id: 'evt-other', personId: 'person-2', action: 'APPOINTMENT_CONFIRMED', description: 'Outro', customerId: null, serviceOrderId: null, appointmentId: 'appt-x', chargeId: null, createdAt: new Date('2026-05-30T12:00:00.000Z') },
+    ])
+
+    const result = await service.getSummary('org-trusted', now)
+    const ana = result.people[0]
+    const bia = result.people[1]
+
+    expect(ana.customers).toEqual({ activeCustomersCount: 3, attendedCustomersCount: 2, customersWithOpenServiceOrdersCount: 1, customersWithOverdueServiceOrdersCount: 1 })
+    expect(ana.appointments.nextAppointments).toHaveLength(3)
+    expect(ana.appointments.conflictsCount).toBeNull()
+    expect(ana.serviceOrders).toEqual(expect.objectContaining({ completedServiceOrdersCount: 2, averageCompletionMinutes: 60, completionRatePct: 67 }))
+    expect(ana.serviceOrders.recentServiceOrders).toHaveLength(3)
+    expect(ana.timeline.lastEvents).toEqual([expect.objectContaining({ id: 'evt-1', entityType: 'SERVICE_ORDER', entityId: 'so-1' })])
+    expect(ana.risk).toEqual(expect.objectContaining({ riskScore: 7, operationalRiskScore: 12, operationalState: 'WARNING', riskTrend: null }))
+    expect(bia.timeline.lastEvents).toEqual([expect.objectContaining({ id: 'evt-other' })])
+    expect(bia.serviceOrders.completionRatePct).toBeNull()
+  })
+
   it.each([
     [{ openServiceOrdersCount: 2, todayAppointmentsCount: 1, dailyServiceOrderCapacity: 5, dailyAppointmentCapacity: 5 }, 'UNDER_CAPACITY'],
     [{ openServiceOrdersCount: 5, todayAppointmentsCount: 1, dailyServiceOrderCapacity: 5, dailyAppointmentCapacity: 5 }, 'AT_CAPACITY'],
