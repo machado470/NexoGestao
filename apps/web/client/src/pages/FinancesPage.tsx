@@ -480,6 +480,10 @@ export default function FinancesPage() {
     { page: 1, limit: 500 },
     { retry: false }
   );
+  const operationalQueueQuery = trpc.finance.operationalQueue.useQuery(
+    { limit: 50 },
+    { retry: false }
+  );
   const customersQuery = trpc.nexo.customers.list.useQuery(
     { page: 1, limit: 500 },
     { retry: false }
@@ -496,6 +500,10 @@ export default function FinancesPage() {
   const charges = useMemo(
     () => normalizeArrayPayload<ChargeRecord>(chargesQuery.data),
     [chargesQuery.data]
+  );
+  const operationalQueue = useMemo(
+    () => normalizeArrayPayload<any>(operationalQueueQuery.data),
+    [operationalQueueQuery.data]
   );
   const customers = useMemo(
     () => normalizeArrayPayload<any>(customersQuery.data),
@@ -1524,6 +1532,65 @@ export default function FinancesPage() {
           }
         />
       </AppSectionCard>
+
+
+      <AppSectionBlock
+        title="Carteira Prioritária"
+        subtitle="Até 50 cobranças ordenadas por atraso, impacto financeiro, risco e ausência de contato recente."
+        compact
+      >
+        {operationalQueueQuery.isLoading ? (
+          <AppPageLoadingState description="Carregando fila operacional financeira..." />
+        ) : operationalQueue.length === 0 ? (
+          <AppPageEmptyState
+            title="Sem ação prioritária agora"
+            description="Nenhuma cobrança pendente ou vencida entrou na fila operacional."
+          />
+        ) : (
+          <div className="grid gap-3 lg:grid-cols-2">
+            {operationalQueue.slice(0, 6).map(item => {
+              const summary = item?.financialOperationalSummary ?? {};
+              const customerName = safeFinancialEntityName(
+                item?.customer?.name ?? item?.customerName
+              );
+              return (
+                <button
+                  key={String(item?.id ?? customerName)}
+                  type="button"
+                  className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3 text-left transition-colors hover:border-[var(--accent-primary)]"
+                  onClick={() => setSelectedChargeId(String(item?.id ?? ""))}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-[var(--text-primary)]">
+                        {customerName}
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                        {summary.priorityReason ?? "Priorização derivada da cobrança."}
+                      </p>
+                    </div>
+                    <AppStatusBadge
+                      label={String(summary.riskLevel ?? "NORMAL")}
+                      tone={summary.riskLevel === "SUSPENDED" || summary.riskLevel === "RESTRICTED" ? "danger" : summary.riskLevel === "WARNING" ? "warning" : "success"}
+                    />
+                  </div>
+                  <div className="mt-3 grid gap-2 text-xs text-[var(--text-secondary)] sm:grid-cols-3">
+                    <span>
+                      Valor: <strong className="text-[var(--text-primary)]">{formatCurrency(Number(item?.amountCents ?? 0))}</strong>
+                    </span>
+                    <span>
+                      Atraso: <strong className="text-[var(--text-primary)]">{Number(summary.daysOverdue ?? 0)} dia(s)</strong>
+                    </span>
+                    <span>
+                      Ação: <strong className="text-[var(--text-primary)]">{String(summary.recommendedAction ?? item?.nextBestCollectionAction ?? "REVIEW_CHARGE")}</strong>
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </AppSectionBlock>
 
       <AppSectionBlock
         title="Pipeline Financeiro"

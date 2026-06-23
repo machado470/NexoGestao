@@ -70,6 +70,13 @@ export class FinanceController {
     return { ok: true, data }
   }
 
+  @Get('operational-queue')
+  @Roles('ADMIN', 'MANAGER')
+  async operationalQueue(@Org() orgId: string, @Query('limit') limit?: string) {
+    const data = await this.finance.getOperationalQueue(orgId, { limit: Number(limit) || 50 })
+    return { ok: true, data }
+  }
+
   @Get('charges')
   @Roles('ADMIN', 'MANAGER')
   async listCharges(@Org() orgId: string, @Query() query: ChargesQueryDto) {

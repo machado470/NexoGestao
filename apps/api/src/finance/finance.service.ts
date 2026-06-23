@@ -24,6 +24,29 @@ import {
   buildOperationalResult,
 } from '../common/operations/operational-result'
 
+
+type CollectionPriority = 'HIGH' | 'MEDIUM' | 'LOW'
+type CollectionAction =
+  | 'SEND_PAYMENT_LINK'
+  | 'SEND_REMINDER'
+  | 'CALL_CUSTOMER'
+  | 'REVIEW_CHARGE'
+  | 'WAIT_FOR_DUE_DATE'
+type CollectionRiskLevel = 'NORMAL' | 'WARNING' | 'RESTRICTED' | 'SUSPENDED'
+
+function daysBetweenUtc(from: Date, to: Date) {
+  const dayMs = 24 * 60 * 60 * 1000
+  return Math.max(0, Math.floor((Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), to.getUTCDate()) - Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate())) / dayMs))
+}
+
+function asRiskLevel(value: unknown): CollectionRiskLevel {
+  return value === 'WARNING' || value === 'RESTRICTED' || value === 'SUSPENDED' ? value : 'NORMAL'
+}
+
+function metadataValue(metadata: unknown, key: string): unknown {
+  return metadata && typeof metadata === 'object' ? (metadata as Record<string, unknown>)[key] : undefined
+}
+
 @Injectable()
 export class FinanceService {
   private readonly logger = new Logger(FinanceService.name)
@@ -204,6 +227,137 @@ export class FinanceService {
       paidCount: paidAgg._count._all ?? 0,
       paidAmountCents: paidAgg._sum.amountCents ?? 0,
     }
+  }
+
+
+  // =========================
+  // OPERATIONAL COLLECTION QUEUE
+  // =========================
+  async getOperationalQueue(orgId: string, input?: { limit?: number }) {
+    const limit = Math.min(Math.max(Number(input?.limit) || 50, 1), 50)
+    const now = new Date()
+
+    const charges = await this.prisma.charge.findMany({
+      where: { orgId, status: { in: ['PENDING', 'OVERDUE'] } },
+      include: {
+        customer: true,
+        serviceOrder: true,
+        payments: { orderBy: { paidAt: 'desc' }, take: 5 },
+      },
+      orderBy: [{ dueDate: 'asc' }, { amountCents: 'desc' }],
+      take: 200,
+    })
+
+    const customerIds = [...new Set(charges.map((item) => item.customerId).filter(Boolean))]
+    const chargeIds = charges.map((item) => item.id)
+
+    const [timelineEvents, whatsappMessages, riskEvents] = await Promise.all([
+      this.prisma.timelineEvent.findMany({
+        where: { orgId, OR: [{ customerId: { in: customerIds } }, { chargeId: { in: chargeIds } }] },
+        orderBy: { createdAt: 'desc' },
+        take: 500,
+      }),
+      this.prisma.whatsAppMessage.findMany({
+        where: { orgId, customerId: { in: customerIds } },
+        orderBy: { createdAt: 'desc' },
+        take: 500,
+      }),
+      this.prisma.timelineEvent.findMany({
+        where: { orgId, customerId: { in: customerIds }, action: { in: ['RISK_UPDATED', 'CUSTOMER_OPERATIONAL_RISK_UPDATED'] } },
+        orderBy: { createdAt: 'desc' },
+        take: 200,
+      }),
+    ])
+
+    const lastTimelineByCustomer = new Map<string, any>()
+    const lastReminderByCharge = new Map<string, any>()
+    const lastRecommendationByCharge = new Map<string, any>()
+    for (const event of timelineEvents as any[]) {
+      const isSystemCollectionEvent = String(event.action ?? '').startsWith('COLLECTION_') || ['RISK_UPDATED', 'CUSTOMER_OPERATIONAL_RISK_UPDATED'].includes(String(event.action ?? ''))
+      if (event.customerId && !isSystemCollectionEvent && !lastTimelineByCustomer.has(event.customerId)) lastTimelineByCustomer.set(event.customerId, event)
+      if (event.chargeId && ['CHARGE_REMINDER_SENT', 'COLLECTION_REMINDER_SENT'].includes(event.action) && !lastReminderByCharge.has(event.chargeId)) lastReminderByCharge.set(event.chargeId, event)
+      if (event.chargeId && event.action === 'COLLECTION_ACTION_RECOMMENDED' && !lastRecommendationByCharge.has(event.chargeId)) lastRecommendationByCharge.set(event.chargeId, event)
+    }
+
+    const lastWhatsappByCustomer = new Map<string, any>()
+    for (const message of whatsappMessages as any[]) {
+      if (message.customerId && !lastWhatsappByCustomer.has(message.customerId)) lastWhatsappByCustomer.set(message.customerId, message)
+    }
+
+    const riskByCustomer = new Map<string, CollectionRiskLevel>()
+    for (const event of riskEvents as any[]) {
+      if (!event.customerId || riskByCustomer.has(event.customerId)) continue
+      riskByCustomer.set(event.customerId, asRiskLevel(metadataValue(event.metadata, 'nextState') ?? metadataValue(event.metadata, 'riskLevel')))
+    }
+
+    const riskWeight: Record<CollectionRiskLevel, number> = { NORMAL: 0, WARNING: 1, RESTRICTED: 2, SUSPENDED: 3 }
+    const priorityWeight: Record<CollectionPriority, number> = { LOW: 1, MEDIUM: 2, HIGH: 3 }
+
+    const items = charges.map((charge: any) => {
+      const dueDate = new Date(charge.dueDate)
+      const isOverdue = dueDate.getTime() < now.getTime() || charge.status === 'OVERDUE'
+      const daysOverdue = isOverdue ? daysBetweenUtc(dueDate, now) : 0
+      const lastPaymentDate = charge.payments?.[0]?.paidAt ?? charge.paidAt ?? null
+      const lastTimelineDate = lastTimelineByCustomer.get(charge.customerId)?.createdAt ?? null
+      const lastWhatsappDate = lastWhatsappByCustomer.get(charge.customerId)?.createdAt ?? lastWhatsappByCustomer.get(charge.customerId)?.sentAt ?? null
+      const lastContactDate = [lastTimelineDate, lastWhatsappDate].filter(Boolean).sort((a: Date, b: Date) => b.getTime() - a.getTime())[0] ?? null
+      const lastChargeReminderDate = lastReminderByCharge.get(charge.id)?.createdAt ?? null
+      const riskLevel = riskByCustomer.get(charge.customerId) ?? 'NORMAL'
+      const noRecentContact = !lastContactDate || daysBetweenUtc(new Date(lastContactDate), now) >= 3
+
+      let recommendedAction: CollectionAction = 'WAIT_FOR_DUE_DATE'
+      if (charge.amountCents <= 0 || !charge.customerId) recommendedAction = 'REVIEW_CHARGE'
+      else if (isOverdue && (daysOverdue >= 7 || riskWeight[riskLevel] >= 2)) recommendedAction = 'CALL_CUSTOMER'
+      else if (isOverdue && !lastChargeReminderDate) recommendedAction = 'SEND_PAYMENT_LINK'
+      else if (isOverdue && noRecentContact) recommendedAction = 'SEND_REMINDER'
+      else if (daysOverdue === 0 && dueDate.getTime() <= now.getTime() + 2 * 24 * 60 * 60 * 1000) recommendedAction = 'SEND_REMINDER'
+
+      const priority: CollectionPriority = isOverdue && (charge.amountCents >= 100000 || daysOverdue >= 7 || riskWeight[riskLevel] >= 2) ? 'HIGH' : isOverdue || riskLevel === 'WARNING' ? 'MEDIUM' : 'LOW'
+      const priorityReason = isOverdue
+        ? `${daysOverdue} dia(s) de atraso, ${charge.amountCents} centavos em aberto, risco ${riskLevel}`
+        : `Cobrança a vencer em ${Math.max(0, daysBetweenUtc(now, dueDate))} dia(s), risco ${riskLevel}`
+      const recommendedActionTarget = recommendedAction === 'CALL_CUSTOMER' || recommendedAction === 'SEND_REMINDER' || recommendedAction === 'SEND_PAYMENT_LINK' ? 'CUSTOMER' : 'CHARGE'
+      const summary = { priority, priorityReason, daysOverdue, lastPaymentDate, lastContactDate, lastChargeReminderDate, riskLevel, recommendedAction, recommendedActionTarget }
+      return { ...charge, financialOperationalSummary: summary, nextBestCollectionAction: recommendedAction }
+    }).sort((a: any, b: any) => {
+      const sa = a.financialOperationalSummary
+      const sb = b.financialOperationalSummary
+      return (sb.daysOverdue > 0 ? 1 : 0) - (sa.daysOverdue > 0 ? 1 : 0)
+        || b.amountCents - a.amountCents
+        || riskWeight[sb.riskLevel as CollectionRiskLevel] - riskWeight[sa.riskLevel as CollectionRiskLevel]
+        || (sa.lastContactDate ? 1 : 0) - (sb.lastContactDate ? 1 : 0)
+        || priorityWeight[sb.priority as CollectionPriority] - priorityWeight[sa.priority as CollectionPriority]
+    }).slice(0, limit)
+
+    await Promise.all(items.map(async (item: any) => {
+      const previous = lastRecommendationByCharge.get(item.id)
+      const previousPriority = metadataValue(previous?.metadata, 'priority')
+      const previousAction = metadataValue(previous?.metadata, 'recommendedAction')
+      const summary = item.financialOperationalSummary
+      if (previousPriority === summary.priority && previousAction === summary.recommendedAction) return
+      await this.safeTimelineLog({
+        orgId,
+        action: 'COLLECTION_ACTION_RECOMMENDED',
+        description: `Ação de cobrança recomendada: ${summary.recommendedAction}`,
+        customerId: item.customerId,
+        chargeId: item.id,
+        serviceOrderId: item.serviceOrderId ?? undefined,
+        metadata: { priority: summary.priority, recommendedAction: summary.recommendedAction, riskLevel: summary.riskLevel, daysOverdue: summary.daysOverdue },
+      })
+      if (previousPriority && previousPriority !== summary.priority) {
+        await this.safeTimelineLog({
+          orgId,
+          action: 'COLLECTION_PRIORITY_CHANGED',
+          description: `Prioridade de cobrança alterada para ${summary.priority}`,
+          customerId: item.customerId,
+          chargeId: item.id,
+          serviceOrderId: item.serviceOrderId ?? undefined,
+          metadata: { previousPriority, priority: summary.priority, recommendedAction: summary.recommendedAction },
+        })
+      }
+    }))
+
+    return { items, meta: { limit, total: items.length } }
   }
 
   // =========================
