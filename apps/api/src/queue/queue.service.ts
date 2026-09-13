@@ -41,15 +41,18 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     const currentMeta = (data.meta && typeof data.meta === 'object' && !Array.isArray(data.meta))
       ? data.meta as Record<string, unknown>
       : {}
+    const { traceContext: _receivedTraceContext, ...durableMeta } = currentMeta
     const requestId = sanitizeTracingId(currentMeta.requestId) ?? sanitizeTracingId(data.requestId) ?? this.requestContext.requestId
     const correlationId = sanitizeTracingId(currentMeta.correlationId) ?? sanitizeTracingId(data.correlationId) ?? this.requestContext.correlationId ?? requestId
     const carrier: Record<string, string> = {}
     propagation.inject(context.active(), carrier)
-    const traceContext = Object.fromEntries(Object.entries(carrier).filter(([key]) => key === 'traceparent' || key === 'tracestate'))
+    const traceContext = Object.fromEntries(Object.entries(carrier).filter(
+      ([key, value]) => (key === 'traceparent' || key === 'tracestate') && typeof value === 'string' && value.trim().length > 0,
+    ))
     return {
       ...data,
       meta: {
-        ...currentMeta,
+        ...durableMeta,
         ...(requestId ? { requestId } : {}),
         ...(correlationId ? { correlationId } : {}),
         ...(Object.keys(traceContext).length ? { traceContext } : {}),
