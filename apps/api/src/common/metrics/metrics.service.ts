@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common'
+import { metrics } from '@opentelemetry/api'
 
 type MetricKey =
   | 'executionsCompleted'
@@ -19,10 +20,33 @@ type MetricKey =
 @Injectable()
 export class MetricsService {
   private readonly counters = new Map<MetricKey, number>()
+  private readonly meter = metrics.getMeter('nexogestao.domain')
+  private readonly domainCounter = this.meter.createCounter('nexo_domain_operations_total', {
+    description: 'Process-local domain events, aggregated across replicas by the configured OTEL reader.',
+    unit: '{event}',
+  })
 
   increment(metric: MetricKey, by = 1) {
     const current = this.counters.get(metric) ?? 0
     this.counters.set(metric, current + by)
+
+    const attributes = this.exportableAttributes(metric)
+    if (attributes) this.domainCounter.add(by, attributes)
+  }
+
+  /** HTTP keys remain snapshot-only: middleware URLs are not guaranteed route templates and HTTP is auto-instrumented. */
+  private exportableAttributes(metric: MetricKey): { operation: string; status: string } | null {
+    if (metric.startsWith('errorsByEndpoint:') || metric.startsWith('requestsByEndpoint:') || metric.startsWith('latencyByEndpoint:')) return null
+    if (metric.startsWith('providerTimeouts:')) return null
+    if (metric.startsWith('executionActionStatus:')) return { operation: 'execution_action', status: metric.split(':')[1] }
+    if (metric.startsWith('financeOperationStatus:')) return { operation: 'finance_operation', status: metric.split(':')[1] }
+    const operations: Partial<Record<MetricKey, string>> = {
+      executionsCompleted: 'execution_completed', chargesCreated: 'charge_created', paymentsProcessed: 'payment_processed',
+      idempotencyReplays: 'idempotency_replay', idempotencyConflicts: 'idempotency_conflict', idempotencyInProgress: 'idempotency_in_progress',
+      integrationTemporaryFailures: 'integration_temporary_failure',
+    }
+    const operation = operations[metric]
+    return operation ? { operation, status: 'recorded' } : null
   }
 
   incrementErrorByEndpoint(endpoint: string) {

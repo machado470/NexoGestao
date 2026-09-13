@@ -338,7 +338,7 @@ export class WhatsAppProcessor implements OnModuleInit, OnModuleDestroy {
     try {
       this.worker = new Worker(
         QUEUE_NAMES.WHATSAPP,
-        async (job: Job<any>) => this.process(job),
+        async (job: Job<any>) => this.queueService.processJobWithTracing(QUEUE_NAMES.WHATSAPP, job.name, job.data, () => this.process(job)),
         {
           connection: this.connection,
           ...QUEUE_DEFAULT_WORKER_OPTIONS,

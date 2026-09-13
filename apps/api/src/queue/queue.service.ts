@@ -13,6 +13,7 @@ import { QUEUE_CONNECTION, QUEUE_DEFAULT_JOB_OPTIONS, QUEUE_NAMES, QueueName } f
 import { QueueObservabilityService } from '../common/metrics/queue-observability.service'
 import { RequestContextService } from '../common/context/request-context.service'
 import { sanitizeTracingId } from '../common/context/request-tracing.util'
+import { context, propagation, SpanStatusCode, trace } from '@opentelemetry/api'
 
 @Injectable()
 export class QueueService implements OnModuleInit, OnModuleDestroy {
@@ -42,16 +43,40 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
       : {}
     const requestId = sanitizeTracingId(currentMeta.requestId) ?? sanitizeTracingId(data.requestId) ?? this.requestContext.requestId
     const correlationId = sanitizeTracingId(currentMeta.correlationId) ?? sanitizeTracingId(data.correlationId) ?? this.requestContext.correlationId ?? requestId
+    const carrier: Record<string, string> = {}
+    propagation.inject(context.active(), carrier)
+    const traceContext = Object.fromEntries(Object.entries(carrier).filter(([key]) => key === 'traceparent' || key === 'tracestate'))
     return {
       ...data,
       meta: {
         ...currentMeta,
         ...(requestId ? { requestId } : {}),
         ...(correlationId ? { correlationId } : {}),
+        ...(Object.keys(traceContext).length ? { traceContext } : {}),
       },
       ...(requestId ? { requestId } : {}),
       ...(correlationId ? { correlationId } : {}),
     } as T
+  }
+
+  async processJobWithTracing<T>(queue: QueueName, jobName: string, payload: unknown, handler: () => Promise<T>): Promise<T> {
+    const data = payload && typeof payload === 'object' ? payload as Record<string, any> : {}
+    const rawCarrier = data.meta?.traceContext
+    const carrier = rawCarrier && typeof rawCarrier === 'object'
+      ? Object.fromEntries(Object.entries(rawCarrier).filter(([key, value]) => (key === 'traceparent' || key === 'tracestate') && typeof value === 'string'))
+      : {}
+    const parent = propagation.extract(context.active(), carrier)
+    return trace.getTracer('nexogestao.queues').startActiveSpan('queue.process', {
+      // jobName is deliberately not an attribute: QueueService accepts arbitrary names.
+      attributes: { 'messaging.system': 'bullmq', 'messaging.destination.name': queue, 'messaging.operation.type': 'process' },
+    }, parent, async (span) => {
+      try { return await handler() }
+      catch (error) {
+        span.recordException(error instanceof Error ? error : new Error(String(error)))
+        span.setStatus({ code: SpanStatusCode.ERROR, message: error instanceof Error ? error.message : String(error) })
+        throw error
+      } finally { span.end() }
+    })
   }
 
   async onModuleInit() {
@@ -240,6 +265,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
         ...QUEUE_DEFAULT_JOB_OPTIONS,
         ...options,
       })
+      this.queueMetrics.increment(`queue.job.enqueue.success.${queueName}`)
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
       this.logger.error(`Falha ao enfileirar job (${queueName}:${name}): ${msg}`)

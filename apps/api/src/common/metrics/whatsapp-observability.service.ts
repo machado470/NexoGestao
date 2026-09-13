@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common'
+import { metrics } from '@opentelemetry/api'
 
 @Injectable()
 export class WhatsAppObservabilityService {
+  private readonly meter = metrics.getMeter('nexogestao.whatsapp')
+  private readonly events = this.meter.createCounter('nexo_whatsapp_events_total', { unit: '{event}' })
+  private readonly duration = this.meter.createHistogram('nexo_whatsapp_processing_duration', { unit: 'ms' })
   outboundTotal = 0
   inboundTotal = 0
   failedJobsTotal = 0
@@ -15,18 +19,19 @@ export class WhatsAppObservabilityService {
   inboundWebhookDeadLetteredTotal = 0
   processingSamples: number[] = []
 
-  incOutbound() { this.outboundTotal += 1 }
-  incInbound() { this.inboundTotal += 1 }
-  incFailedJobs() { this.failedJobsTotal += 1 }
-  incFailedWebhook() { this.failedWebhookTotal += 1 }
-  incQueuedJobs() { this.queuedJobsTotal += 1 }
-  incRetry() { this.retryTotal += 1 }
-  incInboundWebhookQueued() { this.inboundWebhookQueuedTotal += 1 }
-  incInboundWebhookStarted() { this.inboundWebhookStartedTotal += 1 }
-  incInboundWebhookCompleted() { this.inboundWebhookCompletedTotal += 1 }
-  incInboundWebhookFailed() { this.inboundWebhookFailedTotal += 1 }
-  incInboundWebhookDeadLettered() { this.inboundWebhookDeadLetteredTotal += 1 }
-  observeProcessingDuration(ms: number) { this.processingSamples.push(ms) }
+  private record(operation: string, status: string) { this.events.add(1, { operation, status }) }
+  incOutbound() { this.outboundTotal += 1; this.record('message_outbound', 'completed') }
+  incInbound() { this.inboundTotal += 1; this.record('message_inbound', 'completed') }
+  incFailedJobs() { this.failedJobsTotal += 1; this.record('job', 'failed') }
+  incFailedWebhook() { this.failedWebhookTotal += 1; this.record('webhook', 'failed') }
+  incQueuedJobs() { this.queuedJobsTotal += 1; this.record('job', 'queued') }
+  incRetry() { this.retryTotal += 1; this.record('job', 'retry') }
+  incInboundWebhookQueued() { this.inboundWebhookQueuedTotal += 1; this.record('inbound_webhook', 'queued') }
+  incInboundWebhookStarted() { this.inboundWebhookStartedTotal += 1; this.record('inbound_webhook', 'started') }
+  incInboundWebhookCompleted() { this.inboundWebhookCompletedTotal += 1; this.record('inbound_webhook', 'completed') }
+  incInboundWebhookFailed() { this.inboundWebhookFailedTotal += 1; this.record('inbound_webhook', 'failed') }
+  incInboundWebhookDeadLettered() { this.inboundWebhookDeadLetteredTotal += 1; this.record('inbound_webhook', 'dead_letter') }
+  observeProcessingDuration(ms: number) { this.processingSamples.push(ms); if (Number.isFinite(ms)) this.duration.record(ms, { operation: 'webhook_processing' }) }
 
   snapshot() {
     const total = this.processingSamples.reduce((a, b) => a + b, 0)
