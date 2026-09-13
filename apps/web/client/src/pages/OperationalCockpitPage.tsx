@@ -1,95 +1,66 @@
-import { useMemo, useState, type ReactNode } from "react";
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { RefreshCw } from "lucide-react";
+import type { inferRouterOutputs } from "@trpc/server";
 
 import {
-  AppInfoCard,
+  AppAlert,
+  AppAlertDescription,
+  AppAlertTitle,
   AppPageShell,
   AppSectionCard,
-  AppStatCard,
   AppStatusBadge,
 } from "@/components/app-system";
 import {
   AppOperationalHeader,
-  AppPageEmptyState,
   AppPageErrorState,
   AppPageLoadingState,
   AppSectionBlock,
 } from "@/components/internal-page-system";
 import { Button } from "@/components/ui/button";
-import { presentationStatusLabel } from "@/lib/presentation-status";
 import { trpc } from "@/lib/trpc";
+import type { AppRouter } from "../../../server/routers";
 
-type Severity = "INFO" | "WARNING" | "CRITICAL";
+export type TenantFactStatus =
+  | "available"
+  | "unavailable"
+  | "not_configured"
+  | "unknown";
 
-type Incident = {
-  id: string;
-  title: string;
-  severity: Severity;
-  description: string;
+const statusLabels: Record<TenantFactStatus, string> = {
+  available: "Disponível",
+  unavailable: "Indisponível",
+  not_configured: "Não configurado",
+  unknown: "Não disponível",
 };
 
-type Queue = {
-  queue: string;
-  degraded: boolean;
-  waiting: number;
-  failed: number;
-};
-
-type ActionState = "idle" | "loading" | "success" | "error";
-
-const severityTone: Record<Severity, "info" | "warning" | "danger"> = {
-  INFO: "info",
-  WARNING: "warning",
-  CRITICAL: "danger",
+const reasonLabels: Record<string, string> = {
+  TENANT_CONFIGURATION_NOT_OBSERVABLE:
+    "A configuração desta organização não pode ser observada por esta fonte.",
+  NO_WEBHOOK_ENDPOINTS: "Nenhum endpoint de webhook está configurado.",
+  NO_SUBSCRIPTION: "Nenhuma assinatura está configurada.",
+  PROVIDER_AVAILABILITY_NOT_OBSERVABLE:
+    "A disponibilidade do provedor não é afirmada por esta fonte.",
+  NO_OPERATION_CONFIG: "Nenhuma configuração operacional foi encontrada.",
 };
 
 export default function OperationalCockpitPage() {
   const [autoRefresh, setAutoRefresh] = useState(false);
-
-  const summary = trpc.operations.summary.useQuery(undefined, {
+  const tenantSummary = trpc.operations.tenantSummary.useQuery(undefined, {
     refetchInterval: autoRefresh ? 30_000 : false,
   });
 
-  const incidents = trpc.operations.incidents.useQuery(undefined, {
-    refetchInterval: autoRefresh ? 30_000 : false,
-  });
-
-  const refresh = async () => {
-    await Promise.all([summary.refetch(), incidents.refetch()]);
-  };
-
-  const criticalIncidents = useMemo(
-    () => getCriticalIncidents(incidents.data ?? []),
-    [incidents.data]
-  );
-
-  const degradedQueues = useMemo(
-    () => getDegradedQueues(summary.data?.queues ?? []),
-    [summary.data?.queues]
-  );
-
-  const dlqItems = useMemo(
-    () =>
-      (summary.data?.dlq ?? []).filter(
-        item => item.backlog > 0 || item.failed > 0
-      ),
-    [summary.data?.dlq]
-  );
-
-  const loading = summary.isLoading || incidents.isLoading;
-  const error = summary.error ?? incidents.error;
-  const summaryStatus = summary.data?.status ?? null;
+  const refresh = () => tenantSummary.refetch();
 
   return (
     <AppPageShell className="gap-4">
       <AppOperationalHeader
         density="compact"
-        title="Cockpit Operacional / SRE"
-        description="Leitura rápida para ação operacional: incidentes, degradações, backlog e recuperação."
+        title="Cockpit Operacional"
+        description="Visão operacional da organização"
         primaryAction={
           <Button
             size="sm"
-            disabled={summary.isFetching || incidents.isFetching}
+            disabled={tenantSummary.isFetching}
             onClick={() => void refresh()}
           >
             <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
@@ -102,259 +73,253 @@ export default function OperationalCockpitPage() {
             variant="outline"
             onClick={() => setAutoRefresh(value => !value)}
           >
-            {autoRefresh
-              ? "Auto-refresh ligado"
-              : "Auto-refresh desligado"}
+            {autoRefresh ? "Auto-refresh ligado" : "Auto-refresh desligado"}
           </Button>
         }
       />
 
-      {loading ? (
-        <AppPageLoadingState description="Carregando sinais operacionais..." />
+      {tenantSummary.isLoading ? (
+        <AppPageLoadingState description="Carregando dados operacionais..." />
       ) : null}
 
-      {error ? (
+      {tenantSummary.error ? (
         <AppPageErrorState
-          description={error.message}
+          title="Dados operacionais indisponíveis"
+          description="Não foi possível consultar os fatos operacionais desta organização."
           onAction={() => void refresh()}
         />
       ) : null}
 
-      {!loading && !error ? (
+      {!tenantSummary.error && tenantSummary.data ? (
         <>
-          <section
-            className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3"
-            aria-label="Resumo do cockpit operacional"
-          >
-            <AppStatCard
-              label="Status geral"
-              value={
-                summaryStatus
-                  ? presentationStatusLabel(summaryStatus)
-                  : "Indisponível"
-              }
-              delta={
-                <AppStatusBadge
-                  label={
-                    summaryStatus
-                      ? presentationStatusLabel(summaryStatus)
-                      : "Sem leitura"
-                  }
-                  tone={
-                    summaryStatus === "ok"
-                      ? "success"
-                      : summaryStatus === "degraded"
-                        ? "warning"
-                        : "neutral"
-                  }
-                />
-              }
-            />
+          <AppAlert role="status">
+            <AppAlertTitle>Dados da organização</AppAlertTitle>
+            <AppAlertDescription>
+              Gerados em {formatTimestamp(tenantSummary.data.generatedAt)}. Cada
+              seção apresenta somente o fato observado pela respectiva fonte.
+            </AppAlertDescription>
+          </AppAlert>
 
-            <AppStatCard
-              label="Incidentes ativos"
-              value={
-                incidents.data
-                  ? String(incidents.data.length)
-                  : "Indisponível"
-              }
-              delta={
-                <AppStatusBadge
-                  label={
-                    incidents.data
-                      ? criticalIncidents.length
-                        ? `${criticalIncidents.length} crítico(s)`
-                        : "Sem críticos"
-                      : "Sem leitura"
-                  }
-                  tone={
-                    incidents.data && criticalIncidents.length
-                      ? "danger"
-                      : "neutral"
-                  }
-                />
-              }
-            />
-
-            <AppStatCard
-              label="Filas degradadas"
-              value={
-                summary.data
-                  ? String(degradedQueues.length)
-                  : "Indisponível"
-              }
-              delta={
-                <AppStatusBadge
-                  label={
-                    summary.data
-                      ? degradedQueues.length
-                        ? "Degradação informada"
-                        : "Sem degradação"
-                      : "Sem leitura"
-                  }
-                  tone={
-                    summary.data && degradedQueues.length
-                      ? "warning"
-                      : "neutral"
-                  }
-                />
-              }
-            />
-          </section>
-
-          <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-            <AppSectionBlock
-              title="Incidentes ativos"
-              subtitle="Severidade e descrição retornadas pelo backend operacional."
-              compact
-            >
-              {incidents.data?.length ? (
-                <AppSectionCard className="space-y-2 p-3">
-                  {incidents.data.map(item => (
-                    <OperationalRow
-                      key={item.id}
-                      label={item.title}
-                      meta={item.description}
-                      icon={
-                        <AlertTriangle className="h-3.5 w-3.5 text-[var(--text-secondary)]" />
-                      }
-                      badge={
-                        <AppStatusBadge
-                          label={presentationStatusLabel(item.severity)}
-                          tone={severityTone[item.severity]}
-                        />
-                      }
-                    />
-                  ))}
-                </AppSectionCard>
-              ) : (
-                <AppPageEmptyState
-                  title="Nenhum incidente ativo"
-                  description="A fonte oficial não retornou incidentes ativos."
-                />
-              )}
-            </AppSectionBlock>
-
-            <AppSectionBlock
-              title="Filas degradadas"
-              subtitle="Somente filas marcadas como degradadas pelo backend."
-              compact
-            >
-              {degradedQueues.length ? (
-                <AppSectionCard className="space-y-2 p-3">
-                  {degradedQueues.map(item => (
-                    <OperationalRow
-                      key={item.queue}
-                      label={formatQueueName(item.queue)}
-                      meta={`${item.waiting} aguardando · ${item.failed} falhas`}
-                      badge={
-                        <AppStatusBadge
-                          label="Degradada"
-                          tone="warning"
-                        />
-                      }
-                    />
-                  ))}
-                </AppSectionCard>
-              ) : (
-                <AppPageEmptyState
-                  title="Nenhuma fila degradada"
-                  description="Nenhuma fila foi marcada como degradada pela fonte oficial."
-                />
-              )}
-            </AppSectionBlock>
-
-            <AppSectionBlock
-              title="DLQ / backlog"
-              subtitle="Backlog e falhas exibidos como fatos, sem severidade fabricada no navegador."
-              compact
-            >
-              {dlqItems.length ? (
-                <AppSectionCard className="space-y-2 p-3">
-                  {dlqItems.map(item => (
-                    <OperationalRow
-                      key={item.queue}
-                      label={formatQueueName(item.queue)}
-                      meta={`${item.backlog} aguardando · ${item.failed} falhas`}
-                      badge={
-                        <AppStatusBadge
-                          label="DLQ"
-                          tone="neutral"
-                        />
-                      }
-                    />
-                  ))}
-                </AppSectionCard>
-              ) : (
-                <AppPageEmptyState
-                  title="Sem itens em DLQ"
-                  description="Nenhum backlog ou falha foi retornado para a DLQ."
-                />
-              )}
-            </AppSectionBlock>
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <ResourcesSection fact={tenantSummary.data.facts[0]} />
+            <WhatsAppSection fact={tenantSummary.data.facts[1]} />
+            <WebhooksSection fact={tenantSummary.data.facts[2]} />
+            <BillingSection fact={tenantSummary.data.facts[3]} />
+            <OperationConfigSection fact={tenantSummary.data.facts[4]} />
           </div>
         </>
       ) : null}
-
-      <AppInfoCard className="text-sm text-[var(--text-secondary)]">
-        <p className="font-medium text-[var(--text-primary)]">
-          Recovery / replay
-        </p>
-        <p className="mt-1">
-          O retry genérico de DLQ está indisponível. Replays somente são
-          oferecidos quando uma entrega identificada e elegível é confirmada
-          pelo backend.
-        </p>
-      </AppInfoCard>
     </AppPageShell>
   );
 }
 
-function OperationalRow({
-  label,
-  meta,
-  badge,
-  icon,
+type Summary = inferRouterOutputs<AppRouter>["operations"]["tenantSummary"];
+
+function ResourcesSection({ fact }: { fact: Summary["facts"][0] }) {
+  const rows = [
+    ["Clientes", fact.facts.customersVolume, fact.facts.customersUpdatedAt],
+    [
+      "Agendamentos",
+      fact.facts.appointmentsVolume,
+      fact.facts.appointmentsUpdatedAt,
+    ],
+    [
+      "Ordens de serviço",
+      fact.facts.serviceOrdersVolume,
+      fact.facts.serviceOrdersUpdatedAt,
+    ],
+    ["Cobranças", fact.facts.chargesVolume, fact.facts.chargesUpdatedAt],
+    ["Pagamentos", fact.facts.paymentsVolume, fact.facts.paymentsUpdatedAt],
+  ] as const;
+
+  return (
+    <FactSection title="Recursos" fact={fact} statusContext="Fonte de recursos">
+      {rows.map(([label, value, updatedAt]) => (
+        <FactRow
+          key={label}
+          label={label}
+          value={formatNullable(value)}
+          detail={
+            updatedAt
+              ? `Atualizado em ${formatTimestamp(updatedAt)}`
+              : undefined
+          }
+        />
+      ))}
+    </FactSection>
+  );
+}
+
+function WhatsAppSection({ fact }: { fact: Summary["facts"][1] }) {
+  return (
+    <FactSection
+      title="WhatsApp"
+      fact={fact}
+      statusContext="Observação do WhatsApp"
+    >
+      <FactRow
+        label="Mensagens com falha observadas"
+        value={
+          fact.facts.failedMessages === null
+            ? "Não disponível"
+            : `${fact.facts.failedMessages} mensagens com falha observadas`
+        }
+      />
+    </FactSection>
+  );
+}
+
+function WebhooksSection({ fact }: { fact: Summary["facts"][2] }) {
+  const rows = [
+    ["Endpoints configurados", fact.facts.configuredEndpoints],
+    ["Endpoints ativos", fact.facts.activeEndpoints],
+    ["Entregas pendentes", fact.facts.pendingDeliveries],
+    ["Entregas concluídas", fact.facts.successfulDeliveries],
+    ["Entregas com falha", fact.facts.failedDeliveries],
+  ] as const;
+  return (
+    <FactSection
+      title="Webhooks"
+      fact={fact}
+      statusContext="Configuração de webhooks"
+    >
+      {fact.status === "unknown" ? (
+        <p className="text-sm text-[var(--text-secondary)]">
+          Disponibilidade não observável
+        </p>
+      ) : null}
+      {rows.map(([label, value]) => (
+        <FactRow key={label} label={label} value={formatNullable(value)} />
+      ))}
+    </FactSection>
+  );
+}
+
+function BillingSection({ fact }: { fact: Summary["facts"][3] }) {
+  return (
+    <FactSection
+      title="Cobrança"
+      fact={fact}
+      statusContext="Configuração da assinatura"
+    >
+      <FactRow
+        label="Status da assinatura"
+        value={fact.facts.subscriptionStatus ?? "Não configurado"}
+      />
+      {fact.facts.subscriptionStatus && fact.status === "unknown" ? (
+        <p className="text-xs text-[var(--text-secondary)]">
+          O status acima é o registro da assinatura; a disponibilidade do
+          provedor não está sendo afirmada.
+        </p>
+      ) : null}
+    </FactSection>
+  );
+}
+
+function OperationConfigSection({ fact }: { fact: Summary["facts"][4] }) {
+  return (
+    <FactSection
+      title="Configuração operacional"
+      fact={fact}
+      statusContext="Configuração disponível"
+    >
+      <FactRow
+        label="Modo de execução"
+        value={fact.facts.executionMode ?? "Não configurado"}
+      />
+      <FactRow
+        label="Atualização da configuração"
+        value={
+          fact.facts.updatedAt
+            ? formatTimestamp(fact.facts.updatedAt)
+            : "Não disponível"
+        }
+      />
+    </FactSection>
+  );
+}
+
+function FactSection({
+  title,
+  fact,
+  statusContext,
+  children,
 }: {
-  label: string;
-  meta: string;
-  badge: ReactNode;
-  icon?: ReactNode;
+  title: string;
+  fact: {
+    status: TenantFactStatus;
+    observedAt: string;
+    reasonCode: string | null;
+  };
+  statusContext: string;
+  children: ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-[var(--border-subtle)] pb-2 last:border-none last:pb-0">
-      <div className="min-w-0">
-        <p className="truncate text-sm text-[var(--text-primary)]">
-          {label}
-        </p>
-        <p className="text-xs text-[var(--text-secondary)]">{meta}</p>
-      </div>
+    <AppSectionBlock
+      title={title}
+      subtitle={`Observado em ${formatTimestamp(fact.observedAt)}`}
+      compact
+    >
+      <AppSectionCard className="space-y-3 p-3">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-xs text-[var(--text-secondary)]">
+            {statusContext}
+          </span>
+          <AppStatusBadge label={statusLabel(fact.status)} tone="neutral" />
+        </div>
+        {fact.reasonCode ? (
+          <p className="text-xs text-[var(--text-secondary)]">
+            {reasonDescription(fact.reasonCode)}
+          </p>
+        ) : null}
+        <div className="space-y-2">{children}</div>
+      </AppSectionCard>
+    </AppSectionBlock>
+  );
+}
 
-      <div className="flex shrink-0 items-center gap-2">
-        {icon}
-        {badge}
+function FactRow({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string;
+  detail?: string;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4 border-t border-[var(--border-subtle)] pt-2 first:border-0 first:pt-0">
+      <div>
+        <p className="text-sm text-[var(--text-primary)]">{label}</p>
+        {detail ? (
+          <p className="text-xs text-[var(--text-secondary)]">{detail}</p>
+        ) : null}
       </div>
+      <span className="text-sm font-medium text-[var(--text-primary)]">
+        {value}
+      </span>
     </div>
   );
 }
 
-export function getCriticalIncidents(items: Incident[]) {
-  return items.filter(item => item.severity === "CRITICAL");
+export function statusLabel(status: TenantFactStatus) {
+  return statusLabels[status];
 }
 
-export function getDegradedQueues(items: Queue[]) {
-  return items.filter(item => item.degraded);
+export function reasonDescription(reasonCode: string) {
+  return (
+    reasonLabels[reasonCode] ??
+    `Informação adicional não disponível (${reasonCode}).`
+  );
 }
 
-export function shouldBlockOperationalAction(
-  current: ActionState | undefined,
-  hasConcurrentAction: boolean
-) {
-  return current === "loading" || hasConcurrentAction;
+export function formatNullable(value: number | null) {
+  return value === null ? "Não disponível" : String(value);
 }
 
-export function formatQueueName(queue: string) {
-  return queue
-    .replace(/[-_]/g, " ")
-    .replace(/\b\w/g, char => char.toUpperCase());
+export function formatTimestamp(value: string) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "medium",
+  }).format(new Date(value));
 }
