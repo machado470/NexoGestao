@@ -2,9 +2,9 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import {
-  getCriticalIncidents,
-  getDegradedQueues,
-  shouldBlockOperationalAction,
+  formatNullable,
+  reasonDescription,
+  statusLabel,
 } from "./OperationalCockpitPage";
 
 const source = readFileSync(
@@ -12,98 +12,93 @@ const source = readFileSync(
   "utf8"
 );
 
-describe("OperationalCockpitPage selectors", () => {
-  it("destaca apenas incidentes marcados como CRITICAL pela fonte", () => {
-    const list = getCriticalIncidents([
-      { id: "1", severity: "INFO" },
-      { id: "2", severity: "CRITICAL" },
-    ] as Parameters<typeof getCriticalIncidents>[0]);
-
-    expect(list).toHaveLength(1);
-    expect(list[0]?.id).toBe("2");
+describe("OperationalCockpitPage presentation", () => {
+  it.each([
+    ["available", "Disponível"],
+    ["unknown", "Não disponível"],
+    ["unavailable", "Indisponível"],
+    ["not_configured", "Não configurado"],
+  ] as const)("maps %s literally", (status, label) => {
+    expect(statusLabel(status)).toBe(label);
   });
 
-  it("retorna apenas filas oficialmente degradadas", () => {
-    const list = getDegradedQueues([
-      {
-        queue: "a",
-        degraded: false,
-        waiting: 0,
-        failed: 0,
-      },
-      {
-        queue: "b",
-        degraded: true,
-        waiting: 2,
-        failed: 0,
-      },
-      {
-        queue: "c",
-        degraded: true,
-        waiting: 0,
-        failed: 1,
-      },
-    ]);
-
-    expect(list.map(item => item.queue)).toEqual(["b", "c"]);
+  it("preserves factual zero and presents null as unavailable", () => {
+    expect(formatNullable(0)).toBe("0");
+    expect(formatNullable(null)).toBe("Não disponível");
   });
 
-  it("empty states permanecem vazios", () => {
-    expect(getCriticalIncidents([])).toEqual([]);
-    expect(getDegradedQueues([])).toEqual([]);
-  });
-
-  it("bloqueia ação duplicada quando loading ou ação concorrente", () => {
-    expect(shouldBlockOperationalAction("loading", false)).toBe(true);
-    expect(shouldBlockOperationalAction("idle", true)).toBe(true);
-    expect(shouldBlockOperationalAction("idle", false)).toBe(false);
+  it("uses a neutral fallback for an unknown reason code", () => {
+    expect(reasonDescription("NEW_REASON")).toBe(
+      "Informação adicional não disponível (NEW_REASON)."
+    );
   });
 });
 
-describe("OperationalCockpitPage golden-standard contract", () => {
-  it("uses the canonical page hierarchy and surfaces", () => {
+describe("OperationalCockpitPage tenant contract", () => {
+  it("queries only the tenant summary without identity input", () => {
+    expect(source).toContain(
+      "trpc.operations.tenantSummary.useQuery(undefined"
+    );
+    expect(source).toContain("tenantSummary.refetch()");
+  });
+
+  it.each([
+    "operations.summary",
+    "operations.incidents",
+    "operations.queues",
+    "operations.dlq",
+    "/internal/operations/",
+    "orgId",
+    "x-org-id",
+    "Date.now(",
+    "severity",
+    "nextAction",
+    "priorityScore",
+    ".sort(",
+  ])("does not contain forbidden tenant-path construct %s", forbidden => {
+    expect(source).not.toContain(forbidden);
+  });
+
+  it("uses canonical page states and surfaces", () => {
     expect(source).toContain("<AppPageShell");
     expect(source).toContain("<AppOperationalHeader");
     expect(source).toContain("<AppSectionBlock");
-    expect(source).toContain("<AppSectionCard");
-    expect(source).toContain("<AppStatCard");
-    expect(source).toContain("<AppInfoCard");
     expect(source).toContain("<AppStatusBadge");
-
-    expect(source).not.toContain("MiniCard");
-    expect(source).not.toContain("ListCard");
+    expect(source).toContain("<AppAlert");
+    expect(source).toContain("<AppPageLoadingState");
+    expect(source).toContain('title="Dados operacionais indisponíveis"');
   });
 
-  it("uses official operations contracts as its source", () => {
-    expect(source).toContain("trpc.operations.summary.useQuery");
-    expect(source).toContain("trpc.operations.incidents.useQuery");
-    expect(source).toContain('item.severity === "CRITICAL"');
-    expect(source).toContain("item.degraded");
-  });
-
-  it("does not rank or reconstruct operational decisions", () => {
-    expect(source).not.toContain(".sort(");
-    expect(source).not.toContain("Date.now");
-    expect(source).not.toContain("priority");
-    expect(source).not.toContain("nextAction");
-    expect(source).not.toContain("score");
-  });
-
-  it("does not manufacture DLQ severity from backlog counts", () => {
-    expect(source).toContain(
-      "item.backlog > 0 || item.failed > 0"
+  it("does not present optimistic or aggregate classifications", () => {
+    expect(source).not.toMatch(
+      /Saudável|saudável|Sem incidentes|Sem críticos|Sem degradação|risco baixo|tudo funcionando/i
     );
-    expect(source).toContain('label="DLQ"');
-    expect(source).not.toContain(
-      'item.backlog > 0 ? "CRITICAL" : "WARNING"'
+    expect(source).toContain("Configuração disponível");
+    expect(source).toMatch(
+      /a disponibilidade do\s+provedor não está sendo afirmada/
     );
+    expect(source).toContain("Disponibilidade não observável");
   });
 
-  it("contains no legacy hardcoded severity palette or broken utility classes", () => {
-    expect(source).not.toContain("bg-rose");
-    expect(source).not.toContain("bg-amber");
-    expect(source).not.toContain("bg-zinc");
-    expect(source).not.toContain("rounded-xlborder");
-    expect(source).not.toContain("mt-2space-y-2");
+  it("renders requested factual values and timestamps", () => {
+    for (const field of [
+      "customersVolume",
+      "appointmentsVolume",
+      "serviceOrdersVolume",
+      "chargesVolume",
+      "paymentsVolume",
+      "failedMessages",
+      "configuredEndpoints",
+      "activeEndpoints",
+      "pendingDeliveries",
+      "successfulDeliveries",
+      "failedDeliveries",
+      "subscriptionStatus",
+      "executionMode",
+      "generatedAt",
+      "observedAt",
+      "updatedAt",
+    ])
+      expect(source).toContain(field);
   });
 });
