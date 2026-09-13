@@ -4,13 +4,29 @@ import { PrismaService } from '../prisma/prisma.service'
 import { TimelineService } from '../timeline/timeline.service'
 import { WhatsAppService } from './whatsapp.service'
 
+type RequestExecutionPayload = {
+  entityType?: string
+  entityId?: string | null
+  paymentLink?: string
+  customerName?: string
+  chargeAmount?: string | number
+  chargeDueDate?: string
+  appointmentDate?: string
+  appointmentTime?: string
+  serviceOrderNumber?: string
+  startsAt?: string
+  endsAt?: string
+  content?: string
+  templateKey?: string
+  context?: Record<string, string | number>
+}
 type RequestExecutionInput = {
   orgId: string
   conversationId: string
   suggestedAction: WhatsAppSuggestedAction
   requestedBy?: string | null
   executionReason?: string | null
-  actionPayload?: Record<string, unknown> | null
+  actionPayload?: RequestExecutionPayload | null
   idempotencyKey?: string | null
   autoExecuteSafe?: boolean
 }

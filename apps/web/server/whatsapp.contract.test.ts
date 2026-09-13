@@ -155,4 +155,40 @@ describe("WhatsApp BFF input contracts", () => {
     await expect(caller().whatsapp.sendMessage({ customerId: "customer-1", content: "Olá", messageType: "provider_text" } as any)).rejects.toMatchObject({ code: "BAD_REQUEST" });
     await expect(caller().whatsapp.sendMessage({ customerId: "customer-1", content: "Olá", orgId: "forged" } as any)).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
+
+  const executionResponse = (suggestedAction: string) => ({
+    id: messageId, conversationId, suggestedAction, status: "PENDING_APPROVAL", approvalRequired: true,
+    executionReason: null, failureReason: null, actionPayload: null, approvedAt: null, executedAt: null,
+    failedAt: null, cancelledAt: null, createdAt: now, updatedAt: now,
+  });
+
+  it.each([
+    ["SEND_PAYMENT_LINK", { entityType: "CHARGE", entityId: "charge-1", paymentLink: "https://pay.local/1", chargeAmount: 0 }],
+    ["CONFIRM_APPOINTMENT", { entityType: "APPOINTMENT", entityId: "appointment-1", appointmentDate: "2026-09-14", appointmentTime: "10:00" }],
+    ["RESCHEDULE_APPOINTMENT", { entityType: "APPOINTMENT", entityId: "appointment-1", startsAt: "2026-09-14T10:00:00.000Z", endsAt: "2026-09-14T11:00:00.000Z" }],
+    ["SEND_SERVICE_UPDATE", { entityType: "SERVICE_ORDER", entityId: "service-order-1", serviceOrderNumber: "OS-1" }],
+    ["REPLY_WITH_TEMPLATE", { entityType: "GENERAL", entityId: null, templateKey: "manual_followup", context: { customerName: "Ana" } }],
+    ["ESCALATE_TO_OPERATOR", undefined],
+    ["MARK_RESOLVED", { entityType: "GENERAL", entityId: null }],
+  ])("accepts the strict %s execution payload", async (suggestedAction, actionPayload) => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ data: executionResponse(suggestedAction) }), { status: 200 }));
+    await caller().whatsapp.requestExecution({ conversationId, suggestedAction, actionPayload } as any);
+    const transported = JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body));
+    expect(transported).not.toHaveProperty("conversationId");
+    expect(transported).toEqual({ suggestedAction, ...(actionPayload === undefined ? {} : { actionPayload }) });
+  });
+
+  it.each([
+    ["extra key", { conversationId, suggestedAction: "MARK_RESOLVED", invented: true }],
+    ["tenant spoofing", { conversationId, suggestedAction: "MARK_RESOLVED", orgId: "forged" }],
+    ["nested tenant spoofing", { conversationId, suggestedAction: "MARK_RESOLVED", actionPayload: { entityType: "GENERAL", entityId: null, tenantId: "forged" } }],
+    ["incompatible payload", { conversationId, suggestedAction: "MARK_RESOLVED", actionPayload: { entityType: "GENERAL", entityId: null, paymentLink: "https://pay.local/1" } }],
+    ["missing payment link", { conversationId, suggestedAction: "SEND_PAYMENT_LINK", actionPayload: { entityType: "CHARGE", entityId: "charge-1" } }],
+    ["invalid timestamp", { conversationId, suggestedAction: "RESCHEDULE_APPOINTMENT", actionPayload: { entityType: "APPOINTMENT", entityId: "appointment-1", startsAt: "tomorrow" } }],
+    ["invalid zero-like string", { conversationId, suggestedAction: "SEND_SERVICE_UPDATE", actionPayload: { entityType: "SERVICE_ORDER", entityId: "service-order-1", serviceOrderNumber: "" } }],
+  ])("rejects requestExecution %s before transport", async (_label, input) => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    await expect(caller().whatsapp.requestExecution(input as any)).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });

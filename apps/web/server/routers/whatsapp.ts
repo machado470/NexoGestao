@@ -180,6 +180,52 @@ const whatsappTemplateContext = z.object({
   companyName: z.string().min(1).optional(),
 }).strict();
 
+const executionTargetInput = z.object({
+  entityType: whatsappEntityType.optional(),
+  entityId: z.string().min(1).nullable().optional(),
+}).strict();
+const executionTemplateContextInput = whatsappTemplateContext;
+const executionRequestCommon = {
+  conversationId: z.string().min(1),
+  executionReason: z.string().min(1).optional(),
+  idempotencyKey: z.string().min(1).optional(),
+  autoExecuteSafe: z.boolean().optional(),
+};
+const strictRequestExecutionInput = z.discriminatedUnion("suggestedAction", [
+  z.object({ ...executionRequestCommon, suggestedAction: z.literal("SEND_PAYMENT_LINK"), actionPayload: executionTargetInput.extend({
+    paymentLink: z.string().url(), customerName: z.string().min(1).optional(), chargeAmount: z.union([z.string().min(1), z.number()]).optional(), chargeDueDate: z.string().min(1).optional(),
+  }).strict() }).strict(),
+  z.object({ ...executionRequestCommon, suggestedAction: z.literal("CONFIRM_APPOINTMENT"), actionPayload: executionTargetInput.extend({
+    customerName: z.string().min(1).optional(), appointmentDate: z.string().min(1).optional(), appointmentTime: z.string().min(1).optional(),
+  }).strict().optional() }).strict(),
+  z.object({ ...executionRequestCommon, suggestedAction: z.literal("RESCHEDULE_APPOINTMENT"), actionPayload: executionTargetInput.extend({
+    startsAt: z.string().datetime({ offset: true }), endsAt: z.string().datetime({ offset: true }).optional(), content: z.string().min(1).optional(),
+  }).strict() }).strict(),
+  z.object({ ...executionRequestCommon, suggestedAction: z.literal("SEND_SERVICE_UPDATE"), actionPayload: executionTargetInput.extend({
+    customerName: z.string().min(1).optional(), serviceOrderNumber: z.string().min(1).optional(),
+  }).strict().optional() }).strict(),
+  z.object({ ...executionRequestCommon, suggestedAction: z.literal("REPLY_WITH_TEMPLATE"), actionPayload: executionTargetInput.extend({
+    templateKey: whatsappTemplateKey, context: executionTemplateContextInput.optional(),
+  }).strict() }).strict(),
+  z.object({ ...executionRequestCommon, suggestedAction: z.literal("ESCALATE_TO_OPERATOR"), actionPayload: executionTargetInput.optional() }).strict(),
+  z.object({ ...executionRequestCommon, suggestedAction: z.literal("MARK_RESOLVED"), actionPayload: executionTargetInput.optional() }).strict(),
+]);
+type RequestExecutionTransportInput = {
+  conversationId: string;
+  suggestedAction: z.infer<typeof strictRequestExecutionInput>["suggestedAction"];
+  executionReason?: string;
+  actionPayload?: {
+    entityType?: string; entityId?: string | null; paymentLink?: string; customerName?: string;
+    chargeAmount?: string | number; chargeDueDate?: string; appointmentDate?: string; appointmentTime?: string;
+    serviceOrderNumber?: string; startsAt?: string; endsAt?: string; content?: string; templateKey?: string;
+    context?: z.infer<typeof executionTemplateContextInput>;
+  };
+  idempotencyKey?: string;
+  autoExecuteSafe?: boolean;
+};
+// Keep the caller type compatible with the official target while runtime parsing remains discriminated and strict.
+const requestExecutionInput = strictRequestExecutionInput as z.ZodType<RequestExecutionTransportInput>;
+
 const whatsappSendInput = z.object({
   customerId: z.string().min(1),
   content: z.string().min(1),
@@ -274,9 +320,12 @@ export const whatsappRouter = router({
       .query(async ({ ctx, input }) => publicOutput(executionOutput, await authedGet(ctx as NexoContext, `/whatsapp/action-executions/${input.id}`))),
 
     requestExecution: protectedProcedure
-      .input(z.object({ conversationId: z.string().min(1), suggestedAction: z.enum(['SEND_PAYMENT_LINK', 'CONFIRM_APPOINTMENT', 'RESCHEDULE_APPOINTMENT', 'SEND_SERVICE_UPDATE', 'ESCALATE_TO_OPERATOR', 'MARK_RESOLVED', 'REPLY_WITH_TEMPLATE']), executionReason: z.string().optional(), actionPayload: z.record(z.string(), z.any()).optional(), idempotencyKey: z.string().optional(), autoExecuteSafe: z.boolean().optional() }))
+      .input(requestExecutionInput)
       .output(executionOutput)
-      .mutation(async ({ ctx, input }) => publicOutput(executionOutput, await authedPost(ctx as NexoContext, `/whatsapp/conversations/${input.conversationId}/actions`, input))),
+      .mutation(async ({ ctx, input }) => {
+        const { conversationId, ...body } = input;
+        return publicOutput(executionOutput, await authedPost(ctx as NexoContext, `/whatsapp/conversations/${conversationId}/actions`, body));
+      }),
 
     approveExecution: protectedProcedure
       .input(z.object({ id: z.string().min(1), reason: z.string().optional() }))

@@ -16,7 +16,7 @@ import {
 } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { Throttle } from '@nestjs/throttler'
-import { WhatsAppConversationStatus, WhatsAppMessageStatus, WhatsAppSuggestedAction } from '@prisma/client'
+import { WhatsAppConversationStatus, WhatsAppMessageStatus } from '@prisma/client'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
 import { Roles } from '../auth/decorators/roles.decorator'
@@ -28,7 +28,7 @@ import { QuotasService } from '../quotas/quotas.service'
 import { createWhatsAppProvider, getWhatsAppProviderReadiness } from './providers/provider.factory'
 import { WhatsAppService, buildDeterministicMessageKey } from './whatsapp.service'
 import { WhatsAppExecutionService } from './whatsapp-execution.service'
-import { ListConversationsQueryDto, ListWebhookEventsQueryDto, MessageFeedQueryDto, ReplayWebhookEventsDto, SendConversationMessageDto, SendMessageDto, SendTemplateMessageDto, UpdateConversationStatusDto, UpdateMessageStatusDto } from './dto/whatsapp.dto'
+import { ListConversationsQueryDto, ListWebhookEventsQueryDto, MessageFeedQueryDto, ReplayWebhookEventsDto, RequestActionExecutionDto, SendConversationMessageDto, SendMessageDto, SendTemplateMessageDto, UpdateConversationStatusDto, UpdateMessageStatusDto } from './dto/whatsapp.dto'
 import { IdempotencyInterceptor } from '../common/idempotency/idempotency.interceptor'
 
 @ApiTags('WhatsApp')
@@ -152,9 +152,8 @@ export class WhatsAppController {
     @Org() orgId: string,
     @User() user: any,
     @Param('id') conversationId: string,
-    @Body() body: { suggestedAction?: WhatsAppSuggestedAction; executionReason?: string; actionPayload?: Record<string, unknown>; idempotencyKey?: string; autoExecuteSafe?: boolean },
+    @Body() body: RequestActionExecutionDto,
   ) {
-    if (!body?.suggestedAction) throw new BadRequestException('suggestedAction é obrigatório')
     return this.requireExecutions().requestExecution({
       orgId,
       conversationId,
