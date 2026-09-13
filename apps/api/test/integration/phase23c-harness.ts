@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
-import type IORedis from 'ioredis'
+import IORedis from 'ioredis'
 
 const composeFile = '../../docker-compose.phase23c-test.yml'
 
@@ -41,4 +41,30 @@ export async function waitRedisClientsReady(connections: Iterable<IORedis>, time
     (statuses) => statuses.length > 0 && statuses.every((status) => status === 'ready' || status === 'connect'),
     timeoutMs,
   )
+}
+
+/** Redis readiness probe. Unlike a producer, this connection may queue its PING
+ * while the initial connection is being established. One client is retained for
+ * the whole wait and is always disconnected by the harness. */
+export async function waitRedisReachable(redisUrl: string, timeoutMs = 20_000): Promise<void> {
+  const connection = new IORedis(redisUrl, {
+    lazyConnect: true,
+    maxRetriesPerRequest: 1,
+    connectTimeout: 1_000,
+  })
+  let timer: NodeJS.Timeout | undefined
+
+  try {
+    await Promise.race([
+      connection.connect(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`Redis did not become ready in ${timeoutMs}ms`)), timeoutMs)
+      }),
+    ])
+    const reply = await connection.ping()
+    if (reply !== 'PONG') throw new Error(`Unexpected Redis PING reply: ${reply}`)
+  } finally {
+    if (timer) clearTimeout(timer)
+    connection.disconnect()
+  }
 }
