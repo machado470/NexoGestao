@@ -6,7 +6,7 @@ import { QueueService } from '../../src/queue/queue.service'
 import { HealthController } from '../../src/health/health.controller'
 import { QueueObservabilityService } from '../../src/common/metrics/queue-observability.service'
 import { QUEUE_NAMES } from '../../src/queue/queue.constants'
-import { compose, eventually, assertDedicatedPhase23cInfrastructure, waitRedisClientsReady } from './phase23c-harness'
+import { compose, eventually, assertDedicatedPhase23cInfrastructure, waitRedisClientsReady, waitRedisReachable } from './phase23c-harness'
 import { describeRealIntegration, RUN_REAL_INTEGRATION, REAL_INTEGRATION_SKIP_REASON } from './infra-guards'
 
 if (!RUN_REAL_INTEGRATION) console.warn(`[integration-skip] REAL REDIS / REAL BULLMQ: ${REAL_INTEGRATION_SKIP_REASON}`)
@@ -98,10 +98,7 @@ describeRealIntegration('Phase 2.3C — REAL REDIS / REAL BULLMQ down, recovery 
   })
 
   it('records a canonical queue stall through QueueService and then reprocesses the job', async () => {
-    await eventually(async () => {
-      const probe = new IORedis(process.env.REDIS_URL!, producerOptions)
-      try { return await probe.ping() } finally { probe.disconnect() }
-    }, (reply) => reply === 'PONG', 30_000)
+    await waitRedisReachable(process.env.REDIS_URL!, 30_000)
 
     const stalledAuxiliaryConnections = new Set<IORedis>()
     const stalledProducer = new IORedis(process.env.REDIS_URL!, producerOptions)

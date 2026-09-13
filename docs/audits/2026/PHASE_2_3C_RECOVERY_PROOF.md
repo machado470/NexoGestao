@@ -1,16 +1,16 @@
 ---
-status: first-real-run-partial-remediation-ready
+status: real-run-partial-stalled-pending
 owner: nexogestao
 last_reviewed: 2026-09-13
 ---
 
 # Phase 2.3C — operational recovery proof
 
-This document records factual observations only. It is not an availability claim, an SLA, or Phase 2.3D.
+This document records factual observations from the latest real-infrastructure execution. It is not an availability claim, an SLA, or Phase 2.3D.
 
-## Safe infrastructure and command
+## Safe infrastructure and standalone command
 
-The harness uses ephemeral, dedicated services from `docker-compose.phase23c-test.yml`: PostgreSQL database `phase23c` on host port `55433`, and Redis database 15 on host port `56380`. PostgreSQL uses the Phase 2.3C-only named volume `phase23c-postgres-data`, which survives the tested `stop`/`start` and is deleted by the runner's final `down --volumes`; Redis persistence is disabled. No development service, shared volume, `FLUSHALL`, external webhook, Meta, or Z-API endpoint is used. The test helper refuses destructive actions unless both URLs exactly identify these test resources.
+The harness uses ephemeral, dedicated services from `docker-compose.phase23c-test.yml`: PostgreSQL database `phase23c` on host port `55433`, and Redis database 15 on host port `56380`. The PostgreSQL Phase 2.3C-only volume survives the tested `stop`/`start` and is removed by final cleanup; Redis persistence is disabled. The harness does not use a development service, shared volume, `FLUSHALL`, or an external webhook provider.
 
 Run from the repository root:
 
@@ -18,59 +18,63 @@ Run from the repository root:
 ./scripts/run-phase23c-recovery.sh
 ```
 
-The runner brings up the isolated services, applies the repository's real migration history with `prisma migrate deploy`, runs only the three opt-in suites with `RUN_REAL_INTEGRATION=true`, and always executes `docker compose down --volumes --remove-orphans` through a shell trap. Every destructive Jest suite also restores a stopped service in `afterAll`; queue records and database fixtures use unique IDs and are deleted without touching unrelated queues or organizations.
+The runner starts the isolated Compose project and then performs bounded readiness checks against both published **host** ports. It prefers `pg_isready` for PostgreSQL and `redis-cli PING` for Redis, with bounded host TCP checks when those clients are unavailable. Only after those checks does it run `prisma migrate deploy` and the three opt-in suites. Its trap always runs `docker compose down --volumes --remove-orphans`. This removes the former dependency on manually prewarming the ports.
 
-If `RUN_REAL_INTEGRATION` is absent, Jest reports each suite as skipped. A skipped suite is not evidence of a successful recovery test.
+Without `RUN_REAL_INTEGRATION=true`, Jest skips these suites. A skip is not recovery evidence.
 
-## First real execution — observed evidence
+## Latest real execution — observed evidence
 
-The first Docker-backed execution exposed both harness defects and a production defect. The run is **partial evidence**, not a passing Phase 2.3C claim:
+The latest Docker-backed execution completed four tests successfully and left one failure, the stalled scenario.
 
-- **Redis down/recovery: PROVED in this execution.** The existing QueueService rejected enqueue while Redis was unavailable and recovered after the real service restart.
-- **PostgreSQL down detection: PROVED.** Readiness factually returned `not_ready` with both `checks.database.ok` and `checks.prismaClient.ok` false.
-- **PostgreSQL recovery: NOT YET PROVED.** The suite aborted on a contradictory leakage assertion which rejected the legitimate `prismaClient` contract key. The assertion now permits that key while continuing to reject actual connection material, raw errors, stacks, Prisma internals, and filesystem details; another real run is required to prove `ready -> not_ready -> ready` and fixture preservation.
-- **Webhook retries and persisted `FAILED` status: OBSERVED.**
-- **Webhook DLQ: FAILED because of a real production bug.** The real BullMQ infrastructure rejected colon-delimited custom IDs (`Custom Id cannot contain :`), leaving the DLQ empty. This was discovered by the real infrastructure, not by a mock. Dispatch, official replay, and DLQ now share stable BullMQ-safe hyphenated ID helpers.
-- **Complete webhook replay: NOT YET PROVED.** A new real run must still demonstrate the DLQ item and metric, official replay to a 2xx destination, persisted `SUCCESS`, blocked second replay, and organization isolation.
-- **Stalled handling: NOT YET PROVED.** The previous harness reused QueueEvents immediately after the Redis stop/start scenario. The stalled proof now creates a fresh production QueueService after a positive Redis probe, waits for its tracked QueueEvents/JobScheduler clients to be ready, and polls the real event/counter and replacement-worker completion for up to 30 seconds.
-- **Cleanup: PROVED.** The run restored and removed its dedicated infrastructure as designed.
-- **WhatsApp external provider behavior: NOT CLAIMED.** No real provider was exercised.
+### Proved
 
-### Custom BullMQ job ID audit
+- PostgreSQL down detection and automatic recovery without an application restart.
+- Preservation of the PostgreSQL fixture across the real stop/start cycle.
+- Approximate PostgreSQL detection time of **4.6 seconds** and recovery time of **8.3 seconds** in this execution. These samples are observations, **not an SLA**.
+- Redis down detection, explicit fail-closed enqueue while unavailable, automatic recovery, and processing of a newly enqueued job after recovery.
+- Webhook retries, persisted `FAILED`, real DLQ insertion, official replay, and persisted `SUCCESS` after replay.
+- Rejection of a second replay after `SUCCESS` and organization isolation exercised by the webhook suite.
+- Complete cleanup of the dedicated test infrastructure and fixtures.
 
-The repository-wide audit classified `jobId` occurrences as follows:
+The many `ECONNREFUSED` messages emitted during the Redis-down window are expected effects of the deliberate outage and reconnection attempts; they are not separate test failures.
 
-- **A — custom BullMQ IDs:** webhook dispatch/replay changed from `webhook:dispatch:<deliveryId>` to `webhook-dispatch-<deliveryId>`; webhook DLQ changed from `webhook:dispatch:dlq:<deliveryId>` to `webhook-dispatch-dlq-<deliveryId>`. The two outbound WhatsApp custom IDs were also colon-delimited and were corrected to `whatsapp-dispatch-<messageId>` and `whatsapp-dispatch-retry-<messageId>`.
-- **A — already safe and unchanged:** WhatsApp inbound/replay IDs are hyphenated, notification IDs are SHA-256 hashes, and the Phase 2.3C integration seed ID is hyphenated.
-- **B — domain/observability fields:** processor status updates, payload fields, API results, and operational log `jobId` values merely report the BullMQ ID and were not rewritten.
-- **C — tests:** webhook dispatch, replay, and DLQ contracts now pin the safe IDs and each explicitly rejects `:`.
+### Not proved yet
+
+- **Stalled end-to-end.** The only failed test was the stalled harness. Its initial readiness polling created a new fail-fast producer connection on every attempt and issued `PING` while each client was still `connecting`. With `enableOfflineQueue: false`, ioredis correctly rejected that command before any one connection could become ready. This is a harness defect, not evidence of a QueueService defect.
+
+The corrected harness now uses one dedicated, lazy readiness connection, awaits its connection readiness, sends `PING`, and always disconnects it. It does not change the fail-fast producer configuration or production runtime. A future real run is required before stalled can be classified as proved.
 
 ## Evidence matrix
 
-The matrix below describes the corrected proof contract for the next run; it does not override the observed/proved classifications above.
+| Scenario | Failure exercised | Latest real result |
+| --- | --- | --- |
+| PostgreSQL | Stop only `postgres-phase23c`; observe readiness failure; restart the same container | **PASS:** down detected, normal Prisma path recovered without restart, fixture preserved; observed ~4.6 s detection and ~8.3 s recovery (not SLA). |
+| Redis / BullMQ | Stop only `redis-phase23c`; readiness and enqueue fail; restart it | **PASS:** enqueue failed closed, existing service recovered automatically, and a post-recovery job was consumed. Repeated connection-refused diagnostics during the outage were expected. |
+| Webhook DLQ/replay | Local destination returns 503 through configured attempts, then 204 for official replay | **PASS:** retries, `FAILED`, DLQ, tenant isolation, official replay to `SUCCESS`, and blocked second replay were observed. |
+| BullMQ stalled | Acquire a canonical `automation` job, interrupt its lock owner, start a replacement Worker | **NOT YET PROVED:** the precondition probe failed because it reused producer fail-fast options incorrectly. The corrected test must still observe the real stalled event and completion in real infrastructure. |
 
-| Scenario | Before | Introduced failure | During failure | Recovery / result |
-| --- | --- | --- | --- | --- |
-| REAL POSTGRES | Readiness `ready`; `SELECT 1`; fixture present | Compose stops only `postgres-phase23c` | Readiness throws 503 with `not_ready`; database and Prisma checks are false; response is checked for DSN/password/client leakage and does not invent a successful database check | Compose starts the same ephemeral container; the suite polls the normal Prisma query path (no application restart or artificial reconnect); readiness returns `ready` and the original fixture is read. Detection/recovery milliseconds are logged as approximate observations, not an SLA. |
-| REAL REDIS / BULLMQ | Readiness is `ready`, queue status is available, and a real enqueue returns a job ID | Compose stops only `redis-phase23c` | Readiness throws 503, queue status becomes unavailable, enqueue rejects explicitly, and the factual enqueue-failure counter increments; the readiness database probe remains successful | Compose starts Redis; the existing ioredis/QueueService reconnects without application restart; readiness returns `ready`, and a new job is enqueued and consumed by a real Worker. |
-| REAL BULLMQ webhook DLQ | Two persisted organizations; endpoint belongs to A; local HTTP server returns 503 | A delivery payload/meta claims B and supplies non-authoritative trace-like data | Real worker performs two configured attempts, delivery becomes `FAILED`, retry/failed/dead-letter counters increase, and `webhooks-dlq` contains the item. Listing/replay as B cannot see or mutate it. | Local destination switches to 204. The official `replayFailedDelivery` path moves `FAILED` to `PENDING`; worker persists `SUCCESS`. A second replay is rejected and only one successful local HTTP effect exists. The delivery is not simultaneously listed pending and successful. |
-| REAL BULLMQ stalled | After Redis responds healthy, a fresh production QueueService is created; its tracked QueueEvents/JobScheduler connections must reach `ready`/`connect`. Canonical `automation` is obliterated only in dedicated Redis database 15; only harness Worker intervals are reduced | First Worker is force-closed after acquiring the job lock | The suite polls up to 30 seconds for the real QueueService QueueEvents listener to record `stalledEvents.automation` count/timestamp and increment `queue.job.stalled.automation`; no current-stalled gauge is introduced | A replacement Worker must complete the same job according to BullMQ policy. This is the corrected proof strategy and remains unproved until the next opt-in Docker run passes. |
+## Corrected stalled proof contract
 
-The Redis outage harness keeps its `QueueService` producer fail-fast (`maxRetriesPerRequest: 1`, offline queue disabled), while every BullMQ Worker and the dedicated connections created by QueueEvents use `maxRetriesPerRequest: null`; all auxiliary clients are tracked and closed. The stalled scenario does not reuse that outage/recovery QueueService. It probes Redis health, constructs a new instance of the same production class with separately tracked auxiliary clients, waits on client state rather than a blind sleep, obliterates only the canonical `automation` queue in dedicated Redis database 15, and interrupts a harness-only Worker with short lock/stalled intervals. It then polls the real `QueueService.getQueueStatus()` state and `QueueObservabilityService` counter before verifying reprocessing, and asserts that no fictional `queue.backlog.stalled.automation` gauge exists.
+The Redis outage producer remains fail-fast with `maxRetriesPerRequest: 1`, `enableOfflineQueue: false`, and `connectTimeout: 1000`. The readiness probe is separate: it retains one connection, permits normal initial command handling, waits for `ready`, performs `PING`, and closes in `finally`. Worker and QueueEvents auxiliary connections retain their BullMQ blocking/retry semantics.
 
-## Scope and gaps
+After reachability succeeds, the test creates a fresh production `QueueService`, waits for its tracked auxiliary clients, and obliterates only the canonical `automation` queue in dedicated Redis database 15. A harness Worker acquires the job and is force-closed so its lock expires; a replacement Worker then applies BullMQ's recovery policy. Within the 30-second harness timeout, proof requires all of these facts:
 
-- **PostgreSQL down/recovery:** down detection is proved; recovery and fixture preservation remain unproved until the corrected opt-in suite completes in a Docker-capable environment.
-- **Redis down/recovery:** proved by the first real execution through the existing ioredis connection, without an application restart.
-- **Webhook DLQ/replay:** the harness covers real BullMQ, real PostgreSQL, real retries, deterministic local HTTP failure/recovery, official replay, and A/B isolation. Correlation/request IDs are sent through the queue payload and the suite checks factual in-process metric counters, but the full path remains unproved until a corrected run completes.
-- **WhatsApp DLQ/replay:** **not proved**. The current mock provider would not establish external-provider equivalence, so production provider behavior was not changed merely to facilitate this phase. Existing unit coverage is not relabeled as real evidence.
-- **Stalled:** corrected opt-in infrastructure proof, still unproved. On a passing run, the canonical queue and real QueueService QueueEvents listener must demonstrate BullMQ's event, Nexo counter/timestamp capture, and recovery policy. It does not claim that a `stalled` state is queryable. Production lock/stalled intervals are unchanged.
-- **Tracing:** the production processing wrapper already creates/ends processing spans and marks thrown handlers as error. This harness exercises that wrapper and distinct retry invocations, but no test exporter is installed here; exported span status/identity is therefore **not independently observed**. Persisted replay does not preserve an original parent trace because the current schema has no traceparent field.
-- **Pub/Sub transitions:** not proved independently. Pub/Sub remains optional and is not used as the critical readiness authority.
-- **Secrets/logs:** readiness response leakage is asserted. Full captured-log redaction across ioredis/BullMQ library diagnostics is not yet proved.
+- `status.stalledEvents.automation.count >= 1`;
+- `status.stalledEvents.automation.lastStalledAt` is defined;
+- metric `queue.job.stalled.automation >= 1`;
+- metric `queue.backlog.stalled.automation` is absent; and
+- the job count reaches exactly `completed === 1`.
+
+This changes harness timing only. Production lock/stalled intervals and QueueService are unchanged.
+
+## Scope and remaining gaps
+
+- WhatsApp external-provider DLQ/replay is not proved; the local webhook proof is not relabeled as provider equivalence.
+- Exported tracing is not independently observed because this harness installs no test exporter. Persisted replay has no original parent trace field in the current schema.
+- Pub/Sub transitions are not independently proved and Pub/Sub is not the readiness authority.
+- Readiness response leakage is asserted, but full captured-log redaction across third-party ioredis/BullMQ diagnostics is not proved.
+- Phase 2.3D has not started.
 
 ## Cleanup evidence
 
-The runner's `EXIT`, `INT`, and `TERM` trap restores/removes both containers and their ephemeral data even when Jest fails. PostgreSQL and Redis suites start their dependency in `afterAll`. The webhook suite closes its processor and fake HTTP server, obliterates only the two known queue names in dedicated Redis DB 15, and deletes only fixtures belonging to its two generated organization IDs.
-
-After a Docker-capable evidence run, retain the command output containing approximate detection/recovery times and run the normal regression gates. Do not convert those sampled times into an SLA.
+The runner's `EXIT`, `INT`, and `TERM` trap removes both containers and their ephemeral data even when Jest fails. Each destructive suite also restores a stopped dependency in `afterAll`. The webhook suite closes its processor and local HTTP server, removes only its known queues in dedicated Redis DB 15, and deletes only its generated organization fixtures.
