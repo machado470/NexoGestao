@@ -37,6 +37,7 @@ model Organization {
   whatsAppMessages             WhatsAppMessage[]
   whatsAppTemplates            WhatsAppTemplate[]
   whatsAppWebhookEvents        WhatsAppWebhookEvent[]
+  whatsAppProviderAccounts     WhatsAppProviderAccount[]
   whatsAppActionExecutions     WhatsAppActionExecution[]
   operationalActionExecutions  OperationalActionExecution[]
   operationalOutboxEvents      OperationalOutboxEvent[]
@@ -858,7 +859,7 @@ model WhatsAppMessage {
   renderedText      String
   content           String?
   provider          String?
-  providerMessageId String?               @unique
+  providerMessageId String?
   errorCode         String?
   errorMessage      String?
   metadata          Json?
@@ -882,6 +883,22 @@ model WhatsAppMessage {
   @@index([orgId, messageType, createdAt])
   @@index([orgId, status, lockedAt, createdAt])
   @@index([status, lockedAt])
+  @@unique([orgId, provider, providerMessageId])
+}
+
+model WhatsAppProviderAccount {
+  id        String   @id @default(uuid())
+  orgId     String
+  provider  String
+  accountId String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, accountId])
+  @@index([orgId, active])
 }
 
 model WhatsAppWebhookEvent {

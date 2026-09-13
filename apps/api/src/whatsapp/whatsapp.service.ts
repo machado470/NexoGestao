@@ -985,6 +985,10 @@ export class WhatsAppService {
     return this.requireWebhookService().createWebhookEvent(input)
   }
 
+  async resolveWebhookTenant(provider: string, payload: unknown) {
+    return this.requireWebhookService().resolveTenantFromProviderAccount(provider, payload)
+  }
+
   async enqueueInboundWebhook(input: Parameters<WhatsAppWebhookService['enqueueInboundWebhook']>[0]) {
     return this.requireWebhookService().enqueueInboundWebhook(input)
   }
