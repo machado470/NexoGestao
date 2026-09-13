@@ -20,7 +20,7 @@ export class AutomationProcessor implements OnModuleInit, OnModuleDestroy {
     try {
       this.worker = new Worker(
         QUEUE_NAMES.AUTOMATION,
-        async (job: Job<any>) => {
+        async (job: Job<any>) => this.queueService.processJobWithTracing(QUEUE_NAMES.AUTOMATION, job.name, job.data, async () => {
           await this.queueService.updateJobStatus({
             queue: QUEUE_NAMES.AUTOMATION,
             jobId: job.id?.toString() ?? '',
@@ -37,7 +37,7 @@ export class AutomationProcessor implements OnModuleInit, OnModuleDestroy {
             status: 'COMPLETED',
             completed: true,
           })
-        },
+        }),
         { connection: this.connection, ...QUEUE_DEFAULT_WORKER_OPTIONS },
       )
 

@@ -20,7 +20,7 @@ export class NotificationProcessor implements OnModuleInit, OnModuleDestroy {
     try {
       this.worker = new Worker(
         QUEUE_NAMES.NOTIFICATIONS,
-        async (job: Job<any>) => {
+        async (job: Job<any>) => this.queueService.processJobWithTracing(QUEUE_NAMES.NOTIFICATIONS, job.name, job.data, async () => {
           await this.queueService.updateJobStatus({
             queue: QUEUE_NAMES.NOTIFICATIONS,
             jobId: job.id?.toString() ?? '',
@@ -35,7 +35,7 @@ export class NotificationProcessor implements OnModuleInit, OnModuleDestroy {
             status: 'COMPLETED',
             completed: true,
           })
-        },
+        }),
         { connection: this.connection, ...QUEUE_DEFAULT_WORKER_OPTIONS },
       )
 

@@ -20,7 +20,7 @@ export class FinanceProcessor implements OnModuleInit, OnModuleDestroy {
     try {
       this.worker = new Worker(
         QUEUE_NAMES.FINANCE,
-        async (job: Job<any>) => {
+        async (job: Job<any>) => this.queueService.processJobWithTracing(QUEUE_NAMES.FINANCE, job.name, job.data, async () => {
           await this.queueService.updateJobStatus({
             queue: QUEUE_NAMES.FINANCE,
             jobId: job.id?.toString() ?? '',
@@ -44,7 +44,7 @@ export class FinanceProcessor implements OnModuleInit, OnModuleDestroy {
             status: 'COMPLETED',
             completed: true,
           })
-        },
+        }),
         { connection: this.connection, ...QUEUE_DEFAULT_WORKER_OPTIONS },
       )
 

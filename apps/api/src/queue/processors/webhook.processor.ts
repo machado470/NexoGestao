@@ -24,7 +24,7 @@ export class WebhookProcessor implements OnModuleInit, OnModuleDestroy {
     try {
       this.worker = new Worker(
         QUEUE_NAMES.WEBHOOKS,
-        async (job: Job<any>) => {
+        async (job: Job<any>) => this.queueService.processJobWithTracing(QUEUE_NAMES.WEBHOOKS, job.name, job.data, async () => {
           await this.queueService.updateJobStatus({ queue: QUEUE_NAMES.WEBHOOKS, jobId: job.id?.toString() ?? '', status: 'ACTIVE' })
           if (job.name !== WEBHOOK_QUEUE_JOB_NAMES.DISPATCH) return
 
@@ -45,7 +45,7 @@ export class WebhookProcessor implements OnModuleInit, OnModuleDestroy {
 
           await this.webhookService.markDeliveryAttempt({ deliveryId: delivery.id, attempts: job.attemptsMade + 1, status: 'SUCCESS' })
           await this.queueService.updateJobStatus({ queue: QUEUE_NAMES.WEBHOOKS, jobId: job.id?.toString() ?? '', status: 'COMPLETED', completed: true })
-        },
+        }),
         { connection: this.connection, ...QUEUE_DEFAULT_WORKER_OPTIONS },
       )
 
