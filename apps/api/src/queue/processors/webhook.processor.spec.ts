@@ -24,8 +24,10 @@ describe('WebhookProcessor DLQ hardening', () => {
       QUEUE_NAMES.WEBHOOKS_DLQ,
       WEBHOOK_QUEUE_JOB_NAMES.DISPATCH_DLQ,
       expect.objectContaining({ deliveryId: 'd1', orgId: 'org1', webhookId: 'w1', attemptsMade: 5 }),
-      { jobId: 'webhook:dispatch:dlq:d1' },
+      { jobId: 'webhook-dispatch-dlq-d1' },
     )
+    const dlqJobId = queueService.addJob.mock.calls[0][3].jobId
+    expect(dlqJobId).not.toContain(':')
 
     const payload = JSON.parse((warnSpy.mock.calls[0]?.[0] ?? '{}') as string)
     expect(payload).toEqual(expect.objectContaining({

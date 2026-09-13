@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
+import type IORedis from 'ioredis'
 
 const composeFile = '../../docker-compose.phase23c-test.yml'
 
@@ -32,4 +33,12 @@ export async function eventually<T>(probe: () => Promise<T>, accept: (value: T) 
     await delay(200)
   } while (Date.now() < deadline)
   throw new Error(`Condition not reached in ${timeoutMs}ms; latest=${String(latest!)}`)
+}
+
+export async function waitRedisClientsReady(connections: Iterable<IORedis>, timeoutMs = 20_000) {
+  return eventually(
+    async () => Array.from(connections, (connection) => connection.status),
+    (statuses) => statuses.length > 0 && statuses.every((status) => status === 'ready' || status === 'connect'),
+    timeoutMs,
+  )
 }

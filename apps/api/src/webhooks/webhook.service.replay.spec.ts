@@ -8,7 +8,7 @@ describe('WebhookService replay failed delivery', () => {
     const queueService = {
       ensureEnabled: jest.fn().mockResolvedValue(true),
       getQueue: jest.fn().mockReturnValue({ getJob }),
-      addJob: jest.fn().mockResolvedValue({ id: 'webhook:dispatch:d1' }),
+      addJob: jest.fn().mockResolvedValue({ id: 'webhook-dispatch-d1' }),
     }
     const prisma = {} as any
     const svc = new WebhookService(prisma, queueService as any)
@@ -27,9 +27,10 @@ describe('WebhookService replay failed delivery', () => {
       'webhooks',
       'dispatch-webhook',
       { deliveryId: 'd1' },
-      expect.objectContaining({ jobId: 'webhook:dispatch:d1' }),
+      expect.objectContaining({ jobId: 'webhook-dispatch-d1' }),
     )
-    expect(result).toEqual(expect.objectContaining({ ok: true, deliveryId: 'd1', jobId: 'webhook:dispatch:d1' }))
+    expect(result).toEqual(expect.objectContaining({ ok: true, deliveryId: 'd1', jobId: 'webhook-dispatch-d1' }))
+    expect(result.jobId).not.toContain(':')
   })
 
   it('bloqueia replay de SUCCESS', async () => {
