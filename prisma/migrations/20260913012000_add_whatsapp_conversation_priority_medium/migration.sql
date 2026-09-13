@@ -1,0 +1,2 @@
+ALTER TYPE "WhatsAppConversationPriority"
+ADD VALUE IF NOT EXISTS 'MEDIUM' BEFORE 'NORMAL';
