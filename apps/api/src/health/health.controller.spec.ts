@@ -1,4 +1,4 @@
-import { CanActivate, ExecutionContext, INestApplication, UnauthorizedException } from '@nestjs/common'
+import { CanActivate, ExecutionContext, INestApplication, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common'
 import { Test } from '@nestjs/testing'
 import request from 'supertest'
 import { HealthController } from './health.controller'
@@ -60,5 +60,76 @@ describe('HealthController authorization', () => {
     expect(body).toMatchObject({ orgId: 'org-a', checks: { tenant: { ok: true } } })
     expect(JSON.stringify(body)).not.toMatch(/org-b|stack|secret|password/i)
     expect(prisma.organization.findUnique).toHaveBeenCalledWith({ where: { id: 'org-a' }, select: { id: true } })
+  })
+})
+
+describe('HealthController readiness factual dependency checks', () => {
+  const config = { get: jest.fn().mockReturnValue('') }
+
+  function controller(input: {
+    database?: 'up' | 'down'
+    queue?: Record<string, unknown>
+  } = {}) {
+    const prisma = {
+      $queryRaw: input.database === 'down'
+        ? jest.fn().mockRejectedValue(new Error('postgres unavailable'))
+        : jest.fn().mockResolvedValue([{ '?column?': 1 }]),
+    }
+    const queue = {
+      getQueueStatus: jest.fn().mockResolvedValue(input.queue ?? { notifications: { waiting: 0 } }),
+      isEnabled: jest.fn().mockReturnValue(input.queue?.ok !== false),
+    }
+    return {
+      health: new HealthController(prisma as any, config as any, queue as any),
+      prisma,
+      queue,
+    }
+  }
+
+  it('não declara ready quando PostgreSQL está indisponível', async () => {
+    const { health } = controller({ database: 'down' })
+
+    await expect(health.readiness()).rejects.toMatchObject({
+      response: expect.objectContaining({
+        status: 'not_ready',
+        checks: expect.objectContaining({
+          database: expect.objectContaining({ ok: false }),
+          prismaClient: { ok: false },
+        }),
+      }),
+    })
+  })
+
+  it('não declara ready quando Redis/fila está indisponível', async () => {
+    const { health } = controller({
+      queue: { ok: false, redisEnabled: false, reason: 'Redis indisponível', status: 'end' },
+    })
+
+    await expect(health.readiness()).rejects.toBeInstanceOf(ServiceUnavailableException)
+    await expect(health.readiness()).rejects.toMatchObject({
+      response: expect.objectContaining({
+        status: 'not_ready',
+        checks: expect.objectContaining({ queue: expect.objectContaining({ ok: false }) }),
+      }),
+    })
+  })
+
+  it('volta a declarar ready após as dependências se recuperarem', async () => {
+    const { health, prisma, queue } = controller({ database: 'down' })
+
+    await expect(health.readiness()).rejects.toBeInstanceOf(ServiceUnavailableException)
+
+    prisma.$queryRaw.mockResolvedValue([{ '?column?': 1 }])
+    queue.getQueueStatus.mockResolvedValue({ notifications: { waiting: 0 } })
+    queue.isEnabled.mockReturnValue(true)
+
+    await expect(health.readiness()).resolves.toMatchObject({
+      status: 'ready',
+      checks: {
+        database: expect.objectContaining({ ok: true }),
+        prismaClient: { ok: true },
+        queue: expect.objectContaining({ ok: true, enabled: true }),
+      },
+    })
   })
 })
