@@ -81,9 +81,52 @@ docker exec "$DB_CONTAINER" createdb -U phase24 phase24_recovery
 ALLOW_NON_PRODUCTION_RESTORE=yes DB_CONTAINER="$DB_CONTAINER" "$ROOT/scripts/restore-db.sh" --non-interactive "$BACKUP_FILE"
 pnpm exec prisma migrate deploy --schema prisma/schema.prisma
 
-PROOF="$(docker exec "$DB_CONTAINER" psql -U phase24 -d phase24_recovery -Atqc \
-  'SELECT o.slug||\|'||c.phone||\|'||a.status||\|'||s."amountCents"||\|'||ch."amountCents"||\|'||p.method||\|'||p."amountCents" FROM "Organization" o JOIN "Customer" c ON c."orgId"=o.id JOIN "Appointment" a ON a."customerId"=c.id JOIN "ServiceOrder" s ON s."appointmentId"=a.id JOIN "Charge" ch ON ch."serviceOrderId"=s.id JOIN "Payment" p ON p."chargeId"=ch.id WHERE o.id='"'"'24000000-0000-4000-8000-000000000001'"'"';')"
+PROOF="$(
+  docker exec -i "$DB_CONTAINER" \
+    psql -X -v ON_ERROR_STOP=1 \
+    -U phase24 \
+    -d phase24_recovery \
+    -Atq <<'SQL'
+SELECT concat_ws(
+  '|',
+  o.slug,
+  c.phone,
+  a.status::text,
+  s."amountCents"::text,
+  ch."amountCents"::text,
+  p.method::text,
+  p."amountCents"::text
+)
+FROM "Organization" o
+JOIN "Customer" c
+  ON c."orgId" = o.id
+JOIN "Appointment" a
+  ON a."customerId" = c.id
+JOIN "ServiceOrder" s
+  ON s."appointmentId" = a.id
+JOIN "Charge" ch
+  ON ch."serviceOrderId" = s.id
+JOIN "Payment" p
+  ON p."chargeId" = ch.id
+WHERE o.id = '24000000-0000-4000-8000-000000000001';
+SQL
+)"
 [[ "$PROOF" == 'phase24-recovery|+550000000024|CONFIRMED|12345|12345|PIX|12345' ]] || die "relational fixture mismatch: $PROOF"
-docker exec "$DB_CONTAINER" psql -U phase24 -d phase24_recovery -v ON_ERROR_STOP=1 -Atqc \
-  'INSERT INTO "Customer" (id,"orgId",name,phone,active,"createdAt","updatedAt") VALUES ('"'"'24000000-0000-4000-8000-000000000099'"'"','"'"'24000000-0000-4000-8000-000000000001'"'"','"'"'Schema smoke'"'"','"'"'+550000000099'"'"',true,now(),now()); SELECT count(*) FROM "Customer" WHERE "orgId"='"'"'24000000-0000-4000-8000-000000000001'"'"';' | grep -qx 2
+echo 'phase24_relational_restore_verified'
+
+CUSTOMER_COUNT="$(
+  docker exec -i "$DB_CONTAINER" \
+    psql -X -v ON_ERROR_STOP=1 \
+    -U phase24 \
+    -d phase24_recovery \
+    -Atq <<'SQL'
+INSERT INTO "Customer" (id,"orgId",name,phone,active,"createdAt","updatedAt") VALUES
+  ('24000000-0000-4000-8000-000000000099','24000000-0000-4000-8000-000000000001','Schema smoke','+550000000099',true,now(),now());
+SELECT count(*)
+FROM "Customer"
+WHERE "orgId" = '24000000-0000-4000-8000-000000000001';
+SQL
+)"
+[[ "$CUSTOMER_COUNT" == 2 ]] || die "schema usability customer count mismatch: $CUSTOMER_COUNT"
+echo 'phase24_schema_write_verified'
 echo 'phase24_drill_completed: backup, integrity, restore, relational fixture and schema usability proved'
