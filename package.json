@@ -14,6 +14,7 @@
     "prisma:generate": "pnpm --filter ./apps/api prisma:generate",
     "prisma:migrate:deploy": "pnpm --filter ./apps/api prisma:migrate:deploy",
     "prisma:check": "node scripts/check-prisma-client.mjs",
+    "whatsapp:provision-account": "tsx scripts/provision-whatsapp-provider-account.ts",
     "db:smoke:operational-actions": "node scripts/check-operational-actions-db.mjs",
     "smoke:operational-actions:diagnostics": "node scripts/smoke-operational-actions-diagnostics.mjs",
     "ci:preflight": "pnpm prisma:check && pnpm -r typecheck && pnpm -s build && pnpm --filter ./apps/api test && pnpm --filter ./apps/web test",
