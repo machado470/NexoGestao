@@ -1,0 +1,22 @@
+name: nexogestao-phase24-recovery
+
+# Dedicated, destructive and disposable Phase 2.4 recovery infrastructure.
+services:
+  postgres-phase24:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: phase24
+      POSTGRES_PASSWORD: phase24-local-only
+      POSTGRES_DB: phase24_recovery
+    ports:
+      - "127.0.0.1:${PHASE24_POSTGRES_PORT:-55424}:5432"
+    volumes:
+      - phase24-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U phase24 -d phase24_recovery"]
+      interval: 1s
+      timeout: 2s
+      retries: 30
+
+volumes:
+  phase24-postgres-data:

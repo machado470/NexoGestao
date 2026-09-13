@@ -1,110 +1,100 @@
 #!/usr/bin/env bash
-# ============================================================
-# NexoGestao — Backup Automático do Banco de Dados
-# ============================================================
-# Uso:
-#   ./scripts/backup-db.sh                    # backup local
-#   ./scripts/backup-db.sh --upload           # backup + upload S3
-#   ./scripts/backup-db.sh --container nexogestao_postgres_prod
-#
-# Cron job (diário às 2h):
-#   0 2 * * * /app/scripts/backup-db.sh --upload >> /var/log/nexo-backup.log 2>&1
-# ============================================================
+# Canonical PostgreSQL backup entrypoint. S3 is optional and never implied.
 set -euo pipefail
+umask 077
 
-# ─── Configuração ────────────────────────────────────────────
 BACKUP_DIR="${BACKUP_DIR:-/backups}"
 RETENTION_DAYS="${RETENTION_DAYS:-30}"
 DB_CONTAINER="${DB_CONTAINER:-nexogestao_postgres_prod}"
-TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-BACKUP_FILE="nexogestao_backup_${TIMESTAMP}.sql.gz"
-BACKUP_PATH="${BACKUP_DIR}/${BACKUP_FILE}"
-
-# S3 (opcional)
+POSTGRES_USER="${POSTGRES_USER:-}"
+POSTGRES_DB="${POSTGRES_DB:-}"
+POSTGRES_HOST="${POSTGRES_HOST:-}"
+POSTGRES_PORT="${POSTGRES_PORT:-5432}"
 S3_BUCKET="${BACKUP_S3_BUCKET:-}"
 S3_REGION="${BACKUP_S3_REGION:-sa-east-1}"
 S3_PREFIX="${BACKUP_S3_PREFIX:-backups/postgres}"
-
-# Banco
-POSTGRES_USER="${POSTGRES_USER:-nexo}"
-POSTGRES_DB="${POSTGRES_DB:-nexogestao}"
-POSTGRES_HOST="${POSTGRES_HOST:-postgres}"
-POSTGRES_PORT="${POSTGRES_PORT:-5432}"
-
-# ─── Funções ─────────────────────────────────────────────────
-log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [BACKUP] $*"; }
-log_ok() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [OK] $*"; }
-log_err() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [ERROR] $*" >&2; }
-
-# ─── Verificações ────────────────────────────────────────────
-mkdir -p "$BACKUP_DIR"
-
-log "Iniciando backup do banco: ${POSTGRES_DB}"
-log "Destino: ${BACKUP_PATH}"
-
-# ─── Executar pg_dump ────────────────────────────────────────
 UPLOAD=false
-for arg in "$@"; do
-  [[ "$arg" == "--upload" ]] && UPLOAD=true
-  [[ "$arg" == "--container" ]] && DB_CONTAINER="${2:-$DB_CONTAINER}"
+LOCK_DIR=""
+TMP_BACKUP=""
+TMP_CHECKSUM=""
+
+log() { printf 'timestamp=%s component=postgres_backup event=%s status=%s %s\n' "$(date -u +%FT%TZ)" "$1" "$2" "${3:-}"; }
+die() { log backup_failed failed "reason=$(printf %q "$*")" >&2; exit 1; }
+cleanup() {
+  local rc=$?
+  [[ -z "$TMP_BACKUP" ]] || rm -f -- "$TMP_BACKUP"
+  [[ -z "$TMP_CHECKSUM" ]] || rm -f -- "$TMP_CHECKSUM"
+  [[ -z "$LOCK_DIR" ]] || rmdir -- "$LOCK_DIR" 2>/dev/null || true
+  exit "$rc"
+}
+trap cleanup EXIT INT TERM
+
+while (($#)); do
+  case "$1" in
+    --upload) UPLOAD=true; shift ;;
+    --container) [[ $# -ge 2 ]] || die "--container requires a value"; DB_CONTAINER="$2"; shift 2 ;;
+    *) die "unknown argument: $1" ;;
+  esac
 done
 
-# Verificar se estamos dentro do Docker ou rodando localmente
-if command -v docker &>/dev/null && docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^${DB_CONTAINER}$"; then
-  log "Modo Docker: usando container ${DB_CONTAINER}"
-  docker exec "${DB_CONTAINER}" \
-    pg_dump -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" \
-    --no-owner --no-acl --clean --if-exists \
-    | gzip -9 > "${BACKUP_PATH}"
-elif command -v pg_dump &>/dev/null; then
-  log "Modo local: usando pg_dump direto"
-  PGPASSWORD="${POSTGRES_PASSWORD:-}" pg_dump \
-    -h "${POSTGRES_HOST}" \
-    -p "${POSTGRES_PORT}" \
-    -U "${POSTGRES_USER}" \
-    -d "${POSTGRES_DB}" \
-    --no-owner --no-acl --clean --if-exists \
-    | gzip -9 > "${BACKUP_PATH}"
+[[ "$RETENTION_DAYS" =~ ^[0-9]+$ ]] || die "RETENTION_DAYS must be a non-negative integer"
+[[ -n "$POSTGRES_USER" && -n "$POSTGRES_DB" ]] || die "POSTGRES_USER and POSTGRES_DB are required"
+command -v gzip >/dev/null || die "gzip is required"
+command -v sha256sum >/dev/null || die "sha256sum is required"
+mkdir -p -- "$BACKUP_DIR" || die "cannot create BACKUP_DIR"
+[[ -d "$BACKUP_DIR" && -w "$BACKUP_DIR" ]] || die "BACKUP_DIR is not a writable directory"
+BACKUP_DIR="$(cd "$BACKUP_DIR" && pwd -P)"
+LOCK_DIR="$BACKUP_DIR/.nexogestao-backup.lock"
+mkdir "$LOCK_DIR" 2>/dev/null || die "another canonical backup is already running"
+
+STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+UNIQUE="${STAMP}_$$_$(printf '%04x' "$((RANDOM & 65535))")"
+BACKUP_FILE="nexogestao_backup_${UNIQUE}.sql.gz"
+BACKUP_PATH="$BACKUP_DIR/$BACKUP_FILE"
+CHECKSUM_PATH="$BACKUP_PATH.sha256"
+TMP_BACKUP="$(mktemp "$BACKUP_DIR/.${BACKUP_FILE}.partial.XXXXXX")"
+TMP_CHECKSUM="$(mktemp "$BACKUP_DIR/.${BACKUP_FILE}.sha256.partial.XXXXXX")"
+log backup_started started "database=$(printf %q "$POSTGRES_DB") destination=$(printf %q "$BACKUP_PATH")"
+
+if command -v docker >/dev/null 2>&1 && docker inspect -f '{{.State.Running}}' "$DB_CONTAINER" 2>/dev/null | grep -qx true; then
+  docker exec "$DB_CONTAINER" pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+    --no-owner --no-acl --clean --if-exists | gzip -9 >"$TMP_BACKUP"
 else
-  log_err "pg_dump não encontrado e container Docker não está rodando"
-  exit 1
+  [[ -n "$POSTGRES_HOST" ]] || die "POSTGRES_HOST is required when DB_CONTAINER is unavailable"
+  command -v pg_dump >/dev/null || die "pg_dump is required when DB_CONTAINER is unavailable"
+  PGPASSWORD="${POSTGRES_PASSWORD:-}" pg_dump -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" \
+    -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --no-acl --clean --if-exists | gzip -9 >"$TMP_BACKUP"
 fi
+[[ -s "$TMP_BACKUP" ]] || die "pg_dump produced an empty artifact"
+gzip -t -- "$TMP_BACKUP"
+log integrity_verified success "artifact=$(printf %q "$BACKUP_FILE")"
+HASH="$(sha256sum "$TMP_BACKUP" | awk '{print $1}')"
+printf '%s  %s\n' "$HASH" "$(basename "$TMP_BACKUP")" >"$TMP_CHECKSUM"
+(cd "$BACKUP_DIR" && sha256sum -c -- "$(basename "$TMP_CHECKSUM")" >/dev/null) || die "local checksum verification failed"
+printf '%s  %s\n' "$HASH" "$BACKUP_FILE" >"$TMP_CHECKSUM"
+# Publish only the locally validated dump and its sidecar.
+mv -- "$TMP_BACKUP" "$BACKUP_PATH"; TMP_BACKUP=""
+mv -- "$TMP_CHECKSUM" "$CHECKSUM_PATH"; TMP_CHECKSUM=""
+(cd "$BACKUP_DIR" && sha256sum -c -- "$(basename "$CHECKSUM_PATH")" >/dev/null) || die "published checksum verification failed"
+log checksum_verified success "sha256=$HASH"
+log backup_created success "result=LOCAL_BACKUP_SUCCESS artifact=$(printf %q "$BACKUP_PATH")"
 
-# ─── Verificar tamanho ───────────────────────────────────────
-BACKUP_SIZE=$(du -sh "${BACKUP_PATH}" | cut -f1)
-log_ok "Backup criado: ${BACKUP_FILE} (${BACKUP_SIZE})"
+find "$BACKUP_DIR" -maxdepth 1 -type f \( -name 'nexogestao_backup_*.sql.gz' -o -name 'nexogestao_backup_*.sql.gz.sha256' \) \
+  -mtime "+$RETENTION_DAYS" -delete
+log retention_completed success "retention_days=$RETENTION_DAYS"
 
-# ─── Checksum ────────────────────────────────────────────────
-sha256sum "${BACKUP_PATH}" > "${BACKUP_PATH}.sha256"
-log_ok "Checksum: $(cat "${BACKUP_PATH}.sha256")"
-
-# ─── Upload para S3 (opcional) ───────────────────────────────
-if [[ "$UPLOAD" == "true" && -n "$S3_BUCKET" ]]; then
-  log "Enviando para S3: s3://${S3_BUCKET}/${S3_PREFIX}/${BACKUP_FILE}"
-
-  if command -v aws &>/dev/null; then
-    aws s3 cp "${BACKUP_PATH}" "s3://${S3_BUCKET}/${S3_PREFIX}/${BACKUP_FILE}" \
-      --region "${S3_REGION}" \
-      --storage-class STANDARD_IA
-    aws s3 cp "${BACKUP_PATH}.sha256" "s3://${S3_BUCKET}/${S3_PREFIX}/${BACKUP_FILE}.sha256" \
-      --region "${S3_REGION}"
-    log_ok "Upload S3 concluído"
-  else
-    log_err "AWS CLI não encontrado — upload S3 ignorado"
-  fi
-elif [[ "$UPLOAD" == "true" && -z "$S3_BUCKET" ]]; then
-  log "BACKUP_S3_BUCKET não configurado — upload S3 ignorado"
+if [[ "$UPLOAD" != true ]]; then
+  log offsite_skipped skipped "result=OFFSITE_UPLOAD_SKIPPED reason=not_requested"
+elif [[ -z "$S3_BUCKET" ]]; then
+  log offsite_failed failed "result=OFFSITE_UPLOAD_FAILED reason=bucket_not_configured" >&2
+  exit 2
+elif ! command -v aws >/dev/null 2>&1; then
+  log offsite_failed failed "result=OFFSITE_UPLOAD_FAILED reason=aws_cli_unavailable" >&2
+  exit 2
+elif aws s3 cp "$BACKUP_PATH" "s3://$S3_BUCKET/$S3_PREFIX/$BACKUP_FILE" --region "$S3_REGION" && \
+     aws s3 cp "$CHECKSUM_PATH" "s3://$S3_BUCKET/$S3_PREFIX/$BACKUP_FILE.sha256" --region "$S3_REGION"; then
+  log offsite_uploaded success "result=OFFSITE_UPLOAD_SUCCESS destination=s3://$S3_BUCKET/$S3_PREFIX/"
+else
+  log offsite_failed failed "result=OFFSITE_UPLOAD_FAILED reason=aws_upload_error" >&2
+  exit 2
 fi
-
-# ─── Limpeza de backups antigos ──────────────────────────────
-log "Removendo backups com mais de ${RETENTION_DAYS} dias..."
-find "${BACKUP_DIR}" -name "nexogestao_backup_*.sql.gz" -mtime "+${RETENTION_DAYS}" -delete
-find "${BACKUP_DIR}" -name "nexogestao_backup_*.sha256" -mtime "+${RETENTION_DAYS}" -delete
-REMAINING=$(find "${BACKUP_DIR}" -name "nexogestao_backup_*.sql.gz" | wc -l)
-log_ok "Backups restantes: ${REMAINING}"
-
-# ─── Resumo ──────────────────────────────────────────────────
-log_ok "Backup concluído com sucesso!"
-log_ok "Arquivo: ${BACKUP_PATH}"
-log_ok "Tamanho: ${BACKUP_SIZE}"
-log_ok "Retenção: ${RETENTION_DAYS} dias"

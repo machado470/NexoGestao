@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 # ============================================================
+# LEGACY / NON-CANONICAL: retained during Phase 2.4 Wave 2A.
+# Do not schedule this implementation. Future automation must invoke
+# scripts/backup-db.sh after the disposable recovery flow is accepted.
 # NexoGestão — Script de Backup com Rotação (7 dias)
 # ============================================================
 # Faz o dump do PostgreSQL do container, compacta e mantém
