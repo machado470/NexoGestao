@@ -30,6 +30,30 @@ DB_CONTAINER="$("${COMPOSE[@]}" ps -q postgres-phase24)"
 docker port "$DB_CONTAINER" 5432/tcp | grep -Fxq '127.0.0.1:55424' || die "unexpected PostgreSQL port binding"
 
 cd "$ROOT"
+echo 'phase24_postgres_host_wait'
+HOST_READY_DEADLINE=$((SECONDS + 60))
+HOST_READY_LOG="$ARTIFACT_DIR/postgres-host-readiness.log"
+HOST_READY=false
+while (( SECONDS < HOST_READY_DEADLINE )); do
+  HOST_READY_REMAINING=$((HOST_READY_DEADLINE - SECONDS))
+  if printf 'SELECT 1;\n' | timeout "${HOST_READY_REMAINING}s" pnpm exec prisma db execute --url "$DATABASE_URL" --stdin >"$HOST_READY_LOG" 2>&1; then
+    HOST_READY=true
+    break
+  fi
+  sleep 1
+done
+if [[ "$HOST_READY" != true ]]; then
+  echo 'phase24_postgres_host_timeout: PostgreSQL did not accept a host SQL query within 60 seconds' >&2
+  cat "$HOST_READY_LOG" >&2 || true
+  echo 'phase24_postgres_host_diagnostics: docker compose ps' >&2
+  "${COMPOSE[@]}" ps >&2 || true
+  echo 'phase24_postgres_host_diagnostics: docker port' >&2
+  docker port "$DB_CONTAINER" 5432/tcp >&2 || true
+  echo 'phase24_postgres_host_diagnostics: recent postgres logs' >&2
+  "${COMPOSE[@]}" logs --tail 100 postgres-phase24 >&2 || true
+  die 'PostgreSQL host readiness timed out'
+fi
+echo 'phase24_postgres_host_ready'
 pnpm exec prisma migrate deploy --schema prisma/schema.prisma
 docker exec -i "$DB_CONTAINER" psql -v ON_ERROR_STOP=1 -U phase24 -d phase24_recovery <<'SQL'
 INSERT INTO "Organization" (id,name,slug,"requiresOnboarding",timezone,currency,"createdAt") VALUES
