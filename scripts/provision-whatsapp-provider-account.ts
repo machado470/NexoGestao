@@ -1,23 +1,12 @@
 import { PrismaClient } from '@prisma/client'
+import { parseProvisionWhatsAppProviderAccountArgs } from '../apps/api/src/whatsapp/whatsapp-provider-account.cli'
 import { provisionWhatsAppProviderAccount } from '../apps/api/src/whatsapp/whatsapp-provider-account.provisioning'
 
-function argument(name: string) {
-  const index = process.argv.indexOf(`--${name}`)
-  return index >= 0 ? process.argv[index + 1] : undefined
-}
-
 async function main() {
-  const provider = argument('provider')
-  const accountId = argument('account-id')
-  const orgId = argument('org-id')
-  const orgSlug = argument('org-slug')
+  const input = parseProvisionWhatsAppProviderAccountArgs(process.argv.slice(2))
   const prisma = new PrismaClient()
   try {
-    const account = await provisionWhatsAppProviderAccount(prisma, {
-      provider: provider ?? '',
-      accountId: accountId ?? '',
-      ...(orgId ? { orgId } : { orgSlug: orgSlug ?? '' }),
-    })
+    const account = await provisionWhatsAppProviderAccount(prisma, input)
     console.log(`Associação confirmada: ${account.provider}/${account.accountId} -> ${account.orgId}`)
   } finally {
     await prisma.$disconnect()
