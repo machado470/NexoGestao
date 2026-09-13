@@ -233,11 +233,11 @@ export class WhatsAppController {
   async webhook(@Param('provider') provider: string, @Body() payload: any, @Headers() headers: Record<string, string>) {
     const startedAt = Date.now()
     const traceId = String(headers?.['x-request-id'] ?? headers?.['x-trace-id'] ?? `wa-${Date.now()}`).trim()
-    const orgId = this.extractWebhookOrgId(payload, headers)
     const serviceProvider = createWhatsAppProvider()
     if (serviceProvider.getProviderName() !== provider) throw new BadRequestException('provider inválido')
     const signatureOk = await serviceProvider.verifyWebhookSignature(payload, headers)
     if (!signatureOk) throw new BadRequestException('assinatura inválida')
+    const { orgId } = await this.whatsapp.resolveWebhookTenant(provider, payload)
 
     const webhookEvent = await this.whatsapp.createWebhookEvent({
       orgId,
@@ -278,13 +278,6 @@ export class WhatsAppController {
   private requireExecutions() {
     if (!this.executions) throw new BadRequestException('Serviço de execução WhatsApp indisponível')
     return this.executions
-  }
-
-  private extractWebhookOrgId(payload: any, headers: Record<string, string>) {
-    const raw = headers?.['x-org-id'] ?? headers?.['x-nexo-org-id'] ?? payload?.orgId ?? payload?.tenantId
-    const orgId = String(raw ?? '').trim()
-    if (!orgId) throw new BadRequestException('orgId é obrigatório para webhook WhatsApp')
-    return orgId
   }
 
   private resolveWebhookAdminOrgId(authOrgId: string, queryOrgId?: string) {

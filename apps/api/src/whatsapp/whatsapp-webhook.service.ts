@@ -363,4 +363,35 @@ export class WhatsAppWebhookService {
     return Array.from(ids)
   }
 
+  async resolveTenantFromProviderAccount(provider: string, payload: unknown) {
+    const accountIds = this.extractProviderAccountIds(provider, payload)
+    if (accountIds.length === 0) {
+      throw new BadRequestException('conta do provider não identificada no webhook WhatsApp')
+    }
+
+    const accounts = await this.prisma.whatsAppProviderAccount.findMany({
+      where: { provider, accountId: { in: accountIds }, active: true },
+      select: { orgId: true, accountId: true },
+    })
+    const orgIds = [...new Set(accounts.map((account) => account.orgId))]
+    if (accounts.length !== accountIds.length || orgIds.length !== 1) {
+      throw new BadRequestException('conta do provider desconhecida ou correlação de tenant ambígua')
+    }
+    return { orgId: orgIds[0], accountIds }
+  }
+
+  private extractProviderAccountIds(provider: string, payload: unknown) {
+    const body = (payload ?? {}) as any
+    const rawIds: unknown[] = []
+    if (provider === 'meta_cloud') {
+      for (const entry of Array.isArray(body.entry) ? body.entry : []) {
+        for (const change of Array.isArray(entry?.changes) ? entry.changes : []) {
+          rawIds.push(change?.value?.metadata?.phone_number_id)
+        }
+      }
+    } else if (provider === 'mock') {
+      rawIds.push(body.providerAccountId ?? body.accountId)
+    }
+    return [...new Set(rawIds.map((value) => String(value ?? '').trim()).filter(Boolean))]
+  }
 }
