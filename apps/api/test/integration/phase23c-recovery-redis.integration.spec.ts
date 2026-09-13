@@ -1,5 +1,7 @@
 import IORedis from 'ioredis'
 import { Worker } from 'bullmq'
+import { ChildProcess, fork } from 'node:child_process'
+import { join } from 'node:path'
 import { ServiceUnavailableException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { QueueService } from '../../src/queue/queue.service'
@@ -13,6 +15,31 @@ if (!RUN_REAL_INTEGRATION) console.warn(`[integration-skip] REAL REDIS / REAL BU
 
 const producerOptions = { maxRetriesPerRequest: 1, enableOfflineQueue: false, connectTimeout: 1_000 }
 const workerOptions = { maxRetriesPerRequest: null, connectTimeout: 1_000 }
+
+type ChildExit = { exitCode: number | null, signalCode: NodeJS.Signals | null }
+
+function waitForChildExit(child: ChildProcess, timeoutMs = 5_000): Promise<ChildExit> {
+  if (child.exitCode !== null || child.signalCode !== null) {
+    return Promise.resolve({ exitCode: child.exitCode, signalCode: child.signalCode })
+  }
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error(`child did not exit within ${timeoutMs}ms`)), timeoutMs)
+    child.once('exit', (exitCode, signalCode) => {
+      clearTimeout(timeout)
+      resolve({ exitCode, signalCode })
+    })
+  })
+}
+
+function withTimeout<T>(promise: Promise<T>, label: string, timeoutMs = 30_000): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs)
+    promise.then(
+      (value) => { clearTimeout(timeout); resolve(value) },
+      (error) => { clearTimeout(timeout); reject(error) },
+    )
+  })
+}
 
 describeRealIntegration('Phase 2.3C — REAL REDIS / REAL BULLMQ down, recovery and stalled', () => {
   jest.setTimeout(120_000)
@@ -113,49 +140,71 @@ describeRealIntegration('Phase 2.3C — REAL REDIS / REAL BULLMQ down, recovery 
     await waitRedisClientsReady(stalledAuxiliaryConnections, 20_000)
     const queue = stalledQueues.getQueue(QUEUE_NAMES.AUTOMATION)
     await queue.obliterate({ force: true })
-    let stalledWorker: Worker | undefined
+    let stalledChild: ChildProcess | undefined
+    let childExit: ChildExit | undefined
     let recoveryWorker: Worker | undefined
-    let stalledConnection: IORedis | undefined
     let recoveryConnection: IORedis | undefined
-    const acquired = new Promise<void>((resolve) => {
-      stalledConnection = new IORedis(process.env.REDIS_URL!, workerOptions)
-      stalledWorker = new Worker(QUEUE_NAMES.AUTOMATION, async () => {
-        resolve()
-        await new Promise(() => undefined)
-      }, {
-        connection: stalledConnection,
-        lockDuration: 500,
-        stalledInterval: 500,
-        maxStalledCount: 1,
-      })
-    })
+    let workerStalledJobId: string | undefined
+    let originalJobId: string | undefined
 
     try {
-      await queue.add('stall-once', {})
-      await acquired
-      await stalledWorker?.close(true)
+      const acquired = new Promise<string>((resolve, reject) => {
+        stalledChild = fork(join(__dirname, 'fixtures/phase23c-stalled-worker.js'), [], {
+          env: { ...process.env, REDIS_URL: process.env.REDIS_URL! },
+          stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
+        })
+        stalledChild.once('error', reject)
+        stalledChild.on('message', (message: { type?: string, jobId?: string, message?: string }) => {
+          if (message.type === 'acquired' && message.jobId) resolve(message.jobId)
+          if (message.type === 'error') reject(new Error(`stalled child worker: ${message.message}`))
+        })
+      })
+      const job = await queue.add('stall-once', {})
+      originalJobId = job.id
+      expect(await withTimeout(acquired, 'child acquisition')).toBe(originalJobId)
+
+      const exitPromise = waitForChildExit(stalledChild!)
+      expect(stalledChild!.kill('SIGKILL')).toBe(true)
+      childExit = await exitPromise
+      expect(childExit.signalCode).toBe('SIGKILL')
 
       recoveryConnection = new IORedis(process.env.REDIS_URL!, workerOptions)
+      let resolveWorkerStalled: (jobId: string) => void
+      const workerStalled = new Promise<string>((resolve) => { resolveWorkerStalled = resolve })
       recoveryWorker = new Worker(QUEUE_NAMES.AUTOMATION, async () => 'recovered', {
         connection: recoveryConnection,
         lockDuration: 500,
         stalledInterval: 500,
         maxStalledCount: 1,
       })
+      recoveryWorker.on('stalled', (jobId) => {
+        workerStalledJobId = jobId
+        resolveWorkerStalled(jobId)
+      })
 
-      const status = await eventually(
-        () => stalledQueues.getQueueStatus(),
-        (snapshot) => snapshot.ok === true && (snapshot.stalledEvents?.automation?.count ?? 0) >= 1,
-        30_000,
-      )
+      expect(await withTimeout(workerStalled, 'recovery Worker stalled event')).toBe(originalJobId)
+      const status = await eventually(() => stalledQueues.getQueueStatus(), (snapshot) =>
+        snapshot.ok === true && (snapshot.stalledEvents?.automation?.count ?? 0) >= 1, 30_000)
       expect(status.stalledEvents.automation.lastStalledAt).toBeDefined()
       expect(stalledMetrics.snapshot().counters['queue.job.stalled.automation']).toBeGreaterThanOrEqual(1)
       expect(stalledMetrics.snapshot().gauges).not.toHaveProperty('queue.backlog.stalled.automation')
       await eventually(() => queue.getJobCounts('completed'), (counts) => counts.completed === 1, 30_000)
+    } catch (error) {
+      const job = originalJobId ? await queue.getJob(originalJobId).catch(() => undefined) : undefined
+      const diagnostic = {
+        counts: await queue.getJobCounts('waiting', 'active', 'completed', 'failed', 'delayed').catch(String),
+        jobState: await job?.getState().catch(String),
+        stalledEvents: await stalledQueues.getQueueStatus().then((status) => status.stalledEvents).catch(String),
+        counters: stalledMetrics.snapshot().counters,
+        workerStalledObserved: workerStalledJobId,
+        childExitCode: childExit?.exitCode ?? stalledChild?.exitCode,
+        childSignalCode: childExit?.signalCode ?? stalledChild?.signalCode,
+      }
+      throw new Error(`${error instanceof Error ? error.message : String(error)}; stalled diagnostic=${JSON.stringify(diagnostic)}`)
     } finally {
-      await stalledWorker?.close(true).catch(() => undefined)
+      if (stalledChild && stalledChild.exitCode === null && stalledChild.signalCode === null) stalledChild.kill('SIGKILL')
+      if (stalledChild) await waitForChildExit(stalledChild).catch(() => undefined)
       await recoveryWorker?.close(true).catch(() => undefined)
-      if (stalledConnection?.status !== 'end') await stalledConnection?.quit().catch(() => stalledConnection?.disconnect())
       if (recoveryConnection?.status !== 'end') await recoveryConnection?.quit().catch(() => recoveryConnection?.disconnect())
       await queue.obliterate({ force: true }).catch(() => undefined)
       await stalledQueues.onModuleDestroy()

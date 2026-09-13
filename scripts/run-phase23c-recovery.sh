@@ -25,7 +25,14 @@ wait_for_host_service() {
 wait_for_postgres() {
   local deadline=$((SECONDS + 30))
   if ! command -v pg_isready >/dev/null 2>&1; then
-    echo "pg_isready is unavailable; using a bounded host TCP check for PostgreSQL."
+    echo "pg_isready is unavailable on the host; checking PostgreSQL inside its container."
+    until "${COMPOSE[@]}" exec -T postgres-phase23c pg_isready -U phase23c -d phase23c >/dev/null 2>&1; do
+      if (( SECONDS >= deadline )); then
+        echo "Timed out waiting for PostgreSQL readiness inside postgres-phase23c" >&2
+        return 1
+      fi
+      sleep 1
+    done
     wait_for_host_service PostgreSQL 55433
     return
   fi
