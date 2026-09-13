@@ -51,8 +51,39 @@ describe('QueueService W3C asynchronous context', () => {
 
   it('does not invent or attach trace metadata when no active context is injected', () => {
     ;(propagation.inject as jest.Mock).mockImplementationOnce(() => undefined)
-    const payload = createService().withRequestTracing({ orgId: 'org-1' })
+    const payload = createService().withRequestTracing({
+      orgId: 'org-1',
+      meta: {
+        requestId: 'request-from-job',
+        correlationId: 'correlation-from-job',
+        traceContext: { traceparent: 'forged-parent', baggage: 'forged-baggage' },
+      },
+    })
     expect(payload.meta).not.toHaveProperty('traceContext')
+    expect(payload.meta).toMatchObject({ requestId: 'request-from-job', correlationId: 'correlation-from-job' })
+    expect(payload.orgId).toBe('org-1')
     expect(payload).not.toHaveProperty('traceId')
+  })
+
+  it('replaces received trace metadata exclusively with the context injected now', () => {
+    const payload = createService().withRequestTracing({
+      orgId: 'authoritative-org',
+      meta: {
+        requestId: 'request-from-job',
+        correlationId: 'correlation-from-job',
+        traceContext: {
+          traceparent: 'forged-parent',
+          tracestate: 'forged=state',
+          baggage: 'tenant=spoofed',
+          orgId: 'spoofed-org',
+          extra: 'must-not-cross',
+        },
+      },
+    })
+
+    expect(payload.meta.traceContext).toEqual(injectedCarrier)
+    expect(payload.meta.traceContext.traceparent).not.toBe('forged-parent')
+    expect(payload.meta).toMatchObject({ requestId: 'request-from-job', correlationId: 'correlation-from-job' })
+    expect(payload.orgId).toBe('authoritative-org')
   })
 })
