@@ -81,7 +81,7 @@ Status: `current` descreve a referência vigente; `review` explicita conteúdo �
 | [Desenvolvimento local](operations/local-development.md)    | Setup e operação local             | current | true            | README e instruções dispersas             | 2026-09-06     |
 | [Deployment](operations/deployment.md)                      | Gates e alvos de implantação       | review  | true            | `DEPLOYMENT_GUIDE.md`                     | 2026-09-06     |
 | [Runbook de staging](operations/staging-runbook.md)         | Deploy e diagnóstico de staging    | current | true            | `DEPLOY_STAGING.md`, `RUNBOOK_STAGING.md` | 2026-09-06     |
-| [Auditoria Fase 2.4 — produção e recovery](audits/2026/PHASE_2_4_PRODUCTION_RECOVERY_AUDIT.md) | Autoridade, backup e restore (Onda 1) | current | true | baseline PR #1011 | 2026-09-13 |
+| [Auditoria Fase 2.4 — produção e recovery](audits/2026/PHASE_2_4_PRODUCTION_RECOVERY_AUDIT.md) | Fechamento da Onda 2A e prova descartável de backup/restore | current | true | baseline após PR #1016 | 2026-09-13 |
 | [Configuração de piloto](operations/pilot-configuration.md) | Configuração operacional do piloto | current | true            | `docs/pilot/PILOT_CONFIGURATION_GUIDE.md` | 2026-09-06     |
 | [Estratégia de testes](testing/strategy.md)                 | Suítes, escopo e confiabilidade    | current | true            | `TEST_SUITE_RELIABILITY.md`               | 2026-09-06     |
 | [Integração real](testing/real-integration.md)              | Teste real de isolamento tenant    | current | true            | README antes co-localizado                | 2026-09-06     |
