@@ -1,17 +1,23 @@
 ---
-status: review
+status: CLOSED
 owner: nexogestao
 last_reviewed: 2026-09-13
+closed_at: 2026-09-13
 source_of_truth: false
-scope: phase-2.3d-first-wave
-baseline: main-after-pr-1007
+scope: phase-2.3d
+baseline: main-after-pr-1010
 ---
 
-# Fase 2.3D — auditoria e desenho do Cockpit tenant-scoped
+# Fase 2.3D — Cockpit operacional tenant-scoped
+
+> **Status final: CLOSED.** A Fase 2.3D foi encerrada em **2026-09-13**, na baseline `main`
+> após o PR #1010 (merge `f6ac68233433d61ba9ff2aecfe5d667fba9a76e2`). Este documento preserva
+> abaixo o desenho auditado na Onda 1 e registra, ao final, as evidências de implementação e
+> fechamento das Ondas 2 e 3.
 
 ## 1. Decisão executiva
 
-Esta primeira onda é **auditoria e desenho**, não implementação da UI. A baseline inspecionada é o
+Esta seção registra a primeira onda, que foi **auditoria e desenho**, não implementação da UI. A baseline inspecionada foi o
 merge `608b807f` (PR #1007). As Fases 2.3A, 2.3B e 2.3C permanecem fechadas; esta proposta não
 altera recovery, Redis, stalled, governança ou risco.
 
@@ -233,3 +239,85 @@ página e remover seus consumidores de summary/incidents globais.
 Ficam fora: autoridade de operador de plataforma, reabertura de `/internal/operations/*`, health
 global, alertas/incidentes tenant, risco, prioridade, severidade, próxima ação, mudanças de
 governança, recovery/Redis/stalled e qualquer trabalho da Fase 2.4.
+
+## 8. Fechamento formal
+
+As três ondas previstas foram concluídas:
+
+| Onda | Escopo | Estado |
+|---|---|---|
+| 1 | Auditoria e desenho | **CLOSED** |
+| 2 | Contrato tenant-scoped API/BFF | **CLOSED** |
+| 3 | Migração do Operational Cockpit | **CLOSED** |
+
+A baseline final é `main` após o PR #1010, cujo merge é
+`f6ac68233433d61ba9ff2aecfe5d667fba9a76e2`. Este fechamento é exclusivamente documental e não
+inicia a Fase 2.4.
+
+### 8.1 Contrato entregue
+
+- REST: `GET /v1/operations/tenant-summary`.
+- BFF: `operations.tenantSummary`.
+- A única autoridade de tenant é `req.user.orgId`, isto é, o contexto autenticado. Nenhum `orgId`
+  vindo do navegador é autoridade.
+- Os estados canônicos são `available`, `unavailable`, `not_configured` e `unknown`.
+- A resposta contém os cinco fatos discriminados `resources`, `whatsapp`, `webhooks`, `billing` e
+  `operation_config`.
+
+O contrato expõe fatos tenant-scoped. Ele não é um motor de saúde operacional e não deriva health,
+risco, prioridade ou próxima ação.
+
+### 8.2 Prova de isolamento em PostgreSQL real
+
+Em **2026-09-13**, a prova de integração com PostgreSQL real foi executada com sucesso:
+
+```text
+PASS test/integration/tenant-operations-summary-postgres.integration.spec.ts
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+test_exit=0
+```
+
+A execução persistiu dados diferentes para duas organizações e validou que a leitura de cada uma
+não continha dados da outra. Também provou que o secret do webhook e o payload privado não vazaram
+e que `orgId` não foi exposto no payload público.
+
+### 8.3 Proteção global preservada
+
+`/internal/operations/*` permanece reservado à plataforma e um `ADMIN` de organização continua
+recebendo `403`. Não foi concedido ao tenant acesso a health global de PostgreSQL ou Redis, filas
+globais, DLQ global, workers, Pub/Sub, OTEL, incidentes globais ou readiness global de providers.
+`apps/api/src/health/operations.controller.ts` não foi alterado como parte deste fechamento.
+
+### 8.4 Frontend concluído
+
+`OperationalCockpitPage` consome somente
+`trpc.operations.tenantSummary.useQuery(undefined)`. O auto-refresh e o refresh manual atuam apenas
+sobre `tenantSummary`. A página não consome mais `operations.summary`, `operations.incidents`,
+`operations.queues`, `operations.dlq` nem `/internal/operations/*`.
+
+A interface apresenta cinco seções factuais: **Recursos**, **WhatsApp**, **Webhooks**,
+**Cobrança** e **Configuração operacional**. Ela não apresenta health agregado, severity, risco,
+score, priority, `nextAction`, mensagem fabricada de “sem incidentes” ou normalidade inferida por
+ausência. Zero permanece um zero factual; `null` é apresentado como “Não disponível”; `unknown` e
+`not_configured` permanecem explícitos.
+
+### 8.5 Evidências da Onda 3
+
+Os gates registrados para a migração final foram:
+
+| Verificação | Resultado |
+|---|---|
+| `pnpm --filter ./apps/web test` | **PASS** — 75 arquivos, 573 testes |
+| `pnpm --filter ./apps/web typecheck` | **PASS** |
+| `pnpm --filter ./apps/web build` | **PASS** |
+| Vitest específico: `OperationalCockpitPage.test.ts` e `operational-cockpit.contract.test.ts` | **PASS** — 2 arquivos, 31 testes |
+| `git diff --check` | **PASS** |
+
+### 8.6 Limites das evidências
+
+O encerramento não reivindica HA ou SLA, health global da plataforma, disponibilidade global do
+Stripe ou do provider WhatsApp, recuperação de Pub/Sub, incidentes tenant derivados, nem
+risco/prioridade/`nextAction` tenant. Esses temas permanecem fora do escopo. A Fase 2.3D termina
+com a apresentação estrita de fatos tenant-scoped; a ausência de um fato não prova normalidade.
