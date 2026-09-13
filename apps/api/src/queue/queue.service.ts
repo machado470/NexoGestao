@@ -20,6 +20,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
   private readonly queueMap = new Map<QueueName, Queue>()
   private readonly queueEventsMap = new Map<QueueName, QueueEvents>()
   private readonly schedulerMap = new Map<QueueName, JobScheduler>()
+  private readonly stalledEvents = new Map<QueueName, { count: number; lastStalledAt: string }>()
   private connectionInitPromise?: Promise<void>
   private hasLoggedAlreadyConnecting = false
   private hasLoggedActive = false
@@ -192,6 +193,14 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
       }
       const queue = new Queue(queueName, opts)
       const events = new QueueEvents(queueName, { connection: this.connection })
+      events.on('stalled', () => {
+        const previous = this.stalledEvents.get(queueName)
+        this.stalledEvents.set(queueName, {
+          count: (previous?.count ?? 0) + 1,
+          lastStalledAt: new Date().toISOString(),
+        })
+        this.queueMetrics.increment(`queue.job.stalled.${queueName}`)
+      })
       const scheduler = new JobScheduler(queueName, { connection: this.connection })
 
       this.queueMap.set(queueName, queue)
@@ -296,26 +305,19 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
       this.queueMetrics.setGauge(`queue.backlog.waiting.${queueName}`, Number(sample.waiting ?? 0))
       this.queueMetrics.setGauge(`queue.backlog.failed.${queueName}`, Number(sample.failed ?? 0))
       this.queueMetrics.setGauge(`queue.backlog.active.${queueName}`, Number(sample.active ?? 0))
+      this.queueMetrics.setGauge(`queue.backlog.delayed.${queueName}`, Number(sample.delayed ?? 0))
     }
 
-    const webhookFailed = Number(result[QUEUE_NAMES.WEBHOOKS]?.failed ?? 0)
-    const webhookDlqWaiting = Number(result[QUEUE_NAMES.WEBHOOKS_DLQ]?.waiting ?? 0)
-    const degraded = webhookFailed > 0 || webhookDlqWaiting > 0
-
-    if (degraded) {
-      this.queueMetrics.increment('queue.degraded.total')
-      return {
-        ok: false,
-        reason: 'queue_degraded_webhook_failures',
-        details: {
-          webhookFailed,
-          webhookDlqWaiting,
-        },
-        queues: result,
-      }
+    return {
+      ok: true,
+      redisEnabled: true,
+      status: this.connection.status,
+      queues: result,
+      // BullMQ 5.73 exposes stalled as a transient QueueEvents event, not as a
+      // current job state. Keep the factual process-local event count/timestamp
+      // separate from the persisted queue gauges.
+      stalledEvents: Object.fromEntries(this.stalledEvents.entries()),
     }
-
-    return result
   }
 
   async onModuleDestroy() {

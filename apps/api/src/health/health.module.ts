@@ -11,9 +11,12 @@ import { OperationsController } from './operations.controller'
 import { OperationalMonitoringService } from './operational-monitoring.service'
 import { OperationalIncidentsService } from './operational-incidents.service'
 import { ActiveUserGuard } from '../auth/guards/active-user.guard'
+import { NotificationsModule } from '../notifications/notifications.module'
+import { OutboxModule } from '../outbox/outbox.module'
+import { BillingModule } from '../billing/billing.module'
 
 @Module({
-  imports: [PrismaModule, QueueModule],
+  imports: [PrismaModule, QueueModule, NotificationsModule, OutboxModule, BillingModule],
   controllers: [HealthController, InternalStatsController, OperationsController],
   providers: [WhatsAppObservabilityService, OperationalDiagnosticsService, OperationalSignalsService, QueueMetricsExporterService, OperationalMonitoringService, OperationalIncidentsService, ActiveUserGuard],
   exports: [WhatsAppObservabilityService],

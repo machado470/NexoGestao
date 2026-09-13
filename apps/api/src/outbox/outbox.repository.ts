@@ -6,6 +6,30 @@ import { PrismaService } from '../prisma/prisma.service'
 export class OutboxRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  async factualSnapshot() {
+    const [row] = await this.prisma.$queryRaw<Array<{
+      pending: bigint
+      failed: bigint
+      processing: bigint
+      oldestPendingAt: Date | null
+    }>>(Prisma.sql`
+      SELECT
+        COUNT(*) FILTER (WHERE "status" IN ('PENDING', 'RETRY')) AS "pending",
+        COUNT(*) FILTER (WHERE "status" = 'FAILED') AS "failed",
+        COUNT(*) FILTER (WHERE "status" = 'PROCESSING') AS "processing",
+        MIN("createdAt") FILTER (WHERE "status" IN ('PENDING', 'RETRY')) AS "oldestPendingAt"
+      FROM "OperationalOutboxEvent"
+      WHERE "status" IN ('PENDING', 'RETRY', 'FAILED', 'PROCESSING')
+    `)
+
+    return {
+      pending: Number(row.pending),
+      failed: Number(row.failed),
+      processing: Number(row.processing),
+      oldestPendingAt: row.oldestPendingAt,
+    }
+  }
+
   async claimBatch(input: { workerId: string; batchSize: number; staleBefore: Date }) {
     return this.prisma.$transaction(async tx => {
       const rows = await tx.$queryRaw<OperationalOutboxEvent[]>(Prisma.sql`

@@ -21,6 +21,6 @@ import { NotificationStreamHub } from './notification-stream-hub.service'
     NotificationPubSubService
   ],
   controllers: [NotificationsController],
-  exports: [NotificationsService],
+  exports: [NotificationsService, NotificationPubSubService],
 })
 export class NotificationsModule {}

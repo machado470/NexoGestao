@@ -69,6 +69,7 @@ describe('HealthController readiness factual dependency checks', () => {
   function controller(input: {
     database?: 'up' | 'down'
     queue?: Record<string, unknown>
+    pubSub?: Record<string, boolean>
   } = {}) {
     const prisma = {
       $queryRaw: input.database === 'down'
@@ -80,7 +81,11 @@ describe('HealthController readiness factual dependency checks', () => {
       isEnabled: jest.fn().mockReturnValue(input.queue?.ok !== false),
     }
     return {
-      health: new HealthController(prisma as any, config as any, queue as any),
+      health: new HealthController(prisma as any, config as any, queue as any, {
+        readiness: jest.fn().mockReturnValue(input.pubSub ?? {
+          publisherReady: true, subscriberReady: true, subscribed: true, shuttingDown: false,
+        }),
+      } as any),
       prisma,
       queue,
     }
@@ -129,6 +134,24 @@ describe('HealthController readiness factual dependency checks', () => {
         database: expect.objectContaining({ ok: true }),
         prismaClient: { ok: true },
         queue: expect.objectContaining({ ok: true, enabled: true }),
+      },
+    })
+  })
+
+  it('mantém readiness crítico ready quando somente o Pub/Sub está indisponível', async () => {
+    const { health } = controller({
+      pubSub: { publisherReady: false, subscriberReady: false, subscribed: false, shuttingDown: false },
+    })
+
+    await expect(health.readiness()).resolves.toMatchObject({
+      status: 'ready',
+      integrations: {
+        notificationPubSub: {
+          availability: 'unavailable',
+          publisher: 'unavailable',
+          subscriber: 'unavailable',
+          subscription: 'unavailable',
+        },
       },
     })
   })

@@ -98,3 +98,28 @@ describe('QueueService degraded-mode safety', () => {
   })
 
 })
+
+describe('QueueService factual queue snapshot', () => {
+  it('expõe stalled como contador de eventos transitórios, não como gauge atual', async () => {
+    const metrics = { increment: jest.fn(), setGauge: jest.fn(), observeDuration: jest.fn() }
+    const service = new QueueService(
+      { status: 'ready' } as any,
+      {} as any,
+      metrics as any,
+      { requestId: null, correlationId: null } as any,
+    ) as any
+    const queue = { getJobCounts: jest.fn().mockResolvedValue({ waiting: 1, active: 2, completed: 3, failed: 4, delayed: 5 }) }
+    for (const name of ['automation', 'notifications', 'whatsapp', 'whatsapp-dlq', 'finance', 'webhooks', 'webhooks-dlq']) {
+      service.queueMap.set(name, queue)
+    }
+    service.stalledEvents.set('notifications', { count: 2, lastStalledAt: '2026-09-13T10:00:00.000Z' })
+
+    await expect(service.getQueueStatus()).resolves.toMatchObject({
+      ok: true,
+      queues: { notifications: { delayed: 5, failed: 4 } },
+      stalledEvents: { notifications: { count: 2, lastStalledAt: '2026-09-13T10:00:00.000Z' } },
+    })
+    expect(metrics.setGauge).not.toHaveBeenCalledWith(expect.stringContaining('stalled'), expect.anything())
+    expect(metrics.setGauge).toHaveBeenCalledWith('queue.backlog.delayed.notifications', 5)
+  })
+})
