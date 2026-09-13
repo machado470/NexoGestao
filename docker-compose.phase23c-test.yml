@@ -1,0 +1,31 @@
+name: nexogestao-phase23c
+
+# Destructive recovery tests may stop these services.  They deliberately have
+# no shared volumes and do not reuse the development ports or container names.
+services:
+  postgres-phase23c:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: phase23c
+      POSTGRES_PASSWORD: phase23c-local-only
+      POSTGRES_DB: phase23c
+    ports:
+      - "${PHASE23C_POSTGRES_PORT:-55433}:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U phase23c -d phase23c"]
+      interval: 1s
+      timeout: 2s
+      retries: 30
+
+  redis-phase23c:
+    image: redis:7
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "${PHASE23C_REDIS_PORT:-56380}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 1s
+      timeout: 2s
+      retries: 30
