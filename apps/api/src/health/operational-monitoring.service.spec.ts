@@ -54,6 +54,7 @@ describe('OperationalMonitoringService factual contract v2', () => {
       },
     })
     expect(outbox.facts).toMatchObject({ pending: 6, backlog: 6, failed: 2, processing: 1, oldestPendingAt: '2026-09-13T09:00:00.000Z' })
+    expect(JSON.stringify(snapshot)).not.toMatch(/"(?:score|severity|priority)"/i)
 
     const summary = await createService().summary()
     expect(summary.status).toBe('ok')
