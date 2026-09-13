@@ -5,7 +5,46 @@ last_reviewed: 2026-09-13
 source_of_truth: true
 ---
 
-# Fase 2.4 — auditoria de produção, backup e recovery (Onda 1)
+# Fase 2.4 — auditoria de produção, backup e recovery
+
+## Onda 2A — implementação e prova descartável (2026-09-13)
+
+### IMPLEMENTED
+
+- `scripts/backup-db.sh` é o caminho canônico futuro: lock, `umask 077`, temporário no mesmo filesystem, gzip validado, SHA-256 verificado antes da publicação, rename, cleanup por trap e retenção somente após backup íntegro.
+- Resultados local e offsite são independentes. Eventos distinguem `LOCAL_BACKUP_SUCCESS`, `OFFSITE_UPLOAD_SUCCESS`, `OFFSITE_UPLOAD_SKIPPED` e `OFFSITE_UPLOAD_FAILED`; pedido de upload sem bucket/AWS CLI falha com status diferente de zero.
+- `scripts/restore-db.sh` aceita apenas o padrão canônico com sidecar, valida checksum e gzip antes de escrever, mostra o alvo, proíbe produção, exige opt-in no modo não interativo, usa `psql ON_ERROR_STOP`, aplica `prisma migrate deploy` e verifica migrations.
+- `.env.prod.example` é o contrato sanitizado. Deploy e Compose agora falham cedo para banco, Redis, autenticação, URLs, Stripe e credenciais condicionais do provider WhatsApp, sem defaults produtivos conhecidos para banco/Redis.
+- Compose/runner próprios da Fase 2.4 validam o alvo real e exercitam migrations, fixture relacional, backup, recriação do banco, restore e comparação de PK/FK, enums, timestamps e valores monetários.
+- O backup legado e o cron foram preservados, marcados como não canônicos/template não instalado; nenhum cron foi ativado.
+
+### PROVED
+
+- **Mecanismo local descartável:** depende da evidência de execução abaixo. Uma passagem prova somente o caminho PostgreSQL isolado, nunca backup, agenda, host ou recovery de produção.
+
+### NOT_PROVED
+
+- Produção, cron instalado, storage/capacidade real, offsite, IAM, criptografia, bucket policy, versioning, lifecycle, alertas/dashboard e execução por operador continuam `NOT_PROVED`.
+- Railway não foi removido nem declarado desativado. O drill valida PostgreSQL independentemente; Compose segue autoridade estática do repositório e a plataforma real exige confirmação operacional.
+- Restore SQL pode deixar o alvo parcialmente escrito após erro. A abordagem segura é banco novo/descartável, como no drill, não restore in-place como primeira escolha.
+
+### MISSING
+
+- RPO e RTO permanecem `NOT_DEFINED`: `RETENTION_DAYS` não é RPO e duração do script/drill não é RTO ou SLA.
+- Criptografia/offsite comprovados, alerting externo e runbook/ownership de produção ficam para decisão posterior; a Onda 2B não começa aqui.
+
+### CONFLICTING
+
+- Cron e `infra/backup/run-backup.sh` ainda representam o fluxo legado, deliberadamente não instalado nesta onda. Consolidação operacional fica para uma onda posterior.
+- Compose é autoridade estática no Git e `railway.json` permanece presente; isso não demonstra qual plataforma está ativa.
+
+### Evidência da Onda 2A
+
+Os checks e o drill desta mudança são registrados no fechamento. `PROVED` significa somente drill E2E concluído em infraestrutura descartável na data informada; sem Docker, o estado correto é `IMPLEMENTED_NOT_PROVED`.
+
+- Data: `2026-09-13` (UTC).
+- `bash -n` nos três scripts, `pnpm prisma:check` e `git diff --check`: passaram.
+- `docker info`: indisponível neste ambiente; o drill E2E não foi executado. Portanto backup e restore permanecem **`IMPLEMENTED_NOT_PROVED`**, e nenhum item desta onda foi promovido a `PROVED`.
 
 ## Escopo, baseline e método
 

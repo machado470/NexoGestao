@@ -82,9 +82,25 @@ log_ok ".env.prod carregado"
 log "Validando variáveis obrigatórias..."
 
 REQUIRED_VARS=(
+  "POSTGRES_USER"
   "POSTGRES_PASSWORD"
+  "POSTGRES_DB"
+  "DATABASE_URL"
+  "REDIS_URL"
+  "REDIS_PASSWORD"
   "JWT_SECRET"
   "NODE_ENV"
+  "DOMAIN"
+  "APP_URL"
+  "FRONTEND_URL"
+  "CORS_ORIGINS"
+  "VITE_API_URL"
+  "WHATSAPP_PROVIDER"
+  "STRIPE_SECRET_KEY"
+  "STRIPE_WEBHOOK_SECRET"
+  "STRIPE_PRICE_STARTER"
+  "STRIPE_PRICE_PRO"
+  "STRIPE_PRICE_BUSINESS"
 )
 
 MISSING=()
@@ -103,7 +119,7 @@ if [[ ${#MISSING[@]} -gt 0 ]]; then
 fi
 
 # Alertas para variáveis de produção importantes (não obrigatórias para subir)
-WARN_VARS=("STRIPE_SECRET_KEY" "STRIPE_WEBHOOK_SECRET" "SENTRY_DSN_API")
+WARN_VARS=("SENTRY_DSN" "VITE_SENTRY_DSN")
 for var in "${WARN_VARS[@]}"; do
   if [[ -z "${!var:-}" ]]; then
     log_warn "$var não configurado — funcionalidade relacionada operará em modo degradado"
@@ -111,6 +127,26 @@ for var in "${WARN_VARS[@]}"; do
 done
 
 log_ok "Variáveis validadas"
+
+[[ "$NODE_ENV" == "production" ]] || die "NODE_ENV deve ser production"
+[[ "$POSTGRES_USER" != "postgres" ]] || die "POSTGRES_USER genérico 'postgres' não é aceito em produção"
+[[ ${#POSTGRES_PASSWORD} -ge 16 ]] || die "POSTGRES_PASSWORD deve ter ao menos 16 caracteres"
+[[ ${#REDIS_PASSWORD} -ge 16 ]] || die "REDIS_PASSWORD deve ter ao menos 16 caracteres"
+[[ ${#JWT_SECRET} -ge 32 ]] || die "JWT_SECRET deve ter ao menos 32 caracteres"
+
+case "$WHATSAPP_PROVIDER" in
+  meta_cloud)
+    for var in META_ACCESS_TOKEN META_PHONE_NUMBER_ID META_APP_SECRET; do
+      [[ -n "${!var:-}" ]] || die "$var é obrigatório para WHATSAPP_PROVIDER=meta_cloud"
+    done
+    ;;
+  zapi)
+    for var in ZAPI_INSTANCE_ID ZAPI_TOKEN ZAPI_CLIENT_TOKEN; do
+      [[ -n "${!var:-}" ]] || die "$var é obrigatório para WHATSAPP_PROVIDER=zapi"
+    done
+    ;;
+  *) die "WHATSAPP_PROVIDER deve ser meta_cloud ou zapi em produção" ;;
+esac
 
 # ─── 4. Gerar SSL (Let's Encrypt) se DOMAIN e EMAIL existirem ─
 DOMAIN="${DOMAIN:-}"

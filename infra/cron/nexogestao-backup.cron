@@ -1,6 +1,8 @@
 # ============================================================
 # NexoGestão — Cron Jobs de Backup de PRODUÇÃO
 # ============================================================
+# VERSIONED LEGACY TEMPLATE ONLY. It is not evidence of installation and must
+# not be installed during Phase 2.4 Wave 2A. Its command remains non-canonical.
 # Instalação (como root):
 #   sudo cp /caminho/completo/para/NexoGestao/infra/cron/nexogestao-backup.cron /etc/cron.d/nexogestao-backup
 #   sudo chmod 644 /etc/cron.d/nexogestao-backup
