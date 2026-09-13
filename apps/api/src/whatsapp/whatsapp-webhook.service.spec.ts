@@ -59,4 +59,30 @@ describe('WhatsAppWebhookService tenant isolation', () => {
       where: { id: 'webhook-tenant-b', orgId: 'tenant-a', provider: 'meta_cloud' },
     })
   })
+
+  it('usa jobIds BullMQ determinísticos sem dois-pontos e distingue replay do enqueue inicial', async () => {
+    const addJob = jest.fn()
+      .mockResolvedValueOnce({ id: 'whatsapp-inbound-webhook-event-1' })
+      .mockResolvedValueOnce({ id: 'whatsapp-inbound-webhook-event-1-replay-attempt-1' })
+    const metrics = { incInboundWebhookQueued: jest.fn() }
+    const service = new WhatsAppWebhookService({} as any, { addJob } as any, metrics as any)
+    const input = {
+      webhookEventId: 'event-1',
+      orgId: 'tenant-a',
+      provider: 'meta_cloud',
+      traceId: 'trace-1',
+      receivedAt: new Date('2026-09-13T00:00:00.000Z'),
+    }
+
+    await service.enqueueInboundWebhook(input)
+    await service.enqueueInboundWebhook({ ...input, replayAttemptId: 'replay-attempt-1' })
+
+    const initialJobId = addJob.mock.calls[0][3].jobId
+    const replayJobId = addJob.mock.calls[1][3].jobId
+    expect(initialJobId).toBe('whatsapp-inbound-webhook-event-1')
+    expect(replayJobId).toBe('whatsapp-inbound-webhook-event-1-replay-attempt-1')
+    expect(initialJobId).not.toContain(':')
+    expect(replayJobId).not.toContain(':')
+    expect(replayJobId).not.toBe(initialJobId)
+  })
 })

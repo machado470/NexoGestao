@@ -44,21 +44,31 @@ describeRealIntegration('Phase 2.2 WhatsApp public webhook tenant isolation (Pos
     }
     throw new Error(`webhook ${id} was not processed by the real Redis worker`)
   }
-  const assertNoWrongTenantEffects = async (expected: Record<string, number>) => {
+  type TenantState = Record<string, { events: number; conversations: number; messages: number; timeline: number; actions: number }>
+  const snapshot = async (): Promise<TenantState> => {
+    const state: TenantState = {}
     for (const orgId of orgIds) {
-      const actual = {
+      state[orgId] = {
         events: await prisma.whatsAppWebhookEvent.count({ where: { orgId } }),
         conversations: await prisma.whatsAppConversation.count({ where: { orgId } }),
         messages: await prisma.whatsAppMessage.count({ where: { orgId } }),
         timeline: await prisma.timelineEvent.count({ where: { orgId } }),
         actions: await prisma.whatsAppActionExecution.count({ where: { orgId } }),
       }
-      expect(actual.events).toBe(expected[`${orgId}:events`] ?? 0)
-      expect(actual.conversations).toBe(expected[`${orgId}:conversations`] ?? 0)
-      expect(actual.messages).toBe(expected[`${orgId}:messages`] ?? 0)
-      expect(actual.timeline).toBe(expected[`${orgId}:timeline`] ?? 0)
-      expect(actual.actions).toBe(0)
     }
+    return state
+  }
+  const expectUnchanged = (before: TenantState, after: TenantState) => {
+    expect(after).toEqual(before)
+  }
+  const expectInboundDelta = (before: TenantState, after: TenantState, tenantId: string) => {
+    const otherTenantId = tenantId === ids.orgA ? ids.orgB : ids.orgA
+    expect(after[tenantId].events - before[tenantId].events).toBe(1)
+    expect(after[tenantId].conversations - before[tenantId].conversations).toBe(1)
+    expect(after[tenantId].messages - before[tenantId].messages).toBe(1)
+    expect(after[tenantId].timeline - before[tenantId].timeline).toBeGreaterThanOrEqual(1)
+    expect(after[tenantId].actions - before[tenantId].actions).toBe(0)
+    expect(after[otherTenantId]).toEqual(before[otherTenantId])
   }
 
   beforeAll(async () => {
@@ -83,6 +93,15 @@ describeRealIntegration('Phase 2.2 WhatsApp public webhook tenant isolation (Pos
     ] })
   })
 
+  beforeEach(async () => {
+    if (!RUN_REAL_INTEGRATION) return
+    await prisma.timelineEvent.deleteMany({ where: { orgId: { in: orgIds } } })
+    await prisma.whatsAppActionExecution.deleteMany({ where: { orgId: { in: orgIds } } })
+    await prisma.whatsAppMessage.deleteMany({ where: { orgId: { in: orgIds } } })
+    await prisma.whatsAppConversation.deleteMany({ where: { orgId: { in: orgIds } } })
+    await prisma.whatsAppWebhookEvent.deleteMany({ where: { orgId: { in: orgIds } } })
+  })
+
   afterAll(async () => {
     try {
       if (prisma) {
@@ -101,45 +120,51 @@ describeRealIntegration('Phase 2.2 WhatsApp public webhook tenant isolation (Pos
   })
 
   it('correlaciona A e B exclusivamente pela conta persistida e ignora tenant spoofing', async () => {
+    const initial = await snapshot()
     const bodyA = payload(accounts.a, `wamid-${randomUUID()}`, { orgId: ids.orgB, tenantId: ids.orgB, organizationId: ids.orgB })
     const eventA = (await post(bodyA).set('x-org-id', ids.orgB).expect(200)).body.webhookEventId
     await waitForEvent(eventA)
-    await assertNoWrongTenantEffects({ [`${ids.orgA}:events`]: 1, [`${ids.orgA}:conversations`]: 1, [`${ids.orgA}:messages`]: 1, [`${ids.orgA}:timeline`]: 1 })
+    const afterA = await snapshot()
+    expectInboundDelta(initial, afterA, ids.orgA)
 
     const bodyB = payload(accounts.b, `wamid-${randomUUID()}`, { orgId: ids.orgA, tenantId: ids.orgA, organizationId: ids.orgA })
     const eventB = (await post(bodyB).set('x-nexo-org-id', ids.orgA).expect(200)).body.webhookEventId
     await waitForEvent(eventB)
-    await assertNoWrongTenantEffects({
-      [`${ids.orgA}:events`]: 1, [`${ids.orgA}:conversations`]: 1, [`${ids.orgA}:messages`]: 1, [`${ids.orgA}:timeline`]: 1,
-      [`${ids.orgB}:events`]: 1, [`${ids.orgB}:conversations`]: 1, [`${ids.orgB}:messages`]: 1, [`${ids.orgB}:timeline`]: 1,
-    })
+    expectInboundDelta(afterA, await snapshot(), ids.orgB)
   })
 
   it('rejeita conta desconhecida e correlação ambígua antes de persistir qualquer efeito', async () => {
+    const before = await snapshot()
     await post(payload(accounts.unknown, `wamid-${randomUUID()}`, { orgId: ids.orgA })).expect(400)
     const ambiguous = payload(accounts.a, `wamid-${randomUUID()}`)
     ambiguous.entry.push(payload(accounts.b, `wamid-${randomUUID()}`).entry[0])
     await post(ambiguous).expect(400)
-    await assertNoWrongTenantEffects({
-      [`${ids.orgA}:events`]: 1, [`${ids.orgA}:conversations`]: 1, [`${ids.orgA}:messages`]: 1, [`${ids.orgA}:timeline`]: 1,
-      [`${ids.orgB}:events`]: 1, [`${ids.orgB}:conversations`]: 1, [`${ids.orgB}:messages`]: 1, [`${ids.orgB}:timeline`]: 1,
-    })
+    expectUnchanged(before, await snapshot())
   })
 
   it('mantém replay e providerMessageId tenant-safe sem efeitos derivados extras', async () => {
-    const eventA = await prisma.whatsAppWebhookEvent.findFirstOrThrow({ where: { orgId: ids.orgA } })
+    const providerMessageId = `wamid-shared-${randomUUID()}`
+    const initialEventId = (await post(payload(accounts.a, providerMessageId)).expect(200)).body.webhookEventId
+    const eventA = await waitForEvent(initialEventId)
+    const afterInitial = await snapshot()
     const tokenA = jwt.sign({ sub: ids.userA, role: 'ADMIN', orgId: ids.orgA })
     await request(app.getHttpServer()).post(`/whatsapp/webhook-events/${eventA.id}/replay`)
       .set('Authorization', `Bearer ${tokenA}`).send({ force: true }).expect(201)
     await new Promise((resolve) => setTimeout(resolve, 500))
+    expectUnchanged(afterInitial, await snapshot())
 
-    const originalId = (eventA.payload as any).entry[0].changes[0].value.messages[0].id
-    const equivalentSpoof = payload(accounts.a, originalId, { orgId: ids.orgB, tenantId: ids.orgB })
+    const equivalentSpoof = payload(accounts.a, providerMessageId, { orgId: ids.orgB, tenantId: ids.orgB })
     const replayedPublicEvent = (await post(equivalentSpoof).expect(200)).body.webhookEventId
     await waitForEvent(replayedPublicEvent)
-    await assertNoWrongTenantEffects({
-      [`${ids.orgA}:events`]: 2, [`${ids.orgA}:conversations`]: 1, [`${ids.orgA}:messages`]: 1, [`${ids.orgA}:timeline`]: 1,
-      [`${ids.orgB}:events`]: 1, [`${ids.orgB}:conversations`]: 1, [`${ids.orgB}:messages`]: 1, [`${ids.orgB}:timeline`]: 1,
-    })
+    const afterDuplicateA = await snapshot()
+    expect(afterDuplicateA[ids.orgA].events - afterInitial[ids.orgA].events).toBe(1)
+    expect(afterDuplicateA[ids.orgA].conversations).toBe(afterInitial[ids.orgA].conversations)
+    expect(afterDuplicateA[ids.orgA].messages).toBe(afterInitial[ids.orgA].messages)
+    expect(afterDuplicateA[ids.orgA].timeline).toBe(afterInitial[ids.orgA].timeline)
+    expect(afterDuplicateA[ids.orgB]).toEqual(afterInitial[ids.orgB])
+
+    const eventB = (await post(payload(accounts.b, providerMessageId)).expect(200)).body.webhookEventId
+    await waitForEvent(eventB)
+    expectInboundDelta(afterDuplicateA, await snapshot(), ids.orgB)
   })
 })

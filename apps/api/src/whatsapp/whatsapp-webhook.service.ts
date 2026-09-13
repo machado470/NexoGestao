@@ -194,7 +194,7 @@ export class WhatsAppWebhookService {
         QUEUE_NAMES.WHATSAPP,
         WHATSAPP_QUEUE_JOB_NAMES.INBOUND_WEBHOOK,
         payload,
-        { jobId: input.replayAttemptId ? `whatsapp:inbound-webhook:${input.webhookEventId}:${input.replayAttemptId}` : `whatsapp:inbound-webhook:${input.webhookEventId}` },
+        { jobId: input.replayAttemptId ? `whatsapp-inbound-webhook-${input.webhookEventId}-${input.replayAttemptId}` : `whatsapp-inbound-webhook-${input.webhookEventId}` },
       )
     } catch (error) {
       if (error instanceof ServiceUnavailableException) {
