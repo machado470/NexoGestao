@@ -1,5 +1,5 @@
 ---
-status: real-run-partial-stalled-pending
+status: real-run-stalled-observed-completion-rerun-pending
 owner: nexogestao
 last_reviewed: 2026-09-13
 ---
@@ -24,7 +24,7 @@ Without `RUN_REAL_INTEGRATION=true`, Jest skips these suites. A skip is not reco
 
 ## Latest real execution — observed evidence
 
-The latest Docker-backed execution completed four tests successfully and left one failure, the stalled scenario.
+The latest Docker-backed execution completed four tests successfully. The stalled scenario also proved the real stalled mechanism, but its final assertion failed because it expected a retained completed job despite the production queue's `removeOnComplete: true` default.
 
 ### Proved
 
@@ -34,15 +34,19 @@ The latest Docker-backed execution completed four tests successfully and left on
 - Redis down detection, explicit fail-closed enqueue while unavailable, automatic recovery, and processing of a newly enqueued job after recovery.
 - Webhook retries, persisted `FAILED`, real DLQ insertion, official replay, and persisted `SUCCESS` after replay.
 - Rejection of a second replay after `SUCCESS` and organization isolation exercised by the webhook suite.
+- The child BullMQ Worker acquired the original job and was then abruptly terminated with `SIGKILL`.
+- The replacement BullMQ Worker emitted `stalled` for that original job ID.
+- The real `QueueService` recorded `stalledEvents.automation.count = 1` and a factual `lastStalledAt`.
+- `QueueObservabilityService` incremented `queue.job.stalled.automation` to 1, while the fictitious `queue.backlog.stalled.automation` gauge remained absent.
 - Complete cleanup of the dedicated test infrastructure and fixtures.
 
 The many `ECONNREFUSED` messages emitted during the Redis-down window are expected effects of the deliberate outage and reconnection attempts; they are not separate test failures.
 
-### Not proved yet
+### Remaining green-run confirmation
 
-- **Stalled end-to-end.** The only failed test was the stalled harness. Its initial readiness polling created a new fail-fast producer connection on every attempt and issued `PING` while each client was still `connecting`. With `enableOfflineQueue: false`, ioredis correctly rejected that command before any one connection could become ready. This is a harness defect, not evidence of a QueueService defect.
+- **`stalled -> reprocess -> completed`.** The real stalled execution reached recovery and the production queue removed the completed job, but the harness incorrectly required `completed === 1`. Because `QueueService` configures `removeOnComplete: true`, a successfully completed job is not retained in that count. This was only an assertion incompatible with the real queue configuration, not a runtime failure.
 
-The corrected harness now uses one dedicated, lazy readiness connection, awaits its connection readiness, sends `PING`, and always disconnects it. It does not change the fail-fast producer configuration or production runtime. A future real run is required before stalled can be classified as proved.
+The corrected harness now captures the replacement Worker's `completed` event and requires its job ID to equal the original ID, then waits for `queue.getJob(originalJobId)` to become `undefined`. A future green real run is required before the complete `stalled -> reprocess -> completed` chain is classified as proved. No production queue option or runtime behavior was changed.
 
 ## Evidence matrix
 
@@ -51,7 +55,7 @@ The corrected harness now uses one dedicated, lazy readiness connection, awaits 
 | PostgreSQL | Stop only `postgres-phase23c`; observe readiness failure; restart the same container | **PASS:** down detected, normal Prisma path recovered without restart, fixture preserved; observed ~4.6 s detection and ~8.3 s recovery (not SLA). |
 | Redis / BullMQ | Stop only `redis-phase23c`; readiness and enqueue fail; restart it | **PASS:** enqueue failed closed, existing service recovered automatically, and a post-recovery job was consumed. Repeated connection-refused diagnostics during the outage were expected. |
 | Webhook DLQ/replay | Local destination returns 503 through configured attempts, then 204 for official replay | **PASS:** retries, `FAILED`, DLQ, tenant isolation, official replay to `SUCCESS`, and blocked second replay were observed. |
-| BullMQ stalled | Acquire a canonical `automation` job, interrupt its lock owner, start a replacement Worker | **NOT YET PROVED:** the precondition probe failed because it reused producer fail-fast options incorrectly. The corrected test must still observe the real stalled event and completion in real infrastructure. |
+| BullMQ stalled | Acquire a canonical `automation` job, kill its lock owner with `SIGKILL`, start a replacement Worker | **STALLED PROVED:** the replacement Worker emitted `stalled` for the original job; `QueueService` recorded count 1 and `lastStalledAt`; the canonical counter reached 1 and no false backlog gauge appeared. A green rerun of the corrected completion assertion remains pending. |
 
 ## Corrected stalled proof contract
 
@@ -63,9 +67,10 @@ After reachability succeeds, the test creates a fresh production `QueueService`,
 - `status.stalledEvents.automation.lastStalledAt` is defined;
 - metric `queue.job.stalled.automation >= 1`;
 - metric `queue.backlog.stalled.automation` is absent; and
-- the job count reaches exactly `completed === 1`.
+- the replacement Worker's `completed` event reports the original job ID; and
+- `queue.getJob(originalJobId)` eventually returns `undefined`, consistently with the real `removeOnComplete: true` default.
 
-This changes harness timing only. Production lock/stalled intervals and QueueService are unchanged.
+The failure in the latest real run was solely **"completed count expected as 1 despite `removeOnComplete=true`"**. The corrected contract changes only the harness assertion and diagnostics. Production lock/stalled intervals, `QUEUE_DEFAULT_JOB_OPTIONS`, and `QueueService` are unchanged.
 
 ## Scope and remaining gaps
 
