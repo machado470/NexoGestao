@@ -82,22 +82,37 @@ describeRealIntegration('Phase 2 tenant mutation isolation (Postgres e2e)', () =
   })
 
   afterAll(async () => {
-    if (prisma) {
-      await prisma.timelineEvent.deleteMany({ where: { orgId: { in: orgIds } } })
-      await prisma.auditEvent.deleteMany({ where: { orgId: { in: orgIds } } })
-      await prisma.idempotencyRecord.deleteMany({ where: { orgId: { in: orgIds } } })
-      await prisma.payment.deleteMany({ where: { orgId: { in: orgIds } } })
-      await prisma.whatsAppMessage.deleteMany({ where: { orgId: { in: orgIds } } })
-      await prisma.whatsAppActionExecution.deleteMany({ where: { orgId: { in: orgIds } } })
-      await prisma.whatsAppConversation.deleteMany({ where: { orgId: { in: orgIds } } })
-      await prisma.charge.deleteMany({ where: { orgId: { in: orgIds } } })
-      await prisma.serviceOrder.deleteMany({ where: { orgId: { in: orgIds } } })
-      await prisma.customer.deleteMany({ where: { orgId: { in: orgIds } } })
-      await prisma.person.deleteMany({ where: { orgId: { in: orgIds } } })
-      await prisma.user.deleteMany({ where: { orgId: { in: orgIds } } })
-      await prisma.organization.deleteMany({ where: { id: { in: orgIds } } })
+    try {
+      if (prisma) {
+        await prisma.timelineEvent.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.usageMetric.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.auditEvent.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.idempotencyRecord.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.payment.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.whatsAppMessage.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.whatsAppActionExecution.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.whatsAppConversation.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.whatsAppTemplate.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.whatsAppWebhookEvent.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.charge.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.serviceOrder.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.appointment.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.customer.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.organizationExecutionConfig.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.tenantFeatureOverride.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.subscription.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.person.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.user.deleteMany({ where: { orgId: { in: orgIds } } })
+        // Official events can finish persisting while the other tenant rows are
+        // being drained, so make the organization deletion the final FK boundary.
+        await prisma.timelineEvent.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.organization.deleteMany({ where: { id: { in: orgIds } } })
+      }
+    } finally {
+      if (app) {
+        await app.close()
+      }
     }
-    await app?.close()
   })
 
   it('não atualiza customer nem O.S. da Org B', async () => {
