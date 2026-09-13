@@ -36,3 +36,20 @@ export interface OperationalRecoveryAction {
   method: 'POST'
   available: boolean
 }
+
+export type FactualAvailability = 'available' | 'unavailable' | 'not_configured' | 'unknown'
+
+export interface DependencyObservation {
+  component: string
+  availability: FactualAvailability
+  observedAt: string
+  latencyMs?: number
+  configured?: boolean
+  facts?: Record<string, unknown>
+}
+
+export interface FactualOperationsSnapshot {
+  contractVersion: 2
+  observedAt: string
+  dependencies: DependencyObservation[]
+}

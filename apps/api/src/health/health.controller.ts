@@ -8,6 +8,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { ActiveUserGuard } from '../auth/guards/active-user.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
 import { Roles } from '../auth/decorators/roles.decorator'
+import { NotificationPubSubService } from '../notifications/notification-pubsub.service'
 
 @Controller('health')
 export class HealthController {
@@ -15,6 +16,7 @@ export class HealthController {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     @Optional() private readonly queueService?: QueueService,
+    @Optional() private readonly notificationPubSub?: NotificationPubSubService,
   ) {}
 
   private hasValue(name: string): boolean {
@@ -129,6 +131,7 @@ export class HealthController {
 
     const emailConfigured = this.hasValue('RESEND_API_KEY')
     const whatsappReadiness = getWhatsAppProviderReadiness(process.env)
+    const notificationReadiness = this.notificationPubSub?.readiness()
 
     const whatsappIntegrationStatus = whatsappReadiness.mode === 'mock'
       ? 'configured_mock'
@@ -149,6 +152,17 @@ export class HealthController {
         credentialsReady: whatsappReadiness.credentialsReady,
         missingEnv: whatsappReadiness.missingEnv,
         queueAvailable: this.queueService?.isEnabled() ?? false,
+      },
+      notificationPubSub: {
+        availability: notificationReadiness
+          ? notificationReadiness.publisherReady && notificationReadiness.subscriberReady && notificationReadiness.subscribed && !notificationReadiness.shuttingDown
+            ? 'available'
+            : 'unavailable'
+          : 'unknown',
+        observedAt: new Date().toISOString(),
+        publisher: notificationReadiness ? (notificationReadiness.publisherReady ? 'available' : 'unavailable') : 'unknown',
+        subscriber: notificationReadiness ? (notificationReadiness.subscriberReady ? 'available' : 'unavailable') : 'unknown',
+        subscription: notificationReadiness ? (notificationReadiness.subscribed ? 'available' : 'unavailable') : 'unknown',
       },
     }
   }

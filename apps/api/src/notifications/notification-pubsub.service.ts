@@ -34,6 +34,7 @@ export class NotificationPubSubService implements OnModuleInit, OnModuleDestroy 
   private subscriberReady = false
   private subscribed = false
   private shuttingDown = false
+  private lastPublish?: { status: NotificationPublishResult['status']; observedAt: string }
   private readonly cancelPending = new Set<() => void>()
 
   constructor(@Inject(QUEUE_CONNECTION) private readonly redis: IORedis, private readonly hub: NotificationStreamHub) {}
@@ -86,7 +87,9 @@ export class NotificationPubSubService implements OnModuleInit, OnModuleDestroy 
     }
   }
 
-  diagnostics(): NotificationPubSubDiagnostics { return { channel: this.channel, ...this.readiness() } }
+  diagnostics(): NotificationPubSubDiagnostics & { lastPublish?: { status: NotificationPublishResult['status']; observedAt: string } } {
+    return { channel: this.channel, ...this.readiness(), ...(this.lastPublish ? { lastPublish: this.lastPublish } : {}) }
+  }
 
   private logRejected(reason: 'channel' | 'envelope') {
     const diagnostic = this.diagnostics()
@@ -105,7 +108,7 @@ export class NotificationPubSubService implements OnModuleInit, OnModuleDestroy 
   }
 
   async publish(event: NotificationTransportEvent, timeoutMs = DEFAULT_PUBLISH_TIMEOUT_MS): Promise<NotificationPublishResult> {
-    if (this.shuttingDown) return { status: 'shutting-down', subscriberCount: null }
+    if (this.shuttingDown) return this.recordPublish({ status: 'shutting-down', subscriberCount: null })
     const deadline = Date.now() + timeoutMs
     try {
       await this.initializePublisher(this.remaining(deadline))
@@ -118,9 +121,9 @@ export class NotificationPubSubService implements OnModuleInit, OnModuleDestroy 
       )
       if (subscriberCount === 0) {
         this.logger.warn('Publish de notificação sem subscribers; persistência preservada')
-        return { status: 'no-subscribers', subscriberCount: 0 }
+        return this.recordPublish({ status: 'no-subscribers', subscriberCount: 0 })
       }
-      return { status: 'published', subscriberCount }
+      return this.recordPublish({ status: 'published', subscriberCount })
     } catch (error) {
       return this.publishFailure(error instanceof RedisOperationTimeout ? 'timeout' : 'unavailable')
     }
@@ -212,7 +215,12 @@ export class NotificationPubSubService implements OnModuleInit, OnModuleDestroy 
 
   private publishFailure(status: 'timeout' | 'unavailable'): NotificationPublishResult {
     this.logger.warn(`Falha no publish de notificação (${status}); persistência preservada`)
-    return { status, subscriberCount: null }
+    return this.recordPublish({ status, subscriberCount: null })
+  }
+
+  private recordPublish(result: NotificationPublishResult): NotificationPublishResult {
+    this.lastPublish = { status: result.status, observedAt: new Date().toISOString() }
+    return result
   }
 }
 
