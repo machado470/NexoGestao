@@ -145,6 +145,8 @@ describeRealIntegration('Phase 2.3C — REAL REDIS / REAL BULLMQ down, recovery 
     let recoveryWorker: Worker | undefined
     let recoveryConnection: IORedis | undefined
     let workerStalledJobId: string | undefined
+    let completedJobId: string | undefined
+    let workerCompleted: Promise<string> | undefined
     let originalJobId: string | undefined
 
     try {
@@ -181,6 +183,12 @@ describeRealIntegration('Phase 2.3C — REAL REDIS / REAL BULLMQ down, recovery 
         workerStalledJobId = jobId
         resolveWorkerStalled(jobId)
       })
+      workerCompleted = new Promise<string>((resolve) => {
+        recoveryWorker!.on('completed', (job) => {
+          completedJobId = job.id
+          resolve(job.id!)
+        })
+      })
 
       expect(await withTimeout(workerStalled, 'recovery Worker stalled event')).toBe(originalJobId)
       const status = await eventually(() => stalledQueues.getQueueStatus(), (snapshot) =>
@@ -188,7 +196,8 @@ describeRealIntegration('Phase 2.3C — REAL REDIS / REAL BULLMQ down, recovery 
       expect(status.stalledEvents.automation.lastStalledAt).toBeDefined()
       expect(stalledMetrics.snapshot().counters['queue.job.stalled.automation']).toBeGreaterThanOrEqual(1)
       expect(stalledMetrics.snapshot().gauges).not.toHaveProperty('queue.backlog.stalled.automation')
-      await eventually(() => queue.getJobCounts('completed'), (counts) => counts.completed === 1, 30_000)
+      expect(await withTimeout(workerCompleted, 'recovery Worker completed event')).toBe(originalJobId)
+      await eventually(() => queue.getJob(originalJobId!), (completedJob) => completedJob === undefined, 30_000)
     } catch (error) {
       const job = originalJobId ? await queue.getJob(originalJobId).catch(() => undefined) : undefined
       const diagnostic = {
@@ -197,6 +206,7 @@ describeRealIntegration('Phase 2.3C — REAL REDIS / REAL BULLMQ down, recovery 
         stalledEvents: await stalledQueues.getQueueStatus().then((status) => status.stalledEvents).catch(String),
         counters: stalledMetrics.snapshot().counters,
         workerStalledObserved: workerStalledJobId,
+        completedJobId,
         childExitCode: childExit?.exitCode ?? stalledChild?.exitCode,
         childSignalCode: childExit?.signalCode ?? stalledChild?.signalCode,
       }
