@@ -6,6 +6,7 @@ import { randomBytes } from 'crypto'
 import { QueueService } from '../queue/queue.service'
 import { QUEUE_NAMES, WEBHOOK_QUEUE_JOB_NAMES } from '../queue/queue.constants'
 import { buildOperationalLogContext } from '../common/logging/operational-log-context'
+import { webhookDispatchJobId } from './webhook-job-id'
 
 @Injectable()
 export class WebhookService {
@@ -286,7 +287,7 @@ export class WebhookService {
       )
     }
 
-    const jobId = `webhook:dispatch:${delivery.id}`
+    const jobId = webhookDispatchJobId(delivery.id)
     const queue = this.queueService.getQueue(QUEUE_NAMES.WEBHOOKS)
     const existingJob = await queue.getJob(jobId)
     const existingState = existingJob ? await existingJob.getState() : null

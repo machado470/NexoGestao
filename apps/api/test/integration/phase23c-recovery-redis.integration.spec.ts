@@ -6,7 +6,7 @@ import { QueueService } from '../../src/queue/queue.service'
 import { HealthController } from '../../src/health/health.controller'
 import { QueueObservabilityService } from '../../src/common/metrics/queue-observability.service'
 import { QUEUE_NAMES } from '../../src/queue/queue.constants'
-import { compose, eventually, assertDedicatedPhase23cInfrastructure } from './phase23c-harness'
+import { compose, eventually, assertDedicatedPhase23cInfrastructure, waitRedisClientsReady } from './phase23c-harness'
 import { describeRealIntegration, RUN_REAL_INTEGRATION, REAL_INTEGRATION_SKIP_REASON } from './infra-guards'
 
 if (!RUN_REAL_INTEGRATION) console.warn(`[integration-skip] REAL REDIS / REAL BULLMQ: ${REAL_INTEGRATION_SKIP_REASON}`)
@@ -20,6 +20,7 @@ describeRealIntegration('Phase 2.3C — REAL REDIS / REAL BULLMQ down, recovery 
   let queues: QueueService
   let metrics: QueueObservabilityService
   let health: HealthController
+  let outageServiceDestroyed = false
   const auxiliaryConnections = new Set<IORedis>()
 
   beforeAll(async () => {
@@ -41,14 +42,6 @@ describeRealIntegration('Phase 2.3C — REAL REDIS / REAL BULLMQ down, recovery 
     health = new HealthController({ $queryRaw: async () => [{ '?column?': 1 }] } as any, new ConfigService(), queues)
   })
 
-  beforeEach(async () => {
-    await queues.getQueue(QUEUE_NAMES.AUTOMATION).obliterate({ force: true })
-  })
-
-  afterEach(async () => {
-    await queues.getQueue(QUEUE_NAMES.AUTOMATION).obliterate({ force: true }).catch(() => undefined)
-  })
-
   afterAll(async () => {
     let restoreError: unknown
     try {
@@ -57,7 +50,7 @@ describeRealIntegration('Phase 2.3C — REAL REDIS / REAL BULLMQ down, recovery 
       restoreError = error
     } finally {
       await queues?.getQueue(QUEUE_NAMES.AUTOMATION).obliterate({ force: true }).catch(() => undefined)
-      await queues?.onModuleDestroy()
+      if (!outageServiceDestroyed) await queues?.onModuleDestroy()
       for (const connection of auxiliaryConnections) {
         if (connection.status !== 'end') await connection.quit().catch(() => connection.disconnect())
       }
@@ -69,6 +62,7 @@ describeRealIntegration('Phase 2.3C — REAL REDIS / REAL BULLMQ down, recovery 
     let worker: Worker | undefined
     let workerConnection: IORedis | undefined
     try {
+      await queues.getQueue(QUEUE_NAMES.AUTOMATION).obliterate({ force: true })
       expect((await health.readiness()).status).toBe('ready')
       const first = await queues.addJob(QUEUE_NAMES.AUTOMATION, 'phase23c-before', { fixture: true })
       expect(first.id).toBeDefined()
@@ -92,13 +86,36 @@ describeRealIntegration('Phase 2.3C — REAL REDIS / REAL BULLMQ down, recovery 
       expect((await queues.getQueueStatus()).ok).toBe(true)
       expect((await health.readiness()).status).toBe('ready')
     } finally {
+      // Leave Redis healthy even when an assertion fails after the deliberate stop,
+      // so the independently constructed stalled scenario never inherits outage state.
+      compose('redis-phase23c', 'start')
       await worker?.close(true).catch(() => undefined)
       if (workerConnection?.status !== 'end') await workerConnection?.quit().catch(() => workerConnection?.disconnect())
+      await queues.getQueue(QUEUE_NAMES.AUTOMATION).obliterate({ force: true }).catch(() => undefined)
+      await queues.onModuleDestroy()
+      outageServiceDestroyed = true
     }
   })
 
   it('records a canonical queue stall through QueueService and then reprocesses the job', async () => {
-    const queue = queues.getQueue(QUEUE_NAMES.AUTOMATION)
+    await eventually(async () => {
+      const probe = new IORedis(process.env.REDIS_URL!, producerOptions)
+      try { return await probe.ping() } finally { probe.disconnect() }
+    }, (reply) => reply === 'PONG', 30_000)
+
+    const stalledAuxiliaryConnections = new Set<IORedis>()
+    const stalledProducer = new IORedis(process.env.REDIS_URL!, producerOptions)
+    stalledProducer.duplicate = (() => {
+      const auxiliary = new IORedis(process.env.REDIS_URL!, workerOptions)
+      stalledAuxiliaryConnections.add(auxiliary)
+      return auxiliary
+    }) as IORedis['duplicate']
+    const stalledMetrics = new QueueObservabilityService()
+    const stalledQueues = new QueueService(stalledProducer, {} as any, stalledMetrics, { requestId: 'req-23c-stalled', correlationId: 'corr-23c-stalled' } as any)
+    await stalledQueues.onModuleInit()
+    await waitRedisClientsReady(stalledAuxiliaryConnections, 20_000)
+    const queue = stalledQueues.getQueue(QUEUE_NAMES.AUTOMATION)
+    await queue.obliterate({ force: true })
     let stalledWorker: Worker | undefined
     let recoveryWorker: Worker | undefined
     let stalledConnection: IORedis | undefined
@@ -130,20 +147,24 @@ describeRealIntegration('Phase 2.3C — REAL REDIS / REAL BULLMQ down, recovery 
       })
 
       const status = await eventually(
-        () => queues.getQueueStatus(),
+        () => stalledQueues.getQueueStatus(),
         (snapshot) => snapshot.ok === true && (snapshot.stalledEvents?.automation?.count ?? 0) >= 1,
-        10_000,
+        30_000,
       )
       expect(status.stalledEvents.automation.lastStalledAt).toBeDefined()
-      expect(metrics.snapshot().counters['queue.job.stalled.automation']).toBeGreaterThanOrEqual(1)
-      expect(metrics.snapshot().gauges).not.toHaveProperty('queue.backlog.stalled.automation')
-      await eventually(() => queue.getJobCounts('completed'), (counts) => counts.completed === 1, 10_000)
+      expect(stalledMetrics.snapshot().counters['queue.job.stalled.automation']).toBeGreaterThanOrEqual(1)
+      expect(stalledMetrics.snapshot().gauges).not.toHaveProperty('queue.backlog.stalled.automation')
+      await eventually(() => queue.getJobCounts('completed'), (counts) => counts.completed === 1, 30_000)
     } finally {
       await stalledWorker?.close(true).catch(() => undefined)
       await recoveryWorker?.close(true).catch(() => undefined)
       if (stalledConnection?.status !== 'end') await stalledConnection?.quit().catch(() => stalledConnection?.disconnect())
       if (recoveryConnection?.status !== 'end') await recoveryConnection?.quit().catch(() => recoveryConnection?.disconnect())
       await queue.obliterate({ force: true }).catch(() => undefined)
+      await stalledQueues.onModuleDestroy()
+      for (const connection of stalledAuxiliaryConnections) {
+        if (connection.status !== 'end') await connection.quit().catch(() => connection.disconnect())
+      }
     }
   })
 })

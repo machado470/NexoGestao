@@ -16,6 +16,8 @@ describe('WebhookDispatcher fan-out idempotente', () => {
     expect(webhooks.getActiveEndpointsByEvent).toHaveBeenCalledWith('org-persistida', 'service.order.completed')
     expect(webhooks.createPendingDelivery).toHaveBeenCalledWith(expect.objectContaining({ endpointId: 'a', idempotencyKey: 'outbox:event-1:endpoint:a' }))
     expect(webhooks.createPendingDelivery).toHaveBeenCalledWith(expect.objectContaining({ endpointId: 'b', idempotencyKey: 'outbox:event-1:endpoint:b' }))
-    expect(queue.addJob).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.anything(), expect.objectContaining({ jobId: 'webhook:dispatch:delivery-a' }))
+    expect(queue.addJob).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.anything(), expect.objectContaining({ jobId: 'webhook-dispatch-delivery-a' }))
+    const jobId = queue.addJob.mock.calls[0][3].jobId
+    expect(jobId).not.toContain(':')
   })
 })

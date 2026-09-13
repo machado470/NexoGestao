@@ -7,6 +7,7 @@ import { QueueService } from '../queue.service'
 import { WebhookService } from '../../webhooks/webhook.service'
 import { QueueObservabilityService } from '../../common/metrics/queue-observability.service'
 import { buildOperationalLogContext } from '../../common/logging/operational-log-context'
+import { webhookDlqJobId } from '../../webhooks/webhook-job-id'
 
 @Injectable()
 export class WebhookProcessor implements OnModuleInit, OnModuleDestroy {
@@ -103,7 +104,7 @@ export class WebhookProcessor implements OnModuleInit, OnModuleDestroy {
       failedReason: err.message,
       attemptsMade,
       jobId: job.id?.toString() ?? null,
-    }, { jobId: `webhook:dispatch:dlq:${deliveryId}` })
+    }, { jobId: webhookDlqJobId(deliveryId) })
 
     this.queueMetrics.increment('webhook.dispatch.dlq.total')
     this.logger.error(JSON.stringify({

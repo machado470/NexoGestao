@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { QueueService } from '../queue/queue.service'
 import { QUEUE_NAMES, WEBHOOK_QUEUE_JOB_NAMES } from '../queue/queue.constants'
 import { WebhookService } from './webhook.service'
+import { webhookDispatchJobId } from './webhook-job-id'
 
 @Injectable()
 export class WebhookDispatcher {
@@ -55,7 +56,7 @@ export class WebhookDispatcher {
         {
           attempts: 5,
           backoff: { type: 'exponential', delay: 1_000, jitter: 0.3 },
-          jobId: `webhook:dispatch:${delivery.id}`,
+          jobId: webhookDispatchJobId(delivery.id),
         },
       )
     }
