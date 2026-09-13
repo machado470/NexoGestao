@@ -11,8 +11,8 @@ services:
       POSTGRES_DB: phase23c
     ports:
       - "${PHASE23C_POSTGRES_PORT:-55433}:5432"
-    tmpfs:
-      - /var/lib/postgresql/data
+    volumes:
+      - phase23c-postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U phase23c -d phase23c"]
       interval: 1s
@@ -29,3 +29,6 @@ services:
       interval: 1s
       timeout: 2s
       retries: 30
+
+volumes:
+  phase23c-postgres-data:

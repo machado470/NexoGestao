@@ -77,7 +77,7 @@ describeRealIntegration('Phase 2.3C — REAL BULLMQ webhook DLQ, replay and tena
       await prisma.organization.deleteMany({ where: { id: { in: [orgA, orgB] } } }).catch(() => undefined)
       await prisma.$disconnect()
     }
-    await new Promise<void>((resolve) => server?.close(() => resolve()))
+    if (server) await new Promise<void>((resolve) => server.close(() => resolve()))
   })
 
   it('exhausts real retries, persists FAILED, and dead-letters under the authoritative tenant', async () => {

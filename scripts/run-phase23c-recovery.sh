@@ -12,7 +12,7 @@ trap cleanup EXIT INT TERM
 
 "${COMPOSE[@]}" up -d --wait
 cd "$ROOT"
-pnpm exec prisma db push --skip-generate --schema prisma/schema.prisma
+pnpm exec prisma migrate deploy --schema prisma/schema.prisma
 pnpm --filter ./apps/api test -- \
   test/integration/phase23c-recovery-postgres.integration.spec.ts \
   test/integration/phase23c-recovery-redis.integration.spec.ts \
