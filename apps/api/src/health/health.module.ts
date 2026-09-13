@@ -14,11 +14,14 @@ import { ActiveUserGuard } from '../auth/guards/active-user.guard'
 import { NotificationsModule } from '../notifications/notifications.module'
 import { OutboxModule } from '../outbox/outbox.module'
 import { BillingModule } from '../billing/billing.module'
+import { DashboardModule } from '../dashboard/dashboard.module'
+import { TenantOperationsController } from './tenant-operations.controller'
+import { TenantOperationsService } from './tenant-operations.service'
 
 @Module({
-  imports: [PrismaModule, QueueModule, NotificationsModule, OutboxModule, BillingModule],
-  controllers: [HealthController, InternalStatsController, OperationsController],
-  providers: [WhatsAppObservabilityService, OperationalDiagnosticsService, OperationalSignalsService, QueueMetricsExporterService, OperationalMonitoringService, OperationalIncidentsService, ActiveUserGuard],
+  imports: [PrismaModule, QueueModule, NotificationsModule, OutboxModule, BillingModule, DashboardModule],
+  controllers: [HealthController, InternalStatsController, OperationsController, TenantOperationsController],
+  providers: [WhatsAppObservabilityService, OperationalDiagnosticsService, OperationalSignalsService, QueueMetricsExporterService, OperationalMonitoringService, OperationalIncidentsService, TenantOperationsService, ActiveUserGuard],
   exports: [WhatsAppObservabilityService],
 })
 export class HealthModule {}
