@@ -406,6 +406,7 @@ export class WhatsAppService {
     const existing = await this.prisma.whatsAppMessage.findFirst({
       where: {
         providerMessageId: item.providerMessageId,
+        provider: providerName,
         orgId: options.orgId ?? undefined,
       },
     })
@@ -440,7 +441,7 @@ export class WhatsAppService {
     if (!phone) throw new BadRequestException('telefone de origem inválido')
 
     const duplicated = item.providerMessageId
-      ? await this.prisma.whatsAppMessage.findFirst({ where: { orgId, providerMessageId: item.providerMessageId } })
+      ? await this.prisma.whatsAppMessage.findFirst({ where: { orgId, provider: providerName, providerMessageId: item.providerMessageId } })
       : null
     if (duplicated) {
       await this.logMessageTimelineEventOnce({ orgId, messageId: duplicated.id, action: 'MESSAGE_RECEIVED' })

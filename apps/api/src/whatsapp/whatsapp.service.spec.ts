@@ -217,7 +217,7 @@ describe('WhatsAppService inbound/outbound', () => {
       QUEUE_NAMES.WHATSAPP,
       WHATSAPP_QUEUE_JOB_NAMES.INBOUND_WEBHOOK,
       expect.objectContaining({ webhookEventId: 'wh1', orgId: 'org1', provider: 'meta_cloud', traceId: 'trace-1', receivedAt: '2026-05-06T00:00:00.000Z' }),
-      { jobId: 'whatsapp:inbound-webhook:wh1' },
+      { jobId: 'whatsapp-inbound-webhook-wh1' },
     )
     expect(metrics.incInboundWebhookQueued).toHaveBeenCalled()
   })
@@ -320,7 +320,7 @@ describe('WhatsAppService inbound/outbound', () => {
       QUEUE_NAMES.WHATSAPP,
       WHATSAPP_QUEUE_JOB_NAMES.INBOUND_WEBHOOK,
       expect.objectContaining({ webhookEventId: 'wh1', orgId: 'org1', provider: 'meta_cloud', traceId: 'trace-1' }),
-      expect.objectContaining({ jobId: expect.stringMatching(/^whatsapp:inbound-webhook:wh1:replay-/) }),
+      expect.objectContaining({ jobId: expect.stringMatching(/^whatsapp-inbound-webhook-wh1-replay-/) }),
     )
   })
 
