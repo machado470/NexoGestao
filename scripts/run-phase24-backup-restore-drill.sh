@@ -27,7 +27,7 @@ docker compose version >/dev/null || die "Docker Compose v2 is required"
 "${COMPOSE[@]}" up -d --wait
 DB_CONTAINER="$("${COMPOSE[@]}" ps -q postgres-phase24)"
 [[ -n "$DB_CONTAINER" ]] || die "dedicated PostgreSQL container was not created"
-[[ "$(docker inspect -f '{{range .NetworkSettings.Ports}}{{println .}}{{end}}' "$DB_CONTAINER")" == *'127.0.0.1:55424'* ]] || die "unexpected PostgreSQL port binding"
+docker port "$DB_CONTAINER" 5432/tcp | grep -Fxq '127.0.0.1:55424' || die "unexpected PostgreSQL port binding"
 
 cd "$ROOT"
 pnpm exec prisma migrate deploy --schema prisma/schema.prisma

@@ -35,6 +35,10 @@ CHECKSUM_FILE="$BACKUP_FILE.sha256"
 TARGET="$(node -e 'const u=new URL(process.env.DATABASE_URL); if(u.protocol!=="postgresql:"&&u.protocol!=="postgres:")process.exit(2); console.log(`${u.hostname}|${u.port||"5432"}|${u.pathname.slice(1)}`)' 2>/dev/null)" || fail "DATABASE_URL is not a valid PostgreSQL URL"
 IFS='|' read -r TARGET_HOST TARGET_PORT TARGET_DB <<<"$TARGET"
 [[ -n "$TARGET_HOST" && -n "$TARGET_DB" ]] || fail "DATABASE_URL target is incomplete"
+case "${TARGET_HOST,,}" in
+  localhost|127.0.0.1) ;;
+  *) fail "remote restore targets are prohibited in Phase 2.4" ;;
+esac
 case "${NODE_ENV:-}" in production) fail "production restore is prohibited in Phase 2.4";; esac
 case "${TARGET_HOST,,}:${TARGET_DB,,}" in *prod*|*production*) fail "target resembles production and is prohibited";; esac
 log restore_started started "host=$(printf %q "$TARGET_HOST") port=$TARGET_PORT database=$(printf %q "$TARGET_DB") artifact=$(printf %q "$BACKUP_FILE")"
