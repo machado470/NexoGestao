@@ -14,6 +14,8 @@ Status: `current` descreve a referência vigente; `review` explicita conteúdo �
 
 ## Entrada e estado
 
+- [Runbook canônico de produção](operations/production-runbook.md) — deploy Compose, backup agendado, estado factual e limites de evidência da Fase 2.4.
+
 | Documento                         | Finalidade                           | Status  | source_of_truth | Substitui / substituído por                                     | Última revisão |
 | --------------------------------- | ------------------------------------ | ------- | --------------- | --------------------------------------------------------------- | -------------- |
 | [README](../README.md)            | Entrada curta, requisitos e comandos | current | true            | substitui README mínimo anterior                                | 2026-09-06     |

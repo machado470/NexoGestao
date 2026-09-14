@@ -44,8 +44,10 @@ command -v sha256sum >/dev/null || die "sha256sum is required"
 mkdir -p -- "$BACKUP_DIR" || die "cannot create BACKUP_DIR"
 [[ -d "$BACKUP_DIR" && -w "$BACKUP_DIR" ]] || die "BACKUP_DIR is not a writable directory"
 BACKUP_DIR="$(cd "$BACKUP_DIR" && pwd -P)"
-LOCK_DIR="$BACKUP_DIR/.nexogestao-backup.lock"
-mkdir "$LOCK_DIR" 2>/dev/null || die "another canonical backup is already running"
+LOCK_PATH="$BACKUP_DIR/.nexogestao-backup.lock"
+mkdir "$LOCK_PATH" 2>/dev/null || die "another canonical backup is already running"
+# Only the process which acquired the lock is allowed to remove it in cleanup.
+LOCK_DIR="$LOCK_PATH"
 
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 UNIQUE="${STAMP}_$$_$(printf '%04x' "$((RANDOM & 65535))")"
