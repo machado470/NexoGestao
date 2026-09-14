@@ -1,18 +1,9 @@
-# ============================================================
-# NexoGestão — Cron Jobs de Backup de PRODUÇÃO
-# ============================================================
-# VERSIONED LEGACY TEMPLATE ONLY. It is not evidence of installation and must
-# not be installed during Phase 2.4 Wave 2A. Its command remains non-canonical.
-# Instalação (como root):
-#   sudo cp /caminho/completo/para/NexoGestao/infra/cron/nexogestao-backup.cron /etc/cron.d/nexogestao-backup
-#   sudo chmod 644 /etc/cron.d/nexogestao-backup
+# NexoGestao production backup — VERSIONED TEMPLATE
+# NOT PROOF OF INSTALLATION. Replace both placeholders before an operator installs it.
+# NEXO_REPOSITORY_ROOT must be an absolute checkout path; the secrets file stays outside Git.
+# RETENTION_DAYS belongs in the explicit environment file and is not an RPO.
 #
-# O caminho para run-backup.sh deve ser absoluto.
-# ============================================================
+# Example rendering target (do not execute this file as-is):
+# 0 2 * * * <service-user> NEXO_BACKUP_ENV_FILE=/absolute/outside-git/backup-production.env <NEXO_REPOSITORY_ROOT>/scripts/run-production-backup.sh
 
-# Backup diário às 2h da manhã (com rotação de 7 dias)
-# O caminho /home/ubuntu/NexoGestao pode variar dependendo de onde o repo foi clonado
-0 2 * * * root /usr/bin/env bash /home/ubuntu/NexoGestao/infra/backup/run-backup.sh >> /var/log/nexo-backup.log 2>&1
-
-# Limpeza de logs antigos (mensal)
-0 4 1 * * root find /var/log -name "nexo-backup*.log" -mtime +90 -delete
+0 2 * * * <service-user> NEXO_BACKUP_ENV_FILE=/absolute/outside-git/backup-production.env <NEXO_REPOSITORY_ROOT>/scripts/run-production-backup.sh

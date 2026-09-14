@@ -139,9 +139,35 @@ A Onda 2A não prova:
 Não houve mudança em scripts, Compose, API, BFF, frontend, schema Prisma ou
 produção para registrar este fechamento.
 
-## Próxima etapa — Fase 2.4 Onda 2B
+## Fechamento da Onda 2B — automação operacional
 
-A Onda 2B fica registrada, **sem implementação nesta mudança**, para:
+A Onda 2B consolidou o caminho versionado sem reabrir a prova da Onda 2A.
+`scripts/backup-db.sh` permanece o único motor; o legado é somente shim, e o
+template cron aponta ao runner canônico. O runner exige arquivo de ambiente
+explícito, modos fail-closed e grava state factual atômico.
+
+| Controle | Estado após Onda 2B |
+| --- | --- |
+| backup mechanism | `PROVED_IN_DISPOSABLE_INFRASTRUCTURE` |
+| scheduled backup mechanism | `IMPLEMENTED_NOT_PROVED_IN_PRODUCTION` |
+| cron installed | `NOT_PROVED` |
+| offsite | `IMPLEMENTED_NOT_PROVED` |
+| offsite encryption/versioning/lifecycle | `NOT_PROVED` |
+| alert delivery | `MISSING` |
+| actual production platform | `NOT_VERIFIED` |
+| repository deploy authority | `COMPOSE` |
+| RPO / RTO | `NOT_DEFINED` / `NOT_DEFINED` |
+| DR owner | `NOT_ASSIGNED` |
+
+Não houve acesso à produção, instalação de cron, bucket ou credenciais reais.
+A prova offsite pendente cobre bucket real, TLS, criptografia em repouso,
+versionamento, lifecycle, retenção, IAM mínimo, upload de dump e checksum,
+download, checksum pós-download e restore pelo artefato baixado. Defaults AWS
+não constituem prova. O procedimento está no runbook canônico.
+
+## Escopo originalmente previsto para a Onda 2B
+
+A Onda 2B havia sido registrada para:
 
 1. consolidar o cron para o script canônico;
 2. definir a estratégia offsite;
