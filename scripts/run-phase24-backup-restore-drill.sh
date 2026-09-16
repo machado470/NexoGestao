@@ -31,19 +31,21 @@ docker port "$DB_CONTAINER" 5432/tcp | grep -Fxq '127.0.0.1:55424' || die "unexp
 
 cd "$ROOT"
 echo 'phase24_postgres_host_wait'
-HOST_READY_DEADLINE=$((SECONDS + 60))
+HOST_READY_MAX_ATTEMPTS=12
+HOST_READY_ATTEMPT_TIMEOUT=5
 HOST_READY_LOG="$ARTIFACT_DIR/postgres-host-readiness.log"
 HOST_READY=false
-while (( SECONDS < HOST_READY_DEADLINE )); do
-  HOST_READY_REMAINING=$((HOST_READY_DEADLINE - SECONDS))
-  if printf 'SELECT 1;\n' | timeout "${HOST_READY_REMAINING}s" pnpm exec prisma db execute --url "$DATABASE_URL" --stdin >"$HOST_READY_LOG" 2>&1; then
+for ((HOST_READY_ATTEMPT = 1; HOST_READY_ATTEMPT <= HOST_READY_MAX_ATTEMPTS; HOST_READY_ATTEMPT++)); do
+  if printf 'SELECT 1;\n' | timeout "${HOST_READY_ATTEMPT_TIMEOUT}s" pnpm exec prisma db execute --url "$DATABASE_URL" --stdin >"$HOST_READY_LOG" 2>&1; then
     HOST_READY=true
     break
   fi
-  sleep 1
+  if (( HOST_READY_ATTEMPT < HOST_READY_MAX_ATTEMPTS )); then
+    sleep 1
+  fi
 done
 if [[ "$HOST_READY" != true ]]; then
-  echo 'phase24_postgres_host_timeout: PostgreSQL did not accept a host SQL query within 60 seconds' >&2
+  echo "phase24_postgres_host_timeout: PostgreSQL did not accept a host SQL query after $HOST_READY_MAX_ATTEMPTS attempts" >&2
   cat "$HOST_READY_LOG" >&2 || true
   echo 'phase24_postgres_host_diagnostics: docker compose ps' >&2
   "${COMPOSE[@]}" ps >&2 || true
