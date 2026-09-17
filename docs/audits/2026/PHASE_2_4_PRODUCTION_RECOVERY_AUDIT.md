@@ -1,7 +1,7 @@
 ---
 status: current
 owner: nexogestao
-last_reviewed: 2026-09-13
+last_reviewed: 2026-09-16
 source_of_truth: true
 ---
 
@@ -9,171 +9,128 @@ source_of_truth: true
 
 ## Fechamento da Onda 2A
 
-**Estado:** `CLOSED / PROVED_IN_DISPOSABLE_INFRASTRUCTURE`<br>
-**Data da prova:** `2026-09-13`<br>
-**Baseline:** `main` após PR #1016, merge `c3605c4aaf661771c580dee350a754554533685e`.
+**Estado final:** `CLOSED / PROVED`<br>
+**Ambiente da prova:** WSL 2 com Docker funcional e infraestrutura local dedicada e descartável<br>
+**Baseline:** `main` em `cb00c58c40a18ed76f0dea0c2a2856fee19bdde6` (`cb00c58`), após o merge da PR #1019<br>
+**Resultado do drill:** `EXIT CODE 0`
 
-Este fechamento é **docs-only**. Ele registra a execução real do mecanismo canônico em
-infraestrutura descartável e não altera nem executa backup, restore, runner, cron,
-deploy ou produção.
+A Onda 2A está encerrada. A classificação `PROVED` aplica-se estritamente ao
+mecanismo canônico de backup/restore local e à recuperação em infraestrutura
+descartável, nos limites documentados abaixo. Ela não equivale a prontidão
+operacional de produção.
 
-## Vocabulário de estados
+Este fechamento é exclusivamente documental: não altera nem executa código de
+produção, scripts, Prisma, migrations, frontend, backend, BFF, deploy ou recursos
+de produção.
 
-| Estado | Significado neste documento |
-| --- | --- |
-| `PROVED_IN_DISPOSABLE_INFRASTRUCTURE` | Comportamento observado no drill real, isolado e descartável descrito abaixo. Não constitui prova de produção. |
-| `IMPLEMENTED_NOT_PROVED_IN_PRODUCTION` | Capacidade presente no repositório, mas sem evidência de execução no ambiente real de produção. |
-| `MISSING` | Capacidade, decisão ou controle ainda ausente. |
-| `CONFLICTING` | Há autoridades ou caminhos concorrentes que ainda exigem decisão/consolidação. |
+## Evidência final da Onda 2A
 
-`PROVED_IN_DISPOSABLE_INFRASTRUCTURE` nunca deve ser abreviado para `PROVED` sem o
-qualificador do ambiente. A existência de código ou documentação, por si só, não
-promove uma capacidade para esse estado.
-
-## Evidência real do drill
-
-O drill foi executado no WSL com Docker real por meio de:
+O drill completo foi executado a partir do baseline registrado, por meio de:
 
 ```text
 scripts/run-phase24-backup-restore-drill.sh
 ```
 
-Resultado final registrado:
+O alvo de restore foi exclusivamente o banco local dedicado:
 
 ```text
-phase24_postgres_host_ready
-LOCAL_BACKUP_SUCCESS
-restore_completed
-phase24_relational_restore_verified
-phase24_schema_write_verified
-phase24_drill_completed:
-backup, integrity, restore, relational fixture and schema usability proved
-
-drill_exit=0
+127.0.0.1:55424/phase24_recovery
 ```
 
-A evidência fecha exclusivamente a prova reproduzida em infraestrutura
-descartável. Os tempos observados não definem nem permitem inferir SLA, RPO ou RTO.
+As evidências observadas foram:
 
-## `PROVED_IN_DISPOSABLE_INFRASTRUCTURE`
+- readiness comprovada por consulta SQL real ao banco, e não apenas pela
+  disponibilidade da porta;
+- 67 migrations reconhecidas, com nenhuma migration pendente após o restore;
+- backup criado com sucesso;
+- integridade do artefato e checksum validados;
+- restore executado somente no banco local dedicado e descartável;
+- `phase24_relational_restore_verified` aprovado, comprovando a restauração da
+  fixture, de seus valores e de suas relações;
+- `phase24_schema_write_verified` aprovado, comprovando a usabilidade do schema
+  por uma nova escrita após o restore;
+- `phase24_drill_completed` confirmou `backup + integrity + restore + relational
+  fixture + schema usability proved`;
+- processo completo encerrado com exit code `0`;
+- cleanup concluído, sem permanência dos recursos e artefatos temporários do
+  drill;
+- `pnpm prisma:check` aprovado; e
+- `git diff --check` aprovado.
 
-No limite estrito do drill de `2026-09-13`, ficou provado que:
+## O que a classificação `PROVED` estabelece
 
-- um PostgreSQL 15 dedicado sobe e fica acessível pelo host;
-- `prisma migrate deploy` aplica as 67 migrations;
-- a fixture relacional é persistida;
-- o backup canônico gera um artefato `.sql.gz`;
-- `gzip -t` passa;
-- o SHA-256 é gerado e validado;
-- o backup emite `LOCAL_BACKUP_SUCCESS`;
-- o banco é destruído e recriado;
-- o restore canônico valida o checksum antes de escrever;
-- o restore executa o `psql` com `ON_ERROR_STOP`;
-- o restore completa com sucesso;
-- não há migrations pendentes após o restore;
-- `Organization`, `Customer`, `Appointment`, `ServiceOrder`, `Charge` e `Payment`
-  são restaurados corretamente;
-- valores, relações e enums são preservados;
-- uma nova escrita no schema após o restore funciona;
-- o cleanup remove container, network, volume e artefatos temporários; e
-- nenhum recurso da Fase 2.4 permanece após o drill.
+No escopo da Onda 2A, ficou provado que:
 
-Esses resultados provam o mecanismo local canônico de backup/restore e as
-invariantes verificadas pelo runner. Não provam operação, dados, storage, agenda ou
-recovery no ambiente de produção.
+- o mecanismo canônico cria um backup local íntegro e verificável;
+- o checksum protege a entrada do restore e é validado antes da restauração;
+- o backup pode restaurar um banco PostgreSQL dedicado em infraestrutura local
+  descartável;
+- o estado restaurado preserva as invariantes relacionais verificadas pelo drill;
+- o schema restaurado permanece utilizável para escrita; e
+- o fluxo completo é reproduzível, termina com sucesso e limpa seus recursos.
 
-## `IMPLEMENTED_NOT_PROVED_IN_PRODUCTION`
-
-- O backup canônico está implementado, porém não foi executado no host real de
-  produção.
-- O restore canônico está implementado e foi provado somente no alvo descartável;
-  restore de produção não foi executado.
-- O suporte a upload S3/offsite está implementado, mas nenhum upload real foi
-  provado.
-- A topologia e o fluxo de deploy presentes no repositório não constituem prova de
-  deploy, rollback ou recovery em produção.
-
-## `MISSING`
-
-Continuam ausentes ou sem aprovação/evidência operacional:
-
-- cron instalado em produção;
-- estratégia offsite aprovada e upload S3/offsite real;
-- criptografia offsite;
-- lifecycle e versioning do bucket;
-- política de retenção offsite;
-- sinalização e alertas de falha;
-- deploy de produção;
-- rollback de aplicação;
-- restore de produção e DR completo;
-- runbook canônico de produção;
-- owner de DR; e
-- objetivos aprovados de RPO e RTO.
-
-**RPO = `NOT_DEFINED`**<br>
-**RTO = `NOT_DEFINED`**
-
-A duração deste drill não é RTO. A frequência de qualquer exemplo ou template de
-cron não é RPO. Nenhum SLA é inferido desta evidência.
-
-## `CONFLICTING`
-
-- O cron e `infra/backup/run-backup.sh` ainda representam o fluxo legado, enquanto
-  `scripts/backup-db.sh` é o caminho canônico. Nenhum cron foi consolidado ou
-  instalado nesta onda.
-- Compose e Railway permanecem alvos concorrentes até uma decisão operacional
-  explícita. A prova descartável não determina qual plataforma está ativa em
-  produção.
+Assim, **backup/restore local e recuperação em infraestrutura descartável estão
+provados**. A Onda 2A não deve ser reaberta, salvo diante de regressão comprovada
+contra essas garantias.
 
 ## Limites do fechamento
 
-A Onda 2A não prova:
+O fechamento da Onda 2A **não significa produção operacional completa** e não
+declara o ambiente de produção pronto. Em particular, a evidência não prova:
 
-- backup no host real de produção ou cron instalado em produção;
-- upload S3/offsite, criptografia, lifecycle, versioning ou retenção offsite;
-- alertas de falha;
-- deploy ou rollback de aplicação em produção;
-- restore de produção ou DR completo; nem
+- agendamento instalado e executado em produção;
+- armazenamento offsite real;
+- criptografia, versionamento, lifecycle ou retenção do destino offsite;
+- observabilidade ou entrega de alertas de falha;
+- qual runtime é a autoridade operacional atual de produção;
+- recuperação de dados reais ou restore no ambiente de produção;
+- runbook exercitado por um responsável operacional; nem
 - RPO, RTO ou qualquer SLA.
 
-Não houve mudança em scripts, Compose, API, BFF, frontend, schema Prisma ou
-produção para registrar este fechamento.
+Os tempos do drill não definem RTO, e a frequência de exemplos de cron não define
+RPO. Nenhum desses objetivos pode ser inferido desta prova.
 
-## Fechamento da Onda 2B — automação operacional
+## Abertura formal da Onda 2B
 
-A Onda 2B consolidou o caminho versionado sem reabrir a prova da Onda 2A.
-`scripts/backup-db.sh` permanece o único motor; o legado é somente shim, e o
-template cron aponta ao runner canônico. O runner exige arquivo de ambiente
-explícito, modos fail-closed e grava state factual atômico.
+**Phase 2.4 — Onda 2B:** Produção Operacional de Backup e Disaster Recovery<br>
+**Estado:** `OPEN / PLANNED`<br>
+**Objetivo:** transformar o mecanismo já provado de backup/restore em uma
+operação utilizável e governável em produção.
 
-| Controle | Estado após Onda 2B |
+A abertura desta onda delimita trabalho futuro; nenhum dos itens abaixo é
+implementado por este registro nem declarado operacionalmente pronto.
+
+### Escopo futuro
+
+1. agendamento/cron do backup canônico;
+2. destino offsite;
+3. encryption;
+4. versioning;
+5. lifecycle e retention;
+6. observabilidade;
+7. alertas de falha;
+8. decisão documentada do runtime de produção — Compose, Railway ou a autoridade
+   operacional vigente;
+9. runbook de recuperação;
+10. owner/responsável por Disaster Recovery;
+11. evidência operacional de execução; e
+12. decisão explícita de RPO e RTO.
+
+### Decisões ainda abertas
+
+| Decisão/controle | Estado na abertura da Onda 2B |
 | --- | --- |
-| backup mechanism | `PROVED_IN_DISPOSABLE_INFRASTRUCTURE` |
-| scheduled backup mechanism | `IMPLEMENTED_NOT_PROVED_IN_PRODUCTION` |
-| cron installed | `NOT_PROVED` |
-| offsite | `IMPLEMENTED_NOT_PROVED` |
-| offsite encryption/versioning/lifecycle | `NOT_PROVED` |
-| alert delivery | `MISSING` |
-| actual production platform | `NOT_VERIFIED` |
-| repository deploy authority | `COMPOSE` |
-| RPO / RTO | `NOT_DEFINED` / `NOT_DEFINED` |
-| DR owner | `NOT_ASSIGNED` |
+| cron/agendamento em produção | `OPEN` |
+| destino offsite | `OPEN` |
+| encryption, versioning, lifecycle e retention | `OPEN` |
+| observabilidade e alertas de falha | `OPEN` |
+| runtime/autoridade operacional de produção | `OPEN` |
+| runbook de recuperação | `OPEN` |
+| owner de DR | `OPEN` |
+| evidência operacional em produção | `NOT_PROVED` |
+| RPO | `NOT_DEFINED` |
+| RTO | `NOT_DEFINED` |
 
-Não houve acesso à produção, instalação de cron, bucket ou credenciais reais.
-A prova offsite pendente cobre bucket real, TLS, criptografia em repouso,
-versionamento, lifecycle, retenção, IAM mínimo, upload de dump e checksum,
-download, checksum pós-download e restore pelo artefato baixado. Defaults AWS
-não constituem prova. O procedimento está no runbook canônico.
-
-## Escopo originalmente previsto para a Onda 2B
-
-A Onda 2B havia sido registrada para:
-
-1. consolidar o cron para o script canônico;
-2. definir a estratégia offsite;
-3. definir encryption, versioning e lifecycle;
-4. adicionar sinalização e alerta de falha;
-5. fechar a decisão Compose versus Railway;
-6. criar o runbook canônico de produção;
-7. definir o owner de DR; e
-8. manter RPO e RTO como decisão futura até aprovação explícita.
+RPO e RTO permanecem decisões explícitas em aberto e não serão inventados ou
+deduzidos do drill. O fechamento da Onda 2A é o ponto de partida técnico da Onda
+2B, não uma evidência antecipada de que seu escopo operacional esteja concluído.
