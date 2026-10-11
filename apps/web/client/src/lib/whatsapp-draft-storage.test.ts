@@ -6,14 +6,21 @@ import {
   whatsappDraftStorageKey,
 } from "./whatsapp-draft-storage";
 
-function makeStorage() {
+function makeStorage(reorderAfterRemoval = false) {
   const values = new Map<string, string>();
   return {
     get length() { return values.size; },
     key: (index: number) => [...values.keys()][index] ?? null,
     getItem: (key: string) => values.get(key) ?? null,
     setItem: (key: string, value: string) => { values.set(key, value); },
-    removeItem: (key: string) => { values.delete(key); },
+    removeItem: (key: string) => {
+      values.delete(key);
+      if (reorderAfterRemoval) {
+        const entries = [...values.entries()].reverse();
+        values.clear();
+        for (const [name, value] of entries) values.set(name, value);
+      }
+    },
   };
 }
 
@@ -83,5 +90,16 @@ describe("WhatsApp draft identity and logout", () => {
     const key = whatsappDraftStorageKey({ id: "a", organizationId: "org-1" });
     expect(readWhatsAppDrafts(key)).toEqual({});
     expect(() => persistWhatsAppDrafts(key, { conversation: "Texto" })).not.toThrow();
+  });
+
+  it("clears every application key when deletion changes storage ordering", () => {
+    const storage = makeStorage(true);
+    vi.stubGlobal("window", { localStorage: storage, sessionStorage: makeStorage() });
+    for (const key of ["nexo:whatsapp:composer:v4:org-1:a", "nexo:whatsapp:composer:v4:org-1:b", "nexo.whatsapp.composer.v3", "unrelated-app"]) {
+      storage.setItem(key, "value");
+    }
+    clearAppStorage();
+    expect(storage.length).toBe(1);
+    expect(storage.getItem("unrelated-app")).toBe("value");
   });
 });

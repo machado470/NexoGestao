@@ -5,8 +5,9 @@ export function clearAppStorage() {
   for (const storageName of ["localStorage", "sessionStorage"] as const) {
     try {
       const storage = window[storageName];
-      for (let i = storage.length - 1; i >= 0; i -= 1) {
-        const key = storage.key(i);
+      // A ordem de Storage.key() pode mudar após uma remoção.
+      const keys = Array.from({ length: storage.length }, (_, index) => storage.key(index));
+      for (const key of keys) {
         if (key && APP_STORAGE_PREFIXES.some(prefix => key.startsWith(prefix))) {
           storage.removeItem(key);
         }
