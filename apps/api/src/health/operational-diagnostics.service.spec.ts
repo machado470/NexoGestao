@@ -16,6 +16,33 @@ describe('OperationalDiagnosticsService', () => {
     return { prisma, service }
   }
 
+  it.each(['missing', 'stale', 'recent'])(
+    'distingue avaliação ausente, antiga e recente: %s', async (state) => {
+      const { prisma, service } = build()
+      for (const model of ['charge', 'payment', 'serviceOrder', 'whatsAppMessage', 'timelineEvent']) {
+        prisma[model].findMany.mockResolvedValue([])
+      }
+      const createdAt = new Date(Date.now() - (state === 'stale' ? 20 : 1) * 86_400_000)
+      prisma.riskSnapshot.findFirst.mockResolvedValue(state === 'missing' ? null : { id: 'risk-1', createdAt })
+      prisma.governanceRun.findFirst.mockResolvedValue(state === 'missing' ? null : { id: 'gov-1', createdAt })
+
+      const result = await service.runForOrg('org-a')
+      if (state === 'recent') {
+        expect(result.findings).toEqual([])
+      } else {
+        expect(result.findings.map(finding => finding.code)).toEqual([
+          `RISK_SNAPSHOT_${state.toUpperCase()}`,
+          `GOVERNANCE_RUN_${state.toUpperCase()}`,
+        ])
+        expect(result.findings.map(finding => finding.entityId)).toEqual(
+          state === 'missing' ? ['missing', 'missing'] : ['risk-1', 'gov-1'],
+        )
+        expect(result.findings.every(finding => finding.metadata.lastCreatedAt ===
+          (state === 'missing' ? null : createdAt.toISOString()))).toBe(true)
+      }
+    },
+  )
+
   it('detecta charge PAID sem payment e payment com charge não PAID', async () => {
     const { prisma, service } = build()
     prisma.charge.findMany
