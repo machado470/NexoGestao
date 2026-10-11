@@ -668,7 +668,7 @@ describeRealIntegration('Canonical Operational Workflow (e2e)', () => {
     const timeline = await prisma.timelineEvent.findMany({
       where: { orgId: primaryOrgId },
       orderBy: { createdAt: 'asc' },
-      select: { action: true, metadata: true },
+      select: { action: true, metadata: true, serviceOrderId: true },
     })
 
     const actions = timeline.map((event) => event.action)
@@ -677,11 +677,16 @@ describeRealIntegration('Canonical Operational Workflow (e2e)', () => {
       'APPOINTMENT_CREATED',
       'APPOINTMENT_CONFIRMED',
       'SERVICE_ORDER_CREATED',
-      'EXECUTION_STARTED',
-      'EXECUTION_DONE',
+      'SERVICE_ORDER_STARTED',
+      'SERVICE_ORDER_COMPLETED',
       'CHARGE_CREATED',
       'PAYMENT_RECEIVED',
     ]))
+
+    expect(timeline.filter(event => event.serviceOrderId === serviceOrderId && event.action === 'SERVICE_ORDER_STARTED')).toHaveLength(1)
+    expect(timeline.filter(event => event.serviceOrderId === serviceOrderId && event.action === 'SERVICE_ORDER_COMPLETED')).toHaveLength(1)
+    expect(actions).not.toContain('EXECUTION_STARTED')
+    expect(actions).not.toContain('EXECUTION_DONE')
 
     // 14) recalculate risk from operational events (job endpoint + persisted state)
     await request(app.getHttpServer())

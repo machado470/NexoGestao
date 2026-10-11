@@ -210,16 +210,6 @@ export class ExecutionService {
       metadata: startedMetadata,
     })
 
-    await this.timeline.log({
-      orgId: input.orgId,
-      personId: actorPersonId,
-      action: 'EXECUTION_STARTED',
-      description: 'Execução iniciada em modo fallback por ServiceOrder',
-      customerId: updated.customerId,
-      serviceOrderId: updated.id,
-      metadata: startedMetadata,
-    })
-
     await this.audit.log({
       orgId: input.orgId,
       action: 'EXECUTION_STARTED',
@@ -375,16 +365,6 @@ export class ExecutionService {
         personId: actorPersonId,
         action: 'SERVICE_ORDER_COMPLETED',
         description: 'Ordem de serviço concluída por execução fallback',
-        customerId: updated.customerId,
-        serviceOrderId: updated.id,
-        metadata: completedMetadata,
-      })
-
-      await this.timeline.log({
-        orgId: input.orgId,
-        personId: actorPersonId,
-        action: 'EXECUTION_DONE',
-        description: 'Execução concluída em modo fallback por ServiceOrder',
         customerId: updated.customerId,
         serviceOrderId: updated.id,
         metadata: completedMetadata,
