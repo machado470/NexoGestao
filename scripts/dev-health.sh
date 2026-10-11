@@ -4,6 +4,11 @@ set -euo pipefail
 API_URL="${NEXO_API_URL:-http://127.0.0.1:3000}"
 WEB_URL="${NEXO_WEB_URL:-http://127.0.0.1:3010}"
 
+API_URL="${API_URL%/}"
+if [[ "$API_URL" != */v1 ]]; then
+  API_URL="$API_URL/v1"
+fi
+
 ok=0
 
 check_http() {
@@ -20,7 +25,7 @@ check_http() {
   fi
 }
 
-check_http "API /health" "$API_URL/health"
+check_http "API /v1/health" "$API_URL/health"
 check_http "WEB /" "$WEB_URL/"
 
 if [ "$ok" -ne 0 ]; then

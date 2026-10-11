@@ -1,5 +1,6 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
 import cookie from "cookie";
+import { TRPCError } from "@trpc/server";
 import { resolveNexoApiUrl } from "./nexoApiUrl";
 
 const NEXO_TOKEN_COOKIE = "nexo_token";
@@ -18,14 +19,15 @@ export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
   res: CreateExpressContextOptions["res"];
   user: TrpcUser | null;
+  bootstrapError?: TRPCError;
 };
 
 export type Context = TrpcContext;
 
 class NexoBootstrapError extends Error {
-  public readonly kind: "unavailable" | "upstream" | "malformed";
+  public readonly kind: "unavailable" | "upstream" | "malformed" | "rate_limited";
 
-  constructor(message: string, kind: "unavailable" | "upstream" | "malformed") {
+  constructor(message: string, kind: "unavailable" | "upstream" | "malformed" | "rate_limited") {
     super(message);
     this.name = "NexoBootstrapError";
     this.kind = kind;
@@ -265,7 +267,7 @@ export async function fetchNexoMe(req: any) {
           return null;
         }
 
-        const errorKind = response.status >= 500 ? "upstream" : "malformed";
+        const errorKind = response.status === 429 ? "rate_limited" : response.status >= 500 ? "upstream" : "malformed";
         logWithSuppression(
           `status:${response.status}`,
           "error",
@@ -405,6 +407,13 @@ export async function createContext(
       req: opts.req,
       res: opts.res,
       user: null,
+      bootstrapError: new TRPCError({
+        code: error instanceof NexoBootstrapError && error.kind === "rate_limited"
+          ? "TOO_MANY_REQUESTS"
+          : "SERVICE_UNAVAILABLE",
+        message: "Não foi possível validar a sessão. Tente novamente em instantes.",
+        cause: error,
+      }),
     };
   }
 }

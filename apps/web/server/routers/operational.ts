@@ -65,7 +65,7 @@ export const tenantOperationsSummary = z.object({
 }).strict();
 
 export const operationsRouter = router({
-    tenantSummary: protectedProcedure.output(tenantOperationsSummary).query(({ ctx }) => authedGet(ctx as NexoContext, "/v1/operations/tenant-summary")),
+    tenantSummary: protectedProcedure.output(tenantOperationsSummary).query(({ ctx }) => authedGet(ctx as NexoContext, "/operations/tenant-summary")),
     summary: protectedProcedure.output(operationsSummary).query(({ ctx }) => authedGet(ctx as NexoContext, "/internal/operations/summary")),
     incidents: protectedProcedure.output(z.array(incident)).query(({ ctx }) => authedGet(ctx as NexoContext, "/internal/operations/incidents")),
     queues: protectedProcedure.output(z.array(queueStatus)).query(({ ctx }) => authedGet(ctx as NexoContext, "/internal/operations/queues")),

@@ -217,7 +217,7 @@ function isSessionUnavailableError(error: unknown): boolean {
       ? maybeError.cause.message
       : "";
 
-  if (code === "SERVICE_UNAVAILABLE") return true;
+  if (code === "SERVICE_UNAVAILABLE" || code === "TOO_MANY_REQUESTS") return true;
   if (httpStatus === 503) return true;
   if (message.includes("SESSION_UPSTREAM_UNAVAILABLE")) return true;
   if (causeMessage.includes("SESSION_UPSTREAM_UNAVAILABLE")) return true;

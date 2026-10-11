@@ -51,6 +51,6 @@ describe("operations.tenantSummary contract", () => {
     const source = readFileSync(new URL("./operational.ts", import.meta.url), "utf8");
     const tenantPath = source.slice(source.indexOf("tenantSummary:"), source.indexOf("summary:", source.indexOf("tenantSummary:") + 1));
     expect(tenantPath).not.toMatch(/fallback|threshold|\.sort\s*\(|\/internal\/operations\//i);
-    expect(tenantPath).toContain('"/v1/operations/tenant-summary"');
+    expect(tenantPath).toContain('"/operations/tenant-summary"');
   });
 });

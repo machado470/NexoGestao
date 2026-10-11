@@ -16,10 +16,10 @@ describe("notification BFF persistent authority", () => {
   beforeEach(() => { vi.clearAllMocks(); vi.stubGlobal("fetch", fetchMock); });
 
   it("uses /v1 API and session bearer instead of Prisma or memory", async () => {
-    fetchMock.mockResolvedValue({ ok: true, text: async () => JSON.stringify({ items: [item], total: 1, page: 1, pages: 1, unreadCount: 1 }) });
+    fetchMock.mockResolvedValue({ ok: true, text: async () => JSON.stringify({ success: true, data: { items: [item], total: 1, page: 1, pages: 1, unreadCount: 1 } }) });
     const result = await appRouter.createCaller(createCtx()).dashboard.notificationCenter.list({ page: 1, limit: 10, category: "all" });
     expect(result.items).toHaveLength(1);
-    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/v1/notifications?"), expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringMatching(/^http:\/\/127\.0\.0\.1:3000\/v1\/notifications\?/), expect.objectContaining({
       headers: expect.objectContaining({ Authorization: "Bearer session-token" }),
     }));
   });

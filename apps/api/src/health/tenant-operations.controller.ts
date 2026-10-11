@@ -10,7 +10,7 @@ type AuthenticatedRequest = Request & { user: { orgId: string } }
 
 @UseGuards(JwtAuthGuard, ActiveUserGuard, RolesGuard)
 @Roles('ADMIN')
-@Controller('v1/operations')
+@Controller('operations')
 export class TenantOperationsController {
   constructor(private readonly service: TenantOperationsService) {}
 

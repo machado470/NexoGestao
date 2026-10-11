@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { nexoFetch } from "./nexoClient";
+import { authedGet, authedPatch, type NexoContext } from "./nexoTransport";
 
 export const notificationCategorySchema = z.enum(["all", "appointments", "finance", "risk"]);
 export type NotificationCategory = z.infer<typeof notificationCategorySchema>;
@@ -43,18 +43,16 @@ export async function listOperationalNotifications(
     page: String(params.page ?? 1),
     category: params.category ?? "all",
   });
-  const raw = await nexoFetch<unknown>(source, `/v1/notifications?${query}`);
+  const raw = await authedGet(source as NexoContext, `/notifications?${query}`);
   return notificationListSchema.parse(raw);
 }
 
 export async function countUnreadOperationalNotifications(source: unknown) {
-  const raw = await nexoFetch<unknown>(source, "/v1/notifications/unread-count");
+  const raw = await authedGet(source as NexoContext, "/notifications/unread-count");
   return unreadSchema.parse(raw);
 }
 
 export async function markNotificationAsRead(source: unknown, id: string) {
-  const raw = await nexoFetch<unknown>(source, `/v1/notifications/${encodeURIComponent(id)}/read`, {
-    method: "PATCH",
-  });
+  const raw = await authedPatch(source as NexoContext, `/notifications/${encodeURIComponent(id)}/read`);
   return markReadSchema.parse(raw);
 }

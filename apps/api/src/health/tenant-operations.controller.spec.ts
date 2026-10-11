@@ -26,6 +26,7 @@ describe('TenantOperationsController', () => {
       .overrideGuard(RolesGuard).useValue({ canActivate: () => true })
       .compile()
     app = module.createNestApplication()
+    app.setGlobalPrefix('v1')
     await app.init()
   })
 

@@ -68,7 +68,8 @@ export const appRouter = router({
   session: router({
     me: publicProcedure.query(async ({ ctx }) => {
       try {
-        return await fetchNexoMe(ctx.req);
+        if (ctx.bootstrapError) throw ctx.bootstrapError;
+        return ctx.user ?? await fetchNexoMe(ctx.req);
       } catch (error) {
         if (
           error instanceof NexoBootstrapError &&

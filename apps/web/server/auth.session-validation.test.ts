@@ -34,6 +34,8 @@ describe("BFF validated session", () => {
       id: "u1",
       organizationId: "org1",
     }));
+    await expect(appRouter.createCaller(ctx).session.me()).resolves.toEqual(ctx.user);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
   });
 
   it("/me com 401 não cria sessão token-only", async () => {
@@ -52,6 +54,16 @@ describe("BFF validated session", () => {
     const ctx = await createContext({ req: makeReq(), res: makeRes() } as any);
 
     expect(ctx.user).toBeNull();
+    expect(ctx.bootstrapError?.code).toBe("SERVICE_UNAVAILABLE");
+    await expect(appRouter.createCaller(ctx).auth.me()).rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE" });
+  });
+
+  it("/me com 429 preserva limitação sem fingir sessão inválida", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ message: "rate limited" }), { status: 429 }));
+    const ctx = await createContext({ req: makeReq("limited-token"), res: makeRes() } as any);
+    expect(ctx.user).toBeNull();
+    await expect(appRouter.createCaller(ctx).auth.me()).rejects.toMatchObject({ code: "TOO_MANY_REQUESTS" });
+    await expect(appRouter.createCaller(ctx).session.me()).rejects.toMatchObject({ code: "TOO_MANY_REQUESTS" });
   });
 
   it("protectedProcedure bloqueia token presente sem sessão validada", async () => {

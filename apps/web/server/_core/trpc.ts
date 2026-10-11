@@ -44,6 +44,7 @@ function readTokenFromCtx(ctx: TrpcContext): string | null {
 
 const requireUser = t.middleware(async (opts) => {
   const { ctx, next } = opts;
+  if (ctx.bootstrapError) throw ctx.bootstrapError;
   const token = readTokenFromCtx(ctx);
 
   if (!token || ctx.user?.validated !== true) {
@@ -63,6 +64,7 @@ export const protectedProcedure = t.procedure.use(requireUser);
 export const adminProcedure = t.procedure.use(
   t.middleware(async (opts) => {
     const { ctx, next } = opts;
+    if (ctx.bootstrapError) throw ctx.bootstrapError;
     const token = readTokenFromCtx(ctx);
 
     if (!token || ctx.user?.validated !== true) {
