@@ -28,13 +28,19 @@ export function summarize(body, trpc = false) {
   return result
 }
 
+export function transportFailure(error) {
+  const allowed = new Set(['ECONNREFUSED', 'ECONNRESET', 'ENOTFOUND', 'ETIMEDOUT', 'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_SOCKET', 'UND_ERR_HEADERS_TIMEOUT'])
+  const code = error?.cause?.code ?? error?.code
+  return { http: null, state: 'TRANSPORT_ERROR', reason: error?.name === 'TimeoutError' ? 'TIMEOUT' : allowed.has(code) ? code : 'REQUEST_FAILED' }
+}
+
 async function check(url, headers = {}, trpc = false) {
   try {
     const response = await fetch(url, { headers, redirect: 'error', signal: AbortSignal.timeout(10000) })
     let body
     try { body = await response.json() } catch { return { http: response.status, state: response.ok ? 'NON_JSON' : 'HTTP_ERROR' } }
     return { http: response.status, ...(response.ok ? summarize(body, trpc) : { state: 'HTTP_ERROR' }) }
-  } catch { return { http: null, state: 'TRANSPORT_ERROR' } }
+  } catch (error) { return transportFailure(error) }
 }
 
 function localUrl(value) {
@@ -59,12 +65,13 @@ async function main() {
   if (input.status !== 0) throw new Error('Execute em um terminal interativo do WSL.')
   const [email, password] = input.stdout.split('\n')
   input.stdout = ''
-  let token, orgId
+  let token, orgId, loginHttp = null
   try {
-    const response = await fetch(new URL('auth/login', api), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }), redirect: 'error', signal: AbortSignal.timeout(10000) })
+    const response = await fetch(new URL('auth/login', api), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }), redirect: 'error', signal: AbortSignal.timeout(30000) })
+    loginHttp = response.status
     report.http.login = { http: response.status, state: response.ok ? 'OK' : 'HTTP_ERROR' }
     if (response.ok) { const raw = await response.json(); const body = raw.data ?? raw; token = body.token; orgId = body.user?.orgId }
-  } catch { report.http.login = { http: null, state: 'TRANSPORT_ERROR' } }
+  } catch (error) { report.http.login = loginHttp === null ? transportFailure(error) : { http: loginHttp, state: 'INVALID_RESPONSE' } }
   if (typeof token === 'string' && typeof orgId === 'string') {
     report.scope = { orgId }
     const headers = { Authorization: `Bearer ${token}` }
