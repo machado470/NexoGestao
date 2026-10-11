@@ -104,6 +104,7 @@ describe('BillingService canonical BUSINESS identity', () => {
     const service = new BillingService(prisma, config, {} as any)
 
     await expect(service.getBillingStatus('org-1')).resolves.toEqual({
+      checkout: { mode: 'UNAVAILABLE', availablePlans: [] },
       status: 'ACTIVE',
       plan: 'BUSINESS',
       isActive: true,

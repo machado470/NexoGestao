@@ -386,6 +386,14 @@ export class BillingService {
   }
 
   async getBillingStatus(orgId: string) {
+    const simulated = !this.stripe && this.isSimulatedCheckoutEnabled()
+    const checkout = {
+      mode: simulated ? 'SIMULATED' : this.stripe ? 'STRIPE' : 'UNAVAILABLE',
+      availablePlans: ['STARTER', 'PRO', 'BUSINESS'].filter(
+        plan => simulated || (this.isStripeConfigured && Boolean(this.getPlanPriceMap()[plan])),
+      ),
+    }
+
 
     const subscription = await this.prisma.subscription.findUnique({
       where: { orgId },
@@ -395,6 +403,7 @@ export class BillingService {
     if (!subscription) {
       return {
         status: 'NO_SUBSCRIPTION',
+        checkout,
         plan: 'FREE',
         isActive: false,
       }
@@ -404,6 +413,7 @@ export class BillingService {
 
     return {
       status: subscription.status,
+      checkout,
       plan: planName,
       isActive:
         subscription.status === SubscriptionStatus.ACTIVE ||

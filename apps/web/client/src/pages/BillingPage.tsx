@@ -98,6 +98,9 @@ export default function BillingPage() {
   );
   const status = parseStatus(statusQuery.data?.status);
   const currentPlanName = parsePlanName(statusQuery.data?.plan);
+  const availableCheckoutPlans: string[] = !statusQuery.isError
+    ? statusQuery.data?.checkout?.availablePlans ?? []
+    : [];
   const currentPlan = catalog.find(plan => plan.name === currentPlanName) ?? null;
   const checkoutOptions = catalog.filter(plan =>
     CHECKOUT_PLANS.includes(plan.name)
@@ -147,7 +150,7 @@ export default function BillingPage() {
   });
 
   const startCheckout = () => {
-    if (!checkoutPlan || checkoutPlan === "FREE") return;
+    if (!checkoutPlan || checkoutPlan === "FREE" || !availableCheckoutPlans.includes(checkoutPlan)) return;
     checkoutMutation.mutate({
       planName: checkoutPlan,
       successUrl: `${window.location.origin}/billing`,
@@ -328,10 +331,15 @@ export default function BillingPage() {
                 <Button
                   type="button"
                   variant={plan.name === currentPlanName ? "outline" : "default"}
+                  disabled={!availableCheckoutPlans.includes(plan.name)}
                   onClick={() => setCheckoutPlan(plan.name)}
                 >
                   <ExternalLink className="mr-2 size-4" aria-hidden="true" />
-                  {plan.name === currentPlanName ? "Abrir checkout" : "Escolher plano"}
+                  {!availableCheckoutPlans.includes(plan.name)
+                    ? "Checkout indisponível"
+                    : statusQuery.data?.checkout?.mode === "SIMULATED"
+                      ? "Simular assinatura"
+                      : plan.name === currentPlanName ? "Abrir checkout" : "Escolher plano"}
                 </Button>
               </AppSectionCard>
             ))}

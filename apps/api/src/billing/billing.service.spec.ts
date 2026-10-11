@@ -52,6 +52,21 @@ describe('BillingService degraded mode', () => {
 
 })
 
+describe('BillingService checkout availability', () => {
+  it.each([
+    [{}, 'UNAVAILABLE', []],
+    [{ BILLING_ENABLE_SIMULATED_CHECKOUT: 'true' }, 'SIMULATED', ['STARTER', 'PRO', 'BUSINESS']],
+    [{ STRIPE_SECRET_KEY: 'sk_test_local', STRIPE_PRICE_PRO: 'price_pro' }, 'STRIPE', ['PRO']],
+  ])('returns configured capability for both existing and absent subscriptions', async (values, mode, availablePlans) => {
+    const config = { get: (key: string) => (values as Record<string, string>)[key] ?? '' } as any
+    const prisma = { subscription: { findUnique: jest.fn().mockResolvedValue(null) } } as any
+    const service = new BillingService(prisma, config, {} as any)
+    expect((await service.getBillingStatus('org-1')).checkout).toEqual({ mode, availablePlans })
+    prisma.subscription.findUnique.mockResolvedValue({ status: 'ACTIVE', plan: { name: 'PRO' }, currentPeriodEnd: null })
+    expect((await service.getBillingStatus('org-1')).checkout).toEqual({ mode, availablePlans })
+  })
+})
+
 describe('BillingService Stripe synchronization', () => {
   const config = {
     get: jest.fn((key: string) => {
