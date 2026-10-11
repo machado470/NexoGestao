@@ -956,7 +956,7 @@ export default function CustomersPage() {
           <>
             {portfolioOperationalStatusBadge}
             <AppStatusBadge
-              label={`${customers.length} clientes na carteira`}
+              label={customersQuery.isError ? "Carteira indisponível" : customersQuery.isLoading ? "Carregando carteira" : `${customers.length} clientes na carteira`}
               tone="neutral"
             />
             <AppStatusBadge
@@ -972,7 +972,7 @@ export default function CustomersPage() {
             />
             <AppStatusBadge
               label={
-                isServiceOrdersUnavailable
+                (isServiceOrdersUnavailable || customersQuery.isError)
                   ? "O.S. indisponíveis"
                   : `${profiles.filter(profile => profile.hasOpenServiceOrder).length} com O.S. aberta`
               }
@@ -1116,7 +1116,7 @@ export default function CustomersPage() {
           ))}
         </div>
         <span className="rounded-md border border-[var(--border-subtle)] px-2 py-1 text-xs text-[var(--text-muted)]">
-          {filteredProfiles.length} resultado(s)
+          {customersQuery.isError ? "Resultados indisponíveis" : customersQuery.isLoading ? "Carregando resultados" : `${filteredProfiles.length} resultado(s)`}
         </span>
       </AppFiltersBar>
 

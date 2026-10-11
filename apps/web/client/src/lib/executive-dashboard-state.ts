@@ -21,7 +21,7 @@ export function resolveExecutiveDashboardState(input: {
 export const executiveDashboardStateLabel: Record<ExecutiveDashboardState, string> = {
   LOADING: "Carregando operação",
   ERROR: "Falha de leitura",
-  EMPTY: "Sem dados operacionais",
+  EMPTY: "Sem avaliação operacional",
   HEALTHY: "Operação saudável",
   ATTENTION: "Operação com atenção",
   CRITICAL: "Operação crítica",

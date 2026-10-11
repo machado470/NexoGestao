@@ -21,7 +21,7 @@ import {
   AppPageLoadingState,
   AppPageShell,
   AppSectionBlock,
-  AppStatusBadge,
+  AppContextChip,
 } from "@/components/internal-page-system";
 import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
@@ -111,7 +111,7 @@ export default function CalendarPage() {
   const { isAuthenticated } = useAuth();
   const calendarRef = useRef<FullCalendar>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [periodTitle, setPeriodTitle] = useState("Período atual");
+  const [periodTitle, setPeriodTitle] = useState(new Intl.DateTimeFormat("pt-BR", { dateStyle: "long" }).format(new Date()));
   const [viewMode, setViewMode] = useOperationalMemoryState<ViewMode>(
     "nexo.calendar.view.v2",
     "timeGridWeek"
@@ -267,10 +267,10 @@ export default function CalendarPage() {
         }
         contextChips={
           <>
-            <AppStatusBadge label={periodTitle} />
-            <AppStatusBadge
-              label={`${factualCounts.total} evento(s) exibido(s)`}
-            />
+            <AppContextChip>{periodTitle}</AppContextChip>
+            <AppContextChip tone={appointmentsQuery.isError ? "warning" : "neutral"}>
+              {appointmentsQuery.isError ? "Eventos indisponíveis" : appointmentsQuery.isLoading ? "Carregando eventos" : `${factualCounts.total} evento(s) retornado(s)`}
+            </AppContextChip>
           </>
         }
       >
@@ -332,8 +332,9 @@ export default function CalendarPage() {
               role="status"
               className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-4 text-sm text-[var(--text-secondary)]"
             >
-              Capacidade e disponibilidade indisponíveis na fonte oficial para
-              este recorte.
+              {officialCapacityQuery.isError
+                ? "Não foi possível consultar a capacidade e disponibilidade."
+                : "Nenhum responsável retornado para este recorte."}
             </div>
           ) : (
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -437,7 +438,7 @@ export default function CalendarPage() {
               >
                 <p className="text-xs text-[var(--text-muted)]">{label}</p>
                 <p className="text-xl font-semibold text-[var(--text-primary)]">
-                  {value}
+                  {appointmentsQuery.isError || appointmentsQuery.isLoading ? "—" : value}
                 </p>
               </div>
             ))}

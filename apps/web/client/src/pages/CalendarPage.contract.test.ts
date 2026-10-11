@@ -55,7 +55,7 @@ describe("CalendarPage official temporal-exploration contract", () => {
       "dailyAppointmentCapacity",
     ].forEach(field => expect(source).toContain(field));
     expect(source).toContain(
-      "Capacidade e disponibilidade indisponíveis na fonte oficial"
+      "Não foi possível consultar a capacidade e disponibilidade."
     );
     expect(source).not.toMatch(/dailyAppointmentCapacity\s*-/);
     expect(source).not.toMatch(
@@ -121,7 +121,7 @@ describe("CalendarPage official temporal-exploration contract", () => {
       "AppOperationalHeader",
       "AppSectionBlock",
       "AppFiltersBar",
-      "AppStatusBadge",
+      "AppContextChip",
       "AppPageLoadingState",
       "AppPageErrorState",
       "AppPageEmptyState",

@@ -223,7 +223,7 @@ export default function ProfilePage() {
         ) : operationalQuery.isError ? (
           <AppPageErrorState
             title="Contexto operacional indisponível"
-            description="A identidade permanece disponível, mas o resumo de People não respondeu ou não está autorizado para esta conta. Nenhuma condição saudável foi presumida."
+            description="O resumo operacional não respondeu ou não está autorizado para esta conta. Consulte o estado da identidade acima. Nenhuma condição saudável foi presumida."
             actionLabel="Tentar novamente"
             onAction={() => void operationalQuery.refetch()}
           />

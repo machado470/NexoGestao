@@ -148,7 +148,7 @@ describe("ExecutiveDashboard decision center", () => {
     expect(source).toContain("Não foi possível ler a operação");
     expect(source).toContain("não assume que está tudo bem");
     expect(source).toContain(
-      "A operação não cria alertas ou recomendações fictícias"
+      "As consultas de clientes, financeiro, sinais e Timeline permanecem independentes"
     );
   });
 
@@ -221,12 +221,12 @@ describe("ExecutiveDashboard decision center", () => {
     expect(source).not.toMatch(/attention\.length[\s\S]{0,100}"NORMAL"/);
   });
 
-  it("renders explicit dashboard states and a real onboarding CTA", () => {
+  it("renders explicit dashboard evaluation state without hiding independent data", () => {
     expect(source).toContain("resolveExecutiveDashboardState");
     expect(source).toContain('dashboardState !== "EMPTY"');
-    expect(source).toContain("Ainda não há dados operacionais");
-    expect(source).toContain("Cadastrar ou importar primeiro cliente");
-    expect(source).toContain('navigate("/customers")');
+    expect(source).toContain("Nenhuma avaliação operacional disponível");
+    expect(source).toContain("Consultar governança");
+    expect(source).toContain('navigate("/governance")');
   });
 
   it("diferencia erro de ação, vazio e ação real sem CTA fictício", () => {

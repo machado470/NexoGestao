@@ -1006,7 +1006,7 @@ export default function ServiceOrdersPage() {
               )}
               onClick={() => setActiveFilter(filter.key as ServiceOrdersFilter)}
             >
-              {filter.label}
+              {serviceOrdersQuery.isError || serviceOrdersQuery.isLoading ? filter.label.replace(/\(\d+\)/, "(—)") : filter.label}
             </button>
           ))}
           <AppDropdown>
@@ -1028,13 +1028,13 @@ export default function ServiceOrdersPage() {
                     "font-semibold text-[var(--accent-primary)]"
                 )}
               >
-                Concluídas sem cobrança ({counts.doneWithoutCharge})
+                Concluídas sem cobrança ({serviceOrdersQuery.isError || serviceOrdersQuery.isLoading ? "—" : counts.doneWithoutCharge})
               </AppDropdownItem>
             </AppDropdownContent>
           </AppDropdown>
         </div>
         <span className="rounded-md border border-[var(--border-subtle)] px-2 py-1 text-xs text-[var(--text-muted)]">
-          {filteredOrders.length} / {counts.all} O.S.
+          {serviceOrdersQuery.isError ? "O.S. indisponíveis" : serviceOrdersQuery.isLoading ? "Carregando O.S." : `${filteredOrders.length} / ${counts.all} O.S.`}
         </span>
       </AppFiltersBar>
 

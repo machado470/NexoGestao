@@ -1326,7 +1326,7 @@ function ExecutionChatColumn({
             </label>
             <input
               id="whatsapp-composer"
-              value={content}
+              value={hasConversation ? content : ""}
               onChange={event => canCompose && setContent(event.target.value)}
               onKeyDown={event => {
                 if (event.key !== "Enter" || event.shiftKey) return;
@@ -1738,10 +1738,15 @@ export default function WhatsAppPage() {
     "ALL" | WhatsAppPriority
   >("ALL");
   const [responsibleFilter, setResponsibleFilter] = useState("ALL");
-  const [content, setContent] = useOperationalMemoryState(
-    "nexo.whatsapp.composer.v2",
-    ""
+  const [drafts, setDrafts] = useOperationalMemoryState<Record<string, string>>(
+    "nexo.whatsapp.composer.v3",
+    {}
   );
+  const content = selectedConversationId ? drafts[selectedConversationId] ?? "" : "";
+  const setContent = useCallback((value: string) => {
+    if (!selectedConversationId) return;
+    setDrafts(previous => ({ ...previous, [selectedConversationId]: value }));
+  }, [selectedConversationId, setDrafts]);
   const [composerMessageTypeOverride, setComposerMessageTypeOverride] =
     useState<OperationalMessageType | null>(null);
   const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
@@ -2415,7 +2420,6 @@ export default function WhatsAppPage() {
   const handleSelectConversation = (conversationId: string) => {
     hasManualSelectionRef.current = true;
     setSelectedConversationId(conversationId);
-    setContent("");
     setComposerMessageTypeOverride(null);
     setComposerError(null);
   };
@@ -2611,7 +2615,11 @@ export default function WhatsAppPage() {
           contextChips={
             <>
               <AppContextChip tone="neutral">
-                {conversations.length} conversa(s) no inbox
+                {conversationsQuery.isError
+                  ? "Inbox indisponível"
+                  : conversationsQuery.isLoading
+                    ? "Carregando inbox"
+                    : `${conversations.length} conversa(s) no inbox`}
               </AppContextChip>
               <AppContextChip tone={healthQuery.error ? "warning" : "success"}>
                 {healthQuery.error

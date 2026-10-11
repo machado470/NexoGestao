@@ -18,6 +18,7 @@ import {
   AppDataTable,
   AppFiltersBar,
   AppOperationalHeader,
+  AppPageErrorState,
   AppPagination,
   AppSectionBlock,
 } from "@/components/internal-page-system";
@@ -159,7 +160,7 @@ export default function AuditPage() {
         title="Auditoria"
         description="Rastreabilidade administrativa dos fatos e evidências registrados. Esta fonte é independente da Timeline operacional."
         contextChips={<>
-          <AppContextChip>{events.length} registro(s) nesta página</AppContextChip>
+          <AppContextChip>{listQuery.isError ? "Registros indisponíveis" : listQuery.isLoading ? "Carregando registros" : `${events.length} registro(s) nesta página`}</AppContextChip>
           {!summaryQuery.isLoading && !summaryQuery.isError ? <AppContextChip>{summary.total} no recorte oficial</AppContextChip> : null}
           {hasFilters ? <AppContextChip tone="accent">Filtros aplicados</AppContextChip> : null}
         </>}
@@ -191,7 +192,7 @@ export default function AuditPage() {
       ) : null}
 
       <AppSectionBlock title="Registros de auditoria" subtitle="Ordem oficial da API: eventos mais recentes primeiro. Selecione um registro para examinar sua evidência.">
-        {listQuery.isLoading ? <AppLoadingState label="Carregando registros de auditoria..." /> : getAuditEmptyState(events, listQuery.isLoading) ? (
+        {listQuery.isLoading ? <AppLoadingState label="Carregando registros de auditoria..." /> : listQuery.isError ? <AppPageErrorState description="Não foi possível consultar os registros de auditoria." onAction={retry} /> : getAuditEmptyState(events, listQuery.isLoading) ? (
           <AppEmptyState title={hasFilters ? "Nenhum registro corresponde aos filtros" : "Nenhum registro de auditoria"} description={hasFilters ? "Revise ou limpe os filtros para ampliar o recorte." : "Ainda não há fatos registrados para esta organização."} action={hasFilters ? <Button type="button" variant="neutral" onClick={clearFilters}>Limpar filtros</Button> : undefined} />
         ) : (
           <>

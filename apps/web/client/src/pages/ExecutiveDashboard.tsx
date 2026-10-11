@@ -810,7 +810,7 @@ export default function ExecutiveDashboard() {
     readNullableNumber(comparison, "failedMessagesPct"),
     true
   );
-  const nextBestAction = nextBestActionQuery.data;
+  const nextBestAction = nextBestActionQuery.isError ? null : nextBestActionQuery.data;
   const recommendedAction: RecommendedAction | null = nextBestAction
     ? {
         title: formatCurrencyMentions(nextBestAction.title),
@@ -842,7 +842,7 @@ export default function ExecutiveDashboard() {
   );
   const missingComparisonCount =
     pulseComparisons.length - availableComparisons.length;
-  const hasOperationalData = dashboardState !== "EMPTY";
+  const hasOperationalEvaluation = dashboardState !== "EMPTY";
   const officialReference = operationalStateQuery.data?.evidenceAt
     ? `Referência oficial: ${formatEventDateTime(operationalStateQuery.data.evidenceAt)}`
     : "Referência temporal oficial indisponível";
@@ -1144,21 +1144,20 @@ export default function ExecutiveDashboard() {
           </Button>
         </div>
       ) : null}
-      {!pageLoading && !pageError && !hasOperationalData ? (
+      {!pageLoading && !pageError && !hasOperationalEvaluation ? (
         <div className="space-y-3">
           <AppPageEmptyState
-            title="Ainda não há dados operacionais"
-            description="Nenhuma avaliação operacional foi concluída com dados avaliáveis. Cadastre ou importe o primeiro cliente para iniciar. A operação não cria alertas ou recomendações fictícias, nem inventa riscos, valores, cobranças ou ações."
+            title="Nenhuma avaliação operacional disponível"
+            description="A governança ainda não concluiu uma avaliação com dados avaliáveis. As consultas de clientes, financeiro, sinais e Timeline permanecem independentes e são apresentadas abaixo."
           />
           <div className="flex justify-center">
-            <Button onClick={() => navigate("/customers")}>
-              Cadastrar ou importar primeiro cliente
+            <Button onClick={() => navigate("/governance")}>
+              Consultar governança
             </Button>
           </div>
         </div>
       ) : null}
 
-      {hasOperationalData ? (
         <div className="w-full min-w-0 space-y-3 sm:space-y-4">
           <div className="grid w-full min-w-0 items-start gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(20rem,0.65fr)] sm:gap-4">
             <AppSectionBlock
@@ -1601,7 +1600,6 @@ export default function ExecutiveDashboard() {
             </div>
           </AppSectionBlock>
         </div>
-      ) : null}
     </AppPageShell>
   );
 }
