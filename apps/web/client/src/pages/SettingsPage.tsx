@@ -16,7 +16,7 @@ import {
   AppPageLoadingState,
   AppPageShell,
   AppSectionBlock,
-  AppStatusBadge,
+  AppContextChip,
 } from "@/components/internal-page-system";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
@@ -122,9 +122,9 @@ export default function SettingsPage() {
         contextChips={
           settings ? (
             <>
-              <AppStatusBadge label={settings.name} />
+              <AppContextChip>{settings.name}</AppContextChip>
               {hasChanges ? (
-                <AppStatusBadge label="Alterações não salvas" />
+                <AppContextChip tone="warning">Alterações não salvas</AppContextChip>
               ) : null}
             </>
           ) : undefined

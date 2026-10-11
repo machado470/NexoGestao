@@ -15,6 +15,7 @@ import {
   AppPageShell,
   AppSectionBlock,
   AppStatusBadge,
+  AppContextChip,
 } from "@/components/internal-page-system";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
@@ -137,12 +138,12 @@ export default function ProfilePage() {
         contextChips={
           profile ? (
             <>
-              {role ? <AppStatusBadge label={role} /> : null}
+              {role ? <AppContextChip>{role}</AppContextChip> : null}
               {accountStatus === undefined || accountStatus === null ? null : (
-                <AppStatusBadge label={accountStatus ? "Ativo" : "Inativo"} />
+                <AppContextChip>{accountStatus ? "Ativo" : "Inativo"}</AppContextChip>
               )}
               {organizationName ? (
-                <AppStatusBadge label={organizationName} />
+                <AppContextChip>{organizationName}</AppContextChip>
               ) : null}
             </>
           ) : undefined
@@ -249,14 +250,14 @@ export default function ProfilePage() {
               className="flex flex-wrap gap-2"
               aria-label="Estados operacionais oficiais"
             >
-              <AppStatusBadge label={operationalProfile.status} />
+              <AppContextChip>{operationalProfile.status}</AppContextChip>
               <AppStatusBadge label={operationalProfile.operationalStatus} />
-              <AppStatusBadge label={operationalProfile.priority} />
+              <AppContextChip>Prioridade: {operationalProfile.priority}</AppContextChip>
               {operationalProfile.availabilityStatus ? (
-                <AppStatusBadge label={operationalProfile.availabilityStatus} />
+                <AppContextChip>Disponibilidade: {operationalProfile.availabilityStatus}</AppContextChip>
               ) : null}
               {operationalProfile.loadStatus ? (
-                <AppStatusBadge label={operationalProfile.loadStatus} />
+                <AppContextChip>Capacidade: {operationalProfile.loadStatus}</AppContextChip>
               ) : null}
             </div>
 
