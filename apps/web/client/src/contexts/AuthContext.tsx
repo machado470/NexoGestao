@@ -15,6 +15,7 @@ import {
   shouldBootstrapSessionForPath,
 } from "@/lib/routeAccess";
 import { pushAuditEvent, setAuditField } from "@/lib/renderAudit";
+import { clearAppStorage } from "@/lib/app-storage";
 
 type AuthUser = {
   token?: string;
@@ -72,7 +73,6 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-const APP_STORAGE_PREFIXES = ["nexo:", "nexogestao_", "pilot-onboarding:"];
 /* =========================
    HELPERS
 ========================= */
@@ -132,31 +132,6 @@ function redirectToLogin() {
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error("[AUTH] redirect failed", error);
-  }
-}
-
-function clearAppStorage() {
-  try {
-    if (typeof window === "undefined") return;
-
-    for (let i = window.localStorage.length - 1; i >= 0; i -= 1) {
-      const key = window.localStorage.key(i);
-      if (!key) continue;
-      if (APP_STORAGE_PREFIXES.some(prefix => key.startsWith(prefix))) {
-        window.localStorage.removeItem(key);
-      }
-    }
-
-    for (let i = window.sessionStorage.length - 1; i >= 0; i -= 1) {
-      const key = window.sessionStorage.key(i);
-      if (!key) continue;
-      if (APP_STORAGE_PREFIXES.some(prefix => key.startsWith(prefix))) {
-        window.sessionStorage.removeItem(key);
-      }
-    }
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error("[AUTH] clear storage failed", error);
   }
 }
 

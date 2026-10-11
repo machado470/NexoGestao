@@ -34,6 +34,8 @@ import {
 
 import { trpc } from "@/lib/trpc";
 import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
+import { useWhatsAppDrafts } from "@/hooks/useWhatsAppDrafts";
+import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { presentationStatusLabel } from "@/lib/presentation-status";
 import { Button } from "@/components/ui/button";
@@ -1711,6 +1713,7 @@ function OperationalContextColumn({
 }
 
 export default function WhatsAppPage() {
+  const { user } = useAuth();
   const [location, setLocation] = useLocation();
   const searchParams = useMemo(
     () => new URLSearchParams(location.split("?")[1] ?? ""),
@@ -1738,15 +1741,7 @@ export default function WhatsAppPage() {
     "ALL" | WhatsAppPriority
   >("ALL");
   const [responsibleFilter, setResponsibleFilter] = useState("ALL");
-  const [drafts, setDrafts] = useOperationalMemoryState<Record<string, string>>(
-    "nexo.whatsapp.composer.v3",
-    {}
-  );
-  const content = selectedConversationId ? drafts[selectedConversationId] ?? "" : "";
-  const setContent = useCallback((value: string) => {
-    if (!selectedConversationId) return;
-    setDrafts(previous => ({ ...previous, [selectedConversationId]: value }));
-  }, [selectedConversationId, setDrafts]);
+  const [content, setContent] = useWhatsAppDrafts(user, selectedConversationId);
   const [composerMessageTypeOverride, setComposerMessageTypeOverride] =
     useState<OperationalMessageType | null>(null);
   const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
