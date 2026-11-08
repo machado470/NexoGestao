@@ -51,7 +51,7 @@ O startup falha quando PostgreSQL não responde ou o smoke canônico do banco fa
 3. Configure `DOMAIN` como hostname DNS simples (sem protocolo, porta ou path).
    Providencie `fullchain.pem` e `privkey.pem` no diretório absoluto `TLS_CERT_DIR`.
    O certificado deve cobrir domínio raiz, `app.DOMAIN` e `api.DOMAIN`.
-4. `HTTP_BIND`/`HTTPS_BIND` usam loopback por padrão, em 8080/8443. Portas públicas,
+4. `HTTP_BIND`/`HTTPS_BIND` usam loopback por padrão, em 80/443. Portas públicas,
    firewall, DNS e certificados reais dependem do destino ainda não identificado.
 
 Nginx usa o mecanismo de templates da imagem oficial, substituindo apenas
