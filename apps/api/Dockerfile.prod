@@ -40,8 +40,8 @@ COPY --from=builder /app/apps/api/dist ./apps/api/dist
 COPY --from=builder /app/packages/common/dist ./packages/common/dist
 COPY --from=builder /opt/prisma-client /opt/prisma-client
 RUN client_dir="$(node -p 'require("path").dirname(require.resolve("@prisma/client/package.json"))')" \
-    && mkdir -p "$client_dir/../.prisma" \
-    && cp -r /opt/prisma-client "$client_dir/../.prisma/client" \
+    && mkdir -p "$client_dir/../../.prisma" \
+    && cp -r /opt/prisma-client "$client_dir/../../.prisma/client" \
     && rm -rf /opt/prisma-client
 COPY scripts/check-operational-actions-db.mjs scripts/wait-for-postgres.mjs ./scripts/
 COPY apps/api/docker-entrypoint.sh ./apps/api/docker-entrypoint.sh
