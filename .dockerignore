@@ -14,3 +14,7 @@ apps/**/dist
 **/.env.*
 **/coverage
 **/.turbo
+
+work
+**/dist
+**/*.tsbuildinfo
