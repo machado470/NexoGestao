@@ -2,180 +2,36 @@
   "date": "2026-11-08",
   "productionCounts": {
     "info": 0,
-    "low": 1,
-    "moderate": 10,
+    "low": 0,
+    "moderate": 0,
     "high": 0,
     "critical": 0
   },
   "allDependencyCounts": {
     "info": 0,
-    "low": 2,
-    "moderate": 14,
+    "low": 1,
+    "moderate": 0,
     "high": 0,
     "critical": 0
   },
-  "remainingProductionAdvisories": [
+  "remainingProductionAdvisories": [],
+  "registryFindingsWithLocalRemediation": [
     {
-      "package": "uuid",
-      "severity": "moderate",
-      "title": "uuid: Missing buffer bounds check in v3/v5/v6 when buf is provided",
-      "patchedVersions": ">=11.1.1",
-      "url": "https://github.com/advisories/GHSA-w5hq-g745-h8pq",
-      "findings": [
-        {
-          "version": "9.0.1",
-          "paths": [
-            "apps__api>uuid"
-          ]
-        }
-      ]
-    },
-    {
-      "package": "@opentelemetry/core",
-      "severity": "moderate",
-      "title": "OpenTelemetry Core: Unbounded memory allocation in W3C Baggage propagation",
-      "patchedVersions": ">=2.8.0",
-      "url": "https://github.com/advisories/GHSA-8988-4f7v-96qf",
-      "findings": [
-        {
-          "version": "1.30.1",
-          "paths": [
-            "apps__api>@sentry/node>@opentelemetry/core"
-          ]
-        }
-      ]
-    },
-    {
-      "package": "katex",
+      "package": "deepmerge",
       "severity": "low",
-      "title": "KaTeX: Existing prototype pollution can bypass trust restrictions",
-      "patchedVersions": ">=0.18.2",
-      "url": "https://github.com/advisories/GHSA-238p-pmpm-9mq7",
+      "title": "deepmerge mergeObject() allows prototype poisoning of returned objects",
+      "upstreamPatchedVersion": null,
+      "url": "https://github.com/advisories/GHSA-gcqx-w48m-w2h4",
+      "remediationStatus": "locally_patched_awaiting_upstream_release",
+      "patch": "patches/deepmerge@4.3.1.patch",
+      "regressionCommand": "pnpm test:security:dependencies",
+      "coverage": "Actual Jest/Nest CLI CJS copies and UMD: own __proto__, nested objects, arrays, both-input merge, symbols, configuration merging and array options.",
+      "registryStillReportsAffectedVersion": true,
       "findings": [
         {
-          "version": "0.16.47",
+          "version": "4.3.1",
           "paths": [
-            "apps__web>streamdown>katex"
-          ]
-        }
-      ]
-    },
-    {
-      "package": "@opentelemetry/instrumentation-pg",
-      "severity": "moderate",
-      "title": "Multiple @opentelemetry/instrumentation-* packages expose database username via unconditional db.user span attribute",
-      "patchedVersions": ">=0.73.0",
-      "url": "https://github.com/advisories/GHSA-qqmp-wf37-98f9",
-      "findings": [
-        {
-          "version": "0.50.0",
-          "paths": [
-            "apps__api>@sentry/node>@opentelemetry/instrumentation-pg"
-          ]
-        }
-      ]
-    },
-    {
-      "package": "@opentelemetry/instrumentation-mysql2",
-      "severity": "moderate",
-      "title": "Multiple @opentelemetry/instrumentation-* packages expose database username via unconditional db.user span attribute",
-      "patchedVersions": ">=0.67.0",
-      "url": "https://github.com/advisories/GHSA-qqmp-wf37-98f9",
-      "findings": [
-        {
-          "version": "0.45.0",
-          "paths": [
-            "apps__api>@sentry/node>@opentelemetry/instrumentation-mysql2"
-          ]
-        }
-      ]
-    },
-    {
-      "package": "@opentelemetry/instrumentation-knex",
-      "severity": "moderate",
-      "title": "Multiple @opentelemetry/instrumentation-* packages expose database username via unconditional db.user span attribute",
-      "patchedVersions": ">=0.65.0",
-      "url": "https://github.com/advisories/GHSA-qqmp-wf37-98f9",
-      "findings": [
-        {
-          "version": "0.44.0",
-          "paths": [
-            "apps__api>@sentry/node>@opentelemetry/instrumentation-knex"
-          ]
-        }
-      ]
-    },
-    {
-      "package": "@opentelemetry/instrumentation-mysql",
-      "severity": "moderate",
-      "title": "Multiple @opentelemetry/instrumentation-* packages expose database username via unconditional db.user span attribute",
-      "patchedVersions": ">=0.67.0",
-      "url": "https://github.com/advisories/GHSA-qqmp-wf37-98f9",
-      "findings": [
-        {
-          "version": "0.45.0",
-          "paths": [
-            "apps__api>@sentry/node>@opentelemetry/instrumentation-mysql"
-          ]
-        }
-      ]
-    },
-    {
-      "package": "@opentelemetry/instrumentation-mongoose",
-      "severity": "moderate",
-      "title": "Multiple @opentelemetry/instrumentation-* packages expose database username via unconditional db.user span attribute",
-      "patchedVersions": ">=0.67.0",
-      "url": "https://github.com/advisories/GHSA-qqmp-wf37-98f9",
-      "findings": [
-        {
-          "version": "0.46.0",
-          "paths": [
-            "apps__api>@sentry/node>@opentelemetry/instrumentation-mongoose"
-          ]
-        }
-      ]
-    },
-    {
-      "package": "@opentelemetry/instrumentation-tedious",
-      "severity": "moderate",
-      "title": "Multiple @opentelemetry/instrumentation-* packages expose database username via unconditional db.user span attribute",
-      "patchedVersions": ">=0.40.0",
-      "url": "https://github.com/advisories/GHSA-qqmp-wf37-98f9",
-      "findings": [
-        {
-          "version": "0.18.0",
-          "paths": [
-            "apps__api>@sentry/node>@opentelemetry/instrumentation-tedious"
-          ]
-        }
-      ]
-    },
-    {
-      "package": "glob",
-      "severity": "moderate",
-      "title": "Glob: AbortSignal cancellation bypass allows post-timeout filesystem traversal",
-      "patchedVersions": ">=14.0.2",
-      "url": "https://github.com/advisories/GHSA-3g3m-2fjr-6pw4",
-      "findings": [
-        {
-          "version": "10.5.0",
-          "paths": [
-            "apps__api>@opentelemetry/auto-instrumentations-node>@opentelemetry/resource-detector-gcp>gcp-metadata>gaxios>rimraf>glob"
-          ]
-        }
-      ]
-    },
-    {
-      "package": "minimatch",
-      "severity": "moderate",
-      "title": "minimatch has potential denial of service via globparts amplification",
-      "patchedVersions": ">=11.0.1",
-      "url": "https://github.com/advisories/GHSA-g3hv-75wg-m249",
-      "findings": [
-        {
-          "version": "9.0.9",
-          "paths": [
-            "apps__api>@opentelemetry/auto-instrumentations-node>@opentelemetry/resource-detector-gcp>gcp-metadata>gaxios>rimraf>glob>minimatch"
+            "apps__api>@nestjs/cli>fork-ts-checker-webpack-plugin>deepmerge"
           ]
         }
       ]

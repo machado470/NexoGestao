@@ -56,6 +56,9 @@ jobs:
       - name: Install with immutable lockfile
         run: pnpm install --frozen-lockfile
 
+      - name: Security dependency regressions
+        run: pnpm test:security:dependencies
+
       - name: Generate Prisma Client
         run: pnpm --filter ./apps/api prisma:generate
 
@@ -122,3 +125,11 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      - name: Docker image and patched dependency smoke
+        run: |
+          docker build --tag nexogestao-api:ci .
+          docker run --rm --network none --entrypoint node nexogestao-api:ci \
+            --test /app/scripts/deepmerge-security.test.cjs
+          docker run --rm --network none --entrypoint node nexogestao-api:ci \
+            -e 'require("@sentry/profiling-node").nodeProfilingIntegration(); require("@nexogestao/common"); require("./dist/app.module"); if (typeof require("@prisma/client").PrismaClient !== "function") process.exit(1)'
