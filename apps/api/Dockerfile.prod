@@ -1,65 +1,61 @@
-# Stage 1: Build
-FROM node:20-slim AS builder
-
+# syntax=docker/dockerfile:1
+FROM node:24-bookworm-slim AS base
 WORKDIR /app
-
-# Instalar dependências globais
-RUN npm install -g pnpm@10.30.3
-
-# Copiar arquivos de manifesto do workspace
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openssl ca-certificates curl postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+RUN --mount=type=secret,id=proxy_ca \
+    if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
+    npm install -g pnpm@10.30.3
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY patches ./patches
 COPY apps/api/package.json apps/api/package.json
+COPY packages/common/package.json packages/common/package.json
 
-# Instalar dependências
-RUN pnpm install --frozen-lockfile
-
-# Copiar o restante do código-fonte
+FROM base AS builder
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
+RUN --mount=type=secret,id=proxy_ca \
+    if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
+    pnpm install --frozen-lockfile
 COPY . .
+RUN --mount=type=secret,id=proxy_ca \
+    if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
+    pnpm prepare:workspace
+RUN common_dir="$(cd apps/api && node -p 'require.resolve("@nexogestao/common/package.json")')" \
+    && mkdir -p "$(dirname "$common_dir")/dist" \
+    && cp -r packages/common/dist/. "$(dirname "$common_dir")/dist/"
+RUN --mount=type=secret,id=proxy_ca \
+    if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
+    pnpm --filter ./apps/api build
+# file: dependencies are copied by pnpm before common is built.
+RUN common_dir="$(cd apps/api && node -p 'require.resolve("@nexogestao/common/package.json")')" \
+    && mkdir -p "$(dirname "$common_dir")/dist" \
+    && cp -r packages/common/dist/. "$(dirname "$common_dir")/dist/" \
+    && node -e 'const fs=require("fs"),p=require("path"); fs.cpSync(p.dirname(require.resolve(".prisma/client/package.json", {paths:[require.resolve("@prisma/client")]})), "/opt/prisma-client", {recursive:true})'
 
-# Gerar Prisma Client
-RUN pnpm --filter api prisma:generate
+FROM base AS production-deps
+ENV PRISMA_SKIP_POSTINSTALL_GENERATE=true
+RUN --mount=type=secret,id=proxy_ca \
+    if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
+    pnpm install --prod --frozen-lockfile
 
-# Construir a aplicação
-RUN pnpm --filter api build
-
-# Stage 2: Production
-FROM node:20-slim
-
-WORKDIR /app
-
-# Instalar dependências de produção e utilitários
-RUN apt-get update && apt-get install -y \
-  openssl \
-  ca-certificates \
-  postgresql-client \
-  curl \
-  && rm -rf /var/lib/apt/lists/*
-
-RUN npm install -g pnpm@10.30.3
-
-# Copiar arquivos de manifesto para instalar apenas as dependências de produção
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY patches ./patches
-COPY apps/api/package.json apps/api/package.json
-
-# Instalar somente dependências de produção
-RUN pnpm install --prod --frozen-lockfile
-
-# Copiar o entrypoint e torná-lo executável
-COPY --from=builder /app/apps/api/docker-entrypoint.sh /app/apps/api/docker-entrypoint.sh
-RUN chmod +x /app/apps/api/docker-entrypoint.sh \
-  && sed -i 's/\r$//' /app/apps/api/docker-entrypoint.sh
-
-# Copiar os artefatos de build
+FROM production-deps AS runtime
+ENV NODE_ENV=production
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
-COPY --from=builder /app/prisma ./prisma
-
+COPY --from=builder /app/packages/common/dist ./packages/common/dist
+COPY --from=builder /opt/prisma-client /opt/prisma-client
+RUN common_dir="$(cd apps/api && node -p 'require.resolve("@nexogestao/common/package.json")')" \
+    && mkdir -p "$(dirname "$common_dir")/dist" \
+    && cp -r packages/common/dist/. "$(dirname "$common_dir")/dist/" \
+    && client_dir="$(node -p 'require("path").dirname(require.resolve("@prisma/client/package.json"))')" \
+    && mkdir -p "$client_dir/../.prisma" \
+    && cp -r /opt/prisma-client "$client_dir/../.prisma/client" \
+    && rm -rf /opt/prisma-client
+COPY scripts/check-operational-actions-db.mjs scripts/wait-for-postgres.mjs ./scripts/
+COPY apps/api/docker-entrypoint.sh ./apps/api/docker-entrypoint.sh
+RUN chmod +x apps/api/docker-entrypoint.sh
 WORKDIR /app/apps/api
-
 EXPOSE 3000
-
-# O entrypoint cuidará de migrations, seed e de iniciar a aplicação
 ENTRYPOINT ["/app/apps/api/docker-entrypoint.sh"]
-
 CMD ["node", "dist/main.js"]

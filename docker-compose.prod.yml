@@ -1,5 +1,3 @@
-version: '3.9'
-
 # ============================================================
 # NexoGestao — Docker Compose PRODUÇÃO
 # ============================================================
@@ -14,7 +12,6 @@ services:
   # ─── PostgreSQL ────────────────────────────────────────────
   postgres:
     image: postgres:15-alpine
-    container_name: nexogestao_postgres_prod
     restart: unless-stopped
     environment:
       POSTGRES_USER:     ${POSTGRES_USER:?POSTGRES_USER obrigatório}
@@ -22,7 +19,6 @@ services:
       POSTGRES_DB:       ${POSTGRES_DB:?POSTGRES_DB obrigatório}
     volumes:
       - pgdata_prod:/var/lib/postgresql/data
-      - ./scripts/backup:/backups
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:?POSTGRES_USER obrigatório} -d ${POSTGRES_DB:?POSTGRES_DB obrigatório}"]
       interval: 10s
@@ -40,9 +36,8 @@ services:
   # ─── Redis ─────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
-    container_name: nexogestao_redis_prod
     restart: unless-stopped
-    command: redis-server --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD obrigatório} --appendonly yes
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD obrigatório}", "--appendonly", "yes"]
     volumes:
       - redisdata_prod:/data
     healthcheck:
@@ -65,14 +60,17 @@ services:
       dockerfile: ./apps/api/Dockerfile.prod
       args:
         NODE_ENV: production
-    container_name: nexogestao_api_prod
     restart: unless-stopped
     env_file:
-      - .env.prod
+      - ${NEXO_ENV_FILE:-.env.prod}
     environment:
       NODE_ENV:     production
-      DATABASE_URL: postgresql://${POSTGRES_USER:?POSTGRES_USER obrigatório}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD obrigatório}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB obrigatório}?schema=public
-      REDIS_URL:    redis://:${REDIS_PASSWORD:?REDIS_PASSWORD obrigatório}@redis:6379
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL obrigatório; use credenciais percent-encoded}
+      REDIS_URL: ${REDIS_URL:?REDIS_URL obrigatório; use credenciais percent-encoded}
+      API_PORT: "3000"
+      AUTO_MIGRATE: "0"
+      SEED_MODE: ""
+      REQUIRE_DATABASE_SMOKE: "1"
     depends_on:
       postgres:
         condition: service_healthy
@@ -81,7 +79,7 @@ services:
     expose:
       - "3000"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/v1/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:3000/v1/health/readiness"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -102,19 +100,20 @@ services:
       args:
         NODE_ENV: production
         VITE_API_URL: ${VITE_API_URL:?VITE_API_URL obrigatório}
-    container_name: nexogestao_web_prod
     restart: unless-stopped
     env_file:
-      - .env.prod
+      - ${NEXO_ENV_FILE:-.env.prod}
     environment:
       NODE_ENV: production
+      WEB_PORT: "3010"
+      NEXO_API_URL: http://api:3000
     depends_on:
       api:
         condition: service_healthy
     expose:
-      - "3000"
+      - "3010"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      test: ["CMD", "curl", "-f", "http://localhost:3010"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -129,21 +128,26 @@ services:
 
   # ─── Nginx (Reverse Proxy + HTTPS) ─────────────────────────
   nginx:
-    image: nginx:1.25-alpine
-    container_name: nexogestao_nginx_prod
+    image: nginx:stable-alpine
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
+      - "${HTTP_BIND:-127.0.0.1}:${HTTP_PORT:-8080}:80"
+      - "${HTTPS_BIND:-127.0.0.1}:${HTTPS_PORT:-8443}:443"
+    environment:
+      DOMAIN: ${DOMAIN:?DOMAIN obrigatório}
+      NGINX_ENVSUBST_FILTER: "^DOMAIN$"
+      NGINX_ENVSUBST_OUTPUT_DIR: /etc/nginx
     volumes:
-      - ./infra/nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
-      - ./infra/nginx/ssl:/etc/nginx/ssl:ro
+      - ./infra/nginx/nginx.prod.conf:/etc/nginx/templates/nginx.conf.template:ro
+      - ${TLS_CERT_DIR:?TLS_CERT_DIR obrigatório}:/etc/nginx/ssl:ro
       - nginx_logs:/var/log/nginx
       - certbot_www:/var/www/certbot:ro
       - certbot_conf:/etc/letsencrypt:ro
     depends_on:
-      - api
-      - web
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
     networks:
       - nexo_internal
     logging:
@@ -154,8 +158,8 @@ services:
 
   # ─── Certbot (Let's Encrypt — renovação automática) ────────
   certbot:
+    profiles: ["certificates"]
     image: certbot/certbot:latest
-    container_name: nexogestao_certbot
     volumes:
       - certbot_www:/var/www/certbot
       - certbot_conf:/etc/letsencrypt
@@ -164,23 +168,30 @@ services:
     networks:
       - nexo_internal
 
-# ─── Volumes ───────────────────────────────────────────────
+  # Explicit one-shot migration; never started by ordinary compose up.
+  migrate:
+    profiles: ["maintenance"]
+    build:
+      context: .
+      dockerfile: ./apps/api/Dockerfile.prod
+      target: builder
+    env_file:
+      - ${NEXO_ENV_FILE:-.env.prod}
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL obrigatório}
+    command: ["pnpm", "--filter", "./apps/api", "exec", "prisma", "migrate", "deploy", "--schema", "../../prisma/schema.prisma"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [nexo_internal]
+
 volumes:
   pgdata_prod:
-    driver: local
   redisdata_prod:
-    driver: local
   nginx_logs:
-    driver: local
   certbot_www:
-    driver: local
   certbot_conf:
-    driver: local
 
-# ─── Networks ──────────────────────────────────────────────
 networks:
   nexo_internal:
     driver: bridge
-    ipam:
-      config:
-        - subnet: 172.20.0.0/16

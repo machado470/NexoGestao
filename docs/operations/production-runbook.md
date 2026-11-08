@@ -42,3 +42,15 @@ Em migration falha, interrompa rollout, preserve logs/banco, não edite históri
 O DR owner ainda não atribuído deverá aprovar restore, verificar backup, responder à falha, executar drill periódico, aprovar RPO/RTO e manter acesso controlado ao offsite.
 
 Uma prova futura deve verificar bucket real, TLS, criptografia em repouso, versionamento, lifecycle, retenção, IAM mínimo, upload de dump e checksum, download, checksum pós-download e restore do artefato baixado. Defaults AWS não provam esses controles.
+
+## Base executável de Compose (sem destino real)
+
+Siga a seção “Base Compose reproduzível” em `deployment.md` para configuração,
+TLS, build e comando one-shot `migrate`. `AUTO_MIGRATE=0` e `SEED_MODE` vazio
+são impostos no serviço API. O startup verifica banco e schema, mas não os altera.
+A prova `scripts/smoke-production-compose.sh` usa somente recursos descartáveis.
+
+Antes de qualquer execução real, ainda faltam: provedor/servidor/domínio,
+identificação do daemon e dos volumes existentes, responsáveis, backup aprovado,
+janela, firewall/TLS e critérios de smoke/rollback. O CI valida a base Compose;
+não executa publicação, migrations remotas ou promoção real.
