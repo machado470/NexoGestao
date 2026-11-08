@@ -100,6 +100,7 @@ services:
       args:
         NODE_ENV: production
         VITE_API_URL: ${VITE_API_URL:?VITE_API_URL obrigatório}
+        VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
     restart: unless-stopped
     env_file:
       - ${NEXO_ENV_FILE:-.env.prod}

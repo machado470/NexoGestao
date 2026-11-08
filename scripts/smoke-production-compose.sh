@@ -69,6 +69,7 @@ if [ "${1:-}" = '--config-only' ]; then exit 0; fi
 "${compose[@]}" build api web migrate
 "${compose[@]}" up -d --wait postgres redis
 "${compose[@]}" run --rm migrate
+"${compose[@]}" run --rm -e NEXO_DISPOSABLE_COMPOSE_SMOKE=1 migrate node scripts/check-operational-actions-index.test.mjs
 "${compose[@]}" up -d --wait --wait-timeout 240 api web nginx
 "${compose[@]}" exec -T nginx nginx -t
 https_endpoint="$("${compose[@]}" port nginx 443)"

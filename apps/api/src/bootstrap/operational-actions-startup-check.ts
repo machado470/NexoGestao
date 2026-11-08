@@ -30,14 +30,21 @@ const checks = [
     key: 'index',
     label: 'índice único parcial REQUESTED por (orgId, logicalKey)',
     query: `SELECT 1
-      FROM pg_indexes
-      WHERE schemaname = 'public'
-        AND tablename = 'OperationalActionExecution'
-        AND indexname = 'OperationalActionExecution_unique_requested_per_key'
-        AND indexdef ILIKE '%UNIQUE%'
-        AND indexdef ILIKE '%"orgId"%'
-        AND indexdef ILIKE '%"logicalKey"%'
-        AND indexdef ILIKE '%WHERE ((status = ''REQUESTED''::"OperationalActionExecutionStatus"))%'
+      FROM pg_index i
+      JOIN pg_class t ON t.oid = i.indrelid
+      JOIN pg_namespace n ON n.oid = t.relnamespace
+      JOIN pg_class idx ON idx.oid = i.indexrelid
+      WHERE n.nspname = 'public'
+        AND t.relname = 'OperationalActionExecution'
+        AND idx.relname = 'OperationalActionExecution_unique_requested_per_key'
+        AND i.indisunique AND i.indisvalid AND i.indisready
+        AND i.indnkeyatts = 2
+        AND (SELECT array_agg(a.attname::text ORDER BY k.ordinality)
+             FROM unnest(i.indkey) WITH ORDINALITY AS k(attnum, ordinality)
+             JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum
+             WHERE k.ordinality <= i.indnkeyatts) = ARRAY['orgId', 'logicalKey']
+        AND regexp_replace(pg_get_expr(i.indpred, i.indrelid), '[()[:space:]]', '', 'g')
+            = 'status=''REQUESTED''::"OperationalActionExecutionStatus"'
       LIMIT 1`,
   },
 ] as const
