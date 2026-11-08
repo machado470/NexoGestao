@@ -77,14 +77,14 @@ curl --fail --silent --show-error --cacert "$smoke_dir/tls/fullchain.pem" \
   -H 'Host: app.nexo.test' "https://localhost:${https_endpoint##*:}/" | grep -q '<div id="root">'
 curl --fail --silent --show-error --cacert "$smoke_dir/tls/fullchain.pem" \
   -H 'Host: api.nexo.test' "https://localhost:${https_endpoint##*:}/v1/health" > "$smoke_dir/health.json"
-node -e 'const h=JSON.parse(require("fs").readFileSync(process.argv[1])); if(h.status!=="ok") process.exit(1)' "$smoke_dir/health.json"
+node -e 'const h=JSON.parse(require("fs").readFileSync(process.argv[1])); if(h.success!==true || h.data?.status!=="ok") process.exit(1)' "$smoke_dir/health.json"
 # Redirect must preserve Nginx variables after DOMAIN substitution.
 curl --silent --show-error --dump-header "$smoke_dir/redirect" --output /dev/null \
   -H 'Host: app.nexo.test' "http://localhost:${http_endpoint##*:}/smoke?check=1"
 grep -q 'Location: https://app.nexo.test/smoke?check=1' "$smoke_dir/redirect"
 curl --fail --silent --show-error --cacert "$smoke_dir/tls/fullchain.pem" \
   -H 'Host: api.nexo.test' "https://localhost:${https_endpoint##*:}/v1/health/readiness" > "$smoke_dir/readiness.json"
-node -e 'const h=JSON.parse(require("fs").readFileSync(process.argv[1])); if(h.status!=="ready") process.exit(1)' "$smoke_dir/readiness.json"
+node -e 'const h=JSON.parse(require("fs").readFileSync(process.argv[1])); if(h.success!==true || h.data?.status!=="ready") process.exit(1)' "$smoke_dir/readiness.json"
 # A failed login to the pristine database proves BFF -> API connectivity.
 login_status="$(curl --silent --show-error --cacert "$smoke_dir/tls/fullchain.pem" \
   -H 'Host: app.nexo.test' -H 'Content-Type: application/json' \
