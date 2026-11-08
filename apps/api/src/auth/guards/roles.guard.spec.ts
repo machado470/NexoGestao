@@ -30,6 +30,12 @@ describe('RolesGuard canonical role normalization', () => {
     expect(() => guardFor(['OPERADOR']).canActivate(context(role))).toThrow(ForbiddenException)
   })
 
+  it.each(['STAFF', 'OPERADOR', 'VIEWER', 'FINANCEIRO'])('denies %s explicit manager permission', role => {
+    expect(() => guardFor(['ADMIN', 'MANAGER']).canActivate(context(role))).toThrow(ForbiddenException)
+  })
+  it('preserves manager permission', () => {
+    expect(guardFor(['ADMIN', 'MANAGER']).canActivate(context('MANAGER'))).toBe(true)
+  })
   it('permite rota sem @Roles', () => {
     expect(guardFor([]).canActivate(context())).toBe(true)
   })

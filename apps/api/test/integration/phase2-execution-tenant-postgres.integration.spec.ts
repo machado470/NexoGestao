@@ -33,7 +33,7 @@ describeRealIntegration('Phase 2 Execution tenant isolation (Postgres e2e)', () 
   const serviceOrderA = randomUUID()
   const serviceOrderB = randomUUID()
   const auth = (orgId: string, userId: string, personId: string) => ({
-    Authorization: `Bearer ${jwt.sign({ sub: userId, role: 'ADMIN', orgId, personId })}`,
+    Authorization: `Bearer ${jwt.sign({ sessionVersion: 0, sub: userId, role: 'ADMIN', orgId, personId })}`,
   })
 
   beforeAll(async () => {

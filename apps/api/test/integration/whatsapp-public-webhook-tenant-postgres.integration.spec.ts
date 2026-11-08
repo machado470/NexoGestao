@@ -87,6 +87,10 @@ describeRealIntegration('Phase 2.2 WhatsApp public webhook tenant isolation (Pos
       { id: ids.userA, orgId: ids.orgA, email: `${ids.userA}@test.invalid`, role: 'ADMIN', active: true },
       { id: ids.userB, orgId: ids.orgB, email: `${ids.userB}@test.invalid`, role: 'ADMIN', active: true },
     ] })
+    await prisma.person.createMany({ data: [
+      { id: ids.userA, userId: ids.userA, orgId: ids.orgA, name: 'Admin A', role: 'ADMIN' },
+      { id: ids.userB, userId: ids.userB, orgId: ids.orgB, name: 'Admin B', role: 'ADMIN' },
+    ] })
     await prisma.whatsAppProviderAccount.createMany({ data: [
       { orgId: ids.orgA, provider: 'meta_cloud', accountId: accounts.a },
       { orgId: ids.orgB, provider: 'meta_cloud', accountId: accounts.b },
@@ -111,6 +115,7 @@ describeRealIntegration('Phase 2.2 WhatsApp public webhook tenant isolation (Pos
         await prisma.whatsAppConversation.deleteMany({ where: { orgId: { in: orgIds } } })
         await prisma.whatsAppWebhookEvent.deleteMany({ where: { orgId: { in: orgIds } } })
         await prisma.whatsAppProviderAccount.deleteMany({ where: { orgId: { in: orgIds } } })
+        await prisma.person.deleteMany({ where: { orgId: { in: orgIds } } })
         await prisma.user.deleteMany({ where: { orgId: { in: orgIds } } })
         await prisma.organization.deleteMany({ where: { id: { in: orgIds } } })
       }
@@ -147,7 +152,7 @@ describeRealIntegration('Phase 2.2 WhatsApp public webhook tenant isolation (Pos
     const initialEventId = (await post(payload(accounts.a, providerMessageId)).expect(200)).body.webhookEventId
     const eventA = await waitForEvent(initialEventId)
     const afterInitial = await snapshot()
-    const tokenA = jwt.sign({ sub: ids.userA, role: 'ADMIN', orgId: ids.orgA })
+    const tokenA = jwt.sign({ sessionVersion: 0, sub: ids.userA, personId: ids.userA, role: 'ADMIN', orgId: ids.orgA })
     await request(app.getHttpServer()).post(`/whatsapp/webhook-events/${eventA.id}/replay`)
       .set('Authorization', `Bearer ${tokenA}`).send({ force: true }).expect(201)
     await new Promise((resolve) => setTimeout(resolve, 500))

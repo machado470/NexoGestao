@@ -102,6 +102,7 @@ export class AuthService {
   createSessionPayload(user: any) {
     const token = this.jwt.sign({
       sub: user.id,
+      sessionVersion: user.sessionVersion ?? 0,
       role: user.role,
       orgId: user.orgId,
       personId: user.person?.id,
@@ -234,76 +235,10 @@ export class AuthService {
     }
   }
 
-  async loginWithGoogleProfile(googleUser: {
-    email: string
-    firstName?: string
-    lastName?: string
-    sub?: string
-    picture?: string
-    emailVerified?: boolean
-  }) {
-    const email = (googleUser.email ?? '').trim().toLowerCase()
-
-    if (!email) {
-      throw new BadRequestException('Email Google é obrigatório')
-    }
-
-    if (googleUser.emailVerified === false) {
-      throw new UnauthorizedException('Conta Google sem e-mail verificado')
-    }
-
-    let user = await this.prisma.user.findUnique({
-      where: { email },
-      include: { person: true },
-    })
-
-    if (!user) {
-      throw new UnauthorizedException(
-        'Nenhuma conta encontrada para este e-mail. Solicite acesso ao administrador.',
-      )
-    }
-
-    if (!user.person) {
-      const displayName =
-        `${googleUser.firstName ?? ''} ${googleUser.lastName ?? ''}`.trim() ||
-        email
-
-      user = await this.prisma.user.update({
-        where: { id: user.id },
-        data: {
-          person: {
-            create: {
-              name: displayName,
-              email,
-              role: user.role,
-              active: true,
-              orgId: user.orgId,
-            },
-          },
-        },
-        include: { person: true },
-      })
-    }
-
-    if (!user.emailVerifiedAt) {
-      user = await this.prisma.user.update({
-        where: { id: user.id },
-        data: {
-          emailVerifiedAt: new Date(),
-          emailVerifyTokenHash: null,
-          emailVerifyTokenExpiresAt: null,
-        },
-        include: { person: true },
-      })
-    }
-
-    return this.createSessionPayload(user)
-  }
-
   async validateGoogleUser(googleUser: any) {
     const email = (googleUser?.email ?? '').trim().toLowerCase()
 
-    if (!email) {
+    if (!email || googleUser?.emailVerified !== true) {
       throw new UnauthorizedException('Usuário Google inválido')
     }
 
@@ -421,14 +356,22 @@ export class AuthService {
 
     const hashedPassword = await bcrypt.hash(password, 10)
 
-    await this.prisma.user.update({
-      where: { id: user.id },
+    const updated = await this.prisma.user.updateMany({
+      where: {
+        id: user.id,
+        resetToken: this.hashToken(normalizedToken),
+        resetTokenExpiresAt: { gt: new Date() },
+      },
       data: {
         password: hashedPassword,
+        sessionVersion: { increment: 1 },
         resetToken: null,
         resetTokenExpiresAt: null,
       },
     })
+    if (updated.count !== 1) {
+      throw new UnauthorizedException('Token inválido ou expirado')
+    }
 
     return {
       success: true,
@@ -460,8 +403,8 @@ export class AuthService {
       throw new UnauthorizedException('Conta não ativada')
     }
 
-    if (!user.person) {
-      throw new UnauthorizedException('Usuário sem identidade operacional')
+    if (!user.person || !user.person.active) {
+      throw new UnauthorizedException('Usuário sem identidade operacional ativa')
     }
 
     const valid = await bcrypt.compare(password, user.password)

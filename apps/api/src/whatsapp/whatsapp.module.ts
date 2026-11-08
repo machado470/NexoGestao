@@ -18,12 +18,12 @@ import { WhatsAppIntelligenceService } from './whatsapp-intelligence.service'
 import { WhatsAppExecutionService } from './whatsapp-execution.service'
 import { IdempotencyCacheService } from '../common/idempotency/idempotency-cache.service'
 import { IdempotencyInterceptor } from '../common/idempotency/idempotency.interceptor'
-import { HealthModule } from '../health/health.module'
+import { WhatsAppMetricsModule } from '../common/metrics/whatsapp-metrics.module'
 
 const testControllers = process.env.NODE_ENV === 'production' ? [] : [WhatsAppTestController]
 
 @Module({
-  imports: [PrismaModule, QueueModule, TimelineModule, QuotasModule, HealthModule],
+  imports: [PrismaModule, QueueModule, TimelineModule, QuotasModule, WhatsAppMetricsModule],
   controllers: [...testControllers, WhatsAppController],
   providers: [
     WhatsAppService,

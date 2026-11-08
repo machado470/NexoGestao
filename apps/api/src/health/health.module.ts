@@ -3,7 +3,7 @@ import { HealthController } from './health.controller'
 import { PrismaModule } from '../prisma/prisma.module'
 import { QueueModule } from '../queue/queue.module'
 import { InternalStatsController } from './internal-stats.controller'
-import { WhatsAppObservabilityService } from '../common/metrics/whatsapp-observability.service'
+import { WhatsAppMetricsModule } from '../common/metrics/whatsapp-metrics.module'
 import { OperationalDiagnosticsService } from './operational-diagnostics.service'
 import { OperationalSignalsService } from './operational-signals.service'
 import { QueueMetricsExporterService } from '../common/metrics/queue-metrics-exporter.service'
@@ -19,9 +19,9 @@ import { TenantOperationsController } from './tenant-operations.controller'
 import { TenantOperationsService } from './tenant-operations.service'
 
 @Module({
-  imports: [PrismaModule, QueueModule, NotificationsModule, OutboxModule, BillingModule, DashboardModule],
+  imports: [WhatsAppMetricsModule, PrismaModule, QueueModule, NotificationsModule, OutboxModule, BillingModule, DashboardModule],
   controllers: [HealthController, InternalStatsController, OperationsController, TenantOperationsController],
-  providers: [WhatsAppObservabilityService, OperationalDiagnosticsService, OperationalSignalsService, QueueMetricsExporterService, OperationalMonitoringService, OperationalIncidentsService, TenantOperationsService, ActiveUserGuard],
-  exports: [WhatsAppObservabilityService],
+  providers: [OperationalDiagnosticsService, OperationalSignalsService, QueueMetricsExporterService, OperationalMonitoringService, OperationalIncidentsService, TenantOperationsService, ActiveUserGuard],
+  exports: [WhatsAppMetricsModule],
 })
 export class HealthModule {}

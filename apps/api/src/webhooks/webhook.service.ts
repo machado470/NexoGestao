@@ -7,6 +7,7 @@ import { QueueService } from '../queue/queue.service'
 import { QUEUE_NAMES, WEBHOOK_QUEUE_JOB_NAMES } from '../queue/queue.constants'
 import { buildOperationalLogContext } from '../common/logging/operational-log-context'
 import { webhookDispatchJobId } from './webhook-job-id'
+import { validateWebhookUrl } from './webhook-http'
 
 @Injectable()
 export class WebhookService {
@@ -28,6 +29,7 @@ export class WebhookService {
   }
 
   async createEndpoint(orgId: string, dto: CreateWebhookDto) {
+    validateWebhookUrl(dto.url)
     const delegate = this.webhookEndpointDelegate
     if (!delegate) {
       return {
@@ -74,6 +76,7 @@ export class WebhookService {
   }
 
   async updateEndpoint(orgId: string, id: string, dto: UpdateWebhookDto) {
+    if (dto.url !== undefined) validateWebhookUrl(dto.url)
     const delegate = this.webhookEndpointDelegate
     if (!delegate) {
       throw new NotFoundException('Webhook endpoint não disponível neste ambiente')
