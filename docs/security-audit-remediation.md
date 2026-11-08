@@ -76,50 +76,62 @@ CI runs those separately through `scripts/run-phase23c-recovery.sh`, using their
 required dedicated PostgreSQL/Redis endpoints and cleanup. Recovery tests are not
 silently skipped or run against shared CI services.
 
-## Dependency refresh
+## Dependency remediation follow-up
 
-The pnpm 10.30.3 lockfile was refreshed within the declared dependency ranges.
-Nest stays on major 11; OpenTelemetry uses the compatible SDK 2 family
-(sdk-node/exporter 0.223, auto-instrumentations 0.81, API 1.9). The real SDK trace
-regression uses the SDK 2 constructor API for span processors. The tracing startup,
-Prometheus HTTP endpoint and shutdown were also exercised with telemetry enabled.
+The production dependency audit now reports zero findings at every severity.
+The complete audit reports zero critical/high/moderate findings and one low
+registry advisory for deepmerge 4.3.1. There is no upstream patched release for
+GHSA-gcqx-w48m-w2h4. Its vulnerable code is patched locally through pnpm's
+`patchedDependencies`, with the patch hash recorded in the lockfile. No advisory
+is ignored or suppressed in the audit configuration.
 
-Scoped overrides require patched protobufjs 8 and multer 2 versions. tRPC packages
-are aligned on 11.16. Vitest was migrated to 4.1.12 (compatible with the project's
-Node 20/24 environment) to remove critical test-server and worker-pool advisories.
+The patch defines own data properties instead of assigning through inherited
+setters when constructing merge results. This prevents an own `__proto__` input
+key from poisoning the returned object's prototype, without dropping legitimate
+data or changing array/custom merge behavior. It covers source, CJS and UMD files.
+The regression reproduces the defect before the patch and verifies the actual
+copies loaded by Jest and Nest CLI plus the UMD build. Run
+`pnpm test:security:dependencies`; it is also part of preflight and CI. Remove the
+local patch only after an upstream fix is available and the regression still passes.
 
-At the verification snapshot, `pnpm audit --prod --json` reported **0 critical,
-0 high, 10 moderate and 1 low** findings. The complete audit including development
-reported **0 critical, 0 high, 14 moderate and 2 low**. The original production
-snapshot was 1 critical, 47 high, 74 moderate and 13 low. Counts describe advisory
-records, not demonstrated application exploits, and may change with the registry.
+Sentry Node, profiling and React move to SDK 10.78, aligned with OpenTelemetry API
+1.9.1. UUID moves to 11.1.1; its obsolete external types package is removed. Scoped
+resolutions update gaxios 7, glob, minimatch and postcss-selector-parser. Streamdown
+keeps its existing API while its math plugin resolves patched KaTeX 0.18.2. This
+release preserves the Node 20 compatibility required by the current images. Nest
+runtime and CLI remain on major 11; no Node major migration is required.
 
-Remaining production findings require separate compatibility work: Sentry 8 pins
-older OpenTelemetry instrumentation/core; uuid 9 has a bounds-check advisory in
-v3/v5/v6 while this application imports v4; streamdown pins KaTeX 0.16; Google's
-resource detector reaches older glob/minimatch through gaxios/rimraf. These were
-not suppressed or overridden across incompatible major versions. See
-`docs/security-dependency-advisories.json` for exact versions, paths and links.
+The native Sentry profiler is allowed in pnpm's build list. The actual SDK and
+native profiling were exercised with an in-memory event transport under Node 24
+and under Node 20 in an offline container; no events were sent externally. Tests
+also cover redaction, disabled/failed initialization, math rendering, Markdown
+formatting and untrusted content.
 
-## Local verification results after the follow-up
+Docker install stages copy the patch before immutable installation and pin pnpm
+10.30.3, so a global package-manager upgrade cannot silently omit the patch.
+The canonical image accepts an optional build-secret CA for managed proxy trust;
+no certificate is copied into an image layer. Local environment files and nested
+node_modules are excluded from build contexts.
 
-The complete `pnpm ci:preflight` command passed on the final dependency set.
+Exact audit counts and the remediated registry advisory are recorded in
+`docs/security-dependency-advisories.json`. Counts are registry advisory records,
+not a guarantee that the application is free of all security defects.
 
-- Full API test command: 130 suites / 721 tests passed; 52 real-infrastructure tests
-  are intentionally skipped in that command and exercised by the separate runs.
-- Vitest 4 frontend/BFF suite: 76 files / 576 tests passed.
-- Main integration command with real PostgreSQL/Redis: 12 suites / 53 tests passed;
-  the 8 separately gated suites were run explicitly below.
-- Additional isolated execution, governance, operational state, risk, reconciliation
-  and Outbox integration: 7 suites / 16 tests passed.
-- Pristine-database bootstrap integration: 1 test passed.
-- Dedicated Phase 2.3C recovery script: 3 suites / 5 tests passed, including real
-  service stop/start and webhook replay; the script cleaned its containers/volume.
-- Enabled OpenTelemetry startup, Prometheus HTTP response and shutdown passed.
-- Headless Chromium loaded the built login page and rendered its password form.
-- TypeScript checks, immutable pnpm installation, Prisma migration/client checks,
-  API/frontend/BFF builds, web lint and whitespace validation passed.
+## Verification of the remaining-advisories change
 
-No failing broad application integration remains from the earlier dependency cycle.
-Real Google OAuth and external telemetry providers were not exercised; no production
-configuration was changed.
+- Immutable pnpm 10.30.3 installation and full `pnpm ci:preflight` passed.
+- API: 131 suites / 724 tests passed; real-infrastructure suites remain separately
+  gated in this command. Web/BFF: 77 files / 580 tests passed.
+- Patched dependency regression: 12 cases passed under Node 24 and in an offline
+  Node 20 container. The original package failed the poisoning reproductions.
+- Main PostgreSQL/Redis integration run: 12 suites / 53 tests passed.
+- Actual Sentry SDK/profiling smoke passed with an in-memory transport under both
+  Node 24 and Node 20. No external provider credentials or events were used.
+- The canonical Docker image reached dependency installation locally, but the full
+  image build ran out of the managed environment's 8 GB disk while copying layers.
+  Only cache records from that attempt were removed. CI now builds the complete
+  image and runs the patched-dependency and compiled API import smoke in it.
+
+Production data and deployment were not changed. This change requires an immutable
+install from the committed lockfile; copying manifests without the patch directory
+or switching package-manager major versions would invalidate that guarantee.

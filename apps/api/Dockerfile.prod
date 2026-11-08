@@ -4,10 +4,11 @@ FROM node:20-slim AS builder
 WORKDIR /app
 
 # Instalar dependências globais
-RUN npm install -g pnpm
+RUN npm install -g pnpm@10.30.3
 
 # Copiar arquivos de manifesto do workspace
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY patches ./patches
 COPY apps/api/package.json apps/api/package.json
 
 # Instalar dependências
@@ -35,10 +36,11 @@ RUN apt-get update && apt-get install -y \
   curl \
   && rm -rf /var/lib/apt/lists/*
 
-RUN npm install -g pnpm
+RUN npm install -g pnpm@10.30.3
 
 # Copiar arquivos de manifesto para instalar apenas as dependências de produção
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY patches ./patches
 COPY apps/api/package.json apps/api/package.json
 
 # Instalar somente dependências de produção

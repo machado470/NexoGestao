@@ -17,7 +17,7 @@
     "whatsapp:provision-account": "tsx scripts/provision-whatsapp-provider-account.ts",
     "db:smoke:operational-actions": "node scripts/check-operational-actions-db.mjs",
     "smoke:operational-actions:diagnostics": "node scripts/smoke-operational-actions-diagnostics.mjs",
-    "ci:preflight": "pnpm prisma:check && pnpm -r typecheck && pnpm -s build && pnpm --filter ./apps/api test && pnpm --filter ./apps/web test",
+    "ci:preflight": "pnpm test:security:dependencies && pnpm prisma:check && pnpm -r typecheck && pnpm -s build && pnpm --filter ./apps/api test && pnpm --filter ./apps/web test",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "test": "turbo run test",
@@ -37,7 +37,8 @@
     "dev:health": "./scripts/dev-health.sh",
     "dev:logs": "./scripts/dev-logs.sh",
     "test:tenant:isolation": "docker compose -f docker-compose.yml up -d postgres redis && RUN_REAL_INTEGRATION=true pnpm --filter ./apps/api test -- test/integration/canonical-operational-workflow.spec.ts",
-    "test:dev-full-ports": "./scripts/test-dev-full-ports.sh"
+    "test:dev-full-ports": "./scripts/test-dev-full-ports.sh",
+    "test:security:dependencies": "node --test scripts/deepmerge-security.test.cjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -51,7 +52,12 @@
     "overrides": {
       "ioredis": "5.9.3",
       "protobufjs@>=8.0.0 <8.6.6": "^8.6.6",
-      "multer@>=2.0.0 <2.5.0": "^2.5.0"
+      "multer@>=2.0.0 <2.5.0": "^2.5.0",
+      "gaxios@>=7.0.0 <7.3.1": "^7.3.1",
+      "glob@>=9.0.0 <14.0.2": "^14.0.4",
+      "minimatch@>=9.0.0 <11.0.1": "^11.0.5",
+      "postcss-selector-parser@>=6.0.0 <6.1.5": "^6.1.5",
+      "katex@>=0.16.0 <0.18.2": "0.18.2"
     },
     "onlyBuiltDependencies": [
       "@nestjs/core",
@@ -63,8 +69,12 @@
       "esbuild",
       "msgpackr-extract",
       "prisma",
-      "unrs-resolver"
-    ]
+      "unrs-resolver",
+      "@sentry/node-cpu-profiler"
+    ],
+    "patchedDependencies": {
+      "deepmerge@4.3.1": "patches/deepmerge@4.3.1.patch"
+    }
   },
   "dependencies": {
     "@prisma/client": "5.22.0",

@@ -4,10 +4,11 @@ FROM node:20-slim AS builder
 WORKDIR /app
 
 # Instalar pnpm
-RUN npm install -g pnpm
+RUN npm install -g pnpm@10.30.3
 
 # Copiar manifestos
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY patches ./patches
 COPY apps/web/package.json apps/web/package.json
 
 # Instalar dependências
@@ -25,7 +26,7 @@ FROM node:20-slim
 WORKDIR /app
 
 # Instalar pnpm para rodar o script de start
-RUN npm install -g pnpm
+RUN npm install -g pnpm@10.30.3
 
 # Copiar package.json do web para o pnpm encontrar o script
 COPY apps/web/package.json apps/web/package.json
