@@ -26,8 +26,7 @@ describe('real OpenTelemetry SDK proofs', () => {
 
   it('continues an extracted W3C trace and exports the failed worker span', async () => {
     const exporter = new InMemorySpanExporter()
-    const provider = new NodeTracerProvider()
-    provider.addSpanProcessor(new SimpleSpanProcessor(exporter))
+    const provider = new NodeTracerProvider({ spanProcessors: [new SimpleSpanProcessor(exporter)] })
     provider.register({ propagator: new W3CTraceContextPropagator() })
     const parentTraceId = '11111111111111111111111111111111'
     const parentSpanId = '2222222222222222'

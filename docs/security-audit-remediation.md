@@ -60,34 +60,66 @@ policy remains covered by dedicated destination security tests.
 
 Live Google OAuth was not exercised because no Google credentials were configured;
 cryptographic checks and BFF callback behavior were tested with controlled fixtures.
-Dependency advisory upgrades are a separate follow-up. No production database,
-production sessions, deployment or secrets were changed by this implementation.
+No production database, production sessions, deployment or secrets were changed
+by this implementation. Remaining advisory migrations are listed below.
 
-## Integration blocker confirmed on the baseline
+## Application bootstrap and CI isolation
 
-The broad AppModule integration run cannot initialize WhatsAppModule because its
-HealthModule import is undefined in the Health/Dashboard/Governance/Finance cycle.
-The same canonical-operational-workflow test failed with the same stack on the
-unmodified `e08dfaf0` baseline in an isolated worktree using the same installed
-dependencies. This is a pre-existing integration blocker, not a passing full E2E
-result. It needs a separate module dependency repair before release.
+WhatsApp previously imported HealthModule only to consume its metrics provider,
+creating a Health/Dashboard/Governance/Finance/WhatsApp import cycle. Metrics now
+live in the leaf WhatsAppMetricsModule, imported by both Health and WhatsApp. A
+complete AppModule compilation test verifies the dependency graph and that both
+consumers receive the same provider instance.
 
-The Phase 2.3C recovery suites additionally require their own exact dedicated
-Compose endpoints and correctly refused the generic disposable test database.
-Their recovery/fault-injection behavior was not validated in this run.
+The normal integration command excludes only the three Phase 2.3C recovery suites.
+CI runs those separately through `scripts/run-phase23c-recovery.sh`, using their
+required dedicated PostgreSQL/Redis endpoints and cleanup. Recovery tests are not
+silently skipped or run against shared CI services.
 
-## Local verification results
+## Dependency refresh
 
-- API unit/HTTP/security suite: 125 suites, 697 tests passed.
-- Web/BFF suite: 76 files, 576 tests passed.
-- Real PostgreSQL security regression suite: 5 tests passed.
-- Prisma schema validation, client generation, and all migrations on a disposable
-  PostgreSQL database: passed.
-- API and web TypeScript checks, API/frontend/BFF builds, web operating-system
-  lint, and git diff whitespace check: passed.
-- Broad application integration is not green: baseline startup cycle described
-  above remains unresolved. The full aggregate ci:preflight was not claimed.
+The pnpm 10.30.3 lockfile was refreshed within the declared dependency ranges.
+Nest stays on major 11; OpenTelemetry uses the compatible SDK 2 family
+(sdk-node/exporter 0.223, auto-instrumentations 0.81, API 1.9). The real SDK trace
+regression uses the SDK 2 constructor API for span processors. The tracing startup,
+Prometheus HTTP endpoint and shutdown were also exercised with telemetry enabled.
 
-Local commands used installed binaries. For the Prisma preflight helper, the
-environment's newer pnpm needed dependency auto-install and package-manager
-auto-switch disabled; the declared package manager/lockfile were not changed.
+Scoped overrides require patched protobufjs 8 and multer 2 versions. tRPC packages
+are aligned on 11.16. Vitest was migrated to 4.1.12 (compatible with the project's
+Node 20/24 environment) to remove critical test-server and worker-pool advisories.
+
+At the verification snapshot, `pnpm audit --prod --json` reported **0 critical,
+0 high, 10 moderate and 1 low** findings. The complete audit including development
+reported **0 critical, 0 high, 14 moderate and 2 low**. The original production
+snapshot was 1 critical, 47 high, 74 moderate and 13 low. Counts describe advisory
+records, not demonstrated application exploits, and may change with the registry.
+
+Remaining production findings require separate compatibility work: Sentry 8 pins
+older OpenTelemetry instrumentation/core; uuid 9 has a bounds-check advisory in
+v3/v5/v6 while this application imports v4; streamdown pins KaTeX 0.16; Google's
+resource detector reaches older glob/minimatch through gaxios/rimraf. These were
+not suppressed or overridden across incompatible major versions. See
+`docs/security-dependency-advisories.json` for exact versions, paths and links.
+
+## Local verification results after the follow-up
+
+The complete `pnpm ci:preflight` command passed on the final dependency set.
+
+- Full API test command: 130 suites / 721 tests passed; 52 real-infrastructure tests
+  are intentionally skipped in that command and exercised by the separate runs.
+- Vitest 4 frontend/BFF suite: 76 files / 576 tests passed.
+- Main integration command with real PostgreSQL/Redis: 12 suites / 53 tests passed;
+  the 8 separately gated suites were run explicitly below.
+- Additional isolated execution, governance, operational state, risk, reconciliation
+  and Outbox integration: 7 suites / 16 tests passed.
+- Pristine-database bootstrap integration: 1 test passed.
+- Dedicated Phase 2.3C recovery script: 3 suites / 5 tests passed, including real
+  service stop/start and webhook replay; the script cleaned its containers/volume.
+- Enabled OpenTelemetry startup, Prometheus HTTP response and shutdown passed.
+- Headless Chromium loaded the built login page and rendered its password form.
+- TypeScript checks, immutable pnpm installation, Prisma migration/client checks,
+  API/frontend/BFF builds, web lint and whitespace validation passed.
+
+No failing broad application integration remains from the earlier dependency cycle.
+Real Google OAuth and external telemetry providers were not exercised; no production
+configuration was changed.

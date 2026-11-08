@@ -81,6 +81,10 @@ jobs:
           RUN_REAL_INTEGRATION: "true"
         run: pnpm --filter ./apps/api test:integration:real
 
+      # Recovery tests intentionally stop infrastructure and require their own exact endpoints.
+      - name: Real PostgreSQL and Redis recovery integration
+        run: bash scripts/run-phase23c-recovery.sh
+
       # Outbox requires an isolated PostgreSQL database and has its own safety guard.
       - name: Real PostgreSQL Outbox integration
         run: bash scripts/run-outbox-integration.sh
