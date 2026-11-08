@@ -5,6 +5,7 @@ import { PrismaService } from '../../src/prisma/prisma.service'
 import { QueueService } from '../../src/queue/queue.service'
 import { QueueObservabilityService } from '../../src/common/metrics/queue-observability.service'
 import { WebhookService } from '../../src/webhooks/webhook.service'
+import * as webhookHttp from '../../src/webhooks/webhook-http'
 import { WebhookProcessor } from '../../src/queue/processors/webhook.processor'
 import { QUEUE_NAMES, WEBHOOK_QUEUE_JOB_NAMES } from '../../src/queue/queue.constants'
 import { assertDedicatedPhase23cInfrastructure, eventually } from './phase23c-harness'
@@ -30,6 +31,12 @@ describeRealIntegration('Phase 2.3C — REAL BULLMQ webhook DLQ, replay and tena
 
   beforeAll(async () => {
     assertDedicatedPhase23cInfrastructure()
+    // This suite exercises real queue/replay behavior using its controlled loopback receiver.
+    // Public-destination/TLS enforcement is covered independently in webhook-http.spec.ts.
+    jest.spyOn(webhookHttp, 'sendWebhook').mockImplementation(async (url, body, headers) => {
+      const response = await fetch(url, { method: 'POST', body, headers, signal: AbortSignal.timeout(15000), redirect: 'error' })
+      if (!response.ok) throw new Error(`Webhook HTTP error status=${response.status}`)
+    })
     server = createServer((request, response) => {
       request.resume()
       if (!destinationHealthy) { response.writeHead(503).end('controlled failure'); return }
@@ -66,6 +73,7 @@ describeRealIntegration('Phase 2.3C — REAL BULLMQ webhook DLQ, replay and tena
 
   afterAll(async () => {
     await processor?.onModuleDestroy()
+    jest.restoreAllMocks()
     if (queueService) {
       for (const name of [QUEUE_NAMES.WEBHOOKS, QUEUE_NAMES.WEBHOOKS_DLQ]) {
         await queueService.getQueue(name).obliterate({ force: true }).catch(() => undefined)

@@ -42,6 +42,7 @@ describe('AuthService Google OAuth', () => {
 
     const result = await service.validateGoogleUser({
       email: ' Existing@Example.com ',
+      emailVerified: true,
       role: 'ADMIN',
       orgId: 'org-from-client',
     })
@@ -52,6 +53,7 @@ describe('AuthService Google OAuth', () => {
     })
     expect(jwt.sign).toHaveBeenCalledWith({
       sub: persistedUser.id,
+      sessionVersion: 0,
       role: persistedUser.role,
       orgId: persistedUser.orgId,
       personId: persistedUser.person.id,
@@ -68,7 +70,7 @@ describe('AuthService Google OAuth', () => {
     const { service, prisma, jwt } = createSubject(null)
 
     await expect(
-      service.validateGoogleUser({ email: 'unknown@example.com' }),
+      service.validateGoogleUser({ email: 'unknown@example.com', emailVerified: true }),
     ).rejects.toBeInstanceOf(UnauthorizedException)
 
     expect(prisma.user.create).not.toHaveBeenCalled()
@@ -89,7 +91,7 @@ describe('AuthService Google OAuth', () => {
     const { service, jwt } = createSubject(user)
 
     await expect(
-      service.validateGoogleUser({ email: persistedUser.email }),
+      service.validateGoogleUser({ email: persistedUser.email, emailVerified: true }),
     ).rejects.toBeInstanceOf(UnauthorizedException)
     expect(jwt.sign).not.toHaveBeenCalled()
   })
@@ -103,4 +105,10 @@ describe('AuthService Google OAuth', () => {
     expect(prisma.user.findUnique).not.toHaveBeenCalled()
     expect(jwt.sign).not.toHaveBeenCalled()
   })
+  it.each([false, undefined])('denies Google profiles without verified email (%s)', async verified => {
+    const { service, jwt } = createSubject()
+    await expect(service.validateGoogleUser({ email: persistedUser.email, emailVerified: verified })).rejects.toBeInstanceOf(UnauthorizedException)
+    expect(jwt.sign).not.toHaveBeenCalled()
+  })
+
 })

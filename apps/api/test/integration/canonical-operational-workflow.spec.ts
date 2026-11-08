@@ -50,7 +50,7 @@ describeRealIntegration('Canonical Operational Workflow (e2e)', () => {
   const secondaryUserId = randomUUID()
 
   const authFor = (orgId: string, userId: string, personId: string) => {
-    const token = jwt.sign({ sub: userId, role: 'ADMIN', orgId, personId })
+    const token = jwt.sign({ sessionVersion: 0, sub: userId, role: 'ADMIN', orgId, personId })
     return { Authorization: `Bearer ${token}` }
   }
 

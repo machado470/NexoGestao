@@ -19,7 +19,7 @@ describeRealIntegration('Notifications SSE multi-instance (real PostgreSQL + Red
   let serviceA: NotificationsService; let baseB: string
   const orgA = randomUUID(), orgB = randomUUID(), userA = randomUUID(), userAOther = randomUUID(), userB = randomUUID()
   const jwt = new JwtService({ secret: process.env.JWT_SECRET })
-  const token = (userId: string, orgId: string) => jwt.sign({ sub: userId, orgId, role: 'ADMIN' }, { expiresIn: '5m' })
+  const token = (userId: string, orgId: string) => jwt.sign({ sessionVersion: 0, sub: userId, personId: userId, orgId, role: userId === userAOther ? 'STAFF' : 'ADMIN' }, { expiresIn: '5m' })
 
   async function createApp() {
     const module = await Test.createTestingModule({ imports: [AppModule] }).compile()
@@ -105,6 +105,11 @@ describeRealIntegration('Notifications SSE multi-instance (real PostgreSQL + Red
       { id: userAOther, orgId: orgA, email: `${userAOther}@test.invalid`, role: 'STAFF', active: true },
       { id: userB, orgId: orgB, email: `${userB}@test.invalid`, role: 'ADMIN', active: true },
     ] })
+    await prisma.person.createMany({ data: [
+      { id: userA, userId: userA, orgId: orgA, name: 'Admin A', role: 'ADMIN' },
+      { id: userAOther, userId: userAOther, orgId: orgA, name: 'Staff A', role: 'STAFF' },
+      { id: userB, userId: userB, orgId: orgB, name: 'Admin B', role: 'ADMIN' },
+    ] })
     expect(await appA.get(NotificationPubSubService).waitUntilReady()).toEqual({
       publisherReady: true, subscriberReady: true, subscribed: true, shuttingDown: false,
     })
@@ -115,6 +120,7 @@ describeRealIntegration('Notifications SSE multi-instance (real PostgreSQL + Red
 
   afterAll(async () => {
     await prisma?.notification.deleteMany({ where: { orgId: { in: [orgA, orgB] } } })
+    await prisma?.person.deleteMany({ where: { orgId: { in: [orgA, orgB] } } })
     await prisma?.user.deleteMany({ where: { orgId: { in: [orgA, orgB] } } })
     await prisma?.organization.deleteMany({ where: { id: { in: [orgA, orgB] } } })
     await Promise.allSettled([appA?.close(), appB?.close()])
@@ -129,7 +135,7 @@ describeRealIntegration('Notifications SSE multi-instance (real PostgreSQL + Red
     await request(appB.getHttpServer()).get(`/v1/notifications/stream?token=${token(userA, orgA)}&orgId=${orgA}&userId=${userA}`).expect(401)
     await request(appB.getHttpServer()).get('/v1/notifications/stream').set('Authorization', 'Bearer invalid').expect(401)
     await prisma.user.update({ where: { id: userAOther }, data: { active: false } })
-    await request(appB.getHttpServer()).get('/v1/notifications/stream').set('Authorization', `Bearer ${token(userAOther, orgA)}`).expect(403)
+    await request(appB.getHttpServer()).get('/v1/notifications/stream').set('Authorization', `Bearer ${token(userAOther, orgA)}`).expect(401)
     await prisma.user.update({ where: { id: userAOther }, data: { active: true } })
   })
 

@@ -35,7 +35,7 @@ describeRealIntegration('Phase 2 tenant mutation isolation (Postgres e2e)', () =
   }
   const orgIds = [ids.orgA, ids.orgB]
   const authA = () => ({
-    Authorization: `Bearer ${jwt.sign({ sub: ids.userA, role: 'ADMIN', orgId: ids.orgA, personId: ids.personA })}`,
+    Authorization: `Bearer ${jwt.sign({ sessionVersion: 0, sub: ids.userA, role: 'ADMIN', orgId: ids.orgA, personId: ids.personA })}`,
   })
 
   beforeAll(async () => {

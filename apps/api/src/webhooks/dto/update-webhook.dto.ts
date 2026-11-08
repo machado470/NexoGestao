@@ -2,7 +2,7 @@ import { IsArray, IsBoolean, IsOptional, IsString, IsUrl } from 'class-validator
 
 export class UpdateWebhookDto {
   @IsOptional()
-  @IsUrl({ require_protocol: true })
+  @IsUrl({ require_protocol: true, protocols: ['https'] })
   url?: string
 
   @IsOptional()
