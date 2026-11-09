@@ -10,7 +10,14 @@ describeRealIntegration('Audit safety regressions with PostgreSQL', () => {
   jest.setTimeout(30000)
   const prisma = new PrismaClient()
   const orgId = randomUUID()
-  const timeline = new TimelineService(prisma as any, {} as any, {} as any)
+  const deliveries: Array<{ event: any; person: any }> = []
+  const dispatcher = { dispatchTimelineEvent: async (input: any) => {
+    deliveries.push({
+      event: await prisma.timelineEvent.findUnique({ where: { id: input.timelineEventId } }),
+      person: await prisma.person.findUnique({ where: { id: input.data.personId } }),
+    })
+  } }
+  const timeline = new TimelineService(prisma as any, {} as any, dispatcher as any)
   const people = new PeopleService(prisma as any, {} as any, timeline)
   beforeAll(async () => {
     await prisma.organization.create({ data: { id: orgId, name: 'Audit safety', slug: `audit-${orgId}` } })
@@ -40,6 +47,9 @@ describeRealIntegration('Audit safety regressions with PostgreSQL', () => {
     expect(await prisma.user.count({ where: { orgId, active: true, role: 'ADMIN', person: { is: { active: true } } } })).toBe(1)
     expect(await prisma.auditEvent.count({ where: { orgId, action: 'PERSON_DEACTIVATED' } })).toBe(1)
     expect(await prisma.timelineEvent.count({ where: { orgId, action: 'PERSON_DEACTIVATED' } })).toBe(1)
+    expect(deliveries).toHaveLength(1)
+    expect(deliveries[0].event).toMatchObject({ orgId, action: 'PERSON_DEACTIVATED' })
+    expect(deliveries[0].person).toMatchObject({ orgId, active: false })
   })
   it('rolls back the activity change and audit when transactional timeline persistence fails', async () => {
     const person = await prisma.person.create({ data: { orgId, name: 'Worker', role: 'STAFF' } })
@@ -47,6 +57,7 @@ describeRealIntegration('Audit safety regressions with PostgreSQL', () => {
     await expect(failing.deactivatePerson(person.id, orgId, null)).rejects.toThrow('timeline failure')
     expect((await prisma.person.findUniqueOrThrow({ where: { id: person.id } })).active).toBe(true)
     expect(await prisma.auditEvent.count({ where: { orgId, personId: person.id } })).toBe(0)
+    expect(deliveries).toHaveLength(1)
   })
   it('rejects a payment if another connection edits the amount after validation reads it', async () => {
     const customer = await prisma.customer.create({ data: { orgId, name: 'Customer', phone: randomUUID() } })

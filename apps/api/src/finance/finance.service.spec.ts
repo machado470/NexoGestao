@@ -48,11 +48,20 @@ describe('FinanceService hardening', () => {
 
   it('rejects changing a settled charge amount without modifying the payment', async () => {
     const { service, prisma } = buildService()
-    prisma.charge.findFirst.mockResolvedValue({ id: 'ch-1', status: 'PAID', updatedAt: new Date() })
+    prisma.charge.findFirst.mockResolvedValue({ id: 'ch-1', status: 'PAID', amountCents: 1000, updatedAt: new Date() })
     prisma.charge.updateMany = jest.fn()
     await expect(service.updateCharge({ orgId: 'org-1', id: 'ch-1', amountCents: 20000, expectedUpdatedAt: new Date().toISOString() }))
       .rejects.toThrow('cobrança paga')
     expect(prisma.charge.updateMany).not.toHaveBeenCalled()
+  })
+
+  it('preserves note edits when the paid charge editor sends its unchanged amount', async () => {
+    const { service, prisma } = buildService()
+    const updatedAt = new Date()
+    prisma.charge.findFirst.mockResolvedValue({ id: 'ch-1', status: 'PAID', amountCents: 1000, updatedAt })
+    prisma.charge.updateMany = jest.fn().mockResolvedValue({ count: 1 })
+    await service.updateCharge({ orgId: 'org-1', id: 'ch-1', amountCents: 1000, notes: 'Recibo revisado', expectedUpdatedAt: updatedAt.toISOString() })
+    expect(prisma.charge.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ amountCents: 1000, notes: 'Recibo revisado' }) }))
   })
 
   it('does not create a payment when the charge changes after amount validation', async () => {

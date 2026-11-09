@@ -670,11 +670,11 @@ export class FinanceService {
   }) {
     const charge = await this.prisma.charge.findFirst({
       where: { id: input.id, orgId: input.orgId },
-      select: { id: true, status: true, paidAt: true, updatedAt: true },
+      select: { id: true, status: true, amountCents: true, paidAt: true, updatedAt: true },
     })
 
     if (!charge) throw new NotFoundException('Charge não encontrada')
-    if (charge.status === 'PAID' && input.amountCents !== undefined) {
+    if (charge.status === 'PAID' && input.amountCents !== undefined && input.amountCents !== charge.amountCents) {
       throw new BadRequestException('O valor de uma cobrança paga não pode ser alterado.')
     }
 

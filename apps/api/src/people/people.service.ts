@@ -4,6 +4,8 @@ import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { TimelineService } from '../timeline/timeline.service'
 
+type ActivityEvent = { input: Parameters<TimelineService['logInTransaction']>[0]; id: string }
+
 @Injectable()
 export class PeopleService {
   private static readonly MAX_DAILY_CAPACITY = 100
@@ -76,17 +78,16 @@ export class PeopleService {
   async updatePerson(id: string, orgId: string, data: any, actorUserId: string | null = null) {
     if (data?.active !== undefined) {
       if (typeof data.active !== 'boolean') throw new BadRequestException('active deve ser booleano.')
-      return this.prisma.$transaction(async tx => {
-        await this.lockActivityChange(tx, orgId, actorUserId)
-        return this.updatePersonRecord(id, orgId, data, tx, actorUserId)
-      })
+      return this.withActivityTransaction(orgId, actorUserId, (tx, events) =>
+        this.updatePersonRecord(id, orgId, data, tx, actorUserId, events),
+      )
     }
     return this.updatePersonRecord(id, orgId, data, this.prisma, actorUserId)
   }
 
   private async updatePersonRecord(
     id: string, orgId: string, data: any,
-    db: Prisma.TransactionClient, actorUserId: string | null,
+    db: Prisma.TransactionClient, actorUserId: string | null, events: ActivityEvent[] = [],
   ) {
     const person = await db.person.findFirst({
       where: { id, orgId },
@@ -134,13 +135,31 @@ export class PeopleService {
         entityType: 'Person', entityId: id,
         metadata: { previouslyActive: person.active, active: data.active },
       } })
-      await this.timeline.logInTransaction({
+      const input = {
         orgId, personId: id, action,
         description: data.active ? 'Pessoa reativada' : 'Pessoa desativada (soft delete)',
         metadata: { actorUserId, active: data.active },
-      }, db)
+      }
+      const event = await this.timeline.logInTransaction(input, db)
+      events.push({ input, id: event.id })
     }
     return db.person.findFirst({ where: { id, orgId } })
+  }
+
+  private async withActivityTransaction<T>(
+    orgId: string, actorUserId: string | null,
+    work: (tx: Prisma.TransactionClient, events: ActivityEvent[]) => Promise<T>,
+  ): Promise<T> {
+    const events: ActivityEvent[] = []
+    const result = await this.prisma.$transaction(async tx => {
+      await this.lockActivityChange(tx, orgId, actorUserId)
+      return work(tx, events)
+    })
+    // External delivery only sees committed evidence, never a rolled-back event.
+    for (const event of events) {
+      await this.timeline.dispatchPersistedEventWebhook(event.input, event.id)
+    }
+    return result
   }
 
   private async lockActivityChange(tx: Prisma.TransactionClient, orgId: string, actorUserId: string | null) {
@@ -177,14 +196,13 @@ export class PeopleService {
 
   /** Both entry points use the same transaction, protections and authoritative evidence. */
   async deactivatePerson(id: string, orgId: string, actorUserId: string | null) {
-    return this.prisma.$transaction(async tx => {
-      await this.lockActivityChange(tx, orgId, actorUserId)
+    return this.withActivityTransaction(orgId, actorUserId, async (tx, events) => {
       const person = await tx.person.findFirst({ where: { id, orgId } })
       if (!person) throw new NotFoundException('Pessoa não encontrada')
       if (!person.active) return { ok: true, message: 'Pessoa já estava inativa', person }
       const updated = await this.updatePersonRecord(id, orgId, {
         active: false, expectedUpdatedAt: person.updatedAt.toISOString(),
-      }, tx, actorUserId)
+      }, tx, actorUserId, events)
       return { ok: true, person: updated }
     })
   }

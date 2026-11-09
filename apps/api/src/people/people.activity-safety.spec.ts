@@ -15,7 +15,7 @@ describe('People activity safety', () => {
       user: { findFirst: jest.fn().mockResolvedValue({ id: 'admin' }), count: jest.fn().mockResolvedValue(1) },
       auditEvent: { create: jest.fn().mockResolvedValue({}) },
     }
-    timeline = { logInTransaction: jest.fn().mockResolvedValue({}) }
+    timeline = { logInTransaction: jest.fn().mockResolvedValue({ id: 'event-1' }), dispatchPersistedEventWebhook: jest.fn().mockResolvedValue(undefined) }
     service = new PeopleService({ $transaction: (fn: any) => fn(tx) } as any, {} as any, timeline)
   })
   const edit = (s: PeopleService) => s.updatePerson('person', 'org', { active: false, expectedUpdatedAt: stamp.toISOString() }, 'actor')
@@ -38,6 +38,18 @@ describe('People activity safety', () => {
     expect(tx.user.count).toHaveBeenCalledWith({ where: { orgId: 'org', id: { not: 'admin' }, active: true, role: 'ADMIN', person: { is: { active: true } } } })
     expect(tx.auditEvent.create).toHaveBeenCalledWith({ data: expect.objectContaining({ orgId: 'org', actorUserId: 'actor', personId: 'person', action: 'PERSON_DEACTIVATED' }) })
     expect(timeline.logInTransaction).toHaveBeenCalledWith(expect.objectContaining({ orgId: 'org', personId: 'person', action: 'PERSON_DEACTIVATED' }), tx)
+  })
+  it.each(['PATCH', 'DELETE'])('%s dispatches the persisted event only after commit', async route => {
+    let committed = false
+    service = new PeopleService({ $transaction: async (fn: any) => { const result = await fn(tx); committed = true; return result } } as any, {} as any, timeline)
+    timeline.dispatchPersistedEventWebhook.mockImplementation(async () => { expect(committed).toBe(true) })
+    await (route === 'PATCH' ? edit(service) : service.deactivatePerson('person', 'org', 'actor'))
+    expect(timeline.dispatchPersistedEventWebhook).toHaveBeenCalledWith(expect.objectContaining({ action: 'PERSON_DEACTIVATED', orgId: 'org', personId: 'person' }), 'event-1')
+  })
+  it('never dispatches an event if the transaction fails at commit', async () => {
+    service = new PeopleService({ $transaction: async (fn: any) => { await fn(tx); throw new Error('commit failed') } } as any, {} as any, timeline)
+    await expect(edit(service)).rejects.toThrow('commit failed')
+    expect(timeline.dispatchPersistedEventWebhook).not.toHaveBeenCalled()
   })
   it('rejects an actor whose administrative access changed while waiting for the lock', async () => {
     tx.user.findFirst.mockResolvedValueOnce(null)
