@@ -203,7 +203,6 @@ export function EditChargeModal({
       id: chargeId,
       amountCents: parsed.data.amountCents,
       dueDate: new Date(`${parsed.data.dueDate}T12:00:00`).toISOString(),
-      status: parsed.data.status === "CANCELED" ? "CANCELED" : undefined,
       notes: parsed.data.notes || undefined,
       expectedUpdatedAt:
         typeof charge?.updatedAt === "string" ? charge.updatedAt : undefined,
@@ -345,20 +344,8 @@ export function EditChargeModal({
                     <label className="mb-2 block text-sm font-medium text-[var(--text-primary)]">
                       Status
                     </label>
-                    <select
-                      value={formData.status}
-                      onChange={e =>
-                        setFormData({ ...formData, status: e.target.value })
-                      }
-                      className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2.5 text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/35 disabled:cursor-not-allowed disabled:opacity-100 disabled:text-[var(--text-muted)]"
-                      disabled={disableEditing || updateCharge.isPending}
-                    >
-                      <option value="PENDING">Manter ativa</option>
-                      <option value="CANCELED">Cancelar cobrança</option>
-                    </select>
-                    <p className="mt-1 text-xs text-[var(--text-muted)]">
-                      O backend só permite cancelamento manual. Cobranças pagas
-                      seguem o fluxo de pagamento.
+                    <p className="text-sm text-[var(--text-secondary)]">
+                      Para cancelar, use a ação “Cancelar cobrança” na lista e informe o motivo.
                     </p>
                   </div>
 
@@ -439,12 +426,10 @@ export function EditChargeModal({
 
                   <div>
                     <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
-                      Ação de status
+                      Status atual
                     </p>
                     <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
-                      {formData.status === "CANCELED"
-                        ? "Cancelar cobrança"
-                        : "Manter ativa"}
+                      {getStatusLabel(charge?.status)}
                     </p>
                   </div>
 

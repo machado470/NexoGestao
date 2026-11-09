@@ -63,6 +63,12 @@ export class FinanceService {
     private readonly outbox: OutboxService,
   ) {}
 
+  private assertAmountCents(amountCents: number) {
+    if (!Number.isInteger(amountCents) || amountCents < 1 || amountCents > 2_147_483_647) {
+      throw new BadRequestException('amountCents deve ser um inteiro entre 1 e 2147483647.')
+    }
+  }
+
   private logCritical(params: {
     level: 'log' | 'warn' | 'error'
     action: string
@@ -480,9 +486,7 @@ export class FinanceService {
     serviceOrderId?: string | null
     idempotencyKey?: string | null
   }) {
-    if (input.amountCents <= 0) {
-      throw new BadRequestException('amountCents deve ser maior que zero')
-    }
+    this.assertAmountCents(input.amountCents)
     this.logCritical({
       level: 'log',
       action: 'CREATE_CHARGE_START',
@@ -668,6 +672,10 @@ export class FinanceService {
     actorUserId?: string | null
     expectedUpdatedAt?: string | null
   }) {
+    if (input.amountCents !== undefined) this.assertAmountCents(input.amountCents)
+    if (input.status === 'CANCELED') {
+      throw new BadRequestException('Use o fluxo de cancelamento com motivo obrigatório.')
+    }
     const charge = await this.prisma.charge.findFirst({
       where: { id: input.id, orgId: input.orgId },
       select: { id: true, status: true, amountCents: true, paidAt: true, updatedAt: true },
@@ -680,9 +688,6 @@ export class FinanceService {
 
     if (input.status) {
       this.assertChargeStatusTransition(charge.status, input.status)
-    }
-    if (charge.status === 'PAID' && input.status === 'CANCELED') {
-      throw new BadRequestException('Cobrança paga não pode ser cancelada')
     }
 
     const expectedUpdatedAt = this.parseExpectedUpdatedAt(
@@ -726,11 +731,8 @@ export class FinanceService {
     })
     await this.safeTimelineLog({
       orgId: input.orgId,
-      action: input.status === 'CANCELED' ? 'CHARGE_CANCELED' : 'CHARGE_UPDATED',
-      description:
-        input.status === 'CANCELED'
-          ? `Cobrança ${charge.id} cancelada`
-          : `Cobrança ${charge.id} atualizada`,
+      action: 'CHARGE_UPDATED',
+      description: `Cobrança ${charge.id} atualizada`,
       chargeId: charge.id,
       metadata: {
         actorUserId: input.actorUserId ?? null,
@@ -1172,9 +1174,7 @@ export class FinanceService {
       throw new BadRequestException('serviceOrderId é obrigatório para vincular cobrança')
     }
 
-    if (!input.amountCents || input.amountCents <= 0) {
-      throw new BadRequestException('Valor da cobrança inválido para a O.S.')
-    }
+    this.assertAmountCents(input.amountCents)
 
     const idemKey = [
       'service-order-charge-link',
@@ -1497,7 +1497,7 @@ export class FinanceService {
       include: { customer: true },
     })
 
-    if (!charge || !charge.customer?.phone) return
+    if (!charge || !charge.customer?.phone || !['PENDING', 'OVERDUE'].includes(charge.status)) return
 
     const amount = this.formatCurrency(charge.amountCents)
     const dueDate = this.formatDate(charge.dueDate)
@@ -1525,10 +1525,10 @@ export class FinanceService {
       select: { id: true, status: true },
     })
     if (!charge) throw new NotFoundException('Charge não encontrada')
-    if (charge.status === 'PAID') {
+    if (charge.status !== 'PENDING' && charge.status !== 'OVERDUE') {
       throw new BadRequestException({
         code: 'CHARGE_STATE_INVALID_FOR_REMINDER',
-        message: 'Cobrança paga não deve receber lembrete de cobrança.',
+        message: 'Somente cobranças pendentes ou vencidas podem receber lembretes.',
         details: { chargeId: charge.id, status: charge.status },
       })
     }

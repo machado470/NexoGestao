@@ -75,6 +75,13 @@ const paidCharge = () => ({
 describe("finance critical mutation output contracts", () => {
   beforeEach(() => vi.restoreAllMocks());
 
+  it("rejects cancellation through editing without calling the API", async () => {
+    const fetch = respond(updatedCharge());
+    await expect(caller().finance.charges.update({ id: "charge-1", status: "CANCELED" }))
+      .rejects.toThrow("motivo obrigatório");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it("returns only the validated create contract from the global API envelope", async () => {
     respond(createdCharge());
     await expect(caller().finance.charges.create({

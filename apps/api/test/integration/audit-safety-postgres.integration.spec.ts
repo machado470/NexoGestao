@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client'
 import { randomUUID } from 'crypto'
 import { PeopleService } from '../../src/people/people.service'
 import { FinanceService } from '../../src/finance/finance.service'
+import { AuditService } from '../../src/audit/audit.service'
 import { TimelineService } from '../../src/timeline/timeline.service'
 import { describeRealIntegration } from './infra-guards'
 
@@ -12,6 +13,7 @@ describeRealIntegration('Audit safety regressions with PostgreSQL', () => {
   const orgId = randomUUID()
   const deliveries: Array<{ event: any; person: any }> = []
   const dispatcher = { dispatchTimelineEvent: async (input: any) => {
+    if (!input.data.personId) return
     deliveries.push({
       event: await prisma.timelineEvent.findUnique({ where: { id: input.timelineEventId } }),
       person: await prisma.person.findUnique({ where: { id: input.data.personId } }),
@@ -93,4 +95,18 @@ describeRealIntegration('Audit safety regressions with PostgreSQL', () => {
     expect(await prisma.payment.count({ where: { chargeId: charge.id } })).toBe(0)
     expect(await prisma.charge.findUniqueOrThrow({ where: { id: charge.id } })).toMatchObject({ status: 'PENDING', amountCents: 2000 })
   })
+  it('requires a cancellation reason and preserves canonical cancellation metadata', async () => {
+    const customer = await prisma.customer.create({ data: { orgId, name: 'Cancel customer', phone: randomUUID() } })
+    const charge = await prisma.charge.create({ data: { orgId, customerId: customer.id, amountCents: 1000, dueDate: new Date() } })
+    const finance = new FinanceService(prisma as any, {} as any, timeline, {} as any, {} as any,
+      {} as any, {} as any, new AuditService(prisma as any), {} as any)
+    await expect(finance.updateCharge({ orgId, id: charge.id, status: 'CANCELED', expectedUpdatedAt: charge.updatedAt.toISOString() })).rejects.toThrow('motivo obrigatório')
+    expect((await prisma.charge.findUniqueOrThrow({ where: { id: charge.id } })).status).toBe('PENDING')
+    await expect(finance.cancelCharge({ orgId, id: charge.id, cancellationReason: ' ', expectedUpdatedAt: charge.updatedAt.toISOString() })).rejects.toThrow('Motivo')
+    await finance.cancelCharge({ orgId, id: charge.id, actorUserId: 'audit-actor', cancellationReason: 'Cobrança duplicada', expectedUpdatedAt: charge.updatedAt.toISOString() })
+    expect(await prisma.charge.findUniqueOrThrow({ where: { id: charge.id } })).toMatchObject({ status: 'CANCELED', canceledByUserId: 'audit-actor', cancellationReason: 'Cobrança duplicada', canceledAt: expect.any(Date) })
+    expect(await prisma.auditEvent.count({ where: { orgId, entityId: charge.id, action: 'CHARGE_CANCELED' } })).toBe(1)
+    await expect(finance.remindChargeInOrg(orgId, charge.id)).rejects.toThrow('Somente cobranças pendentes')
+  })
+
 })
