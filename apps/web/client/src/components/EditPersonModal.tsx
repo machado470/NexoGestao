@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { emptyPersonForm, initialPersonEditSession, personEditSessionReducer, type PersonEditValues } from "@/lib/person-edit-session";
+import { parsePlannedCapacityInput } from "@/lib/planned-capacity-input";
+import { useEffect, useMemo, useReducer, useRef } from "react";
 import { Loader2, Pencil, Save } from "lucide-react";
 import { toast } from "sonner";
 
@@ -39,25 +41,8 @@ type PersonDetails = {
   workloadNotes: string | null;
 };
 
-type FormData = {
-  name: string;
-  role: string;
-  email: string;
-  active: boolean;
-  dailyServiceOrderCapacity: string;
-  dailyAppointmentCapacity: string;
-  workloadNotes: string;
-};
-
-const DEFAULT_FORM: FormData = {
-  name: "",
-  role: "",
-  email: "",
-  active: true,
-  dailyServiceOrderCapacity: "",
-  dailyAppointmentCapacity: "",
-  workloadNotes: "",
-};
+type FormData = PersonEditValues;
+const DEFAULT_FORM = emptyPersonForm;
 
 function normalizePersonPayload(payload: unknown): PersonDetails | null {
   const raw = (payload as { data?: unknown } | null | undefined)?.data ?? payload;
@@ -123,6 +108,7 @@ export default function EditPersonModal({
   onClose,
   onSaved,
 }: Props) {
+  const utils = trpc.useUtils();
   const canLoad = open && Boolean(personId);
 
   const personQuery = trpc.people.getById.useQuery(
@@ -139,12 +125,15 @@ export default function EditPersonModal({
     [personQuery.data]
   );
 
-  const initialForm = useMemo(() => buildForm(personData), [personData]);
-  const [formData, setFormData] = useState<FormData>(DEFAULT_FORM);
-
+  const [session, dispatch] = useReducer(personEditSessionReducer, initialPersonEditSession);
+  const formData = session.values;
+  const initialForm = session.initial;
+  const current = useRef({ open, personId });
+  if (current.current.open !== open || current.current.personId !== personId) current.current = { open, personId };
   useEffect(() => {
-    setFormData(open ? initialForm : DEFAULT_FORM);
-  }, [open, initialForm]);
+    if (!open || !personId) dispatch({ type: "closed" });
+    else if (personData) dispatch({ type: "received", id: personId, version: personData.updatedAt ?? undefined, values: buildForm(personData) });
+  }, [open, personId, personData]);
 
   const hasChanges = useMemo(
     () => !formsAreEqual(formData, initialForm),
@@ -152,7 +141,8 @@ export default function EditPersonModal({
   );
 
   const updatePerson = trpc.people.update.useMutation({
-    onSuccess: () => {
+    onSuccess: saved => {
+      utils.people.getById.setData({ id: String(personId) }, saved);
       toast.success("Pessoa atualizada com sucesso.");
       onSaved();
       onClose();
@@ -162,7 +152,7 @@ export default function EditPersonModal({
         toast.error(getConcurrencyErrorMessage("cadastro da pessoa"), {
           action: {
             label: "Recarregar",
-            onClick: () => void personQuery.refetch(),
+            onClick: () => void reloadPerson(),
           },
         });
         return;
@@ -173,7 +163,18 @@ export default function EditPersonModal({
   });
 
   const handleChange = (field: keyof FormData, value: string | boolean) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    dispatch({ type: "edit", values: { [field]: value } });
+  };
+
+  const reloadPerson = async () => {
+    if (updatePerson.isPending || personQuery.isFetching) return;
+    if (hasChanges && !window.confirm("Recarregar descartará suas alterações não salvas. Deseja continuar?")) return;
+    const requestSession = current.current;
+    const result = await personQuery.refetch();
+    if (current.current !== requestSession || !current.current.open || current.current.personId !== personId) return;
+    const latest = normalizePersonPayload(result.data);
+    if (result.isError || !latest) { toast.error("Não foi possível recarregar. Suas alterações foram preservadas."); return; }
+    dispatch({ type: "reload", id: String(personId), version: latest.updatedAt ?? undefined, values: buildForm(latest) });
   };
 
   const handleSubmit = (event: React.FormEvent) => {
@@ -187,12 +188,14 @@ export default function EditPersonModal({
     const name = formData.name.trim();
     const role = formData.role.trim();
     const email = formData.email.trim();
-    const dailyServiceOrderCapacity = formData.dailyServiceOrderCapacity
-      ? Number(formData.dailyServiceOrderCapacity)
-      : undefined;
-    const dailyAppointmentCapacity = formData.dailyAppointmentCapacity
-      ? Number(formData.dailyAppointmentCapacity)
-      : undefined;
+    const serviceCapacity = parsePlannedCapacityInput(formData.dailyServiceOrderCapacity, initialForm.dailyServiceOrderCapacity ? Number(initialForm.dailyServiceOrderCapacity) : null);
+    const appointmentCapacity = parsePlannedCapacityInput(formData.dailyAppointmentCapacity, initialForm.dailyAppointmentCapacity ? Number(initialForm.dailyAppointmentCapacity) : null);
+    if (!serviceCapacity.ok || !appointmentCapacity.ok) {
+      toast.error("Informe capacidades inteiras de 1 a 100. Capacidades já definidas não podem ficar vazias.");
+      return;
+    }
+    const dailyServiceOrderCapacity = serviceCapacity.value;
+    const dailyAppointmentCapacity = appointmentCapacity.value;
 
     if (!name) {
       toast.error("Informe o nome da pessoa.");
@@ -218,11 +221,11 @@ export default function EditPersonModal({
       dailyServiceOrderCapacity,
       dailyAppointmentCapacity,
       workloadNotes: formData.workloadNotes.trim() || null,
-      expectedUpdatedAt: personData?.updatedAt ?? undefined,
+      expectedUpdatedAt: session.version,
     });
   };
 
-  const unavailable = personQuery.isError || !personData;
+  const unavailable = session.id !== personId || !personData;
 
   return (
     <FormModal
@@ -250,10 +253,11 @@ export default function EditPersonModal({
               {hasChanges ? "Alterações pendentes" : "Nada para salvar"}
             </span>
 
+            <Button type="button" variant="outline" disabled={updatePerson.isPending || personQuery.isFetching} onClick={() => void reloadPerson()}>Recarregar dados</Button>
             <Button
               type="button"
               variant="outline"
-              onClick={() => setFormData(initialForm)}
+              onClick={() => dispatch({ type: "discard" })}
               disabled={!hasChanges || updatePerson.isPending}
             >
               Descartar
@@ -282,6 +286,7 @@ export default function EditPersonModal({
         <AppErrorState message="Não foi possível carregar os dados da pessoa." />
       ) : (
         <AppForm id="edit-person-form" onSubmit={handleSubmit}>
+          {personQuery.isError ? <p role="alert" className="text-sm text-destructive">Não foi possível atualizar os dados. Suas alterações foram preservadas.</p> : null}
           <AppField label="Nome" htmlFor="edit-person-name">
             <AppInput
               id="edit-person-name"
@@ -314,10 +319,12 @@ export default function EditPersonModal({
             <AppField
               label="Capacidade diária de O.S."
               htmlFor="edit-person-service-order-capacity"
+              hint="Informe um inteiro de 1 a 100. Uma capacidade definida não pode ficar vazia."
             >
               <AppInput
                 id="edit-person-service-order-capacity"
                 type="number"
+                step="1"
                 min="1"
                 max="100"
                 value={formData.dailyServiceOrderCapacity}
@@ -331,10 +338,12 @@ export default function EditPersonModal({
             <AppField
               label="Capacidade diária de agendamentos"
               htmlFor="edit-person-appointment-capacity"
+              hint="Informe um inteiro de 1 a 100. Uma capacidade definida não pode ficar vazia."
             >
               <AppInput
                 id="edit-person-appointment-capacity"
                 type="number"
+                step="1"
                 min="1"
                 max="100"
                 value={formData.dailyAppointmentCapacity}

@@ -1,3 +1,4 @@
+import { parseMoneyInputToCents as parseAmountToCents } from "@/lib/money-input";
 import { Button } from "@/components/ui/button";
 import { useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -31,7 +32,10 @@ interface CreateChargeModalProps {
 }
 
 type ChargeMode = "MANUAL" | "RECURRING" | "SERVICE";
-type PostCreateAction = "CREATE_ONLY" | "CREATE_AND_CHARGE" | "CREATE_AND_TRACK";
+type PostCreateAction =
+  | "CREATE_ONLY"
+  | "CREATE_AND_CHARGE"
+  | "CREATE_AND_TRACK";
 
 type FormState = {
   mode: ChargeMode;
@@ -64,17 +68,6 @@ const postActionLabels: Record<PostCreateAction, string> = {
   CREATE_AND_CHARGE: "Criar e cobrar agora",
   CREATE_AND_TRACK: "Criar e acompanhar depois",
 };
-
-function parseAmountToCents(raw: string): number | null {
-  const normalized = raw.replace(/\s/g, "").replace(/\./g, "").replace(",", ".").trim();
-  const amount = Number(normalized);
-
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return null;
-  }
-
-  return Math.round(amount * 100);
-}
 
 function formatCurrencyFromInput(raw: string) {
   const cents = parseAmountToCents(raw);
@@ -129,8 +122,9 @@ export function CreateChargeModal({
 
   const selectedCustomerName = useMemo(() => {
     return (
-      customers.find((customer: any) => String(customer.id) === formData.customerId)
-        ?.name ?? "Nenhum cliente selecionado"
+      customers.find(
+        (customer: any) => String(customer.id) === formData.customerId
+      )?.name ?? "Nenhum cliente selecionado"
     );
   }, [customers, formData.customerId]);
 
@@ -144,7 +138,9 @@ export function CreateChargeModal({
 
   const shortNotes = formData.notes.trim();
   const summarizedNotes =
-    shortNotes.length > 60 ? `${shortNotes.slice(0, 57)}...` : shortNotes || "Sem observações";
+    shortNotes.length > 60
+      ? `${shortNotes.slice(0, 57)}...`
+      : shortNotes || "Sem observações";
 
   const resetAndClose = () => {
     if (createCharge.isPending) return;
@@ -156,7 +152,11 @@ export function CreateChargeModal({
     const customerId = formData.customerId.trim();
     const amount = formData.amount.trim();
     const dueDate = formData.dueDate;
-    const notes = [formData.notes.trim(), formData.serviceReference.trim() && `Ref.: ${formData.serviceReference.trim()}`]
+    const notes = [
+      formData.notes.trim(),
+      formData.serviceReference.trim() &&
+        `Ref.: ${formData.serviceReference.trim()}`,
+    ]
       .filter(Boolean)
       .join("\n");
 
@@ -180,7 +180,10 @@ export function CreateChargeModal({
       amountCents: parsed.data.amountCents,
       dueDate: new Date(`${parsed.data.dueDate}T12:00:00`).toISOString(),
       notes: parsed.data.notes || undefined,
-      idempotencyKey: buildIdempotencyKey("finance.create_charge", parsed.data.customerId),
+      idempotencyKey: buildIdempotencyKey(
+        "finance.create_charge",
+        parsed.data.customerId
+      ),
     };
 
     const previousCharges = utils.finance.charges.list.getData(undefined);
@@ -198,31 +201,40 @@ export function CreateChargeModal({
     });
 
     createCharge.mutate(payload, {
-      onSuccess: async (created) => {
+      onSuccess: async created => {
         utils.finance.charges.list.setData(undefined, (old: any) => {
           const raw = old as { data: any[]; pagination: any } | undefined;
           const applyReplace = (items: any[]) =>
-            items.map((item) => (String(item?.id) === tempId ? created : item));
+            items.map(item => (String(item?.id) === tempId ? created : item));
           if (!raw || !Array.isArray(raw.data)) return undefined;
           return { ...raw, data: applyReplace(raw.data) };
         });
 
-        const customerId = String((created as any)?.customerId ?? payload.customerId ?? "");
+        const customerId = String(
+          (created as any)?.customerId ?? payload.customerId ?? ""
+        );
         await invalidateOperationalGraph(utils, customerId || undefined);
-        const operationStatus = String((created as any)?.operation?.status ?? "").toLowerCase();
+        const operationStatus = String(
+          (created as any)?.operation?.status ?? ""
+        ).toLowerCase();
         const degraded = (created as any)?.degraded;
         const successMessage = resolveOperationFeedback({
           operationStatus,
           degradedStatus: degraded?.status,
           executedMessage: "Cobrança criada com contexto sincronizado.",
-          duplicateMessage: "Requisição duplicada detectada: cobrança reaproveitada com segurança.",
-          retryScheduledMessage: "Cobrança criada. WhatsApp entrou em modo pendente para retry.",
+          duplicateMessage:
+            "Requisição duplicada detectada: cobrança reaproveitada com segurança.",
+          retryScheduledMessage:
+            "Cobrança criada. WhatsApp entrou em modo pendente para retry.",
         });
 
         toast.success(successMessage, {
           action: {
             label: "Ver cobrança",
-            onClick: () => navigate(`/finances?chargeId=${String((created as any)?.id ?? "")}`),
+            onClick: () =>
+              navigate(
+                `/finances?chargeId=${String((created as any)?.id ?? "")}`
+              ),
           },
         });
 
@@ -263,7 +275,7 @@ export function CreateChargeModal({
         onSuccess();
         onClose();
       },
-      onError: (error) => {
+      onError: error => {
         utils.finance.charges.list.setData(undefined, previousCharges as any);
         toast.error(error.message || "Erro ao criar cobrança");
       },
@@ -273,7 +285,7 @@ export function CreateChargeModal({
   return (
     <FormModal
       open={isOpen}
-      onOpenChange={(open) => {
+      onOpenChange={open => {
         if (!open) resetAndClose();
       }}
       closeBlocked={createCharge.isPending}
@@ -289,10 +301,16 @@ export function CreateChargeModal({
       footer={
         <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-[var(--modal-section-muted)]">
-            Essa cobrança ficará disponível no acompanhamento financeiro imediatamente.
+            Essa cobrança ficará disponível no acompanhamento financeiro
+            imediatamente.
           </p>
           <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row">
-            <Button type="button" variant="outline" onClick={resetAndClose} disabled={createCharge.isPending}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={resetAndClose}
+              disabled={createCharge.isPending}
+            >
               Cancelar
             </Button>
             <Button
@@ -316,21 +334,26 @@ export function CreateChargeModal({
     >
       <div className="space-y-5">
         <section className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--modal-section-muted)]">Modo da cobrança</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--modal-section-muted)]">
+            Modo da cobrança
+          </p>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            {(Object.keys(chargeModeLabels) as ChargeMode[]).map((mode) => (
+            {(Object.keys(chargeModeLabels) as ChargeMode[]).map(mode => (
               <button
                 key={mode}
                 type="button"
                 disabled={createCharge.isPending}
-                onClick={() => setFormData((state) => ({ ...state, mode }))}
+                onClick={() => setFormData(state => ({ ...state, mode }))}
                 className="rounded-[0.82rem] nexo-field border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-2 text-left text-sm text-[var(--modal-section-text)] transition hover:border-[var(--accent-primary)]/50 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <p className="font-medium">{chargeModeLabels[mode]}</p>
                 <p className="text-xs text-[var(--modal-section-muted)]">
-                  {mode === "MANUAL" && "Fluxo direto para cobrança fora da rotina."}
-                  {mode === "RECURRING" && "Mantém padrão mensal com vencimento previsível."}
-                  {mode === "SERVICE" && "Vincule ao contexto de execução do serviço."}
+                  {mode === "MANUAL" &&
+                    "Fluxo direto para cobrança fora da rotina."}
+                  {mode === "RECURRING" &&
+                    "Mantém padrão mensal com vencimento previsível."}
+                  {mode === "SERVICE" &&
+                    "Vincule ao contexto de execução do serviço."}
                 </p>
               </button>
             ))}
@@ -338,13 +361,19 @@ export function CreateChargeModal({
         </section>
 
         <section className="space-y-4 rounded-[0.95rem] nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] p-4">
-          <p className="text-sm font-semibold text-[var(--modal-section-text)]">Dados essenciais</p>
+          <p className="text-sm font-semibold text-[var(--modal-section-text)]">
+            Dados essenciais
+          </p>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-[var(--modal-section-muted)]">Cliente *</label>
+            <label className="text-sm font-medium text-[var(--modal-section-muted)]">
+              Cliente *
+            </label>
             <Select
               value={formData.customerId}
-              onValueChange={(customerId) => setFormData((state) => ({ ...state, customerId }))}
+              onValueChange={customerId =>
+                setFormData(state => ({ ...state, customerId }))
+              }
               disabled={createCharge.isPending}
             >
               <SelectTrigger ref={customerSelectRef}>
@@ -359,97 +388,159 @@ export function CreateChargeModal({
               </SelectContent>
             </Select>
             {!formData.customerId ? (
-              <p className="text-xs text-[var(--modal-section-muted)]">Selecione o cliente para liberar o envio da cobrança.</p>
+              <p className="text-xs text-[var(--modal-section-muted)]">
+                Selecione o cliente para liberar o envio da cobrança.
+              </p>
             ) : null}
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-[var(--modal-section-muted)]">Valor *</label>
+              <label className="text-sm font-medium text-[var(--modal-section-muted)]">
+                Valor *
+              </label>
               <Input
                 inputMode="decimal"
                 placeholder="100,00"
+                aria-label="Valor em reais"
                 value={formData.amount}
-                onChange={(e) => setFormData((state) => ({ ...state, amount: e.target.value }))}
+                onChange={e =>
+                  setFormData(state => ({ ...state, amount: e.target.value }))
+                }
                 disabled={createCharge.isPending}
               />
-              <p className="text-xs text-[var(--modal-section-muted)]">Valor atual: {formatCurrencyFromInput(formData.amount)}</p>
+              <p className="text-xs text-[var(--modal-section-muted)]">
+                Valor atual: {formatCurrencyFromInput(formData.amount)}. Use
+                1234,56 ou 1.234,56.
+              </p>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-[var(--modal-section-muted)]">Vencimento *</label>
+              <label className="text-sm font-medium text-[var(--modal-section-muted)]">
+                Vencimento *
+              </label>
               <Input
                 type="date"
                 value={formData.dueDate}
-                onChange={(e) => setFormData((state) => ({ ...state, dueDate: e.target.value }))}
+                onChange={e =>
+                  setFormData(state => ({ ...state, dueDate: e.target.value }))
+                }
                 disabled={createCharge.isPending}
               />
-              <p className="text-xs text-[var(--modal-section-muted)]">Prévia: {formatDueDatePreview(formData.dueDate)}</p>
+              <p className="text-xs text-[var(--modal-section-muted)]">
+                Prévia: {formatDueDatePreview(formData.dueDate)}
+              </p>
             </div>
           </div>
         </section>
 
         <section className="space-y-4">
           <div className="space-y-2">
-            <p className="text-sm font-semibold text-[var(--modal-section-text)]">Contexto opcional</p>
-            <p className="text-xs text-[var(--modal-section-muted)]">Use apenas se ajudar no acompanhamento e na comunicação.</p>
+            <p className="text-sm font-semibold text-[var(--modal-section-text)]">
+              Contexto opcional
+            </p>
+            <p className="text-xs text-[var(--modal-section-muted)]">
+              Use apenas se ajudar no acompanhamento e na comunicação.
+            </p>
           </div>
 
           {formData.mode === "SERVICE" ? (
             <div className="space-y-2">
-              <label className="text-sm font-medium text-[var(--modal-section-muted)]">Referência do serviço</label>
+              <label className="text-sm font-medium text-[var(--modal-section-muted)]">
+                Referência do serviço
+              </label>
               <Input
                 placeholder="Ex.: OS #1042 · Troca de compressor"
                 value={formData.serviceReference}
-                onChange={(e) => setFormData((state) => ({ ...state, serviceReference: e.target.value }))}
+                onChange={e =>
+                  setFormData(state => ({
+                    ...state,
+                    serviceReference: e.target.value,
+                  }))
+                }
                 disabled={createCharge.isPending}
               />
             </div>
           ) : null}
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-[var(--modal-section-muted)]">Observações</label>
+            <label className="text-sm font-medium text-[var(--modal-section-muted)]">
+              Observações
+            </label>
             <Textarea
               rows={3}
               placeholder="Ex.: combinado com cliente para envio até 18h"
               className="max-h-32 resize-y"
               value={formData.notes}
-              onChange={(e) => setFormData((state) => ({ ...state, notes: e.target.value }))}
+              onChange={e =>
+                setFormData(state => ({ ...state, notes: e.target.value }))
+              }
               disabled={createCharge.isPending}
             />
           </div>
         </section>
 
         <section className="space-y-2 rounded-[0.95rem] nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] p-4">
-          <p className="text-sm font-semibold text-[var(--modal-section-text)]">Após criar</p>
+          <p className="text-sm font-semibold text-[var(--modal-section-text)]">
+            Após criar
+          </p>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            {(Object.keys(postActionLabels) as PostCreateAction[]).map((action) => (
-              <button
-                key={action}
-                type="button"
-                onClick={() => setFormData((state) => ({ ...state, postAction: action }))}
-                disabled={createCharge.isPending}
-                className="rounded-[0.82rem] nexo-field border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-2 text-left text-sm text-[var(--modal-section-text)] transition hover:border-[var(--accent-primary)]/50"
-              >
-                <span className="font-medium">{postActionLabels[action]}</span>
-                {action === "CREATE_AND_CHARGE" ? (
-                  <span className="mt-1 inline-flex items-center gap-1 text-xs text-[var(--modal-section-muted)]">
-                    <MessageCircle className="h-3.5 w-3.5" />
-                    Sugere envio imediato
+            {(Object.keys(postActionLabels) as PostCreateAction[]).map(
+              action => (
+                <button
+                  key={action}
+                  type="button"
+                  onClick={() =>
+                    setFormData(state => ({ ...state, postAction: action }))
+                  }
+                  disabled={createCharge.isPending}
+                  className="rounded-[0.82rem] nexo-field border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-2 text-left text-sm text-[var(--modal-section-text)] transition hover:border-[var(--accent-primary)]/50"
+                >
+                  <span className="font-medium">
+                    {postActionLabels[action]}
                   </span>
-                ) : null}
-              </button>
-            ))}
+                  {action === "CREATE_AND_CHARGE" ? (
+                    <span className="mt-1 inline-flex items-center gap-1 text-xs text-[var(--modal-section-muted)]">
+                      <MessageCircle className="h-3.5 w-3.5" />
+                      Sugere envio imediato
+                    </span>
+                  ) : null}
+                </button>
+              )
+            )}
           </div>
         </section>
 
         <section className="rounded-[0.95rem] nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] p-4">
-          <p className="text-sm font-semibold text-[var(--modal-section-text)]">Resumo ao vivo</p>
+          <p className="text-sm font-semibold text-[var(--modal-section-text)]">
+            Resumo ao vivo
+          </p>
           <div className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-            <p><span className="text-[var(--modal-section-muted)]">Cliente:</span> {selectedCustomerName}</p>
-            <p><span className="text-[var(--modal-section-muted)]">Valor:</span> {formatCurrencyFromInput(formData.amount)}</p>
-            <p><span className="text-[var(--modal-section-muted)]">Vencimento:</span> {formatDueDatePreview(formData.dueDate)}</p>
-            <p><span className="text-[var(--modal-section-muted)]">Tipo:</span> {chargeModeLabels[formData.mode]}</p>
-            <p className="sm:col-span-2"><span className="text-[var(--modal-section-muted)]">Observações:</span> {summarizedNotes}</p>
+            <p>
+              <span className="text-[var(--modal-section-muted)]">
+                Cliente:
+              </span>{" "}
+              {selectedCustomerName}
+            </p>
+            <p>
+              <span className="text-[var(--modal-section-muted)]">Valor:</span>{" "}
+              {formatCurrencyFromInput(formData.amount)}
+            </p>
+            <p>
+              <span className="text-[var(--modal-section-muted)]">
+                Vencimento:
+              </span>{" "}
+              {formatDueDatePreview(formData.dueDate)}
+            </p>
+            <p>
+              <span className="text-[var(--modal-section-muted)]">Tipo:</span>{" "}
+              {chargeModeLabels[formData.mode]}
+            </p>
+            <p className="sm:col-span-2">
+              <span className="text-[var(--modal-section-muted)]">
+                Observações:
+              </span>{" "}
+              {summarizedNotes}
+            </p>
           </div>
         </section>
       </div>

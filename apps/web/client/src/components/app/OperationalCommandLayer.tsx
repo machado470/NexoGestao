@@ -578,6 +578,7 @@ export function NexoExecutiveMetric(props: {
   context: string;
   ctaLabel: string;
   onClick: () => void;
+  disabled?: boolean;
   icon?: ReactNode;
   className?: string;
 }) {
@@ -605,6 +606,7 @@ export function NexoExecutiveMetric(props: {
         {props.context}
       </p>
       <Button
+        disabled={props.disabled}
         className="mt-auto h-8 justify-between px-3 text-xs"
         variant="secondary"
         onClick={props.onClick}

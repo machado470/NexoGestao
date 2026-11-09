@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { parseAvailabilityInterval } from "@/lib/availability-input";
+import { useMemo, useRef, useState } from "react";
 import { CalendarClock, Trash2, Wrench } from "lucide-react";
 import { useLocation } from "wouter";
 import CreatePersonModal from "@/components/CreatePersonModal";
@@ -225,6 +226,9 @@ export default function PeoplePage() {
     useState<AvailabilityFilter>("all");
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("all");
   const [roleFilter, setRoleFilter] = useState("all");
+  const availabilityPending = useRef(false);
+  const deletionPending = useRef(false);
+  const [availabilityError, setAvailabilityError] = useState<string | null>(null);
   const [startsAt, setStartsAt] = useState("");
   const [endsAt, setEndsAt] = useState("");
   const [reason, setReason] = useState("");
@@ -244,7 +248,10 @@ export default function PeoplePage() {
   );
   const createAvailabilityException =
     trpc.people.createAvailabilityException.useMutation({
+      onError: error => setAvailabilityError("Não foi possível registrar a indisponibilidade. " + error.message),
+      onSettled: () => { availabilityPending.current = false; },
       onSuccess: async () => {
+        setAvailabilityError(null);
         setStartsAt("");
         setEndsAt("");
         setReason("");
@@ -256,6 +263,7 @@ export default function PeoplePage() {
     });
   const deleteAvailabilityException =
     trpc.people.deleteAvailabilityException.useMutation({
+      onSettled: () => { deletionPending.current = false; },
       onSuccess: async () => {
         await Promise.all([
           utils.people.operationalSummary.invalidate(),
@@ -314,13 +322,12 @@ export default function PeoplePage() {
 
   const refresh = () => void summaryQuery.refetch();
   const submitAvailability = () => {
-    if (!selectedPersonId || !startsAt || !endsAt) return;
-    createAvailabilityException.mutate({
-      personId: selectedPersonId,
-      startsAt: new Date(startsAt).toISOString(),
-      endsAt: new Date(endsAt).toISOString(),
-      reason: reason.trim() || null,
-    });
+    if (!selectedPersonId || availabilityPending.current || deletionPending.current || deleteAvailabilityException.isPending) return;
+    const interval = parseAvailabilityInterval(startsAt, endsAt);
+    if (!interval.ok) { setAvailabilityError(interval.message); return; }
+    setAvailabilityError(null);
+    availabilityPending.current = true;
+    createAvailabilityException.mutate({ personId: selectedPersonId, startsAt: interval.startsAt, endsAt: interval.endsAt, reason: reason.trim() || null });
   };
 
   if (isInitializing) {
@@ -803,6 +810,7 @@ export default function PeoplePage() {
                   data-testid="availability-exception-form"
                 >
                   <h3 className="font-semibold">Registrar indisponibilidade</h3>
+                  {availabilityError ? <p role="alert" className="text-sm text-destructive">{availabilityError}</p> : null}
                   <div className="grid min-w-0 gap-2 sm:grid-cols-2">
                     <AppField
                       label="Início"
@@ -811,6 +819,7 @@ export default function PeoplePage() {
                       <AppInput
                         id="availability-exception-start"
                         type="datetime-local"
+                        disabled={createAvailabilityException.isPending || deleteAvailabilityException.isPending}
                         value={startsAt}
                         onChange={event => setStartsAt(event.target.value)}
                       />
@@ -822,6 +831,7 @@ export default function PeoplePage() {
                       <AppInput
                         id="availability-exception-end"
                         type="datetime-local"
+                        disabled={createAvailabilityException.isPending || deleteAvailabilityException.isPending}
                         value={endsAt}
                         onChange={event => setEndsAt(event.target.value)}
                       />
@@ -833,6 +843,7 @@ export default function PeoplePage() {
                   >
                     <AppInput
                       id="availability-exception-reason"
+                      disabled={createAvailabilityException.isPending || deleteAvailabilityException.isPending}
                       value={reason}
                       maxLength={200}
                       onChange={event => setReason(event.target.value)}
@@ -842,7 +853,7 @@ export default function PeoplePage() {
                     disabled={
                       !startsAt ||
                       !endsAt ||
-                      createAvailabilityException.isPending
+                      createAvailabilityException.isPending || deleteAvailabilityException.isPending
                     }
                     onClick={submitAvailability}
                   >
@@ -855,6 +866,7 @@ export default function PeoplePage() {
                 <h3 className="font-semibold">
                   Indisponibilidades registradas
                 </h3>
+                {deleteAvailabilityException.isError ? <p role="alert" className="text-sm text-destructive">Não foi possível remover a indisponibilidade. {deleteAvailabilityException.error.message}</p> : null}
                 {exceptionsQuery.isLoading ? (
                   <AppPageLoadingState description="Carregando indisponibilidades..." />
                 ) : exceptionsQuery.error ? (
@@ -883,13 +895,13 @@ export default function PeoplePage() {
                         <Button
                           size="icon"
                           variant="ghost"
+                          disabled={createAvailabilityException.isPending || deleteAvailabilityException.isPending}
                           aria-label={`Remover indisponibilidade de ${selectedPerson.name}`}
-                          onClick={() =>
-                            deleteAvailabilityException.mutate({
-                              personId: selectedPerson.personId,
-                              exceptionId: exception.id,
-                            })
-                          }
+                          onClick={() => {
+                            if (deletionPending.current || availabilityPending.current) return;
+                            deletionPending.current = true;
+                            deleteAvailabilityException.mutate({ personId: selectedPerson.personId, exceptionId: exception.id });
+                          }}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>

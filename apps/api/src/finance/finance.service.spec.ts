@@ -46,6 +46,35 @@ describe('FinanceService hardening', () => {
     return { service, prisma, idempotency, metrics, audit, timeline }
   }
 
+  it('carrega a cobrança focada somente no tenant e entrega saldo calculado pelo backend', async () => {
+    const { service, prisma } = buildService()
+    prisma.charge.findFirst.mockResolvedValue({
+      id: 'charge-1', orgId: 'org-1', amountCents: 10000, status: 'PENDING',
+      payments: [{ amountCents: 2500 }], dueDate: new Date('2026-11-01T00:00:00Z'),
+    })
+    await expect(service.getCharge('org-1', 'charge-1')).resolves.toMatchObject({
+      id: 'charge-1', paidAmountCents: 2500, balanceCents: 7500, daysOverdue: null,
+    })
+    expect(prisma.charge.findFirst).toHaveBeenCalledWith({
+      where: { id: 'charge-1', orgId: 'org-1' },
+      include: { customer: true, serviceOrder: true, payments: true },
+    })
+  })
+
+  it('não expõe cobrança inexistente ou de outro tenant', async () => {
+    const { service, prisma } = buildService()
+    prisma.charge.findFirst.mockResolvedValue(null)
+    await expect(service.getCharge('org-1', 'other-charge')).rejects.toBeInstanceOf(NotFoundException)
+  })
+
+  it('preserva saldo zero quando pagamentos já cobrem a cobrança', async () => {
+    const { service, prisma } = buildService()
+    prisma.charge.findFirst.mockResolvedValue({
+      id: 'paid', amountCents: 500, status: 'PAID', payments: [{ amountCents: 600 }],
+    })
+    await expect(service.getCharge('org-1', 'paid')).resolves.toMatchObject({ paidAmountCents: 600, balanceCents: 0 })
+  })
+
   it('bloqueia geração de cobrança para O.S. cancelada', async () => {
     const { service, prisma, idempotency } = buildService()
     idempotency.begin.mockResolvedValue({ mode: 'execute', recordId: 'idem-1' })

@@ -10,6 +10,7 @@ import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import { ChevronLeft, ChevronRight, Plus, RefreshCcw } from "lucide-react";
 import { useLocation } from "wouter";
+import { can } from "@/lib/rbac";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { CreateAppointmentModal } from "@/components/CreateAppointmentModal";
@@ -108,7 +109,11 @@ function officialLabel(value?: string | null) {
 
 export default function CalendarPage() {
   const [, navigate] = useLocation();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, role } = useAuth();
+  const canCreateAppointment = Boolean(
+    role && can(role, "appointments:create")
+  );
+  const canReadTeamSummary = Boolean(role && can(role, "people:manage"));
   const calendarRef = useRef<FullCalendar>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [periodTitle, setPeriodTitle] = useState("Período atual");
@@ -137,7 +142,7 @@ export default function CalendarPage() {
   });
   const officialCapacityQuery = trpc.people.operationalSummary.useQuery(
     undefined,
-    { enabled: isAuthenticated, retry: false }
+    { enabled: isAuthenticated && canReadTeamSummary, retry: false }
   );
 
   const appointments = useMemo(
@@ -238,7 +243,7 @@ export default function CalendarPage() {
       appointmentsQuery.refetch(),
       customersQuery.refetch(),
       peopleQuery.refetch(),
-      officialCapacityQuery.refetch(),
+      ...(canReadTeamSummary ? [officialCapacityQuery.refetch()] : []),
     ]);
   };
 
@@ -256,7 +261,10 @@ export default function CalendarPage() {
         title="Calendário"
         description="Exploração temporal dos agendamentos persistidos, sem decisões operacionais locais."
         primaryAction={
-          <Button onClick={() => setShowCreateModal(true)}>
+          <Button
+            disabled={!canCreateAppointment}
+            onClick={() => setShowCreateModal(true)}
+          >
             <Plus className="mr-1.5 h-4 w-4" /> Novo agendamento
           </Button>
         }
@@ -325,7 +333,12 @@ export default function CalendarPage() {
           title="Disponibilidade e capacidade oficiais"
           subtitle="Valores exibidos diretamente pelo resumo operacional; o calendário não calcula vagas, margem ou horário livre."
         >
-          {officialCapacityQuery.isLoading ? (
+          {!canReadTeamSummary ? (
+            <p role="status" className="text-sm text-[var(--text-secondary)]">
+              O resumo de capacidade da equipe está disponível para
+              administradores.
+            </p>
+          ) : officialCapacityQuery.isLoading ? (
             <AppPageLoadingState description="Carregando capacidade e disponibilidade oficiais..." />
           ) : officialCapacityQuery.isError || officialScope.length === 0 ? (
             <div
@@ -705,7 +718,7 @@ export default function CalendarPage() {
       </div>
 
       <CreateAppointmentModal
-        isOpen={showCreateModal}
+        isOpen={showCreateModal && canCreateAppointment}
         onClose={() => setShowCreateModal(false)}
         onSuccess={refetchAll}
         customers={customers}

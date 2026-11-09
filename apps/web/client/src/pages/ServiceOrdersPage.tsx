@@ -1,5 +1,7 @@
+import { useAuth } from "@/contexts/AuthContext";
+import { can } from "@/lib/rbac";
 import { useEffect, useMemo, useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { toast } from "sonner";
 
 import { trpc } from "@/lib/trpc";
@@ -197,14 +199,17 @@ function safeText(value: unknown, fallback = "—") {
 }
 
 export default function ServiceOrdersPage() {
+  const { role } = useAuth();
+  const canCreateOrder = Boolean(role && can(role, "orders:create"));
+  const canEditOrder = Boolean(role && can(role, "orders:update"));
+  const canManageFinance = Boolean(role && can(role, "finance:update"));
+  const canReadFinance = Boolean(role && can(role, "finance:read"));
   const pageSize = 8;
   const _operationalSeverityContract: OperationalSeverity = "healthy";
   void _operationalSeverityContract;
-  const [location, navigate] = useLocation();
-  const params = useMemo(
-    () => new URLSearchParams(location.split("?")[1] ?? ""),
-    [location]
-  );
+  const [, navigate] = useLocation();
+  const routeSearch = useSearch();
+  const params = useMemo(() => new URLSearchParams(routeSearch), [routeSearch]);
 
   const urlServiceOrderId =
     params.get("id") ?? params.get("serviceOrderId") ?? params.get("os");
@@ -252,9 +257,11 @@ export default function ServiceOrdersPage() {
   );
   const chargesQuery = trpc.finance.charges.list.useQuery(
     { page: 1, limit: 500 },
-    { retry: false }
+    { enabled: canReadFinance, retry: false }
   );
-  const peopleQuery = trpc.people.list.useQuery(undefined, { retry: false });
+  const peopleQuery = trpc.people.assignees.useQuery(undefined, {
+    retry: false,
+  });
   const timelineQuery = trpc.timeline.listByServiceOrder.useQuery(
     { serviceOrderId: String(selectedOrderId ?? ""), limit: 20 },
     { enabled: Boolean(selectedOrderId), retry: false }
@@ -270,10 +277,10 @@ export default function ServiceOrdersPage() {
     trpc.serviceOrders.generateCharge.useMutation();
 
   const capabilities = {
-    start: Boolean(startExecutionMutation),
-    complete: Boolean(completeExecutionMutation),
-    generateCharge: Boolean(generateChargeMutation),
-    edit: true,
+    start: canEditOrder && Boolean(startExecutionMutation),
+    complete: canEditOrder && Boolean(completeExecutionMutation),
+    generateCharge: canManageFinance && Boolean(generateChargeMutation),
+    edit: canEditOrder,
   };
 
   const serviceOrders = useMemo(
@@ -527,7 +534,7 @@ export default function ServiceOrdersPage() {
     );
     if (linkedOrder) {
       setSelectedOrderId(linkedOrder.id);
-    } else if (!serviceOrdersQuery.isLoading) {
+    } else if (canCreateOrder && !serviceOrdersQuery.isLoading) {
       setOpenCreate(true);
     }
   }, [
@@ -535,6 +542,7 @@ export default function ServiceOrdersPage() {
     serviceOrdersQuery.isLoading,
     setSelectedOrderId,
     urlAppointmentId,
+    canCreateOrder,
   ]);
 
   useEffect(() => {
@@ -655,7 +663,7 @@ export default function ServiceOrdersPage() {
     ]);
     await Promise.all([
       serviceOrdersQuery.refetch(),
-      chargesQuery.refetch(),
+      ...(canReadFinance ? [chargesQuery.refetch()] : []),
       appointmentsQuery.refetch(),
       timelineQuery.refetch(),
     ]);
@@ -772,6 +780,7 @@ export default function ServiceOrdersPage() {
       return;
     }
     if (item.nextAction.type === "edit") {
+      if (!capabilities.edit) return;
       setEditingId(item.id);
       return;
     }
@@ -870,7 +879,7 @@ export default function ServiceOrdersPage() {
           <Button
             type="button"
             onClick={() => setOpenCreate(true)}
-            disabled={customersQuery.isError}
+            disabled={!canCreateOrder || customersQuery.isError}
             title={
               customersQuery.isError
                 ? "Nova O.S. indisponível enquanto clientes não puderem ser carregados"
@@ -905,7 +914,7 @@ export default function ServiceOrdersPage() {
               void Promise.all([
                 customersQuery.refetch(),
                 appointmentsQuery.refetch(),
-                chargesQuery.refetch(),
+                ...(canReadFinance ? [chargesQuery.refetch()] : []),
                 peopleQuery.refetch(),
               ])
             }
@@ -960,9 +969,7 @@ export default function ServiceOrdersPage() {
         <div className="w-full md:w-auto md:min-w-[150px]">
           <AppSelect
             value={deadlineFilter}
-            onValueChange={value =>
-              setDeadlineFilter(value as DeadlineFilter)
-            }
+            onValueChange={value => setDeadlineFilter(value as DeadlineFilter)}
             ariaLabel="Filtrar por prazo"
             options={[
               { value: "all", label: "Todos os prazos" },
@@ -974,9 +981,7 @@ export default function ServiceOrdersPage() {
         <div className="w-full md:w-auto md:min-w-[170px]">
           <AppSelect
             value={priorityFilter}
-            onValueChange={value =>
-              setPriorityFilter(value as PriorityFilter)
-            }
+            onValueChange={value => setPriorityFilter(value as PriorityFilter)}
             ariaLabel="Filtrar por prioridade"
             options={[
               { value: "all", label: "Todas as prioridades" },
@@ -1151,6 +1156,15 @@ export default function ServiceOrdersPage() {
                           >
                             <Button
                               size="sm"
+                              disabled={
+                                anyActionPending ||
+                                !item.nextAction ||
+                                (item.nextAction.type === "charge"
+                                  ? !capabilities.generateCharge
+                                  : ["start", "complete", "edit"].includes(
+                                      item.nextAction.type
+                                    ) && !canEditOrder)
+                              }
                               onClick={() => runPrimaryAction(item)}
                             >
                               {item.nextAction?.label ?? "Decisão indisponível"}
@@ -1537,7 +1551,7 @@ export default function ServiceOrdersPage() {
       </div>
 
       <CreateServiceOrderModal
-        open={openCreate}
+        open={openCreate && canCreateOrder}
         onClose={() => setOpenCreate(false)}
         onSuccess={() => void refreshEverything()}
         customers={customers.map(item => ({
@@ -1555,7 +1569,7 @@ export default function ServiceOrdersPage() {
       />
 
       <EditServiceOrderModal
-        isOpen={Boolean(editingId)}
+        isOpen={Boolean(editingId) && canEditOrder}
         onClose={() => setEditingId(null)}
         onSuccess={() => {
           setEditingId(null);

@@ -7,7 +7,7 @@ const context = (role?: string) => ({
   switchToHttp: () => ({ getRequest: () => ({ user: role === undefined ? {} : { role } }) }),
 }) as any
 
-describe('RolesGuard canonical role normalization', () => {
+describe('RolesGuard canonical role separation and legacy read aliases', () => {
   const guardFor = (requiredRoles: string[]) => new RolesGuard({ getAllAndOverride: jest.fn().mockReturnValue(requiredRoles) } as any)
 
   it.each([
@@ -30,12 +30,13 @@ describe('RolesGuard canonical role normalization', () => {
     expect(() => guardFor(['OPERADOR']).canActivate(context(role))).toThrow(ForbiddenException)
   })
 
-  it.each(['STAFF', 'OPERADOR', 'VIEWER', 'FINANCEIRO'])('denies %s explicit manager permission', role => {
-    expect(() => guardFor(['ADMIN', 'MANAGER']).canActivate(context(role))).toThrow(ForbiddenException)
+  it.each(['ADMIN', 'MANAGER', 'STAFF', 'VIEWER'])('enforces the declared canonical role for %s without widening it', role => {
+    for (const required of ['ADMIN', 'MANAGER', 'STAFF', 'VIEWER']) {
+      if (role === 'ADMIN' || role === required) expect(guardFor([required]).canActivate(context(role))).toBe(true)
+      else expect(() => guardFor([required]).canActivate(context(role))).toThrow(ForbiddenException)
+    }
   })
-  it('preserves manager permission', () => {
-    expect(guardFor(['ADMIN', 'MANAGER']).canActivate(context('MANAGER'))).toBe(true)
-  })
+
   it('permite rota sem @Roles', () => {
     expect(guardFor([]).canActivate(context())).toBe(true)
   })

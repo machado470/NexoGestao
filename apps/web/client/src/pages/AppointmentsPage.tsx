@@ -1,6 +1,11 @@
+import {
+  toLocalDateTimeInput,
+  parseLocalDateTimeInput,
+} from "@/lib/local-date-time";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { toast } from "sonner";
+import { can } from "@/lib/rbac";
 import { useAuth } from "@/contexts/AuthContext";
 import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
@@ -100,13 +105,16 @@ export default function AppointmentsPage() {
   // possui fonte oficial de severidade e, por isso, não renderiza nem deriva uma.
   const officialOperationalSeverity: OperationalSeverity | null = null;
   void officialOperationalSeverity;
-  const [location, navigate] = useLocation();
-  const { isAuthenticated } = useAuth();
-  const utils = trpc.useUtils();
-  const params = useMemo(
-    () => new URLSearchParams(location.split("?")[1] ?? ""),
-    [location]
+  const [, navigate] = useLocation();
+  const routeSearch = useSearch();
+  const { isAuthenticated, role } = useAuth();
+  const canCreateAppointment = Boolean(
+    role && can(role, "appointments:create")
   );
+  const canEditAppointment = Boolean(role && can(role, "appointments:update"));
+  const canCreateOrder = Boolean(role && can(role, "orders:create"));
+  const utils = trpc.useUtils();
+  const params = useMemo(() => new URLSearchParams(routeSearch), [routeSearch]);
   const routeCustomerId = params.get("customerId");
   const routeAppointmentId = params.get("appointmentId") ?? params.get("id");
   const routeAction = params.get("action");
@@ -144,7 +152,7 @@ export default function AppointmentsPage() {
     enabled: isAuthenticated,
     retry: false,
   });
-  const peopleQuery = trpc.people.list.useQuery(undefined, {
+  const peopleQuery = trpc.people.assignees.useQuery(undefined, {
     enabled: isAuthenticated,
     retry: false,
   });
@@ -256,6 +264,7 @@ export default function AppointmentsPage() {
   useEffect(() => {
     const key = `${routeAppointmentId ?? ""}:${routeAction ?? ""}`;
     if (
+      !canEditAppointment ||
       routeAction !== "reschedule" ||
       !selected ||
       openedRouteAction.current === key
@@ -264,7 +273,7 @@ export default function AppointmentsPage() {
     openedRouteAction.current = key;
     setEditing(selected.item);
     setOpenModal(true);
-  }, [routeAction, routeAppointmentId, selected]);
+  }, [routeAction, routeAppointmentId, selected, canEditAppointment]);
 
   const timelineQuery = trpc.timeline.listByCustomer.useQuery(
     { customerId: selected?.customerId ?? "", limit: 25 },
@@ -298,8 +307,8 @@ export default function AppointmentsPage() {
       customerId: String(
         editing?.customerId ?? editing?.customer?.id ?? routeCustomerId ?? ""
       ),
-      date: start ? start.toISOString().slice(0, 10) : "",
-      time: start ? start.toISOString().slice(11, 16) : "",
+      date: toLocalDateTimeInput(start).slice(0, 10),
+      time: toLocalDateTimeInput(start).slice(11, 16),
       status: String(
         editing?.status ?? "SCHEDULED"
       ).toUpperCase() as AppointmentStatus,
@@ -321,8 +330,11 @@ export default function AppointmentsPage() {
 
   async function saveAppointment(event: React.FormEvent) {
     event.preventDefault();
-    const startsAt = new Date(`${form.date}T${form.time}`);
-    if (!form.customerId || Number.isNaN(startsAt.getTime())) {
+    const startsAt = parseLocalDateTimeInput(
+      `${form.date}T${form.time}`,
+      editing?.startsAt
+    );
+    if (!form.customerId || !startsAt) {
       toast.error("Cliente, data e hora são obrigatórios.");
       return;
     }
@@ -373,6 +385,7 @@ export default function AppointmentsPage() {
   }
 
   async function updateStatus(id: string, status: AppointmentStatus) {
+    if (!canEditAppointment) return;
     const appointment = appointments.find(item => String(item.id) === id);
     try {
       await updateMutation.mutateAsync({
@@ -426,6 +439,7 @@ export default function AppointmentsPage() {
           }
           primaryAction={
             <Button
+              disabled={!canCreateAppointment}
               onClick={() => {
                 setEditing(null);
                 setOpenModal(true);
@@ -665,7 +679,9 @@ export default function AppointmentsPage() {
                               onClick={() =>
                                 void updateStatus(row.id, "CONFIRMED")
                               }
-                              disabled={updateMutation.isPending}
+                              disabled={
+                                !canEditAppointment || updateMutation.isPending
+                              }
                             >
                               Confirmar
                             </Button>
@@ -696,13 +712,16 @@ export default function AppointmentsPage() {
                                   setEditing(row.item);
                                   setOpenModal(true);
                                 },
-                                disabled: !row.id,
+                                disabled: !canEditAppointment || !row.id,
                               },
                               {
                                 label: "Cancelar",
                                 onSelect: () =>
                                   void updateStatus(row.id, "CANCELED"),
-                                disabled: !row.id || row.status === "CANCELED",
+                                disabled:
+                                  !canEditAppointment ||
+                                  !row.id ||
+                                  row.status === "CANCELED",
                               },
                               {
                                 label: row.order?.id
@@ -715,7 +734,10 @@ export default function AppointmentsPage() {
                                       )
                                     : (setSelectedId(row.id),
                                       setOpenServiceOrderModal(true)),
-                                disabled: !row.id || serviceOrdersQuery.isError,
+                                disabled:
+                                  !row.id ||
+                                  serviceOrdersQuery.isError ||
+                                  (!row.order?.id && !canCreateOrder),
                               },
                               { type: "separator" },
                               {
@@ -820,6 +842,7 @@ export default function AppointmentsPage() {
                   <div className="mt-4 flex flex-wrap gap-2">
                     <Button
                       variant="outline"
+                      disabled={!canEditAppointment}
                       onClick={() => {
                         setEditing(selected.item);
                         setOpenModal(true);
@@ -895,7 +918,9 @@ export default function AppointmentsPage() {
         </div>
 
         <FormModal
-          open={openModal}
+          open={
+            openModal && (editing ? canEditAppointment : canCreateAppointment)
+          }
           onOpenChange={next => {
             setOpenModal(next);
             if (!next) setEditing(null);
@@ -1043,7 +1068,7 @@ export default function AppointmentsPage() {
         </FormModal>
       </div>
       <CreateServiceOrderModal
-        isOpen={openServiceOrderModal}
+        isOpen={openServiceOrderModal && canCreateOrder}
         onClose={() => setOpenServiceOrderModal(false)}
         onSuccess={() => {
           setSuccessMessage("O.S. criada com sucesso.");

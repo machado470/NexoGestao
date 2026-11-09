@@ -1,18 +1,24 @@
-import { IsOptional, IsString, IsIn, IsNotEmpty } from 'class-validator';
+import { Transform } from 'class-transformer'
+import { IsString, IsIn, IsNotEmpty, IsTimeZone, ValidateIf, Matches } from 'class-validator'
+
+const trimText = ({ value }: { value: unknown }) => typeof value === 'string' ? value.trim() : value
 
 export class UpdateOrganizationSettingsDto {
-  @IsOptional()
+  @ValidateIf((_object, value) => value !== undefined)
+  @Transform(trimText)
   @IsString()
-  @IsNotEmpty()
-  name?: string;
+  @IsNotEmpty({ message: 'Informe o nome da organização.' })
+  name?: string
 
-  @IsOptional()
+  @ValidateIf((_object, value) => value !== undefined)
+  @Transform(trimText)
   @IsString()
-  @IsNotEmpty()
-  timezone?: string;
+  @Matches(/^(?![+-])/, { message: 'Use um fuso horário nomeado, como America/Sao_Paulo ou UTC.' })
+  @IsTimeZone({ message: 'Informe um fuso horário válido, como America/Sao_Paulo ou UTC.' })
+  timezone?: string
 
-  @IsOptional()
+  @ValidateIf((_object, value) => value !== undefined)
   @IsString()
   @IsIn(['BRL', 'USD', 'EUR'], { message: 'Moeda inválida. Use BRL, USD ou EUR.' })
-  currency?: string;
+  currency?: string
 }

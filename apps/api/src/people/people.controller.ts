@@ -55,15 +55,15 @@ export class PeopleController {
   }
 
   /**
-   * 👑 ADMIN — métrica institucional
+   * 👑 ADMIN — métrica da organização autenticada
    * GET /people/stats/linked
    * IMPORTANTE: rota estática deve vir ANTES de :id para não ser capturada como parâmetro dinâmico.
    */
   @Get('stats/linked')
   @Roles('ADMIN')
-  async countLinked() {
+  async countLinked(@Org() orgId: string) {
     return {
-      count: await this.people.countUsersWithPerson(),
+      count: await this.people.countUsersWithPerson(orgId),
     }
   }
 

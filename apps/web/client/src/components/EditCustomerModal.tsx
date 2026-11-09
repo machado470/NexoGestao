@@ -1,5 +1,7 @@
+import { executeCustomerUpdate } from "@/lib/customer-update-flow";
+import { customerEditDraftReducer, initialCustomerEditDraft, isCustomerEditDirty } from "@/lib/customer-edit-draft";
 import { Button } from "@/components/ui/button";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
@@ -51,15 +53,19 @@ function normalizeCustomerPayload(payload: unknown): CustomerDetails | null {
 
 export default function EditCustomerModal({ open, customerId, onClose, onSaved }: Props) {
   const utils = trpc.useUtils();
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [notes, setNotes] = useState("");
-  const [active, setActive] = useState(true);
-  const [initialSnapshot, setInitialSnapshot] = useState<string>("");
+  const [draft, dispatch] = useReducer(customerEditDraftReducer, initialCustomerEditDraft);
+  const { name, phone, email, notes, active } = draft.values;
+  const setName = (name: string) => dispatch({ type: "edit", values: { name } });
+  const setPhone = (phone: string) => dispatch({ type: "edit", values: { phone } });
+  const setEmail = (email: string) => dispatch({ type: "edit", values: { email } });
+  const setNotes = (notes: string) => dispatch({ type: "edit", values: { notes } });
+  const setActive = (active: boolean) => dispatch({ type: "edit", values: { active } });
   const [loadingTimedOut, setLoadingTimedOut] = useState(false);
 
   const idStr = customerId != null ? String(customerId) : undefined;
+
+  const session = useRef({ open, idStr });
+  session.current = { open, idStr };
 
   const customerQuery = trpc.customers.getById.useQuery(
     { id: idStr! },
@@ -70,6 +76,7 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
     }
   );
 
+  const submitting = useRef(false);
   const updateMutation = trpc.customers.update.useMutation();
   useCriticalActionGuard({
     isPending: updateMutation.isPending,
@@ -80,34 +87,15 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
     return normalizeCustomerPayload(customerQuery.data);
   }, [customerQuery.data]);
 
+  const snapshot = (value: CustomerDetails) => ({
+    id: idStr!, version: value.updatedAt ?? undefined,
+    values: { name: value.name ?? "", phone: value.phone ?? "", email: value.email ?? "", notes: value.notes ?? "", active: Boolean(value.active) },
+  });
+
   useEffect(() => {
-    if (!open) return;
-
-    if (customer) {
-      setName(customer.name ?? "");
-      setPhone(customer.phone ?? "");
-      setEmail(customer.email ?? "");
-      setNotes(customer.notes ?? "");
-      setActive(Boolean(customer.active));
-      setInitialSnapshot(
-        JSON.stringify({
-          name: customer.name ?? "",
-          phone: customer.phone ?? "",
-          email: customer.email ?? "",
-          notes: customer.notes ?? "",
-          active: Boolean(customer.active),
-        })
-      );
-      return;
-    }
-
-    setName("");
-    setPhone("");
-    setEmail("");
-    setNotes("");
-    setActive(true);
-    setInitialSnapshot("");
-  }, [open, customer]);
+    if (!open || !idStr) dispatch({ type: "closed" });
+    else if (customer) dispatch({ type: "received", ...snapshot(customer) });
+  }, [open, idStr, customer]);
 
   useEffect(() => {
     if (!open || !customerQuery.isLoading || customer) {
@@ -119,16 +107,19 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
     return () => window.clearTimeout(timeoutId);
   }, [customer, customerQuery.isLoading, open]);
 
-  const isDirty = useMemo(() => {
-    const current = JSON.stringify({
-      name: name.trim(),
-      phone: phone.trim(),
-      email: email.trim(),
-      notes: notes.trim(),
-      active,
-    });
-    return Boolean(initialSnapshot) && initialSnapshot !== current;
-  }, [active, email, initialSnapshot, name, notes, phone]);
+  const isDirty = isCustomerEditDirty(draft);
+  const reloadCustomer = async () => {
+    if (updateMutation.isPending || customerQuery.isFetching) return;
+    if (isDirty && !window.confirm("Recarregar descartará suas alterações não salvas. Deseja continuar?")) return;
+    const result = await customerQuery.refetch();
+    if (!session.current.open || session.current.idStr !== idStr) return;
+    const latest = normalizeCustomerPayload(result.data);
+    if (result.isError || !latest) {
+      toast.error("Não foi possível recarregar. Suas alterações foram preservadas.");
+      return;
+    }
+    dispatch({ type: "reload", ...snapshot(latest) });
+  };
 
   const canSubmit = useMemo(() => {
     return name.trim().length >= 2 && phone.trim().length >= 10 && isDirty;
@@ -142,7 +133,7 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
   );
 
   const submit = async () => {
-    if (!idStr) return;
+    if (!idStr || submitting.current) return;
 
     const parsed = customerSchema.safeParse({
       name: name.trim(),
@@ -157,59 +148,52 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
       return;
     }
 
-    const previousCustomers = utils.customers.list.getData(undefined);
-
+    submitting.current = true;
     try {
-      const updatedPayload = {
-        id: idStr,
-        name: parsed.data.name,
-        phone: parsed.data.phone,
-        email: parsed.data.email || undefined,
-        notes: parsed.data.notes?.trim() ? parsed.data.notes.trim() : undefined,
-        active,
-        expectedUpdatedAt:
-          typeof customer?.updatedAt === "string" ? customer.updatedAt : undefined,
-      };
-      const optimisticUpdate = {
-        name: parsed.data.name,
-        phone: parsed.data.phone,
-        email: parsed.data.email || null,
-        notes: parsed.data.notes?.trim() ? parsed.data.notes.trim() : null,
-        active,
-      };
-
-      utils.customers.list.setData(undefined, old =>
-        old?.map(item =>
-          item.id === idStr ? { ...item, ...optimisticUpdate } : item
-        )
-      );
-
-      await updateMutation.mutateAsync(updatedPayload);
-      await invalidateOperationalGraph(utils, idStr);
-      toast.success(`Cliente atualizado: ${parsed.data.name}`, {
-        action: {
-          label: "Ver cliente",
-          onClick: () => {
-            window.location.assign(`/customers?customerId=${idStr}`);
-          },
+      const outcome = await executeCustomerUpdate({
+        persist: () => updateMutation.mutateAsync({
+          id: idStr,
+          name: parsed.data.name,
+          phone: parsed.data.phone,
+          email: parsed.data.email || null,
+          notes: parsed.data.notes?.trim() ? parsed.data.notes.trim() : null,
+          active,
+          expectedUpdatedAt: draft.version,
+        }),
+        confirm: saved => {
+          utils.customers.list.setData(undefined, old =>
+            old?.map(item => item.id === idStr ? saved : item)
+          );
+          utils.customers.getById.setData({ id: idStr }, saved);
+          onClose();
+          toast.success(`Cliente atualizado: ${saved.name}`, {
+            action: { label: "Ver cliente", onClick: () => window.location.assign(`/customers?customerId=${idStr}`) },
+          });
+        },
+        synchronize: async () => {
+          const results = await Promise.allSettled([
+            invalidateOperationalGraph(utils, idStr),
+            // fetch propagates read failures; invalidate alone normally suppresses them.
+            Promise.resolve().then(() => onSaved?.({ id: idStr })),
+          ]);
+          await utils.customers.list.fetch(undefined, { staleTime: 0 });
+          if (results.some(result => result.status === "rejected")) throw new Error("Customer refresh failed");
         },
       });
-      await onSaved?.({ id: idStr });
-      onClose();
-    } catch (error) {
-      utils.customers.list.setData(undefined, previousCustomers as any);
+      if (outcome.status === "saved") {
+        if (!outcome.synchronized) toast.warning("Cliente salvo. Não foi possível atualizar todos os dados da tela; atualize a consulta para conferir.");
+        return;
+      }
+      const error = outcome.error;
       if (isConcurrentConflictError(error)) {
         toast.error(getConcurrencyErrorMessage("cliente"), {
-          action: {
-            label: "Recarregar",
-            onClick: () => void customerQuery.refetch(),
-          },
+          action: { label: "Recarregar", onClick: () => void reloadCustomer() },
         });
         return;
       }
-      const message =
-        error instanceof Error ? error.message : "Erro ao atualizar cliente";
-      toast.error(message);
+      toast.error(error instanceof Error ? error.message : "Erro ao atualizar cliente");
+    } finally {
+      submitting.current = false;
     }
   };
 
@@ -233,6 +217,9 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
             <span>Status: <strong className="text-[var(--modal-section-text)]">{operationalSummary.status}</strong></span>
             <span>Contato: <strong className="text-[var(--modal-section-text)]">{operationalSummary.contact}</strong></span>
           </div>
+          <Button type="button" variant="outline" disabled={updateMutation.isPending || customerQuery.isFetching} onClick={() => void reloadCustomer()}>
+            Recarregar dados
+          </Button>
           <Button type="button" variant="outline" onClick={handleClose}>
             Cancelar
           </Button>
@@ -256,6 +243,7 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
       }
     >
         <div className="space-y-5">
+          {customerQuery.error && customer ? <p role="alert">Não foi possível atualizar os dados. Suas alterações foram preservadas.</p> : null}
           {customerQuery.isLoading && !customer ? (
             <div className="flex items-center justify-center py-8 text-sm text-[var(--modal-section-muted)]">
               <Loader2 className="mr-2 h-5 w-5 animate-spin text-orange-500" />
@@ -266,7 +254,7 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
                 </Button>
               ) : null}
             </div>
-          ) : customerQuery.error ? (
+          ) : customerQuery.error && !customer ? (
             <div className="space-y-3 rounded-xl border border-[color-mix(in_srgb,var(--danger)_38%,transparent)] bg-[color-mix(in_srgb,var(--danger)_10%,var(--app-overlay-surface))] p-5 text-sm text-[var(--danger)]">
               <p>Não foi possível carregar os dados do cliente.</p>
               <Button
@@ -320,7 +308,7 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
                       <p className="text-sm font-medium text-[var(--modal-section-text)]">Cliente ativo</p>
                       <p className="text-xs text-[var(--modal-section-muted)]">Desative para tirar o cliente do fluxo sem apagar histórico.</p>
                     </div>
-                    <button type="button" onClick={() => setActive((prev) => !prev)} className={`inline-flex min-w-[88px] items-center justify-center rounded-full px-3 py-2 text-xs font-medium transition-colors ${active ? "bg-emerald-500/15 text-emerald-300" : "bg-[var(--surface-elevated)] text-[var(--modal-section-muted)]"}`}>
+                    <button type="button" onClick={() => setActive(!active)} className={`inline-flex min-w-[88px] items-center justify-center rounded-full px-3 py-2 text-xs font-medium transition-colors ${active ? "bg-emerald-500/15 text-emerald-300" : "bg-[var(--surface-elevated)] text-[var(--modal-section-muted)]"}`}>
                       {active ? "Ativo" : "Inativo"}
                     </button>
                   </div>

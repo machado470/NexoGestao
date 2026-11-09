@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useReducer } from "react";
 import { Building2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
@@ -18,10 +18,17 @@ import {
   AppSectionBlock,
   AppStatusBadge,
 } from "@/components/internal-page-system";
+import { OrganizationAccessSection } from "@/components/OrganizationAccessSection";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { normalizeObjectPayload } from "@/lib/query-helpers";
 import { trpc } from "@/lib/trpc";
+import {
+  hasSettingsChanges,
+  initialSettingsDraft,
+  settingsDraftReducer,
+} from "@/lib/settings-draft";
+import { isValidSettingsTimezone } from "@/lib/settings-validation";
 
 type Currency = "BRL" | "USD" | "EUR";
 
@@ -49,20 +56,23 @@ export default function SettingsPage() {
   const settings = normalizeObjectPayload<OrganizationSettings>(
     settingsQuery.data
   );
-  const [name, setName] = useState("");
-  const [timezone, setTimezone] = useState("");
-  const [currency, setCurrency] = useState<Currency>("BRL");
+  const [draft, dispatch] = useReducer(
+    settingsDraftReducer,
+    initialSettingsDraft
+  );
+  const { name, timezone, currency } = draft.values;
 
   useEffect(() => {
-    if (!settings) return;
-    setName(settings.name);
-    setTimezone(settings.timezone);
-    setCurrency(settings.currency);
-  }, [settings?.currency, settings?.name, settings?.timezone]);
+    if (settings) dispatch({ type: "received", values: settings });
+  }, [settings?.id, settings?.currency, settings?.name, settings?.timezone]);
 
   const updateMutation = trpc.settings.update.useMutation({
-    onSuccess: async () => {
-      await utils.settings.get.invalidate();
+    onMutate: () => utils.settings.get.cancel(),
+    onSuccess: data => {
+      const confirmed = normalizeObjectPayload<OrganizationSettings>(data);
+      if (!confirmed) return;
+      utils.settings.get.setData(undefined, data);
+      dispatch({ type: "confirmed", values: confirmed });
       toast.success("Configurações da organização salvas.");
     },
     onError: error => {
@@ -70,25 +80,23 @@ export default function SettingsPage() {
     },
   });
 
-  const hasChanges = Boolean(
-    settings &&
-    (name !== settings.name ||
-      timezone !== settings.timezone ||
-      currency !== settings.currency)
-  );
-  const hasRequiredValues = name.trim() !== "" && timezone.trim() !== "";
+  const hasChanges = hasSettingsChanges(draft);
+  const timezoneValid = isValidSettingsTimezone(timezone);
+  const hasRequiredValues = name.trim() !== "" && timezoneValid;
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!hasChanges || !hasRequiredValues || updateMutation.isPending) return;
-    updateMutation.mutate({ name, timezone, currency });
+    updateMutation.mutate({
+      name: name.trim(),
+      timezone: timezone.trim(),
+      currency,
+    });
   };
 
   const resetForm = () => {
     if (!settings) return;
-    setName(settings.name);
-    setTimezone(settings.timezone);
-    setCurrency(settings.currency);
+    dispatch({ type: "discard" });
     updateMutation.reset();
   };
 
@@ -135,12 +143,18 @@ export default function SettingsPage() {
         title="Organização"
         subtitle="Nome, fuso horário e moeda são as configurações atualmente persistidas para toda a organização."
       >
+        {settingsQuery.isError && settings ? (
+          <p role="alert" className="mb-4 text-sm text-destructive">
+            Não foi possível atualizar as configurações. Suas edições foram
+            preservadas.
+          </p>
+        ) : null}
         {settingsQuery.isLoading ? (
           <AppPageLoadingState
             title="Carregando configurações"
             description="Consultando os valores persistidos da organização."
           />
-        ) : settingsQuery.isError ? (
+        ) : settingsQuery.isError && !settings ? (
           <AppPageErrorState
             title="Configurações indisponíveis"
             description="A fonte oficial não respondeu. Nenhum valor padrão foi presumido."
@@ -164,7 +178,10 @@ export default function SettingsPage() {
                   autoComplete="organization"
                   value={name}
                   onChange={event => {
-                    setName(event.target.value);
+                    dispatch({
+                      type: "edit",
+                      values: { name: event.target.value },
+                    });
                     updateMutation.reset();
                   }}
                   aria-invalid={name.trim() === ""}
@@ -194,25 +211,27 @@ export default function SettingsPage() {
                   name="timezone"
                   value={timezone}
                   onChange={event => {
-                    setTimezone(event.target.value);
+                    dispatch({
+                      type: "edit",
+                      values: { timezone: event.target.value },
+                    });
                     updateMutation.reset();
                   }}
                   placeholder="America/Sao_Paulo"
-                  aria-invalid={timezone.trim() === ""}
+                  aria-invalid={!timezoneValid}
                   aria-describedby={
-                    timezone.trim() === ""
-                      ? "settings-timezone-error"
-                      : undefined
+                    !timezoneValid ? "settings-timezone-error" : undefined
                   }
                   disabled={updateMutation.isPending}
                   required
                 />
-                {timezone.trim() === "" ? (
+                {!timezoneValid ? (
                   <p
                     id="settings-timezone-error"
                     className="text-xs text-destructive"
                   >
-                    Informe o fuso horário.
+                    Informe um fuso horário válido, como America/Sao_Paulo ou
+                    UTC.
                   </p>
                 ) : null}
               </AppField>
@@ -225,7 +244,11 @@ export default function SettingsPage() {
                 <AppSelect
                   value={currency}
                   onValueChange={value => {
-                    setCurrency(value as Currency);
+                    if (updateMutation.isPending) return;
+                    dispatch({
+                      type: "edit",
+                      values: { currency: value as Currency },
+                    });
                     updateMutation.reset();
                   }}
                   options={currencyOptions}
@@ -289,6 +312,7 @@ export default function SettingsPage() {
           </AppForm>
         )}
       </AppSectionBlock>
+      <OrganizationAccessSection />
     </AppPageShell>
   );
 }

@@ -18,6 +18,7 @@ import { User } from '../auth/decorators/user.decorator'
 import { AppointmentsService } from './appointments.service'
 import { CreateAppointmentDto } from './dto/create-appointment.dto'
 import { UpdateAppointmentDto } from './dto/update-appointment.dto'
+import { Throttle } from '@nestjs/throttler'
 import { QuotasService } from '../quotas/quotas.service'
 
 @Controller('appointments')
@@ -29,12 +30,15 @@ export class AppointmentsController {
   ) {}
 
   @Get()
+  // Listas e grade são reconsultadas após edições e mudanças de período/filtro.
+  @Throttle({ default: { limit: 120, ttl: 60_000 } })
   @Roles('ADMIN', 'MANAGER', 'STAFF', 'VIEWER')
   list(@Org() orgId: string, @Query() query: any) {
     return this.appointments.list(orgId, query)
   }
 
   @Get(':id')
+  @Throttle({ default: { limit: 120, ttl: 60_000 } })
   @Roles('ADMIN', 'MANAGER', 'STAFF', 'VIEWER')
   get(@Org() orgId: string, @Param('id') id: string) {
     return this.appointments.get(orgId, id)

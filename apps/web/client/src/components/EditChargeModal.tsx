@@ -1,3 +1,4 @@
+import { parseMoneyInputToCents as parseAmountToCents } from "@/lib/money-input";
 import { Button } from "@/components/ui/button";
 import { useEffect, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
@@ -32,17 +33,6 @@ interface EditChargeModalProps {
   onClose: () => void;
   onSuccess: () => void;
   chargeId: string | null;
-}
-
-function parseAmountToCents(raw: string): number | null {
-  const normalized = raw.replace(",", ".").trim();
-  const amount = Number(normalized);
-
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return null;
-  }
-
-  return Math.round(amount * 100);
 }
 
 function formatCurrencyFromInput(raw: string) {
@@ -155,7 +145,7 @@ export function EditChargeModal({
       onSuccess();
       onClose();
     },
-    onError: (error) => {
+    onError: error => {
       if (isConcurrentConflictError(error)) {
         toast.error(getConcurrencyErrorMessage("cobrança"), {
           action: {
@@ -227,7 +217,7 @@ export function EditChargeModal({
   const disableEditing = isCanceled || isPaid;
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => (!open ? onClose() : null)}>
+    <Dialog open={isOpen} onOpenChange={open => (!open ? onClose() : null)}>
       <DialogContent
         showCloseButton={false}
         className="max-h-[90vh] max-w-2xl overflow-hidden border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-0 shadow-sm dark:bg-[var(--surface-base)]"
@@ -238,7 +228,8 @@ export function EditChargeModal({
             Editar Cobrança
           </DialogTitle>
           <DialogDescription className="mt-1 text-sm text-[var(--text-muted)]">
-            Ajuste valor, vencimento, cancelamento manual e observações da cobrança.
+            Ajuste valor, vencimento, cancelamento manual e observações da
+            cobrança.
           </DialogDescription>
         </DialogHeader>
         {getCharge.isLoading ? (
@@ -247,221 +238,228 @@ export function EditChargeModal({
           </div>
         ) : (
           <div className="max-h-[70vh] overflow-y-auto p-6">
-          <div className="space-y-6">
-            <section className="rounded-xl border border-[var(--border-subtle)] p-4">
-              <SectionTitle
-                icon={Receipt}
-                title="Contexto da cobrança"
-                subtitle="Veja rapidamente quem será impactado e em que estado a cobrança está."
-              />
+            <div className="space-y-6">
+              <section className="rounded-xl border border-[var(--border-subtle)] p-4">
+                <SectionTitle
+                  icon={Receipt}
+                  title="Contexto da cobrança"
+                  subtitle="Veja rapidamente quem será impactado e em que estado a cobrança está."
+                />
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
-                    Cliente
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
-                    {charge?.customer?.name || "Cliente não identificado"}
-                  </p>
-                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
+                      Cliente
+                    </p>
+                    <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
+                      {charge?.customer?.name || "Cliente não identificado"}
+                    </p>
+                  </div>
 
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
-                    Status atual
-                  </p>
-                  <div className="mt-1">
-                    <span
-                      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getStatusBadgeClass(
-                        charge?.status
-                      )}`}
-                    >
-                      {getStatusLabel(charge?.status)}
-                    </span>
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
+                      Status atual
+                    </p>
+                    <div className="mt-1">
+                      <span
+                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getStatusBadgeClass(
+                          charge?.status
+                        )}`}
+                      >
+                        {getStatusLabel(charge?.status)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
+                      O.S. vinculada
+                    </p>
+                    <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
+                      {charge?.serviceOrder?.title || "Cobrança manual"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
+                      Pago em
+                    </p>
+                    <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
+                      {charge?.paidAt
+                        ? new Date(charge.paidAt).toLocaleDateString("pt-BR")
+                        : "Ainda não pago"}
+                    </p>
                   </div>
                 </div>
+              </section>
 
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
-                    O.S. vinculada
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
-                    {charge?.serviceOrder?.title || "Cobrança manual"}
-                  </p>
-                </div>
+              <section className="rounded-xl border border-[var(--border-subtle)] p-4">
+                <SectionTitle
+                  icon={Wallet}
+                  title="Dados editáveis"
+                  subtitle="Ajuste o que ainda pode ser alterado dentro das regras do backend."
+                />
 
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
-                    Pago em
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
-                    {charge?.paidAt
-                      ? new Date(charge.paidAt).toLocaleDateString("pt-BR")
-                      : "Ainda não pago"}
-                  </p>
-                </div>
-              </div>
-            </section>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-[var(--text-primary)]">
+                        Valor (R$) *
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={formData.amount}
+                        onChange={e =>
+                          setFormData({ ...formData, amount: e.target.value })
+                        }
+                        className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2.5 text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/35 disabled:cursor-not-allowed disabled:opacity-100 disabled:text-[var(--text-muted)]"
+                        placeholder="100,00"
+                        aria-label="Valor em reais"
+                        disabled={disableEditing || updateCharge.isPending}
+                      />
+                      <p className="mt-1 text-xs text-[var(--text-muted)]">
+                        Valor atual: {formatCurrencyFromInput(formData.amount)}.
+                        Use 1234,56 ou 1.234,56.
+                      </p>
+                    </div>
 
-            <section className="rounded-xl border border-[var(--border-subtle)] p-4">
-              <SectionTitle
-                icon={Wallet}
-                title="Dados editáveis"
-                subtitle="Ajuste o que ainda pode ser alterado dentro das regras do backend."
-              />
+                    <div>
+                      <label className="mb-2 flex items-center gap-2 text-sm font-medium text-[var(--text-primary)]">
+                        <CalendarDays className="h-4 w-4 text-gray-500" />
+                        Data de vencimento *
+                      </label>
+                      <input
+                        type="date"
+                        value={formData.dueDate}
+                        onChange={e =>
+                          setFormData({ ...formData, dueDate: e.target.value })
+                        }
+                        className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2.5 text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/35 disabled:cursor-not-allowed disabled:opacity-100 disabled:text-[var(--text-muted)]"
+                        disabled={disableEditing || updateCharge.isPending}
+                      />
+                    </div>
+                  </div>
 
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="mb-2 block text-sm font-medium text-[var(--text-primary)]">
-                      Valor (R$) *
+                      Status
                     </label>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={formData.amount}
-                      onChange={(e) =>
-                        setFormData({ ...formData, amount: e.target.value })
+                    <select
+                      value={formData.status}
+                      onChange={e =>
+                        setFormData({ ...formData, status: e.target.value })
                       }
                       className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2.5 text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/35 disabled:cursor-not-allowed disabled:opacity-100 disabled:text-[var(--text-muted)]"
-                      placeholder="100,00"
                       disabled={disableEditing || updateCharge.isPending}
-                    />
+                    >
+                      <option value="PENDING">Manter ativa</option>
+                      <option value="CANCELED">Cancelar cobrança</option>
+                    </select>
                     <p className="mt-1 text-xs text-[var(--text-muted)]">
-                      Valor atual: {formatCurrencyFromInput(formData.amount)}
+                      O backend só permite cancelamento manual. Cobranças pagas
+                      seguem o fluxo de pagamento.
                     </p>
                   </div>
 
                   <div>
-                    <label className="mb-2 flex items-center gap-2 text-sm font-medium text-[var(--text-primary)]">
-                      <CalendarDays className="h-4 w-4 text-gray-500" />
-                      Data de vencimento *
+                    <label className="mb-2 block text-sm font-medium text-[var(--text-primary)]">
+                      Notas
                     </label>
-                    <input
-                      type="date"
-                      value={formData.dueDate}
-                      onChange={(e) =>
-                        setFormData({ ...formData, dueDate: e.target.value })
+                    <textarea
+                      value={formData.notes}
+                      onChange={e =>
+                        setFormData({ ...formData, notes: e.target.value })
                       }
                       className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2.5 text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/35 disabled:cursor-not-allowed disabled:opacity-100 disabled:text-[var(--text-muted)]"
-                      disabled={disableEditing || updateCharge.isPending}
+                      placeholder="Adicione notas sobre a cobrança"
+                      rows={4}
+                      disabled={updateCharge.isPending}
                     />
                   </div>
                 </div>
+              </section>
 
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-[var(--text-primary)]">
-                    Status
-                  </label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) =>
-                      setFormData({ ...formData, status: e.target.value })
-                    }
-                    className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2.5 text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/35 disabled:cursor-not-allowed disabled:opacity-100 disabled:text-[var(--text-muted)]"
-                    disabled={disableEditing || updateCharge.isPending}
-                  >
-                    <option value="PENDING">Manter ativa</option>
-                    <option value="CANCELED">Cancelar cobrança</option>
-                  </select>
-                  <p className="mt-1 text-xs text-[var(--text-muted)]">
-                    O backend só permite cancelamento manual. Cobranças pagas seguem o fluxo de pagamento.
-                  </p>
+              {isPaid && (
+                <section className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800 dark:border-green-900/40 dark:bg-green-950/20 dark:text-green-300">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <div>
+                      <p className="font-medium">Cobrança já paga</p>
+                      <p className="mt-1">
+                        Esta cobrança já foi quitada e não pode ter valor,
+                        vencimento ou status alterados.
+                      </p>
+                    </div>
+                  </div>
+                </section>
+              )}
+
+              {isCanceled && (
+                <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4 text-sm text-[var(--text-secondary)]">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <div>
+                      <p className="font-medium">Cobrança já cancelada</p>
+                      <p className="mt-1">
+                        Esta cobrança já está cancelada. Só as notas continuam
+                        ajustáveis.
+                      </p>
+                    </div>
+                  </div>
+                </section>
+              )}
+
+              <section className="rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--surface-base)] p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-orange-500" />
+                  <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+                    Resumo antes de salvar
+                  </h3>
                 </div>
 
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-[var(--text-primary)]">
-                    Notas
-                  </label>
-                  <textarea
-                    value={formData.notes}
-                    onChange={(e) =>
-                      setFormData({ ...formData, notes: e.target.value })
-                    }
-                    className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2.5 text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/35 disabled:cursor-not-allowed disabled:opacity-100 disabled:text-[var(--text-muted)]"
-                    placeholder="Adicione notas sobre a cobrança"
-                    rows={4}
-                    disabled={updateCharge.isPending}
-                  />
-                </div>
-              </div>
-            </section>
-
-            {isPaid && (
-              <section className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800 dark:border-green-900/40 dark:bg-green-950/20 dark:text-green-300">
-                <div className="flex items-start gap-2">
-                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
-                    <p className="font-medium">Cobrança já paga</p>
-                    <p className="mt-1">
-                      Esta cobrança já foi quitada e não pode ter valor, vencimento ou status alterados.
+                    <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
+                      Valor
+                    </p>
+                    <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
+                      {formatCurrencyFromInput(formData.amount)}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
+                      Vencimento
+                    </p>
+                    <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
+                      {formatDueDatePreview(formData.dueDate)}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
+                      Ação de status
+                    </p>
+                    <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
+                      {formData.status === "CANCELED"
+                        ? "Cancelar cobrança"
+                        : "Manter ativa"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
+                      Observações
+                    </p>
+                    <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
+                      {formData.notes.trim() || "Sem observações"}
                     </p>
                   </div>
                 </div>
               </section>
-            )}
-
-            {isCanceled && (
-              <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4 text-sm text-[var(--text-secondary)]">
-                <div className="flex items-start gap-2">
-                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                  <div>
-                    <p className="font-medium">Cobrança já cancelada</p>
-                    <p className="mt-1">
-                      Esta cobrança já está cancelada. Só as notas continuam ajustáveis.
-                    </p>
-                  </div>
-                </div>
-              </section>
-            )}
-
-            <section className="rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--surface-base)] p-4">
-              <div className="mb-3 flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 text-orange-500" />
-                <h3 className="text-sm font-semibold text-[var(--text-primary)]">
-                  Resumo antes de salvar
-                </h3>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
-                    Valor
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
-                    {formatCurrencyFromInput(formData.amount)}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
-                    Vencimento
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
-                    {formatDueDatePreview(formData.dueDate)}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
-                    Ação de status
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
-                    {formData.status === "CANCELED" ? "Cancelar cobrança" : "Manter ativa"}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
-                    Observações
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
-                    {formData.notes.trim() || "Sem observações"}
-                  </p>
-                </div>
-              </div>
-            </section>
+            </div>
           </div>
-        </div>
         )}
         <DialogFooter className="flex gap-2 border-t border-[var(--border-subtle)] p-6 sm:justify-start">
           <Button
