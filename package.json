@@ -14,6 +14,7 @@
     "prisma:generate": "pnpm --filter ./apps/api prisma:generate",
     "prisma:migrate:deploy": "pnpm --filter ./apps/api prisma:migrate:deploy",
     "prisma:check": "node scripts/check-prisma-client.mjs",
+    "prisma:check:drift": "pnpm --filter ./apps/api exec prisma migrate diff --from-schema-datasource ../../prisma/schema.prisma --to-schema-datamodel ../../prisma/schema.prisma --exit-code",
     "whatsapp:provision-account": "tsx scripts/provision-whatsapp-provider-account.ts",
     "db:smoke:operational-actions": "node scripts/check-operational-actions-db.mjs",
     "smoke:operational-actions:diagnostics": "node scripts/smoke-operational-actions-diagnostics.mjs",
