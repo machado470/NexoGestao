@@ -3,6 +3,9 @@ import IORedis from 'ioredis'
 import { existsSync } from 'node:fs'
 import { PrismaModule } from '../prisma/prisma.module'
 import { QUEUE_CONNECTION } from './queue.constants'
+import { ActiveUserGuard } from '../auth/guards/active-user.guard'
+import { RolesGuard } from '../auth/guards/roles.guard'
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { QueueController } from './queue.controller'
 import { QueueService } from './queue.service'
 import { QueueObservabilityService } from '../common/metrics/queue-observability.service'
@@ -66,6 +69,9 @@ function parseRedisConfig() {
     },
     QueueService,
     QueueObservabilityService,
+    JwtAuthGuard,
+    ActiveUserGuard,
+    RolesGuard,
   ],
   exports: [QUEUE_CONNECTION, QueueService, QueueObservabilityService],
 })
