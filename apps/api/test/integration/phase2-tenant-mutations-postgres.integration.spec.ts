@@ -188,7 +188,17 @@ describeRealIntegration('Phase 2 tenant mutation isolation (Postgres e2e)', () =
     expect(await prisma.auditEvent.count({ where: { orgId: { in: orgIds } } })).toBe(auditBefore)
   })
 
-  it('completa onboarding somente para a organização autenticada', async () => {
+  it('exige evidência própria antes de completar onboarding somente para a organização autenticada', async () => {
+    // A ordem concluída e a cobrança de B não podem liberar A.
+    await request(app.getHttpServer()).post('/onboarding/complete').set(authA()).send({}).expect(400)
+    expect(await prisma.organization.findUnique({ where: { id: ids.orgA } })).toMatchObject({ requiresOnboarding: true })
+    expect(await prisma.organization.findUnique({ where: { id: ids.orgB } })).toMatchObject({ requiresOnboarding: true })
+
+    await prisma.serviceOrder.update({ where: { id: ids.serviceOrderA }, data: { status: 'DONE' } })
+    await prisma.charge.create({ data: {
+      orgId: ids.orgA, customerId: ids.customerA, serviceOrderId: ids.serviceOrderA,
+      amountCents: 12500, dueDate: new Date(Date.now() + 86_400_000), status: 'PENDING',
+    } })
     await request(app.getHttpServer()).post('/onboarding/complete').set(authA()).send({}).expect(201)
 
     expect(await prisma.organization.findUnique({ where: { id: ids.orgA } })).toMatchObject({ requiresOnboarding: false })
