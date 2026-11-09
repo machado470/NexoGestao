@@ -3,6 +3,7 @@ import {
   Logger,
   BadRequestException,
   ServiceUnavailableException,
+  ConflictException,
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { PrismaService } from '../prisma/prisma.service'
@@ -72,6 +73,7 @@ export class PaymentsService {
         select: {
           id: true,
           amountCents: true,
+          currency: true,
           status: true,
           customerId: true,
           customer: {
@@ -104,7 +106,7 @@ export class PaymentsService {
         line_items: [
           {
             price_data: {
-              currency: 'brl',
+              currency: charge.currency.toLowerCase(),
               unit_amount: dto.amount,
               product_data: {
                 name: dto.description,
@@ -123,6 +125,9 @@ export class PaymentsService {
           customerId: dto.customerId,
           description: dto.description,
         },
+        payment_intent_data: { metadata: {
+          orgId: dto.orgId, chargeId: dto.chargeId, customerId: dto.customerId,
+        } },
       })
 
       if (!session.url) {
@@ -163,78 +168,42 @@ export class PaymentsService {
 
     if (
       event.type === 'charge.succeeded' ||
-      event.type === 'checkout.session.completed'
+      event.type === 'checkout.session.completed' ||
+      event.type === 'checkout.session.async_payment_succeeded'
     ) {
       const object = event.data.object as Stripe.Charge | Stripe.Checkout.Session
-
-      const orgId =
-        object.metadata && typeof object.metadata.orgId === 'string'
-          ? object.metadata.orgId
-          : null
-
-      const chargeId =
-        object.metadata && typeof object.metadata.chargeId === 'string'
-          ? object.metadata.chargeId
-          : null
-
-      const externalRef = 'id' in object && typeof object.id === 'string' ? object.id : null
-
-      if (!orgId || !chargeId) {
-        this.logger.warn(
-          `Webhook Stripe sem orgId/chargeId. event=${event.type} externalRef=${externalRef ?? 'n/a'}`,
-        )
-        return { received: true }
+      const orgId = object.metadata?.orgId
+      const chargeId = object.metadata?.chargeId
+      if (!orgId || !chargeId) return { received: true }
+      const isCharge = event.type === 'charge.succeeded'
+      const chargeObject = object as Stripe.Charge
+      const session = object as Stripe.Checkout.Session
+      const settled = isCharge
+        ? chargeObject.paid === true && chargeObject.captured === true
+        : session.mode === 'payment' && session.payment_status === 'paid'
+      if (!settled) return { received: true }
+      const amountCents = isCharge ? chargeObject.amount_captured : session.amount_total
+      const currency = object.currency?.toLowerCase()
+      const intent = object.payment_intent
+      const intentId = typeof intent === 'string' ? intent : intent?.id
+      if (!Number.isSafeInteger(amountCents) || amountCents <= 0 || !currency || !intentId) {
+        throw new BadRequestException('Pagamento Stripe liquidado sem valor, moeda ou referência válidos.')
       }
+      const externalRef = `stripe:${intentId}`
 
       const internalCharge = await this.prisma.charge.findFirst({
         where: { id: chargeId, orgId },
-        select: {
-          id: true,
-          orgId: true,
-          amountCents: true,
-          status: true,
-        },
+        select: { id: true, orgId: true, amountCents: true, currency: true, status: true },
       })
-
-      if (!internalCharge) {
-        this.logger.warn(
-          `Cobrança interna não encontrada para webhook Stripe. orgId=${orgId} chargeId=${chargeId} externalRef=${externalRef ?? 'n/a'}`,
-        )
-        return { received: true }
+      if (!internalCharge) throw new BadRequestException('Cobrança Stripe não encontrada para esta organização.')
+      if (internalCharge.amountCents !== amountCents || internalCharge.currency.toLowerCase() !== currency) {
+        throw new ConflictException('Pagamento Stripe diverge do valor ou moeda da cobrança. Conciliação necessária.')
       }
-
-      if (internalCharge.status === 'PAID') {
-        this.logger.log(
-          `Webhook Stripe ignorado: cobrança já paga. orgId=${orgId} chargeId=${chargeId} externalRef=${externalRef ?? 'n/a'}`,
-        )
-        return { received: true }
-      }
-
       await this.finance.payCharge({
-        orgId,
-        chargeId,
-        actorUserId: null,
-        method: 'CARD',
-        amountCents: internalCharge.amountCents,
+        orgId, chargeId, actorUserId: null, method: 'CARD',
+        amountCents, currency, externalRef,
+        idempotencyKey: `stripe-payment:${intentId}`,
       })
-
-      if (externalRef) {
-        const latestPayment = await this.prisma.payment.findFirst({
-          where: {
-            orgId,
-            chargeId,
-          },
-          orderBy: { createdAt: 'desc' },
-          select: { id: true, externalRef: true },
-        })
-
-        if (latestPayment && !latestPayment.externalRef) {
-          await this.prisma.payment.update({
-            where: { id: latestPayment.id },
-            data: { externalRef },
-          })
-        }
-      }
 
       this.logger.log(
         `Pagamento processado com sucesso via Stripe. event=${event.type} chargeId=${chargeId} externalRef=${externalRef ?? 'n/a'}`,
