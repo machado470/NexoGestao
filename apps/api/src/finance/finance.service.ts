@@ -4,6 +4,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common'
 import { csvRow } from '../common/csv'
 import { PrismaService } from '../prisma/prisma.service'
@@ -1428,12 +1429,19 @@ export class FinanceService {
       .sort((a, b) => a.month.localeCompare(b.month))
   }
 
-  async createAutomationCharge(data: Record<string, string | number | boolean | null>) {
-    return { ok: true }
+  async createAutomationCharge(_data: Record<string, string | number | boolean | null>) {
+    throw new ServiceUnavailableException('Criação automática de cobranças indisponível neste ambiente.')
   }
 
   async sendPaymentReminder(data: Record<string, string | number | boolean | null>) {
-    return { ok: true }
+    const orgId = typeof data?.orgId === 'string' ? data.orgId.trim() : ''
+    const chargeId = typeof data?.chargeId === 'string' ? data.chargeId.trim() : ''
+    if (!orgId || !chargeId) throw new BadRequestException('Lembrete financeiro exige orgId e chargeId válidos.')
+    const result = await this.sendPaymentReminderWhatsApp(chargeId, orgId)
+    if (result.status === 'skipped' && result.reason === 'charge_missing') {
+      throw new NotFoundException('Cobrança não encontrada nesta organização.')
+    }
+    return result
   }
 
   // =========================
@@ -1505,19 +1513,19 @@ export class FinanceService {
     })
   }
 
-  async sendPaymentReminderWhatsApp(chargeId: string) {
-    const charge = await this.prisma.charge.findUnique({
-      where: { id: chargeId },
-      include: { customer: true },
-    })
-
-    if (!charge || !charge.customer?.phone || !['PENDING', 'OVERDUE'].includes(charge.status)) return
+  async sendPaymentReminderWhatsApp(chargeId: string, orgId?: string) {
+    const charge = orgId
+      ? await this.prisma.charge.findFirst({ where: { id: chargeId, orgId }, include: { customer: true } })
+      : await this.prisma.charge.findUnique({ where: { id: chargeId }, include: { customer: true } })
+    if (!charge) return { status: 'skipped' as const, reason: 'charge_missing' }
+    if (!['PENDING', 'OVERDUE'].includes(charge.status)) return { status: 'skipped' as const, reason: 'charge_closed' }
+    if (!charge.customer?.phone) return { status: 'skipped' as const, reason: 'missing_phone' }
 
     const amount = this.formatCurrency(charge.amountCents)
     const dueDate = this.formatDate(charge.dueDate)
     const text = `Olá, ${charge.customer.name}! Lembramos que sua cobrança de ${amount} vence em ${dueDate}.`
 
-    await this.whatsapp.enqueueMessage({
+    const result = await this.whatsapp.enqueueMessage({
       orgId: charge.orgId,
       customerId: charge.customerId,
       toPhone: charge.customer.phone,
@@ -1531,6 +1539,8 @@ export class FinanceService {
       }),
       renderedText: text,
     })
+    if (!result?.message?.id) throw new ServiceUnavailableException('Não foi possível confirmar o enfileiramento do lembrete.')
+    return { status: result.created ? 'queued' as const : 'duplicate' as const, messageId: result.message.id }
   }
 
   async remindChargeInOrg(orgId: string, chargeId: string) {

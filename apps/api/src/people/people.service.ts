@@ -46,6 +46,13 @@ export class PeopleService {
     }
   }
 
+  async listAssignees(orgId: string) {
+    return this.prisma.person.findMany({
+      where: { active: true, orgId },
+      select: { id: true, name: true },
+    })
+  }
+
   async listActiveByOrg(orgId: string) {
     return this.prisma.person.findMany({
       where: {
