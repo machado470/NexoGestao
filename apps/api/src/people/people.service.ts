@@ -65,9 +65,10 @@ export class PeopleService {
     })
   }
 
-  async countUsersWithPerson() {
+  async countUsersWithPerson(orgId: string) {
+    if (!orgId) throw new BadRequestException("orgId é obrigatório")
     return this.prisma.person.count({
-      where: { userId: { not: null } },
+      where: { orgId, userId: { not: null } },
     })
   }
 

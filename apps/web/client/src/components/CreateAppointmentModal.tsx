@@ -1,3 +1,7 @@
+import {
+  toLocalDateTimeInput,
+  parseLocalDateTimeInput,
+} from "@/lib/local-date-time";
 import { Button } from "@/components/ui/button";
 import { useEffect, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
@@ -54,7 +58,8 @@ export function CreateAppointmentModal({
   const [formData, setFormData] = useState(INITIAL_FORM);
   const assigneeWarningTelemetry = useAssigneeWarningTelemetry("APPOINTMENT");
   const utils = trpc.useUtils();
-  const peopleQuery = trpc.people.list.useQuery(undefined, {
+  const peopleQuery = trpc.people.assignees.useQuery(undefined, {
+    enabled: isOpen,
     retry: false,
     refetchOnWindowFocus: false,
   });
@@ -79,8 +84,8 @@ export function CreateAppointmentModal({
     setFormData({
       ...INITIAL_FORM,
       customerId: initialCustomerId ? String(initialCustomerId) : "",
-      date: initialStartsAt ? initialStartsAt.slice(0, 10) : "",
-      time: initialStartsAt ? initialStartsAt.slice(11, 16) : "",
+      date: toLocalDateTimeInput(initialStartsAt).slice(0, 10),
+      time: toLocalDateTimeInput(initialStartsAt).slice(11, 16),
       durationMinutes:
         initialStartsAt && initialEndsAt
           ? String(
@@ -95,7 +100,13 @@ export function CreateAppointmentModal({
             )
           : "60",
     });
-  }, [assigneeWarningTelemetry.reset, initialCustomerId, initialEndsAt, initialStartsAt, isOpen]);
+  }, [
+    assigneeWarningTelemetry.reset,
+    initialCustomerId,
+    initialEndsAt,
+    initialStartsAt,
+    isOpen,
+  ]);
 
   const createAppointment = trpc.appointments.create.useMutation();
 
@@ -114,12 +125,18 @@ export function CreateAppointmentModal({
       return;
     }
 
-    const startsAt = new Date(`${formData.date}T${formData.time}`);
-    if (Number.isNaN(startsAt.getTime())) {
+    const startsAt = parseLocalDateTimeInput(
+      `${formData.date}T${formData.time}`,
+      initialStartsAt
+    );
+    if (!startsAt) {
       toast.error("Data e hora inválidas");
       return;
     }
-    const durationMinutes = Math.max(15, Number(formData.durationMinutes) || 60);
+    const durationMinutes = Math.max(
+      15,
+      Number(formData.durationMinutes) || 60
+    );
     const endsAt = new Date(startsAt.getTime() + durationMinutes * 60000);
 
     if (
@@ -142,8 +159,7 @@ export function CreateAppointmentModal({
       notes: formData.notes.trim() || undefined,
     };
 
-    const previousAppointments =
-      utils.appointments.list.getData(undefined);
+    const previousAppointments = utils.appointments.list.getData(undefined);
     const tempId = `temp-appointment-${Date.now()}`;
     const selectedCustomer = customers.find(
       item => String(item.id) === payload.customerId
@@ -197,10 +213,7 @@ export function CreateAppointmentModal({
         onClose();
       },
       onError: error => {
-        utils.appointments.list.setData(
-          undefined,
-          previousAppointments as any
-        );
+        utils.appointments.list.setData(undefined, previousAppointments as any);
         toast.error(error.message || "Erro ao criar agendamento");
       },
     });
@@ -334,7 +347,8 @@ export function CreateAppointmentModal({
           />
         </AppField>
         <p className="text-xs text-[var(--modal-section-muted)]">
-          Dica operacional: a página sinaliza conflitos e próximos horários após criar.
+          Dica operacional: a página sinaliza conflitos e próximos horários após
+          criar.
         </p>
       </AppForm>
     </FormModal>

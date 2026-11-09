@@ -13,27 +13,27 @@ export class WhatsAppAutomationService {
   ) {}
 
   async sendAppointmentConfirmation(orgId: string, appointmentId: string) {
-    return this.sendFromEntity(orgId, 'APPOINTMENT', appointmentId, 'APPOINTMENT_CONFIRMATION', 'APPOINTMENT_CONFIRMATION_SENT')
+    return this.sendFromEntity(orgId, 'APPOINTMENT', appointmentId, 'APPOINTMENT_CONFIRMATION')
   }
 
   async sendAppointmentReminder(orgId: string, appointmentId: string) {
-    return this.sendFromEntity(orgId, 'APPOINTMENT', appointmentId, 'APPOINTMENT_REMINDER', 'APPOINTMENT_REMINDER_SENT')
+    return this.sendFromEntity(orgId, 'APPOINTMENT', appointmentId, 'APPOINTMENT_REMINDER')
   }
 
   async sendPaymentReminder(orgId: string, chargeId: string) {
-    return this.sendFromEntity(orgId, 'CHARGE', chargeId, 'PAYMENT_REMINDER', 'PAYMENT_REMINDER_SENT')
+    return this.sendFromEntity(orgId, 'CHARGE', chargeId, 'PAYMENT_REMINDER')
   }
 
   async sendPaymentLink(orgId: string, chargeId: string) {
-    return this.sendFromEntity(orgId, 'CHARGE', chargeId, 'PAYMENT_LINK', 'PAYMENT_LINK_SENT')
+    return this.sendFromEntity(orgId, 'CHARGE', chargeId, 'PAYMENT_LINK')
   }
 
   async sendPaymentConfirmation(orgId: string, paymentId: string) {
-    return this.sendFromEntity(orgId, 'PAYMENT', paymentId, 'PAYMENT_CONFIRMATION', 'WHATSAPP_MESSAGE_SENT')
+    return this.sendFromEntity(orgId, 'PAYMENT', paymentId, 'PAYMENT_CONFIRMATION')
   }
 
   async sendServiceUpdate(orgId: string, serviceOrderId: string) {
-    return this.sendFromEntity(orgId, 'SERVICE_ORDER', serviceOrderId, 'SERVICE_UPDATE', 'WHATSAPP_MESSAGE_SENT')
+    return this.sendFromEntity(orgId, 'SERVICE_ORDER', serviceOrderId, 'SERVICE_UPDATE')
   }
 
   private async sendFromEntity(
@@ -41,7 +41,6 @@ export class WhatsAppAutomationService {
     entityType: WhatsAppEntityType,
     entityId: string,
     messageType: WhatsAppMessageType,
-    timelineAction: string,
   ) {
     const data = await this.resolveEntity(orgId, entityType, entityId)
     if (!data?.customer?.phone) return null
@@ -56,9 +55,10 @@ export class WhatsAppAutomationService {
       content,
     })
 
-    await this.timeline.log({
+    if (message.created && message.message) await this.timeline.log({
       orgId,
-      action: timelineAction,
+      action: 'WHATSAPP_MESSAGE_QUEUED',
+      description: 'Mensagem automática adicionada à fila de envio.',
       customerId: data.customer.id,
       metadata: {
         messageId: message.message?.id ?? null,

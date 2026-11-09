@@ -52,6 +52,7 @@ const EVENT_LABELS: Record<string, string> = {
   SERVICE_ORDER_COMPLETED: "Ordem de serviço concluída",
   APPOINTMENT_CANCELLED: "Agendamento cancelado",
   APPOINTMENT_CONFIRMED: "Agendamento confirmado",
+  WHATSAPP_MESSAGE_QUEUED: "Mensagem na fila de envio",
   MESSAGE_SENT: "Mensagem enviada",
   MESSAGE_FAILED: "Mensagem com falha",
   RISK_UPDATED: "Risco atualizado",

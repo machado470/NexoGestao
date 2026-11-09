@@ -1,6 +1,7 @@
 import { Controller, Get, Req, UnauthorizedException, UseGuards } from '@nestjs/common'
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
+import { Throttle } from '@nestjs/throttler'
 import { PrismaService } from '../prisma/prisma.service'
 
 @Controller('me')
@@ -9,6 +10,8 @@ export class MeController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Get()
+  // O BFF revalida a sessão em cada consulta; uma tela pode emitir várias consultas.
+  @Throttle({ default: { limit: 120, ttl: 60_000 } })
   async me(@Req() req: any) {
     const authUser = req.user ?? null
     const orgId = authUser?.orgId ?? null

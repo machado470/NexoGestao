@@ -304,6 +304,10 @@ export class WhatsAppService {
         errorMessage: input.errorMessage ?? updated.errorMessage ?? null,
       })
     }
+    if (input.status === 'SENT') {
+      const byTypeAction = this.getMessageTypeTimelineAction(updated.messageType)
+      if (byTypeAction) await this.logMessageTimelineEventOnce({ orgId, messageId: updated.id, action: byTypeAction })
+    }
     return updated
   }
 
@@ -1251,6 +1255,9 @@ export class WhatsAppService {
 
   private getMessageTypeTimelineAction(messageType: WhatsAppMessageType | null | undefined): string | null {
     if (messageType === 'PAYMENT_LINK') return 'PAYMENT_LINK_SENT'
+    if (messageType === 'APPOINTMENT_CONFIRMATION') return 'APPOINTMENT_CONFIRMATION_SENT'
+    if (messageType === 'PAYMENT_REMINDER') return 'PAYMENT_REMINDER_SENT'
+    if (messageType === 'PAYMENT_CONFIRMATION') return 'PAYMENT_CONFIRMATION_SENT'
     if (messageType === 'APPOINTMENT_REMINDER') return 'APPOINTMENT_REMINDER_SENT'
     if (messageType === 'SERVICE_UPDATE') return 'SERVICE_UPDATE_SENT'
     return null

@@ -1,5 +1,6 @@
+import { executeCustomerUpdate as executeCustomerCreation } from "@/lib/customer-update-flow";
 import { Button } from "@/components/ui/button";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
@@ -53,6 +54,7 @@ export default function CreateCustomerModal({
 
   const utils = trpc.useUtils();
   const { track } = useProductAnalytics();
+  const submitting = useRef(false);
   const createCustomer = trpc.customers.create.useMutation();
 
   useCriticalActionGuard({
@@ -99,6 +101,7 @@ export default function CreateCustomerModal({
   };
 
   const submit = async () => {
+    if (submitting.current || createdCustomer) return;
     const parsed = customerSchema.safeParse({
       name: name.trim(),
       phone: phone.trim(),
@@ -118,125 +121,105 @@ export default function CreateCustomerModal({
       ? parsed.data.cpfCnpj.replace(/\D/g, "")
       : "";
 
-    const previousCustomers = utils.customers.list.getData(undefined);
-
+    submitting.current = true;
+    let confirmedCustomerId: string | undefined;
     try {
-      const tempId = `temp-customer-${Date.now()}`;
-      const optimisticTimestamp = new Date().toISOString();
-      const optimisticCustomer = {
-        id: tempId,
-        name: parsed.data.name,
-        phone: parsed.data.phone,
-        email: parsed.data.email || null,
-        notes: parsed.data.notes?.trim() ? parsed.data.notes.trim() : null,
-        cpfCnpj: normalizedCpfCnpj || null,
-        address: parsed.data.address?.trim() ? parsed.data.address.trim() : null,
-        active: true,
-        createdAt: optimisticTimestamp,
-        updatedAt: optimisticTimestamp,
-      };
+      const outcome = await executeCustomerCreation({
+        persist: () => createCustomer.mutateAsync({
+          name: parsed.data.name,
+          phone: parsed.data.phone,
+          email: parsed.data.email || undefined,
+          notes: parsed.data.notes?.trim() ? parsed.data.notes.trim() : undefined,
+          cpfCnpj: normalizedCpfCnpj || undefined,
+          address: parsed.data.address?.trim() ? parsed.data.address.trim() : undefined,
+        }),
+        confirm: created => {
+          confirmedCustomerId = created.id;
+          setCreatedCustomer({ id: created.id, name: created.name });
+          reset();
+          utils.customers.list.setData(undefined, old => [created, ...(old ?? []).filter(item => item.id !== created.id)]);
+          const createdId = created.id;
+          const createdName = created.name;
 
-      utils.customers.list.setData(undefined, old => [
-        optimisticCustomer,
-        ...(old ?? []),
-      ]);
-
-      const created = await createCustomer.mutateAsync({
-        name: parsed.data.name,
-        phone: parsed.data.phone,
-        email: parsed.data.email || undefined,
-        notes: parsed.data.notes?.trim() ? parsed.data.notes.trim() : undefined,
-        cpfCnpj: normalizedCpfCnpj || undefined,
-        address: parsed.data.address?.trim() ? parsed.data.address.trim() : undefined,
-      });
-
-      utils.customers.list.setData(undefined, old =>
-        (old ?? []).map(item => (item.id === tempId ? created : item))
-      );
-
-      const createdId = created.id;
-      const createdName = created.name;
-
-      toast.success(`Cliente criado: ${createdName}`, {
-        action: {
-          label:
+          toast.success(`Cliente criado: ${createdName}`, {
+            action: {
+              label:
+                nextStep === "schedule"
+                  ? "Criar agendamento"
+                  : nextStep === "message"
+                    ? "Enviar mensagem"
+                    : nextStep === "billing"
+                      ? "Criar cobrança"
+                      : "Ver cliente",
+              onClick: async () => {
+                if (nextStep === "schedule")
+                  return navigate(
+                    `/appointments?customerId=${createdId}&source=customer_created`
+                  );
+                if (nextStep === "message")
+                  return navigate(
+                    `/whatsapp?customerId=${createdId}&source=customer_created`
+                  );
+                if (nextStep === "billing")
+                  return navigate(
+                    `/finances?customerId=${createdId}&source=customer_created`
+                  );
+                await onCreated?.({ id: createdId, name: createdName });
+                close();
+              },
+            },
+          });
+          notify.successPersistent(
+            "Cliente criado",
             nextStep === "schedule"
-              ? "Criar agendamento"
+              ? "Próximo passo escolhido: criar agendamento para manter continuidade."
               : nextStep === "message"
-                ? "Enviar mensagem"
+                ? "Próximo passo escolhido: iniciar contato contextual por WhatsApp."
                 : nextStep === "billing"
-                  ? "Criar cobrança"
-                  : "Ver cliente",
-          onClick: async () => {
-            if (nextStep === "schedule")
-              return navigate(
-                `/appointments?customerId=${createdId}&source=customer_created`
-              );
-            if (nextStep === "message")
-              return navigate(
-                `/whatsapp?customerId=${createdId}&source=customer_created`
-              );
-            if (nextStep === "billing")
-              return navigate(
-                `/finances?customerId=${createdId}&source=customer_created`
-              );
-            await onCreated?.({ id: createdId, name: createdName });
-            close();
-          },
+                  ? "Próximo passo escolhido: criar cobrança para ativar o fluxo financeiro."
+                  : "Cadastro concluído. Abra o workspace para seguir com operação.",
+            {
+              label:
+                nextStep === "schedule"
+                  ? "Abrir agenda"
+                  : nextStep === "message"
+                    ? "Abrir WhatsApp"
+                    : nextStep === "billing"
+                      ? "Abrir financeiro"
+                      : "Criar O.S.",
+              onClick: () => {
+                if (nextStep === "schedule")
+                  return navigate(`/appointments?customerId=${createdId}`);
+                if (nextStep === "message")
+                  return navigate(`/whatsapp?customerId=${createdId}`);
+                if (nextStep === "billing")
+                  return navigate(`/finances?customerId=${createdId}`);
+                navigate(`/service-orders?customerId=${createdId}`);
+              },
+            }
+          );
+
+          registerActionFlowEvent("customer_created");
+          track("create_customer", {
+            screen: "customers",
+            customerId: createdId,
+            nextStep,
+          });
+
+        },
+        synchronize: async () => {
+          await invalidateOperationalGraph(utils, confirmedCustomerId);
+          await utils.customers.list.fetch(undefined, { staleTime: 0 });
         },
       });
-      notify.successPersistent(
-        "Cliente criado e sincronizado",
-        nextStep === "schedule"
-          ? "Próximo passo escolhido: criar agendamento para manter continuidade."
-          : nextStep === "message"
-            ? "Próximo passo escolhido: iniciar contato contextual por WhatsApp."
-            : nextStep === "billing"
-              ? "Próximo passo escolhido: criar cobrança para ativar o fluxo financeiro."
-              : "Cadastro concluído. Abra o workspace para seguir com operação.",
-        {
-          label:
-            nextStep === "schedule"
-              ? "Abrir agenda"
-              : nextStep === "message"
-                ? "Abrir WhatsApp"
-                : nextStep === "billing"
-                  ? "Abrir financeiro"
-                  : "Criar O.S.",
-          onClick: () => {
-            if (nextStep === "schedule")
-              return navigate(`/appointments?customerId=${createdId}`);
-            if (nextStep === "message")
-              return navigate(`/whatsapp?customerId=${createdId}`);
-            if (nextStep === "billing")
-              return navigate(`/finances?customerId=${createdId}`);
-            navigate(`/service-orders?customerId=${createdId}`);
-          },
-        }
-      );
-
-      registerActionFlowEvent("customer_created");
-      track("create_customer", {
-        screen: "customers",
-        customerId: createdId,
-        nextStep,
-      });
-      setCreatedCustomer({ id: createdId, name: createdName });
-      reset();
-      await invalidateOperationalGraph(utils, createdId);
-    } catch (err: any) {
-      utils.customers.list.setData(undefined, previousCustomers as any);
-      toast.error("Falha ao criar cliente: " + (err?.message ?? "erro"));
-      notify.error(
-        "Não foi possível criar o cliente",
-        "Confira os dados e tente novamente.",
-        {
-          label: "Tentar novamente",
-          onClick: () => {
-            void submit();
-          },
-        }
-      );
+      if (outcome.status === "saved") {
+        if (!outcome.synchronized) toast.warning("Cliente criado. Não foi possível atualizar todos os dados da tela; consulte a lista novamente.");
+        return;
+      }
+      const error = outcome.error;
+      toast.error("Não foi possível confirmar o cadastro: " + (error instanceof Error ? error.message : "erro"));
+    } finally {
+      submitting.current = false;
     }
   };
 

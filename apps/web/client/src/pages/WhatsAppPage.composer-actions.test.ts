@@ -8,9 +8,33 @@ import {
   mapConversation,
   presentOfficialWhatsAppActions,
   resolveMessageType,
+  resolveRefreshedConversation,
 } from "./WhatsAppPage";
 
 describe("WhatsApp authoritative presentation", () => {
+  it("promotes a virtual contact using the canonical refreshed inbox envelope", () => {
+    const payload = {
+      items: [
+        { id: "other", customerId: "customer-other" },
+        {
+          id: "real-conversation",
+          customerId: "customer-1",
+          customer: { name: "Ana" },
+        },
+      ],
+      nextCursor: null,
+    };
+    expect(resolveRefreshedConversation(payload, "customer-1")).toMatchObject({
+      id: "real-conversation",
+      name: "Ana",
+      isVirtual: false,
+    });
+    expect(resolveRefreshedConversation(payload, "unknown")).toBeUndefined();
+    expect(
+      resolveRefreshedConversation(undefined, "customer-1")
+    ).toBeUndefined();
+    expect(resolveRefreshedConversation(payload, undefined)).toBeUndefined();
+  });
   it("masks personal phone numbers", () => {
     expect(maskPhone("+55 (11) 98765-4321")).toBe("•••• 4321");
     expect(maskPhone(null)).toBe("Telefone cadastrado");

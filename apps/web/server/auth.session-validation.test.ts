@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createContext } from "./_core/context";
+import { createContext, fetchNexoMe } from "./_core/context";
 import { appRouter } from "./routers";
 
 function makeReq(token = "token-1") {
@@ -96,5 +96,20 @@ describe("BFF validated session", () => {
       me: null,
     });
     expect(res.clearCookie).toHaveBeenCalledWith("nexo_token", expect.any(Object));
+  });
+});
+
+
+describe("onboarding routing in validated sessions", () => {
+  beforeEach(() => vi.restoreAllMocks());
+  it.each([true, false])("preserves the official onboarding flag %s", async requiresOnboarding => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ data: { data: {
+      user: { id: "onboarding-user", role: "ADMIN", orgId: "onboarding-org" },
+      requiresOnboarding,
+    } } }), { status: 200 }));
+    expect(await fetchNexoMe(makeReq(`onboarding-${requiresOnboarding}`))).toMatchObject({
+      validated: true, requiresOnboarding,
+      redirect: requiresOnboarding ? "/onboarding" : "/executive-dashboard",
+    });
   });
 });

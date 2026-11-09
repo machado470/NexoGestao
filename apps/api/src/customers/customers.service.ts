@@ -396,8 +396,8 @@ export class CustomersService {
     data: {
       name?: string
       phone?: string
-      email?: string
-      notes?: string
+      email?: string | null
+      notes?: string | null
       active?: boolean
       expectedUpdatedAt?: string
     }
@@ -434,7 +434,9 @@ export class CustomersService {
       data.phone = v
     }
 
-    if (typeof params.data.email === 'string') {
+    if (params.data.email === null) {
+      data.email = null
+    } else if (typeof params.data.email === 'string') {
       const v = normalizeEmail(params.data.email)
 
       if (v && v !== before.email) {
@@ -455,7 +457,9 @@ export class CustomersService {
       data.email = v
     }
 
-    if (typeof params.data.notes === 'string') {
+    if (params.data.notes === null) {
+      data.notes = null
+    } else if (typeof params.data.notes === 'string') {
       const v = params.data.notes.trim()
       data.notes = v ? v : null
     }

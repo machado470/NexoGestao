@@ -42,7 +42,7 @@ describe("FinancesPage authoritative finance contract", () => {
 
   it("envia pagamento exato e idempotente sem identidade do navegador", () => {
     expect(source).toContain("amountCents: exactAmount");
-    expect(source).toContain("idempotencyKey: crypto.randomUUID()");
+    expect(source).toContain("createManualPaymentFlow()");
     expect(source).not.toMatch(/\borgId\s*:/);
     expect(source).not.toMatch(/\brole\s*:/);
   });
@@ -86,12 +86,13 @@ describe("FinancesPage authoritative finance contract", () => {
   });
 
   it("preserva os dados após erro e fecha somente depois da confirmação do backend", () => {
-    expect(source).toContain("await pay.mutateAsync");
-    expect(source).toMatch(
-      /await pay\.mutateAsync[\s\S]*await refresh\(\);\s*setPaying\(null\)/
+    expect(source).toContain("pay.mutateAsync(payload)");
+    expect(source).toMatch(/onConfirmed: result => \{\s*setPaying\(null\)/);
+    expect(source).toContain(
+      'outcome.status === "confirmed" && !outcome.refreshed'
     );
-    expect(source).toMatch(
-      /setPaymentError\(\s*error\?\.message\s*\?\?\s*"Não foi possível registrar o pagamento\."/
+    expect(source).toContain(
+      "Não foi possível confirmar o resultado do pagamento."
     );
     expect(source).toContain(
       'aria-describedby={paymentError ? "payment-error" : undefined}'

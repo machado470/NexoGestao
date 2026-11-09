@@ -1,5 +1,9 @@
-import { useMemo, useRef, useState } from "react";
-import { useLocation } from "wouter";
+import {
+  createManualPaymentFlow,
+  parseManualPaymentCents,
+} from "@/lib/manual-payment-flow";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useSearch } from "wouter";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { CreateChargeModal } from "@/components/CreateChargeModal";
@@ -26,7 +30,10 @@ import {
   AppStatusBadge,
   AppPageShell,
 } from "@/components/app-system";
-import { normalizeArrayPayload } from "@/lib/query-helpers";
+import {
+  normalizeArrayPayload,
+  normalizeObjectPayload,
+} from "@/lib/query-helpers";
 import { safeDate } from "@/lib/operational/kpi";
 import { formatCurrency } from "@/lib/operations/operations.utils";
 import type { OperationalSeverity } from "@/lib/operations/operational-intelligence";
@@ -123,6 +130,17 @@ function actionLabel(value: unknown) {
 
 export default function FinancesPage() {
   const [, navigate] = useLocation();
+  const routeSearch = useSearch();
+  const routeParams = new URLSearchParams(routeSearch);
+  const focusedChargeId = routeParams.get("chargeId");
+  const customerId = routeParams.get("customerId");
+  const paymentRequested = routeParams.get("action") === "pay";
+  const openedPaymentLink = useRef<string | null>(null);
+  const focusedQuery = trpc.finance.charges.getById.useQuery(
+    { id: focusedChargeId ?? "" },
+    { enabled: Boolean(focusedChargeId), retry: false }
+  );
+  const focusedCharge = normalizeObjectPayload<Charge>(focusedQuery.data);
   const paymentInputRef = useRef<HTMLInputElement>(null);
   const cancellationInputRef = useRef<HTMLInputElement>(null);
   const [openCreate, setOpenCreate] = useState(false);
@@ -132,6 +150,8 @@ export default function FinancesPage() {
   const [canceling, setCanceling] = useState<Charge | null>(null);
   const [amountCents, setAmountCents] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("PIX");
+  const [paymentFlow] = useState(() => createManualPaymentFlow());
+  const [paymentSubmitting, setPaymentSubmitting] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [cancellationReason, setCancellationReason] = useState("");
   const [cancellationError, setCancellationError] = useState<string | null>(
@@ -156,23 +176,29 @@ export default function FinancesPage() {
   const visibleCharges = useMemo(() => {
     const term = search.trim().toLocaleLowerCase("pt-BR");
     return charges.filter(charge => {
+      if (customerId && String(charge.customerId) !== customerId) return false;
       if (status !== "all" && String(charge.status) !== status) return false;
       if (!term) return true;
       return `${charge.customer?.name ?? ""} ${charge.serviceOrder?.number ?? ""}`
         .toLocaleLowerCase("pt-BR")
         .includes(term);
     });
-  }, [charges, search, status]);
+  }, [charges, search, status, customerId]);
 
   const refresh = async () => {
-    await Promise.all([
+    const results = await Promise.allSettled([
       chargesQuery.refetch(),
+      ...(focusedChargeId ? [focusedQuery.refetch()] : []),
       statsQuery.refetch(),
       queueQuery.refetch(),
     ]);
+    return results.every(
+      result => result.status === "fulfilled" && !result.value.isError
+    );
   };
 
   const openPayment = (charge: Charge) => {
+    if (paymentFlow.pending) return;
     setPaymentError(null);
     setAmountCents(
       typeof charge.balanceCents === "number" ? String(charge.balanceCents) : ""
@@ -181,28 +207,85 @@ export default function FinancesPage() {
     setPaying(charge);
   };
 
+  useEffect(() => {
+    if (!focusedChargeId || !paymentRequested) {
+      openedPaymentLink.current = null;
+      return;
+    }
+    if (
+      focusedQuery.isFetching ||
+      focusedQuery.isError ||
+      !focusedCharge ||
+      String(focusedCharge.id) !== focusedChargeId ||
+      openedPaymentLink.current === focusedChargeId
+    )
+      return;
+    openedPaymentLink.current = focusedChargeId;
+    if (["PENDING", "OVERDUE"].includes(String(focusedCharge.status))) {
+      openPayment(focusedCharge);
+    } else {
+      toast.message(
+        "Esta cobrança não está disponível para registrar pagamento."
+      );
+    }
+  }, [
+    focusedChargeId,
+    paymentRequested,
+    focusedCharge,
+    focusedQuery.isFetching,
+    focusedQuery.isError,
+  ]);
+
   const submitPayment = async () => {
-    if (!paying) return;
-    const exactAmount = Number(amountCents);
-    if (!Number.isInteger(exactAmount) || exactAmount < 1) {
+    if (!paying || paymentFlow.pending) return;
+    const exactAmount = parseManualPaymentCents(amountCents);
+    if (exactAmount === null) {
       setPaymentError("Informe um valor inteiro maior que zero, em centavos.");
       return;
     }
     setPaymentError(null);
+    setPaymentSubmitting(true);
     try {
-      await pay.mutateAsync({
-        chargeId: String(paying.id),
-        amountCents: exactAmount,
-        method,
-        idempotencyKey: crypto.randomUUID(),
-      });
-      await refresh();
-      setPaying(null);
-      toast.success("Pagamento confirmado pelo serviço financeiro.");
-    } catch (error: any) {
-      setPaymentError(
-        error?.message ?? "Não foi possível registrar o pagamento."
+      const outcome = await paymentFlow.run(
+        { chargeId: String(paying.id), amountCents: exactAmount, method },
+        {
+          send: payload => pay.mutateAsync(payload),
+          onConfirmed: result => {
+            setPaying(null);
+            toast.success(
+              result.idempotent
+                ? "Este pagamento já estava registrado."
+                : "Pagamento confirmado pelo serviço financeiro."
+            );
+          },
+          refresh,
+        }
       );
+      if (outcome.status === "failed") {
+        const error = outcome.error as {
+          message?: string;
+          data?: { code?: string };
+        } | null;
+        const rejected = [
+          "BAD_REQUEST",
+          "CONFLICT",
+          "FORBIDDEN",
+          "UNAUTHORIZED",
+          "NOT_FOUND",
+          "TOO_MANY_REQUESTS",
+        ].includes(error?.data?.code ?? "");
+        setPaymentError(
+          rejected && error?.message
+            ? error.message
+            : "Não foi possível confirmar o resultado do pagamento. Mantenha os dados e tente novamente."
+        );
+      } else if (outcome.status === "confirmed" && !outcome.refreshed) {
+        toast.warning(
+          "Pagamento confirmado. Não foi possível atualizar todos os dados da tela; use Atualizar para consultar novamente."
+        );
+      }
+    } finally {
+      setPaymentSubmitting(false);
     }
   };
 
@@ -220,9 +303,12 @@ export default function FinancesPage() {
         cancellationReason: reason,
         expectedUpdatedAt: canceling.updatedAt,
       });
-      await refresh();
       setCanceling(null);
       toast.success("Cobrança cancelada pelo serviço financeiro.");
+      if (!(await refresh()))
+        toast.warning(
+          "Cobrança cancelada. Use Atualizar para consultar os dados mais recentes."
+        );
     } catch (error: any) {
       setCancellationError(
         error?.message ?? "Não foi possível cancelar a cobrança."
@@ -230,13 +316,13 @@ export default function FinancesPage() {
     }
   };
 
-  if (chargesQuery.isLoading)
+  if (chargesQuery.isLoading && !focusedChargeId)
     return (
       <AppPageShell>
         <AppPageLoadingState title="Carregando carteira oficial" />
       </AppPageShell>
     );
-  if (chargesQuery.isError && charges.length === 0) {
+  if (chargesQuery.isError && charges.length === 0 && !focusedChargeId) {
     return (
       <AppPageShell>
         <AppPageErrorState
@@ -270,6 +356,55 @@ export default function FinancesPage() {
           </>
         }
       />
+
+      {focusedChargeId ? (
+        <AppSectionBlock
+          title="Cobrança selecionada"
+          subtitle="Registro oficial indicado pelo link de origem."
+        >
+          {focusedQuery.isLoading ? (
+            <AppPageLoadingState title="Carregando cobrança selecionada" />
+          ) : focusedQuery.isError ||
+            !focusedCharge ||
+            String(focusedCharge.id) !== focusedChargeId ? (
+            <AppPageErrorState
+              title="Cobrança indisponível"
+              description="O registro não foi encontrado ou você não possui acesso."
+              actionLabel="Tentar novamente"
+              onAction={() => void focusedQuery.refetch()}
+            />
+          ) : (
+            <div className="space-y-2">
+              <p>
+                {factualLabel(
+                  focusedCharge.customer?.name,
+                  "Cliente não informado"
+                )}{" "}
+                · {statusLabel(focusedCharge.status)}
+              </p>
+              <p>Saldo oficial: {money(focusedCharge.balanceCents)}</p>
+              {["PENDING", "OVERDUE"].includes(String(focusedCharge.status)) ? (
+                <Button onClick={() => openPayment(focusedCharge)}>
+                  Registrar pagamento
+                </Button>
+              ) : null}
+            </div>
+          )}
+          <Button variant="outline" onClick={() => navigate("/finances")}>
+            Ver carteira completa
+          </Button>
+        </AppSectionBlock>
+      ) : null}
+      {customerId ? (
+        <AppAlert>
+          <AppAlertDescription>
+            Carteira filtrada pelo cliente selecionado.
+            <Button variant="outline" onClick={() => navigate("/finances")}>
+              Ver todos os clientes
+            </Button>
+          </AppAlertDescription>
+        </AppAlert>
+      ) : null}
 
       <AppSectionBlock
         title="Indicadores oficiais"
@@ -443,7 +578,16 @@ export default function FinancesPage() {
             />
           </AppField>
         </AppFiltersBar>
-        {visibleCharges.length === 0 ? (
+        {chargesQuery.isError ? (
+          <AppPageErrorState
+            title="Carteira indisponível"
+            description="A cobrança selecionada permanece disponível independentemente da carteira."
+            actionLabel="Tentar novamente"
+            onAction={() => void chargesQuery.refetch()}
+          />
+        ) : chargesQuery.isLoading ? (
+          <AppPageLoadingState title="Carregando carteira oficial" />
+        ) : visibleCharges.length === 0 ? (
           <AppEmptyState
             title="Nenhuma cobrança encontrada"
             description="A carteira oficial não contém itens para os filtros selecionados."
@@ -554,18 +698,18 @@ export default function FinancesPage() {
       <FormModal
         open={Boolean(paying)}
         onOpenChange={open => {
-          if (!open) setPaying(null);
+          if (!open && !paymentFlow.pending) setPaying(null);
         }}
         title="Registrar pagamento manual"
         description={`Cobrança de ${factualLabel(paying?.customer?.name, "cliente não informado")}. Saldo oficial: ${money(paying?.balanceCents)}`}
-        closeBlocked={pay.isPending}
+        closeBlocked={paymentSubmitting}
         initialFocusRef={paymentInputRef}
         footer={
           <AppFormActions>
             <Button
               type="button"
               variant="outline"
-              disabled={pay.isPending}
+              disabled={paymentSubmitting}
               onClick={() => setPaying(null)}
             >
               Voltar
@@ -573,9 +717,9 @@ export default function FinancesPage() {
             <Button
               type="submit"
               form="manual-payment-form"
-              disabled={pay.isPending}
+              disabled={paymentSubmitting}
             >
-              {pay.isPending ? "Confirmando…" : "Confirmar pagamento"}
+              {paymentSubmitting ? "Confirmando…" : "Confirmar pagamento"}
             </Button>
           </AppFormActions>
         }
@@ -605,6 +749,7 @@ export default function FinancesPage() {
                 id="payment-amount"
                 inputMode="numeric"
                 value={amountCents}
+                disabled={paymentSubmitting}
                 onChange={event => setAmountCents(event.target.value)}
                 aria-invalid={Boolean(paymentError)}
                 aria-describedby={paymentError ? "payment-error" : undefined}
@@ -614,7 +759,9 @@ export default function FinancesPage() {
               <AppSelect
                 ariaLabel="Método do pagamento"
                 value={method}
-                onValueChange={value => setMethod(value as PaymentMethod)}
+                onValueChange={value => {
+                  if (!paymentFlow.pending) setMethod(value as PaymentMethod);
+                }}
                 options={methodOptions}
               />
             </AppField>

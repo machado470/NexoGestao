@@ -1,68 +1,42 @@
-import { Injectable } from '@nestjs/common'
+import { BadRequestException, Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
-
-type OnboardingStep = 'createCustomer' | 'createService' | 'createCharge'
+import type { OnboardingStep } from './dto/complete-onboarding-step.dto'
 
 @Injectable()
 export class OnboardingService {
   constructor(private prisma: PrismaService) {}
 
+  /** Status reads never release the organization or accept client-side progress as evidence. */
   async getOnboardingStatus(orgId: string) {
-    const [organization, customerCount, serviceOrderCount, chargeCount] =
-      await Promise.all([
-        this.prisma.organization.findUnique({
-          where: { id: orgId },
-          select: { requiresOnboarding: true },
-        }),
-        this.prisma.customer.count({ where: { orgId } }),
-        this.prisma.serviceOrder.count({ where: { orgId } }),
-        this.prisma.charge.count({ where: { orgId } }),
-      ])
-
-    if (!organization) {
-      return null
-    }
-
-    const createCustomer = customerCount > 0
-    const createService = serviceOrderCount > 0
-    const createCharge = chargeCount > 0
-    const shouldComplete = createCustomer && createService && createCharge
-
-    if (organization.requiresOnboarding && shouldComplete) {
-      await this.prisma.organization.update({
-        where: { id: orgId },
-        data: { requiresOnboarding: false },
-      })
-      organization.requiresOnboarding = false
-    }
-
+    const [organization, customerCount, serviceOrderCount, chargeCount] = await Promise.all([
+      this.prisma.organization.findUnique({ where: { id: orgId }, select: { requiresOnboarding: true } }),
+      this.prisma.customer.count({ where: { orgId } }),
+      this.prisma.serviceOrder.count({ where: { orgId, status: 'DONE' } }),
+      this.prisma.charge.count({ where: {
+        orgId,
+        status: { in: ['PENDING', 'OVERDUE', 'PAID'] },
+        customer: { is: { orgId } },
+        serviceOrder: { is: { orgId, status: 'DONE' } },
+      } }),
+    ])
+    if (!organization) return null
     return {
       requiresOnboarding: organization.requiresOnboarding,
-      steps: {
-        createCustomer,
-        createService,
-        createCharge,
-      },
+      steps: { createCustomer: customerCount > 0, createService: serviceOrderCount > 0, createCharge: chargeCount > 0 },
     }
   }
 
-  async completeOnboardingStep(orgId: string, step: OnboardingStep) {
-    const org = await this.prisma.organization.findUnique({
-      where: { id: orgId },
-      select: { id: true, requiresOnboarding: true },
-    })
-
-    if (!org) return null
-
-    if (step === 'createCharge' && org.requiresOnboarding) {
-      await this.prisma.organization.update({
-        where: { id: orgId },
-        data: {
-          requiresOnboarding: false,
-        },
-      })
+  async completeOnboarding(orgId: string) {
+    const status = await this.getOnboardingStatus(orgId)
+    if (!status || !status.requiresOnboarding) return status
+    if (!Object.values(status.steps).every(Boolean)) {
+      throw new BadRequestException('Cadastre um cliente, conclua uma O.S. e gere uma cobrança vinculada antes de finalizar o onboarding.')
     }
+    await this.prisma.organization.update({ where: { id: orgId }, data: { requiresOnboarding: false } })
+    return { ...status, requiresOnboarding: false }
+  }
 
-    return this.getOnboardingStatus(orgId)
+  async completeOnboardingStep(orgId: string, step: OnboardingStep) {
+    return step === 'createCharge' ? this.completeOnboarding(orgId) : this.getOnboardingStatus(orgId)
   }
 }

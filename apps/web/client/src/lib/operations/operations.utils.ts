@@ -468,6 +468,7 @@ export function getTimelineEventLabel(event: TimelineEventLike) {
     GOVERNANCE_RUN_STARTED: "Governança iniciada",
     GOVERNANCE_RUN_COMPLETED: "Governança concluída",
     OPERATIONAL_STATE_CHANGED: "Estado operacional alterado",
+    WHATSAPP_MESSAGE_QUEUED: "Mensagem na fila de envio",
     MESSAGE_SENT: "Mensagem enviada",
     MESSAGE_FAILED: "Falha no envio da mensagem",
     MESSAGE_RETRY_REQUESTED: "Retry de mensagem solicitado",

@@ -438,11 +438,19 @@ export class FinanceService {
   async getCharge(orgId: string, id: string) {
     const charge = await this.prisma.charge.findFirst({
       where: { id, orgId },
-      include: { customer: true, payments: true },
+      include: { customer: true, serviceOrder: true, payments: true },
     })
 
     if (!charge) throw new NotFoundException('Charge não encontrada')
-    return charge
+    const paidAmountCents = charge.payments.reduce((total, payment) => total + payment.amountCents, 0)
+    const evaluatedAt = new Date()
+    return {
+      ...charge,
+      paidAmountCents,
+      balanceCents: Math.max(0, charge.amountCents - paidAmountCents),
+      daysOverdue: charge.status === 'OVERDUE' ? daysBetweenUtc(charge.dueDate, evaluatedAt) : null,
+      evaluatedAt,
+    }
   }
 
   async getPayment(orgId: string, id: string) {

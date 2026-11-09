@@ -1,3 +1,5 @@
+import { parseMoneyInputToCents } from "@/lib/money-input";
+import { parseLocalDateTimeInput } from "@/lib/local-date-time";
 import { Button } from "@/components/ui/button";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -67,15 +69,7 @@ const INITIAL_FORM: FormState = {
 };
 
 function parseAmountToCents(raw: string): number | undefined {
-  const normalized = raw.replace(",", ".").trim();
-  if (!normalized) return undefined;
-
-  const value = Number(normalized);
-  if (!Number.isFinite(value) || value <= 0) {
-    return undefined;
-  }
-
-  return Math.round(value * 100);
+  return parseMoneyInputToCents(raw) ?? undefined;
 }
 
 function formatCurrencyFromInput(raw: string) {
@@ -128,18 +122,24 @@ export default function CreateServiceOrderModal({
     );
   }, [customers.length, formData.customerId, formData.title]);
   const isDirty = useMemo(() => {
-    return Object.entries(formData).some(([, value]) => value.trim().length > 0);
+    return Object.entries(formData).some(
+      ([, value]) => value.trim().length > 0
+    );
   }, [formData]);
 
   const hasAmount = formData.amount.trim().length > 0;
   const selectedCustomerName =
-    customers.find((customer) => customer.id === formData.customerId)?.name ??
+    customers.find(customer => customer.id === formData.customerId)?.name ??
     "Cliente não definido";
   const summaryAmount = formatCurrencyFromInput(formData.amount);
 
   const handleClose = () => {
     if (createMutation.isPending) return;
-    if (!createdServiceOrder && isDirty && !window.confirm("Existem dados não salvos. Deseja fechar e descartar?")) {
+    if (
+      !createdServiceOrder &&
+      isDirty &&
+      !window.confirm("Existem dados não salvos. Deseja fechar e descartar?")
+    ) {
       return;
     }
     setCreatedServiceOrder(null);
@@ -155,9 +155,11 @@ export default function CreateServiceOrderModal({
       assigneeWarningTelemetry.reset();
       return;
     }
-    setFormData((current) => ({
+    setFormData(current => ({
       ...current,
-      customerId: current.customerId || (initialCustomerId ? String(initialCustomerId) : ""),
+      customerId:
+        current.customerId ||
+        (initialCustomerId ? String(initialCustomerId) : ""),
     }));
   }, [assigneeWarningTelemetry.reset, initialCustomerId, resolvedOpen]);
 
@@ -193,6 +195,20 @@ export default function CreateServiceOrderModal({
       return;
     }
 
+    const scheduledFor = parseLocalDateTimeInput(
+      parsed.data.scheduledFor || ""
+    );
+    const dueDate = parseLocalDateTimeInput(parsed.data.dueDate || "");
+    if (
+      (parsed.data.scheduledFor && !scheduledFor) ||
+      (parsed.data.dueDate && !dueDate)
+    ) {
+      toast.error(
+        "Data ou horário inválido. Revise a programação e o vencimento."
+      );
+      return;
+    }
+
     const payload = {
       customerId: parsed.data.customerId,
       appointmentId: appointmentId ? String(appointmentId) : undefined,
@@ -200,15 +216,15 @@ export default function CreateServiceOrderModal({
       title: parsed.data.title,
       description: parsed.data.description || undefined,
       priority: parsed.data.priority,
-      scheduledFor: parsed.data.scheduledFor || undefined,
+      scheduledFor: scheduledFor?.toISOString(),
       amountCents: parsed.data.amountCents,
-      dueDate: parsed.data.dueDate || undefined,
+      dueDate: dueDate?.toISOString(),
     };
 
     assigneeWarningTelemetry.trackConfirmed(payload.assignedToPersonId);
 
     createMutation.mutate(payload, {
-      onSuccess: async (created) => {
+      onSuccess: async created => {
         await invalidateOperationalGraph(
           utils,
           payload.customerId,
@@ -236,7 +252,9 @@ export default function CreateServiceOrderModal({
           action: {
             label: "Ver O.S.",
             onClick: () =>
-              navigate(buildServiceOrdersDeepLink(String((created as any)?.id ?? ""))),
+              navigate(
+                buildServiceOrdersDeepLink(String((created as any)?.id ?? ""))
+              ),
           },
         });
         notify.successPersistent(
@@ -244,11 +262,14 @@ export default function CreateServiceOrderModal({
           "Próximo passo: gerar a cobrança para transformar execução em receita.",
           {
             label: "Ir para Financeiro",
-            onClick: () => navigate(`/finances?serviceOrderId=${String((created as any)?.id ?? "")}`),
+            onClick: () =>
+              navigate(
+                `/finances?serviceOrderId=${String((created as any)?.id ?? "")}`
+              ),
           }
         );
       },
-      onError: (error) => {
+      onError: error => {
         toast.error(error.message || "Erro ao criar ordem de serviço");
         notify.error(
           "Falha ao criar O.S.",
@@ -267,7 +288,7 @@ export default function CreateServiceOrderModal({
   return (
     <FormModal
       open={resolvedOpen}
-      onOpenChange={(open) => (!open ? handleClose() : undefined)}
+      onOpenChange={open => (!open ? handleClose() : undefined)}
       title="Nova O.S."
       description={`${selectedCustomerName} · ${hasAmount ? summaryAmount : "Sem valor definido"}`}
       closeBlocked={createMutation.isPending}
@@ -277,11 +298,7 @@ export default function CreateServiceOrderModal({
         <>
           {createdServiceOrder ? (
             <>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleClose}
-              >
+              <Button type="button" variant="outline" onClick={handleClose}>
                 Fechar
               </Button>
               <Button
@@ -291,7 +308,9 @@ export default function CreateServiceOrderModal({
                   setCreatedServiceOrder(null);
                   setFormData({
                     ...INITIAL_FORM,
-                    customerId: initialCustomerId ? String(initialCustomerId) : "",
+                    customerId: initialCustomerId
+                      ? String(initialCustomerId)
+                      : "",
                   });
                 }}
               >
@@ -311,7 +330,9 @@ export default function CreateServiceOrderModal({
                 type="button"
                 variant="outline"
                 onClick={() => {
-                  navigate(`/customers?customerId=${createdServiceOrder.customerId}`);
+                  navigate(
+                    `/customers?customerId=${createdServiceOrder.customerId}`
+                  );
                   handleClose();
                 }}
               >
@@ -322,8 +343,18 @@ export default function CreateServiceOrderModal({
           {!createdServiceOrder ? (
             <>
               <div className="mr-auto flex flex-wrap gap-6 text-sm text-[var(--modal-section-muted)]">
-                <span>Status: <strong className="text-[var(--modal-section-text)]">Aberta</strong></span>
-                <span>Valor: <strong className="text-[var(--modal-section-text)]">{hasAmount ? summaryAmount : "—"}</strong></span>
+                <span>
+                  Status:{" "}
+                  <strong className="text-[var(--modal-section-text)]">
+                    Aberta
+                  </strong>
+                </span>
+                <span>
+                  Valor:{" "}
+                  <strong className="text-[var(--modal-section-text)]">
+                    {hasAmount ? summaryAmount : "—"}
+                  </strong>
+                </span>
               </div>
               <Button
                 type="button"
@@ -343,7 +374,9 @@ export default function CreateServiceOrderModal({
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Criando...
                   </span>
-                ) : "Salvar alteração"}
+                ) : (
+                  "Salvar alteração"
+                )}
               </Button>
             </>
           ) : null}
@@ -356,10 +389,12 @@ export default function CreateServiceOrderModal({
             Ordem de serviço criada com sucesso
           </h3>
           <p className="text-sm text-[var(--modal-section-muted)]">
-            <strong>{createdServiceOrder.title}</strong> já está registrada no fluxo operacional.
+            <strong>{createdServiceOrder.title}</strong> já está registrada no
+            fluxo operacional.
           </p>
           <p className="text-xs text-[var(--modal-section-muted)]">
-            Você pode abrir a O.S., ir para o cliente ou criar uma nova sem sair da tela.
+            Você pode abrir a O.S., ir para o cliente ou criar uma nova sem sair
+            da tela.
           </p>
         </AppSectionCard>
       ) : null}
@@ -369,12 +404,20 @@ export default function CreateServiceOrderModal({
           <section className="rounded-xl nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] p-4">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
-                <p className="text-xs uppercase tracking-wide text-[var(--modal-section-muted)]">Identificador</p>
-                <p className="text-sm font-semibold text-[var(--modal-section-text)]">Nova O.S.</p>
+                <p className="text-xs uppercase tracking-wide text-[var(--modal-section-muted)]">
+                  Identificador
+                </p>
+                <p className="text-sm font-semibold text-[var(--modal-section-text)]">
+                  Nova O.S.
+                </p>
               </div>
               <div className="text-right">
-                <p className="text-xs uppercase tracking-wide text-[var(--modal-section-muted)]">Cliente</p>
-                <p className="text-sm font-medium text-[var(--modal-section-text)]">{selectedCustomerName}</p>
+                <p className="text-xs uppercase tracking-wide text-[var(--modal-section-muted)]">
+                  Cliente
+                </p>
+                <p className="text-sm font-medium text-[var(--modal-section-text)]">
+                  {selectedCustomerName}
+                </p>
               </div>
             </div>
           </section>
@@ -385,12 +428,20 @@ export default function CreateServiceOrderModal({
               role="alert"
               className="text-sm text-[var(--modal-section-text)]"
             >
-              Você precisa ter ao menos um cliente para criar uma O.S. Cadastre um cliente e volte aqui.
+              Você precisa ter ao menos um cliente para criar uma O.S. Cadastre
+              um cliente e volte aqui.
             </AppSectionCard>
           ) : null}
 
-          <Accordion type="multiple" defaultValue={["main", "financial"]} className="space-y-3">
-            <AccordionItem value="main" className="rounded-xl nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] px-4">
+          <Accordion
+            type="multiple"
+            defaultValue={["main", "financial"]}
+            className="space-y-3"
+          >
+            <AccordionItem
+              value="main"
+              className="rounded-xl nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] px-4"
+            >
               <AccordionTrigger className="py-3 text-sm font-semibold text-[var(--modal-section-text)]">
                 Dados principais
                 <span className="ml-2 text-xs font-normal text-[var(--modal-section-muted)]">
@@ -401,11 +452,11 @@ export default function CreateServiceOrderModal({
                 <AppField label="Cliente *">
                   <AppSelect
                     value={formData.customerId}
-                    onValueChange={(customerId) =>
-                      setFormData((state) => ({ ...state, customerId }))
+                    onValueChange={customerId =>
+                      setFormData(state => ({ ...state, customerId }))
                     }
                     placeholder="Selecione um cliente"
-                    options={customers.map((customer) => ({
+                    options={customers.map(customer => ({
                       value: customer.id,
                       label: customer.name,
                     }))}
@@ -416,11 +467,11 @@ export default function CreateServiceOrderModal({
                   <div className="space-y-1.5">
                     <AppSelect
                       value={formData.assignedToPersonId || undefined}
-                      onValueChange={(assignedToPersonId) =>
-                        setFormData((state) => ({ ...state, assignedToPersonId }))
+                      onValueChange={assignedToPersonId =>
+                        setFormData(state => ({ ...state, assignedToPersonId }))
                       }
                       placeholder="Selecione um colaborador"
-                      options={people.map((person) => ({
+                      options={people.map(person => ({
                         value: person.id,
                         label: person.name,
                       }))}
@@ -434,7 +485,10 @@ export default function CreateServiceOrderModal({
                         type="button"
                         className="text-xs text-[var(--modal-section-muted)] transition-colors hover:text-[var(--modal-section-text)]"
                         onClick={() =>
-                          setFormData((state) => ({ ...state, assignedToPersonId: "" }))
+                          setFormData(state => ({
+                            ...state,
+                            assignedToPersonId: "",
+                          }))
                         }
                       >
                         Limpar responsável
@@ -447,8 +501,11 @@ export default function CreateServiceOrderModal({
                   <AppInput
                     placeholder="Ex: Manutenção elétrica no quadro do condomínio"
                     value={formData.title}
-                    onChange={(e) =>
-                      setFormData((state) => ({ ...state, title: e.target.value }))
+                    onChange={e =>
+                      setFormData(state => ({
+                        ...state,
+                        title: e.target.value,
+                      }))
                     }
                     disabled={createMutation.isPending}
                   />
@@ -459,8 +516,11 @@ export default function CreateServiceOrderModal({
                     placeholder="Ex: Levar escada, trocar disjuntor e testar iluminação da área comum."
                     rows={3}
                     value={formData.description}
-                    onChange={(e) =>
-                      setFormData((state) => ({ ...state, description: e.target.value }))
+                    onChange={e =>
+                      setFormData(state => ({
+                        ...state,
+                        description: e.target.value,
+                      }))
                     }
                     disabled={createMutation.isPending}
                   />
@@ -468,7 +528,10 @@ export default function CreateServiceOrderModal({
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="financial" className="rounded-xl nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] px-4">
+            <AccordionItem
+              value="financial"
+              className="rounded-xl nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] px-4"
+            >
               <AccordionTrigger className="py-3 text-sm font-semibold text-[var(--modal-section-text)]">
                 Financeiro
                 <span className="ml-2 text-xs font-normal text-[var(--modal-section-muted)]">
@@ -481,14 +544,18 @@ export default function CreateServiceOrderModal({
                     <AppInput
                       type="datetime-local"
                       value={formData.scheduledFor}
-                      onChange={(e) =>
-                        setFormData((state) => ({ ...state, scheduledFor: e.target.value }))
+                      onChange={e =>
+                        setFormData(state => ({
+                          ...state,
+                          scheduledFor: e.target.value,
+                        }))
                       }
                       disabled={createMutation.isPending}
                     />
                     {appointmentId ? (
                       <AppInlineHint>
-                        Sugestão: esta O.S. pode herdar contexto do agendamento #{appointmentId}.
+                        Sugestão: esta O.S. pode herdar contexto do agendamento
+                        #{appointmentId}.
                       </AppInlineHint>
                     ) : null}
                   </AppField>
@@ -497,8 +564,11 @@ export default function CreateServiceOrderModal({
                       inputMode="decimal"
                       placeholder="Ex: 890,00"
                       value={formData.amount}
-                      onChange={(e) =>
-                        setFormData((state) => ({ ...state, amount: e.target.value }))
+                      onChange={e =>
+                        setFormData(state => ({
+                          ...state,
+                          amount: e.target.value,
+                        }))
                       }
                       disabled={createMutation.isPending}
                     />
@@ -508,11 +578,16 @@ export default function CreateServiceOrderModal({
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="advanced" className="rounded-xl nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] px-4">
+            <AccordionItem
+              value="advanced"
+              className="rounded-xl nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] px-4"
+            >
               <AccordionTrigger className="py-3 text-sm font-semibold text-[var(--modal-section-text)]">
                 Avançado
                 <span className="ml-2 text-xs font-normal text-[var(--modal-section-muted)]">
-                  {formData.dueDate.trim() ? "Com vencimento" : "Sem vencimento"}
+                  {formData.dueDate.trim()
+                    ? "Com vencimento"
+                    : "Sem vencimento"}
                 </span>
               </AccordionTrigger>
               <AccordionContent className="pb-4">
@@ -520,7 +595,12 @@ export default function CreateServiceOrderModal({
                   <AppInput
                     type="datetime-local"
                     value={formData.dueDate}
-                    onChange={(e) => setFormData((state) => ({ ...state, dueDate: e.target.value }))}
+                    onChange={e =>
+                      setFormData(state => ({
+                        ...state,
+                        dueDate: e.target.value,
+                      }))
+                    }
                     disabled={createMutation.isPending}
                   />
                 </AppField>
@@ -530,7 +610,8 @@ export default function CreateServiceOrderModal({
 
           {hasAmount ? (
             <p className="text-xs text-[var(--modal-section-muted)]">
-              Se o vencimento ficar vazio, o backend pode definir um padrão automático.
+              Se o vencimento ficar vazio, o backend pode definir um padrão
+              automático.
             </p>
           ) : null}
         </AppForm>

@@ -26,6 +26,8 @@ const customerCreateInput = z.object({
 });
 
 const customerUpdateInput = customerCreateInput.partial().extend({
+  email: z.string().email().nullable().optional(),
+  notes: z.string().nullable().optional(),
   id: z.string().min(1),
   active: z.boolean().optional(),
   expectedUpdatedAt: z.string().datetime().optional(),
