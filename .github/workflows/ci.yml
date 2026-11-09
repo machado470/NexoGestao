@@ -68,6 +68,9 @@ jobs:
       - name: Apply migrations to disposable CI database
         run: pnpm --filter ./apps/api exec prisma migrate deploy --schema ../../prisma/schema.prisma
 
+      - name: Verify Prisma schema matches migrated database
+        run: pnpm prisma:check:drift
+
       - name: Preflight
         run: pnpm prisma:check
 

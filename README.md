@@ -29,6 +29,7 @@ pnpm dev              # ambiente completo
 pnpm build            # build dos workspaces
 pnpm lint             # lint dos workspaces
 pnpm prisma:check     # valida o Prisma Client
+pnpm prisma:check:drift # compara schema com o banco configurado e migrado
 pnpm dev:infra        # somente PostgreSQL e Redis
 ```
 

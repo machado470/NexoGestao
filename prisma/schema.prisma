@@ -84,6 +84,8 @@ model User {
   org                       Organization  @relation(fields: [orgId], references: [id])
   usageMetrics              UsageMetric[]
   notificationRecipients    NotificationRecipient[]
+
+  @@index([emailVerifyTokenHash])
 }
 
 model Notification {
@@ -195,7 +197,7 @@ model TimelineEvent {
 /// Entrega transacional de fatos operacionais. O registro permanece para
 /// inspeção mesmo depois do processamento ou de uma falha definitiva.
 model OperationalOutboxEvent {
-  id             String   @id @default(uuid())
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   orgId          String
   eventType      String
   schemaVersion  Int      @default(1)
@@ -215,14 +217,14 @@ model OperationalOutboxEvent {
   occurredAt     DateTime @default(now())
   processedAt    DateTime?
   createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  updatedAt      DateTime @default(now()) @updatedAt
   org            Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   @@unique([orgId, idempotencyKey])
   @@index([status, availableAt, createdAt])
   @@index([orgId, status, availableAt])
   @@index([lockedAt, status])
-  @@index([orgId, aggregateType, aggregateId, occurredAt])
+  @@index([orgId, aggregateType, aggregateId, occurredAt], map: "OperationalOutboxEvent_orgId_aggregateType_aggregateId_occurred")
 }
 
 model WebhookEndpoint {
@@ -628,9 +630,10 @@ model OperationalActionExecution {
   org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   @@index([orgId, status, createdAt])
+  @@index([orgId, actionType, entityId, sourceSignalId, createdAt], map: "OperationalActionExecution_orgId_actionType_entityId_sourceSign")
   @@index([orgId, actionType, entityType, entityId, sourceSignalId, createdAt])
   @@index([orgId, logicalKey, createdAt])
-  @@index([orgId, entityType, entityId, createdAt])
+  @@index([orgId, entityType, entityId, createdAt], map: "OperationalActionExecution_orgId_entityType_entityId_createdAt_")
 }
 
 model IdempotencyRecord {
@@ -658,7 +661,7 @@ model Expense {
   category        ExpenseCategory
   type            ExpenseType       @default(VARIABLE)
   recurrence      ExpenseRecurrence @default(NONE)
-  occurredAt      DateTime
+  occurredAt      DateTime          @db.Timestamptz(6)
   dueDay          Int?
   isActive        Boolean           @default(true)
   notes           String?
@@ -753,7 +756,7 @@ model WhatsAppConversation {
   id                      String                       @id @default(uuid())
   orgId                   String
   customerId              String?
-  provider                String?
+  provider                String                       @default("mock")
   providerConversationId  String?
   phone                   String
   title                   String?
@@ -777,7 +780,7 @@ model WhatsAppConversation {
   intelligenceVersion     Int                          @default(1)
   unreadCount             Int                          @default(0)
   createdAt               DateTime                     @default(now())
-  updatedAt               DateTime                     @updatedAt
+  updatedAt               DateTime                     @default(now()) @updatedAt
 
   org              Organization              @relation(fields: [orgId], references: [id])
   customer         Customer?                 @relation(fields: [customerId], references: [id])
@@ -791,7 +794,7 @@ model WhatsAppConversation {
   @@index([orgId, lastMessageAt])
   @@index([orgId, customerId, lastMessageAt])
   @@index([orgId, priority, lastMessageAt])
-  @@index([orgId, priority, unreadCount, lastMessageAt])
+  @@index([orgId, priority, unreadCount, lastMessageAt], map: "WhatsAppConversation_orgId_priority_unreadCount_lastMessageAt_i")
   @@index([orgId, intent, lastInboundAt])
   @@index([orgId, slaStatus, responseDueAt])
 }
@@ -824,7 +827,7 @@ model WhatsAppActionExecution {
   @@unique([orgId, idempotencyKey])
   @@index([orgId, status, createdAt])
   @@index([orgId, conversationId, createdAt])
-  @@index([orgId, suggestedAction, status, createdAt])
+  @@index([orgId, suggestedAction, status, createdAt], map: "WhatsAppActionExecution_orgId_suggestedAction_status_createdAt_")
 }
 
 model WhatsAppTemplate {
@@ -874,10 +877,10 @@ model WhatsAppMessage {
   lockedAt          DateTime?
   lockedBy          String?
   createdAt         DateTime              @default(now())
-  updatedAt         DateTime              @updatedAt
+  updatedAt         DateTime              @default(now()) @updatedAt
 
   conversation WhatsAppConversation? @relation(fields: [conversationId], references: [id])
-  customer     Customer?             @relation(fields: [customerId], references: [id])
+  customer     Customer?             @relation(fields: [customerId], references: [id], onDelete: Restrict)
   org          Organization          @relation(fields: [orgId], references: [id])
 
   @@index([orgId, customerId, createdAt])
