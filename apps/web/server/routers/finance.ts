@@ -292,11 +292,14 @@ export const financeRouter = router({
         z.object({
           id: z.union([z.string(), z.number()]).transform((v) => String(v)),
           amount: z.number().min(0.01).optional(),
-          amountCents: z.number().int().min(1).optional(),
+          amountCents: z.number().int().min(1).max(2_147_483_647).optional(),
           dueDate: z.coerce.date().optional(),
           status: z.enum(["PENDING", "OVERDUE", "CANCELED"]).optional(),
           notes: z.string().optional(),
           expectedUpdatedAt: z.string().datetime().optional(),
+        }).refine(input => input.status !== "CANCELED", {
+          message: "Use o fluxo de cancelamento com motivo obrigatório.",
+          path: ["status"],
         })
       )
       .output(updateChargeOutputSchema)

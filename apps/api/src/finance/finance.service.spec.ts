@@ -46,6 +46,39 @@ describe('FinanceService hardening', () => {
     return { service, prisma, idempotency, metrics, audit, timeline }
   }
 
+  it('requires the dedicated cancellation flow before any mutation', async () => {
+    const { service, prisma } = buildService()
+    await expect(service.updateCharge({ orgId: 'org-1', id: 'ch-1', status: 'CANCELED', expectedUpdatedAt: new Date().toISOString() }))
+      .rejects.toThrow('motivo obrigatório')
+    expect(prisma.charge.findFirst).not.toHaveBeenCalled()
+  })
+
+  it.each([0, -1, 1.5, NaN, Infinity, 2_147_483_648])('rejects invalid cents %p before reserving an operation', async amountCents => {
+    const { service, prisma, idempotency } = buildService()
+    await expect(service.createCharge({ orgId: 'org-1', customerId: 'c-1', amountCents, dueDate: new Date() })).rejects.toBeInstanceOf(BadRequestException)
+    await expect(service.updateCharge({ orgId: 'org-1', id: 'ch-1', amountCents, expectedUpdatedAt: new Date().toISOString() })).rejects.toBeInstanceOf(BadRequestException)
+    await expect(service.ensureChargeForServiceOrderDone({ orgId: 'org-1', customerId: 'c-1', serviceOrderId: 'os-1', amountCents })).rejects.toBeInstanceOf(BadRequestException)
+    expect(prisma.charge.findFirst).not.toHaveBeenCalled()
+    expect(idempotency.begin).not.toHaveBeenCalled()
+  })
+
+  it.each(['PAID', 'CANCELED'])('rejects manual reminders for %s charges', async status => {
+    const { service, prisma } = buildService()
+    prisma.charge.findFirst.mockResolvedValue({ id: 'ch-1', status })
+    const send = jest.spyOn(service, 'sendPaymentReminderWhatsApp')
+    await expect(service.remindChargeInOrg('org-1', 'ch-1')).rejects.toBeInstanceOf(BadRequestException)
+    expect(send).not.toHaveBeenCalled()
+  })
+
+  it.each(['PAID', 'CANCELED'])('does not enqueue a reminder if a delayed worker finds a %s charge', async status => {
+    const { service, prisma } = buildService()
+    prisma.charge.findUnique = jest.fn().mockResolvedValue({ id: 'ch-1', status, customer: { phone: '5511999999999' } })
+    const enqueue = jest.fn()
+    ;(service as any).whatsapp.enqueueMessage = enqueue
+    await service.sendPaymentReminderWhatsApp('ch-1')
+    expect(enqueue).not.toHaveBeenCalled()
+  })
+
   it('rejects changing a settled charge amount without modifying the payment', async () => {
     const { service, prisma } = buildService()
     prisma.charge.findFirst.mockResolvedValue({ id: 'ch-1', status: 'PAID', amountCents: 1000, updatedAt: new Date() })

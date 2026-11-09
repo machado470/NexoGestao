@@ -1,10 +1,11 @@
-import { IsOptional, IsString, IsNumber, IsDateString, IsIn, Min } from 'class-validator'
+import { IsOptional, IsString, IsInt, IsDateString, IsIn, Min, Max } from 'class-validator'
 
 const ALLOWED_STATUSES = ['CANCELED'] as const
 
 export class UpdateChargeDto {
-  @IsNumber()
+  @IsInt()
   @Min(1)
+  @Max(2_147_483_647)
   @IsOptional()
   amountCents?: number
 

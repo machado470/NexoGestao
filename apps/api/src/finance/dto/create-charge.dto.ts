@@ -1,12 +1,13 @@
-import { IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, IsDateString, Min } from 'class-validator'
+import { IsNotEmpty, IsInt, IsOptional, IsString, IsUUID, IsDateString, Min, Max } from 'class-validator'
 
 export class CreateChargeDto {
   @IsUUID()
   @IsNotEmpty()
   customerId!: string
 
-  @IsNumber()
+  @IsInt()
   @Min(1)
+  @Max(2_147_483_647)
   amountCents!: number
 
   @IsDateString()
