@@ -674,6 +674,9 @@ export class FinanceService {
     })
 
     if (!charge) throw new NotFoundException('Charge não encontrada')
+    if (charge.status === 'PAID' && input.amountCents !== undefined) {
+      throw new BadRequestException('O valor de uma cobrança paga não pode ser alterado.')
+    }
 
     if (input.status) {
       this.assertChargeStatusTransition(charge.status, input.status)
@@ -983,6 +986,8 @@ export class FinanceService {
           id: charge.id,
           orgId: input.orgId,
           status: { in: ['PENDING', 'OVERDUE'] },
+          amountCents: charge.amountCents,
+          updatedAt: charge.updatedAt,
         },
         data: { status: 'PAID', paidAt },
       })
@@ -993,8 +998,8 @@ export class FinanceService {
         })
 
         if (!alreadyPaid) {
-          throw new BadRequestException(
-            'Charge já foi processada por outra operação',
+          throw new ConflictException(
+            'Cobrança alterada por outra operação. Recarregue antes de registrar o pagamento.',
           )
         }
 

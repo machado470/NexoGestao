@@ -1,4 +1,5 @@
-import { Injectable, BadRequestException, ConflictException, NotFoundException } from '@nestjs/common'
+import { Injectable, BadRequestException, ConflictException, NotFoundException, ForbiddenException } from '@nestjs/common'
+import { Prisma } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { TimelineService } from '../timeline/timeline.service'
@@ -72,16 +73,32 @@ export class PeopleService {
     })
   }
 
-  async updatePerson(id: string, orgId: string, data: any) {
-    const person = await this.prisma.person.findFirst({
+  async updatePerson(id: string, orgId: string, data: any, actorUserId: string | null = null) {
+    if (data?.active !== undefined) {
+      if (typeof data.active !== 'boolean') throw new BadRequestException('active deve ser booleano.')
+      return this.prisma.$transaction(async tx => {
+        await this.lockActivityChange(tx, orgId, actorUserId)
+        return this.updatePersonRecord(id, orgId, data, tx, actorUserId)
+      })
+    }
+    return this.updatePersonRecord(id, orgId, data, this.prisma, actorUserId)
+  }
+
+  private async updatePersonRecord(
+    id: string, orgId: string, data: any,
+    db: Prisma.TransactionClient, actorUserId: string | null,
+  ) {
+    const person = await db.person.findFirst({
       where: { id, orgId },
       select: { id: true, updatedAt: true, active: true },
     })
     if (!person) throw new NotFoundException('Pessoa não encontrada')
     const expectedUpdatedAt = this.parseExpectedUpdatedAt(data?.expectedUpdatedAt)
     this.validateCapacityPatch(data)
+    const activityChanged = data?.active !== undefined && data.active !== person.active
+    if (activityChanged && !data.active) await this.assertCanDeactivate(db, id, orgId, actorUserId)
     const { expectedUpdatedAt: _expectedUpdatedAt, ...patch } = data ?? {}
-    const mutation = await this.prisma.person.updateMany({
+    const mutation = await db.person.updateMany({
       where: { id, orgId, updatedAt: expectedUpdatedAt },
       data: {
         name: patch.name,
@@ -94,7 +111,7 @@ export class PeopleService {
       },
     })
     if (mutation.count !== 1) {
-      const latest = await this.prisma.person.findFirst({
+      const latest = await db.person.findFirst({
         where: { id, orgId },
         select: { id: true, updatedAt: true, active: true },
       })
@@ -110,57 +127,66 @@ export class PeopleService {
         },
       })
     }
-    return this.prisma.person.findFirst({ where: { id, orgId } })
+    if (activityChanged) {
+      const action = data.active ? 'PERSON_REACTIVATED' : 'PERSON_DEACTIVATED'
+      await db.auditEvent.create({ data: {
+        orgId, personId: id, actorUserId, action,
+        entityType: 'Person', entityId: id,
+        metadata: { previouslyActive: person.active, active: data.active },
+      } })
+      await this.timeline.logInTransaction({
+        orgId, personId: id, action,
+        description: data.active ? 'Pessoa reativada' : 'Pessoa desativada (soft delete)',
+        metadata: { actorUserId, active: data.active },
+      }, db)
+    }
+    return db.person.findFirst({ where: { id, orgId } })
   }
 
-  /**
-   * Soft delete: desativa a pessoa sem remover do banco.
-   * Bloqueia se houver OS ativa vinculada à pessoa.
-   * Gera audit + timeline conforme regras do sistema.
-   */
-  async deactivatePerson(id: string, orgId: string, actorUserId: string | null) {
-    const person = await this.prisma.person.findFirst({ where: { id, orgId } })
-    if (!person) throw new NotFoundException('Pessoa não encontrada')
-    if (!person.active) {
-      return { ok: true, message: 'Pessoa já estava inativa', person }
+  private async lockActivityChange(tx: Prisma.TransactionClient, orgId: string, actorUserId: string | null) {
+    // Share the member-administration lock and revalidate an actor that may have waited for it.
+    await tx.$queryRaw(Prisma.sql`SELECT id FROM "Organization" WHERE id = ${orgId} FOR UPDATE`)
+    if (actorUserId) {
+      const actor = await tx.user.findFirst({ where: {
+        id: actorUserId, orgId, role: 'ADMIN', active: true, person: { is: { active: true } },
+      } })
+      if (!actor) throw new ForbiddenException('Somente administradores ativos podem alterar acessos.')
     }
+  }
 
-    // Bloqueia se há OS ativa vinculada à pessoa
-    const activeOS = await this.prisma.serviceOrder.count({
-      where: {
-        orgId,
-        assignedToPersonId: id,
-        status: { in: ['OPEN', 'IN_PROGRESS'] },
-      },
-    })
+  private async assertCanDeactivate(tx: Prisma.TransactionClient, id: string, orgId: string, actorUserId: string | null) {
+    const activeOS = await tx.serviceOrder.count({ where: {
+      orgId, assignedToPersonId: id, status: { in: ['OPEN', 'ASSIGNED', 'IN_PROGRESS'] },
+    } })
     if (activeOS > 0) {
-      throw new BadRequestException(
-        `Pessoa possui ${activeOS} ordem(ns) de serviço ativa(s). Finalize ou reatribua antes de desativar.`,
-      )
+      throw new BadRequestException(`Pessoa possui ${activeOS} ordem(ns) de serviço ativa(s). Finalize ou reatribua antes de desativar.`)
     }
+    const admin = await tx.user.findFirst({ where: {
+      orgId, active: true, role: 'ADMIN', person: { is: { id, orgId, active: true } },
+    } })
+    if (admin) {
+      if (admin.id === actorUserId) {
+        throw new BadRequestException('Peça a outro administrador para alterar seu próprio acesso.')
+      }
+      const others = await tx.user.count({ where: {
+        orgId, id: { not: admin.id }, active: true, role: 'ADMIN', person: { is: { active: true } },
+      } })
+      if (others === 0) throw new BadRequestException('A organização deve manter pelo menos um administrador ativo.')
+    }
+  }
 
-    const updated = await this.prisma.person.update({
-      where: { id },
-      data: { active: false },
+  /** Both entry points use the same transaction, protections and authoritative evidence. */
+  async deactivatePerson(id: string, orgId: string, actorUserId: string | null) {
+    return this.prisma.$transaction(async tx => {
+      await this.lockActivityChange(tx, orgId, actorUserId)
+      const person = await tx.person.findFirst({ where: { id, orgId } })
+      if (!person) throw new NotFoundException('Pessoa não encontrada')
+      if (!person.active) return { ok: true, message: 'Pessoa já estava inativa', person }
+      const updated = await this.updatePersonRecord(id, orgId, {
+        active: false, expectedUpdatedAt: person.updatedAt.toISOString(),
+      }, tx, actorUserId)
+      return { ok: true, person: updated }
     })
-
-    await this.audit.log({
-      personId: id,
-      action: 'PERSON_DEACTIVATED',
-      context: actorUserId
-        ? `Desativado por ADMIN ${actorUserId}`
-        : 'Desativado pelo sistema',
-    })
-
-    await this.timeline.log({
-      orgId,
-      action: 'PERSON_DEACTIVATED',
-      personId: id,
-      description: 'Pessoa desativada (soft delete)',
-      metadata: { deactivatedBy: actorUserId },
-    })
-
-    return { ok: true, person: updated }
   }
 
   async createPerson(params: {
