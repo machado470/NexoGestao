@@ -5,6 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common'
+import { csvRow } from '../common/csv'
 import { PrismaService } from '../prisma/prisma.service'
 import { TimelineService } from '../timeline/timeline.service'
 import { AuditService } from '../audit/audit.service'
@@ -136,9 +137,7 @@ export class CustomersService {
     const header = 'ID,Nome,Email,Telefone,Ativo,Criado Em\n'
     const rows = customers
       .map((c) => {
-        return `"${c.id}","${c.name}","${c.email || ''}","${c.phone}","${
-          c.active ? 'Sim' : 'Não'
-        }","${c.createdAt.toISOString()}"`
+        return csvRow([c.id, c.name, c.email || '', c.phone, c.active ? 'Sim' : 'Não', c.createdAt.toISOString()])
       })
       .join('\n')
 

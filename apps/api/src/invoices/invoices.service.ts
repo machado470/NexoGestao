@@ -20,6 +20,24 @@ const VALID_TRANSITIONS: Record<InvoiceStatus, InvoiceStatus[]> = {
 export class InvoicesService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private async assertCustomer(orgId: string, customerId?: string | null) {
+    if (customerId == null) return
+    const customer = await this.prisma.customer.findFirst({ where: { id: customerId, orgId }, select: { id: true } })
+    if (!customer) throw new NotFoundException('Cliente não encontrado nesta organização')
+  }
+
+  private assertAmount(value: number) {
+    if (!Number.isInteger(value) || value < 1 || value > 2_147_483_647) {
+      throw new BadRequestException('Valor deve ser um inteiro entre 1 e 2147483647 centavos')
+    }
+  }
+
+  private handleWriteError(error: any): never {
+    if (error?.code === 'P2002') throw new ConflictException('Número de fatura já existe nesta organização')
+    if (error?.code === 'P2003') throw new BadRequestException('Cliente inválido para esta organização')
+    throw error
+  }
+
   async list(
     orgId: string,
     query: {
@@ -50,6 +68,7 @@ export class InvoicesService {
         where,
         include: {
           customer: {
+            where: { orgId },
             select: { id: true, name: true, email: true },
           },
         },
@@ -111,7 +130,7 @@ export class InvoicesService {
   async findOne(orgId: string, id: string) {
     const invoice = await this.prisma.invoice.findFirst({
       where: { id, orgId },
-      include: { customer: true },
+      include: { customer: { where: { orgId } } },
     })
 
     if (!invoice) {
@@ -122,6 +141,8 @@ export class InvoicesService {
   }
 
   async create(orgId: string, dto: CreateInvoiceDto) {
+    await this.assertCustomer(orgId, dto.customerId)
+    this.assertAmount(dto.amountCents)
     const existing = await this.prisma.invoice.findFirst({
       where: { orgId, number: dto.number },
     })
@@ -144,16 +165,20 @@ export class InvoicesService {
       )
     }
 
-    return this.prisma.invoice.create({
-      data: {
-        orgId,
-        customerId: dto.customerId,
-        number: dto.number,
-        description: dto.description,
-        amountCents: dto.amountCents,
-        status: dto.status ?? InvoiceStatus.DRAFT,
-      },
-    })
+    try {
+      return await this.prisma.invoice.create({
+        data: {
+          orgId,
+          customerId: dto.customerId,
+          number: dto.number,
+          description: dto.description ?? '',
+          amountCents: dto.amountCents,
+          status: dto.status ?? InvoiceStatus.DRAFT,
+        },
+      })
+    } catch (error) {
+      this.handleWriteError(error)
+    }
   }
 
   async update(orgId: string, id: string, dto: Partial<CreateInvoiceDto>) {
@@ -183,24 +208,28 @@ export class InvoicesService {
       }
     }
 
-    if (dto.amountCents !== undefined && dto.amountCents <= 0) {
-      throw new BadRequestException(
-        'O valor da fatura deve ser maior que zero',
-      )
-    }
+    if (dto.amountCents !== undefined) this.assertAmount(dto.amountCents)
+    await this.assertCustomer(orgId, dto.customerId)
 
+    if (dto.number !== undefined && (typeof dto.number !== 'string' || !dto.number.trim())) {
+      throw new BadRequestException('Número de fatura inválido')
+    }
     const updateData: any = {
       customerId: dto.customerId,
       number: dto.number,
-      description: dto.description,
+      description: dto.description === undefined ? undefined : dto.description ?? '',
       amountCents: dto.amountCents,
-      status: dto.status,
+      status: dto.status ?? undefined,
     }
 
-    return this.prisma.invoice.update({
-      where: { id },
-      data: updateData,
-    })
+    try {
+      return await this.prisma.invoice.update({
+        where: { id, orgId },
+        data: updateData,
+      })
+    } catch (error) {
+      this.handleWriteError(error)
+    }
   }
 
   async delete(orgId: string, id: string) {

@@ -5,6 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common'
+import { csvRow } from '../common/csv'
 import { PrismaService } from '../prisma/prisma.service'
 import { $Enums, Prisma, WhatsAppEntityType, WhatsAppMessageType } from '@prisma/client'
 import { IdempotencyService } from '../common/idempotency/idempotency.service'
@@ -678,12 +679,16 @@ export class FinanceService {
     }
     const charge = await this.prisma.charge.findFirst({
       where: { id: input.id, orgId: input.orgId },
-      select: { id: true, status: true, amountCents: true, paidAt: true, updatedAt: true },
+      select: { id: true, status: true, amountCents: true, dueDate: true, paidAt: true, updatedAt: true },
     })
 
     if (!charge) throw new NotFoundException('Charge não encontrada')
-    if (charge.status === 'PAID' && input.amountCents !== undefined && input.amountCents !== charge.amountCents) {
-      throw new BadRequestException('O valor de uma cobrança paga não pode ser alterado.')
+    if (['PAID', 'CANCELED'].includes(charge.status) && input.amountCents !== undefined && input.amountCents !== charge.amountCents) {
+      throw new BadRequestException('O valor de uma cobrança paga ou cancelada não pode ser alterado.')
+    }
+
+    if (['PAID', 'CANCELED'].includes(charge.status) && input.dueDate !== undefined && input.dueDate.getTime() !== charge.dueDate?.getTime()) {
+      throw new BadRequestException('O vencimento de uma cobrança encerrada não pode ser alterado.')
     }
 
     if (input.status) {
@@ -900,6 +905,8 @@ export class FinanceService {
     idempotencyKey?: string | null
     paidAt?: string | null
     notes?: string | null
+    externalRef?: string
+    currency?: string
   }) {
     // Reject tenant-forged identifiers before reserving an idempotency key. The
     // transaction repeats this lookup because it remains the authority for the
@@ -937,6 +944,7 @@ export class FinanceService {
         method: input.method,
         paidAt: input.paidAt ?? null,
         notes,
+        ...(input.externalRef ? { externalRef: input.externalRef, currency: input.currency } : {}),
       },
     })
     if (idem.mode === 'replay') {
@@ -960,6 +968,9 @@ export class FinanceService {
       })
 
       if (!charge) throw new NotFoundException('Charge não encontrada')
+      if (input.currency && charge.currency.toLowerCase() !== input.currency.toLowerCase()) {
+        throw new ConflictException('Moeda da cobrança alterada. Conciliação necessária.')
+      }
       if (charge.status === 'CANCELED') {
         throw new BadRequestException({
           code: 'CHARGE_STATE_INVALID_FOR_PAYMENT',
@@ -990,6 +1001,7 @@ export class FinanceService {
           status: { in: ['PENDING', 'OVERDUE'] },
           amountCents: charge.amountCents,
           updatedAt: charge.updatedAt,
+          ...(input.currency ? { currency: charge.currency } : {}),
         },
         data: { status: 'PAID', paidAt },
       })
@@ -1018,6 +1030,9 @@ export class FinanceService {
           })
         }
 
+        if (input.externalRef && latestPayment.externalRef !== input.externalRef) {
+          throw new ConflictException('Cobrança já liquidada por outro pagamento. Conciliação necessária.')
+        }
         return { charge: alreadyPaid, payment: latestPayment, idempotent: true }
       }
 
@@ -1029,6 +1044,7 @@ export class FinanceService {
           method: input.method,
           paidAt,
           notes,
+          ...(input.externalRef ? { externalRef: input.externalRef } : {}),
         },
       })
 
@@ -1299,46 +1315,44 @@ export class FinanceService {
       )
     }
 
-      const result = await this.prisma.charge.updateMany({
-      where: {
-        orgId,
-        status: 'PENDING',
-        dueDate: { lt: todayStart },
-      },
-      data: { status: 'OVERDUE' },
+    const candidates = await this.prisma.charge.findMany({
+      where: { orgId, status: 'PENDING', dueDate: { lt: todayStart } },
     })
-
-    const overdue = await this.prisma.charge.findMany({
-      where: {
-        orgId,
-        status: 'OVERDUE',
-      },
-    })
-
-    for (const charge of overdue) {
-      await this.safeTimelineLog({
-        orgId,
-        action: 'CHARGE_OVERDUE',
-        description: `Cobrança ${charge.id} vencida`,
-        customerId: charge.customerId,
-        serviceOrderId: charge.serviceOrderId,
-        chargeId: charge.id,
+    let updated = 0
+    for (const candidate of candidates) {
+      const input = {
+        orgId, action: 'CHARGE_OVERDUE',
+        description: `Cobrança ${candidate.id} vencida`,
+        customerId: candidate.customerId, serviceOrderId: candidate.serviceOrderId, chargeId: candidate.id,
         metadata: {
-          chargeId: charge.id,
-          customerId: charge.customerId,
-          serviceOrderId: charge.serviceOrderId,
-          amountCents: charge.amountCents,
-          dueDate: charge.dueDate.toISOString(),
-          previousStatus: 'PENDING',
-          nextStatus: 'OVERDUE',
+          chargeId: candidate.id, customerId: candidate.customerId, serviceOrderId: candidate.serviceOrderId,
+          amountCents: candidate.amountCents, dueDate: candidate.dueDate.toISOString(),
+          previousStatus: 'PENDING', nextStatus: 'OVERDUE',
         },
+      }
+      const event = await this.prisma.$transaction(async tx => {
+        const changed = await tx.charge.updateMany({
+          where: { id: candidate.id, orgId, status: 'PENDING', updatedAt: candidate.updatedAt, dueDate: { lt: todayStart } },
+          data: { status: 'OVERDUE' },
+        })
+        if (changed.count !== 1) return null
+        return this.timeline.logInTransaction(input, tx)
       })
+      if (event) {
+        updated++
+        await this.timeline.dispatchPersistedEventWebhook(input, event.id)
+      }
+    }
+
+    // Reminder policy is separate from evidence of a state transition.
+    const overdue = await this.prisma.charge.findMany({ where: { orgId, status: 'OVERDUE' } })
+    for (const charge of overdue) {
       await this.sendPaymentReminderWhatsApp(charge.id).catch((err) =>
         this.logger.error(`Erro overdue WhatsApp: ${err.message}`),
       )
     }
 
-    return { ok: true, updated: result.count }
+    return { ok: true, updated }
   }
 
   // =========================
@@ -1353,7 +1367,7 @@ export class FinanceService {
 
     let csv = 'ID,Cliente,Valor,Vencimento,Status,Criado Em\n'
     for (const c of charges) {
-      csv += `${c.id},"${c.customer?.name ?? ''}",${c.amountCents / 100},${c.dueDate.toISOString()},${c.status},${c.createdAt.toISOString()}\n`
+      csv += csvRow([c.id, c.customer?.name ?? '', c.amountCents / 100, c.dueDate.toISOString(), c.status, c.createdAt.toISOString()]) + '\n'
     }
     return csv
   }

@@ -190,7 +190,7 @@ export function EditChargeModal({
       amountCents: amountCents ?? 0,
       dueDate: formData.dueDate,
       status: formData.status === "CANCELED" ? "CANCELED" : "PENDING",
-      notes: formData.notes.trim() || undefined,
+      notes: formData.notes.trim(),
     });
 
     if (!parsed.success) {
@@ -201,9 +201,11 @@ export function EditChargeModal({
 
     await updateCharge.mutateAsync({
       id: chargeId,
-      amountCents: parsed.data.amountCents,
-      dueDate: new Date(`${parsed.data.dueDate}T12:00:00`).toISOString(),
-      notes: parsed.data.notes || undefined,
+      ...(disableEditing ? {} : {
+        amountCents: parsed.data.amountCents,
+        dueDate: new Date(`${parsed.data.dueDate}T12:00:00`).toISOString(),
+      }),
+      notes: parsed.data.notes ?? "",
       expectedUpdatedAt:
         typeof charge?.updatedAt === "string" ? charge.updatedAt : undefined,
     });

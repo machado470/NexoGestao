@@ -75,6 +75,12 @@ const paidCharge = () => ({
 describe("finance critical mutation output contracts", () => {
   beforeEach(() => vi.restoreAllMocks());
 
+  it("forwards an intentional empty note without omitting it", async () => {
+    const fetch = respond({ ...updatedCharge(), notes: "" });
+    await expect(caller().finance.charges.update({ id: "charge-1", notes: "" })).resolves.toMatchObject({ notes: "" });
+    expect(JSON.parse(String(fetch.mock.calls[0][1]?.body))).toMatchObject({ notes: "" });
+  });
+
   it("rejects cancellation through editing without calling the API", async () => {
     const fetch = respond(updatedCharge());
     await expect(caller().finance.charges.update({ id: "charge-1", status: "CANCELED" }))

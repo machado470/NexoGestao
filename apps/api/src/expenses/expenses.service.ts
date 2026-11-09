@@ -99,17 +99,6 @@ export class ExpensesService {
       else variableTotal += row.amountCents
     }
 
-    if (recurringRows.length > 0) {
-      await this.timeline.log({
-        orgId,
-        action: 'EXPENSE_RECURRING_APPLIED',
-        description: `Despesas recorrentes aplicadas no mês (${recurringRows.length})`,
-        metadata: {
-          recurringAppliedCount: recurringRows.length,
-          month: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`,
-        },
-      })
-    }
 
     return {
       month: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`,

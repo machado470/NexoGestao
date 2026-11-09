@@ -466,6 +466,7 @@ model Customer {
   whatsAppMessages      WhatsAppMessage[]
   timelineEvents        TimelineEvent[]
 
+  @@unique([orgId, id])
   @@unique([orgId, phone])
   @@unique([orgId, email])
   @@index([orgId, createdAt])
@@ -592,6 +593,7 @@ model Payment {
   charge      Charge        @relation(fields: [chargeId], references: [id])
   org         Organization  @relation(fields: [orgId], references: [id])
 
+  @@unique([orgId, externalRef])
   @@index([orgId, createdAt])
   @@index([chargeId, createdAt])
   @@index([orgId, paidAt])
@@ -708,8 +710,9 @@ model Invoice {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
 
-  customer Customer?    @relation(fields: [customerId], references: [id])
+  customer Customer?    @relation(fields: [orgId, customerId], references: [orgId, id], onDelete: NoAction, onUpdate: NoAction)
   org      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  @@unique([orgId, number])
 }
 
 model Launch {

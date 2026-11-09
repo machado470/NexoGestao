@@ -14,6 +14,7 @@ import { RolesGuard } from '../auth/guards/roles.guard'
 import { Roles } from '../auth/decorators/roles.decorator'
 import { Org } from '../auth/decorators/org.decorator'
 import { InvoicesService } from './invoices.service'
+import { UpdateInvoiceDto } from './dto/update-invoice.dto'
 import { CreateInvoiceDto, InvoiceStatus } from './dto/create-invoice.dto'
 
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -63,7 +64,7 @@ export class InvoicesController {
   async update(
     @Org() orgId: string,
     @Param('id') id: string,
-    @Body() body: Partial<CreateInvoiceDto>,
+    @Body() body: UpdateInvoiceDto,
   ) {
     return this.invoices.update(orgId, id, body)
   }
