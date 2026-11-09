@@ -3,7 +3,7 @@ import { FinanceService } from './finance.service'
 describe('Queued financial actions', () => {
   let db: any, whatsapp: any, service: FinanceService
   beforeEach(() => {
-    db = { charge: { findFirst: jest.fn().mockResolvedValue({ id: 'charge', orgId: 'org', status: 'PENDING', customerId: 'customer', amountCents: 1000, dueDate: new Date(), customer: { name: 'Customer', phone: '5511999999999' } }) } }
+    db = { charge: { findFirst: jest.fn().mockResolvedValue({ id: 'charge', orgId: 'org', org: { timezone: 'America/Sao_Paulo' }, status: 'PENDING', customerId: 'customer', amountCents: 1000, dueDate: new Date(), customer: { name: 'Customer', phone: '5511999999999' } }) } }
     whatsapp = { enqueueMessage: jest.fn().mockResolvedValue({ created: true, message: { id: 'm1' } }) }
     service = new FinanceService(db, whatsapp, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any)
   })
@@ -16,7 +16,7 @@ describe('Queued financial actions', () => {
   })
   it('checks the charge within the trusted job tenant and confirms queue admission', async () => {
     await expect(service.sendPaymentReminder({ orgId: 'org', chargeId: 'charge' })).resolves.toEqual({ status: 'queued', messageId: 'm1' })
-    expect(db.charge.findFirst).toHaveBeenCalledWith({ where: { id: 'charge', orgId: 'org' }, include: { customer: true } })
+    expect(db.charge.findFirst).toHaveBeenCalledWith({ where: { id: 'charge', orgId: 'org' }, include: { customer: true, org: { select: { timezone: true } } } })
     expect(whatsapp.enqueueMessage).toHaveBeenCalledTimes(1)
   })
   it('rejects missing or foreign charges without sending WhatsApp', async () => {

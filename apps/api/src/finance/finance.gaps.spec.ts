@@ -4,7 +4,7 @@ import { CustomersService } from '../customers/customers.service'
 describe('Financial gap regressions', () => {
   const stamp = new Date('2026-11-09T12:00:00Z')
   const build = (status = 'PENDING') => {
-    const db: any = { charge: { findFirst: jest.fn().mockResolvedValue({ id: 'charge', orgId: 'org', status, amountCents: 1000, dueDate: stamp, updatedAt: stamp }), updateMany: jest.fn().mockResolvedValue({ count: 1 }), findMany: jest.fn() }, $transaction: jest.fn() }
+    const db: any = { organization: { findUnique: jest.fn().mockResolvedValue({ timezone: 'America/Sao_Paulo' }) }, charge: { findFirst: jest.fn().mockResolvedValue({ id: 'charge', orgId: 'org', status, amountCents: 1000, dueDate: stamp, updatedAt: stamp }), updateMany: jest.fn().mockResolvedValue({ count: 1 }), findMany: jest.fn() }, $transaction: jest.fn() }
     const timeline: any = { log: jest.fn(), logInTransaction: jest.fn().mockResolvedValue({ id: 'event' }), dispatchPersistedEventWebhook: jest.fn() }
     const service = new FinanceService(db, {} as any, timeline, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any)
     db.$transaction.mockImplementation((fn: any) => fn(db))
