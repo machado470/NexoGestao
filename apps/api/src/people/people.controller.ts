@@ -146,8 +146,9 @@ export class PeopleController {
     @Param('id') id: string,
     @Org() orgId: string,
     @Body() body: any,
+    @User() user: any,
   ) {
-    return this.people.updatePerson(id, orgId, body)
+    return this.people.updatePerson(id, orgId, body, user?.userId ?? null)
   }
 
   /**

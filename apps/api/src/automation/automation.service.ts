@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common'
 // import {
 //   AutomationActionType,
 //   AutomationTrigger,
@@ -18,7 +18,6 @@ import { NotificationsService } from '../notifications/notifications.service'
 import { RiskService } from '../risk/risk.service'
 import { WhatsAppService } from '../whatsapp/whatsapp.service'
 import { QueueService } from '../queue/queue.service'
-import { QUEUE_NAMES } from '../queue/queue.constants'
 import { TenantOperationsService } from '../common/tenant-ops/tenant-ops.service'
 import {
   CommercialPolicyService,
@@ -307,38 +306,16 @@ export class AutomationService {
     action: Record<string, any>
     payload: Record<string, any>
   }) {
-    await this.executeAction(input)
-  }
-
-  private async executeAction(input: {
-    orgId: string
-    action: Record<string, any>
-    payload: Record<string, any>
-  }) {
-    const actionType = String(input.action?.type ?? '').trim() as AutomationActionType
-
-    if (!Object.values(AutomationActionType).includes(actionType)) {
-      this.logger.warn(`Unknown automation action type: ${actionType}`)
-      return false
-    }
-
-    await this.queueService.addJob(QUEUE_NAMES.AUTOMATION, 'execute-action', input)
-    return true
+    // The canonical schema has no automation persistence or action executor yet.
+    // Fail the job explicitly instead of reporting success and enqueueing it forever.
+    throw new ServiceUnavailableException('Execução de automações indisponível neste ambiente.')
   }
 
   private async enqueueAutomationAction(input: {
     orgId: string
     action: Record<string, any>
     payload: Record<string, any>
-  }) {
-    const actionType = String(input.action?.type ?? '').trim() as AutomationActionType
-
-    if (!Object.values(AutomationActionType).includes(actionType)) {
-      return false
-    }
-
-    await this.queueService.addJob(QUEUE_NAMES.AUTOMATION, 'execute-action', input)
-
-    return true
+  }): Promise<boolean> {
+    throw new ServiceUnavailableException('Execução de automações indisponível neste ambiente.')
   }
 }
