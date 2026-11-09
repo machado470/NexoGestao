@@ -172,10 +172,9 @@ export const peopleRouter = router({
    * Nest: GET /people/assignees
    */
   assignees: protectedProcedure.query(async ({ ctx }) => {
-    const raw = await nexoFetch<any>(ctx, `/people/assignees`, {
-      method: "GET",
-    });
-    return Array.isArray(raw) ? raw : (unwrapNexoApiResponse(raw) ?? []);
+    const raw = await nexoFetch<unknown>(ctx, `/people/assignees`, { method: "GET" });
+    const payload = Array.isArray(raw) ? raw : (unwrapNexoApiResponse(raw) ?? []);
+    return z.array(z.object({ id: z.string(), name: z.string() }).strip()).parse(payload);
   }),
 
   /**

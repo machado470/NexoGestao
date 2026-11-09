@@ -51,7 +51,7 @@ export class PeopleController {
   @Get('assignees')
   @Roles('ADMIN', 'MANAGER', 'STAFF', 'VIEWER')
   async listAssignees(@Org() orgId: string) {
-    return this.people.listActiveByOrg(orgId)
+    return this.people.listAssignees(orgId)
   }
 
   /**
