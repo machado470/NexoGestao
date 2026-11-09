@@ -7,6 +7,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common'
 import { csvRow } from '../common/csv'
+import { zonedDayBounds } from '../common/zoned-day'
 import { PrismaService } from '../prisma/prisma.service'
 import { $Enums, Prisma, WhatsAppEntityType, WhatsAppMessageType } from '@prisma/client'
 import { IdempotencyService } from '../common/idempotency/idempotency.service'
@@ -1294,19 +1295,23 @@ export class FinanceService {
   }
 
   async automateOverdueLifecycle(orgId: string) {
-    const now = new Date()
-
-    const todayStart = new Date(now)
-    todayStart.setHours(0, 0, 0, 0)
-
-    const todayEnd = new Date(now)
-    todayEnd.setHours(23, 59, 59, 999)
+    const organization = await this.prisma.organization.findUnique({ where: { id: orgId }, select: { timezone: true } })
+    if (!organization) throw new NotFoundException('Organização não encontrada')
+    const now = new Date(Date.now())
+    let todayStart: Date, tomorrowStart: Date
+    try {
+      const bounds = zonedDayBounds(now, organization.timezone)
+      todayStart = bounds.start
+      tomorrowStart = bounds.end
+    } catch {
+      throw new BadRequestException('Fuso horário da organização inválido. Revise as configurações.')
+    }
 
     const dueToday = await this.prisma.charge.findMany({
       where: {
         orgId,
         status: 'PENDING',
-        dueDate: { gte: todayStart, lte: todayEnd },
+        dueDate: { gte: todayStart, lt: tomorrowStart },
       },
     })
 
@@ -1328,7 +1333,7 @@ export class FinanceService {
         metadata: {
           chargeId: candidate.id, customerId: candidate.customerId, serviceOrderId: candidate.serviceOrderId,
           amountCents: candidate.amountCents, dueDate: candidate.dueDate.toISOString(),
-          previousStatus: 'PENDING', nextStatus: 'OVERDUE',
+          previousStatus: 'PENDING', nextStatus: 'OVERDUE', timezone: organization.timezone, evaluatedAt: now.toISOString(),
         },
       }
       const event = await this.prisma.$transaction(async tx => {
@@ -1454,20 +1459,20 @@ export class FinanceService {
     }).format(cents / 100)
   }
 
-  private formatDate(date: Date) {
-    return new Intl.DateTimeFormat('pt-BR').format(date)
+  private formatDate(date: Date, timeZone: string) {
+    return new Intl.DateTimeFormat('pt-BR', { timeZone }).format(date)
   }
 
   async sendChargeWhatsApp(chargeId: string) {
     const charge = await this.prisma.charge.findUnique({
       where: { id: chargeId },
-      include: { customer: true },
+      include: { customer: true, org: { select: { timezone: true } } },
     })
 
     if (!charge || !charge.customer?.phone) return
 
     const amount = this.formatCurrency(charge.amountCents)
-    const dueDate = this.formatDate(charge.dueDate)
+    const dueDate = this.formatDate(charge.dueDate, charge.org.timezone)
     const text = `Olá, ${charge.customer.name}! Segue a sua cobrança no valor de ${amount}, com vencimento em ${dueDate}.`
 
     await this.whatsapp.enqueueMessage({
@@ -1515,14 +1520,14 @@ export class FinanceService {
 
   async sendPaymentReminderWhatsApp(chargeId: string, orgId?: string) {
     const charge = orgId
-      ? await this.prisma.charge.findFirst({ where: { id: chargeId, orgId }, include: { customer: true } })
-      : await this.prisma.charge.findUnique({ where: { id: chargeId }, include: { customer: true } })
+      ? await this.prisma.charge.findFirst({ where: { id: chargeId, orgId }, include: { customer: true, org: { select: { timezone: true } } } })
+      : await this.prisma.charge.findUnique({ where: { id: chargeId }, include: { customer: true, org: { select: { timezone: true } } } })
     if (!charge) return { status: 'skipped' as const, reason: 'charge_missing' }
     if (!['PENDING', 'OVERDUE'].includes(charge.status)) return { status: 'skipped' as const, reason: 'charge_closed' }
     if (!charge.customer?.phone) return { status: 'skipped' as const, reason: 'missing_phone' }
 
     const amount = this.formatCurrency(charge.amountCents)
-    const dueDate = this.formatDate(charge.dueDate)
+    const dueDate = this.formatDate(charge.dueDate, charge.org.timezone)
     const text = `Olá, ${charge.customer.name}! Lembramos que sua cobrança de ${amount} vence em ${dueDate}.`
 
     const result = await this.whatsapp.enqueueMessage({

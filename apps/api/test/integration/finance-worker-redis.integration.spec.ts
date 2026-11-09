@@ -23,7 +23,7 @@ describeRealIntegration('Financial worker outcomes in an isolated Redis queue', 
   })
   beforeEach(() => {
     findFirst.mockReset().mockImplementation(async ({ where }: any) => where.orgId === 'org' && where.id === 'charge' ? {
-      id: 'charge', orgId: 'org', status: 'PENDING', amountCents: 1000, dueDate: new Date(), customerId: 'customer', customer: { name: 'Customer', phone: '5511999999999' },
+      id: 'charge', orgId: 'org', org: { timezone: 'America/Sao_Paulo' }, status: 'PENDING', amountCents: 1000, dueDate: new Date(), customerId: 'customer', customer: { name: 'Customer', phone: '5511999999999' },
     } : null)
     enqueueMessage.mockReset().mockResolvedValue({ created: true, message: { id: 'message' } })
   })
