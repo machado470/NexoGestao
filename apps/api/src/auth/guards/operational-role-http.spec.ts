@@ -4,6 +4,7 @@ import request from 'supertest'
 import { JwtAuthGuard } from './jwt-auth.guard'
 import { RolesGuard } from './roles.guard'
 import { FinanceController } from '../../finance/finance.controller'
+import { ManualPaymentsService } from '../../finance/manual-payments.service'
 import { FinanceService } from '../../finance/finance.service'
 import { TenantOperationsService } from '../../common/tenant-ops/tenant-ops.service'
 import { CommercialPolicyService } from '../../common/commercial/commercial-policy.service'
@@ -20,7 +21,7 @@ describe('canonical operational roles over HTTP', () => {
   beforeAll(async () => {
     const module = await Test.createTestingModule({
       controllers: [FinanceController, ServiceOrdersController],
-      providers: [RolesGuard,
+      providers: [RolesGuard, { provide: ManualPaymentsService, useValue: {} },
         { provide: FinanceService, useValue: finance }, { provide: ServiceOrdersService, useValue: orders },
         { provide: TenantOperationsService, useValue: {} }, { provide: CommercialPolicyService, useValue: {} }, { provide: QuotasService, useValue: {} },
       ],

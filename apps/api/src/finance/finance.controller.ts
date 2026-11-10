@@ -22,6 +22,7 @@ import { Org } from '../auth/decorators/org.decorator'
 import { User } from '../auth/decorators/user.decorator'
 import { OperationalStateGuard } from '../people/operational-state.guard'
 import { FinanceService } from './finance.service'
+import { ManualPaymentsService } from './manual-payments.service'
 import { CreatePaymentDto } from './dto/create-payment.dto'
 import { ChargesQueryDto } from './dto/charges-query.dto'
 import { CreateChargeDto } from './dto/create-charge.dto'
@@ -54,6 +55,7 @@ export class FinanceController {
     private readonly finance: FinanceService,
     private readonly tenantOps: TenantOperationsService,
     private readonly commercial: CommercialPolicyService,
+    private readonly manualPayments: ManualPaymentsService,
   ) {}
 
   @Get('overview')
@@ -235,43 +237,9 @@ export class FinanceController {
     @Param('chargeId') chargeId: string,
     @Body() body: CreatePaymentDto,
   ) {
-    const commercialLimit = await this.commercial.enforceMeter(orgId, 'finance_critical_actions')
-    if (isCommercialBlocked(commercialLimit)) {
-      throw new BadRequestException(
-        `Pagamento bloqueado por política comercial: ${commercialLimit.reasonCode}`,
-      )
-    }
-
-    const payLimit = this.tenantOps.enforceLimit({
-      orgId,
-      scope: 'finance:pay-charge',
-      limit: 30,
-      windowMs: 60_000,
-      blockedReason: 'tenant_finance_pay_charge_rate_limit',
-    })
-    if (!payLimit.allowed) {
-      this.tenantOps.recordCriticalEvent(orgId, 'finance_pay_charge_blocked', {
-        reason: payLimit.reason,
-        used: payLimit.used,
-      })
-      throw new BadRequestException(
-        `Pagamento bloqueado temporariamente: ${payLimit.reason}`,
-      )
-    }
-
-    const actorUserId = user?.userId ?? user?.sub ?? null
-
-    const data = await this.finance.payCharge({
-      orgId,
-      chargeId,
-      actorUserId,
-      method: body.method,
-      amountCents: body.amountCents,
-      paidAt: body.paidAt,
-      notes: body.notes,
-      idempotencyKey: body.idempotencyKey ?? idempotencyKeyHeader,
-    })
-    this.tenantOps.increment(orgId, 'finance_charge_pay')
+    const data = await this.manualPayments.pay(
+      orgId, user?.userId ?? user?.sub ?? null, chargeId, body, idempotencyKeyHeader,
+    )
 
     return { ok: true, data }
   }

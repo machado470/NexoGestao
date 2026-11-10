@@ -15,11 +15,12 @@ import { OutboxModule } from '../outbox/outbox.module'
 
 import { FinanceController } from './finance.controller'
 import { FinanceService } from './finance.service'
+import { ManualPaymentsService } from './manual-payments.service'
 
 @Module({
   imports: [PrismaModule, TimelineModule, AuditModule, OperationalStateModule, NotificationsModule, WhatsAppModule, RiskModule, OnboardingModule, AutomationModule, QueueModule, AnalyticsModule, OutboxModule],
   controllers: [FinanceController],
-  providers: [FinanceService, FinanceProcessor],
-  exports: [FinanceService],
+  providers: [FinanceService, FinanceProcessor, ManualPaymentsService],
+  exports: [FinanceService, ManualPaymentsService],
 })
 export class FinanceModule {}
