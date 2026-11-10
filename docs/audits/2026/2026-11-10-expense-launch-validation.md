@@ -36,7 +36,10 @@ Testes diretos dos serviços comprovam que NaN/Infinity e valores inválidos nã
 chegam à persistência nem à timeline. A suíte não prova concorrência de escrita.
 
 O BFF continua convertendo valores em reais para centavos conforme seu contrato;
-a API agora rejeita o resultado inválido. Não houve alteração na forma de cálculo
+a API agora rejeita o resultado inválido. O alias `date` da atualização legada do BFF é convertido para `occurredAt` e
+removido do payload HTTP, preservando precedência de `occurredAt` quando ambos
+são enviados. Cinco testes do BFF cobrem alias, data canônica, precedência,
+conversão monetária e edição de notas. Não houve alteração na forma de cálculo
 dos resumos mensais nem nas políticas de despesas recorrentes.
 
 Resultado local: 160 suítes / 1.055 testes da API aprovados, TypeScript, build dos
