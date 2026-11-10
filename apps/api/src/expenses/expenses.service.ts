@@ -149,7 +149,7 @@ export class ExpensesService {
   }
 
   async create(orgId: string, userId: string | null, dto: CreateExpenseDto) {
-    if (dto.amountCents <= 0) throw new BadRequestException('O valor da despesa deve ser maior que zero')
+    if (!Number.isInteger(dto.amountCents) || dto.amountCents < 1 || dto.amountCents > 2_147_483_647) throw new BadRequestException('O valor da despesa deve ser inteiro entre 1 e 2147483647 centavos')
     if (!VALID_CATEGORIES.includes(dto.category)) throw new BadRequestException(`Categoria inválida: ${dto.category}`)
 
     const created = await this.prisma.expense.create({
@@ -190,8 +190,8 @@ export class ExpensesService {
     const expense = await this.prisma.expense.findFirst({ where: { id, orgId } })
     if (!expense) throw new NotFoundException('Despesa não encontrada')
 
-    if (dto.amountCents !== undefined && dto.amountCents <= 0) {
-      throw new BadRequestException('O valor da despesa deve ser maior que zero')
+    if (dto.amountCents !== undefined && (!Number.isInteger(dto.amountCents) || dto.amountCents < 1 || dto.amountCents > 2_147_483_647)) {
+      throw new BadRequestException('O valor da despesa deve ser inteiro entre 1 e 2147483647 centavos')
     }
     if (dto.category && !VALID_CATEGORIES.includes(dto.category)) {
       throw new BadRequestException(`Categoria inválida: ${dto.category}`)
