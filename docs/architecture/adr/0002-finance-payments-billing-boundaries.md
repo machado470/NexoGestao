@@ -65,14 +65,14 @@ O nome `Payments` ainda representa integração de pagamento operacional, enquan
 ## Estratégia incremental
 
 1. manter `FinanceService` como facade estável;
-2. migrar a rota legada `payments/charges/:id/pay` para aceitar o contrato canônico de idempotência antes de qualquer remoção;
+2. manter a compatibilidade da rota legada `payments/charges/:id/pay`, agora com idempotência e política manual compartilhadas (correção de 2026-11-10);
 3. extrair a unidade completa de registro para um serviço de Payments somente quando for possível preservar transação, idempotência, concorrência, Timeline e Outbox sem ciclo Finance → Payments → Finance;
 4. migrar consumidores do `SubscriptionsService` legado para Billing e então restringir suas mutações;
 5. somente depois considerar decompor leituras/KPIs e fila do `FinanceService`.
 
 ## Itens não resolvidos e riscos
 
-- A rota legada manual de Payments não recebe chave de idempotência nem preserva o método informado; removê-la ou mudar seu contrato seria incompatível nesta fase.
+- Resolvido em 2026-11-10: a rota legada manual de Payments aceita chave de idempotência no body/header e preserva o método informado. Ambas as rotas usam `ManualPaymentsService` para política comercial, limite por tenant e autoria; o contrato legado sem valor/método permanece disponível. Consulte `docs/audits/2026/2026-11-10-manual-payment-policy-parity.md`.
 - O webhook operacional reconhece `charge.succeeded` e `checkout.session.completed`, mas a deduplicação depende do estado/idempotência do fluxo Finance; uma chave explícita por Stripe event exige migração cuidadosa.
 - `Payment.externalRef` não possui unicidade no schema; nenhuma migration é permitida nesta fase.
 - `SubscriptionsService` ainda duplica operações locais de lifecycle do Billing para consumidores legados.

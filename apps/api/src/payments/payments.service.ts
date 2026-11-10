@@ -233,38 +233,6 @@ export class PaymentsService {
   }
 
   /**
-   * Marca uma cobrança como paga manualmente
-   */
-  async markChargeAsPaid(
-    orgId: string,
-    chargeId: string,
-    _paymentMethod: string = 'manual',
-  ): Promise<void> {
-    try {
-      const charge = await this.prisma.charge.findFirst({
-        where: {
-          id: chargeId,
-          orgId,
-        },
-      })
-      if (!charge) return
-
-      await this.finance.payCharge({
-        orgId,
-        chargeId,
-        actorUserId: null,
-        method: 'OTHER',
-        amountCents: charge.amountCents,
-      })
-
-      this.logger.log(`Cobrança marcada como paga: ${chargeId}`)
-    } catch (error) {
-      this.logger.error(`Erro ao marcar cobrança como paga: ${error}`)
-      throw error
-    }
-  }
-
-  /**
    * Verifica cobranças vencidas e envia notificações
    */
   async checkOverdueCharges(): Promise<void> {
