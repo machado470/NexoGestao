@@ -9,18 +9,9 @@ import {
 } from './dto/create-expense.dto'
 import { ExpensesQueryDto } from './dto/expenses-query.dto'
 import { TimelineService } from '../timeline/timeline.service'
+import { zonedMonthBounds } from '../common/zoned-month'
 
 const VALID_CATEGORIES = Object.values(ExpenseCategory)
-
-function toDateRange(month?: string) {
-  const base = month ? new Date(`${month}-01T00:00:00.000Z`) : new Date()
-  if (Number.isNaN(base.getTime())) {
-    throw new BadRequestException('Mês inválido. Use YYYY-MM')
-  }
-  const start = new Date(base.getUTCFullYear(), base.getUTCMonth(), 1)
-  const end = new Date(base.getUTCFullYear(), base.getUTCMonth() + 1, 1)
-  return { start, end }
-}
 
 @Injectable()
 export class ExpensesService {
@@ -67,8 +58,23 @@ export class ExpensesService {
     }
   }
 
+  private async monthlyRange(orgId: string, month?: string) {
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: orgId }, select: { timezone: true },
+    })
+    try {
+      return zonedMonthBounds(organization?.timezone as string, month)
+    } catch {
+      throw new BadRequestException('Mês ou fuso da organização inválido. Use YYYY-MM e um fuso IANA válido.')
+    }
+  }
+
   async summary(orgId: string, month?: string) {
-    const { start, end } = toDateRange(month)
+    return this.summarizeRange(orgId, await this.monthlyRange(orgId, month))
+  }
+
+  private async summarizeRange(orgId: string, range: ReturnType<typeof zonedMonthBounds>) {
+    const { start, end } = range
 
     const monthlyOneOff = {
       orgId,
@@ -101,7 +107,7 @@ export class ExpensesService {
 
 
     return {
-      month: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`,
+      month: range.month,
       totalExpenses: total,
       totalFixedExpenses: fixedTotal,
       totalVariableExpenses: variableTotal,
@@ -112,8 +118,9 @@ export class ExpensesService {
   }
 
   async getMonthlyFinancialResult(orgId: string, month?: string) {
-    const { start, end } = toDateRange(month)
-    const expenses = await this.summary(orgId, `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`)
+    const range = await this.monthlyRange(orgId, month)
+    const { start, end } = range
+    const expenses = await this.summarizeRange(orgId, range)
 
     const paymentsAgg = await this.prisma.payment.aggregate({
       where: { orgId, paidAt: { gte: start, lt: end } },
