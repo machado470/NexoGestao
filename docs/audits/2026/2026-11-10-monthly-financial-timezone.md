@@ -39,3 +39,9 @@ não faz parte desta alteração.
 
 Resultado local: 162 suítes / 1.079 testes da API aprovados; TypeScript, build dos
 três pacotes, validador Operating System e `git diff --check` aprovados.
+
+Compatibilidade: Node 20.20.2 / ICU 78.2 reproduziu uma divergência de `iso8601`
+na borda do ano 0001 (1 falha / 24 sucessos na suíte focada). O formatador usa
+`gregory`, consistente com o calendário gregoriano proléptico das âncoras Date.
+A suíte completa foi repetida no Node 20: 162 suítes / 1.079 testes aprovados.
+No Node 24, os 25 testes focados também passaram após a correção.

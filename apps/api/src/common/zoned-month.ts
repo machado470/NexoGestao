@@ -1,8 +1,9 @@
 /** UTC bounds of a civil month; do not assume a fixed offset or number of hours. */
 export function zonedMonthBounds(timeZone: string, month?: string, now = new Date(Date.now())) {
   if (typeof timeZone !== 'string' || !timeZone.trim()) throw new RangeError('Missing timezone')
+  // Match JavaScript's proleptic Gregorian UTC anchors, including early years.
   const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone, calendar: 'iso8601', numberingSystem: 'latn', year: 'numeric', month: '2-digit',
+    timeZone, calendar: 'gregory', numberingSystem: 'latn', year: 'numeric', month: '2-digit',
   })
   const civilMonth = (date: Date) => {
     const parts = formatter.formatToParts(date)
