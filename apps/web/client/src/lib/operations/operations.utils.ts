@@ -463,6 +463,7 @@ export function getTimelineEventLabel(event: TimelineEventLike) {
     CHARGE_PAID: "Cobrança paga",
     CHARGE_OVERDUE: "Cobrança vencida",
     PAYMENT_RECEIVED: "Pagamento recebido",
+    PAYMENT_REFUNDED: "Pagamento estornado", PAYMENT_REFUND_REVERSED: "Estorno revertido",
     PAYMENT_CONFIRMED: "Pagamento confirmado",
     RISK_UPDATED: "Risco atualizado",
     GOVERNANCE_RUN_STARTED: "Governança iniciada",

@@ -1,6 +1,7 @@
 import { Injectable, Logger, ForbiddenException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { SubscriptionStatus } from '@prisma/client'
+import { subscriptionAccess } from '../common/commercial/subscription-access'
 
 export interface QuotaLimits {
   customers: number
@@ -59,25 +60,7 @@ export class QuotasService {
 
   async getOrgPlan(orgId: string): Promise<string> {
     try {
-      const subscription = await this.prisma.subscription.findUnique({
-        where: { orgId },
-        include: { plan: true },
-      })
-
-      if (!subscription) return 'FREE'
-
-      if (subscription.status === SubscriptionStatus.CANCELED) {
-        return 'FREE'
-      }
-
-      if (
-        subscription.status === SubscriptionStatus.TRIALING &&
-        subscription.currentPeriodEnd < new Date()
-      ) {
-        return 'FREE'
-      }
-
-      return this.normalizePlan(subscription.plan.name)
+      return (await this.getAdmissionPlan(orgId)) ?? 'FREE'
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'erro desconhecido'
@@ -96,7 +79,8 @@ export class QuotasService {
   }
 
   async canCreateCustomer(orgId: string): Promise<boolean> {
-    const plan = await this.getOrgPlan(orgId)
+    const plan = await this.getAdmissionPlan(orgId)
+    if (plan === null) return false
     const limits = this.getQuotaLimits(plan)
 
     if (limits.customers >= 999999) return true
@@ -107,7 +91,8 @@ export class QuotasService {
   }
 
   async canCreateAppointment(orgId: string): Promise<boolean> {
-    const plan = await this.getOrgPlan(orgId)
+    const plan = await this.getAdmissionPlan(orgId)
+    if (plan === null) return false
     const limits = this.getQuotaLimits(plan)
 
     if (limits.appointments >= 999999) return true
@@ -120,7 +105,8 @@ export class QuotasService {
   }
 
   async canCreateServiceOrder(orgId: string): Promise<boolean> {
-    const plan = await this.getOrgPlan(orgId)
+    const plan = await this.getAdmissionPlan(orgId)
+    if (plan === null) return false
     const limits = this.getQuotaLimits(plan)
 
     if (limits.serviceOrders >= 999999) return true
@@ -133,7 +119,8 @@ export class QuotasService {
   }
 
   async canSendMessage(orgId: string): Promise<boolean> {
-    const plan = await this.getOrgPlan(orgId)
+    const plan = await this.getAdmissionPlan(orgId)
+    if (plan === null) return false
     const limits = this.getQuotaLimits(plan)
 
     if (limits.messages >= 999999) return true
@@ -146,7 +133,8 @@ export class QuotasService {
   }
 
   async canAddStaffMember(orgId: string): Promise<boolean> {
-    const plan = await this.getOrgPlan(orgId)
+    const plan = await this.getAdmissionPlan(orgId)
+    if (plan === null) return false
     const limits = this.getQuotaLimits(plan)
 
     if (limits.users >= 999999) return true
@@ -232,6 +220,17 @@ export class QuotasService {
     }
   }
 
+  private async getAdmissionPlan(orgId: string): Promise<string | null> {
+    const subscription = await this.prisma.subscription.findUnique({ where: { orgId }, include: { plan: true } })
+    if (!subscriptionAccess(subscription).allowed) return null
+    return subscription ? this.normalizePlan(subscription.plan.name) : 'FREE'
+  }
+
+  private async getSubscriptionAccess(orgId: string) {
+    const subscription = await this.prisma.subscription.findUnique({ where: { orgId } })
+    return subscriptionAccess(subscription)
+  }
+
   async validateQuota(
     orgId: string,
     action:
@@ -241,8 +240,10 @@ export class QuotasService {
       | 'CREATE_SERVICE_ORDER'
       | 'ADD_STAFF_MEMBER',
   ): Promise<void> {
-    const plan = await this.getOrgPlan(orgId)
-
+    const access = await this.getSubscriptionAccess(orgId)
+    if (access.allowed === false) {
+      throw new ForbiddenException({ message: access.reasonMessage, reasonCode: access.reasonCode, policyType: access.policyType })
+    }
     let canProceed = false
     let resourceName = ''
 
@@ -274,6 +275,7 @@ export class QuotasService {
     }
 
     if (!canProceed) {
+      const plan = await this.getOrgPlan(orgId)
       this.logger.warn(
         `Quota excedida: ${action} | org=${orgId} | plano=${plan}`,
       )

@@ -1,3 +1,4 @@
+import { refundedAmount } from '../common/finance/refunded-amount'
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
 import { ExpenseRecurrence, ExpenseType } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
@@ -138,12 +139,16 @@ export class ExpensesService {
     })
 
     const revenue = paymentsAgg._sum.amountCents ?? 0
-    const net = revenue - expenses.totalExpenses
-    const committedPercentage = revenue > 0 ? (expenses.totalExpenses / revenue) * 100 : 0
+    const refunded = await refundedAmount(this.prisma, { orgId, paidAt: { gte: start, lt: end } })
+    const netRevenue = revenue - refunded
+    const net = netRevenue - expenses.totalExpenses
+    const committedPercentage = netRevenue > 0 ? (expenses.totalExpenses / netRevenue) * 100 : 0
 
     return {
       month: expenses.month,
       totalRevenueMonth: revenue,
+      refundedAmountMonth: refunded,
+      netRevenueMonth: netRevenue,
       totalExpensesMonth: expenses.totalExpenses,
       totalFixedExpensesMonth: expenses.totalFixedExpenses,
       totalVariableExpensesMonth: expenses.totalVariableExpenses,

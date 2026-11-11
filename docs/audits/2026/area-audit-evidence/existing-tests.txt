@@ -1,0 +1,122 @@
+[Nest] 34925  - 11/11/2026, 4:00:38 PM    WARN [AuthService] [OPTIONAL][integration-missing-config] RESEND_API_KEY ausente. Recuperação por e-mail ficará desabilitada.
+[Nest] 34925  - 11/11/2026, 4:00:38 PM    WARN [AuthService] [OPTIONAL][integration-missing-config] RESEND_API_KEY ausente. Recuperação por e-mail ficará desabilitada.
+[Nest] 34925  - 11/11/2026, 4:00:39 PM     LOG [FinanceService] {"requestId":"req-1","action":"PAY_CHARGE_START","entityId":"ch-1","orgId":"org-1","amountCents":1000,"method":"PIX","message":"Iniciando payCharge"}
+[Nest] 34925  - 11/11/2026, 4:00:39 PM     LOG [FinanceService] {"requestId":"req-1","action":"PAY_CHARGE_START","entityId":"ch-1","orgId":"org-1","amountCents":1000,"method":"PIX","message":"Iniciando payCharge"}
+[Nest] 34925  - 11/11/2026, 4:00:39 PM     LOG [FinanceService] {"requestId":"req-1","action":"PAY_CHARGE_START","entityId":"ch-1","orgId":"org-1","amountCents":1000,"method":"PIX","message":"Iniciando payCharge"}
+[Nest] 34925  - 11/11/2026, 4:00:39 PM     LOG [FinanceService] {"requestId":"req-1","action":"CREATE_CHARGE_START","entityId":"c-1","orgId":"org-1","customerId":"c-1","message":"Iniciando createCharge"}
+[Nest] 34925  - 11/11/2026, 4:00:39 PM    WARN [FinanceService] {"requestId":"req-1","action":"WHATSAPP_SEND_CHARGE","entityId":"ch-1","error":"timeout","message":"Falha de integração no envio de cobrança. Fluxo seguirá em modo degradado"}
+[Nest] 34925  - 11/11/2026, 4:00:39 PM    WARN [FinanceService] {"requestId":"req-1","action":"CREATE_CHARGE_RESULT","entityId":"ch-1","chargeId":"ch-1","orgId":"org-1","message":"Cobrança criada com fallback de WhatsApp (mensagem em fila/pendente)"}
+[Nest] 34925  - 11/11/2026, 4:00:39 PM     LOG [FinanceService] {"requestId":"req-1","action":"CREATE_CHARGE_START","entityId":"c-1","orgId":"org-1","customerId":"c-1","message":"Iniciando createCharge"}
+[Nest] 34925  - 11/11/2026, 4:00:39 PM     LOG [FinanceService] {"requestId":"req-1","action":"PAY_CHARGE_START","entityId":"ch-1","orgId":"org-1","amountCents":1000,"method":"PIX","message":"Iniciando payCharge"}
+[Nest] 34925  - 11/11/2026, 4:00:39 PM     LOG [FinanceService] {"requestId":"req-1","action":"PAY_CHARGE_START","entityId":"ch-1","orgId":"org-1","amountCents":1000,"method":"PIX","message":"Iniciando payCharge"}
+[Nest] 34925  - 11/11/2026, 4:00:39 PM     LOG [FinanceService] {"requestId":"req-1","action":"PAY_CHARGE_RESULT","entityId":"ch-1","paymentId":"pay-1","orgId":"org-1","message":"Pagamento registrado com sucesso"}
+[Nest] 34925  - 11/11/2026, 4:00:39 PM     LOG [FinanceService] {"requestId":"req-1","action":"PAY_CHARGE_START","entityId":"ch-1","orgId":"org-1","amountCents":1000,"method":"PIX","message":"Iniciando payCharge"}
+[Nest] 34925  - 11/11/2026, 4:00:39 PM     LOG [FinanceService] {"requestId":"req-1","action":"PAY_CHARGE_RESULT","entityId":"ch-1","paymentId":"pay-1","orgId":"org-1","message":"Pagamento registrado com sucesso"}
+[Nest] 34925  - 02/10/2026, 9:30:00 AM     LOG [FinanceService] {"requestId":"req-1","action":"PAY_CHARGE_START","entityId":"ch-1","orgId":"org-1","amountCents":1000,"method":"PIX","message":"Iniciando payCharge"}
+[Nest] 34925  - 02/10/2026, 9:30:00 AM     LOG [FinanceService] {"requestId":"req-1","action":"PAY_CHARGE_RESULT","entityId":"ch-1","paymentId":"pay-1","orgId":"org-1","message":"Pagamento registrado com sucesso"}
+[Nest] 34925  - 11/11/2026, 4:00:39 PM     LOG [FinanceService] {"requestId":"req-1","action":"PAY_CHARGE_START","entityId":"ch-1","orgId":"org-1","amountCents":999,"method":"PIX","message":"Iniciando payCharge"}
+[Nest] 34925  - 11/11/2026, 4:00:39 PM     LOG [FinanceService] {"requestId":"req-1","action":"PAY_CHARGE_START","entityId":"ch-1","orgId":"org-1","amountCents":1001,"method":"PIX","message":"Iniciando payCharge"}
+[Nest] 34925  - 11/11/2026, 4:00:39 PM     LOG [FinanceService] {"requestId":"req-1","action":"PAY_CHARGE_START","entityId":"ch-1","orgId":"org-1","amountCents":1001,"method":"PIX","message":"Iniciando payCharge"}
+[Nest] 34925  - 11/11/2026, 4:00:39 PM     LOG [FinanceService] {"requestId":"req-1","action":"PAY_CHARGE_RESULT","entityId":"ch-1","paymentId":"pay-1","orgId":"org-1","message":"Pagamento registrado com sucesso"}
+[Nest] 34925  - 11/11/2026, 4:00:39 PM     LOG [FinanceService] {"requestId":"req-1","action":"PAY_CHARGE_START","entityId":"ch-1","orgId":"org-1","amountCents":1000,"method":"PIX","message":"Iniciando payCharge"}
+[Nest] 34925  - 11/11/2026, 4:00:39 PM     LOG [FinanceService] {"requestId":"req-1","action":"PAY_CHARGE_START","entityId":"ch-1","orgId":"org-1","amountCents":1000,"method":"PIX","message":"Iniciando payCharge"}
+[Nest] 34925  - 11/11/2026, 4:00:40 PM     LOG [PaymentsService] [BOOT][Payments] Stripe inicializado no PaymentsService
+[Nest] 34925  - 11/11/2026, 4:00:40 PM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.completed
+[Nest] 34925  - 11/11/2026, 4:00:40 PM     LOG [PaymentsService] Pagamento processado com sucesso via Stripe. event=checkout.session.completed chargeId=charge externalRef=stripe:pi_test
+[Nest] 34925  - 11/11/2026, 4:00:40 PM     LOG [PaymentsService] [BOOT][Payments] Stripe inicializado no PaymentsService
+[Nest] 34925  - 11/11/2026, 4:00:40 PM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.completed
+[Nest] 34925  - 11/11/2026, 4:00:40 PM     LOG [PaymentsService] [BOOT][Payments] Stripe inicializado no PaymentsService
+[Nest] 34925  - 11/11/2026, 4:00:40 PM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.completed
+[Nest] 34925  - 11/11/2026, 4:00:40 PM     LOG [PaymentsService] [BOOT][Payments] Stripe inicializado no PaymentsService
+[Nest] 34925  - 11/11/2026, 4:00:40 PM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.completed
+[Nest] 34925  - 11/11/2026, 4:00:40 PM     LOG [PaymentsService] [BOOT][Payments] Stripe inicializado no PaymentsService
+[Nest] 34925  - 11/11/2026, 4:00:40 PM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.completed
+[Nest] 34925  - 11/11/2026, 4:00:40 PM     LOG [PaymentsService] [BOOT][Payments] Stripe inicializado no PaymentsService
+[Nest] 34925  - 11/11/2026, 4:00:40 PM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.completed
+[Nest] 34925  - 11/11/2026, 4:00:40 PM     LOG [PaymentsService] [BOOT][Payments] Stripe inicializado no PaymentsService
+[Nest] 34925  - 11/11/2026, 4:00:40 PM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.completed
+[Nest] 34925  - 11/11/2026, 4:00:40 PM     LOG [PaymentsService] Pagamento processado com sucesso via Stripe. event=checkout.session.completed chargeId=charge externalRef=stripe:pi_test
+[Nest] 34925  - 11/11/2026, 4:00:40 PM     LOG [PaymentsService] Webhook Stripe recebido: charge.succeeded
+[Nest] 34925  - 11/11/2026, 4:00:40 PM     LOG [PaymentsService] Pagamento processado com sucesso via Stripe. event=charge.succeeded chargeId=charge externalRef=stripe:pi_test
+[Nest] 34925  - 11/11/2026, 4:00:40 PM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.async_payment_succeeded
+[Nest] 34925  - 11/11/2026, 4:00:40 PM     LOG [PaymentsService] Pagamento processado com sucesso via Stripe. event=checkout.session.async_payment_succeeded chargeId=charge externalRef=stripe:pi_test
+[Nest] 34925  - 11/11/2026, 4:00:40 PM     LOG [PaymentsService] [BOOT][Payments] Stripe inicializado no PaymentsService
+[Nest] 34925  - 11/11/2026, 4:00:40 PM     LOG [PaymentsService] Webhook Stripe recebido: charge.succeeded
+[Nest] 34925  - 11/11/2026, 4:00:40 PM     LOG [PaymentsService] [BOOT][Payments] Stripe inicializado no PaymentsService
+[Nest] 34925  - 11/11/2026, 4:00:40 PM     LOG [PaymentsService] [BOOT][Payments] Stripe inicializado no PaymentsService
+[Nest] 34925  - 11/11/2026, 4:00:40 PM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.completed
+[Nest] 34925  - 11/11/2026, 4:00:40 PM     LOG [PaymentsService] [BOOT][Payments] Stripe inicializado no PaymentsService
+[Nest] 34925  - 11/11/2026, 4:00:40 PM     LOG [PaymentsService] Sessão Stripe criada: cs_test
+[Nest] 34925  - 11/11/2026, 4:00:41 PM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+[Nest] 34925  - 11/11/2026, 4:00:41 PM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+[Nest] 34925  - 11/11/2026, 4:00:41 PM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+[Nest] 34925  - 11/11/2026, 4:00:41 PM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+[Nest] 34925  - 11/11/2026, 4:00:41 PM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+[Nest] 34925  - 11/11/2026, 4:00:41 PM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+[Nest] 34925  - 11/11/2026, 4:00:42 PM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+[Nest] 34925  - 11/11/2026, 4:00:42 PM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+[Nest] 34925  - 11/11/2026, 4:00:42 PM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+[Nest] 34925  - 11/11/2026, 4:00:42 PM     LOG [BillingService] Webhook recebido: checkout.session.completed
+[Nest] 34925  - 11/11/2026, 4:00:42 PM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+[Nest] 34925  - 11/11/2026, 4:00:42 PM     LOG [BillingService] Webhook recebido: invoice.paid
+[Nest] 34925  - 11/11/2026, 4:00:42 PM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+[Nest] 34925  - 11/11/2026, 4:00:42 PM     LOG [BillingService] Webhook recebido: invoice.payment_failed
+[Nest] 34925  - 11/11/2026, 4:00:42 PM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+[Nest] 34925  - 11/11/2026, 4:00:42 PM     LOG [BillingService] Webhook recebido: customer.subscription.updated
+[Nest] 34925  - 11/11/2026, 4:00:42 PM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+[Nest] 34925  - 11/11/2026, 4:00:42 PM     LOG [BillingService] Webhook recebido: customer.subscription.deleted
+[Nest] 34925  - 11/11/2026, 4:00:42 PM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+[Nest] 34925  - 11/11/2026, 4:00:42 PM     LOG [BillingService] Webhook recebido: invoice.paid
+[Nest] 34925  - 11/11/2026, 4:00:42 PM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+[Nest] 34925  - 11/11/2026, 4:00:42 PM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+[Nest] 34925  - 11/11/2026, 4:00:43 PM     LOG [NotificationPubSubService] Redis Pub/Sub conectado
+[Nest] 34925  - 11/11/2026, 4:00:43 PM     LOG [NotificationPubSubService] Redis Pub/Sub conectado
+[Nest] 34925  - 11/11/2026, 4:00:43 PM    WARN [NotificationPubSubService] Publisher indisponível; persistência permanece ativa
+[Nest] 34925  - 11/11/2026, 4:00:43 PM    WARN [NotificationPubSubService] Subscriber indisponível; consultas persistentes permanecem ativas
+[Nest] 34925  - 11/11/2026, 4:00:43 PM     LOG [NotificationPubSubService] Redis Pub/Sub conectado
+[Nest] 34925  - 11/11/2026, 4:00:43 PM    WARN [NotificationPubSubService] Falha no publish de notificação (timeout); persistência preservada
+[Nest] 34925  - 11/11/2026, 4:00:43 PM    WARN [NotificationPubSubService] Publisher indisponível; persistência permanece ativa
+[Nest] 34925  - 11/11/2026, 4:00:43 PM    WARN [NotificationPubSubService] Subscriber indisponível; consultas persistentes permanecem ativas
+[Nest] 34925  - 11/11/2026, 4:00:43 PM     LOG [NotificationPubSubService] Redis Pub/Sub conectado
+[Nest] 34925  - 11/11/2026, 4:00:43 PM    WARN [NotificationPubSubService] Publish de notificação sem subscribers; persistência preservada
+[Nest] 34925  - 11/11/2026, 4:00:43 PM    WARN [NotificationPubSubService] Publisher indisponível; persistência permanece ativa
+[Nest] 34925  - 11/11/2026, 4:00:43 PM    WARN [NotificationPubSubService] Subscriber indisponível; consultas persistentes permanecem ativas
+[Nest] 34925  - 11/11/2026, 4:00:43 PM     LOG [NotificationPubSubService] Redis Pub/Sub conectado
+[Nest] 34925  - 11/11/2026, 4:00:43 PM    WARN [NotificationPubSubService] Redis Pub/Sub reconectando
+[Nest] 34925  - 11/11/2026, 4:00:43 PM    WARN [AuthService] [OPTIONAL][integration-missing-config] RESEND_API_KEY ausente. Recuperação por e-mail ficará desabilitada.
+[Nest] 34925  - 11/11/2026, 4:00:43 PM    WARN [AuthService] [OPTIONAL][integration-missing-config] RESEND_API_KEY ausente. Recuperação por e-mail ficará desabilitada.
+[Nest] 34925  - 11/11/2026, 4:00:43 PM    WARN [AuthService] [OPTIONAL][integration-missing-config] RESEND_API_KEY ausente. Recuperação por e-mail ficará desabilitada.
+[Nest] 34925  - 11/11/2026, 4:00:43 PM    WARN [AuthService] [OPTIONAL][integration-missing-config] RESEND_API_KEY ausente. Recuperação por e-mail ficará desabilitada.
+[Nest] 34925  - 11/11/2026, 4:00:43 PM    WARN [AuthService] [OPTIONAL][integration-missing-config] RESEND_API_KEY ausente. Recuperação por e-mail ficará desabilitada.
+[Nest] 34925  - 11/11/2026, 4:00:43 PM    WARN [AuthService] [OPTIONAL][integration-missing-config] RESEND_API_KEY ausente. Recuperação por e-mail ficará desabilitada.
+[Nest] 34925  - 11/11/2026, 4:00:43 PM    WARN [AuthService] [OPTIONAL][integration-missing-config] RESEND_API_KEY ausente. Recuperação por e-mail ficará desabilitada.
+[Nest] 34925  - 11/11/2026, 4:00:43 PM    WARN [AuthService] [OPTIONAL][integration-missing-config] RESEND_API_KEY ausente. Recuperação por e-mail ficará desabilitada.
+[Nest] 34925  - 11/11/2026, 4:00:43 PM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+[Nest] 34925  - 11/11/2026, 4:00:43 PM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+[Nest] 34925  - 11/11/2026, 4:00:43 PM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+[Nest] 34925  - 11/11/2026, 4:00:43 PM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+[Nest] 34925  - 11/11/2026, 4:00:44 PM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+[Nest] 34925  - 11/11/2026, 4:00:44 PM     LOG [NotificationStreamHub] Stream aberto; conexões=2
+[Nest] 34925  - 11/11/2026, 4:00:44 PM     LOG [NotificationStreamHub] Stream aberto; conexões=3
+[Nest] 34925  - 11/11/2026, 4:00:44 PM     LOG [NotificationStreamHub] Stream encerrado; conexões=2
+[Nest] 34925  - 11/11/2026, 4:00:44 PM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+[Nest] 34925  - 11/11/2026, 4:00:44 PM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+[Nest] 34925  - 11/11/2026, 4:00:44 PM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+[Nest] 34925  - 11/11/2026, 4:00:44 PM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+[Nest] 34925  - 11/11/2026, 4:00:44 PM     LOG [NotificationStreamHub] Stream aberto; conexões=2
+[Nest] 34925  - 11/11/2026, 4:00:44 PM     LOG [NotificationStreamHub] Stream aberto; conexões=3
+[Nest] 34925  - 11/11/2026, 4:00:44 PM     LOG [NotificationStreamHub] Stream aberto; conexões=4
+[Nest] 34925  - 11/11/2026, 4:00:44 PM     LOG [NotificationStreamHub] Stream aberto; conexões=5
+[Nest] 34925  - 11/11/2026, 4:00:44 PM     LOG [NotificationStreamHub] Stream encerrado; conexões=4
+[Nest] 34925  - 11/11/2026, 4:00:44 PM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+[Nest] 34925  - 11/11/2026, 4:00:44 PM     LOG [NotificationStreamHub] Stream encerrado; conexões=0
+[Nest] 34925  - 11/11/2026, 4:00:44 PM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+[Nest] 34925  - 11/11/2026, 4:00:44 PM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+[Nest] 34925  - 11/11/2026, 4:00:44 PM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+[Nest] 34925  - 11/11/2026, 4:00:44 PM     LOG [NotificationStreamHub] Stream aberto; conexões=2
+
+Test Suites: 44 passed, 44 total
+Tests:       424 passed, 424 total
+Snapshots:   0 total
+Time:        16.222 s
+Ran all test suites matching src/auth/|src/invites/|src/onboarding/|src/organization-members/|src/subscriptions/|src/billing/|src/payments/|src/finance/|src/common/commercial/|src/quotas/|src/notifications/|src/reports/|src/automation/|src/expenses/.

@@ -14,13 +14,14 @@ import { AnalyticsModule } from '../analytics/analytics.module'
 import { OutboxModule } from '../outbox/outbox.module'
 
 import { FinanceController } from './finance.controller'
+import { PaymentRefundsService } from './payment-refunds.service'
 import { FinanceService } from './finance.service'
 import { ManualPaymentsService } from './manual-payments.service'
 
 @Module({
   imports: [PrismaModule, TimelineModule, AuditModule, OperationalStateModule, NotificationsModule, WhatsAppModule, RiskModule, OnboardingModule, AutomationModule, QueueModule, AnalyticsModule, OutboxModule],
   controllers: [FinanceController],
-  providers: [FinanceService, FinanceProcessor, ManualPaymentsService],
-  exports: [FinanceService, ManualPaymentsService],
+  providers: [PaymentRefundsService, FinanceService, FinanceProcessor, ManualPaymentsService],
+  exports: [PaymentRefundsService, FinanceService, ManualPaymentsService],
 })
 export class FinanceModule {}

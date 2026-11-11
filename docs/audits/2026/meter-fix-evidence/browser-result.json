@@ -1,0 +1,11 @@
+{
+  "method": "Real PostgreSQL + API + BFF + Chromium; synthetic active FREE tenant at its finance limit",
+  "limit": 100,
+  "existingRecordsPreserved": true,
+  "chargeCreateBlockedHTTPStatus": 400,
+  "readableLimitMessageVisible": true,
+  "noExtraChargePersisted": true,
+  "reloadPassed": true,
+  "pageErrors": [],
+  "pass": true
+}

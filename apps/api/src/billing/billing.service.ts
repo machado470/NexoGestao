@@ -4,6 +4,7 @@ import {
   NotFoundException,
   ServiceUnavailableException,
   BadRequestException,
+  ConflictException,
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { PrismaService } from '../prisma/prisma.service'
@@ -148,6 +149,7 @@ export class BillingService {
       success_url: successUrl ?? 'http://localhost:5173/billing/success',
       cancel_url: cancelUrl ?? 'http://localhost:5173/billing/cancel',
       metadata: { orgId, planName: normalizedPlanName },
+      subscription_data: { metadata: { orgId, planName: normalizedPlanName } },
     })
 
     return {
@@ -183,8 +185,20 @@ export class BillingService {
       })
       if (duplicate) return false
 
+      const object = event.data.object as any
+      const checkout = event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded'
+      const externalRef = event.type.startsWith('invoice.') ? this.stripeId(object.subscription) : this.stripeId(object.id)
+      const orgId = checkout ? object.metadata?.orgId : (await tx.subscription.findFirst({ where: { billingExternalRef: externalRef ?? '__missing__' } }))?.orgId
+      if (!orgId) return this.ignoreWebhook(event, 'sem assinatura local mapeada')
+      // Reconcile under the tenant lock. Provider calls are bounded below, and
+      // retries check idempotency again after acquiring cross-instance ownership.
+      // NO KEY UPDATE serializes reconciliations without blocking FK key-share
+      // locks used by ordinary customer/payment inserts in this organization.
+      const rows = await tx.$queryRaw<Array<{id:string}>>`SELECT id FROM "Organization" WHERE id = ${orgId} FOR NO KEY UPDATE`
+      if (!rows.length) throw new NotFoundException('Organização da assinatura não encontrada')
+      if (await tx.billingEvent.findUnique({ where: { providerEventId: event.id } })) return false
       return this.processWebhookEvent(tx, event)
-    })
+    }, { timeout: 15000, maxWait: 5000 })
 
     return { received: true, processed }
   }
@@ -192,15 +206,16 @@ export class BillingService {
   private async processWebhookEvent(tx: Prisma.TransactionClient, event: Stripe.Event) {
     switch (event.type) {
       case 'checkout.session.completed':
+      case 'checkout.session.async_payment_succeeded':
         return this.processCheckoutCompleted(tx, event)
       case 'invoice.paid':
-        return this.processInvoice(tx, event, SubscriptionStatus.ACTIVE, BillingEventStatus.COMPLETED)
+        return this.processInvoice(tx, event, BillingEventStatus.COMPLETED)
       case 'invoice.payment_failed':
-        return this.processInvoice(tx, event, SubscriptionStatus.PAST_DUE, BillingEventStatus.FAILED)
+        return this.processInvoice(tx, event, BillingEventStatus.FAILED)
       case 'customer.subscription.updated':
         return this.processStripeSubscription(tx, event)
       case 'customer.subscription.deleted':
-        return this.processStripeSubscription(tx, event, SubscriptionStatus.CANCELED)
+        return this.processStripeSubscription(tx, event)
       default:
         this.logger.log(`Webhook ignorado: ${event.type}`)
         return false
@@ -209,7 +224,7 @@ export class BillingService {
 
   private async processCheckoutCompleted(
     tx: Prisma.TransactionClient,
-    event: Stripe.CheckoutSessionCompletedEvent,
+    event: Stripe.CheckoutSessionCompletedEvent | Stripe.CheckoutSessionAsyncPaymentSucceededEvent,
   ) {
     const session = event.data.object
     const orgId = session.metadata?.orgId
@@ -220,40 +235,37 @@ export class BillingService {
       throw new BadRequestException('checkout.session.completed sem metadata orgId/planName ou subscription id')
     }
 
-    const plan = await tx.plan.findUnique({ where: { name: planName } })
-    if (!plan) throw new NotFoundException(`Plano ${planName} não encontrado`)
-
-    const now = new Date()
-    const subscription = await tx.subscription.upsert({
-      where: { orgId },
-      create: {
-        orgId,
-        planId: plan.id,
-        status: SubscriptionStatus.ACTIVE,
-        billingProvider: BillingProvider.STRIPE,
-        billingCustomerRef: this.stripeId(session.customer),
-        billingExternalRef: externalRef,
-        currentPeriodStart: now,
-        currentPeriodEnd: new Date(now.getTime() + 30 * 86400000),
-      },
-      update: {
-        planId: plan.id,
-        status: SubscriptionStatus.ACTIVE,
-        billingProvider: BillingProvider.STRIPE,
-        billingCustomerRef: this.stripeId(session.customer),
-        billingExternalRef: externalRef,
-        canceledAt: null,
-      },
-    })
-
-    await this.createProviderEvent(tx, subscription.id, event, BillingEventType.PAYMENT, BillingEventStatus.COMPLETED, plan.priceCents, 'Stripe checkout concluído')
+    if (session.mode !== 'subscription') throw new BadRequestException('Checkout não é de assinatura')
+    const current = await tx.subscription.findUnique({ where: { orgId } })
+    const provider = await this.readProviderSubscription(externalRef)
+    if (provider.metadata?.orgId && provider.metadata.orgId !== orgId) throw new ConflictException('Assinatura do provedor pertence a outra organização')
+    const eventAt = this.eventDate(event)
+    if (current?.billingExternalRef && current.billingExternalRef !== externalRef &&
+        (provider.status === 'canceled' || (current.billingProviderEventAt && eventAt <= current.billingProviderEventAt))) {
+      await this.createProviderEvent(tx, current.id, event, BillingEventType.ADJUSTMENT, BillingEventStatus.COMPLETED, 0, 'Checkout antigo ignorado; associação atual preservada')
+      return false
+    }
+    const eligible = provider.status === 'active' || provider.status === 'trialing'
+    if (!eligible && current?.billingExternalRef && current.billingExternalRef !== externalRef) {
+      await this.createProviderEvent(tx, current.id, event, BillingEventType.ADJUSTMENT, BillingEventStatus.PENDING, 0, 'Novo checkout pendente; assinatura existente preservada')
+      return false
+    }
+    // Pending checkout must not grant paid quotas through legacy readers that
+    // still derive resource limits from planId independently of status.
+    const authoritativePlan = eligible ? this.planFromStripeSubscription(provider) ?? planName : PlanName.FREE
+    const plan = !eligible && current ? null : await tx.plan.findUnique({ where: { name: authoritativePlan } })
+    if (!plan && !current) throw new NotFoundException(`Plano ${authoritativePlan} não encontrado`)
+    if (eligible && !plan) throw new NotFoundException(`Plano ${authoritativePlan} não encontrado`)
+    const data = { planId: plan?.id ?? current!.planId, ...this.providerState(provider), billingProviderEventAt: this.latestEventDate(current?.billingProviderEventAt, eventAt) }
+    const subscription = await tx.subscription.upsert({ where: { orgId }, create: { orgId, ...data }, update: data })
+    // Checkout is evidence of setup, not a second invoice/payment ledger entry.
+    await this.createProviderEvent(tx, subscription.id, event, BillingEventType.ADJUSTMENT, BillingEventStatus.COMPLETED, 0, 'Stripe checkout reconciliado com assinatura atual')
     return true
   }
 
   private async processInvoice(
     tx: Prisma.TransactionClient,
     event: Stripe.InvoicePaidEvent | Stripe.InvoicePaymentFailedEvent,
-    status: SubscriptionStatus,
     eventStatus: BillingEventStatus,
   ) {
     const invoice = event.data.object
@@ -263,15 +275,12 @@ export class BillingService {
     const current = await tx.subscription.findFirst({ where: { billingExternalRef: externalRef } })
     if (!current) return this.ignoreWebhook(event, `assinatura ${externalRef} não encontrada`)
 
-    const subscription = await tx.subscription.update({
-      where: { id: current.id },
-      data: {
-        status,
-        currentPeriodStart: this.fromUnix(invoice.period_start) ?? current.currentPeriodStart,
-        currentPeriodEnd: this.fromUnix(invoice.period_end) ?? current.currentPeriodEnd,
-        canceledAt: status === SubscriptionStatus.ACTIVE ? null : undefined,
-      },
-    })
+    const provider = await this.readProviderSubscription(externalRef)
+    const planName = this.planFromStripeSubscription(provider)
+    const plan = (provider.status === 'active' || provider.status === 'trialing') && planName ? await tx.plan.findUnique({ where: { name: planName } }) : null
+    const subscription = await tx.subscription.update({ where: { id: current.id }, data: {
+      ...this.providerState(provider), planId: plan?.id ?? current.planId, billingProviderEventAt: this.latestEventDate(current.billingProviderEventAt, this.eventDate(event)),
+    } })
     const amount = event.type === 'invoice.paid' ? invoice.amount_paid : invoice.amount_due
     await this.createProviderEvent(tx, subscription.id, event, BillingEventType.PAYMENT, eventStatus, amount, `Stripe ${event.type}`)
     return true
@@ -280,32 +289,45 @@ export class BillingService {
   private async processStripeSubscription(
     tx: Prisma.TransactionClient,
     event: Stripe.CustomerSubscriptionUpdatedEvent | Stripe.CustomerSubscriptionDeletedEvent,
-    forcedStatus?: SubscriptionStatus,
   ) {
     const stripeSubscription = event.data.object
     const current = await tx.subscription.findFirst({ where: { billingExternalRef: stripeSubscription.id } })
     if (!current) return this.ignoreWebhook(event, `assinatura ${stripeSubscription.id} não encontrada`)
 
-    const planName = this.planFromStripeSubscription(stripeSubscription)
-    const plan = planName ? await tx.plan.findUnique({ where: { name: planName } }) : null
-    const status = forcedStatus ?? this.fromStripeSubscriptionStatus(stripeSubscription.status)
-    const subscription = await tx.subscription.update({
-      where: { id: current.id },
-      data: {
-        status,
-        planId: plan?.id ?? current.planId,
-        billingProvider: BillingProvider.STRIPE,
-        billingCustomerRef: this.stripeId(stripeSubscription.customer) ?? current.billingCustomerRef,
-        currentPeriodStart: this.fromUnix(stripeSubscription.current_period_start) ?? current.currentPeriodStart,
-        currentPeriodEnd: this.fromUnix(stripeSubscription.current_period_end) ?? current.currentPeriodEnd,
-        canceledAt: status === SubscriptionStatus.CANCELED
-          ? this.fromUnix(stripeSubscription.canceled_at) ?? new Date()
-          : null,
-      },
-    })
+    const provider = await this.readProviderSubscription(stripeSubscription.id)
+    const planName = this.planFromStripeSubscription(provider)
+    const plan = (provider.status === 'active' || provider.status === 'trialing') && planName ? await tx.plan.findUnique({ where: { name: planName } }) : null
+    const subscription = await tx.subscription.update({ where: { id: current.id }, data: {
+      ...this.providerState(provider), planId: plan?.id ?? current.planId,
+      billingProviderEventAt: this.latestEventDate(current.billingProviderEventAt, this.eventDate(event)),
+    } })
 
     await this.createProviderEvent(tx, subscription.id, event, BillingEventType.ADJUSTMENT, BillingEventStatus.COMPLETED, 0, `Stripe ${event.type}`)
     return true
+  }
+
+  private async readProviderSubscription(id: string) {
+    const subscription = await this.stripe!.subscriptions.retrieve(id, {}, { timeout: 5000, maxNetworkRetries: 0 })
+    if (subscription.id !== id) throw new ConflictException('Referência de assinatura divergente')
+    return subscription
+  }
+
+  private providerState(subscription: Stripe.Subscription) {
+    const start = this.fromUnix(subscription.current_period_start), end = this.fromUnix(subscription.current_period_end)
+    const customer = this.stripeId(subscription.customer)
+    if (!start || !end || end <= start || !customer) throw new BadRequestException('Assinatura do provedor sem período ou cliente válido')
+    return { status: this.fromStripeSubscriptionStatus(subscription.status), billingProvider: BillingProvider.STRIPE,
+      billingCustomerRef: customer, billingExternalRef: subscription.id, currentPeriodStart: start, currentPeriodEnd: end,
+      canceledAt: subscription.status === 'canceled' ? this.fromUnix(subscription.canceled_at) ?? new Date() : null }
+  }
+
+  private eventDate(event: Stripe.Event) {
+    if (!Number.isSafeInteger(event.created) || event.created <= 0) throw new BadRequestException('Evento Stripe sem data válida')
+    return new Date(event.created * 1000)
+  }
+
+  private latestEventDate(current: Date | null | undefined, incoming: Date) {
+    return current && current > incoming ? current : incoming
   }
 
   private async createProviderEvent(

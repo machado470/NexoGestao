@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { BadRequestException, Injectable, Logger } from '@nestjs/common'
 import { randomUUID } from 'crypto'
 import { Prisma, WhatsAppMessageType } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
@@ -297,6 +297,13 @@ export class ExecutionRunner {
             status: 'throttled' as const,
             tenantLimit,
           }
+        }
+
+        try {
+          await this.commercial.assertMeterInTransaction(tx, params.candidate.orgId, 'automation_executions')
+        } catch (error) {
+          if (error instanceof BadRequestException) return { status: 'commercial_blocked' as const, reason: (error.getResponse() as any)?.reasonCode ?? 'commercial_blocked' }
+          throw error
         }
 
         /*
@@ -1090,7 +1097,7 @@ export class ExecutionRunner {
       return 'blocked'
     }
 
-    const commercialLimit = await this.commercial.enforceMeter(candidate.orgId, 'automation_executions')
+    const commercialLimit = await this.commercial.enforceMeter(candidate.orgId, 'automation_executions', { admissionOnly: true })
     if (isCommercialBlocked(commercialLimit)) {
       await recordBlockedWithContext(executionKey, mode, commercialLimit.reasonCode, 'blocked', {
         ruleId: candidate.decisionId,
@@ -1138,6 +1145,12 @@ export class ExecutionRunner {
 
       this.countOperationalStatus('blocked')
       return 'blocked_recent_execution'
+      }
+
+      if (reservation.status === 'commercial_blocked') {
+        await recordBlockedWithContext(executionKey, mode, reservation.reason, 'blocked', { ruleId: candidate.decisionId, ruleReason: 'commercial admission' })
+        this.countOperationalStatus('blocked')
+        return 'blocked'
       }
 
       if (reservation.status === 'throttled') {

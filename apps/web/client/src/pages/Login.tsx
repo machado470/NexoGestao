@@ -192,10 +192,15 @@ export default function Login() {
     }
 
     setLocalError(null);
-    await resendVerificationMutation.mutateAsync({ email: normalizedEmail });
-    setResendSuccessMessage(
-      "Se o e-mail existir, um novo link de confirmação será enviado."
-    );
+    setResendSuccessMessage(null);
+    try {
+      await resendVerificationMutation.mutateAsync({ email: normalizedEmail });
+      setResendSuccessMessage(
+        "Solicitação recebida. Verifique seu e-mail e a pasta de spam. Se o link não chegar, tente novamente mais tarde."
+      );
+    } catch (error) {
+      setLocalError(normalizeErrorMessage(error));
+    }
   };
 
   return (

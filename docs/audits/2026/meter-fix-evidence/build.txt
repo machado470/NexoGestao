@@ -1,0 +1,139 @@
+
+> nexogestao@1.0.0 build /workspace/NexoGestao
+> turbo run build
+
+
+   • turbo 2.11.10
+   • Packages in scope: @nexogestao/api, @nexogestao/common, @nexogestao/web
+   • Running build in 3 packages
+   • Remote caching disabled
+
+@nexogestao/api:build: cache miss, executing f35da18ed0eca08b
+@nexogestao/web:build: cache hit, replaying logs 844da93d87526c95
+@nexogestao/web:build:
+@nexogestao/web:build: > @nexogestao/web@1.0.0 build /workspace/NexoGestao/apps/web
+@nexogestao/web:build: > vite build && esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist --define:process.env.NODE_ENV=\"production\"
+@nexogestao/web:build:
+@nexogestao/web:build: vite v7.3.7 building client environment for production...
+@nexogestao/web:build: transforming...
+@nexogestao/web:build: ../../node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/util.js (400:0): A comment
+@nexogestao/web:build:
+@nexogestao/web:build: "// Wrapped in a `@__PURE__` IIFE: esbuild never tree-shakes a top-level initializer that contains a member access on `Number`, so the bare object literal survived into every bundle."
+@nexogestao/web:build:
+@nexogestao/web:build: in "../../node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/util.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+@nexogestao/web:build: ../../node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/regexes.js (74:0): A comment
+@nexogestao/web:build:
+@nexogestao/web:build: "/** Anchors a pattern source. The interpolation lives here rather than at the call site because
+@nexogestao/web:build:  * esbuild will not drop a `@__PURE__` call whose own argument interpolates a variable, but it
+@nexogestao/web:build:  * will drop `anchor(dateSource)`. Keeping it inline pinned `date` into every bundle. */"
+@nexogestao/web:build:
+@nexogestao/web:build: in "../../node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/regexes.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+@nexogestao/web:build: ✓ 2020 modules transformed.
+@nexogestao/web:build: rendering chunks...
+@nexogestao/web:build: computing gzip size...
+@nexogestao/web:build: ../dist/public/index.html                                        1.67 kB │ gzip:  0.68 kB
+@nexogestao/web:build: ../dist/public/assets/index-JM9bKe0Z.css                       374.94 kB │ gzip: 51.89 kB
+@nexogestao/web:build: ../dist/public/assets/useRenderWatchdog-B0g78NAC.js              0.17 kB │ gzip:  0.17 kB
+@nexogestao/web:build: ../dist/public/assets/usePageDiagnostics-D61uYfyR.js             0.20 kB │ gzip:  0.17 kB
+@nexogestao/web:build: ../dist/public/assets/useProductAnalytics-tNi3gkl2.js            0.21 kB │ gzip:  0.19 kB
+@nexogestao/web:build: ../dist/public/assets/actionFlow-Wmm2lPfW.js                     0.23 kB │ gzip:  0.19 kB
+@nexogestao/web:build: ../dist/public/assets/money-input-TX14578O.js                    0.34 kB │ gzip:  0.26 kB
+@nexogestao/web:build: ../dist/public/assets/local-date-time-CfR7Kvpa.js                0.47 kB │ gzip:  0.30 kB
+@nexogestao/web:build: ../dist/public/assets/concurrency-BjXI0KO3.js                    0.60 kB │ gzip:  0.38 kB
+@nexogestao/web:build: ../dist/public/assets/operationalConsistency-CFWKQ3oq.js         0.64 kB │ gzip:  0.26 kB
+@nexogestao/web:build: ../dist/public/assets/presentation-status-BhsyaWMq.js            0.91 kB │ gzip:  0.58 kB
+@nexogestao/web:build: ../dist/public/assets/query-helpers-CopBuOU9.js                  0.96 kB │ gzip:  0.34 kB
+@nexogestao/web:build: ../dist/public/assets/card-txgrrJ3j.js                           1.00 kB │ gzip:  0.42 kB
+@nexogestao/web:build: ../dist/public/assets/AuthCallbackPage-jZeLokS0.js               2.18 kB │ gzip:  0.96 kB
+@nexogestao/web:build: ../dist/public/assets/NotFound-DavsZ-DL.js                       2.24 kB │ gzip:  0.86 kB
+@nexogestao/web:build: ../dist/public/assets/presentation-labels-Ct_HP7hR.js            2.79 kB │ gzip:  1.25 kB
+@nexogestao/web:build: ../dist/public/assets/app-modal-system-BQ1ZC635.js               3.51 kB │ gzip:  1.15 kB
+@nexogestao/web:build: ../dist/public/assets/ForgotPasswordPage-6XiwootL.js             4.10 kB │ gzip:  1.63 kB
+@nexogestao/web:build: ../dist/public/assets/useAssigneeWarningTelemetry-uAyKtfEC.js    4.40 kB │ gzip:  1.72 kB
+@nexogestao/web:build: ../dist/public/assets/ConfirmEmailPage-DTQYA_2p.js               4.77 kB │ gzip:  1.64 kB
+@nexogestao/web:build: ../dist/public/assets/ResetPasswordPage-Da8zO-YO.js              4.83 kB │ gzip:  1.70 kB
+@nexogestao/web:build: ../dist/public/assets/operations.utils-CgYltQj7.js               4.97 kB │ gzip:  1.69 kB
+@nexogestao/web:build: ../dist/public/assets/vendor-core-DRtiCwJZ.js                    5.36 kB │ gzip:  2.68 kB
+@nexogestao/web:build: ../dist/public/assets/CreateAppointmentModal-DQfc0zp_.js         7.11 kB │ gzip:  2.51 kB
+@nexogestao/web:build: ../dist/public/assets/AcceptInvitePage-BzutMliq.js               7.96 kB │ gzip:  2.35 kB
+@nexogestao/web:build: ../dist/public/assets/OperationalCockpitPage-Pzj3Xh1V.js         8.21 kB │ gzip:  2.36 kB
+@nexogestao/web:build: ../dist/public/assets/ProfilePage-5zVDewn-.js                    9.94 kB │ gzip:  2.70 kB
+@nexogestao/web:build: ../dist/public/assets/Login-C_gdxB7G.js                         10.51 kB │ gzip:  3.50 kB
+@nexogestao/web:build: ../dist/public/assets/BillingPage-DoLevaqu.js                   11.55 kB │ gzip:  3.42 kB
+@nexogestao/web:build: ../dist/public/assets/TimelinePage-LJEYmSM3.js                  11.89 kB │ gzip:  3.77 kB
+@nexogestao/web:build: ../dist/public/assets/AuditPage-C1W1KhTj.js                     13.07 kB │ gzip:  3.96 kB
+@nexogestao/web:build: ../dist/public/assets/whatsappActionExecution-z6I4V-Fv.js       13.68 kB │ gzip:  3.21 kB
+@nexogestao/web:build: ../dist/public/assets/CreateServiceOrderModal-ChsXNzev.js       16.50 kB │ gzip:  4.42 kB
+@nexogestao/web:build: ../dist/public/assets/GovernancePage-W3_nCzFP.js                17.32 kB │ gzip:  4.30 kB
+@nexogestao/web:build: ../dist/public/assets/SettingsPage-BIjrZS7u.js                  17.78 kB │ gzip:  4.84 kB
+@nexogestao/web:build: ../dist/public/assets/OperationalCommandLayer-D9sW4hx8.js       18.91 kB │ gzip:  3.51 kB
+@nexogestao/web:build: ../dist/public/assets/CalendarPage-DKPBoSFB.js                  20.25 kB │ gzip:  5.40 kB
+@nexogestao/web:build: ../dist/public/assets/Onboarding-ClaKaSIA.js                    21.60 kB │ gzip:  6.31 kB
+@nexogestao/web:build: ../dist/public/assets/WhatsAppWebhookRecoveryPage-CiVrs4Wx.js   25.78 kB │ gzip:  6.19 kB
+@nexogestao/web:build: ../dist/public/assets/AppointmentsPage-Y_rDlzj2.js              27.25 kB │ gzip:  6.90 kB
+@nexogestao/web:build: ../dist/public/assets/PeoplePage-CRuSeAGe.js                    34.69 kB │ gzip:  8.64 kB
+@nexogestao/web:build: ../dist/public/assets/FinancesPage-CIIdVaI1.js                  37.24 kB │ gzip:  9.65 kB
+@nexogestao/web:build: ../dist/public/assets/ExecutiveDashboard-DEEZJlPB.js            39.50 kB │ gzip: 10.32 kB
+@nexogestao/web:build: ../dist/public/assets/WhatsAppPage-Cr4aCGzc.js                  63.47 kB │ gzip: 16.26 kB
+@nexogestao/web:build: ../dist/public/assets/ServiceOrdersPage-CRkqQsRC.js             67.77 kB │ gzip: 14.89 kB
+@nexogestao/web:build: ../dist/public/assets/CustomersPage-4hqocuuJ.js                 78.17 kB │ gzip: 17.00 kB
+@nexogestao/web:build: ../dist/public/assets/vendor-data-mJWXWt4X.js                   97.98 kB │ gzip: 27.07 kB
+@nexogestao/web:build: ../dist/public/assets/vendor-utils-2ROuVwMx.js                 122.34 kB │ gzip: 34.60 kB
+@nexogestao/web:build: ../dist/public/assets/vendor-ui-CuMTyh0g.js                    140.19 kB │ gzip: 44.13 kB
+@nexogestao/web:build: ../dist/public/assets/index-39Gs6n2N.js                        224.23 kB │ gzip: 51.18 kB
+@nexogestao/web:build: ../dist/public/assets/vendor-calendar-PotP2LMF.js              243.65 kB │ gzip: 70.99 kB
+@nexogestao/web:build: ../dist/public/assets/vendor-misc-DbRuqo4F.js                  277.94 kB │ gzip: 89.79 kB
+@nexogestao/web:build: ✓ built in 30.56s
+@nexogestao/web:build:
+@nexogestao/web:build:   dist/index.js  193.6kb
+@nexogestao/web:build:
+@nexogestao/web:build: ⚡ Done in 58ms
+@nexogestao/common:build: cache hit, replaying logs 3890882923149490
+@nexogestao/common:build:
+@nexogestao/common:build: > @nexogestao/common@1.0.0 build /workspace/NexoGestao/packages/common
+@nexogestao/common:build: > tsc --build tsconfig.json
+@nexogestao/common:build:
+@nexogestao/api:build:
+@nexogestao/api:build: > @nexogestao/api@0.1.0 prebuild /workspace/NexoGestao/apps/api
+@nexogestao/api:build: > pnpm run prisma:generate && bash ../../check-types.sh
+@nexogestao/api:build:
+@nexogestao/api:build:
+@nexogestao/api:build: > @nexogestao/api@0.1.0 prisma:generate /workspace/NexoGestao/apps/api
+@nexogestao/api:build: > prisma generate --schema ../../prisma/schema.prisma
+@nexogestao/api:build:
+@nexogestao/api:build: Prisma schema loaded from ../../prisma/schema.prisma
+@nexogestao/api:build:
+@nexogestao/api:build: ✔ Generated Prisma Client (v5.22.0) to ./../../node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0/node_modules/@prisma/client in 2.69s
+@nexogestao/api:build:
+@nexogestao/api:build: Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+@nexogestao/api:build:
+@nexogestao/api:build: Tip: Easily identify and fix slow SQL queries in your app. Optimize helps you enhance your visibility: https://pris.ly/--optimize
+@nexogestao/api:build:
+@nexogestao/api:build: Prisma schema loaded from prisma/schema.prisma
+@nexogestao/api:build:
+@nexogestao/api:build: ✔ Generated Prisma Client (v5.22.0) to ./node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0/node_modules/@prisma/client in 1.82s
+@nexogestao/api:build:
+@nexogestao/api:build: Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+@nexogestao/api:build:
+@nexogestao/api:build: Tip: Want real-time updates to your database without manual polling? Discover how with Pulse: https://pris.ly/tip-0-pulse
+@nexogestao/api:build:
+@nexogestao/api:build:
+@nexogestao/api:build: > nexogestao@1.0.0 prepare:workspace /workspace/NexoGestao
+@nexogestao/api:build: > pnpm prepare:common
+@nexogestao/api:build:
+@nexogestao/api:build:
+@nexogestao/api:build: > nexogestao@1.0.0 prepare:common /workspace/NexoGestao
+@nexogestao/api:build: > pnpm --filter @nexogestao/common build
+@nexogestao/api:build:
+@nexogestao/api:build:
+@nexogestao/api:build: > @nexogestao/common@1.0.0 build /workspace/NexoGestao/packages/common
+@nexogestao/api:build: > tsc --build tsconfig.json
+@nexogestao/api:build:
+@nexogestao/api:build:
+@nexogestao/api:build: > @nexogestao/api@0.1.0 build /workspace/NexoGestao/apps/api
+@nexogestao/api:build: > rm -rf dist && pnpm exec nest build
+@nexogestao/api:build:
+
+ Tasks:    3 successful, 3 total
+Cached:    2 cached, 3 total
+  Time:    1m19.237s

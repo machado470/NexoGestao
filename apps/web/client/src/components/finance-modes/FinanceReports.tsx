@@ -51,7 +51,7 @@ export function FinanceReports({
   expenses = [],
   onCreateExpense,
 }: FinanceReportsProps) {
-  const revenue = Number(monthlyResult?.totalRevenueMonth ?? 0);
+  const revenue = Number(monthlyResult?.netRevenueMonth ?? monthlyResult?.totalRevenueMonth ?? 0);
   const monthExpenses = Number(monthlyResult?.totalExpensesMonth ?? 0);
   const net = Number(monthlyResult?.netMonthlyResult ?? revenue - monthExpenses);
   const committed = Number(

@@ -147,6 +147,8 @@ const dashboardMetricsSchema = z
     openServiceOrders: nonnegativeInteger,
     overdueServiceOrders: nonnegativeInteger,
     weeklyRevenueInCents: nonnegativeInteger,
+    refundedWeeklyAmountInCents: z.number().int().optional(),
+    netWeeklyRevenueInCents: z.number().int().optional(),
     paymentsReceivedCount: nonnegativeInteger,
     comparison: z
       .object({

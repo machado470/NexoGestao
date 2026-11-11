@@ -1,0 +1,11 @@
+{
+  "method": "Chromium mobile 390x844 + real BFF/API/PostgreSQL; email provider unavailable",
+  "registrationNormalUI": true,
+  "registrationDelivery": "provider_unavailable",
+  "resendErrorVisible": true,
+  "recoveryErrorVisible": true,
+  "noFalseDeliveryConfirmation": true,
+  "formRemainsAvailableForRetry": true,
+  "pageErrors": [],
+  "pass": true
+}

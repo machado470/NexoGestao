@@ -643,6 +643,9 @@ export default function FinancesPage() {
                     <span className="block">
                       Pago: {money(charge.paidAmountCents)}
                     </span>
+                    {Number(charge.refundedAmountCents ?? 0) > 0 ? (
+                      <span className="block text-xs">Estornado: {money(charge.refundedAmountCents)} · Recebido líquido: {money(charge.netReceivedAmountCents)}</span>
+                    ) : null}
                     <strong>Saldo: {money(charge.balanceCents)}</strong>
                   </td>
                   <td>
@@ -655,7 +658,7 @@ export default function FinancesPage() {
                         >
                           {money(payment.amountCents)} · {date(payment.paidAt)}{" "}
                           ·{" "}
-                          {factualLabel(payment.method, "Método não informado")}
+                          {methodOptions.find(option => option.value === payment.method)?.label ?? factualLabel(payment.method, "Método não informado")}
                         </span>
                       ))
                     ) : (

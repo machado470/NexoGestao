@@ -15,7 +15,7 @@ export class ManualPaymentsService {
 
   async pay(orgId: string, actorUserId: string | null, chargeId: string,
     body: CreatePaymentDto, idempotencyKeyHeader?: string) {
-    const commercialLimit = await this.commercial.enforceMeter(orgId, 'finance_critical_actions')
+    const commercialLimit = await this.commercial.enforceMeter(orgId, 'finance_critical_actions', { admissionOnly: true })
     if (isCommercialBlocked(commercialLimit)) {
       throw new BadRequestException(
         `Pagamento bloqueado por política comercial: ${commercialLimit.reasonCode}`,
@@ -40,6 +40,7 @@ export class ManualPaymentsService {
     }
 
     const data = await this.finance.payCharge({
+      commercialAdmission: tx => this.commercial.assertMeterInTransaction(tx, orgId, 'finance_critical_actions'),
       orgId,
       chargeId,
       actorUserId,

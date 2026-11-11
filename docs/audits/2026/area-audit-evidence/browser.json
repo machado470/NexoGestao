@@ -1,0 +1,94 @@
+{
+  "method": "Chromium mobile emulation; no physical keyboard or screen reader",
+  "routes": [
+    {
+      "route": "register",
+      "viewport": 390,
+      "documentWidth": 390,
+      "inputs": [
+        {
+          "id": "orgName",
+          "type": "text",
+          "inputMode": "",
+          "labelled": true
+        },
+        {
+          "id": "adminName",
+          "type": "text",
+          "inputMode": "",
+          "labelled": true
+        },
+        {
+          "id": "email",
+          "type": "email",
+          "inputMode": "",
+          "labelled": true
+        },
+        {
+          "id": "password",
+          "type": "password",
+          "inputMode": "",
+          "labelled": true
+        },
+        {
+          "id": "confirmPassword",
+          "type": "password",
+          "inputMode": "",
+          "labelled": true
+        }
+      ]
+    },
+    {
+      "route": "login",
+      "viewport": 390,
+      "documentWidth": 390,
+      "inputs": [
+        {
+          "id": "email",
+          "type": "email",
+          "inputMode": "",
+          "labelled": true
+        },
+        {
+          "id": "password",
+          "type": "password",
+          "inputMode": "",
+          "labelled": true
+        }
+      ]
+    },
+    {
+      "route": "forgot-password",
+      "viewport": 390,
+      "documentWidth": 390,
+      "inputs": [
+        {
+          "id": "email",
+          "type": "email",
+          "inputMode": "",
+          "labelled": true
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "modal": {
+    "focusedId": "customer-phone",
+    "phoneType": "text",
+    "phoneInputMode": "",
+    "documentWidth": 390,
+    "viewport": 390,
+    "viewportHeight": 500,
+    "dialog": [
+      {
+        "height": 450,
+        "top": 25,
+        "bottom": 475,
+        "maxHeight": "450px",
+        "label": "radix-_r_9_"
+      }
+    ],
+    "escapeClosed": true
+  },
+  "pass": true
+}

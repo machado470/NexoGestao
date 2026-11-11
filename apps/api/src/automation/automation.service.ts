@@ -102,7 +102,9 @@ export class AutomationService {
       }
     }
 
-    return delegate.create({
+    return this.prisma.$transaction(async tx => {
+      await this.commercial.assertMeterInTransaction(tx, orgId, 'configurable_automations')
+      return (tx as any).automationRule.create({
       data: {
         orgId,
         name: dto.name.trim(),
@@ -113,6 +115,7 @@ export class AutomationService {
         active: dto.active ?? true,
         createdByUserId: actorUserId,
       },
+      })
     })
   }
 
@@ -193,7 +196,7 @@ export class AutomationService {
         continue
       }
 
-      const planLimit = await this.commercial.enforceMeter(context.orgId, 'automation_executions')
+      const planLimit = await this.commercial.enforceMeter(context.orgId, 'automation_executions', { admissionOnly: true })
       if (isCommercialBlocked(planLimit)) {
         this.tenantOps.increment(context.orgId, 'automation_blocked')
         results.push({
@@ -232,7 +235,9 @@ export class AutomationService {
         continue
       }
 
-      const execution = await executionDelegate.create({
+      const execution = await this.prisma.$transaction(async tx => {
+        await this.commercial.assertMeterInTransaction(tx, context.orgId, 'automation_executions')
+      return (tx as any).automationExecution.create({
         data: {
           orgId: context.orgId,
           ruleId: rule.id,
@@ -240,6 +245,7 @@ export class AutomationService {
           eventPayload: context.payload,
           status: 'PENDING',
         },
+      })
       })
 
       try {

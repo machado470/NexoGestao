@@ -23,6 +23,7 @@ model Organization {
   runs                         GovernanceRun[]
   invoices                     Invoice[]
   launches                     Launch[]
+  paymentRefunds               PaymentRefund[]
   payments                     Payment[]
   persons                      Person[]
   personAvailabilityExceptions PersonAvailabilityException[]
@@ -584,22 +585,44 @@ model Charge {
 }
 
 model Payment {
-  id          String        @id @default(uuid())
+  id          String          @id @default(uuid())
   orgId       String
   chargeId    String
   amountCents Int
   method      PaymentMethod
-  paidAt      DateTime      @default(now())
+  paidAt      DateTime        @default(now())
   notes       String?
   externalRef String?
-  createdAt   DateTime      @default(now())
-  charge      Charge        @relation(fields: [chargeId], references: [id])
-  org         Organization  @relation(fields: [orgId], references: [id])
+  createdAt   DateTime        @default(now())
+  refunds     PaymentRefund[]
+  charge      Charge          @relation(fields: [chargeId], references: [id])
+  org         Organization    @relation(fields: [orgId], references: [id])
 
   @@unique([orgId, externalRef])
+  @@unique([id, orgId])
   @@index([orgId, createdAt])
   @@index([chargeId, createdAt])
   @@index([orgId, paidAt])
+}
+
+model PaymentRefund {
+  id                      String       @id @default(uuid())
+  orgId                   String
+  paymentId               String
+  providerRefundId        String       @unique
+  providerEventId         String
+  amountCents             Int
+  currency                String
+  refundedAt              DateTime
+  reversedAt              DateTime?
+  reversalProviderEventId String?
+  createdAt               DateTime     @default(now())
+  payment                 Payment      @relation(fields: [paymentId, orgId], references: [id, orgId])
+  org                     Organization @relation(fields: [orgId], references: [id])
+
+  @@index([orgId, refundedAt])
+  @@index([paymentId])
+  @@index([orgId, createdAt])
 }
 
 model OperationalActionExecution {
@@ -884,6 +907,7 @@ model WhatsAppMessage {
   customer     Customer?             @relation(fields: [customerId], references: [id], onDelete: Restrict)
   org          Organization          @relation(fields: [orgId], references: [id])
 
+  @@index([orgId, direction, createdAt])
   @@index([orgId, customerId, createdAt])
   @@index([orgId, conversationId, createdAt])
   @@index([orgId, status, createdAt])
@@ -943,17 +967,18 @@ model Plan {
 }
 
 model Subscription {
-  id                 String             @id @default(uuid())
-  orgId              String             @unique
-  planId             String
-  status             SubscriptionStatus @default(ACTIVE)
-  billingProvider    BillingProvider?
-  billingCustomerRef String?
-  billingExternalRef String?
-  currentPeriodStart DateTime
-  currentPeriodEnd   DateTime
-  canceledAt         DateTime?
-  createdAt          DateTime           @default(now())
+  id                     String             @id @default(uuid())
+  orgId                  String             @unique
+  planId                 String
+  status                 SubscriptionStatus @default(ACTIVE)
+  billingProvider        BillingProvider?
+  billingCustomerRef     String?
+  billingExternalRef     String?
+  billingProviderEventAt DateTime?
+  currentPeriodStart     DateTime
+  currentPeriodEnd       DateTime
+  canceledAt             DateTime?
+  createdAt              DateTime           @default(now())
 
   org    Organization   @relation(fields: [orgId], references: [id])
   plan   Plan           @relation(fields: [planId], references: [id])
