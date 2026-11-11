@@ -2760,7 +2760,7 @@ export default function WhatsAppPage() {
             <div
               className={cn(
                 "min-h-0 min-w-0 overflow-hidden md:block",
-                selectedConversationId ? "hidden" : "block"
+                selectedConversation ? "hidden" : "block"
               )}
             >
               <InboxQueueColumn
