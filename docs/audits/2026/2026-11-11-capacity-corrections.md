@@ -130,3 +130,11 @@ Estas correções não estabelecem capacidade máxima, RPS comercial ou SLA. Res
 O ensaio local de leituras simultâneas está em [script](capacity-fix-evidence/read-concurrency.cjs). É limitado, somente GET, aceita apenas loopback e exige confirmação de dataset isolado. Não cria ou apaga registros e não imprime o token. Deve ser distinguido de teste de carga em produção, pois a API local usa configuração de desenvolvimento.
 
 Antes de executar a API atualizada em outro ambiente, aplicar as duas migrations aditivas: o bucket compartilhado é uma dependência dos novos controles. Para uma tabela de Auditoria grande, planejar a criação do índice e acompanhar bloqueios; não foi feito deploy nesta entrega.
+
+## Acompanhamento da CI após o merge do PR #1040
+
+A [CI da main](https://github.com/machado470/NexoGestao/actions/runs/43050387581) falhou no teste canônico porque a execução cruzou as 15h40: o cron global de estado operacional avaliou as duas organizações e gerou um evento legítimo no fixture que deveria permanecer ocioso. Os logs registram `evaluated=2 changed=2` às 15:40:00.080, seguido da execução manual com `evaluated=1 changed=0`. Não foi um evento do fluxo principal gravado no tenant errado.
+
+O teste agora ativa `DISABLE_OPERATIONAL_STATE_SCHEDULE` somente durante sua aplicação, restaura o valor anterior no encerramento e exercita um tick determinístico para garantir que os fixtures permaneçam sob controle. A chamada HTTP manual e suas verificações de persistência/isolamento permanecem. Não se alterou o agendador, as políticas de produção ou a expectativa de isolamento.
+
+Validação local: 108 testes de integração passaram em 23 suítes, com 20 casos desabilitados por seus opt-ins; depois da inclusão do tick explícito, o teste canônico foi repetido e passou. `git diff --check` passou. Os workflows `api-docker` e `Production Compose validation` do merge também passaram. O workflow Pages teve build aprovado e falha 404 na publicação; a execução anterior igualmente falhava na etapa de deploy. A configuração de hospedagem não foi alterada.
