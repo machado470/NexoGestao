@@ -17,4 +17,3 @@
 
 > @nexogestao/api@0.1.0 typecheck /workspace/NexoGestao/apps/api
 > pnpm exec tsc -p tsconfig.json --noEmit
-

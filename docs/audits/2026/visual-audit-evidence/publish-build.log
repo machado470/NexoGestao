@@ -11,64 +11,64 @@
 @nexogestao/web:build: cache miss, executing e2f8cbd06c22b14e
 @nexogestao/api:build: cache miss, executing 15a44e899097ac35
 @nexogestao/common:build: cache hit, replaying logs 3890882923149490
-@nexogestao/common:build: 
+@nexogestao/common:build:
 @nexogestao/common:build: > @nexogestao/common@1.0.0 build /workspace/NexoGestao/packages/common
 @nexogestao/common:build: > tsc --build tsconfig.json
-@nexogestao/common:build: 
-@nexogestao/api:build: 
+@nexogestao/common:build:
+@nexogestao/api:build:
 @nexogestao/api:build: > @nexogestao/api@0.1.0 prebuild /workspace/NexoGestao/apps/api
 @nexogestao/api:build: > pnpm run prisma:generate && bash ../../check-types.sh
-@nexogestao/api:build: 
-@nexogestao/web:build: 
+@nexogestao/api:build:
+@nexogestao/web:build:
 @nexogestao/web:build: > @nexogestao/web@1.0.0 build /workspace/NexoGestao/apps/web
 @nexogestao/web:build: > vite build && esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist --define:process.env.NODE_ENV=\"production\"
-@nexogestao/web:build: 
+@nexogestao/web:build:
 @nexogestao/web:build: vite v7.3.7 building client environment for production...
-@nexogestao/api:build: 
+@nexogestao/api:build:
 @nexogestao/api:build: > @nexogestao/api@0.1.0 prisma:generate /workspace/NexoGestao/apps/api
 @nexogestao/api:build: > prisma generate --schema ../../prisma/schema.prisma
-@nexogestao/api:build: 
+@nexogestao/api:build:
 @nexogestao/web:build: transforming...
 @nexogestao/api:build: Prisma schema loaded from ../../prisma/schema.prisma
-@nexogestao/api:build: 
+@nexogestao/api:build:
 @nexogestao/api:build: ✔ Generated Prisma Client (v5.22.0) to ./../../node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0/node_modules/@prisma/client in 1.06s
-@nexogestao/api:build: 
+@nexogestao/api:build:
 @nexogestao/api:build: Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
-@nexogestao/api:build: 
+@nexogestao/api:build:
 @nexogestao/api:build: Tip: Want to react to database changes in your app as they happen? Discover how with Pulse: https://pris.ly/tip-1-pulse
-@nexogestao/api:build: 
+@nexogestao/api:build:
 @nexogestao/api:build: Prisma schema loaded from prisma/schema.prisma
 @nexogestao/web:build: ../../node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/regexes.js (74:0): A comment
-@nexogestao/web:build: 
+@nexogestao/web:build:
 @nexogestao/web:build: "/** Anchors a pattern source. The interpolation lives here rather than at the call site because
 @nexogestao/web:build:  * esbuild will not drop a `@__PURE__` call whose own argument interpolates a variable, but it
 @nexogestao/web:build:  * will drop `anchor(dateSource)`. Keeping it inline pinned `date` into every bundle. */"
-@nexogestao/web:build: 
+@nexogestao/web:build:
 @nexogestao/web:build: in "../../node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/regexes.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
 @nexogestao/web:build: ../../node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/util.js (400:0): A comment
-@nexogestao/web:build: 
+@nexogestao/web:build:
 @nexogestao/web:build: "// Wrapped in a `@__PURE__` IIFE: esbuild never tree-shakes a top-level initializer that contains a member access on `Number`, so the bare object literal survived into every bundle."
-@nexogestao/web:build: 
+@nexogestao/web:build:
 @nexogestao/web:build: in "../../node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/util.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
-@nexogestao/api:build: 
+@nexogestao/api:build:
 @nexogestao/api:build: ✔ Generated Prisma Client (v5.22.0) to ./node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0/node_modules/@prisma/client in 914ms
-@nexogestao/api:build: 
+@nexogestao/api:build:
 @nexogestao/api:build: Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
-@nexogestao/api:build: 
+@nexogestao/api:build:
 @nexogestao/api:build: Tip: Curious about the SQL queries Prisma ORM generates? Optimize helps you enhance your visibility: https://pris.ly/tip-2-optimize
-@nexogestao/api:build: 
-@nexogestao/api:build: 
+@nexogestao/api:build:
+@nexogestao/api:build:
 @nexogestao/api:build: > nexogestao@1.0.0 prepare:workspace /workspace/NexoGestao
 @nexogestao/api:build: > pnpm prepare:common
-@nexogestao/api:build: 
-@nexogestao/api:build: 
+@nexogestao/api:build:
+@nexogestao/api:build:
 @nexogestao/api:build: > nexogestao@1.0.0 prepare:common /workspace/NexoGestao
 @nexogestao/api:build: > pnpm --filter @nexogestao/common build
-@nexogestao/api:build: 
-@nexogestao/api:build: 
+@nexogestao/api:build:
+@nexogestao/api:build:
 @nexogestao/api:build: > @nexogestao/common@1.0.0 build /workspace/NexoGestao/packages/common
 @nexogestao/api:build: > tsc --build tsconfig.json
-@nexogestao/api:build: 
+@nexogestao/api:build:
 @nexogestao/web:build: ✓ 2019 modules transformed.
 @nexogestao/web:build: rendering chunks...
 @nexogestao/web:build: computing gzip size...
@@ -125,16 +125,15 @@
 @nexogestao/web:build: ../dist/public/assets/vendor-calendar-PotP2LMF.js              243.65 kB │ gzip: 70.99 kB
 @nexogestao/web:build: ../dist/public/assets/vendor-misc-DbRuqo4F.js                  277.94 kB │ gzip: 89.79 kB
 @nexogestao/web:build: ✓ built in 15.27s
-@nexogestao/web:build: 
+@nexogestao/web:build:
 @nexogestao/web:build:   dist/index.js  190.0kb
-@nexogestao/web:build: 
+@nexogestao/web:build:
 @nexogestao/web:build: ⚡ Done in 57ms
-@nexogestao/api:build: 
+@nexogestao/api:build:
 @nexogestao/api:build: > @nexogestao/api@0.1.0 build /workspace/NexoGestao/apps/api
 @nexogestao/api:build: > rm -rf dist && pnpm exec nest build
-@nexogestao/api:build: 
+@nexogestao/api:build:
 
  Tasks:    3 successful, 3 total
 Cached:    1 cached, 3 total
-  Time:    40.029s 
-
+  Time:    40.029s

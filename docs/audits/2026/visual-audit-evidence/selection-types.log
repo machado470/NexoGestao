@@ -1,4 +1,3 @@
 
 > @nexogestao/web@1.0.0 typecheck /workspace/NexoGestao/apps/web
 > tsc --noEmit
-

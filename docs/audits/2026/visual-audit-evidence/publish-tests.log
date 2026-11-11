@@ -10,14 +10,14 @@
 
 @nexogestao/web:test: cache miss, executing 476b685109f5d4b6
 @nexogestao/common:test: cache hit, replaying logs b0eadb70e383416d
-@nexogestao/common:test: 
+@nexogestao/common:test:
 @nexogestao/common:test: > @nexogestao/common@1.0.0 test /workspace/NexoGestao/packages/common
 @nexogestao/common:test: > pnpm build && node --test test/*.test.cjs
-@nexogestao/common:test: 
-@nexogestao/common:test: 
+@nexogestao/common:test:
+@nexogestao/common:test:
 @nexogestao/common:test: > @nexogestao/common@1.0.0 build /workspace/NexoGestao/packages/common
 @nexogestao/common:test: > tsc --build tsconfig.json
-@nexogestao/common:test: 
+@nexogestao/common:test:
 @nexogestao/common:test: ✔ builds canonical customer and service-order notification routes (0.893218ms)
 @nexogestao/common:test: ✔ rejects empty notification route identifiers (0.40685ms)
 @nexogestao/common:test: ✔ accepts only declared internal notification routes (0.480328ms)
@@ -31,26 +31,26 @@
 @nexogestao/common:test: ℹ todo 0
 @nexogestao/common:test: ℹ duration_ms 102.59059
 @nexogestao/api:test: cache hit, replaying logs 9b451fa1e91de836
-@nexogestao/api:test: 
+@nexogestao/api:test:
 @nexogestao/api:test: > @nexogestao/api@0.1.0 pretest /workspace/NexoGestao/apps/api
 @nexogestao/api:test: > pnpm --dir ../.. prepare:workspace
-@nexogestao/api:test: 
-@nexogestao/api:test: 
+@nexogestao/api:test:
+@nexogestao/api:test:
 @nexogestao/api:test: > nexogestao@1.0.0 prepare:workspace /workspace/NexoGestao
 @nexogestao/api:test: > pnpm prepare:common
-@nexogestao/api:test: 
-@nexogestao/api:test: 
+@nexogestao/api:test:
+@nexogestao/api:test:
 @nexogestao/api:test: > nexogestao@1.0.0 prepare:common /workspace/NexoGestao
 @nexogestao/api:test: > pnpm --filter @nexogestao/common build
-@nexogestao/api:test: 
-@nexogestao/api:test: 
+@nexogestao/api:test:
+@nexogestao/api:test:
 @nexogestao/api:test: > @nexogestao/common@1.0.0 build /workspace/NexoGestao/packages/common
 @nexogestao/api:test: > tsc --build tsconfig.json
-@nexogestao/api:test: 
-@nexogestao/api:test: 
+@nexogestao/api:test:
+@nexogestao/api:test:
 @nexogestao/api:test: > @nexogestao/api@0.1.0 test /workspace/NexoGestao/apps/api
 @nexogestao/api:test: > jest --config jest.config.js --runInBand
-@nexogestao/api:test: 
+@nexogestao/api:test:
 @nexogestao/api:test: PASS src/audit/audit-admin.service.spec.ts
 @nexogestao/api:test: PASS src/appointments/appointments.rate-limit.spec.ts
 @nexogestao/api:test: PASS src/common/architecture/app-bootstrap.spec.ts
@@ -281,17 +281,17 @@
 @nexogestao/api:test: PASS src/health/operational-monitoring.service.spec.ts
 @nexogestao/api:test: PASS src/people/operational-state.job.spec.ts
 @nexogestao/api:test:   ● Console
-@nexogestao/api:test: 
+@nexogestao/api:test:
 @nexogestao/api:test:     console.log
 @nexogestao/api:test:       [OperationalStateJob] evaluated=0 changed=0 at=2026-11-11T03:17:48.681Z
-@nexogestao/api:test: 
+@nexogestao/api:test:
 @nexogestao/api:test:       at OperationalStateJob.run (src/people/operational-state.job.ts:110:13)
-@nexogestao/api:test: 
+@nexogestao/api:test:
 @nexogestao/api:test:     console.log
 @nexogestao/api:test:       [OperationalStateJob] evaluated=1 changed=1 at=2026-11-11T03:17:48.683Z
-@nexogestao/api:test: 
+@nexogestao/api:test:
 @nexogestao/api:test:       at OperationalStateJob.run (src/people/operational-state.job.ts:110:13)
-@nexogestao/api:test: 
+@nexogestao/api:test:
 @nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:48 AM    WARN [WhatsAppProviderFactory] [BOOT][WhatsApp][dev-fallback] WHATSAPP_ALLOW_MOCK não definido; provider mock liberado somente porque NODE_ENV!=production
 @nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:48 AM    WARN [WhatsAppProviderFactory] [BOOT][WhatsApp][dev-fallback] WHATSAPP_ALLOW_MOCK não definido; provider mock liberado somente porque NODE_ENV!=production
 @nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:48 AM    WARN [WhatsAppProviderFactory] [BOOT][WhatsApp][dev-fallback] WHATSAPP_ALLOW_MOCK não definido; provider mock liberado somente porque NODE_ENV!=production
@@ -304,13 +304,13 @@
 @nexogestao/api:test: PASS src/billing/billing.plan-catalog.spec.ts
 @nexogestao/api:test: PASS src/people/operational-state.service.concurrency.spec.ts
 @nexogestao/api:test:   ● Console
-@nexogestao/api:test: 
+@nexogestao/api:test:
 @nexogestao/api:test:     console.log
 @nexogestao/api:test:       [OperationalStateJob] evaluated=1 changed=1 at=2026-11-11T03:17:49.081Z
-@nexogestao/api:test: 
+@nexogestao/api:test:
 @nexogestao/api:test:       at OperationalStateJob.run (src/people/operational-state.job.ts:110:13)
 @nexogestao/api:test:           at async Promise.all (index 1)
-@nexogestao/api:test: 
+@nexogestao/api:test:
 @nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:49 AM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
 @nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:49 AM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
 @nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:49 AM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
@@ -356,29 +356,29 @@
 @nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:49 AM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
 @nexogestao/api:test: PASS src/people/operational-state.job.concurrency.spec.ts
 @nexogestao/api:test:   ● Console
-@nexogestao/api:test: 
+@nexogestao/api:test:
 @nexogestao/api:test:     console.log
 @nexogestao/api:test:       [OperationalStateJob] evaluated=1 changed=0 at=2026-11-11T03:17:50.072Z
-@nexogestao/api:test: 
+@nexogestao/api:test:
 @nexogestao/api:test:       at OperationalStateJob.run (src/people/operational-state.job.ts:110:13)
 @nexogestao/api:test:           at async Promise.all (index 1)
-@nexogestao/api:test: 
+@nexogestao/api:test:
 @nexogestao/api:test:     console.log
 @nexogestao/api:test:       [OperationalStateJob] evaluated=1 changed=1 at=2026-11-11T03:17:50.073Z
-@nexogestao/api:test: 
+@nexogestao/api:test:
 @nexogestao/api:test:       at OperationalStateJob.run (src/people/operational-state.job.ts:110:13)
 @nexogestao/api:test:           at async Promise.all (index 0)
-@nexogestao/api:test: 
+@nexogestao/api:test:
 @nexogestao/api:test: PASS src/execution/execution.runner.concurrency.spec.ts
 @nexogestao/api:test: PASS src/risk/risk.service.operational-state.concurrency.spec.ts
 @nexogestao/api:test:   ● Console
-@nexogestao/api:test: 
+@nexogestao/api:test:
 @nexogestao/api:test:     console.log
 @nexogestao/api:test:       [OperationalStateJob] evaluated=1 changed=0 at=2026-11-11T03:17:50.221Z
-@nexogestao/api:test: 
+@nexogestao/api:test:
 @nexogestao/api:test:       at OperationalStateJob.run (src/people/operational-state.job.ts:110:13)
 @nexogestao/api:test:           at async Promise.all (index 1)
-@nexogestao/api:test: 
+@nexogestao/api:test:
 @nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:50 AM     LOG [ExecutionRunner] {"event":"execution_runner_executed","orgId":"org-1","actionId":"action-notify-operational-alert","entityType":"system","entityId":"system-concurrent-1","decisionId":"decision-concurrent-1","result":"success","executionKey":"exec_dio84p"}
 @nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:50 AM   DEBUG [ExecutionRunner] {"event":"execution_runner_blocked","orgId":"org-1","actionId":"action-notify-operational-alert","decisionId":"decision-concurrent-1","entityType":"system","entityId":"system-concurrent-1","reasonCode":"blocked_recent_execution","status":"blocked","executionKey":"exec_dio84p","suppressedCountFromPreviousWindow":0,"cooldownUntil":"2026-11-11T03:18:50.154Z","reasonDetail":"idempotency"}
 @nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:50 AM    WARN [AuthService] [OPTIONAL][integration-missing-config] RESEND_API_KEY ausente. Recuperação por e-mail ficará desabilitada.
@@ -499,19 +499,19 @@
 @nexogestao/api:test: PASS src/people/people-capacity-schema.spec.ts
 @nexogestao/api:test: PASS src/financial-boundaries.spec.ts
 @nexogestao/api:test: PASS src/common/operations/operational-result.spec.ts
-@nexogestao/api:test: 
+@nexogestao/api:test:
 @nexogestao/api:test: Test Suites: 28 skipped, 167 passed, 167 of 195 total
 @nexogestao/api:test: Tests:       98 skipped, 1137 passed, 1235 total
 @nexogestao/api:test: Snapshots:   0 total
 @nexogestao/api:test: Time:        24.319 s, estimated 54 s
 @nexogestao/api:test: Ran all test suites.
-@nexogestao/web:test: 
+@nexogestao/web:test:
 @nexogestao/web:test: > @nexogestao/web@1.0.0 test /workspace/NexoGestao/apps/web
 @nexogestao/web:test: > vitest run
-@nexogestao/web:test: 
-@nexogestao/web:test: 
+@nexogestao/web:test:
+@nexogestao/web:test:
 @nexogestao/web:test:  RUN  v4.1.12 /workspace/NexoGestao/apps/web
-@nexogestao/web:test: 
+@nexogestao/web:test:
 @nexogestao/web:test:  ✓ client/src/lib/local-date-time.test.ts (15 tests) 1600ms
 @nexogestao/web:test:  ✓ server/_core/notificationStream.test.ts (4 tests) 289ms
 @nexogestao/web:test:  ✓ server/phase2-finance-charges-list-contract.test.ts (10 tests) 141ms
@@ -520,7 +520,7 @@
 @nexogestao/web:test:  ✓ server/whatsapp.contract.test.ts (33 tests) 255ms
 @nexogestao/web:test: stdout | server/_core/oauth.security.test.ts > Google OAuth credential forwarding > forwards only the Google ID token, not an asserted email/profile
 @nexogestao/web:test: [auth.google] session token received
-@nexogestao/web:test: 
+@nexogestao/web:test:
 @nexogestao/web:test:  ✓ server/_core/oauth.security.test.ts (3 tests) 102ms
 @nexogestao/web:test:  ✓ server/bff-router-decomposition.test.ts (6 tests) 131ms
 @nexogestao/web:test:  ✓ server/phase2-customers-list-contract.test.ts (12 tests) 89ms
@@ -541,7 +541,7 @@
 @nexogestao/web:test:   },
 @nexogestao/web:test:   "ip": "::ffff:127.0.0.1"
 @nexogestao/web:test: }
-@nexogestao/web:test: 
+@nexogestao/web:test:
 @nexogestao/web:test: stderr | server/consent.route.test.ts > POST /api/consent > rejects invalid payload
 @nexogestao/web:test: [2026-11-11T03:21:24.223Z] [WARN] [Security] Invalid consent payload
 @nexogestao/web:test: {
@@ -558,7 +558,7 @@
 @nexogestao/web:test:     }
 @nexogestao/web:test:   ]
 @nexogestao/web:test: }
-@nexogestao/web:test: 
+@nexogestao/web:test:
 @nexogestao/web:test:  ✓ server/consent.route.test.ts (2 tests) 151ms
 @nexogestao/web:test:  ✓ client/src/pages/WhatsAppWebhookRecovery.test.tsx (8 tests) 21ms
 @nexogestao/web:test:  ✓ server/bff-api.contract.test.ts (9 tests) 38ms
@@ -573,13 +573,13 @@
 @nexogestao/web:test:   cooldownMs: 4000,
 @nexogestao/web:test:   suppressedCount: undefined
 @nexogestao/web:test: }
-@nexogestao/web:test: 
+@nexogestao/web:test:
 @nexogestao/web:test: stderr | server/auth.session-validation.test.ts > BFF validated session > /me indisponível não marca authenticated
 @nexogestao/web:test: [trpc/context] createContext refused token-only auth context { reason: 'unavailable', suppressedCount: undefined }
-@nexogestao/web:test: 
+@nexogestao/web:test:
 @nexogestao/web:test: stderr | server/auth.session-validation.test.ts > BFF validated session > establishSession retorna falha explícita e remove cookie quando /me falha
 @nexogestao/web:test: [auth.establishSession] sessão não validada por /me { reason: 'backend unavailable' }
-@nexogestao/web:test: 
+@nexogestao/web:test:
 @nexogestao/web:test:  ✓ server/auth.session-validation.test.ts (8 tests) 114ms
 @nexogestao/web:test:  ✓ client/src/components/AIChatBox.markdown-security.test.tsx (4 tests) 118ms
 @nexogestao/web:test:  ✓ client/src/Architecture.operational-guardrails.test.ts (15 tests) 124ms
@@ -601,58 +601,58 @@
 @nexogestao/web:test:  ✓ server/operational-notifications.integration.test.ts (4 tests) 16ms
 @nexogestao/web:test: stdout | server/security.test.ts > Security - Audit Logging > deve registrar ações de auditoria
 @nexogestao/web:test: [AUDIT] Deleted 0 logs older than 0 days
-@nexogestao/web:test: 
+@nexogestao/web:test:
 @nexogestao/web:test: stdout | server/security.test.ts > Security - Audit Logging > deve registrar ações de auditoria
 @nexogestao/web:test: [AUDIT] CREATE CUSTOMER #123 by user 1 from 127.0.0.1
-@nexogestao/web:test: 
+@nexogestao/web:test:
 @nexogestao/web:test: stdout | server/security.test.ts > Security - Audit Logging > deve detectar atividades suspeitas
 @nexogestao/web:test: [AUDIT] Deleted 1 logs older than 0 days
-@nexogestao/web:test: 
+@nexogestao/web:test:
 @nexogestao/web:test: stdout | server/security.test.ts > Security - Audit Logging > deve detectar atividades suspeitas
 @nexogestao/web:test: [AUDIT] DELETE CUSTOMER #0 by user 1 from 127.0.0.1
-@nexogestao/web:test: 
+@nexogestao/web:test:
 @nexogestao/web:test: stdout | server/security.test.ts > Security - Audit Logging > deve detectar atividades suspeitas
 @nexogestao/web:test: [AUDIT] DELETE CUSTOMER #1 by user 1 from 127.0.0.1
-@nexogestao/web:test: 
+@nexogestao/web:test:
 @nexogestao/web:test: stdout | server/security.test.ts > Security - Audit Logging > deve detectar atividades suspeitas
 @nexogestao/web:test: [AUDIT] DELETE CUSTOMER #2 by user 1 from 127.0.0.1
-@nexogestao/web:test: 
+@nexogestao/web:test:
 @nexogestao/web:test: stdout | server/security.test.ts > Security - Audit Logging > deve detectar atividades suspeitas
 @nexogestao/web:test: [AUDIT] DELETE CUSTOMER #3 by user 1 from 127.0.0.1
-@nexogestao/web:test: 
+@nexogestao/web:test:
 @nexogestao/web:test: stdout | server/security.test.ts > Security - Audit Logging > deve detectar atividades suspeitas
 @nexogestao/web:test: [AUDIT] DELETE CUSTOMER #4 by user 1 from 127.0.0.1
-@nexogestao/web:test: 
+@nexogestao/web:test:
 @nexogestao/web:test: stdout | server/security.test.ts > Security - Audit Logging > deve detectar atividades suspeitas
 @nexogestao/web:test: [AUDIT] DELETE CUSTOMER #5 by user 1 from 127.0.0.1
-@nexogestao/web:test: 
+@nexogestao/web:test:
 @nexogestao/web:test: stdout | server/security.test.ts > Security - Audit Logging > deve detectar atividades suspeitas
 @nexogestao/web:test: [AUDIT] DELETE CUSTOMER #6 by user 1 from 127.0.0.1
-@nexogestao/web:test: 
+@nexogestao/web:test:
 @nexogestao/web:test: stdout | server/security.test.ts > Security - Audit Logging > deve detectar atividades suspeitas
 @nexogestao/web:test: [AUDIT] DELETE CUSTOMER #7 by user 1 from 127.0.0.1
-@nexogestao/web:test: 
+@nexogestao/web:test:
 @nexogestao/web:test: stdout | server/security.test.ts > Security - Audit Logging > deve detectar atividades suspeitas
 @nexogestao/web:test: [AUDIT] DELETE CUSTOMER #8 by user 1 from 127.0.0.1
-@nexogestao/web:test: 
+@nexogestao/web:test:
 @nexogestao/web:test: stdout | server/security.test.ts > Security - Audit Logging > deve detectar atividades suspeitas
 @nexogestao/web:test: [AUDIT] DELETE CUSTOMER #9 by user 1 from 127.0.0.1
-@nexogestao/web:test: 
+@nexogestao/web:test:
 @nexogestao/web:test: stdout | server/security.test.ts > Security - Audit Logging > deve detectar atividades suspeitas
 @nexogestao/web:test: [AUDIT] DELETE CUSTOMER #10 by user 1 from 127.0.0.1
-@nexogestao/web:test: 
+@nexogestao/web:test:
 @nexogestao/web:test: stdout | server/security.test.ts > Security - Audit Logging > deve detectar atividades suspeitas
 @nexogestao/web:test: [AUDIT] DELETE CUSTOMER #11 by user 1 from 127.0.0.1
-@nexogestao/web:test: 
+@nexogestao/web:test:
 @nexogestao/web:test: stdout | server/security.test.ts > Security - Audit Logging > deve detectar atividades suspeitas
 @nexogestao/web:test: [AUDIT] DELETE CUSTOMER #12 by user 1 from 127.0.0.1
-@nexogestao/web:test: 
+@nexogestao/web:test:
 @nexogestao/web:test: stdout | server/security.test.ts > Security - Audit Logging > deve detectar atividades suspeitas
 @nexogestao/web:test: [AUDIT] DELETE CUSTOMER #13 by user 1 from 127.0.0.1
-@nexogestao/web:test: 
+@nexogestao/web:test:
 @nexogestao/web:test: stdout | server/security.test.ts > Security - Audit Logging > deve detectar atividades suspeitas
 @nexogestao/web:test: [AUDIT] DELETE CUSTOMER #14 by user 1 from 127.0.0.1
-@nexogestao/web:test: 
+@nexogestao/web:test:
 @nexogestao/web:test:  ✓ server/security.test.ts (17 tests) 16ms
 @nexogestao/web:test:  ✓ server/invites.lifecycle.test.ts (6 tests) 17ms
 @nexogestao/web:test:  ✓ server/_core/hardening.test.ts (2 tests) 18ms
@@ -666,7 +666,7 @@
 @nexogestao/web:test:  ✓ client/src/pages/BillingPage.contract.test.ts (10 tests) 7ms
 @nexogestao/web:test: stderr | client/src/components/ConsentBanner.test.ts > ConsentBanner > falha ao salvar quando backend responde erro
 @nexogestao/web:test: Falha ao registrar consentimento (status 500) { prefs: { marketing: true, analytics: true, cookies: true } }
-@nexogestao/web:test: 
+@nexogestao/web:test:
 @nexogestao/web:test: stderr | client/src/components/ConsentBanner.test.ts > ConsentBanner > não fecha indevidamente em erro de rede
 @nexogestao/web:test: Erro ao registrar consentimento. Error: network down
 @nexogestao/web:test:     at /workspace/NexoGestao/apps/web/client/src/components/ConsentBanner.test.ts:55:15
@@ -679,7 +679,7 @@
 @nexogestao/web:test:     at new Promise (<anonymous>)
 @nexogestao/web:test:     at runWithCancel (file:///workspace/NexoGestao/node_modules/.pnpm/@vitest+runner@4.1.12/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
 @nexogestao/web:test:     at file:///workspace/NexoGestao/node_modules/.pnpm/@vitest+runner@4.1.12/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
-@nexogestao/web:test: 
+@nexogestao/web:test:
 @nexogestao/web:test:  ✓ client/src/components/ConsentBanner.test.ts (3 tests) 9ms
 @nexogestao/web:test:  ✓ client/src/pages/CalendarPage.contract.test.ts (9 tests) 6ms
 @nexogestao/web:test:  ✓ client/src/pages/ProfilePage.contract.test.ts (7 tests) 5ms
@@ -727,14 +727,13 @@
 @nexogestao/web:test:  ✓ client/src/lib/concurrency.test.ts (2 tests) 4ms
 @nexogestao/web:test:  ✓ server/auth.logout.test.ts (1 test) 3ms
 @nexogestao/web:test:  ✓ server/modals.test.ts (1 test) 2ms
-@nexogestao/web:test: 
+@nexogestao/web:test:
 @nexogestao/web:test:  Test Files  98 passed (98)
 @nexogestao/web:test:       Tests  792 passed (792)
 @nexogestao/web:test:    Start at  03:21:09
 @nexogestao/web:test:    Duration  45.29s (transform 5.07s, setup 0ms, import 18.76s, tests 5.46s, environment 11ms)
-@nexogestao/web:test: 
+@nexogestao/web:test:
 
  Tasks:    3 successful, 3 total
 Cached:    2 cached, 3 total
-  Time:    46.452s 
-
+  Time:    46.452s
