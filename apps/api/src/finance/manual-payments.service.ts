@@ -22,7 +22,7 @@ export class ManualPaymentsService {
       )
     }
 
-    const payLimit = this.tenantOps.enforceLimit({
+    const payLimit = await this.tenantOps.enforceLimit({
       orgId,
       scope: 'finance:pay-charge',
       limit: 30,

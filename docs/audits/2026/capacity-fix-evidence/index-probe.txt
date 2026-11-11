@@ -1,0 +1,51 @@
+BEGIN
+CREATE TABLE
+INSERT 0 100000
+ANALYZE
+                                                                                QUERY PLAN
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=1529.26..1529.31 rows=20 width=21) (actual time=5.853..5.856 rows=25 loops=1)
+   Buffers: local hit=98 read=1081 written=300
+   ->  Sort  (cost=1529.26..1529.31 rows=20 width=21) (actual time=5.851..5.853 rows=25 loops=1)
+         Sort Key: "createdAt" DESC
+         Sort Method: top-N heapsort  Memory: 28kB
+         Buffers: local hit=98 read=1081 written=300
+         ->  Bitmap Heap Scan on capacity_audit_events  (cost=240.22..1528.83 rows=20 width=21) (actual time=0.748..5.798 rows=200 loops=1)
+               Recheck Cond: ("orgId" = 'org-1'::text)
+               Filter: ("actorPersonId" = 'actor-11'::text)
+               Rows Removed by Filter: 9800
+               Heap Blocks: exact=1137
+               Buffers: local hit=98 read=1081 written=300
+               ->  Bitmap Index Scan on "capacity_audit_events_orgId_createdAt_idx"  (cost=0.00..240.22 rows=10107 width=0) (actual time=0.619..0.619 rows=10000 loops=1)
+                     Index Cond: ("orgId" = 'org-1'::text)
+                     Buffers: local hit=8 read=34
+ Planning:
+   Buffers: shared hit=36 read=2, local read=5
+ Planning Time: 0.455 ms
+ Execution Time: 5.953 ms
+(19 rows)
+
+CREATE INDEX
+ANALYZE
+                                                                   QUERY PLAN
+------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=77.40..77.45 rows=20 width=21) (actual time=0.350..0.353 rows=25 loops=1)
+   Buffers: local hit=174 read=30
+   ->  Sort  (cost=77.40..77.45 rows=20 width=21) (actual time=0.348..0.349 rows=25 loops=1)
+         Sort Key: "createdAt" DESC
+         Sort Method: top-N heapsort  Memory: 28kB
+         Buffers: local hit=174 read=30
+         ->  Bitmap Heap Scan on capacity_audit_events  (cost=4.62..76.96 rows=20 width=21) (actual time=0.074..0.307 rows=200 loops=1)
+               Recheck Cond: (("orgId" = 'org-1'::text) AND ("actorPersonId" = 'actor-11'::text))
+               Heap Blocks: exact=200
+               Buffers: local hit=174 read=30
+               ->  Bitmap Index Scan on capacity_audit_actor_idx  (cost=0.00..4.62 rows=20 width=0) (actual time=0.051..0.052 rows=200 loops=1)
+                     Index Cond: (("orgId" = 'org-1'::text) AND ("actorPersonId" = 'actor-11'::text))
+                     Buffers: local read=4
+ Planning:
+   Buffers: shared hit=15, local read=1
+ Planning Time: 0.216 ms
+ Execution Time: 0.395 ms
+(17 rows)
+
+ROLLBACK

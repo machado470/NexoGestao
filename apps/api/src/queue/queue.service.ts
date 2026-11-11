@@ -1,5 +1,7 @@
 import {
+  HttpException,
   Inject,
+  Optional,
   Injectable,
   Logger,
   OnModuleDestroy,
@@ -8,8 +10,9 @@ import {
 } from '@nestjs/common'
 import { Job, JobsOptions, JobScheduler, Queue, QueueOptions, QueueEvents } from 'bullmq'
 import IORedis from 'ioredis'
+import { TenantOperationsService } from '../common/tenant-ops/tenant-ops.service'
 import { PrismaService } from '../prisma/prisma.service'
-import { QUEUE_CONNECTION, QUEUE_DEFAULT_JOB_OPTIONS, QUEUE_NAMES, QueueName } from './queue.constants'
+import { QUEUE_CONNECTION, QUEUE_DEFAULT_JOB_OPTIONS, QUEUE_NAMES, WHATSAPP_QUEUE_JOB_NAMES, QueueName } from './queue.constants'
 import { QueueObservabilityService } from '../common/metrics/queue-observability.service'
 import { RequestContextService } from '../common/context/request-context.service'
 import { sanitizeTracingId } from '../common/context/request-tracing.util'
@@ -33,6 +36,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     private readonly prisma: PrismaService,
     private readonly queueMetrics: QueueObservabilityService,
     private readonly requestContext: RequestContextService,
+    @Optional() private readonly tenantOps?: TenantOperationsService,
   ) {}
 
   private withRequestTracing<T>(payload: T): T {
@@ -243,11 +247,24 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     return queue
   }
 
+  async reserveWhatsAppAdmission(orgId: string): Promise<void> {
+    if (!(await this.ensureEnabled())) throw new ServiceUnavailableException('Fila indisponível: Redis não conectado')
+    if (!this.tenantOps) {
+      if (process.env.NODE_ENV === 'production') throw new ServiceUnavailableException('Orçamento compartilhado indisponível')
+      return
+    }
+    const configured = Number(process.env.WHATSAPP_TENANT_ENQUEUE_PER_MINUTE ?? 60)
+    const limit = Number.isSafeInteger(configured) && configured > 0 ? Math.min(configured, 600) : 60
+    const budget = await this.tenantOps.enforceLimit({ orgId, scope: 'whatsapp:enqueue', limit, windowMs: 60_000, blockedReason: 'tenant_queue_admission_limit' })
+    if (!budget.allowed) throw new HttpException({ message: 'Limite temporário de mensagens desta organização. Tente novamente em até um minuto.', code: 'TENANT_QUEUE_ADMISSION_LIMIT', retryAfterSeconds: 60 }, 429)
+  }
+
   async addJob<T = Record<string, any>>(
     queueName: QueueName,
     name: string,
     payload: T,
     options?: JobsOptions,
+    admissionReserved = false,
   ): Promise<Job<T>> {
     if (!(await this.ensureEnabled())) {
       const message =
@@ -264,6 +281,12 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
 
     try {
       const payloadWithTracing = this.withRequestTracing(payload)
+      if (!admissionReserved && queueName === QUEUE_NAMES.WHATSAPP && name === WHATSAPP_QUEUE_JOB_NAMES.DISPATCH_MESSAGE && this.tenantOps && (payloadWithTracing as any)?.orgId) {
+        // Idempotent re-enqueues must not consume another admission slot.
+        const existing = options?.jobId ? await queue.getJob(options.jobId) : undefined
+        if (existing) return existing as Job<T>
+        await this.reserveWhatsAppAdmission((payloadWithTracing as any).orgId)
+      }
       job = await queue.add(name, payloadWithTracing, {
         ...QUEUE_DEFAULT_JOB_OPTIONS,
         ...options,

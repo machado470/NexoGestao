@@ -1,0 +1,6 @@
+
+Test Suites: 4 passed, 4 total
+Tests:       16 passed, 16 total
+Snapshots:   0 total
+Time:        23.166 s
+Ran all test suites matching test/integration/canonical-operational-workflow.spec.ts|test/integration/assignee-privacy-postgres.integration.spec.ts|test/integration/finance-timezone-postgres.integration.spec.ts|test/integration/finance-worker-redis.integration.spec.ts.

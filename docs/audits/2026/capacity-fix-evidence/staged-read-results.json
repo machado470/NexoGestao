@@ -1,0 +1,688 @@
+{
+  "kind": "bounded local staged read rehearsal",
+  "environment": "development API, one organization, one process, warm database; not production capacity",
+  "stages": [
+    {
+      "name": "baseline",
+      "clients": 5,
+      "seconds": 15,
+      "durationMs": 15076,
+      "requests": 601,
+      "observedRps": 39.86,
+      "statusCounts": {
+        "200": 601
+      },
+      "p95SuccessMs": 87.41,
+      "routes": [
+        {
+          "route": "customers",
+          "successful": 121,
+          "p50Ms": 7.15,
+          "p95Ms": 14.6,
+          "p99Ms": 36.1,
+          "maxBytes": 2413
+        },
+        {
+          "route": "appointments",
+          "successful": 120,
+          "p50Ms": 9.45,
+          "p95Ms": 19.15,
+          "p99Ms": 23.02,
+          "maxBytes": 5111
+        },
+        {
+          "route": "service-orders",
+          "successful": 121,
+          "p50Ms": 11.42,
+          "p95Ms": 23.7,
+          "p99Ms": 27.75,
+          "maxBytes": 9515
+        },
+        {
+          "route": "whatsapp/conversations",
+          "successful": 119,
+          "p50Ms": 12.13,
+          "p95Ms": 22.21,
+          "p99Ms": 40.83,
+          "maxBytes": 27258
+        },
+        {
+          "route": "customers/operational-summary/page",
+          "successful": 120,
+          "p50Ms": 76.62,
+          "p95Ms": 103.86,
+          "p99Ms": 141.05,
+          "maxBytes": 10784
+        }
+      ]
+    },
+    {
+      "name": "ramp",
+      "clients": 10,
+      "seconds": 30,
+      "durationMs": 30080,
+      "requests": 2281,
+      "observedRps": 75.83,
+      "statusCounts": {
+        "200": 2281
+      },
+      "p95SuccessMs": 120.23,
+      "routes": [
+        {
+          "route": "customers",
+          "successful": 457,
+          "p50Ms": 8.19,
+          "p95Ms": 24.56,
+          "p99Ms": 36.67,
+          "maxBytes": 2413
+        },
+        {
+          "route": "appointments",
+          "successful": 454,
+          "p50Ms": 9.65,
+          "p95Ms": 24.67,
+          "p99Ms": 34.37,
+          "maxBytes": 5111
+        },
+        {
+          "route": "service-orders",
+          "successful": 456,
+          "p50Ms": 11.89,
+          "p95Ms": 29.45,
+          "p99Ms": 43.21,
+          "maxBytes": 9515
+        },
+        {
+          "route": "whatsapp/conversations",
+          "successful": 458,
+          "p50Ms": 15.2,
+          "p95Ms": 36.25,
+          "p99Ms": 53.63,
+          "maxBytes": 27258
+        },
+        {
+          "route": "customers/operational-summary/page",
+          "successful": 456,
+          "p50Ms": 99,
+          "p95Ms": 160.57,
+          "p99Ms": 195.37,
+          "maxBytes": 10784
+        }
+      ]
+    },
+    {
+      "name": "peak",
+      "clients": 20,
+      "seconds": 45,
+      "durationMs": 45188,
+      "requests": 4978,
+      "observedRps": 110.16,
+      "statusCounts": {
+        "200": 4978
+      },
+      "p95SuccessMs": 319.18,
+      "routes": [
+        {
+          "route": "customers",
+          "successful": 993,
+          "p50Ms": 24.16,
+          "p95Ms": 67.99,
+          "p99Ms": 84.81,
+          "maxBytes": 2413
+        },
+        {
+          "route": "appointments",
+          "successful": 993,
+          "p50Ms": 27.45,
+          "p95Ms": 71.64,
+          "p99Ms": 98.99,
+          "maxBytes": 5111
+        },
+        {
+          "route": "service-orders",
+          "successful": 995,
+          "p50Ms": 34.43,
+          "p95Ms": 91.56,
+          "p99Ms": 110.18,
+          "maxBytes": 9515
+        },
+        {
+          "route": "whatsapp/conversations",
+          "successful": 997,
+          "p50Ms": 38.17,
+          "p95Ms": 96.07,
+          "p99Ms": 115.68,
+          "maxBytes": 27258
+        },
+        {
+          "route": "customers/operational-summary/page",
+          "successful": 1000,
+          "p50Ms": 242.11,
+          "p95Ms": 428.26,
+          "p99Ms": 520.64,
+          "maxBytes": 10784
+        }
+      ]
+    },
+    {
+      "name": "recovery",
+      "clients": 5,
+      "seconds": 20,
+      "durationMs": 20145,
+      "requests": 816,
+      "observedRps": 40.51,
+      "statusCounts": {
+        "200": 816
+      },
+      "p95SuccessMs": 74.65,
+      "routes": [
+        {
+          "route": "customers",
+          "successful": 162,
+          "p50Ms": 7.12,
+          "p95Ms": 16.17,
+          "p99Ms": 56.61,
+          "maxBytes": 2413
+        },
+        {
+          "route": "appointments",
+          "successful": 163,
+          "p50Ms": 8.48,
+          "p95Ms": 24.98,
+          "p99Ms": 69.88,
+          "maxBytes": 5111
+        },
+        {
+          "route": "service-orders",
+          "successful": 164,
+          "p50Ms": 10.2,
+          "p95Ms": 25.01,
+          "p99Ms": 66.4,
+          "maxBytes": 9515
+        },
+        {
+          "route": "whatsapp/conversations",
+          "successful": 164,
+          "p50Ms": 11.51,
+          "p95Ms": 29.37,
+          "p99Ms": 57.04,
+          "maxBytes": 27258
+        },
+        {
+          "route": "customers/operational-summary/page",
+          "successful": 163,
+          "p50Ms": 63.93,
+          "p95Ms": 111.54,
+          "p99Ms": 162.59,
+          "maxBytes": 10784
+        }
+      ]
+    }
+  ],
+  "memory": [
+    {
+      "stage": "baseline",
+      "rssMiB": 205.8
+    },
+    {
+      "stage": "baseline",
+      "rssMiB": 234.99
+    },
+    {
+      "stage": "baseline",
+      "rssMiB": 257.96
+    },
+    {
+      "stage": "baseline",
+      "rssMiB": 259.97
+    },
+    {
+      "stage": "baseline",
+      "rssMiB": 261.02
+    },
+    {
+      "stage": "baseline",
+      "rssMiB": 261.59
+    },
+    {
+      "stage": "baseline",
+      "rssMiB": 263.06
+    },
+    {
+      "stage": "baseline",
+      "rssMiB": 263.42
+    },
+    {
+      "stage": "baseline",
+      "rssMiB": 264.06
+    },
+    {
+      "stage": "baseline",
+      "rssMiB": 264.92
+    },
+    {
+      "stage": "baseline",
+      "rssMiB": 270.14
+    },
+    {
+      "stage": "baseline",
+      "rssMiB": 262.05
+    },
+    {
+      "stage": "baseline",
+      "rssMiB": 265.68
+    },
+    {
+      "stage": "baseline",
+      "rssMiB": 265.2
+    },
+    {
+      "stage": "baseline",
+      "rssMiB": 268.08
+    },
+    {
+      "stage": "baseline",
+      "rssMiB": 268.3
+    },
+    {
+      "stage": "ramp",
+      "rssMiB": 268.3
+    },
+    {
+      "stage": "ramp",
+      "rssMiB": 271.56
+    },
+    {
+      "stage": "ramp",
+      "rssMiB": 273.47
+    },
+    {
+      "stage": "ramp",
+      "rssMiB": 274.89
+    },
+    {
+      "stage": "ramp",
+      "rssMiB": 276.61
+    },
+    {
+      "stage": "ramp",
+      "rssMiB": 278.65
+    },
+    {
+      "stage": "ramp",
+      "rssMiB": 279.17
+    },
+    {
+      "stage": "ramp",
+      "rssMiB": 280.27
+    },
+    {
+      "stage": "ramp",
+      "rssMiB": 283.66
+    },
+    {
+      "stage": "ramp",
+      "rssMiB": 283.88
+    },
+    {
+      "stage": "ramp",
+      "rssMiB": 287.12
+    },
+    {
+      "stage": "ramp",
+      "rssMiB": 287.62
+    },
+    {
+      "stage": "ramp",
+      "rssMiB": 289.79
+    },
+    {
+      "stage": "ramp",
+      "rssMiB": 288.47
+    },
+    {
+      "stage": "ramp",
+      "rssMiB": 291.32
+    },
+    {
+      "stage": "ramp",
+      "rssMiB": 292.13
+    },
+    {
+      "stage": "ramp",
+      "rssMiB": 292.8
+    },
+    {
+      "stage": "ramp",
+      "rssMiB": 293.87
+    },
+    {
+      "stage": "ramp",
+      "rssMiB": 295.98
+    },
+    {
+      "stage": "ramp",
+      "rssMiB": 296.54
+    },
+    {
+      "stage": "ramp",
+      "rssMiB": 298.12
+    },
+    {
+      "stage": "ramp",
+      "rssMiB": 299.34
+    },
+    {
+      "stage": "ramp",
+      "rssMiB": 303.25
+    },
+    {
+      "stage": "ramp",
+      "rssMiB": 301.73
+    },
+    {
+      "stage": "ramp",
+      "rssMiB": 305.25
+    },
+    {
+      "stage": "ramp",
+      "rssMiB": 305.52
+    },
+    {
+      "stage": "ramp",
+      "rssMiB": 305.02
+    },
+    {
+      "stage": "ramp",
+      "rssMiB": 306.41
+    },
+    {
+      "stage": "ramp",
+      "rssMiB": 311.12
+    },
+    {
+      "stage": "ramp",
+      "rssMiB": 312.43
+    },
+    {
+      "stage": "ramp",
+      "rssMiB": 314.22
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 314.22
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 314.83
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 315.92
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 318.65
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 320.47
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 321.58
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 322.78
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 328.95
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 327.4
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 330.69
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 332.54
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 334.84
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 336.14
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 338.92
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 340.59
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 341.66
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 345.23
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 346.61
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 348.4
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 351.54
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 351.92
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 352.91
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 354.05
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 356.83
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 360.57
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 360.5
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 361.79
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 367.08
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 367.27
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 369.61
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 371.63
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 374.33
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 375.52
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 375.42
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 376.6
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 379.71
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 382.51
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 382.31
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 383.65
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 388.65
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 389.61
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 391.71
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 392.48
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 392.27
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 396.25
+    },
+    {
+      "stage": "peak",
+      "rssMiB": 396.97
+    },
+    {
+      "stage": "recovery",
+      "rssMiB": 398.63
+    },
+    {
+      "stage": "recovery",
+      "rssMiB": 399.13
+    },
+    {
+      "stage": "recovery",
+      "rssMiB": 399.67
+    },
+    {
+      "stage": "recovery",
+      "rssMiB": 400.26
+    },
+    {
+      "stage": "recovery",
+      "rssMiB": 401.41
+    },
+    {
+      "stage": "recovery",
+      "rssMiB": 184.39
+    },
+    {
+      "stage": "recovery",
+      "rssMiB": 184.25
+    },
+    {
+      "stage": "recovery",
+      "rssMiB": 184.7
+    },
+    {
+      "stage": "recovery",
+      "rssMiB": 189.68
+    },
+    {
+      "stage": "recovery",
+      "rssMiB": 196.64
+    },
+    {
+      "stage": "recovery",
+      "rssMiB": 197.9
+    },
+    {
+      "stage": "recovery",
+      "rssMiB": 197.57
+    },
+    {
+      "stage": "recovery",
+      "rssMiB": 198.89
+    },
+    {
+      "stage": "recovery",
+      "rssMiB": 197.42
+    },
+    {
+      "stage": "recovery",
+      "rssMiB": 197.95
+    },
+    {
+      "stage": "recovery",
+      "rssMiB": 198.56
+    },
+    {
+      "stage": "recovery",
+      "rssMiB": 200.1
+    },
+    {
+      "stage": "recovery",
+      "rssMiB": 200.82
+    },
+    {
+      "stage": "recovery",
+      "rssMiB": 201.32
+    },
+    {
+      "stage": "recovery",
+      "rssMiB": 226.32
+    },
+    {
+      "stage": "recovery",
+      "rssMiB": 227.41
+    }
+  ],
+  "unexpectedErrors": 0,
+  "pass": true,
+  "runtime": {
+    "node": "v24.22.1",
+    "workspaceCgroupCpuQuotaCores": 2,
+    "workspaceCgroupMemoryGiB": 8,
+    "note": "Quota shared by test driver, API and local infrastructure; not dedicated API hardware"
+  }
+}

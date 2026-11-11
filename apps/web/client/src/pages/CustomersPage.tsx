@@ -1,3 +1,4 @@
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
@@ -465,21 +466,23 @@ export default function CustomersPage() {
   const [showInlineCharges, setShowInlineCharges] = useState(false);
   const timelineAnchorRef = useRef<HTMLDivElement | null>(null);
 
-  const customersQuery = trpc.customers.list.useQuery(
-    { page: 1, limit: 300 },
+  const debouncedSearch = useDebouncedValue(searchTerm);
+
+  const customersQuery = trpc.customers.page.useQuery(
+    { page: currentPage, focusId: currentPage === 1 && !searchTerm && activeFilter === "all" && priorityFilter === "all" && riskFilter === "all" ? new URLSearchParams(routeSearch).get("customerId") || undefined : undefined, limit: pageSize, search: debouncedSearch || undefined, active: activeFilter === "all" ? undefined : activeFilter, priority: priorityFilter === "all" ? undefined : priorityFilter, riskState: riskFilter === "all" ? undefined : riskFilter },
     { enabled: isAuthenticated, retry: false }
   );
   const customersOperationalSummaryQuery =
-    trpc.customers.operationalSummary.useQuery(undefined, {
-      enabled: isAuthenticated,
+    trpc.customers.operationalSummaryPage.useQuery({ customerIds: customersQuery.data?.items.map(customer => customer.id) ?? [] }, {
+      enabled: isAuthenticated && Boolean(customersQuery.data),
       retry: false,
     });
-  const appointmentsQuery = trpc.appointments.list.useQuery(
-    { page: 1, limit: 500 },
+  const appointmentsQuery = trpc.appointments.page.useQuery(
+    { page: 1, limit: 200 },
     { enabled: isAuthenticated, retry: false }
   );
-  const serviceOrdersQuery = trpc.serviceOrders.list.useQuery(
-    { page: 1, limit: 500 },
+  const serviceOrdersQuery = trpc.serviceOrders.page.useQuery(
+    { page: 1, limit: 100 },
     { enabled: isAuthenticated, retry: false }
   );
   const chargesQuery = trpc.finance.charges.list.useQuery(
@@ -494,15 +497,15 @@ export default function CustomersPage() {
   const [isRefreshingWorkspace, setIsRefreshingWorkspace] = useState(false);
 
   const customers = useMemo(
-    () => normalizeArrayPayload<Customer>(customersQuery.data),
+    () => normalizeArrayPayload<Customer>(customersQuery.data?.items),
     [customersQuery.data]
   );
   const appointments = useMemo(
-    () => normalizeArrayPayload<Appointment>(appointmentsQuery.data),
+    () => normalizeArrayPayload<Appointment>(appointmentsQuery.data?.items),
     [appointmentsQuery.data]
   );
   const serviceOrders = useMemo(
-    () => normalizeArrayPayload<ServiceOrder>(serviceOrdersQuery.data),
+    () => normalizeArrayPayload<ServiceOrder>(serviceOrdersQuery.data?.items),
     [serviceOrdersQuery.data]
   );
   const charges = useMemo(
@@ -615,13 +618,10 @@ export default function CustomersPage() {
   const hasIncompleteOperationalData =
     customers.length > 0 &&
     (unavailableAuxiliaryData.length > 0 || pendingAuxiliaryData.length > 0);
-  const isChargesUnavailable = !canReadFinance || Boolean(chargesQuery.error);
-  const isServiceOrdersUnavailable = Boolean(serviceOrdersQuery.error);
-  const isAppointmentsUnavailable = Boolean(appointmentsQuery.error);
-  const paginatedProfiles = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredProfiles.slice(start, start + pageSize);
-  }, [currentPage, filteredProfiles]);
+  const isChargesUnavailable = !canReadFinance || Boolean(chargesQuery.error) || (chargesQuery.data?.pagination.total ?? 0) > charges.length;
+  const isServiceOrdersUnavailable = Boolean(serviceOrdersQuery.error) || (serviceOrdersQuery.data?.meta.total ?? 0) > serviceOrders.length;
+  const isAppointmentsUnavailable = Boolean(appointmentsQuery.error) || (appointmentsQuery.data?.meta.total ?? 0) > appointments.length;
+  const paginatedProfiles = filteredProfiles;
 
   const selectedProfile = filteredProfiles.find(
     profile => profile.customerId === activeCustomerId
@@ -771,10 +771,14 @@ export default function CustomersPage() {
       const includeTimeline = options?.includeTimeline ?? false;
       const operations: Promise<unknown>[] = [
         trpcUtils.customers.list.invalidate(),
+      trpcUtils.customers.page.invalidate(),
         trpcUtils.customers.operationalSummary.invalidate(),
+        trpcUtils.customers.operationalSummaryPage.invalidate(),
         trpcUtils.customers.workspace.invalidate({ id: customerId }),
         trpcUtils.appointments.list.invalidate(),
+      trpcUtils.appointments.page.invalidate(),
         trpcUtils.serviceOrders.list.invalidate(),
+      trpcUtils.serviceOrders.page.invalidate(),
         trpcUtils.finance.charges.list.invalidate(),
       ];
       if (includeTimeline) {
@@ -812,12 +816,15 @@ export default function CustomersPage() {
       };
 
       safePush(trpcUtils.customers.list.invalidate());
+      safePush(trpcUtils.customers.page.invalidate());
       safePush(trpcUtils.customers.operationalSummary.invalidate());
+      safePush(trpcUtils.customers.operationalSummaryPage.invalidate());
       safePush(trpcUtils.customers.workspace.invalidate({ id: customerId }));
 
       switch (eventType) {
         case "CUSTOMER_APPOINTMENT_CREATED":
           safePush(trpcUtils.appointments.list.invalidate());
+      safePush(trpcUtils.appointments.page.invalidate());
           safePush(dashboardUtils?.kpis?.invalidate?.());
           safePush(dashboardUtils?.alerts?.invalidate?.());
           safePush(timelineUtils?.listByCustomer?.invalidate?.({ customerId }));
@@ -825,7 +832,9 @@ export default function CustomersPage() {
           break;
         case "CUSTOMER_SERVICE_ORDER_CREATED":
           safePush(trpcUtils.serviceOrders.list.invalidate());
+      safePush(trpcUtils.serviceOrders.page.invalidate());
           safePush(trpcUtils.appointments.list.invalidate());
+      safePush(trpcUtils.appointments.page.invalidate());
           safePush(dashboardUtils?.kpis?.invalidate?.());
           safePush(dashboardUtils?.alerts?.invalidate?.());
           safePush(timelineUtils?.listByCustomer?.invalidate?.({ customerId }));
@@ -870,17 +879,21 @@ export default function CustomersPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeFilter, searchTerm]);
+  }, [activeFilter, searchTerm, priorityFilter, riskFilter]);
+
+  useEffect(() => { setCurrentPage(1); }, [routeSearch]);
 
   useEffect(() => {
+    if (!customersQuery.data) return;
+    if (customersQuery.data.meta.page !== currentPage) { setCurrentPage(customersQuery.data.meta.page); return; }
     const totalPages = Math.max(
       1,
-      Math.ceil(filteredProfiles.length / pageSize)
+      Math.ceil((customersQuery.data?.meta.total ?? 0) / pageSize)
     );
     if (currentPage > totalPages) {
       setCurrentPage(1);
     }
-  }, [currentPage, filteredProfiles.length]);
+  }, [currentPage, customersQuery.data?.meta.total]);
 
   usePageDiagnostics({
     page: "customers",
@@ -968,7 +981,7 @@ export default function CustomersPage() {
           <>
             {portfolioOperationalStatusBadge}
             <AppStatusBadge
-              label={`${customers.length} clientes na carteira`}
+              label={`${customersQuery.data?.meta.total ?? 0} clientes no resultado`}
               tone="neutral"
             />
             <AppStatusBadge
@@ -986,7 +999,7 @@ export default function CustomersPage() {
               label={
                 isServiceOrdersUnavailable
                   ? "O.S. indisponíveis"
-                  : `${profiles.filter(profile => profile.hasOpenServiceOrder).length} com O.S. aberta`
+                  : `${profiles.filter(profile => profile.hasOpenServiceOrder).length} com O.S. aberta nesta página`
               }
               tone="info"
             />
@@ -1049,6 +1062,7 @@ export default function CustomersPage() {
         </AppAlert>
       ) : null}
 
+      {(isServiceOrdersUnavailable || isAppointmentsUnavailable || isChargesUnavailable) && !hasBlockingError ? <p role="status" className="text-sm text-[var(--text-muted)]">O contexto relacionado pode estar parcial ou indisponível. Consulte os módulos do cliente para acessar todo o histórico; ausência neste recorte não confirma ausência de registros.</p> : null}
       <AppFiltersBar
         aria-label="Filtros de apresentação"
         className={cn(
@@ -1162,7 +1176,7 @@ export default function CustomersPage() {
               actionLabel="Tentar novamente"
               onAction={() => void customersQuery.refetch()}
             />
-          ) : customers.length === 0 ? (
+          ) : customers.length === 0 && !searchTerm && activeFilter === "all" && priorityFilter === "all" && riskFilter === "all" ? (
             <AppPageEmptyState title="Nenhum cliente cadastrado"
               description="Cadastre o primeiro cliente para começar."
               action={canCreateCustomer ? <Button onClick={() => setCreateOpen(true)}>Criar primeiro cliente</Button> : undefined} />
@@ -1245,7 +1259,7 @@ export default function CustomersPage() {
 
                     <div className="mt-3 flex items-center justify-between gap-2">
                       <span className="text-sm font-medium text-[var(--text-primary)]">
-                        {formatCurrency(profile.pendingCents)}
+                        {isChargesUnavailable ? "Consulte o financeiro do cliente" : formatCurrency(profile.pendingCents)}
                       </span>
                       <Button
                         size="sm"
@@ -1370,7 +1384,7 @@ export default function CustomersPage() {
                         <td>
                           <div className="min-w-[150px] space-y-2">
                             <p className="font-medium text-[var(--text-primary)]">
-                              {formatCurrency(profile.pendingCents)}
+                              {isChargesUnavailable ? "Consulte o financeiro do cliente" : formatCurrency(profile.pendingCents)}
                             </p>
                             {isChargesUnavailable ? (
                               <AppStatusBadge
@@ -1474,7 +1488,7 @@ export default function CustomersPage() {
               </div>
               <AppPagination
                 currentPage={currentPage}
-                totalItems={filteredProfiles.length}
+                totalItems={customersQuery.data?.meta.total ?? 0}
                 pageSize={pageSize}
                 onPageChange={setCurrentPage}
               />

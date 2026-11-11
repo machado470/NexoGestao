@@ -20,6 +20,15 @@ type MetricKey =
 @Injectable()
 export class MetricsService {
   private readonly counters = new Map<MetricKey, number>()
+  private readonly endpointKeys = new Set<string>()
+
+  private boundedEndpoint(endpoint: string) {
+    if (this.endpointKeys.has(endpoint)) return endpoint
+    if (this.endpointKeys.size >= 500) return 'OTHER /:overflow'
+    this.endpointKeys.add(endpoint)
+    return endpoint
+  }
+
   private readonly meter = metrics.getMeter('nexogestao.domain')
   private readonly domainCounter = this.meter.createCounter('nexo_domain_operations_total', {
     description: 'Process-local domain events, aggregated across replicas by the configured OTEL reader.',
@@ -50,14 +59,15 @@ export class MetricsService {
   }
 
   incrementErrorByEndpoint(endpoint: string) {
-    this.increment(`errorsByEndpoint:${endpoint}`)
+    this.increment(`errorsByEndpoint:${this.boundedEndpoint(endpoint)}`)
   }
 
   incrementRequestByEndpoint(endpoint: string) {
-    this.increment(`requestsByEndpoint:${endpoint}`)
+    this.increment(`requestsByEndpoint:${this.boundedEndpoint(endpoint)}`)
   }
 
   observeEndpointLatency(endpoint: string, latencyMs: number) {
+    endpoint = this.boundedEndpoint(endpoint)
     this.increment(`latencyByEndpoint:${endpoint}:count`)
     this.increment(`latencyByEndpoint:${endpoint}:totalMs`, latencyMs)
   }

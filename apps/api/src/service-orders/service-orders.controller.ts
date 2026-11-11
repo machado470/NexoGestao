@@ -1,3 +1,4 @@
+import { Throttle } from '@nestjs/throttler'
 import {
   Body,
   Controller,
@@ -33,6 +34,7 @@ export class ServiceOrdersController {
   ) {}
 
   @Get()
+  @Throttle({ default: { limit: 120, ttl: 60_000 } })
   @Roles('ADMIN', 'MANAGER', 'STAFF', 'VIEWER')
   list(@Org() orgId: string, @Query() query: any) {
     return this.serviceOrders.list(orgId, query)

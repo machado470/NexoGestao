@@ -89,14 +89,13 @@ export class CustomersService {
     ].join(':')
   }
 
-  async list(orgId: string, query?: ListCustomersQueryDto) {
+  async list(orgId: string, query?: ListCustomersQueryDto, customerIds?: string[]) {
     if (!orgId) throw new BadRequestException('orgId é obrigatório')
 
-    const page = Number(query?.page) || 1
+    let page = Number(query?.page) || 1
     const limit = Number(query?.limit) || 20
-    const skip = (page - 1) * limit
 
-    const where: Prisma.CustomerWhereInput = { orgId }
+    const where: Prisma.CustomerWhereInput = { orgId, ...(customerIds ? { id: { in: customerIds } } : {}), ...(query?.active ? { active: query.active === 'active' } : {}) }
 
     if (query?.search) {
       const s = String(query.search)
@@ -107,10 +106,19 @@ export class CustomersService {
       ]
     }
 
+    if (query?.focusId) {
+      const focused = await this.prisma.customer.findFirst({ where: { AND: [where, { id: query.focusId }] }, select: { id: true, createdAt: true } })
+      if (focused) {
+        const before = await this.prisma.customer.count({ where: { AND: [where, { OR: [{ createdAt: { gt: focused.createdAt } }, { createdAt: focused.createdAt, id: { gt: focused.id } }] }] } })
+        page = Math.floor(before / limit) + 1
+      }
+    }
+    const skip = (page - 1) * limit
+
     const [items, total] = await Promise.all([
       this.prisma.customer.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         take: limit,
         skip,
       }),

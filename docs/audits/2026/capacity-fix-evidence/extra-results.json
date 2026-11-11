@@ -1,0 +1,9 @@
+{
+  "customersSecondPage": true,
+  "customerDeepLinkPage63": true,
+  "appointmentBeyond100Found": true,
+  "calendarPeriodSentToAPI": true,
+  "calendarSecondPage": true,
+  "mobileUnresolvedSelectionInbox": true,
+  "pass": true
+}

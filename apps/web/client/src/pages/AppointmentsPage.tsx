@@ -1,3 +1,4 @@
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import {
   toLocalDateTimeInput,
   parseLocalDateTimeInput,
@@ -134,17 +135,25 @@ export default function AppointmentsPage() {
   const openedRouteAction = useRef<string | null>(null);
   const pageSize = 8;
 
+  const debouncedSearch = useDebouncedValue(queryText);
+
   const appointmentListInput = useMemo(
     () => ({
-      limit: 100,
+      page,
+      id: routeAppointmentId || undefined,
+      limit: pageSize,
+      search: debouncedSearch || undefined,
+      status: statusFilter === 'all' ? undefined : statusFilter as 'SCHEDULED' | 'CONFIRMED' | 'CANCELED' | 'DONE' | 'NO_SHOW',
+      from: dateFilter ? new Date(`${dateFilter}T00:00:00`).toISOString() : undefined,
+      to: dateFilter ? new Date(`${dateFilter}T23:59:59.999`).toISOString() : undefined,
       ...(responsibleFilter === "all"
         ? {}
         : { assignedToPersonId: responsibleFilter }),
       ...(routeCustomerId ? { customerId: routeCustomerId } : {}),
     }),
-    [responsibleFilter, routeCustomerId]
+    [responsibleFilter, routeCustomerId, routeAppointmentId, page, debouncedSearch, statusFilter, dateFilter]
   );
-  const appointmentsQuery = trpc.appointments.list.useQuery(
+  const appointmentsQuery = trpc.appointments.page.useQuery(
     appointmentListInput,
     { enabled: isAuthenticated, retry: false }
   );
@@ -162,7 +171,7 @@ export default function AppointmentsPage() {
   );
 
   const appointments = useMemo(
-    () => normalizeArrayPayload<AppointmentRow>(appointmentsQuery.data),
+    () => normalizeArrayPayload<AppointmentRow>(appointmentsQuery.data?.items),
     [appointmentsQuery.data]
   );
   const customers = useMemo(
@@ -248,10 +257,7 @@ export default function AppointmentsPage() {
       return true;
     });
   }, [dateFilter, queryText, routeCustomerId, rows, statusFilter]);
-  const paginatedRows = filteredRows.slice(
-    (page - 1) * pageSize,
-    page * pageSize
-  );
+  const paginatedRows = filteredRows;
   const selected = filteredRows.find(row => row.id === selectedId) ?? null;
 
   useEffect(
@@ -372,6 +378,7 @@ export default function AppointmentsPage() {
         });
       }
       await utils.appointments.list.invalidate();
+      await utils.appointments.page.invalidate();
       setSuccessMessage(
         editing
           ? "Agendamento atualizado com sucesso."
@@ -394,6 +401,7 @@ export default function AppointmentsPage() {
         expectedUpdatedAt: appointment?.updatedAt ?? undefined,
       });
       await utils.appointments.list.invalidate();
+      await utils.appointments.page.invalidate();
       setSuccessMessage(
         status === "CONFIRMED"
           ? "Agendamento confirmado."
@@ -622,7 +630,7 @@ export default function AppointmentsPage() {
                 actionLabel="Tentar novamente"
                 onAction={() => void appointmentsQuery.refetch()}
               />
-            ) : appointments.length === 0 ? (
+            ) : appointments.length === 0 && !queryText && !dateFilter && statusFilter === "all" && responsibleFilter === "all" && !routeCustomerId ? (
               <AppPageEmptyState
                 title="Sem agendamentos"
                 description="Crie o primeiro agendamento para organizar os atendimentos."
@@ -767,7 +775,7 @@ export default function AppointmentsPage() {
                 </div>
                 <AppPagination
                   currentPage={page}
-                  totalItems={filteredRows.length}
+                  totalItems={appointmentsQuery.data?.meta.total ?? 0}
                   pageSize={pageSize}
                   onPageChange={setPage}
                 />

@@ -5,6 +5,7 @@ import { QUEUE_CONNECTION } from '../../queue/queue.constants'
 export type CachedIdempotencyResponse = {
   statusCode: number
   payload: unknown
+  requestHash?: string
 }
 
 @Injectable()

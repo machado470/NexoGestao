@@ -207,7 +207,7 @@ export class AutomationService {
         continue
       }
 
-      const limit = this.tenantOps.enforceLimit({
+      const limit = await this.tenantOps.enforceLimit({
         orgId: context.orgId,
         scope: 'automation:execute-trigger',
         limit: 100,

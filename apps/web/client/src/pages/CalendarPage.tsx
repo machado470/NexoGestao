@@ -1,4 +1,5 @@
-import { useMemo, useRef, useState } from "react";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   DatesSetArg,
   EventClickArg,
@@ -126,10 +127,17 @@ export default function CalendarPage() {
   const [teamFilter, setTeamFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  const appointmentsQuery = trpc.appointments.list.useQuery(
-    teamFilter === "all"
-      ? { limit: 1000 }
-      : { assignedToPersonId: teamFilter, limit: 1000 },
+  const [visibleRange, setVisibleRange] = useState(() => {
+    const start = new Date(); start.setDate(1); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() - 7);
+    const end = new Date(start); end.setDate(end.getDate() + 49);
+    return { from: start.toISOString(), to: end.toISOString() };
+  });
+  const [calendarPage, setCalendarPage] = useState(1);
+  const debouncedSearch = useDebouncedValue(textFilter);
+  useEffect(() => setCalendarPage(1), [teamFilter, statusFilter, debouncedSearch]);
+
+  const appointmentsQuery = trpc.appointments.page.useQuery(
+    { ...visibleRange, page: calendarPage, limit: 200, search: debouncedSearch || undefined, status: statusFilter === 'all' ? undefined : statusFilter as 'SCHEDULED' | 'CONFIRMED' | 'CANCELED' | 'DONE' | 'NO_SHOW', ...(teamFilter === 'all' ? {} : { assignedToPersonId: teamFilter }) },
     { enabled: isAuthenticated, retry: false }
   );
   const customersQuery = trpc.customers.list.useQuery(undefined, {
@@ -146,7 +154,7 @@ export default function CalendarPage() {
   );
 
   const appointments = useMemo(
-    () => normalizeArrayPayload<Appointment>(appointmentsQuery.data),
+    () => normalizeArrayPayload<Appointment>(appointmentsQuery.data?.items),
     [appointmentsQuery.data]
   );
   const customers = useMemo(
@@ -235,6 +243,8 @@ export default function CalendarPage() {
     calendarRef.current?.getApi()[direction]();
   };
   const onDatesSet = (arg: DatesSetArg) => {
+    const next = { from: arg.start.toISOString(), to: new Date(arg.end.getTime() - 1).toISOString() };
+    if (visibleRange.from !== next.from || visibleRange.to !== next.to) { setVisibleRange(next); setCalendarPage(1); }
     setPeriodTitle(arg.view.title);
     setViewMode(arg.view.type as ViewMode);
   };
@@ -516,6 +526,7 @@ export default function CalendarPage() {
                   description="Ajuste os filtros factuais ou crie um agendamento."
                 />
               ) : null}
+              {(appointmentsQuery.data?.meta.pages ?? 0) > 1 ? <div className="flex items-center gap-3 pb-3"><Button variant="outline" disabled={calendarPage <= 1 || appointmentsQuery.isFetching} onClick={() => setCalendarPage(page => page - 1)}>Anterior</Button><span>Página {calendarPage} de {appointmentsQuery.data?.meta.pages} dos agendamentos deste período</span><Button variant="outline" disabled={calendarPage >= (appointmentsQuery.data?.meta.pages ?? 0) || appointmentsQuery.isFetching} onClick={() => setCalendarPage(page => page + 1)}>Próxima</Button></div> : null}
               <div className="hidden overflow-x-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-2 md:block">
                 <div className="min-w-[640px]"><FullCalendar
                   ref={calendarRef}

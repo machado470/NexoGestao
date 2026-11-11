@@ -61,3 +61,16 @@ export function authedPatch(ctx: NexoContext, path: string, body?: unknown) {
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
 }
+
+/** Additive paginated transport: retain metadata discarded by legacy array readers. */
+export async function authedGetPage(ctx: NexoContext, path: string, query?: Record<string, unknown> | null): Promise<{ items: unknown[]; meta: { page: number; limit: number; total: number; pages: number } }> {
+  let raw: any = await nexoFetch<unknown>(ctx, `${path}${toQueryString(query)}`);
+  for (let i = 0; i < 6 && raw; i++) {
+    if (raw.success === false || raw.ok === false) { unwrapNexoApiResponse(raw); throw new Error("Resposta de erro da API"); }
+    if (Array.isArray(raw.data) || !raw.data || typeof raw.data !== "object") break;
+    raw = raw.data;
+  }
+  const meta = raw?.meta ?? raw?.pagination;
+  if (!Array.isArray(raw?.data) || !meta || !Number.isFinite(meta.total)) throw new Error("Resposta paginada sem metadados válidos");
+  return { items: raw.data as unknown[], meta: { page: Number(meta.page), limit: Number(meta.limit), total: Number(meta.total), pages: Number(meta.pages) } };
+}

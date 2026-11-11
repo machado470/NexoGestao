@@ -80,7 +80,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const orgId = user?.orgId ?? (request.headers['x-org-id'] as string) ?? undefined
     const userId = user?.userId ?? user?.sub ?? undefined
 
-    const endpoint = `${request.method} ${request.route?.path ?? request.path ?? request.url}`
+    const endpoint = `${request.method} ${request.route?.path ?? '/:unmatched'}`
     this.metrics?.incrementErrorByEndpoint(endpoint)
 
     const logMeta = {

@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, Optional, ServiceUnavailableException } from '@nestjs/common'
+import { PrismaService } from '../../prisma/prisma.service'
 
 type LimitBucket = {
   startedAt: number
@@ -32,13 +33,33 @@ export class TenantOperationsService {
   private readonly tenantCounters = new Map<string, Map<TenantMetricEvent, number>>()
   private readonly tenantCriticalEvents = new Map<string, Array<{ type: string; at: string; details?: Record<string, unknown> }>>()
 
-  enforceLimit(params: {
+  constructor(@Optional() private readonly prisma?: PrismaService) {}
+
+  async enforceLimit(params: {
     orgId: string
     scope: string
     limit: number
     windowMs: number
     blockedReason: string
-  }): TenantLimitResult {
+  }, database: Pick<PrismaService, '$queryRaw'> | undefined = this.prisma): Promise<TenantLimitResult> {
+    if (database) {
+      const rows = await database.$queryRaw<Array<{ count: number }>>`
+        INSERT INTO "TenantRateLimitBucket" ("orgId", "scope", "startedAt", "count")
+        VALUES (${params.orgId}, ${params.scope}, statement_timestamp(), 1)
+        ON CONFLICT ("orgId", "scope") DO UPDATE SET
+          "count" = CASE WHEN "TenantRateLimitBucket"."startedAt" + (${params.windowMs} * interval '1 millisecond') <= statement_timestamp()
+                         THEN 1 ELSE CASE WHEN "TenantRateLimitBucket"."count" > ${params.limit}
+                                         THEN "TenantRateLimitBucket"."count" ELSE "TenantRateLimitBucket"."count" + 1 END END,
+          "startedAt" = CASE WHEN "TenantRateLimitBucket"."startedAt" + (${params.windowMs} * interval '1 millisecond') <= statement_timestamp()
+                             THEN statement_timestamp() ELSE "TenantRateLimitBucket"."startedAt" END
+        RETURNING "count"
+      `
+      const used = rows[0].count
+      return { allowed: used <= params.limit, reason: used <= params.limit ? null : params.blockedReason, limit: params.limit, used: Math.min(used, params.limit), windowMs: params.windowMs }
+    }
+    // Directly constructed unit/dev instances retain the old local implementation.
+    // Production must never silently downgrade a shared limit to process memory.
+    if (process.env.NODE_ENV === 'production') throw new ServiceUnavailableException('Limite compartilhado indisponível')
     const now = Date.now()
     const key = `${params.orgId}:${params.scope}`
     const existing = this.limitBuckets.get(key)

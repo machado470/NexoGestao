@@ -280,17 +280,17 @@ export class ExecutionRunner {
 
         /*
          * Somente quem possui ownership consome
-         * o bucket local de execução.
+         * o bucket compartilhado de execução.
          */
         const tenantLimit =
-          this.tenantOps.enforceLimit({
+          await this.tenantOps.enforceLimit({
             orgId: params.candidate.orgId,
             scope: 'execution:auto-actions',
             limit: 180,
             windowMs: 60_000,
             blockedReason:
               'tenant_execution_rate_limit_reached',
-          })
+          }, tx)
 
         if (!tenantLimit.allowed) {
           return {

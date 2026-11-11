@@ -1,0 +1,11 @@
+[Nest] 14967  - 11/11/2026, 4:29:08 AM    WARN [WhatsAppProviderFactory] [BOOT][WhatsApp] provider=mock explicitamente habilitado
+[Nest] 14967  - 11/11/2026, 4:29:08 AM     LOG [WhatsAppProcessor] WhatsApp worker iniciado
+[Nest] 14967  - 11/11/2026, 4:29:08 AM     LOG [WhatsAppProcessor] {"action":"whatsapp.inbound_webhook.job_started","jobId":"4fc62edb-579f-4282-a20b-9c2b948a8af3","attempt":1,"webhookEventId":"fef9f83a-bd23-4f16-87e4-a4ccc80dfab1","orgId":"tenant-b","provider":"mock","traceId":"4479c490-0fdc-4a60-9602-19bc92ecc573","requestId":null,"correlationId":null}
+[Nest] 14967  - 11/11/2026, 4:29:08 AM     LOG [WhatsAppProcessor] {"action":"whatsapp.inbound_webhook.job_completed","jobId":"4fc62edb-579f-4282-a20b-9c2b948a8af3","attempt":1,"webhookEventId":"fef9f83a-bd23-4f16-87e4-a4ccc80dfab1","orgId":"tenant-b","provider":"mock","traceId":"4479c490-0fdc-4a60-9602-19bc92ecc573","requestId":null,"correlationId":null,"processed":1,"latencyMs":2}
+[Nest] 14967  - 11/11/2026, 4:29:09 AM     LOG [WhatsAppProcessor] {"action":"whatsapp.inbound_webhook.job_started","jobId":"10fe361d-5e3f-4b6b-9cd6-92ccd67330ad","attempt":1,"webhookEventId":"4df87f9d-2015-4f4f-bc86-67c90364a599","orgId":"tenant-a","provider":"mock","traceId":"7cb1488e-be4b-4a0f-afad-c63296b7639e","requestId":null,"correlationId":null}
+[Nest] 14967  - 11/11/2026, 4:29:09 AM     LOG [WhatsAppProcessor] {"action":"whatsapp.inbound_webhook.job_completed","jobId":"10fe361d-5e3f-4b6b-9cd6-92ccd67330ad","attempt":1,"webhookEventId":"4df87f9d-2015-4f4f-bc86-67c90364a599","orgId":"tenant-a","provider":"mock","traceId":"7cb1488e-be4b-4a0f-afad-c63296b7639e","requestId":null,"correlationId":null,"processed":1,"latencyMs":0}
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        14.051 s
+Ran all test suites matching apps/api/test/integration/whatsapp-queue-isolation-redis.integration.spec.ts.

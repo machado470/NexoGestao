@@ -2,6 +2,7 @@ import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import {
   authedGet,
+  authedGetPage,
   authedPatch,
   authedPost,
   type NexoContext,
@@ -215,6 +216,12 @@ const customersOperationalSummarySchema = z
   .strict();
 
 export const customersRouter = router({
+  page: protectedProcedure
+    .input(z.object({ focusId: z.string().uuid().optional(), page: z.number().int().min(1).max(10000), limit: z.number().int().min(1).max(500), search: z.string().max(200).optional(), active: z.enum(['active', 'inactive']).optional(), priority: z.enum(['P0', 'P1', 'P2', 'P3']).optional(), riskState: z.enum(['NORMAL', 'WARNING', 'RESTRICTED', 'SUSPENDED']).optional() }))
+    .query(async ({ctx, input}) => {
+      const page = await authedGetPage(ctx as NexoContext, '/customers', input);
+      return { ...page, items: parseCustomersListPayload(page.items) };
+    }),
   list: protectedProcedure
     .input(customersListInput)
     .output(customersListOutputSchema)
@@ -224,6 +231,11 @@ export const customersRouter = router({
         parseCustomersListPayload(payload)
       );
     }),
+
+  operationalSummaryPage: protectedProcedure
+    .input(z.object({customerIds:z.array(z.string().uuid()).max(100)}))
+    .output(customersOperationalSummarySchema)
+    .query(async ({ctx,input}) => customersOperationalSummarySchema.parse(await authedGet(ctx as NexoContext, '/customers/operational-summary/page', input))),
 
   operationalSummary: protectedProcedure
     .output(customersOperationalSummarySchema)
