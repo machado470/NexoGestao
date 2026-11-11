@@ -1,0 +1,5 @@
+Test Suites: 1 passed, 1 total
+Tests:       7 passed, 7 total
+Snapshots:   0 total
+Time:        6.219 s
+Ran all test suites matching src/audit/audit-admin.service.spec.ts.

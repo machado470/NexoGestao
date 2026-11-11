@@ -1,0 +1,5 @@
+
+> @nexogestao/web@1.0.0 lint:os /workspace/NexoGestao/apps/web
+> node ./scripts/validate-operating-system.mjs
+
+✅ Validação Operating System concluída sem inconsistências bloqueantes.

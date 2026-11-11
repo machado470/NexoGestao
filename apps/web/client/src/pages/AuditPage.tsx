@@ -1,3 +1,5 @@
+import { buildAuditActorOptions } from "@/lib/audit-actor-options";
+import { presentationLabel } from "@/lib/presentation-labels";
 import { useMemo, useState } from "react";
 import { Eye, RefreshCw, Search, X } from "lucide-react";
 
@@ -45,7 +47,7 @@ type AuditPagination = { page: number; limit: number; total: number; pages: numb
 type AuditSummary = {
   total: number;
   byAction: Array<{ action: string; count: number }>;
-  byActor: Array<{ actorPersonId?: string | null; count: number }>;
+  byActor: Array<{ actorPersonId?: string | null; actorName?: string | null; count: number }>;
 };
 type AuditFilters = { from?: string; to?: string; actorPersonId?: string; action?: string };
 
@@ -132,10 +134,13 @@ export default function AuditPage() {
     { from: filters.from, to: filters.to },
     { enabled: canLoadAudit, retry: false },
   );
+  const actorsQuery = trpc.people.list.useQuery(undefined, { enabled: canLoadAudit, retry: false });
+  const actors = Array.isArray(actorsQuery.data) ? actorsQuery.data : [];
   const { events, pagination } = useMemo(() => normalizeAuditList(listQuery.data), [listQuery.data]);
   const summary = useMemo(() => normalizeAuditSummary(summaryQuery.data), [summaryQuery.data]);
+  const actorOptions = buildAuditActorOptions(actors, summary.byActor, events, draftFilters.actorPersonId);
   const metadataEntries = getSafeMetadataEntries(getAuditEventMetadata(selectedEvent));
-  const hasFilters = Object.keys(filters).length > 0;
+  const hasFilters = Object.values(filters).some(Boolean);
 
   function applyFilters() {
     setPage(1);
@@ -170,8 +175,14 @@ export default function AuditPage() {
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <AppField label="Período inicial" htmlFor="audit-from"><AppInput id="audit-from" type="date" value={draftFilters.from} onChange={event => setDraftFilters(current => ({ ...current, from: event.target.value }))} /></AppField>
             <AppField label="Período final" htmlFor="audit-to"><AppInput id="audit-to" type="date" value={draftFilters.to} onChange={event => setDraftFilters(current => ({ ...current, to: event.target.value }))} /></AppField>
-            <AppField label="Identificador do ator" htmlFor="audit-actor"><AppInput id="audit-actor" placeholder="ID oficial do ator" value={draftFilters.actorPersonId} onChange={event => setDraftFilters(current => ({ ...current, actorPersonId: event.target.value }))} /></AppField>
-            <AppField label="Tipo de evento" htmlFor="audit-action"><AppInput id="audit-action" placeholder="Ex.: CUSTOMER_UPDATED" value={draftFilters.action} onChange={event => setDraftFilters(current => ({ ...current, action: event.target.value }))} /></AppField>
+            <AppField label="Ator" htmlFor="audit-actor"><select id="audit-actor" className="w-full rounded-md border bg-[var(--surface-base)] p-2" disabled={actorsQuery.isLoading && summaryQuery.isLoading && events.length === 0} value={draftFilters.actorPersonId} onChange={event => setDraftFilters(current => ({ ...current, actorPersonId: event.target.value }))}>
+              <option value="">Todos os atores</option>
+              {actorOptions.map(actor => <option key={actor.id} value={actor.id}>{actor.label}</option>)}
+            </select>{actorsQuery.isError ? <p role="status">Cadastro de pessoas indisponível. Nomes do histórico continuam disponíveis quando retornados pela Auditoria.</p> : null}</AppField>
+            <AppField label="Tipo de evento" htmlFor="audit-action"><select id="audit-action" className="w-full rounded-md border bg-[var(--surface-base)] p-2" value={draftFilters.action} onChange={event => setDraftFilters(current => ({ ...current, action: event.target.value }))}>
+              <option value="">Todos os eventos</option>
+              {Array.from(new Set([...summary.byAction.map(item => item.action), ...events.map(item => item.action), ...(draftFilters.action ? [draftFilters.action] : [])])).map(action => <option key={action} value={action}>{presentationLabel(action)}</option>)}
+            </select></AppField>
           </div>
           <AppFormActions className="mt-3 justify-start">
             <Button type="submit"><Search />Aplicar filtros</Button>
@@ -191,7 +202,7 @@ export default function AuditPage() {
       ) : null}
 
       <AppSectionBlock title="Registros de auditoria" subtitle="Ordem oficial da API: eventos mais recentes primeiro. Selecione um registro para examinar sua evidência.">
-        {listQuery.isLoading ? <AppLoadingState label="Carregando registros de auditoria..." /> : getAuditEmptyState(events, listQuery.isLoading) ? (
+        {listQuery.isError ? <p role="status">Registros indisponíveis. Tente novamente acima.</p> : listQuery.isLoading ? <AppLoadingState label="Carregando registros de auditoria..." /> : getAuditEmptyState(events, listQuery.isLoading) ? (
           <AppEmptyState title={hasFilters ? "Nenhum registro corresponde aos filtros" : "Nenhum registro de auditoria"} description={hasFilters ? "Revise ou limpe os filtros para ampliar o recorte." : "Ainda não há fatos registrados para esta organização."} action={hasFilters ? <Button type="button" variant="neutral" onClick={clearFilters}>Limpar filtros</Button> : undefined} />
         ) : (
           <>
@@ -200,11 +211,11 @@ export default function AuditPage() {
               <tbody>{events.map(event => (
                 <tr key={event.id}>
                   <td className="whitespace-nowrap">{formatDateTime(event.createdAt)}</td>
-                  <td><span className="font-medium text-[var(--text-primary)]">{event.action}</span>{event.context ? <span className="mt-1 block max-w-sm text-xs text-[var(--text-muted)]">{event.context}</span> : null}</td>
+                  <td><span className="font-medium text-[var(--text-primary)]">{presentationLabel(event.action)}</span>{event.context ? <span className="mt-1 block max-w-sm text-xs text-[var(--text-muted)]">{event.context}</span> : null}</td>
                   <td>{event.actorName || event.actorPersonId || event.actorUserId || "Sistema"}</td>
-                  <td>{event.entityType || "—"}</td>
+                  <td>{presentationLabel(event.entityType)}</td>
                   <td className="max-w-56 break-all">{event.entityId || "—"}</td>
-                  <td><Button type="button" variant="ghost" size="sm" onClick={() => setSelectedEvent(event)} aria-label={`Examinar evento ${event.action}`}><Eye />Examinar</Button></td>
+                  <td><Button type="button" variant="ghost" size="sm" onClick={() => setSelectedEvent(event)} aria-label={`Examinar evento ${presentationLabel(event.action)}`}><Eye />Examinar</Button></td>
                 </tr>
               ))}</tbody>
             </AppDataTable>
@@ -216,7 +227,7 @@ export default function AuditPage() {
       <BaseModal open={Boolean(selectedEvent)} onOpenChange={open => { if (!open) setSelectedEvent(null); }} size="lg" title="Evidência do registro" description="Dados oficiais disponíveis no registro selecionado." footer={<Button type="button" variant="neutral" onClick={() => setSelectedEvent(null)}>Fechar</Button>}>
         {selectedEvent ? <div className="space-y-5 text-sm">
           <dl className="grid gap-4 sm:grid-cols-2">
-            {[["Evento", selectedEvent.action], ["Data e hora", formatDateTime(selectedEvent.createdAt)], ["Ator", selectedEvent.actorName || selectedEvent.actorPersonId || selectedEvent.actorUserId || "Sistema"], ["Entidade", selectedEvent.entityType || "—"], ["ID da entidade", selectedEvent.entityId || "—"], ["ID do registro", selectedEvent.id], ["Organização", selectedEvent.orgId], ["Contexto", selectedEvent.context || "—"]].map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-xs font-medium text-[var(--text-muted)]">{label}</dt><dd className="mt-1 break-words text-[var(--text-primary)]">{value}</dd></div>)}
+            {[["Evento", presentationLabel(selectedEvent.action)], ["Data e hora", formatDateTime(selectedEvent.createdAt)], ["Ator", selectedEvent.actorName || selectedEvent.actorPersonId || selectedEvent.actorUserId || "Sistema"], ["Entidade", presentationLabel(selectedEvent.entityType)], ["ID da entidade", selectedEvent.entityId || "—"], ["ID do registro", selectedEvent.id], ["Organização", selectedEvent.orgId], ["Contexto", selectedEvent.context || "—"]].map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-xs font-medium text-[var(--text-muted)]">{label}</dt><dd className="mt-1 break-words text-[var(--text-primary)]">{value}</dd></div>)}
           </dl>
           <section aria-labelledby="audit-evidence-title"><h2 id="audit-evidence-title" className="font-semibold text-[var(--text-primary)]">Metadata legível</h2>{metadataEntries.length ? <dl className="mt-3 grid gap-3 sm:grid-cols-2">{metadataEntries.map(([key, value]) => <div key={key} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3"><dt className="text-xs capitalize text-[var(--text-muted)]">{fieldLabel(key)}</dt><dd className="mt-1 break-all text-[var(--text-primary)]">{value}</dd></div>)}</dl> : <p className="mt-2 text-[var(--text-muted)]">Nenhuma metadata primitiva e segura foi registrada.</p>}</section>
         </div> : null}

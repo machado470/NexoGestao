@@ -1064,16 +1064,9 @@ export default function ServiceOrdersPage() {
               />
             ) : filteredOrders.length === 0 ? (
               <AppPageEmptyState
-                title={
-                  searchTerm.trim()
-                    ? "Busca sem resultado"
-                    : "Nenhuma ordem encontrada"
-                }
-                description={
-                  searchTerm.trim()
-                    ? "Ajuste o termo de busca ou os filtros para continuar."
-                    : "Crie uma nova O.S. para iniciar o fluxo operacional."
-                }
+                title={enrichedOrders.length === 0 ? "Nenhuma ordem de serviço" : "Nenhum resultado para os filtros"}
+                description={enrichedOrders.length === 0 ? "Crie a primeira O.S. para iniciar o atendimento." : "Limpe os filtros para ver as ordens."}
+                action={enrichedOrders.length === 0 ? (canCreateOrder && !customersQuery.isError ? <Button onClick={() => setOpenCreate(true)}>Nova O.S.</Button> : undefined) : <Button variant="outline" onClick={() => { setSearchTerm(""); setActiveFilter("all"); setCustomerFilter("all"); setResponsibleFilter("all"); setDeadlineFilter("all"); setPriorityFilter("all"); setCurrentPage(1); }}>Limpar filtros</Button>}
               />
             ) : (
               <div className="space-y-3">
@@ -1252,7 +1245,7 @@ export default function ServiceOrdersPage() {
             )}
           </AppSectionBlock>
 
-          <AppSectionBlock
+          {filteredOrders.length > 0 && !isLoading && !hasBlockingError ? (          <AppSectionBlock
             title="Detalhe da O.S."
             subtitle="Status, cliente, serviço, responsável, prazo, ações, financeiro e timeline curta."
             className="flex flex-col"
@@ -1546,7 +1539,7 @@ export default function ServiceOrdersPage() {
                 ) : null}
               </div>
             )}
-          </AppSectionBlock>
+          </AppSectionBlock>) : null}
         </div>
       </div>
 

@@ -1,3 +1,4 @@
+import { presentationLabel, PRESENTATION_LABELS } from "@/lib/presentation-labels";
 import { useMemo, useState } from "react";
 import {
   CalendarClock,
@@ -82,7 +83,7 @@ const METADATA_LABELS: Record<string, string> = {
 
 export function officialEventLabel(event: OfficialTimelineEvent) {
   return (
-    event.title ?? EVENT_LABELS[event.eventType] ?? "Evento não classificado"
+    event.title ?? EVENT_LABELS[event.eventType] ?? PRESENTATION_LABELS[event.eventType] ?? "Evento não classificado"
   );
 }
 
@@ -199,7 +200,7 @@ export default function TimelinePage() {
             <RefreshCw
               className={`mr-2 size-3.5 ${query.isFetching ? "animate-spin" : ""}`}
             />
-            Atualizar eventos
+            Atualizar
           </Button>
         }
         contextChips={
@@ -246,7 +247,7 @@ export default function TimelinePage() {
                 { value: "all", label: "Todos os tipos" },
                 ...eventTypes.map(value => ({
                   value,
-                  label: EVENT_LABELS[value] ?? value,
+                  label: EVENT_LABELS[value] ?? presentationLabel(value),
                 })),
               ]}
             />
@@ -314,7 +315,7 @@ export default function TimelinePage() {
               return (
                 <li
                   key={event.id}
-                  className="relative grid min-w-0 gap-3 pb-6 pl-8 last:pb-0 md:grid-cols-[minmax(0,1fr)_auto] md:gap-x-6"
+                  className="relative flex min-w-0 flex-col gap-2 pb-5 pl-6 last:pb-0"
                 >
                   {index < filteredEvents.length - 1 ? (
                     <span
@@ -330,20 +331,27 @@ export default function TimelinePage() {
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="rounded-md bg-[var(--accent-soft)] px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--accent-primary)]">
-                        {event.eventType}
+                        {presentationLabel(event.eventType)}
                       </span>
                       {event.severity ? (
-                        <AppStatusBadge label={event.severity} />
+                        <AppStatusBadge label={presentationLabel(event.severity)} />
                       ) : null}
                       {event.module ? (
                         <span className="text-xs text-[var(--text-muted)]">
-                          {event.module}
+                          {presentationLabel(event.module)}
                         </span>
                       ) : null}
                     </div>
                     <h3 className="mt-2 text-sm font-semibold text-[var(--text-primary)] md:text-[15px]">
                       {officialEventLabel(event)}
                     </h3>
+                  <time
+                    dateTime={event.occurredAt}
+                    className="flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-[var(--text-secondary)]"
+                  >
+                    <CalendarClock className="size-3.5" />
+                    {formatDateTime(event.occurredAt)}
+                  </time>
                     {event.description ? (
                       <p className="mt-1 break-words text-sm leading-6 text-[var(--text-secondary)]">
                         {event.description}
@@ -387,7 +395,7 @@ export default function TimelinePage() {
                                 {METADATA_LABELS[key] ?? key}
                               </dt>
                               <dd className="break-words text-[var(--text-primary)]">
-                                {String(value)}
+                                {presentationLabel(value)}
                               </dd>
                             </div>
                           ))}
@@ -408,13 +416,7 @@ export default function TimelinePage() {
                     ) : null}
                   </div>
 
-                  <time
-                    dateTime={event.occurredAt}
-                    className="flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-[var(--text-secondary)] md:row-start-1 md:justify-self-end"
-                  >
-                    <CalendarClock className="size-3.5" />
-                    {formatDateTime(event.occurredAt)}
-                  </time>
+
                 </li>
               );
             })}

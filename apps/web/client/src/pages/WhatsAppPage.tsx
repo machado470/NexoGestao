@@ -847,7 +847,7 @@ function InboxQueueColumn({
               description={
                 search.trim()
                   ? "Limpe a busca ou altere os filtros."
-                  : "Conversas reais aparecerão aqui quando houver contato pelo canal."
+                  : "A primeira conversa aparecerá quando uma mensagem chegar pelo WhatsApp conectado. Você também pode iniciar o contato a partir de um cliente com telefone, se tiver permissão."
               }
             />
           )
@@ -2756,7 +2756,7 @@ export default function WhatsAppPage() {
           compact
           className="min-h-0 overflow-hidden"
         >
-          <div className="grid min-h-[34rem] min-w-0 grid-cols-1 overflow-hidden md:h-[calc(100dvh-19rem)] md:max-h-[52rem] md:grid-cols-[minmax(17rem,20rem)_minmax(0,1fr)] xl:grid-cols-[minmax(18rem,21rem)_minmax(0,1fr)_minmax(18rem,20rem)]">
+          <div className={cn("grid min-h-[24rem] min-w-0 grid-cols-1 overflow-hidden md:h-[calc(100dvh-19rem)] md:max-h-[52rem]", selectedConversation ? "md:grid-cols-[minmax(17rem,20rem)_minmax(0,1fr)] xl:grid-cols-[minmax(18rem,21rem)_minmax(0,1fr)_minmax(18rem,20rem)]" : "grid-cols-1")}>
             <div
               className={cn(
                 "min-h-0 min-w-0 overflow-hidden md:block",
@@ -2782,8 +2782,8 @@ export default function WhatsAppPage() {
 
             <div
               className={cn(
-                "min-h-0 min-w-0 flex-col overflow-hidden md:flex",
-                selectedConversationId ? "flex" : "hidden"
+                "min-h-0 min-w-0 flex-col overflow-hidden",
+                selectedConversation ? "flex" : "hidden"
               )}
             >
               <ExecutionChatColumn
@@ -2846,7 +2846,7 @@ export default function WhatsAppPage() {
             <div
               className={cn(
                 "min-h-0 min-w-0 overflow-hidden border-l border-[var(--border-subtle)]",
-                isContextVisible ? "hidden xl:block" : "hidden"
+                isContextVisible && selectedConversation ? "hidden xl:block" : "hidden"
               )}
             >
               <OperationalContextColumn

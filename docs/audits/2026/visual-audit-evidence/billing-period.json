@@ -1,0 +1,29 @@
+{
+  "check": "A07 monthly catalog API and browser",
+  "plans": [
+    {
+      "name": "FREE",
+      "priceCents": 0,
+      "billingInterval": null
+    },
+    {
+      "name": "STARTER",
+      "priceCents": 9900,
+      "billingInterval": "month"
+    },
+    {
+      "name": "PRO",
+      "priceCents": 19900,
+      "billingInterval": "month"
+    },
+    {
+      "name": "BUSINESS",
+      "priceCents": 39900,
+      "billingInterval": "month"
+    }
+  ],
+  "monthlyLabels": 4,
+  "currentPlanDisabled": true,
+  "stripeChanged": false,
+  "subscriptionRestored": true
+}

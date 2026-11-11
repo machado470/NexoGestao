@@ -1,0 +1,277 @@
+{
+  "baseCommit": "346455381d0ffcf87b9c92a8cb35e48d0f64c5aa",
+  "fixture": {
+    "customerId": "98b05315-d991-4145-b072-61ea5440a017",
+    "appointmentId": "d68432b6-fdec-4dc9-8eba-c57641ad745e",
+    "orderId": "126f402d-eb22-4b7a-8d0d-6d5be436f150",
+    "chargeId": "ed28305b-1e5c-49b3-a1b2-e9c894318a27",
+    "personId": "234b5605-1335-45df-88d2-ed829fb557de",
+    "orgId": "56145963-b2f8-4aeb-a22e-86903de25fb0",
+    "viewerEmail": "viewer.visual@test.invalid",
+    "runId": "4ab5f7f5-ed11-42a3-8bc4-67f54719e09c"
+  },
+  "apiChecks": [
+    {
+      "check": "UI entities persisted with links",
+      "customerId": "98b05315-d991-4145-b072-61ea5440a017",
+      "appointmentId": "d68432b6-fdec-4dc9-8eba-c57641ad745e",
+      "orderId": "126f402d-eb22-4b7a-8d0d-6d5be436f150"
+    },
+    {
+      "check": "finance",
+      "chargeId": "ed28305b-1e5c-49b3-a1b2-e9c894318a27",
+      "before": {
+        "openCount": 1,
+        "openAmountCents": 12500,
+        "overdueCount": 0,
+        "overdueAmountCents": 0,
+        "paidCount": 0,
+        "paidAmountCents": 0
+      },
+      "after": {
+        "openCount": 0,
+        "openAmountCents": 0,
+        "overdueCount": 0,
+        "overdueAmountCents": 0,
+        "paidCount": 1,
+        "paidAmountCents": 12500
+      },
+      "first": {
+        "ok": true,
+        "paymentId": "dbf4f167-6504-47a8-9f12-57515a63a4f4",
+        "idempotent": false,
+        "operation": {
+          "status": "executed",
+          "reason": "payment_recorded",
+          "idempotencyKey": "visual-payment-ed28305b-1e5c-49b3-a1b2-e9c894318a27",
+          "executionKey": null,
+          "correlationId": "4d9ac06f-7c39-4513-a380-a2e3918082f1",
+          "requestId": "4d9ac06f-7c39-4513-a380-a2e3918082f1"
+        },
+        "degraded": null
+      },
+      "repeat": {
+        "ok": true,
+        "degraded": null,
+        "operation": {
+          "status": "duplicate",
+          "reason": "idempotency_replay",
+          "idempotencyKey": "visual-payment-ed28305b-1e5c-49b3-a1b2-e9c894318a27",
+          "executionKey": null,
+          "correlationId": "6b025d45-403d-40e7-b7c5-2b810108e6f6",
+          "requestId": "6b025d45-403d-40e7-b7c5-2b810108e6f6"
+        },
+        "paymentId": "dbf4f167-6504-47a8-9f12-57515a63a4f4",
+        "idempotent": false
+      },
+      "chargeCount": 1,
+      "paymentCount": 1
+    },
+    {
+      "check": "audit",
+      "eventId": "3f84d32d-f8af-49b9-b934-8341053c95fe",
+      "actorName": "Paula Almeida",
+      "entityId": "98b05315-d991-4145-b072-61ea5440a017",
+      "createdAt": "2026-11-10T03:28:28.718Z"
+    },
+    {
+      "check": "audit",
+      "eventId": "41bd3d0b-eae6-4db1-a811-7c2724e7db44",
+      "actorName": "Paula Almeida",
+      "entityId": "98b05315-d991-4145-b072-61ea5440a017",
+      "createdAt": "2026-11-10T03:28:52.645Z"
+    },
+    {
+      "check": "timeline",
+      "count": 17
+    },
+    {
+      "check": "settings restored",
+      "name": "Serviços Viva - Ambiente Piloto"
+    },
+    {
+      "check": "governance fixture",
+      "runId": "4ab5f7f5-ed11-42a3-8bc4-67f54719e09c",
+      "mode": "dated/stale database test fixture"
+    }
+  ],
+  "governanceAuthorization": [
+    {
+      "path": "/governance/actions/execute",
+      "method": "POST",
+      "status": 403
+    },
+    {
+      "path": "/governance/actions/execute",
+      "method": "POST",
+      "status": 201
+    }
+  ],
+  "whatsapp": {
+    "duplicateCount": 1,
+    "status": 200,
+    "messageId": "e0d72fe3-576d-43ba-942f-0c625116c7bb",
+    "customerId": "98b05315-d991-4145-b072-61ea5440a017",
+    "conversationId": "1cc25965-353f-485e-8487-ce45920744b7",
+    "provider": "mock",
+    "externalMessagesSent": false
+  },
+  "browser": [
+    {
+      "check": "A01 customer empty-filter clear details collapsed",
+      "pass": true
+    },
+    {
+      "check": "A01 appointments filtered-empty clear details collapsed",
+      "pass": true
+    },
+    {
+      "check": "A01 service-orders filtered-empty clear details collapsed",
+      "pass": true
+    },
+    {
+      "check": "A02 dated stale evaluation from API fixture",
+      "pass": true
+    },
+    {
+      "check": "A04 named actor and readable event select retain canonical values",
+      "actor": "234b5605-1335-45df-88d2-ed829fb557de",
+      "action": "CUSTOMER_UPDATED"
+    },
+    {
+      "check": "A03 timeline one/many/narrow",
+      "many": 31,
+      "single": 1,
+      "bodyWidth": 390
+    },
+    {
+      "check": "A05 calendar header remains fixed on inner vertical scroll",
+      "beforeY": 335.65625,
+      "afterY": 335.65625,
+      "scroll": {
+        "top": 140,
+        "height": 459,
+        "scrollHeight": 599
+      },
+      "horizontal": {
+        "width": 602,
+        "scrollWidth": 656,
+        "left": 54
+      }
+    },
+    {
+      "check": "A07 initial iteration before periodicity policy was supplied; superseded by billingPeriod",
+      "pass": true
+    }
+  ],
+  "additionalBrowser": [
+    {
+      "check": "A06 inbound mock conversation selected with customer context",
+      "pass": true
+    },
+    {
+      "check": "A07 active current plan disabled, test database fixture restored",
+      "pass": true
+    },
+    {
+      "check": "A05 header/body column alignment",
+      "maxDelta": 0
+    },
+    {
+      "check": "A01 simulated network failure distinct from empty",
+      "pass": true
+    },
+    {
+      "check": "viewer authenticated read-only UI",
+      "url": "http://127.0.0.1:3310/customers"
+    }
+  ],
+  "whatsappStates": {
+    "loading": "browser response delayed",
+    "searchEmpty": "browser real filtered list",
+    "unavailable": "browser request aborted",
+    "pass": true
+  },
+  "billingPeriod": {
+    "check": "A07 monthly catalog API and browser",
+    "plans": [
+      {
+        "name": "FREE",
+        "priceCents": 0,
+        "billingInterval": null
+      },
+      {
+        "name": "STARTER",
+        "priceCents": 9900,
+        "billingInterval": "month"
+      },
+      {
+        "name": "PRO",
+        "priceCents": 19900,
+        "billingInterval": "month"
+      },
+      {
+        "name": "BUSINESS",
+        "priceCents": 39900,
+        "billingInterval": "month"
+      }
+    ],
+    "monthlyLabels": 4,
+    "currentPlanDisabled": true,
+    "stripeChanged": false,
+    "subscriptionRestored": true
+  },
+  "realIntegrationChecks": {
+    "suites": 4,
+    "tests": 16,
+    "database": "nexo_visual_integration_test",
+    "files": [
+      "canonical-operational-workflow.spec.ts",
+      "assignee-privacy-postgres.integration.spec.ts",
+      "finance-timezone-postgres.integration.spec.ts",
+      "finance-worker-redis.integration.spec.ts"
+    ]
+  },
+  "billingPeriodPolicyAuthority": "User delegated decision: paid plans monthly; FREE without recurring billing. External Stripe configuration unchanged.",
+  "historicalAuditActor": {
+    "check": "Historical inactive audit actor selected by name",
+    "personId": "3a407bb4-9e65-4625-85e4-e00d893e3986",
+    "active": false,
+    "eventId": "dbfe1d2a-d6f1-43cd-9b43-69a02b4a0bdc",
+    "absentFromActiveDirectory": true,
+    "summaryActorName": "Ator histórico inativo QA",
+    "absentFromFirstEventPage": true,
+    "viewerSummaryStatus": 403,
+    "selectedFilter": "3a407bb4-9e65-4625-85e4-e00d893e3986",
+    "pass": true
+  },
+  "conversationAfterRegistration": {
+    "check": "Unknown conversation linked after normal customer registration",
+    "customerId": "44fe9346-3d37-46c2-afa1-4b91e3b8342e",
+    "conversationId": "f68ca686-019a-49d5-864a-e75e2310a506",
+    "firstMessageId": "bc0040df-c027-42d6-aff7-31eeedcd51eb",
+    "secondMessageId": "1726776c-5b22-4e5d-82c7-17c290174e4d",
+    "sameConversation": true,
+    "previousMessageUnchanged": true,
+    "contextType": "GENERAL",
+    "provider": "mock",
+    "pass": true
+  },
+  "finalTestTotals": {
+    "apiPassed": 1116,
+    "apiSkipped": 98,
+    "webPassed": 792,
+    "commonPassed": 4,
+    "defaultTotalPassed": 1912,
+    "realIntegrationPassedSeparately": 16
+  },
+  "latestConsolidatedTestTotals": {
+    "apiPassed": 1137,
+    "apiSkipped": 98,
+    "webPassed": 792,
+    "commonPassed": 4,
+    "totalPassed": 1933,
+    "webAndCommonFromTurboCache": true,
+    "realIntegrationsRepeatedThisRevision": false
+  }
+}

@@ -452,10 +452,22 @@ export class WhatsAppService {
       return { associated: true, orgId, customerId: duplicated.customerId ?? null, messageId: duplicated.id, duplicated: true }
     }
 
-    const customer = await this.prisma.customer.findFirst({
+    let customer = await this.prisma.customer.findFirst({
       where: { orgId, phone },
       select: { id: true, orgId: true, phone: true },
     })
+    if (!customer) {
+      // Registration stores digits; providers supply E.164. Ambiguous legacy
+      // national/international duplicates must not select an arbitrary person.
+      const digits = phone.replace(/\D/g, '')
+      const variants = [digits, ...(phone.startsWith('+55') && [12, 13].includes(digits.length) ? [digits.slice(2)] : [])]
+      const matches = await this.prisma.customer.findMany({
+        where: { orgId, phone: { in: variants } },
+        select: { id: true, orgId: true, phone: true },
+        take: 2,
+      })
+      customer = matches.length === 1 ? matches[0] : null
+    }
 
     const resolution = await this.resolveOperationalContext(orgId, customer?.id ?? null)
     const conversation = await this.resolveOrCreateConversation(orgId, customer?.id ?? null, customer?.phone ?? phone, {
@@ -614,7 +626,18 @@ export class WhatsAppService {
       orderBy: { updatedAt: 'desc' },
     })
 
-    if (existing) return existing
+    if (existing) {
+      if (customerId && !existing.customerId && normalizedPhone && existing.phone === normalizedPhone) {
+        // A first inbound message can precede customer registration. Bind only
+        // an unassociated conversation, guarding against concurrent assignment.
+        const linked = await this.prisma.whatsAppConversation.updateMany({
+          where: { id: existing.id, orgId, customerId: null, phone: normalizedPhone },
+          data: { customerId, contextType: normalizedContextType, contextId: context.contextId ?? null },
+        })
+        if (linked.count > 0) return { ...existing, customerId, contextType: normalizedContextType, contextId: context.contextId ?? null }
+      }
+      return existing
+    }
 
     return this.prisma.whatsAppConversation.create({
       data: {

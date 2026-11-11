@@ -1,0 +1,144 @@
+FAIL src/audit/audit-admin.service.spec.ts
+  ● Audit pagination validation › rejects invalid pagination before querying: {"page":-1}
+
+    expect(received).rejects.toMatchObject(expected)
+
+    - Expected  - 3
+    + Received  + 1
+
+    - Object {
+    -   "status": 400,
+    - }
+    + [TypeError: Cannot read properties of undefined (reading 'map')]
+
+      50 |   ])('rejects invalid pagination before querying: %j', async input => {
+      51 |     const db = { auditEvent: { findMany: jest.fn(), count: jest.fn() } }
+    > 52 |     await expect(new AuditAdminService(db as any).listEvents({ orgId: 'org', ...input })).rejects.toMatchObject({ status: 400 })
+         |                                                                                                   ^
+      53 |     expect(db.auditEvent.findMany).not.toHaveBeenCalled()
+      54 |     expect(db.auditEvent.count).not.toHaveBeenCalled()
+      55 |   })
+
+      at Object.toMatchObject (../../node_modules/.pnpm/expect@30.5.2/node_modules/expect/build/index.js:2155:20)
+      at src/audit/audit-admin.service.spec.ts:52:99
+
+  ● Audit pagination validation › rejects invalid pagination before querying: {"page":1.5}
+
+    expect(received).rejects.toMatchObject(expected)
+
+    - Expected  - 3
+    + Received  + 1
+
+    - Object {
+    -   "status": 400,
+    - }
+    + [TypeError: Cannot read properties of undefined (reading 'map')]
+
+      50 |   ])('rejects invalid pagination before querying: %j', async input => {
+      51 |     const db = { auditEvent: { findMany: jest.fn(), count: jest.fn() } }
+    > 52 |     await expect(new AuditAdminService(db as any).listEvents({ orgId: 'org', ...input })).rejects.toMatchObject({ status: 400 })
+         |                                                                                                   ^
+      53 |     expect(db.auditEvent.findMany).not.toHaveBeenCalled()
+      54 |     expect(db.auditEvent.count).not.toHaveBeenCalled()
+      55 |   })
+
+      at Object.toMatchObject (../../node_modules/.pnpm/expect@30.5.2/node_modules/expect/build/index.js:2155:20)
+      at src/audit/audit-admin.service.spec.ts:52:99
+
+  ● Audit pagination validation › rejects invalid pagination before querying: {"page":null}
+
+    expect(received).rejects.toMatchObject(expected)
+
+    - Expected  - 3
+    + Received  + 1
+
+    - Object {
+    -   "status": 400,
+    - }
+    + [TypeError: Cannot read properties of undefined (reading 'map')]
+
+      50 |   ])('rejects invalid pagination before querying: %j', async input => {
+      51 |     const db = { auditEvent: { findMany: jest.fn(), count: jest.fn() } }
+    > 52 |     await expect(new AuditAdminService(db as any).listEvents({ orgId: 'org', ...input })).rejects.toMatchObject({ status: 400 })
+         |                                                                                                   ^
+      53 |     expect(db.auditEvent.findMany).not.toHaveBeenCalled()
+      54 |     expect(db.auditEvent.count).not.toHaveBeenCalled()
+      55 |   })
+
+      at Object.toMatchObject (../../node_modules/.pnpm/expect@30.5.2/node_modules/expect/build/index.js:2155:20)
+      at src/audit/audit-admin.service.spec.ts:52:99
+
+  ● Audit pagination validation › rejects invalid pagination before querying: {"limit":-1}
+
+    expect(received).rejects.toMatchObject(expected)
+
+    - Expected  - 3
+    + Received  + 1
+
+    - Object {
+    -   "status": 400,
+    - }
+    + [TypeError: Cannot read properties of undefined (reading 'map')]
+
+      50 |   ])('rejects invalid pagination before querying: %j', async input => {
+      51 |     const db = { auditEvent: { findMany: jest.fn(), count: jest.fn() } }
+    > 52 |     await expect(new AuditAdminService(db as any).listEvents({ orgId: 'org', ...input })).rejects.toMatchObject({ status: 400 })
+         |                                                                                                   ^
+      53 |     expect(db.auditEvent.findMany).not.toHaveBeenCalled()
+      54 |     expect(db.auditEvent.count).not.toHaveBeenCalled()
+      55 |   })
+
+      at Object.toMatchObject (../../node_modules/.pnpm/expect@30.5.2/node_modules/expect/build/index.js:2155:20)
+      at src/audit/audit-admin.service.spec.ts:52:99
+
+  ● Audit pagination validation › rejects invalid pagination before querying: {"limit":1.5}
+
+    expect(received).rejects.toMatchObject(expected)
+
+    - Expected  - 3
+    + Received  + 1
+
+    - Object {
+    -   "status": 400,
+    - }
+    + [TypeError: Cannot read properties of undefined (reading 'map')]
+
+      50 |   ])('rejects invalid pagination before querying: %j', async input => {
+      51 |     const db = { auditEvent: { findMany: jest.fn(), count: jest.fn() } }
+    > 52 |     await expect(new AuditAdminService(db as any).listEvents({ orgId: 'org', ...input })).rejects.toMatchObject({ status: 400 })
+         |                                                                                                   ^
+      53 |     expect(db.auditEvent.findMany).not.toHaveBeenCalled()
+      54 |     expect(db.auditEvent.count).not.toHaveBeenCalled()
+      55 |   })
+
+      at Object.toMatchObject (../../node_modules/.pnpm/expect@30.5.2/node_modules/expect/build/index.js:2155:20)
+      at src/audit/audit-admin.service.spec.ts:52:99
+
+  ● Audit pagination validation › rejects invalid pagination before querying: {"limit":null}
+
+    expect(received).rejects.toMatchObject(expected)
+
+    - Expected  - 3
+    + Received  + 1
+
+    - Object {
+    -   "status": 400,
+    - }
+    + [TypeError: Cannot read properties of undefined (reading 'map')]
+
+      50 |   ])('rejects invalid pagination before querying: %j', async input => {
+      51 |     const db = { auditEvent: { findMany: jest.fn(), count: jest.fn() } }
+    > 52 |     await expect(new AuditAdminService(db as any).listEvents({ orgId: 'org', ...input })).rejects.toMatchObject({ status: 400 })
+         |                                                                                                   ^
+      53 |     expect(db.auditEvent.findMany).not.toHaveBeenCalled()
+      54 |     expect(db.auditEvent.count).not.toHaveBeenCalled()
+      55 |   })
+
+      at Object.toMatchObject (../../node_modules/.pnpm/expect@30.5.2/node_modules/expect/build/index.js:2155:20)
+      at src/audit/audit-admin.service.spec.ts:52:99
+
+Test Suites: 1 failed, 1 total
+Tests:       6 failed, 11 passed, 17 total
+Snapshots:   0 total
+Time:        4.963 s, estimated 6 s
+Ran all test suites matching src/audit/audit-admin.service.spec.ts.

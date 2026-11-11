@@ -252,7 +252,7 @@ export default function AppointmentsPage() {
     (page - 1) * pageSize,
     page * pageSize
   );
-  const selected = rows.find(row => row.id === selectedId) ?? null;
+  const selected = filteredRows.find(row => row.id === selectedId) ?? null;
 
   useEffect(
     () => setPage(1),
@@ -625,12 +625,14 @@ export default function AppointmentsPage() {
             ) : appointments.length === 0 ? (
               <AppPageEmptyState
                 title="Sem agendamentos"
-                description="Nenhum agendamento foi retornado pela fonte oficial."
+                description="Crie o primeiro agendamento para organizar os atendimentos."
+                action={canCreateAppointment ? <Button onClick={() => { setEditing(null); setOpenModal(true); }}>Novo agendamento</Button> : undefined}
               />
             ) : filteredRows.length === 0 ? (
               <AppPageEmptyState
-                title="Nenhum resultado"
-                description="Nenhum fato persistido corresponde aos filtros de apresentação."
+                title="Nenhum resultado para os filtros"
+                description="Limpe os filtros para ver a agenda."
+                action={<Button variant="outline" onClick={() => { setQueryText(""); setDateFilter(""); setStatusFilter("all"); setResponsibleFilter("all"); setPage(1); }}>Limpar filtros</Button>}
               />
             ) : (
               <>
@@ -773,7 +775,7 @@ export default function AppointmentsPage() {
             )}
           </AppSectionBlock>
 
-          <AppSectionBlock
+          {filteredRows.length > 0 && !appointmentsQuery.isLoading && !appointmentsQuery.isError ? (          <AppSectionBlock
             title="Detalhe e evidências"
             subtitle="Fatos do agendamento em foco e histórico oficial relacionado."
             compact
@@ -898,7 +900,7 @@ export default function AppointmentsPage() {
                 </div>
               </div>
             )}
-          </AppSectionBlock>
+          </AppSectionBlock>) : null}
 
           <nav
             aria-label="Navegação contextual de agendamentos"

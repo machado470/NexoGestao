@@ -1,0 +1,740 @@
+
+> nexogestao@1.0.0 test /workspace/NexoGestao
+> turbo run test
+
+
+   • turbo 2.11.10
+   • Packages in scope: @nexogestao/api, @nexogestao/common, @nexogestao/web
+   • Running test in 3 packages
+   • Remote caching disabled
+
+@nexogestao/api:test: cache miss, executing 9b451fa1e91de836
+@nexogestao/web:test: cache hit, replaying logs e4d5d452f57b2a3f
+@nexogestao/web:test: 
+@nexogestao/web:test: > @nexogestao/web@1.0.0 test /workspace/NexoGestao/apps/web
+@nexogestao/web:test: > vitest run
+@nexogestao/web:test: 
+@nexogestao/web:test: 
+@nexogestao/web:test:  RUN  v4.1.12 /workspace/NexoGestao/apps/web
+@nexogestao/web:test: 
+@nexogestao/web:test:  ✓ client/src/lib/local-date-time.test.ts (15 tests) 977ms
+@nexogestao/web:test:  ✓ server/whatsapp.contract.test.ts (33 tests) 124ms
+@nexogestao/web:test:  ✓ server/bff-api-contract.test.ts (23 tests) 128ms
+@nexogestao/web:test:  ✓ server/_core/notificationStream.test.ts (4 tests) 205ms
+@nexogestao/web:test:  ✓ client/src/pages/WhatsAppWebhookRecovery.test.tsx (8 tests) 73ms
+@nexogestao/web:test:  ✓ client/src/components/OrganizationMemberActions.test.tsx (5 tests) 34ms
+@nexogestao/web:test:  ✓ server/phase2-finance-charges-list-contract.test.ts (10 tests) 187ms
+@nexogestao/web:test:  ✓ server/phase2-executions-contract.test.ts (17 tests) 75ms
+@nexogestao/web:test:  ✓ server/operational-notifications.integration.test.ts (4 tests) 18ms
+@nexogestao/web:test:  ✓ server/customers-output-contract.test.ts (25 tests) 158ms
+@nexogestao/web:test:  ✓ server/phase2-customers-list-contract.test.ts (12 tests) 98ms
+@nexogestao/web:test:  ✓ server/bff-router-decomposition.test.ts (6 tests) 102ms
+@nexogestao/web:test:  ✓ client/src/components/OrganizationAccessSection.test.tsx (8 tests) 30ms
+@nexogestao/web:test:  ✓ server/dashboard-executive-truth.test.ts (11 tests) 97ms
+@nexogestao/web:test:  ✓ server/bff-api.contract.test.ts (9 tests) 72ms
+@nexogestao/web:test:  ✓ server/finance-mutation-output-contract.test.ts (13 tests) 75ms
+@nexogestao/web:test:  ✓ server/governance-bff-truth.test.ts (5 tests) 67ms
+@nexogestao/web:test:  ✓ server/timeline-output-contract.test.ts (12 tests) 80ms
+@nexogestao/web:test:  ✓ server/executions-output-contract.test.ts (4 tests) 38ms
+@nexogestao/web:test:  ✓ client/src/lib/settings-validation.test.ts (11 tests) 18ms
+@nexogestao/web:test:  ✓ client/src/components/AIChatBox.markdown-security.test.tsx (4 tests) 54ms
+@nexogestao/web:test:  ✓ server/service-orders-output-contract.test.ts (17 tests) 83ms
+@nexogestao/web:test:  ✓ server/onboarding-output-contract.test.ts (16 tests) 48ms
+@nexogestao/web:test: stdout | server/consent.route.test.ts > POST /api/consent > accepts valid payload and returns audit metadata
+@nexogestao/web:test: [2026-11-10T10:11:28.689Z] [INFO] [Audit] LGPD consentimento registrado
+@nexogestao/web:test: {
+@nexogestao/web:test:   "consentEventId": "da59504e-bdc1-458e-bc3f-1f05af379eff",
+@nexogestao/web:test:   "consentAt": "2026-11-10T10:11:28.688Z",
+@nexogestao/web:test:   "preferences": {
+@nexogestao/web:test:     "marketing": true,
+@nexogestao/web:test:     "analytics": false,
+@nexogestao/web:test:     "cookies": true
+@nexogestao/web:test:   },
+@nexogestao/web:test:   "ip": "::ffff:127.0.0.1"
+@nexogestao/web:test: }
+@nexogestao/web:test: 
+@nexogestao/web:test: stderr | server/consent.route.test.ts > POST /api/consent > rejects invalid payload
+@nexogestao/web:test: [2026-11-10T10:11:28.708Z] [WARN] [Security] Invalid consent payload
+@nexogestao/web:test: {
+@nexogestao/web:test:   "issues": [
+@nexogestao/web:test:     {
+@nexogestao/web:test:       "code": "invalid_value",
+@nexogestao/web:test:       "values": [
+@nexogestao/web:test:         true
+@nexogestao/web:test:       ],
+@nexogestao/web:test:       "path": [
+@nexogestao/web:test:         "cookies"
+@nexogestao/web:test:       ],
+@nexogestao/web:test:       "message": "Invalid input: expected true"
+@nexogestao/web:test:     }
+@nexogestao/web:test:   ]
+@nexogestao/web:test: }
+@nexogestao/web:test: 
+@nexogestao/web:test:  ✓ server/consent.route.test.ts (2 tests) 74ms
+@nexogestao/web:test:  ✓ client/src/lib/billing-plan-catalog.test.ts (11 tests) 24ms
+@nexogestao/web:test:  ✓ server/invites.lifecycle.test.ts (6 tests) 15ms
+@nexogestao/web:test:  ✓ client/src/lib/manual-payment-flow.test.ts (22 tests) 65ms
+@nexogestao/web:test:  ✓ server/routers/operational-cockpit.contract.test.ts (9 tests) 40ms
+@nexogestao/web:test:  ✓ client/src/Architecture.global-execution-bar.test.ts (3 tests) 13ms
+@nexogestao/web:test:  ✓ client/src/Architecture.operational-guardrails.test.ts (15 tests) 53ms
+@nexogestao/web:test:  ✓ client/src/lib/whatsappActionExecution.test.tsx (5 tests) 50ms
+@nexogestao/web:test:  ✓ server/expense-update-input-contract.test.ts (5 tests) 46ms
+@nexogestao/web:test: stdout | server/_core/oauth.security.test.ts > Google OAuth credential forwarding > forwards only the Google ID token, not an asserted email/profile
+@nexogestao/web:test: [auth.google] session token received
+@nexogestao/web:test: 
+@nexogestao/web:test:  ✓ server/_core/oauth.security.test.ts (3 tests) 113ms
+@nexogestao/web:test:  ✓ server/phase2-onboarding-input-contract.test.ts (8 tests) 70ms
+@nexogestao/web:test:  ✓ client/src/pages/FinancesPage.navigation.test.tsx (6 tests) 42ms
+@nexogestao/web:test: stderr | server/auth.session-validation.test.ts > BFF validated session > /me indisponível não marca authenticated
+@nexogestao/web:test: [trpc/context] fetchNexoMe upstream unavailable; refusing token-only auth context {
+@nexogestao/web:test:   url: 'http://127.0.0.1:3000/v1/me',
+@nexogestao/web:test:   error: { name: 'Error', message: 'fetch failed', cause: undefined },
+@nexogestao/web:test:   cooldownMs: 4000,
+@nexogestao/web:test:   suppressedCount: undefined
+@nexogestao/web:test: }
+@nexogestao/web:test: 
+@nexogestao/web:test: stderr | server/auth.session-validation.test.ts > BFF validated session > /me indisponível não marca authenticated
+@nexogestao/web:test: [trpc/context] createContext refused token-only auth context { reason: 'unavailable', suppressedCount: undefined }
+@nexogestao/web:test: 
+@nexogestao/web:test: stderr | server/auth.session-validation.test.ts > BFF validated session > establishSession retorna falha explícita e remove cookie quando /me falha
+@nexogestao/web:test: [auth.establishSession] sessão não validada por /me { reason: 'backend unavailable' }
+@nexogestao/web:test: 
+@nexogestao/web:test:  ✓ server/auth.session-validation.test.ts (8 tests) 58ms
+@nexogestao/web:test:  ✓ server/dashboard-executive-pipeline.test.ts (2 tests) 48ms
+@nexogestao/web:test:  ✓ server/service-order-datetime-input.test.ts (4 tests) 21ms
+@nexogestao/web:test:  ✓ client/src/lib/onboarding-service.test.ts (6 tests) 21ms
+@nexogestao/web:test: stdout | server/security.test.ts > Security - Audit Logging > deve registrar ações de auditoria
+@nexogestao/web:test: [AUDIT] Deleted 0 logs older than 0 days
+@nexogestao/web:test: 
+@nexogestao/web:test: stdout | server/security.test.ts > Security - Audit Logging > deve registrar ações de auditoria
+@nexogestao/web:test: [AUDIT] CREATE CUSTOMER #123 by user 1 from 127.0.0.1
+@nexogestao/web:test: 
+@nexogestao/web:test: stdout | server/security.test.ts > Security - Audit Logging > deve detectar atividades suspeitas
+@nexogestao/web:test: [AUDIT] Deleted 1 logs older than 0 days
+@nexogestao/web:test: 
+@nexogestao/web:test: stdout | server/security.test.ts > Security - Audit Logging > deve detectar atividades suspeitas
+@nexogestao/web:test: [AUDIT] DELETE CUSTOMER #0 by user 1 from 127.0.0.1
+@nexogestao/web:test: 
+@nexogestao/web:test: stdout | server/security.test.ts > Security - Audit Logging > deve detectar atividades suspeitas
+@nexogestao/web:test: [AUDIT] DELETE CUSTOMER #1 by user 1 from 127.0.0.1
+@nexogestao/web:test: 
+@nexogestao/web:test: stdout | server/security.test.ts > Security - Audit Logging > deve detectar atividades suspeitas
+@nexogestao/web:test: [AUDIT] DELETE CUSTOMER #2 by user 1 from 127.0.0.1
+@nexogestao/web:test: 
+@nexogestao/web:test: stdout | server/security.test.ts > Security - Audit Logging > deve detectar atividades suspeitas
+@nexogestao/web:test: [AUDIT] DELETE CUSTOMER #3 by user 1 from 127.0.0.1
+@nexogestao/web:test: 
+@nexogestao/web:test: stdout | server/security.test.ts > Security - Audit Logging > deve detectar atividades suspeitas
+@nexogestao/web:test: [AUDIT] DELETE CUSTOMER #4 by user 1 from 127.0.0.1
+@nexogestao/web:test: 
+@nexogestao/web:test: stdout | server/security.test.ts > Security - Audit Logging > deve detectar atividades suspeitas
+@nexogestao/web:test: [AUDIT] DELETE CUSTOMER #5 by user 1 from 127.0.0.1
+@nexogestao/web:test: 
+@nexogestao/web:test: stdout | server/security.test.ts > Security - Audit Logging > deve detectar atividades suspeitas
+@nexogestao/web:test: [AUDIT] DELETE CUSTOMER #6 by user 1 from 127.0.0.1
+@nexogestao/web:test: 
+@nexogestao/web:test: stdout | server/security.test.ts > Security - Audit Logging > deve detectar atividades suspeitas
+@nexogestao/web:test: [AUDIT] DELETE CUSTOMER #7 by user 1 from 127.0.0.1
+@nexogestao/web:test: 
+@nexogestao/web:test: stdout | server/security.test.ts > Security - Audit Logging > deve detectar atividades suspeitas
+@nexogestao/web:test: [AUDIT] DELETE CUSTOMER #8 by user 1 from 127.0.0.1
+@nexogestao/web:test: 
+@nexogestao/web:test: stdout | server/security.test.ts > Security - Audit Logging > deve detectar atividades suspeitas
+@nexogestao/web:test: [AUDIT] DELETE CUSTOMER #9 by user 1 from 127.0.0.1
+@nexogestao/web:test: 
+@nexogestao/web:test: stdout | server/security.test.ts > Security - Audit Logging > deve detectar atividades suspeitas
+@nexogestao/web:test: [AUDIT] DELETE CUSTOMER #10 by user 1 from 127.0.0.1
+@nexogestao/web:test: 
+@nexogestao/web:test: stdout | server/security.test.ts > Security - Audit Logging > deve detectar atividades suspeitas
+@nexogestao/web:test: [AUDIT] DELETE CUSTOMER #11 by user 1 from 127.0.0.1
+@nexogestao/web:test: 
+@nexogestao/web:test: stdout | server/security.test.ts > Security - Audit Logging > deve detectar atividades suspeitas
+@nexogestao/web:test: [AUDIT] DELETE CUSTOMER #12 by user 1 from 127.0.0.1
+@nexogestao/web:test: 
+@nexogestao/web:test: stdout | server/security.test.ts > Security - Audit Logging > deve detectar atividades suspeitas
+@nexogestao/web:test: [AUDIT] DELETE CUSTOMER #13 by user 1 from 127.0.0.1
+@nexogestao/web:test: 
+@nexogestao/web:test: stdout | server/security.test.ts > Security - Audit Logging > deve detectar atividades suspeitas
+@nexogestao/web:test: [AUDIT] DELETE CUSTOMER #14 by user 1 from 127.0.0.1
+@nexogestao/web:test: 
+@nexogestao/web:test:  ✓ server/security.test.ts (17 tests) 17ms
+@nexogestao/web:test:  ✓ server/_core/hardening.test.ts (2 tests) 15ms
+@nexogestao/web:test:  ✓ client/src/lib/operational-prioritization.test.ts (5 tests) 5ms
+@nexogestao/web:test:  ✓ client/src/lib/planned-capacity-input.test.ts (17 tests) 6ms
+@nexogestao/web:test: stderr | client/src/components/ConsentBanner.test.ts > ConsentBanner > falha ao salvar quando backend responde erro
+@nexogestao/web:test: Falha ao registrar consentimento (status 500) { prefs: { marketing: true, analytics: true, cookies: true } }
+@nexogestao/web:test: 
+@nexogestao/web:test: stderr | client/src/components/ConsentBanner.test.ts > ConsentBanner > não fecha indevidamente em erro de rede
+@nexogestao/web:test: Erro ao registrar consentimento. Error: network down
+@nexogestao/web:test:     at /workspace/NexoGestao/apps/web/client/src/components/ConsentBanner.test.ts:55:15
+@nexogestao/web:test:     at Mock (file:///workspace/NexoGestao/node_modules/.pnpm/@vitest+spy@4.1.12/node_modules/@vitest/spy/dist/index.js:332:34)
+@nexogestao/web:test:     at Module.saveConsent (/workspace/NexoGestao/apps/web/client/src/components/ConsentBanner.logic.ts:24:28)
+@nexogestao/web:test:     at /workspace/NexoGestao/apps/web/client/src/components/ConsentBanner.test.ts:53:25
+@nexogestao/web:test:     at file:///workspace/NexoGestao/node_modules/.pnpm/@vitest+runner@4.1.12/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+@nexogestao/web:test:     at file:///workspace/NexoGestao/node_modules/.pnpm/@vitest+runner@4.1.12/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+@nexogestao/web:test:     at file:///workspace/NexoGestao/node_modules/.pnpm/@vitest+runner@4.1.12/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+@nexogestao/web:test:     at new Promise (<anonymous>)
+@nexogestao/web:test:     at runWithCancel (file:///workspace/NexoGestao/node_modules/.pnpm/@vitest+runner@4.1.12/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+@nexogestao/web:test:     at file:///workspace/NexoGestao/node_modules/.pnpm/@vitest+runner@4.1.12/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+@nexogestao/web:test: 
+@nexogestao/web:test:  ✓ client/src/components/ConsentBanner.test.ts (3 tests) 9ms
+@nexogestao/web:test:  ✓ client/src/pages/AuditPage.contract.test.ts (9 tests) 22ms
+@nexogestao/web:test:  ✓ client/src/pages/ExecutiveDashboard.operational-cockpit.test.ts (23 tests) 69ms
+@nexogestao/web:test:  ✓ client/src/pages/WhatsAppPage.golden-standard.test.ts (6 tests) 8ms
+@nexogestao/web:test:  ✓ server/_core/nexoEnvelope.test.ts (8 tests) 5ms
+@nexogestao/web:test:  ✓ server/organization-members.contract.test.ts (7 tests) 14ms
+@nexogestao/web:test:  ✓ client/src/pages/FinancesPage.manual-payment.contract.test.ts (8 tests) 7ms
+@nexogestao/web:test:  ✓ client/src/lib/audit-actor-options.test.ts (5 tests) 6ms
+@nexogestao/web:test:  ✓ client/src/lib/customer-edit-draft.test.ts (7 tests) 5ms
+@nexogestao/web:test:  ✓ client/src/pages/CustomersPage.operational-center.test.ts (21 tests) 11ms
+@nexogestao/web:test:  ✓ client/src/pages/PeoplePage.contract.test.ts (12 tests) 10ms
+@nexogestao/web:test:  ✓ client/src/App.routing-guards.test.ts (6 tests) 6ms
+@nexogestao/web:test:  ✓ client/src/pages/BillingPage.contract.test.ts (10 tests) 9ms
+@nexogestao/web:test:  ✓ client/src/lib/customer-update-flow.test.ts (4 tests) 6ms
+@nexogestao/web:test:  ✓ client/src/pages/AppointmentsPage*.test.ts (8 tests) 7ms
+@nexogestao/web:test:  ✓ client/src/lib/assignee-warning-telemetry.test.ts (5 tests) 7ms
+@nexogestao/web:test:  ✓ client/src/pages/ProfilePage.contract.test.ts (7 tests) 8ms
+@nexogestao/web:test:  ✓ client/src/pages/CalendarPage.contract.test.ts (9 tests) 8ms
+@nexogestao/web:test:  ✓ client/src/pages/ServiceOrdersPage.operational-contract.test.ts (2 tests) 4ms
+@nexogestao/web:test:  ✓ client/src/pages/TimelinePage.contract.test.ts (5 tests) 7ms
+@nexogestao/web:test:  ✓ client/src/pages/ServiceOrdersPage.operational-ui.test.ts (8 tests) 6ms
+@nexogestao/web:test:  ✓ client/src/lib/executive-dashboard-state.test.ts (7 tests) 4ms
+@nexogestao/web:test:  ✓ client/src/components/PersonAssignmentWarning.test.tsx (8 tests) 6ms
+@nexogestao/web:test:  ✓ client/src/lib/person-edit-session.test.ts (5 tests) 19ms
+@nexogestao/web:test:  ✓ client/src/pages/WhatsAppWebhookRecoveryPage.contract.test.ts (5 tests) 5ms
+@nexogestao/web:test:  ✓ client/src/components/MainLayout.notification-route.test.ts (2 tests) 4ms
+@nexogestao/web:test:  ✓ client/src/lib/money-input.test.ts (36 tests) 9ms
+@nexogestao/web:test:  ✓ client/src/pages/WhatsAppPage.composer-actions.test.ts (7 tests) 10ms
+@nexogestao/web:test:  ✓ client/src/pages/OperationalCockpitPage.test.ts (22 tests) 7ms
+@nexogestao/web:test:  ✓ client/src/contexts/AuthContext.auth-state.test.ts (8 tests) 5ms
+@nexogestao/web:test:  ✓ client/src/components/operational/operational-components.contract.test.ts (4 tests) 6ms
+@nexogestao/web:test:  ✓ client/src/hooks/useNotificationStream.test.ts (3 tests) 5ms
+@nexogestao/web:test:  ✓ client/src/pages/GovernancePage.contract.test.ts (7 tests) 6ms
+@nexogestao/web:test:  ✓ client/src/pages/AppointmentAssignee.contract.test.ts (2 tests) 5ms
+@nexogestao/web:test:  ✓ client/src/components/AppVisualFoundation.contract.test.ts (3 tests) 5ms
+@nexogestao/web:test:  ✓ client/src/components/AppBootstrapGuard.test.ts (3 tests) 5ms
+@nexogestao/web:test:  ✓ client/src/pages/SettingsPage.contract.test.ts (5 tests) 7ms
+@nexogestao/web:test:  ✓ client/src/pages/Timeline.test.ts (4 tests) 4ms
+@nexogestao/web:test:  ✓ client/src/lib/rbac.test.ts (7 tests) 5ms
+@nexogestao/web:test:  ✓ client/src/lib/operations/flowChain.test.ts (3 tests) 5ms
+@nexogestao/web:test:  ✓ client/src/pages/Onboarding.contract.test.ts (6 tests) 6ms
+@nexogestao/web:test:  ✓ client/src/lib/settings-draft.test.ts (7 tests) 7ms
+@nexogestao/web:test:  ✓ client/src/lib/availability-input.test.ts (8 tests) 6ms
+@nexogestao/web:test:  ✓ client/src/lib/operational/kpi.test.ts (5 tests) 4ms
+@nexogestao/web:test:  ✓ client/src/components/ConsentBanner.storage.test.ts (3 tests) 5ms
+@nexogestao/web:test:  ✓ client/src/Architecture.bootstrap.test.ts (4 tests) 4ms
+@nexogestao/web:test:  ✓ client/src/pages/PricingPage.contract.test.ts (2 tests) 3ms
+@nexogestao/web:test:  ✓ client/src/lib/concurrency.test.ts (2 tests) 3ms
+@nexogestao/web:test:  ✓ server/billing-checkout-contract.test.ts (1 test) 3ms
+@nexogestao/web:test:  ✓ client/src/lib/presentation-labels.test.ts (5 tests) 7ms
+@nexogestao/web:test:  ✓ server/timeline-authority.contract.test.ts (2 tests) 3ms
+@nexogestao/web:test:  ✓ server/_core/nexoApiUrl.test.ts (2 tests) 3ms
+@nexogestao/web:test:  ✓ client/src/pages/ExecutiveDashboard.whatsapp-approvals.test.ts (1 test) 4ms
+@nexogestao/web:test:  ✓ server/modals.test.ts (1 test) 2ms
+@nexogestao/web:test:  ✓ server/auth.logout.test.ts (1 test) 3ms
+@nexogestao/web:test: 
+@nexogestao/web:test:  Test Files  98 passed (98)
+@nexogestao/web:test:       Tests  792 passed (792)
+@nexogestao/web:test:    Start at  10:11:12
+@nexogestao/web:test:    Duration  37.45s (transform 3.93s, setup 0ms, import 15.50s, tests 4.05s, environment 10ms)
+@nexogestao/web:test: 
+@nexogestao/common:test: cache hit, replaying logs b0eadb70e383416d
+@nexogestao/common:test: 
+@nexogestao/common:test: > @nexogestao/common@1.0.0 test /workspace/NexoGestao/packages/common
+@nexogestao/common:test: > pnpm build && node --test test/*.test.cjs
+@nexogestao/common:test: 
+@nexogestao/common:test: 
+@nexogestao/common:test: > @nexogestao/common@1.0.0 build /workspace/NexoGestao/packages/common
+@nexogestao/common:test: > tsc --build tsconfig.json
+@nexogestao/common:test: 
+@nexogestao/common:test: ✔ builds canonical customer and service-order notification routes (0.893218ms)
+@nexogestao/common:test: ✔ rejects empty notification route identifiers (0.40685ms)
+@nexogestao/common:test: ✔ accepts only declared internal notification routes (0.480328ms)
+@nexogestao/common:test: ✔ rejects unsafe or malformed notification routes (0.326321ms)
+@nexogestao/common:test: ℹ tests 4
+@nexogestao/common:test: ℹ suites 0
+@nexogestao/common:test: ℹ pass 4
+@nexogestao/common:test: ℹ fail 0
+@nexogestao/common:test: ℹ cancelled 0
+@nexogestao/common:test: ℹ skipped 0
+@nexogestao/common:test: ℹ todo 0
+@nexogestao/common:test: ℹ duration_ms 102.59059
+@nexogestao/api:test: 
+@nexogestao/api:test: > @nexogestao/api@0.1.0 pretest /workspace/NexoGestao/apps/api
+@nexogestao/api:test: > pnpm --dir ../.. prepare:workspace
+@nexogestao/api:test: 
+@nexogestao/api:test: 
+@nexogestao/api:test: > nexogestao@1.0.0 prepare:workspace /workspace/NexoGestao
+@nexogestao/api:test: > pnpm prepare:common
+@nexogestao/api:test: 
+@nexogestao/api:test: 
+@nexogestao/api:test: > nexogestao@1.0.0 prepare:common /workspace/NexoGestao
+@nexogestao/api:test: > pnpm --filter @nexogestao/common build
+@nexogestao/api:test: 
+@nexogestao/api:test: 
+@nexogestao/api:test: > @nexogestao/common@1.0.0 build /workspace/NexoGestao/packages/common
+@nexogestao/api:test: > tsc --build tsconfig.json
+@nexogestao/api:test: 
+@nexogestao/api:test: 
+@nexogestao/api:test: > @nexogestao/api@0.1.0 test /workspace/NexoGestao/apps/api
+@nexogestao/api:test: > jest --config jest.config.js --runInBand
+@nexogestao/api:test: 
+@nexogestao/api:test: PASS src/audit/audit-admin.service.spec.ts
+@nexogestao/api:test: PASS src/appointments/appointments.rate-limit.spec.ts
+@nexogestao/api:test: PASS src/common/architecture/app-bootstrap.spec.ts
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:38 AM   ERROR [WhatsAppDispatcherJob] whatsapp stale SENDING reconciliation failed err= msg=postgres unavailable
+@nexogestao/api:test: PASS src/whatsapp/whatsapp.dispatcher.reconciliation.spec.ts
+@nexogestao/api:test: PASS src/operational-actions/operational-actions.controller.spec.ts
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:38 AM    WARN [WhatsAppDispatcherJob] whatsapp stale SENDING reconciled count=1
+@nexogestao/api:test: PASS test/integration/concurrency-wave2.spec.ts
+@nexogestao/api:test: PASS src/payments/manual-payments.http.spec.ts
+@nexogestao/api:test: PASS src/finance/finance.service.spec.ts
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:38 AM     LOG [FinanceService] {"requestId":"req-1","action":"PAY_CHARGE_START","entityId":"ch-1","orgId":"org-1","amountCents":1000,"method":"PIX","message":"Iniciando payCharge"}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:38 AM     LOG [FinanceService] {"requestId":"req-1","action":"PAY_CHARGE_START","entityId":"ch-1","orgId":"org-1","amountCents":1000,"method":"PIX","message":"Iniciando payCharge"}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:38 AM     LOG [FinanceService] {"requestId":"req-1","action":"PAY_CHARGE_START","entityId":"ch-1","orgId":"org-1","amountCents":1000,"method":"PIX","message":"Iniciando payCharge"}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:38 AM     LOG [FinanceService] {"requestId":"req-1","action":"CREATE_CHARGE_START","entityId":"c-1","orgId":"org-1","customerId":"c-1","message":"Iniciando createCharge"}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:38 AM    WARN [FinanceService] {"requestId":"req-1","action":"WHATSAPP_SEND_CHARGE","entityId":"ch-1","error":"timeout","message":"Falha de integração no envio de cobrança. Fluxo seguirá em modo degradado"}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:38 AM    WARN [FinanceService] {"requestId":"req-1","action":"CREATE_CHARGE_RESULT","entityId":"ch-1","chargeId":"ch-1","orgId":"org-1","message":"Cobrança criada com fallback de WhatsApp (mensagem em fila/pendente)"}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:38 AM     LOG [FinanceService] {"requestId":"req-1","action":"CREATE_CHARGE_START","entityId":"c-1","orgId":"org-1","customerId":"c-1","message":"Iniciando createCharge"}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:38 AM     LOG [FinanceService] {"requestId":"req-1","action":"PAY_CHARGE_START","entityId":"ch-1","orgId":"org-1","amountCents":1000,"method":"PIX","message":"Iniciando payCharge"}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:38 AM     LOG [FinanceService] {"requestId":"req-1","action":"PAY_CHARGE_START","entityId":"ch-1","orgId":"org-1","amountCents":1000,"method":"PIX","message":"Iniciando payCharge"}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:38 AM     LOG [FinanceService] {"requestId":"req-1","action":"PAY_CHARGE_RESULT","entityId":"ch-1","paymentId":"pay-1","orgId":"org-1","message":"Pagamento registrado com sucesso"}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:38 AM     LOG [FinanceService] {"requestId":"req-1","action":"PAY_CHARGE_START","entityId":"ch-1","orgId":"org-1","amountCents":1000,"method":"PIX","message":"Iniciando payCharge"}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:38 AM     LOG [FinanceService] {"requestId":"req-1","action":"PAY_CHARGE_RESULT","entityId":"ch-1","paymentId":"pay-1","orgId":"org-1","message":"Pagamento registrado com sucesso"}
+@nexogestao/api:test: [Nest] 3235  - 02/10/2026, 9:30:00 AM     LOG [FinanceService] {"requestId":"req-1","action":"PAY_CHARGE_START","entityId":"ch-1","orgId":"org-1","amountCents":1000,"method":"PIX","message":"Iniciando payCharge"}
+@nexogestao/api:test: [Nest] 3235  - 02/10/2026, 9:30:00 AM     LOG [FinanceService] {"requestId":"req-1","action":"PAY_CHARGE_RESULT","entityId":"ch-1","paymentId":"pay-1","orgId":"org-1","message":"Pagamento registrado com sucesso"}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:38 AM     LOG [FinanceService] {"requestId":"req-1","action":"PAY_CHARGE_START","entityId":"ch-1","orgId":"org-1","amountCents":999,"method":"PIX","message":"Iniciando payCharge"}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:38 AM     LOG [FinanceService] {"requestId":"req-1","action":"PAY_CHARGE_START","entityId":"ch-1","orgId":"org-1","amountCents":1001,"method":"PIX","message":"Iniciando payCharge"}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:38 AM     LOG [FinanceService] {"requestId":"req-1","action":"PAY_CHARGE_START","entityId":"ch-1","orgId":"org-1","amountCents":1001,"method":"PIX","message":"Iniciando payCharge"}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:38 AM     LOG [FinanceService] {"requestId":"req-1","action":"PAY_CHARGE_RESULT","entityId":"ch-1","paymentId":"pay-1","orgId":"org-1","message":"Pagamento registrado com sucesso"}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:38 AM     LOG [FinanceService] {"requestId":"req-1","action":"PAY_CHARGE_START","entityId":"ch-1","orgId":"org-1","amountCents":1000,"method":"PIX","message":"Iniciando payCharge"}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:38 AM     LOG [FinanceService] {"requestId":"req-1","action":"PAY_CHARGE_START","entityId":"ch-1","orgId":"org-1","amountCents":1000,"method":"PIX","message":"Iniciando payCharge"}
+@nexogestao/api:test: PASS src/expenses/financial-input.http.spec.ts
+@nexogestao/api:test: PASS src/whatsapp/whatsapp.dispatcher.ambiguous.spec.ts
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:39 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m1 worker=cron-3235-8dc182bb-259c-4164-b0d3-d525fcc4eb46
+@nexogestao/api:test: PASS test/integration/full-flow.spec.ts
+@nexogestao/api:test: PASS src/auth/auth.security-http.spec.ts
+@nexogestao/api:test: PASS src/finance/finance.queued-actions.spec.ts
+@nexogestao/api:test: PASS src/auth/guards/operational-role-http.spec.ts
+@nexogestao/api:test: PASS src/finance/finance.timezone.spec.ts
+@nexogestao/api:test: PASS src/whatsapp/whatsapp.service.priority.spec.ts
+@nexogestao/api:test: PASS src/whatsapp/whatsapp.webhook-security.spec.ts
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:40 AM     LOG [WhatsAppController] {"action":"whatsapp.webhook.ack","provider":"mock","orgId":"org1","traceId":"trace-1","webhookEventId":"wh1","latencyMs":0}
+@nexogestao/api:test: PASS test/integration/whatsapp-controller.integration.spec.ts
+@nexogestao/api:test: PASS src/whatsapp/whatsapp.claim-safety.spec.ts
+@nexogestao/api:test: PASS src/whatsapp/whatsapp-execution.service.spec.ts
+@nexogestao/api:test: PASS src/whatsapp/whatsapp.timeline-semantics.spec.ts
+@nexogestao/api:test: PASS src/appointments/appointments.service.spec.ts
+@nexogestao/api:test: PASS src/finance/finance.gaps.spec.ts
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:41 AM   ERROR [WhatsAppProcessor] {"action":"whatsapp.inbound_webhook.job_failed","jobId":"job1","attempt":2,"webhookEventId":"wh1","orgId":"org1","provider":"meta_cloud","traceId":"trace-1","requestId":null,"correlationId":null,"error":"transient","latencyMs":0}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:41 AM   ERROR [WhatsAppProcessor] {"action":"whatsapp.inbound_webhook.job_dead_lettered","jobId":"job1","webhookEventId":"wh1","orgId":"org1","provider":"meta_cloud","traceId":"trace-1","attemptsMade":5,"error":"terminal"}
+@nexogestao/api:test: PASS src/queue/processors/whatsapp.processor.spec.ts
+@nexogestao/api:test: PASS src/operational-actions/operational-actions.service.spec.ts
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:41 AM     LOG [WhatsAppProcessor] {"action":"whatsapp.inbound_webhook.job_started","jobId":"job1","attempt":1,"webhookEventId":"wh1","orgId":"org1","provider":"meta_cloud","traceId":"trace-1","requestId":null,"correlationId":null}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:41 AM     LOG [WhatsAppProcessor] {"action":"whatsapp.inbound_webhook.job_completed","jobId":"job1","attempt":1,"webhookEventId":"wh1","orgId":"org1","provider":"meta_cloud","traceId":"trace-1","requestId":null,"correlationId":null,"processed":1,"latencyMs":0}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:41 AM     LOG [WhatsAppProcessor] {"action":"whatsapp.inbound_webhook.job_started","jobId":"job1","attempt":2,"webhookEventId":"wh1","orgId":"org1","provider":"meta_cloud","traceId":"trace-1","requestId":null,"correlationId":null}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:41 AM    WARN [WhatsAppProcessor] {"action":"whatsapp.inbound_webhook.job_retry","jobId":"job1","jobName":"inbound-webhook","attempt":5,"nextAttempt":null,"maxAttempts":5,"delayMs":null,"requestId":"n/a","userId":"n/a","orgId":"org1","webhookEventId":"wh1","provider":"meta_cloud","traceId":"trace-1","error":"terminal"}
+@nexogestao/api:test: PASS src/queue/processors/whatsapp.processor.post-send.spec.ts
+@nexogestao/api:test: PASS src/whatsapp/whatsapp.stale-reconciliation.spec.ts
+@nexogestao/api:test: PASS src/queue/processors/whatsapp.processor.ambiguous.spec.ts
+@nexogestao/api:test: PASS src/service-orders/service-orders.service.spec.ts
+@nexogestao/api:test: PASS src/whatsapp/whatsapp.dispatcher.job.spec.ts
+@nexogestao/api:test: PASS src/whatsapp/whatsapp-automation.service.spec.ts
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m1 worker=cron-3235-f14e3481-a2e8-4ca3-af92-5d2941b2cfb8
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m2 worker=cron-3235-a8401ae0-d171-44f0-9a28-36aa0a629156
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m1 worker=cron-3235-e1efcd8a-127e-4568-afd1-787f37393d20
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m2 worker=cron-3235-b7ea5f85-fcde-48d6-abe5-e45f18a1f3ee
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m1 worker=cron-3235-98f8a7d3-9181-45c0-9912-6e4ccdd0d4ec
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m2 worker=cron-3235-7b8232b9-f0a7-43a5-99d0-6b6309970e84
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m3 worker=cron-3235-bbf44046-33c0-4151-896e-a2eb87fbeae3
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m4 worker=cron-3235-d6157e30-712b-4ded-8dfe-e9b07fc79622
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m5 worker=cron-3235-32a4d15a-6445-4d53-b0fc-c6a3f6b4d985
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m6 worker=cron-3235-05e1819c-651e-4c53-b144-09da7dac5b4f
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m7 worker=cron-3235-4aaa7ba6-1723-4a77-a699-3a9525a05ed3
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m8 worker=cron-3235-d4eb9710-120e-45fe-b5ba-55de5c6ed017
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m9 worker=cron-3235-8ab8034b-6207-4136-922a-902bc2407e9e
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m10 worker=cron-3235-4166023c-53d6-4859-928f-1cb6a88b39ac
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m11 worker=cron-3235-798bcc71-4d44-4b37-929c-d51fb84999d0
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m12 worker=cron-3235-990e7a44-7b67-43e5-b95b-ba1b5d706816
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m13 worker=cron-3235-a25320d7-b1c7-4952-9368-63018037341f
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m14 worker=cron-3235-dec95a81-0f60-4ae9-826e-7b3524c1e177
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m15 worker=cron-3235-bbce7691-bacb-4936-ab5b-ad2b5e3494ac
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m16 worker=cron-3235-c23ec55f-ff86-452c-941b-132be1c769b6
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m17 worker=cron-3235-06cc837d-cd6a-4b38-9809-9c4efb92bbf0
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m18 worker=cron-3235-940a4c35-0bd8-40f3-a76e-87634c888120
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m19 worker=cron-3235-652b2f38-020d-4205-ba85-b790abcd21f4
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m20 worker=cron-3235-28b415c5-0ae0-4e9e-8cc2-5d73bbf3592d
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m21 worker=cron-3235-3e4503b9-e20a-4a34-8e33-5baf59fb2962
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m22 worker=cron-3235-41018bd1-455d-4a21-b649-6490a74657f0
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m23 worker=cron-3235-b9c65afd-53a0-4bf2-98e4-88f3bfaeb5e5
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m24 worker=cron-3235-678045b7-1829-4586-9805-818303428518
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m25 worker=cron-3235-69c2cd68-19eb-4de7-90ef-8be8d8d1765d
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m26 worker=cron-3235-c0911d4c-aa12-4ad5-bec7-ffcc0382c0ae
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m27 worker=cron-3235-b3f0e27b-80c3-46eb-b8ba-0b5715c7d8de
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m28 worker=cron-3235-0c3afce2-6da5-4a76-a091-cd97a292814d
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m29 worker=cron-3235-5b61eee7-0ab5-4d00-983f-b334135b140c
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m30 worker=cron-3235-a4b7b54c-dc07-4fe4-9ea2-e17a4f76a88a
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m31 worker=cron-3235-5398cf83-8b17-442e-8c5d-4850e63de64b
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m32 worker=cron-3235-fcce9303-7efd-46cc-8061-1392bc0f6197
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m33 worker=cron-3235-fa8ea156-ccd4-4785-acee-17c28093e7d0
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m34 worker=cron-3235-f12d6bc0-74c9-472b-8160-eb450aebc255
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m35 worker=cron-3235-bbe4b24a-3ac5-47b3-8301-435195fc9751
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m36 worker=cron-3235-0fab116e-acef-4d5c-bfe0-e4d7d86d1d34
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m37 worker=cron-3235-6058cf4f-9dd6-4d0e-bcd0-b1267654cd1f
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m38 worker=cron-3235-48849854-7f7e-4ecd-a6fc-ad900d536d85
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m39 worker=cron-3235-ef5cb587-0001-478d-943e-870f7212f69e
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m40 worker=cron-3235-7862db0e-4196-4504-b726-4fac51ba454d
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m41 worker=cron-3235-745a2d87-d770-4652-97be-fee21205e44f
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m42 worker=cron-3235-636395e2-53bd-45b7-8a49-0c78510bf1b4
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m43 worker=cron-3235-c6352061-7701-4663-969e-677463b058e3
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m44 worker=cron-3235-a9fd16d9-60eb-4ead-a202-4b0725928e3a
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m45 worker=cron-3235-b4e8198f-2cc5-4ebd-b5b9-d84fa5997aff
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m46 worker=cron-3235-c7440914-72fb-4fe2-9eee-9fcc2c603793
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m47 worker=cron-3235-4d5fd6fb-f8b8-4bbc-95cd-216776b807c5
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m48 worker=cron-3235-3386d59f-b076-4ef3-aa30-335a9ab1bc72
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m49 worker=cron-3235-9f12afa2-76a1-40a0-a63c-109ce2821e81
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m50 worker=cron-3235-9e9bf1b1-7481-47cd-85ec-717f0c5ca000
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM    WARN [WhatsAppProviderFactory] [BOOT][WhatsApp][dev-fallback] WHATSAPP_ALLOW_MOCK não definido; provider mock liberado somente porque NODE_ENV!=production
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppProcessor] WhatsApp worker iniciado
+@nexogestao/api:test: PASS src/queue/processors/whatsapp.processor.lifecycle.spec.ts
+@nexogestao/api:test: PASS src/queue/processors/whatsapp.processor.outbound.spec.ts
+@nexogestao/api:test: PASS src/whatsapp/whatsapp-intelligence.timeline.spec.ts
+@nexogestao/api:test: PASS src/bootstrap/bootstrap.service.spec.ts
+@nexogestao/api:test: PASS src/automation/automation.execution-safety.spec.ts
+@nexogestao/api:test: PASS src/whatsapp/whatsapp.dispatch-fencing.spec.ts
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM   ERROR [WhatsAppDispatcherJob] whatsapp sent persistence failed message=m1 worker=cron-3235-664883f8-9d1f-4235-836e-aa28b9910adb err= msg=postgres unavailable
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM   ERROR [WhatsAppDispatcherJob] whatsapp uncertain persistence failed message=m1 worker=cron-3235-182c52cf-e014-4969-94eb-c0cd88c4672a err= msg=postgres unavailable
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM   ERROR [WhatsAppDispatcherJob] whatsapp provider result uncertain message=m1 worker=cron-3235-894bdc54-f44d-421d-afcb-9b6da3a5c758 err= msg=connection reset
+@nexogestao/api:test: PASS src/whatsapp/whatsapp.dispatcher.post-send.spec.ts
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m1 worker=cron-3235-664883f8-9d1f-4235-836e-aa28b9910adb
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m1 worker=cron-3235-182c52cf-e014-4969-94eb-c0cd88c4672a
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m1 worker=cron-3235-894bdc54-f44d-421d-afcb-9b6da3a5c758
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:42 AM     LOG [WhatsAppDispatcherJob] dispatching whatsapp message=m1 worker=cron-3235-4d0c7fb9-1ee6-4665-9a48-61e5db860f3a
+@nexogestao/api:test: PASS src/tracing.spec.ts
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:43 AM    WARN [AuthService] [OPTIONAL][integration-missing-config] RESEND_API_KEY ausente. Recuperação por e-mail ficará desabilitada.
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:43 AM    WARN [AuthService] [OPTIONAL][integration-missing-config] RESEND_API_KEY ausente. Recuperação por e-mail ficará desabilitada.
+@nexogestao/api:test: PASS src/auth/auth.password-revocation.spec.ts
+@nexogestao/api:test: PASS src/whatsapp/whatsapp.service.spec.ts
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:43 AM     LOG [WhatsAppService] {"requestId":"test-request","userId":"test-user","orgId":"org1","action":"whatsapp.inbound","provider":"meta_cloud","traceId":null,"conversationId":"conv1","messageId":"m1","status":"WAITING_OPERATOR"}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:43 AM     LOG [WhatsAppService] {"action":"whatsapp.webhook.processed","provider":"meta_cloud","orgId":"org1","traceId":null,"webhookEventId":null,"processed":1,"durationMs":2}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:43 AM     LOG [WhatsAppService] {"action":"whatsapp.webhook.processed","provider":"meta_cloud","orgId":"org1","traceId":null,"webhookEventId":null,"processed":1,"durationMs":0}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:43 AM     LOG [WhatsAppService] {"requestId":"test-request","userId":"test-user","orgId":"org1","action":"whatsapp.inbound","provider":"meta_cloud","traceId":null,"conversationId":"conv1","messageId":"m1","status":"WAITING_OPERATOR"}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:43 AM     LOG [WhatsAppService] {"action":"whatsapp.webhook.processed","provider":"meta_cloud","orgId":"org1","traceId":null,"webhookEventId":null,"processed":1,"durationMs":0}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:43 AM     LOG [WhatsAppService] {"requestId":"test-request","userId":"test-user","orgId":"test-org","action":"whatsapp.outbound","conversationId":"conv1","messageId":"m1","status":"WAITING_CUSTOMER"}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:43 AM     LOG [WhatsAppService] {"requestId":"test-request","userId":"test-user","orgId":"org1","action":"whatsapp.inbound","provider":"meta_cloud","traceId":"trace-1","conversationId":"conv1","messageId":"m1","status":"WAITING_OPERATOR"}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:43 AM     LOG [WhatsAppService] {"action":"whatsapp.webhook.processed","provider":"meta_cloud","orgId":"org1","traceId":"trace-1","webhookEventId":"wh-1","processed":1,"durationMs":0}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:43 AM     LOG [WhatsAppWebhookService] {"action":"whatsapp.inbound_webhook.job_queued","queue":"whatsapp","jobName":"inbound-webhook","jobId":"job1","webhookEventId":"wh1","orgId":"org1","provider":"meta_cloud","traceId":"trace-1","receivedAt":"2026-05-06T00:00:00.000Z","replayAttemptId":null}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:43 AM     LOG [WhatsAppService] {"requestId":"test-request","userId":"test-user","orgId":"org1","action":"whatsapp.inbound","provider":"meta_cloud","traceId":"trace-1","conversationId":"conv1","messageId":"m1","status":"WAITING_OPERATOR"}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:43 AM     LOG [WhatsAppService] {"action":"whatsapp.webhook.processed","provider":"meta_cloud","orgId":"org1","traceId":"trace-1","webhookEventId":"wh1","processed":1,"durationMs":0}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:43 AM     LOG [WhatsAppWebhookService] {"action":"whatsapp.inbound_webhook.job_queued","queue":"whatsapp","jobName":"inbound-webhook","jobId":"job-replay","webhookEventId":"wh1","orgId":"org1","provider":"meta_cloud","traceId":"trace-1","receivedAt":"2026-05-06T00:00:00.000Z","replayAttemptId":"replay-3a6eabce-9963-4e41-bd7f-be1a27ec3175"}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:43 AM     LOG [WhatsAppWebhookService] {"action":"whatsapp.inbound_webhook.replay_requested","webhookEventId":"wh1","orgId":"org1","provider":"meta_cloud","traceId":"trace-1","replayAttemptId":"replay-3a6eabce-9963-4e41-bd7f-be1a27ec3175","force":false,"requestedBy":"u1","jobId":"job-replay"}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:43 AM     LOG [WhatsAppWebhookService] {"action":"whatsapp.inbound_webhook.job_queued","queue":"whatsapp","jobName":"inbound-webhook","jobId":"job-force","webhookEventId":"wh1","orgId":"org1","provider":"meta_cloud","traceId":"trace-1","receivedAt":"2026-05-06T00:00:00.000Z","replayAttemptId":"replay-239151ed-0f9e-4440-b502-13017b8e1926"}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:43 AM     LOG [WhatsAppWebhookService] {"action":"whatsapp.inbound_webhook.replay_requested","webhookEventId":"wh1","orgId":"org1","provider":"meta_cloud","traceId":"trace-1","replayAttemptId":"replay-239151ed-0f9e-4440-b502-13017b8e1926","force":true,"requestedBy":null,"jobId":"job-force"}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:43 AM     LOG [WhatsAppService] {"action":"whatsapp.webhook.processed","provider":"meta_cloud","orgId":"org1","traceId":"trace-1","webhookEventId":"wh1","processed":1,"durationMs":0}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:43 AM     LOG [WhatsAppService] {"orgId":"org1","action":"whatsapp.inbound","provider":"mock","traceId":null,"conversationId":"conversation","messageId":"message","status":"WAITING_OPERATOR"}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:43 AM     LOG [WhatsAppService] {"orgId":"org1","action":"whatsapp.inbound","provider":"mock","traceId":null,"conversationId":"conversation","messageId":"message","status":"WAITING_OPERATOR"}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:43 AM     LOG [WhatsAppService] {"orgId":"org1","action":"whatsapp.inbound","provider":"mock","traceId":null,"conversationId":"conversation","messageId":"message","status":"WAITING_OPERATOR"}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:43 AM     LOG [WhatsAppService] {"orgId":"org1","action":"whatsapp.inbound","provider":"mock","traceId":null,"conversationId":"conversation","messageId":"message","status":"WAITING_OPERATOR"}
+@nexogestao/api:test: PASS src/onboarding/onboarding.http.spec.ts
+@nexogestao/api:test: PASS src/health/global-telemetry.security-http.spec.ts
+@nexogestao/api:test: PASS src/expenses/expenses.service.spec.ts
+@nexogestao/api:test: PASS src/health/operations.controller.spec.ts
+@nexogestao/api:test: PASS src/expenses/expenses-month.spec.ts
+@nexogestao/api:test: PASS src/subscriptions/subscriptions.security-http.spec.ts
+@nexogestao/api:test: PASS src/organization-settings/organization-settings.validation-http.spec.ts
+@nexogestao/api:test: PASS src/payments/payments.webhook.spec.ts
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:44 AM     LOG [PaymentsService] [BOOT][Payments] Stripe inicializado no PaymentsService
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:44 AM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.completed
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:44 AM     LOG [PaymentsService] Pagamento processado com sucesso via Stripe. event=checkout.session.completed chargeId=charge externalRef=stripe:pi_test
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:44 AM     LOG [PaymentsService] [BOOT][Payments] Stripe inicializado no PaymentsService
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:44 AM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.completed
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:44 AM     LOG [PaymentsService] [BOOT][Payments] Stripe inicializado no PaymentsService
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:44 AM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.completed
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:44 AM     LOG [PaymentsService] [BOOT][Payments] Stripe inicializado no PaymentsService
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:44 AM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.completed
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:44 AM     LOG [PaymentsService] [BOOT][Payments] Stripe inicializado no PaymentsService
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:44 AM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.completed
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:44 AM     LOG [PaymentsService] [BOOT][Payments] Stripe inicializado no PaymentsService
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:44 AM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.completed
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:44 AM     LOG [PaymentsService] [BOOT][Payments] Stripe inicializado no PaymentsService
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:44 AM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.completed
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:44 AM     LOG [PaymentsService] Pagamento processado com sucesso via Stripe. event=checkout.session.completed chargeId=charge externalRef=stripe:pi_test
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:44 AM     LOG [PaymentsService] Webhook Stripe recebido: charge.succeeded
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:44 AM     LOG [PaymentsService] Pagamento processado com sucesso via Stripe. event=charge.succeeded chargeId=charge externalRef=stripe:pi_test
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:44 AM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.async_payment_succeeded
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:44 AM     LOG [PaymentsService] Pagamento processado com sucesso via Stripe. event=checkout.session.async_payment_succeeded chargeId=charge externalRef=stripe:pi_test
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:44 AM     LOG [PaymentsService] [BOOT][Payments] Stripe inicializado no PaymentsService
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:44 AM     LOG [PaymentsService] Webhook Stripe recebido: charge.succeeded
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:44 AM     LOG [PaymentsService] [BOOT][Payments] Stripe inicializado no PaymentsService
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:44 AM     LOG [PaymentsService] [BOOT][Payments] Stripe inicializado no PaymentsService
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:44 AM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.completed
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:44 AM     LOG [PaymentsService] [BOOT][Payments] Stripe inicializado no PaymentsService
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:44 AM     LOG [PaymentsService] Sessão Stripe criada: cs_test
+@nexogestao/api:test: PASS src/health/internal-stats.controller.spec.ts
+@nexogestao/api:test: PASS src/billing/billing.controller.spec.ts
+@nexogestao/api:test: PASS src/health/health.controller.spec.ts
+@nexogestao/api:test: PASS src/expenses/financial-input.service.spec.ts
+@nexogestao/api:test: PASS src/people/people-linked-count.spec.ts
+@nexogestao/api:test: PASS src/governance/governance-read.controller.spec.ts
+@nexogestao/api:test: PASS src/dashboard/dashboard.controller.spec.ts
+@nexogestao/api:test: PASS src/launches/launches.service.spec.ts
+@nexogestao/api:test: PASS src/expenses/expenses.read-only.spec.ts
+@nexogestao/api:test: PASS src/me/me.rate-limit.spec.ts
+@nexogestao/api:test: PASS src/auth/google-id-token-verifier.spec.ts
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:46 AM   ERROR [WebhookProcessor] {"event":"webhook.dispatch.job_dead_lettered","orgId":"org1","requestId":null,"correlationId":null,"jobId":"job-1","entityType":null,"entityId":null,"actionId":null,"deliveryId":"d1","webhookId":"w1","attempt":5,"errorCode":null,"errorMessage":"timeout","error":{"name":"Error","message":"timeout"},"queue":"webhooks-dlq"}
+@nexogestao/api:test: PASS src/queue/processors/webhook.processor.spec.ts
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:46 AM    WARN [WebhookProcessor] {"event":"webhook.dispatch.job_failed","orgId":"org1","requestId":null,"correlationId":null,"jobId":"job-1","entityType":null,"entityId":null,"actionId":null,"deliveryId":"d1","webhookId":"w1","attempt":5,"errorCode":null,"errorMessage":"timeout","error":{"name":"Error","message":"timeout"},"queue":"webhooks","maxAttempts":5,"finalFailure":true}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:46 AM     LOG [OutboxWorker] {"eventId":"evt-1","orgId":"org-1","eventType":"PAYMENT_RECEIVED","correlationId":"corr-1","status":"processed"}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:46 AM    WARN [OutboxWorker] {"eventId":"evt-1","orgId":"org-1","eventType":"PAYMENT_RECEIVED","correlationId":"corr-1","status":"retry_or_failed","error":"token=<redacted> timeout"}
+@nexogestao/api:test: PASS src/outbox/outbox.worker.spec.ts
+@nexogestao/api:test: PASS src/customers/customers.service.clear-fields.spec.ts
+@nexogestao/api:test: PASS test/integration/execution-concurrency.spec.ts
+@nexogestao/api:test: PASS src/health/tenant-operations.controller.spec.ts
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:46 AM    WARN [ExecutionService] {"event":"execution_start_fallback","orgId":"org-1","serviceOrderId":"exec-start-1","customerId":"cust-1","executorPersonId":"person-1"}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:46 AM    WARN [ExecutionService] {"event":"execution_completion_fallback","requestId":"req-1","userId":"user-1","orgId":"org-1","executionId":"exec-1","serviceOrderId":"exec-1"}
+@nexogestao/api:test: PASS src/health/operational-incidents.service.spec.ts
+@nexogestao/api:test: PASS src/auth/jwt-secret.spec.ts
+@nexogestao/api:test: PASS src/referrals/referrals.service.spec.ts
+@nexogestao/api:test: PASS src/webhooks/webhook.dispatcher.spec.ts
+@nexogestao/api:test: PASS src/otel-sdk-real.spec.ts
+@nexogestao/api:test: PASS src/invoices/dto/invoice-validation.spec.ts
+@nexogestao/api:test: PASS src/whatsapp/dto/whatsapp.dto.spec.ts
+@nexogestao/api:test: PASS src/whatsapp/dto/request-action-execution.dto.spec.ts
+@nexogestao/api:test: PASS src/invites/invites.controller.spec.ts
+@nexogestao/api:test: PASS src/customers/customers.service.notification-failure.spec.ts
+@nexogestao/api:test: PASS src/organization-settings/organization-settings.controller.spec.ts
+@nexogestao/api:test: PASS src/notifications/notifications.service.spec.ts
+@nexogestao/api:test: PASS src/governance/governance-run.service.spec.ts
+@nexogestao/api:test: PASS src/people/people.service.spec.ts
+@nexogestao/api:test: PASS src/health/operational-monitoring.service.spec.ts
+@nexogestao/api:test: PASS src/people/operational-state.job.spec.ts
+@nexogestao/api:test:   ● Console
+@nexogestao/api:test: 
+@nexogestao/api:test:     console.log
+@nexogestao/api:test:       [OperationalStateJob] evaluated=0 changed=0 at=2026-11-11T03:17:48.681Z
+@nexogestao/api:test: 
+@nexogestao/api:test:       at OperationalStateJob.run (src/people/operational-state.job.ts:110:13)
+@nexogestao/api:test: 
+@nexogestao/api:test:     console.log
+@nexogestao/api:test:       [OperationalStateJob] evaluated=1 changed=1 at=2026-11-11T03:17:48.683Z
+@nexogestao/api:test: 
+@nexogestao/api:test:       at OperationalStateJob.run (src/people/operational-state.job.ts:110:13)
+@nexogestao/api:test: 
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:48 AM    WARN [WhatsAppProviderFactory] [BOOT][WhatsApp][dev-fallback] WHATSAPP_ALLOW_MOCK não definido; provider mock liberado somente porque NODE_ENV!=production
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:48 AM    WARN [WhatsAppProviderFactory] [BOOT][WhatsApp][dev-fallback] WHATSAPP_ALLOW_MOCK não definido; provider mock liberado somente porque NODE_ENV!=production
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:48 AM    WARN [WhatsAppProviderFactory] [BOOT][WhatsApp][dev-fallback] WHATSAPP_ALLOW_MOCK não definido; provider mock liberado somente porque NODE_ENV!=production
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:48 AM    WARN [WhatsAppProviderFactory] [BOOT][WhatsApp][dev-fallback] WHATSAPP_ALLOW_MOCK não definido; provider mock liberado somente porque NODE_ENV!=production
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:48 AM     LOG [WhatsAppProviderFactory] [BOOT][WhatsApp] provider=zapi
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:48 AM     LOG [WhatsAppProviderFactory] [BOOT][WhatsApp] provider=zapi
+@nexogestao/api:test: PASS src/payments/payments.service.spec.ts
+@nexogestao/api:test: PASS src/invites/invites.lifecycle.spec.ts
+@nexogestao/api:test: PASS src/governance/enforcement-engine.state-change.spec.ts
+@nexogestao/api:test: PASS src/billing/billing.plan-catalog.spec.ts
+@nexogestao/api:test: PASS src/people/operational-state.service.concurrency.spec.ts
+@nexogestao/api:test:   ● Console
+@nexogestao/api:test: 
+@nexogestao/api:test:     console.log
+@nexogestao/api:test:       [OperationalStateJob] evaluated=1 changed=1 at=2026-11-11T03:17:49.081Z
+@nexogestao/api:test: 
+@nexogestao/api:test:       at OperationalStateJob.run (src/people/operational-state.job.ts:110:13)
+@nexogestao/api:test:           at async Promise.all (index 1)
+@nexogestao/api:test: 
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:49 AM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:49 AM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:49 AM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:49 AM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:49 AM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:49 AM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+@nexogestao/api:test: PASS src/dashboard/dashboard.service.spec.ts
+@nexogestao/api:test: PASS src/queue/processors/finance.processor.spec.ts
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:49 AM   ERROR [QueueService] Fila indisponível: Redis não conectado (notifications:create-notification)
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:49 AM   ERROR [QueueService] Redis indisponível no bootstrap da fila: redis unavailable
+@nexogestao/api:test: PASS src/queue/queue.service.spec.ts
+@nexogestao/api:test: PASS src/people/people.activity-safety.spec.ts
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:49 AM     LOG [QueueService] Queue ativa: automation, notifications, whatsapp, whatsapp-dlq, finance, webhooks, webhooks-dlq
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:49 AM     LOG [QueueService] Queue ativa: automation, notifications, whatsapp, whatsapp-dlq, finance, webhooks, webhooks-dlq
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:49 AM    WARN [QueueService] Fila em modo degradado: novos enqueues falharão até o Redis se recuperar.
+@nexogestao/api:test: PASS src/invites/invites.service.spec.ts
+@nexogestao/api:test: PASS src/whatsapp/whatsapp-webhook.service.spec.ts
+@nexogestao/api:test: PASS src/people/people-operational-summary.service.spec.ts
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:49 AM     LOG [WhatsAppWebhookService] {"action":"whatsapp.inbound_webhook.job_queued","queue":"whatsapp","jobName":"inbound-webhook","jobId":"whatsapp-inbound-webhook-event-1","webhookEventId":"event-1","orgId":"tenant-a","provider":"meta_cloud","traceId":"trace-1","receivedAt":"2026-09-13T00:00:00.000Z","replayAttemptId":null}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:49 AM     LOG [WhatsAppWebhookService] {"action":"whatsapp.inbound_webhook.job_queued","queue":"whatsapp","jobName":"inbound-webhook","jobId":"whatsapp-inbound-webhook-event-1-replay-attempt-1","webhookEventId":"event-1","orgId":"tenant-a","provider":"meta_cloud","traceId":"trace-1","receivedAt":"2026-09-13T00:00:00.000Z","replayAttemptId":"replay-attempt-1"}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:49 AM     LOG [WebhookService] {"event":"webhook.delivery.replay_requested","orgId":"org1","requestId":null,"correlationId":null,"jobId":"webhook-dispatch-d1","entityType":null,"entityId":null,"actionId":null,"deliveryId":"d1","webhookId":"w1","attempt":null,"errorCode":null,"errorMessage":null,"actorUserId":"u1","previousStatus":"FAILED","nextStatus":"PENDING"}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:49 AM    WARN [WebhookService] {"event":"webhook.delivery.replay_blocked","orgId":"org1","requestId":null,"correlationId":null,"jobId":null,"entityType":null,"entityId":null,"actionId":null,"deliveryId":"d1","webhookId":"w1","attempt":null,"errorCode":"INVALID_STATUS","errorMessage":"Webhook delivery em SUCCESS não permite replay"}
+@nexogestao/api:test: PASS src/webhooks/webhook.service.replay.spec.ts
+@nexogestao/api:test: PASS src/risk/risk.service.spec.ts
+@nexogestao/api:test: PASS src/customers/customers.service.workspace.spec.ts
+@nexogestao/api:test: PASS src/billing/billing.service.spec.ts
+@nexogestao/api:test: PASS src/queue/queue-tracing.spec.ts
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:49 AM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:49 AM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:49 AM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:49 AM     LOG [BillingService] Webhook recebido: checkout.session.completed
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:49 AM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:49 AM     LOG [BillingService] Webhook recebido: invoice.paid
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:49 AM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:49 AM     LOG [BillingService] Webhook recebido: invoice.payment_failed
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:49 AM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:49 AM     LOG [BillingService] Webhook recebido: customer.subscription.updated
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:49 AM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:49 AM     LOG [BillingService] Webhook recebido: customer.subscription.deleted
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:49 AM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:49 AM     LOG [BillingService] Webhook recebido: invoice.paid
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:49 AM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:49 AM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+@nexogestao/api:test: PASS src/people/operational-state.job.concurrency.spec.ts
+@nexogestao/api:test:   ● Console
+@nexogestao/api:test: 
+@nexogestao/api:test:     console.log
+@nexogestao/api:test:       [OperationalStateJob] evaluated=1 changed=0 at=2026-11-11T03:17:50.072Z
+@nexogestao/api:test: 
+@nexogestao/api:test:       at OperationalStateJob.run (src/people/operational-state.job.ts:110:13)
+@nexogestao/api:test:           at async Promise.all (index 1)
+@nexogestao/api:test: 
+@nexogestao/api:test:     console.log
+@nexogestao/api:test:       [OperationalStateJob] evaluated=1 changed=1 at=2026-11-11T03:17:50.073Z
+@nexogestao/api:test: 
+@nexogestao/api:test:       at OperationalStateJob.run (src/people/operational-state.job.ts:110:13)
+@nexogestao/api:test:           at async Promise.all (index 0)
+@nexogestao/api:test: 
+@nexogestao/api:test: PASS src/execution/execution.runner.concurrency.spec.ts
+@nexogestao/api:test: PASS src/risk/risk.service.operational-state.concurrency.spec.ts
+@nexogestao/api:test:   ● Console
+@nexogestao/api:test: 
+@nexogestao/api:test:     console.log
+@nexogestao/api:test:       [OperationalStateJob] evaluated=1 changed=0 at=2026-11-11T03:17:50.221Z
+@nexogestao/api:test: 
+@nexogestao/api:test:       at OperationalStateJob.run (src/people/operational-state.job.ts:110:13)
+@nexogestao/api:test:           at async Promise.all (index 1)
+@nexogestao/api:test: 
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:50 AM     LOG [ExecutionRunner] {"event":"execution_runner_executed","orgId":"org-1","actionId":"action-notify-operational-alert","entityType":"system","entityId":"system-concurrent-1","decisionId":"decision-concurrent-1","result":"success","executionKey":"exec_dio84p"}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:50 AM   DEBUG [ExecutionRunner] {"event":"execution_runner_blocked","orgId":"org-1","actionId":"action-notify-operational-alert","decisionId":"decision-concurrent-1","entityType":"system","entityId":"system-concurrent-1","reasonCode":"blocked_recent_execution","status":"blocked","executionKey":"exec_dio84p","suppressedCountFromPreviousWindow":0,"cooldownUntil":"2026-11-11T03:18:50.154Z","reasonDetail":"idempotency"}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:50 AM    WARN [AuthService] [OPTIONAL][integration-missing-config] RESEND_API_KEY ausente. Recuperação por e-mail ficará desabilitada.
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:50 AM    WARN [AuthService] [OPTIONAL][integration-missing-config] RESEND_API_KEY ausente. Recuperação por e-mail ficará desabilitada.
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:50 AM    WARN [AuthService] [OPTIONAL][integration-missing-config] RESEND_API_KEY ausente. Recuperação por e-mail ficará desabilitada.
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:50 AM    WARN [AuthService] [OPTIONAL][integration-missing-config] RESEND_API_KEY ausente. Recuperação por e-mail ficará desabilitada.
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:50 AM    WARN [AuthService] [OPTIONAL][integration-missing-config] RESEND_API_KEY ausente. Recuperação por e-mail ficará desabilitada.
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:50 AM    WARN [AuthService] [OPTIONAL][integration-missing-config] RESEND_API_KEY ausente. Recuperação por e-mail ficará desabilitada.
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:50 AM    WARN [AuthService] [OPTIONAL][integration-missing-config] RESEND_API_KEY ausente. Recuperação por e-mail ficará desabilitada.
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:50 AM    WARN [AuthService] [OPTIONAL][integration-missing-config] RESEND_API_KEY ausente. Recuperação por e-mail ficará desabilitada.
+@nexogestao/api:test: PASS src/auth/auth.service.spec.ts
+@nexogestao/api:test: PASS src/organization-members/organization-members.controller.spec.ts
+@nexogestao/api:test: PASS src/invoices/invoices.service.spec.ts
+@nexogestao/api:test: PASS src/analytics/analytics.service.spec.ts
+@nexogestao/api:test: PASS src/billing/billing.quota-authority.spec.ts
+@nexogestao/api:test: PASS src/common/cache/memory-cache.service.spec.ts
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:50 AM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:50 AM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:50 AM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:50 AM    WARN [BillingService] [BOOT][Billing][disabled] Stripe não configurado — checkout online desabilitado
+@nexogestao/api:test: PASS src/common/commercial/commercial-policy.service.spec.ts
+@nexogestao/api:test: PASS src/auth/jwt.strategy.spec.ts
+@nexogestao/api:test: PASS src/common/sentry/sentry.service.spec.ts
+@nexogestao/api:test: PASS src/outbox/outbox.repository.spec.ts
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:50 AM    WARN [SentryService] [OPTIONAL][optional-disabled] SENTRY_DSN não configurado — monitoramento desativado
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:50 AM     LOG [SentryService] [BOOT] Sentry inicializado (env: production)
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:50 AM    WARN [SentryService] [OPTIONAL][WARN-LOCAL] Falha ao inicializar Sentry: SDK unavailable
+@nexogestao/api:test: PASS src/health/operational-signals.service.spec.ts
+@nexogestao/api:test: PASS src/common/idempotency/idempotency.service.spec.ts
+@nexogestao/api:test: PASS src/organization-settings/organization-settings.service.spec.ts
+@nexogestao/api:test: PASS src/organization-members/organization-members.service.spec.ts
+@nexogestao/api:test: PASS src/analytics/analytics.controller.spec.ts
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:50 AM     LOG [IdempotencyService] {"requestId":"req-1","action":"IDEMPOTENCY_REPLAY","orgId":"org-1","scope":"finance.create_charge","key":"k1"}
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:50 AM    WARN [IdempotencyService] {"requestId":"req-1","action":"IDEMPOTENCY_CONFLICT","orgId":"org-1","scope":"finance.create_charge","key":"k1"}
+@nexogestao/api:test: PASS src/notifications/notification-pubsub.service.spec.ts
+@nexogestao/api:test: PASS src/health/tenant-operations.service.spec.ts
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:51 AM     LOG [NotificationPubSubService] Redis Pub/Sub conectado
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:51 AM     LOG [NotificationPubSubService] Redis Pub/Sub conectado
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:51 AM    WARN [NotificationPubSubService] Publisher indisponível; persistência permanece ativa
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:51 AM    WARN [NotificationPubSubService] Subscriber indisponível; consultas persistentes permanecem ativas
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:51 AM     LOG [NotificationPubSubService] Redis Pub/Sub conectado
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:51 AM    WARN [NotificationPubSubService] Falha no publish de notificação (timeout); persistência preservada
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:51 AM    WARN [NotificationPubSubService] Publisher indisponível; persistência permanece ativa
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:51 AM    WARN [NotificationPubSubService] Subscriber indisponível; consultas persistentes permanecem ativas
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:51 AM     LOG [NotificationPubSubService] Redis Pub/Sub conectado
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:51 AM    WARN [NotificationPubSubService] Publish de notificação sem subscribers; persistência preservada
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:51 AM    WARN [NotificationPubSubService] Publisher indisponível; persistência permanece ativa
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:51 AM    WARN [NotificationPubSubService] Subscriber indisponível; consultas persistentes permanecem ativas
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:51 AM     LOG [NotificationPubSubService] Redis Pub/Sub conectado
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:51 AM    WARN [NotificationPubSubService] Redis Pub/Sub reconectando
+@nexogestao/api:test: PASS src/onboarding/onboarding.service.spec.ts
+@nexogestao/api:test: PASS src/health/operational-diagnostics.service.spec.ts
+@nexogestao/api:test: PASS src/audit/audit.module.spec.ts
+@nexogestao/api:test: PASS src/webhooks/webhook-http.spec.ts
+@nexogestao/api:test: PASS src/subscriptions/subscriptions.service.spec.ts
+@nexogestao/api:test: PASS src/customers/customers-operational-summary.service.spec.ts
+@nexogestao/api:test: PASS src/auth/guards/active-user.guard.spec.ts
+@nexogestao/api:test: PASS src/risk/temporal-risk.service.spec.ts
+@nexogestao/api:test: PASS src/quotas/quotas.plan-name.spec.ts
+@nexogestao/api:test: PASS src/dashboard/executive-pipeline.service.spec.ts
+@nexogestao/api:test: PASS src/auth/guards/roles.guard.spec.ts
+@nexogestao/api:test: PASS src/people/person-availability-exceptions.service.spec.ts
+@nexogestao/api:test: PASS src/governance/governance-read.service.spec.ts
+@nexogestao/api:test: PASS src/whatsapp/providers/provider.factory.spec.ts
+@nexogestao/api:test: PASS src/common/idempotency/idempotency.interceptor.spec.ts
+@nexogestao/api:test: PASS src/finance/dto/create-payment.dto.spec.ts
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:52 AM    WARN [WhatsAppProviderFactory] [BOOT][WhatsApp][dev-fallback] WHATSAPP_ALLOW_MOCK não definido; provider mock liberado somente porque NODE_ENV!=production
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:52 AM    WARN [WhatsAppProviderFactory] [BOOT][WhatsApp] provider=mock explicitamente habilitado
+@nexogestao/api:test: PASS src/outbox/outbox.service.spec.ts
+@nexogestao/api:test: PASS src/organization-settings/dto/update-organization-settings.dto.spec.ts
+@nexogestao/api:test: PASS src/finance/dto/charge-amount.dto.spec.ts
+@nexogestao/api:test: PASS src/notifications/notification-transport.spec.ts
+@nexogestao/api:test: PASS src/common/metrics/queue-metrics-exporter.service.spec.ts
+@nexogestao/api:test: PASS src/whatsapp/whatsapp-intelligence.service.spec.ts
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:52 AM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:52 AM     LOG [NotificationStreamHub] Stream aberto; conexões=2
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:52 AM     LOG [NotificationStreamHub] Stream aberto; conexões=3
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:52 AM     LOG [NotificationStreamHub] Stream encerrado; conexões=2
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:52 AM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:52 AM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:52 AM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:52 AM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:52 AM     LOG [NotificationStreamHub] Stream aberto; conexões=2
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:52 AM     LOG [NotificationStreamHub] Stream aberto; conexões=3
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:52 AM     LOG [NotificationStreamHub] Stream aberto; conexões=4
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:52 AM     LOG [NotificationStreamHub] Stream aberto; conexões=5
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:52 AM     LOG [NotificationStreamHub] Stream encerrado; conexões=4
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:52 AM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:52 AM     LOG [NotificationStreamHub] Stream encerrado; conexões=0
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:52 AM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:52 AM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:52 AM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+@nexogestao/api:test: [Nest] 3235  - 11/11/2026, 3:17:52 AM     LOG [NotificationStreamHub] Stream aberto; conexões=2
+@nexogestao/api:test: PASS src/whatsapp/providers/meta-cloud.provider.spec.ts
+@nexogestao/api:test: PASS src/common/domain/state-transitions.spec.ts
+@nexogestao/api:test: PASS src/common/metrics/otel-metrics.spec.ts
+@nexogestao/api:test: PASS src/whatsapp/providers/zapi.provider.spec.ts
+@nexogestao/api:test: PASS src/common/tenant-ops/tenant-ops.service.spec.ts
+@nexogestao/api:test: PASS src/common/zoned-day.spec.ts
+@nexogestao/api:test: PASS src/common/zoned-month.spec.ts
+@nexogestao/api:test: PASS src/whatsapp/whatsapp-provider-account.cli.spec.ts
+@nexogestao/api:test: PASS src/whatsapp/whatsapp-provider-account.provisioning.spec.ts
+@nexogestao/api:test: PASS src/whatsapp/template.util.spec.ts
+@nexogestao/api:test: PASS src/notifications/notifications.schema.spec.ts
+@nexogestao/api:test: PASS src/notifications/notification-route.spec.ts
+@nexogestao/api:test: PASS test/seed-guard.behavior.spec.ts
+@nexogestao/api:test: PASS src/common/architecture/operational-read-di.guard.spec.ts
+@nexogestao/api:test: PASS src/timeline/timeline-events.spec.ts
+@nexogestao/api:test: PASS src/service-orders/operational-service-boundaries.spec.ts
+@nexogestao/api:test: PASS src/timeline/timeline.presenter.spec.ts
+@nexogestao/api:test: PASS src/prisma/session-revocation.spec.ts
+@nexogestao/api:test: PASS src/common/context/request-tracing.util.spec.ts
+@nexogestao/api:test: PASS src/risk/customer-risk-policy.spec.ts
+@nexogestao/api:test: PASS src/common/csv.spec.ts
+@nexogestao/api:test: PASS src/common/logging/operational-log-context.spec.ts
+@nexogestao/api:test: PASS src/common/domain/operational-state-policy.spec.ts
+@nexogestao/api:test: PASS src/whatsapp/whatsapp.boundary.spec.ts
+@nexogestao/api:test: PASS src/people/people-capacity-schema.spec.ts
+@nexogestao/api:test: PASS src/financial-boundaries.spec.ts
+@nexogestao/api:test: PASS src/common/operations/operational-result.spec.ts
+@nexogestao/api:test: 
+@nexogestao/api:test: Test Suites: 28 skipped, 167 passed, 167 of 195 total
+@nexogestao/api:test: Tests:       98 skipped, 1137 passed, 1235 total
+@nexogestao/api:test: Snapshots:   0 total
+@nexogestao/api:test: Time:        24.319 s, estimated 54 s
+@nexogestao/api:test: Ran all test suites.
+
+ Tasks:    3 successful, 3 total
+Cached:    2 cached, 3 total
+  Time:    27.745s 
+

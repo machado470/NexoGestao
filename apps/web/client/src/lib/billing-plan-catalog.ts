@@ -4,6 +4,7 @@ export type BillingPlanCatalogEntry = {
   name: BillingPlanName;
   displayName: string;
   priceCents: number;
+  billingInterval?: "month" | "year" | null;
   quotas: Record<string, number>;
   commercialLimits: Record<string, unknown>;
   features: Record<string, unknown>;
@@ -66,6 +67,8 @@ export function normalizeBillingPlanCatalog(
         displayName:
           String(item.displayName ?? "").trim() || name,
         priceCents,
+        ...(item.billingInterval === "month" || item.billingInterval === "year" || item.billingInterval === null
+          ? { billingInterval: item.billingInterval as "month" | "year" | null } : {}),
         quotas: normalizeQuotas(item.quotas),
         commercialLimits: asObject(item.commercialLimits),
         features: asObject(item.features),
@@ -106,4 +109,11 @@ export function listEnabledPlanFeatures(
           .replace(/_/g, " ")
           .replace(/\b\w/g, character => character.toUpperCase())
     );
+}
+
+export function formatPlanPeriod(interval: BillingPlanCatalogEntry["billingInterval"]): string {
+  if (interval === "month") return "Mensal";
+  if (interval === "year") return "Anual";
+  if (interval === null) return "Sem cobrança recorrente";
+  return "Periodicidade não informada pelo catálogo";
 }

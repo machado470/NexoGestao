@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   formatPlanQuota,
+  formatPlanPeriod,
   normalizeBillingPlanCatalog,
   listEnabledPlanFeatures,
 } from "./billing-plan-catalog";
@@ -48,4 +49,18 @@ describe("billing canonical plan catalog", () => {
       })
     ).toEqual(["Automação avançada"]);
   });
+  it.each([["month", "Mensal"], ["year", "Anual"], [null, "Sem cobrança recorrente"], [undefined, "Periodicidade não informada pelo catálogo"]] as const)("formats the authoritative interval %s", (interval, label) => {
+    expect(formatPlanPeriod(interval)).toBe(label);
+  });
+  it.each(["month", "year", null] as const)("preserves interval %s through catalog normalization", interval => {
+    expect(normalizeBillingPlanCatalog([{ name: "PRO", priceCents: 19900, billingInterval: interval }])[0].billingInterval).toBe(interval);
+  });
+  it("does not invent an interval for an older or unknown API contract", () => {
+    for (const item of [{}, { billingInterval: "week" }]) {
+      const plan = normalizeBillingPlanCatalog([{ name: "PRO", priceCents: 19900, ...item }])[0];
+      expect(plan.billingInterval).toBeUndefined();
+      expect(formatPlanPeriod(plan.billingInterval)).toBe("Periodicidade não informada pelo catálogo");
+    }
+  });
+
 });

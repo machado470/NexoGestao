@@ -54,7 +54,7 @@ describe('WhatsAppService inbound/outbound', () => {
 
   it('inbound sem cliente retorna erro controlado', async () => {
     const prisma: any = {
-      customer: { findFirst: jest.fn().mockResolvedValue(null) },
+      customer: { findFirst: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]) },
       whatsAppConversation: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({ id: 'conv1', customerId: null, phone: '+5511999999999' }), updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
       whatsAppMessage: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({ id: 'm1', createdAt: new Date(), customerId: null, conversationId: 'conv1', status: 'DELIVERED', providerMessageId: 'wamid.1', messageType: 'MANUAL', entityType: 'GENERAL', entityId: 'conv1', direction: 'INBOUND', errorMessage: null }), count: jest.fn().mockResolvedValue(0) },
       timelineEvent: { findFirst: jest.fn().mockResolvedValue(null) },
@@ -688,6 +688,46 @@ describe('WhatsAppService queued dispatch claim', () => {
     ).rejects.toBe(queueError)
 
     expect(prisma.whatsAppWebhookEvent.updateMany).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    [[{ id: 'local', orgId: 'org1', phone: '11999999999' }], 'local'],
+    [[{ id: 'international', orgId: 'org1', phone: '5511999999999' }], 'international'],
+    [[], null],
+    [[{ id: 'a', orgId: 'org1', phone: '11999999999' }, { id: 'b', orgId: 'org1', phone: '5511999999999' }], null],
+  ])('associates only an unambiguous tenant-scoped numeric phone: %p', async (matches, expected) => {
+    const prisma: any = {
+      customer: { findFirst: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue(matches) },
+      whatsAppMessage: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn(async ({ data }) => ({ ...data, id: 'message', createdAt: new Date() })) },
+    }
+    const svc = new WhatsAppService(prisma, {} as any, { incInbound: jest.fn() } as any, {} as any, {} as any, { increment: jest.fn() } as any, {} as any, {} as any)
+    jest.spyOn(svc as any, 'resolveOperationalContext').mockResolvedValue({ contextType: 'CUSTOMER', contextId: expected })
+    jest.spyOn(svc, 'resolveOrCreateConversation').mockResolvedValue({ id: 'conversation' } as any)
+    jest.spyOn(svc as any, 'touchConversation').mockResolvedValue(undefined)
+    jest.spyOn(svc as any, 'applyOperationalIntelligence').mockResolvedValue({})
+    jest.spyOn(svc as any, 'logMessageTimelineEventOnce').mockResolvedValue(undefined)
+    await (svc as any).processInboundMessage('mock', { fromPhone: '+5511999999999', content: 'Fictício', providerMessageId: null, timestamp: new Date() }, { orgId: 'org1' })
+    expect(prisma.customer.findMany).toHaveBeenCalledWith({ where: { orgId: 'org1', phone: { in: ['5511999999999', '11999999999'] } }, select: { id: true, orgId: true, phone: true }, take: 2 })
+    expect(prisma.whatsAppMessage.create.mock.calls[0][0].data.customerId).toBe(expected)
+  })
+
+  it.each([
+    [{ id: 'conversation', customerId: null, phone: '+5511999999999' }, 1, 'customer'],
+    [{ id: 'conversation', customerId: 'original', phone: '+5511999999999' }, 0, 'original'],
+  ])('binds an unknown conversation without replacing an existing customer: %p', async (existing, writes, expectedCustomerId) => {
+    const prisma: any = { whatsAppConversation: { findFirst: jest.fn().mockResolvedValue(existing), updateMany: jest.fn().mockResolvedValue({ count: 1 }) } }
+    const svc = new WhatsAppService(prisma, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any)
+    const result = await svc.resolveOrCreateConversation('org', 'customer', '11999999999', { contextType: 'CUSTOMER', contextId: 'customer' })
+    expect(result.customerId).toBe(expectedCustomerId)
+    expect(prisma.whatsAppConversation.updateMany).toHaveBeenCalledTimes(writes)
+    if (writes) expect(prisma.whatsAppConversation.updateMany).toHaveBeenCalledWith({ where: { id: 'conversation', orgId: 'org', customerId: null, phone: '+5511999999999' }, data: { customerId: 'customer', contextType: 'CUSTOMER', contextId: 'customer' } })
+  })
+  it('does not replace a concurrent conversation assignment when the conditional write loses', async () => {
+    const existing = { id: 'conversation', customerId: null, phone: '+5511999999999' }
+    const prisma: any = { whatsAppConversation: { findFirst: jest.fn().mockResolvedValue(existing), updateMany: jest.fn().mockResolvedValue({ count: 0 }) } }
+    const svc = new WhatsAppService(prisma, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any)
+    expect(await svc.resolveOrCreateConversation('org', 'customer', '11999999999', { contextType: 'CUSTOMER' })).toEqual(existing)
+    expect(prisma.whatsAppConversation.updateMany).toHaveBeenCalledTimes(1)
   })
 
 })
