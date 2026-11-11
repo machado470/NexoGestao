@@ -30,7 +30,7 @@ describe("ServiceOrdersPage golden-standard composition", () => {
     expect(page).toContain("<AppPageLoadingState");
     expect(page).toContain("<AppPageErrorState");
     expect(page).toContain("<AppPageEmptyState");
-    expect(page).toContain("Nenhuma ordem encontrada");
+    expect(page).toContain("Nenhuma ordem de serviço");
     expect(page).toContain("Falha ao carregar ordens de serviço.");
   });
 

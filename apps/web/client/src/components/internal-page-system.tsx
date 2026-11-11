@@ -1213,9 +1213,11 @@ export function AppPageErrorState({
 export function AppPageEmptyState({
   title,
   description,
+  action,
 }: {
   title: string;
   description: string;
+  action?: ReactNode;
 }) {
   return (
     <AppSectionCard className="flex flex-col items-center justify-center gap-2.5 p-8 text-center">
@@ -1228,6 +1230,7 @@ export function AppPageEmptyState({
       <p className="max-w-xl text-sm leading-6 text-[var(--text-secondary)]">
         {description}
       </p>
+      {action ? <div className="mt-2">{action}</div> : null}
     </AppSectionCard>
   );
 }

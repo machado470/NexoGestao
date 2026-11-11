@@ -1,0 +1,8 @@
+
+ RUN  v4.1.12 /workspace/NexoGestao/apps/web
+
+
+ Test Files  97 passed (97)
+      Tests  779 passed (779)
+   Start at  03:48:58
+   Duration  35.16s (transform 3.52s, setup 0ms, import 14.93s, tests 4.13s, environment 8ms)

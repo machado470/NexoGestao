@@ -545,14 +545,6 @@ export default function CustomersPage() {
     [operationalSummaryByCustomerId, profiles]
   );
 
-  const profileById = useMemo(
-    () =>
-      new Map(
-        operationalProfiles.map(profile => [profile.customerId, profile])
-      ),
-    [operationalProfiles]
-  );
-
   const workspaceQuery = trpc.customers.workspace.useQuery(
     { id: activeCustomerId ?? "" },
     { enabled: isAuthenticated && Boolean(activeCustomerId), retry: false }
@@ -631,9 +623,9 @@ export default function CustomersPage() {
     return filteredProfiles.slice(start, start + pageSize);
   }, [currentPage, filteredProfiles]);
 
-  const selectedProfile = activeCustomerId
-    ? (profileById.get(String(activeCustomerId)) ?? null)
-    : null;
+  const selectedProfile = filteredProfiles.find(
+    profile => profile.customerId === activeCustomerId
+  ) ?? null;
 
   const selectedCustomer = selectedProfile?.customer ?? null;
 
@@ -744,10 +736,10 @@ export default function CustomersPage() {
       type: humanizeCustomerTimelineEvent(event).type,
       occurredAt: formatDateTime(event.occurredAt ?? event.createdAt),
       entity: String(
-        event.entity ?? event.entityType ?? event.target ?? selectedCustomerName
+        (typeof event.entity === "object" ? event.entity?.type : event.entity) ?? event.entityType ?? event.target ?? selectedCustomerName
       ),
       actor: String(
-        event.actor ?? event.author ?? event.createdBy ?? "Sistema"
+        (typeof event.actor === "object" ? event.actor?.name : event.actor) ?? event.author ?? event.createdBy ?? "Ator não informado"
       ),
       summary: humanizeCustomerTimelineEvent(event).summary,
     }));
@@ -1156,7 +1148,7 @@ export default function CustomersPage() {
           className={cn(
             selectedProfile
               ? "order-2 2xl:col-span-12"
-              : "order-1 2xl:col-span-8"
+              : "order-1 2xl:col-span-12"
           )}
           compact
         >
@@ -1171,22 +1163,13 @@ export default function CustomersPage() {
               onAction={() => void customersQuery.refetch()}
             />
           ) : customers.length === 0 ? (
-            <div className="space-y-3">
-              <AppPageEmptyState
-                title="Nenhum cliente cadastrado"
-                description="Cadastre o primeiro cliente para iniciar a memória operacional de relacionamento."
-              />
-              <div className="flex justify-center">
-                <Button onClick={() => setCreateOpen(true)}>
-                  Criar primeiro cliente
-                </Button>
-              </div>
-            </div>
+            <AppPageEmptyState title="Nenhum cliente cadastrado"
+              description="Cadastre o primeiro cliente para começar."
+              action={canCreateCustomer ? <Button onClick={() => setCreateOpen(true)}>Criar primeiro cliente</Button> : undefined} />
           ) : filteredProfiles.length === 0 ? (
-            <AppPageEmptyState
-              title="Busca sem resultado"
-              description="Nenhum cliente corresponde aos filtros ativos e termo pesquisado."
-            />
+            <AppPageEmptyState title="Nenhum resultado para os filtros"
+              description="Limpe os filtros para ver a carteira."
+              action={<Button variant="outline" onClick={() => { setSearchTerm(""); setActiveFilter("all"); setPriorityFilter("all"); setRiskFilter("all"); setCurrentPage(1); }}>Limpar filtros</Button>} />
           ) : (
             <div className="space-y-3">
               <div className="grid gap-2 md:hidden">
@@ -1499,7 +1482,7 @@ export default function CustomersPage() {
           )}
         </AppSectionBlock>
 
-        <AppContextWorkspace
+        {filteredProfiles.length > 0 && !isLoading && !hasBlockingError ? (<AppContextWorkspace
           title="Centro Operacional do Cliente"
           subtitle="Decisão, fluxo, execução e auditoria do cliente selecionado."
           className={cn(
@@ -1891,7 +1874,7 @@ export default function CustomersPage() {
               </div>
             </div>
           )}
-        </AppContextWorkspace>
+        </AppContextWorkspace>) : null}
       </div>
 
       <CreateCustomerModal

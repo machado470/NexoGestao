@@ -1,3 +1,4 @@
+import { useAuth } from "@/contexts/AuthContext";
 import { useMemo, useState } from "react";
 import { ExternalLink, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
@@ -21,6 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   formatPlanPrice,
+  formatPlanPeriod,
   formatPlanQuota,
   normalizeBillingPlanCatalog,
   type BillingPlanCatalogEntry,
@@ -55,6 +57,7 @@ const USAGE_LABELS: Record<string, string> = {
   messages: "Mensagens",
   serviceOrders: "Ordens de serviço",
   users: "Usuários",
+  storage: "Armazenamento",
 };
 
 function parseStatus(value: unknown): SubscriptionStatus | null {
@@ -78,13 +81,15 @@ function formatDate(value: unknown): string {
 }
 
 function planDescription(plan: BillingPlanCatalogEntry): string {
-  const quotas = ["users", "customers"]
+  const quotas = Object.keys(plan.quotas)
     .filter(key => key in plan.quotas)
-    .map(key => `${USAGE_LABELS[key]}: ${formatPlanQuota(plan.quotas[key])}`);
+    .map(key => `${USAGE_LABELS[key] ?? key}: ${formatPlanQuota(plan.quotas[key])}`);
   return quotas.join(" · ");
 }
 
 export default function BillingPage() {
+  const { role } = useAuth();
+  const canManage = role === "ADMIN";
   const [checkoutPlan, setCheckoutPlan] = useState<BillingPlanName | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
   const plansQuery = trpc.billing.plans.useQuery(undefined, { retry: false });
@@ -123,7 +128,7 @@ export default function BillingPage() {
         return;
       }
       setCheckoutPlan(null);
-      toast.success("Assinatura atualizada pelo serviço de Billing.");
+      toast.success("Assinatura atualizada pelo serviço de assinatura.");
       void Promise.all([
         utils.billing.status.invalidate(),
         utils.billing.limits.invalidate(),
@@ -136,7 +141,7 @@ export default function BillingPage() {
   const cancelMutation = trpc.billing.cancel.useMutation({
     onSuccess: async () => {
       setCancelOpen(false);
-      toast.success("Cancelamento confirmado pelo serviço de Billing.");
+      toast.success("Cancelamento confirmado pelo serviço de assinatura.");
       await Promise.all([
         utils.billing.status.invalidate(),
         utils.billing.limits.invalidate(),
@@ -158,7 +163,7 @@ export default function BillingPage() {
   return (
     <AppPageShell className="gap-4 p-3 md:p-5">
       <AppOperationalHeader
-        title="Billing"
+        title="Assinatura e planos"
         description="Plano e assinatura da organização para utilizar o NexoGestão."
         secondaryActions={
           <Button
@@ -188,7 +193,7 @@ export default function BillingPage() {
 
       <AppSectionBlock
         title="Assinatura atual"
-        subtitle="Estado retornado pelo Billing e preço vigente do catálogo comercial."
+        subtitle="Estado retornado pelo serviço de assinatura e preço vigente do catálogo comercial."
       >
         {statusQuery.isLoading ? (
           <AppPageLoadingState
@@ -198,19 +203,19 @@ export default function BillingPage() {
         ) : statusQuery.isError ? (
           <AppPageErrorState
             title="Assinatura indisponível"
-            description="A fonte oficial de Billing não pôde ser consultada. Nenhum plano ou status foi presumido."
+            description="A fonte oficial de assinatura não pôde ser consultada. Nenhum plano ou status foi presumido."
             onAction={() => void statusQuery.refetch()}
           />
         ) : !status ? (
           <AppPageErrorState
             title="Status não reconhecido"
-            description="Billing retornou um estado fora do contrato conhecido. Ele não foi convertido em assinatura ativa."
+            description="O serviço retornou um estado fora do contrato conhecido. Ele não foi convertido em assinatura ativa."
             onAction={() => void statusQuery.refetch()}
           />
         ) : status === "NO_SUBSCRIPTION" ? (
           <AppPageEmptyState
             title="Nenhuma assinatura encontrada"
-            description="Billing informou que esta organização não possui assinatura. Isso não foi convertido em uma assinatura ativa."
+            description="O serviço informou que esta organização não possui assinatura. Isso não foi convertido em uma assinatura ativa."
           />
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -234,6 +239,7 @@ export default function BillingPage() {
               <p className="mt-1 break-words font-semibold text-[var(--text-primary)]">
                 {currentPlan ? formatPlanPrice(currentPlan.priceCents) : "Não informado"}
               </p>
+              <p className="mt-1 text-xs text-[var(--text-muted)]">{formatPlanPeriod(currentPlan?.billingInterval)}</p>
             </AppSectionCard>
             <AppSectionCard className="min-w-0 p-4">
               <p className="text-xs text-[var(--text-muted)]">Fim do período atual</p>
@@ -289,7 +295,7 @@ export default function BillingPage() {
       </AppSectionBlock>
 
       <AppSectionBlock
-        title="Gerenciar assinatura"
+        title="Planos disponíveis"
         subtitle="Checkout e cancelamento são executados pelo backend com a organização derivada da sessão autenticada."
       >
         {plansQuery.isLoading ? (
@@ -312,13 +318,14 @@ export default function BillingPage() {
                     <h3 className="font-semibold text-[var(--text-primary)]">
                       {plan.displayName}
                     </h3>
-                    {plan.name === currentPlanName ? (
+                    {plan.name === currentPlanName && (status === "ACTIVE" || status === "TRIALING") ? (
                       <AppStatusBadge label="Plano atual" tone="success" />
                     ) : null}
                   </div>
                   <p className="mt-2 text-xl font-semibold text-[var(--text-primary)]">
                     {formatPlanPrice(plan.priceCents)}
                   </p>
+                  <p className="text-xs text-[var(--text-muted)]">{formatPlanPeriod(plan.billingInterval)}</p>
                   {planDescription(plan) ? (
                     <p className="mt-2 text-sm text-[var(--text-secondary)]">
                       {planDescription(plan)}
@@ -328,10 +335,11 @@ export default function BillingPage() {
                 <Button
                   type="button"
                   variant={plan.name === currentPlanName ? "outline" : "default"}
+                  disabled={!canManage || checkoutMutation.isPending || (plan.name === currentPlanName && (status === "ACTIVE" || status === "TRIALING"))}
                   onClick={() => setCheckoutPlan(plan.name)}
                 >
                   <ExternalLink className="mr-2 size-4" aria-hidden="true" />
-                  {plan.name === currentPlanName ? "Abrir checkout" : "Escolher plano"}
+                  {plan.name === currentPlanName && (status === "ACTIVE" || status === "TRIALING") ? "Plano atual" : "Escolher plano"}
                 </Button>
               </AppSectionCard>
             ))}
@@ -343,7 +351,7 @@ export default function BillingPage() {
           />
         )}
 
-        {status && !["NO_SUBSCRIPTION", "CANCELED"].includes(status) ? (
+        {canManage && status && !["NO_SUBSCRIPTION", "CANCELED"].includes(status) ? (
           <div className="mt-4 border-t border-[var(--border-subtle)] pt-4">
             <Button type="button" variant="outline" onClick={() => setCancelOpen(true)}>
               Cancelar assinatura
@@ -356,7 +364,7 @@ export default function BillingPage() {
         open={checkoutPlan !== null}
         onOpenChange={open => !open && setCheckoutPlan(null)}
         title="Abrir checkout da assinatura?"
-        description="O destino será exclusivamente o retornado pelo serviço de Billing. A organização é resolvida pela sessão autenticada."
+        description="O destino será exclusivamente o retornado pelo serviço de assinatura. A organização é resolvida pela sessão autenticada."
         confirmLabel={checkoutMutation.isPending ? "Abrindo..." : "Continuar para checkout"}
         onConfirm={startCheckout}
         isPending={checkoutMutation.isPending}

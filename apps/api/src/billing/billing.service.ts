@@ -16,6 +16,7 @@ import {
   Prisma,
 } from '@prisma/client'
 import Stripe from 'stripe'
+import { getDefaultPlanDefinition } from '../common/commercial/default-plan-definitions'
 import { QuotasService } from '../quotas/quotas.service'
 
 @Injectable()
@@ -542,6 +543,7 @@ export class BillingService {
         name: plan.name,
         displayName: plan.displayName,
         priceCents: plan.priceCents,
+        billingInterval: getDefaultPlanDefinition(plan.name).billingInterval,
         quotas: this.quotasService.getQuotaLimits(plan.name),
         commercialLimits: plan.limitsJson,
         features: plan.featuresJson,

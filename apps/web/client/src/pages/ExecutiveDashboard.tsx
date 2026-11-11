@@ -1,3 +1,4 @@
+import { presentationLabel } from "@/lib/presentation-labels";
 import { useMemo } from "react";
 import {
   ArrowRight,
@@ -1053,7 +1054,7 @@ export default function ExecutiveDashboard() {
             <AppContextChip
               tone={operationLevel === "NORMAL" ? "success" : "accent"}
             >
-              Estado: {operationLevel}
+              Estado: {presentationLabel(operationLevel)}
             </AppContextChip>
             <AppContextChip>{roleContext}</AppContextChip>
             <AppContextChip tone={criticalCount > 0 ? "danger" : "neutral"}>

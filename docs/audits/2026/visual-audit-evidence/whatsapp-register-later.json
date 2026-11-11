@@ -1,0 +1,12 @@
+{
+  "check": "Unknown conversation linked after normal customer registration",
+  "customerId": "44fe9346-3d37-46c2-afa1-4b91e3b8342e",
+  "conversationId": "f68ca686-019a-49d5-864a-e75e2310a506",
+  "firstMessageId": "bc0040df-c027-42d6-aff7-31eeedcd51eb",
+  "secondMessageId": "1726776c-5b22-4e5d-82c7-17c290174e4d",
+  "sameConversation": true,
+  "previousMessageUnchanged": true,
+  "contextType": "GENERAL",
+  "provider": "mock",
+  "pass": true
+}

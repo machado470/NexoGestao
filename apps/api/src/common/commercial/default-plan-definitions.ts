@@ -4,6 +4,7 @@ export type PlanCommercialDefinition = {
   name: PlanName
   displayName: string
   priceCents: number
+  billingInterval: 'month' | null
   limitsJson: Prisma.InputJsonValue
   featuresJson: Prisma.InputJsonValue
 }
@@ -13,6 +14,7 @@ const PLAN_COMMERCIAL_DEFINITIONS: Record<PlanName, PlanCommercialDefinition> = 
     name: PlanName.FREE,
     displayName: 'Free',
     priceCents: 0,
+    billingInterval: null,
     limitsJson: {
       automation_executions: 200,
       message_sends: 300,
@@ -30,6 +32,7 @@ const PLAN_COMMERCIAL_DEFINITIONS: Record<PlanName, PlanCommercialDefinition> = 
     name: PlanName.STARTER,
     displayName: 'Basic',
     priceCents: 9900,
+    billingInterval: 'month',
     limitsJson: {
       automation_executions: 2500,
       message_sends: 2000,
@@ -47,6 +50,7 @@ const PLAN_COMMERCIAL_DEFINITIONS: Record<PlanName, PlanCommercialDefinition> = 
     name: PlanName.PRO,
     displayName: 'Pro',
     priceCents: 19900,
+    billingInterval: 'month',
     limitsJson: {
       automation_executions: 15000,
       message_sends: 8000,
@@ -64,6 +68,7 @@ const PLAN_COMMERCIAL_DEFINITIONS: Record<PlanName, PlanCommercialDefinition> = 
     name: PlanName.BUSINESS,
     displayName: 'Enterprise',
     priceCents: 39900,
+    billingInterval: 'month',
     limitsJson: {
       automation_executions: 100000,
       message_sends: 50000,

@@ -516,8 +516,8 @@ export default function CalendarPage() {
                   description="Ajuste os filtros factuais ou crie um agendamento."
                 />
               ) : null}
-              <div className="hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-2 md:block">
-                <FullCalendar
+              <div className="hidden overflow-x-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-2 md:block">
+                <div className="min-w-[640px]"><FullCalendar
                   ref={calendarRef}
                   plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
                   initialView={viewMode}
@@ -532,7 +532,8 @@ export default function CalendarPage() {
                   slotMinTime="07:00:00"
                   slotMaxTime="19:00:00"
                   nowIndicator
-                  height="auto"
+                  height="min(70vh, 720px)"
+                  stickyHeaderDates={true}
                   eventContent={info => (
                     <div className="p-1 text-xs">
                       <strong>{info.timeText}</strong>
@@ -544,7 +545,7 @@ export default function CalendarPage() {
                       </span>
                     </div>
                   )}
-                />
+                /></div>
               </div>
               <div
                 className="space-y-2 md:hidden"

@@ -1,3 +1,6 @@
+import { useAuth } from "@/contexts/AuthContext";
+import { can, type Permission } from "@/lib/rbac";
+import { presentationLabel } from "@/lib/presentation-labels";
 import { useLocation } from "wouter";
 import { ArrowRight, Clock3, FileCheck2, RefreshCw } from "lucide-react";
 
@@ -21,11 +24,11 @@ import { setBootPhase } from "@/lib/bootPhase";
 import { trpc } from "@/lib/trpc";
 
 const STATE_LABELS = {
-  NORMAL: "NORMAL · operação normal",
-  WARNING: "WARNING · operação em atenção",
-  RESTRICTED: "RESTRICTED · operação restrita",
-  SUSPENDED: "SUSPENDED · operação suspensa",
-  UNKNOWN: "UNKNOWN · estado desconhecido",
+  NORMAL: "Operação normal",
+  WARNING: "Operação em atenção",
+  RESTRICTED: "Operação restrita",
+  SUSPENDED: "Operação suspensa",
+  UNKNOWN: "Estado não informado",
 } as const;
 
 function formatDate(value: unknown) {
@@ -45,7 +48,7 @@ function sourceLabel(source: string | undefined) {
     PERSISTED_OPERATIONAL_STATE: "Estado operacional persistido",
     UNAVAILABLE: "Fonte indisponível",
   };
-  return labels[source] ?? source;
+  return labels[source] ?? presentationLabel(source);
 }
 
 export default function GovernancePage() {
@@ -84,9 +87,14 @@ export default function GovernancePage() {
     void Promise.all(
       queries.filter(query => query.isError).map(query => query.refetch())
     );
+  const { role } = useAuth();
+  const routePermissions: Record<string, Permission> = { "/finances": "finance:read", "/service-orders": "orders:read", "/governance": "governance:read", "/timeline": "reports:read" };
   const stateData = stateQuery.data;
   const state = stateData?.operationalState;
   const nextAction = nextActionQuery.data;
+  const destination = nextAction?.routeHint.split("?")[0];
+  const canOpenNextAction = Boolean(role && destination && (destination === "/whatsapp" || (routePermissions[destination] && can(role, routePermissions[destination]))));
+  const staleEvaluation = signalsQuery.data?.signals.some(signal => signal.reason === "GOVERNANCE_RUN_STALE") ?? false;
 
   return (
     <AppPageShell className="gap-4 p-3 md:p-5">
@@ -189,7 +197,7 @@ export default function GovernancePage() {
                   Disponibilidade oficial
                 </dt>
                 <dd className="break-words font-medium text-[var(--text-primary)]">
-                  {stateQuery.data.availability}
+                  {presentationLabel(stateQuery.data.availability)}
                 </dd>
               </div>
             </dl>
@@ -197,70 +205,12 @@ export default function GovernancePage() {
         )}
       </AppSectionBlock>
 
-      <AppSectionBlock
-        title="Sinais e evidências"
-        subtitle="Sinais na ordem fornecida pelo backend, sem reclassificação, pontuação ou ordenação no navegador."
-      >
-        {signalsQuery.isLoading ? (
-          <AppPageLoadingState title="Carregando sinais oficiais" />
-        ) : signalsQuery.isError ? (
-          <AppPageErrorState
-            title="Sinais indisponíveis"
-            description="Não é possível afirmar que não há sinais enquanto a fonte estiver indisponível."
-            actionLabel="Tentar novamente"
-            onAction={() => void signalsQuery.refetch()}
-          />
-        ) : (signalsQuery.data?.signals.length ?? 0) === 0 ? (
-          <AppPageEmptyState
-            title="Nenhum sinal retornado"
-            description="A fonte respondeu sem sinais operacionais ativos."
-          />
-        ) : (
-          <ol
-            className="divide-y divide-[var(--border-subtle)]"
-            aria-label="Sinais operacionais oficiais"
-          >
-            {signalsQuery.data?.signals.map(signal => (
-              <li key={signal.id} className="min-w-0 py-4 first:pt-0 last:pb-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <AppStatusBadge label={signal.severity} />
-                  <span className="text-xs text-[var(--text-muted)]">
-                    {signal.area}
-                  </span>
-                </div>
-                <h3 className="mt-2 break-words font-semibold text-[var(--text-primary)]">
-                  {signal.title}
-                </h3>
-                {signal.reason ? (
-                  <p className="mt-1 break-words text-sm text-[var(--text-secondary)]">
-                    <strong>Razão:</strong> {signal.reason}
-                  </p>
-                ) : null}
-                {signal.summary ? (
-                  <p className="mt-1 break-words text-sm text-[var(--text-secondary)]">
-                    {signal.summary}
-                  </p>
-                ) : null}
-                {signal.impact ? (
-                  <p className="mt-1 break-words text-sm text-[var(--text-secondary)]">
-                    <strong>Impacto informado:</strong> {signal.impact}
-                  </p>
-                ) : null}
-                <p className="mt-2 break-all text-xs text-[var(--text-muted)]">
-                  Origem: {sourceLabel(signal.source)} · ID: {signal.id}
-                  {signal.detectedAt
-                    ? ` · Detectado em ${formatDate(signal.detectedAt)}`
-                    : ""}
-                </p>
-              </li>
-            ))}
-          </ol>
-        )}
+      <AppSectionBlock title="Última avaliação" subtitle="Referência da avaliação concluída retornada pela API.">
+        <p className="text-sm text-[var(--text-secondary)]" role="status">{stateQuery.isLoading ? "Carregando avaliação..." : stateQuery.isError ? "Avaliação indisponível." : stateData?.availability === "NO_DATA" ? "Nenhuma avaliação concluída com dados disponíveis." : stateData?.evidenceAt ? `Avaliação em ${formatDate(stateData.evidenceAt)}. ${staleEvaluation ? "Avaliação desatualizada conforme diagnóstico oficial." : signalsQuery.isError ? "Não foi possível verificar a atualidade da avaliação." : "Sem indicação de desatualização no recorte oficial."}` : "Data da avaliação não informada pela fonte."}</p>
       </AppSectionBlock>
-
       <div className="grid gap-4 xl:grid-cols-2">
         <AppSectionBlock
-          title="Decisão recomendada pelo sistema"
+          title="Próxima ação"
           subtitle="Próxima ação oficial; abrir o destino não executa a ação automaticamente."
         >
           {nextActionQuery.isLoading ? (
@@ -299,10 +249,11 @@ export default function GovernancePage() {
               </p>
               <Button
                 className="mt-4 max-w-full"
-                onClick={() => navigate(nextAction.routeHint)}
+                disabled={!canOpenNextAction}
+                onClick={() => destination === "/governance" ? refresh() : navigate(nextAction.routeHint)}
                 aria-label={`Abrir destino oficial: ${nextAction.title}`}
               >
-                Abrir destino oficial
+                {canOpenNextAction ? destination === "/governance" ? "Atualizar fontes" : "Abrir destino oficial" : "Destino restrito ao seu perfil"}
                 <ArrowRight className="ml-2 size-4" aria-hidden="true" />
               </Button>
             </div>
@@ -349,7 +300,7 @@ export default function GovernancePage() {
                       {factor.name}
                     </dt>
                     <dd className="break-words text-sm font-medium text-[var(--text-primary)] sm:text-right">
-                      {factor.value ?? "Sem sinal"}
+                      {factor.value == null ? "Sem sinal" : presentationLabel(factor.value)}
                       <span className="block text-xs font-normal text-[var(--text-muted)]">
                         {factor.reference}
                       </span>
@@ -361,6 +312,67 @@ export default function GovernancePage() {
           )}
         </AppSectionBlock>
       </div>
+
+      <AppSectionBlock
+        title="Sinais e evidências"
+        subtitle="Sinais na ordem fornecida pelo backend, sem reclassificação, pontuação ou ordenação no navegador."
+      >
+        {signalsQuery.isLoading ? (
+          <AppPageLoadingState title="Carregando sinais oficiais" />
+        ) : signalsQuery.isError ? (
+          <AppPageErrorState
+            title="Sinais indisponíveis"
+            description="Não é possível afirmar que não há sinais enquanto a fonte estiver indisponível."
+            actionLabel="Tentar novamente"
+            onAction={() => void signalsQuery.refetch()}
+          />
+        ) : (signalsQuery.data?.signals.length ?? 0) === 0 ? (
+          <AppPageEmptyState
+            title="Nenhum sinal retornado"
+            description="A fonte respondeu sem sinais operacionais ativos."
+          />
+        ) : (
+          <ol
+            className="divide-y divide-[var(--border-subtle)]"
+            aria-label="Sinais operacionais oficiais"
+          >
+            {signalsQuery.data?.signals.map(signal => (
+              <li key={signal.id} className="min-w-0 py-4 first:pt-0 last:pb-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <AppStatusBadge label={presentationLabel(signal.severity)} />
+                  <span className="text-xs text-[var(--text-muted)]">
+                    {presentationLabel(signal.area)}
+                  </span>
+                </div>
+                <h3 className="mt-2 break-words font-semibold text-[var(--text-primary)]">
+                  {signal.title}
+                </h3>
+                {signal.reason ? (
+                  <p className="mt-1 break-words text-sm text-[var(--text-secondary)]">
+                    <strong>Razão:</strong> {presentationLabel(signal.reason)}
+                  </p>
+                ) : null}
+                {signal.summary ? (
+                  <p className="mt-1 break-words text-sm text-[var(--text-secondary)]">
+                    {signal.summary}
+                  </p>
+                ) : null}
+                {signal.impact ? (
+                  <p className="mt-1 break-words text-sm text-[var(--text-secondary)]">
+                    <strong>Impacto informado:</strong> {signal.impact}
+                  </p>
+                ) : null}
+                <p className="mt-2 break-all text-xs text-[var(--text-muted)]">
+                  Origem: {sourceLabel(signal.source)} · ID: {signal.id}
+                  {signal.detectedAt
+                    ? ` · Detectado em ${formatDate(signal.detectedAt)}`
+                    : ""}
+                </p>
+              </li>
+            ))}
+          </ol>
+        )}
+      </AppSectionBlock>
 
       <AppSectionBlock
         title="Histórico de execuções"

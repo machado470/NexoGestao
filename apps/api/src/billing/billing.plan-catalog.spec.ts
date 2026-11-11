@@ -56,6 +56,7 @@ describe('BillingService canonical plan catalog', () => {
         name: 'STARTER',
         displayName: 'Basic',
         priceCents: 9900,
+        billingInterval: 'month',
         quotas: {
           customers: 30,
           appointments: 200,
@@ -71,6 +72,7 @@ describe('BillingService canonical plan catalog', () => {
         name: 'PRO',
         displayName: 'Pro',
         priceCents: 19900,
+        billingInterval: 'month',
         quotas: {
           customers: 100,
           appointments: 2000,
@@ -116,4 +118,10 @@ describe('BillingService canonical plan catalog', () => {
     await expect(service.getPlanCatalog()).resolves.toEqual([])
     expect(quotas.getQuotaLimits).not.toHaveBeenCalled()
   })
+  it.each(['FREE', 'STARTER', 'PRO', 'BUSINESS'])('publishes an explicit interval for %s without replacing persisted prices', async name => {
+    const service = new BillingService({ plan: { findMany: jest.fn().mockResolvedValue([{ name, displayName: name, priceCents: 12345, limitsJson: {}, featuresJson: {} }]) } } as any,
+      { get: jest.fn().mockReturnValue('') } as any, { getQuotaLimits: jest.fn().mockReturnValue({}) } as any)
+    await expect(service.getPlanCatalog()).resolves.toMatchObject([{ name, priceCents: 12345, billingInterval: name === 'FREE' ? null : 'month' }])
+  })
+
 })

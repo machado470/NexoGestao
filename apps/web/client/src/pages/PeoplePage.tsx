@@ -559,7 +559,7 @@ export default function PeoplePage() {
                             person.dailyAppointmentCapacity,
                             "/dia"
                           )}{" "}
-                          · {capacityLabels[person.capacityStatus]}
+                          · {capacityLabels[person.capacityStatus] ?? "Capacidade não informada"}
                         </p>
                       </button>
                       <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
