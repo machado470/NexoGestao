@@ -191,7 +191,7 @@ export class WhatsAppWebhookService {
 
     try {
       job = await this.queueService.addJob(
-        QUEUE_NAMES.WHATSAPP,
+        QUEUE_NAMES.WHATSAPP_INBOUND,
         WHATSAPP_QUEUE_JOB_NAMES.INBOUND_WEBHOOK,
         payload,
         { jobId: input.replayAttemptId ? `whatsapp-inbound-webhook-${input.webhookEventId}-${input.replayAttemptId}` : `whatsapp-inbound-webhook-${input.webhookEventId}` },
@@ -217,7 +217,7 @@ export class WhatsAppWebhookService {
     this.waMetrics.incInboundWebhookQueued()
     this.logger.log(JSON.stringify({
       action: 'whatsapp.inbound_webhook.job_queued',
-      queue: QUEUE_NAMES.WHATSAPP,
+      queue: QUEUE_NAMES.WHATSAPP_INBOUND,
       jobName: WHATSAPP_QUEUE_JOB_NAMES.INBOUND_WEBHOOK,
       jobId: job.id?.toString() ?? null,
       webhookEventId: input.webhookEventId,

@@ -46,6 +46,7 @@ export class WhatsAppController {
   ) {}
 
   @Get('conversations')
+  @Throttle({ default: { limit: 120, ttl: 60_000 } })
   @ApiOperation({ summary: 'List WhatsApp conversations' })
   async listConversations(@Org() orgId: string, @Query() query: ListConversationsQueryDto) {
     return this.whatsapp.listConversations(orgId, query)
@@ -59,8 +60,14 @@ export class WhatsAppController {
   }
 
   @Get('conversations/:id/messages')
-  async getConversationMessages(@Org() orgId: string, @Param('id') id: string) {
-    return this.whatsapp.getMessages(orgId, id)
+  async getConversationMessages(@Org() orgId: string, @Param('id') id: string, @Query() query: MessageFeedQueryDto) {
+    return this.whatsapp.getMessages(orgId, id, query)
+  }
+
+  @Get('conversations/:id/messages/feed')
+  @Throttle({ default: { limit: 120, ttl: 60_000 } })
+  getConversationMessagesPage(@Org() orgId: string, @Param('id') id: string, @Query() query: MessageFeedQueryDto) {
+    return this.whatsapp.getConversationMessagesPage(orgId, id, query)
   }
 
   @Get('conversations/:id/context')

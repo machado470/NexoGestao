@@ -9,6 +9,8 @@ interface CacheEntry<T> {
 export class MemoryCacheService {
   private readonly cache = new Map<string, CacheEntry<any>>()
 
+  private readonly pending = new Map<string, Promise<unknown>>()
+
   set<T>(key: string, value: T, ttlMs: number): void {
     this.cache.set(key, {
       value,
@@ -28,18 +30,20 @@ export class MemoryCacheService {
 
   delete(key: string): void {
     this.cache.delete(key)
+    this.pending.delete(key)
   }
 
   deleteByPrefix(prefix: string): void {
-    for (const key of this.cache.keys()) {
+    for (const key of new Set([...this.cache.keys(), ...this.pending.keys()])) {
       if (key.startsWith(prefix)) {
-        this.cache.delete(key)
+        this.delete(key)
       }
     }
   }
 
   clear(): void {
     this.cache.clear()
+    this.pending.clear()
   }
 
   /**
@@ -49,8 +53,18 @@ export class MemoryCacheService {
     const cached = this.get<T>(key)
     if (cached !== null) return cached
 
-    const value = await fn()
-    this.set(key, value, ttlMs)
-    return value
+    const existing = this.pending.get(key)
+    if (existing) return existing as Promise<T>
+
+    // Defer the factory so synchronous exceptions also release the reservation.
+    const pending = Promise.resolve().then(fn).then(value => {
+      // Invalidation during computation must not repopulate stale data.
+      if (this.pending.get(key) === pending) this.set(key, value, ttlMs)
+      return value
+    }).finally(() => {
+      if (this.pending.get(key) === pending) this.pending.delete(key)
+    })
+    this.pending.set(key, pending)
+    return pending
   }
 }

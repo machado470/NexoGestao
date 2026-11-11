@@ -1,3 +1,4 @@
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useAuth } from "@/contexts/AuthContext";
 import { can } from "@/lib/rbac";
 import { useEffect, useMemo, useState } from "react";
@@ -243,8 +244,10 @@ export default function ServiceOrdersPage() {
 
   const utils = trpc.useUtils();
 
-  const serviceOrdersQuery = trpc.serviceOrders.list.useQuery(
-    { page: 1, limit: 500 },
+  const debouncedSearch = useDebouncedValue(searchTerm);
+
+  const serviceOrdersQuery = trpc.serviceOrders.page.useQuery(
+    { page: currentPage, limit: pageSize, id: urlServiceOrderId || undefined, appointmentId: urlAppointmentId || undefined, search: debouncedSearch || undefined, customerId: urlCustomerId || (customerFilter === 'all' ? undefined : customerFilter), assignedToPersonId: ['all', 'unassigned'].includes(responsibleFilter) ? undefined : responsibleFilter, unassigned: responsibleFilter === 'unassigned' ? 'true' : undefined, operationalFilter: activeFilter, priorityFilter, deadlineFilter },
     { retry: false }
   );
   const customersQuery = trpc.customers.list.useQuery(
@@ -284,7 +287,7 @@ export default function ServiceOrdersPage() {
   };
 
   const serviceOrders = useMemo(
-    () => normalizeArrayPayload<any>(serviceOrdersQuery.data),
+    () => normalizeArrayPayload<any>(serviceOrdersQuery.data?.items),
     [serviceOrdersQuery.data]
   );
   const customers = useMemo(
@@ -455,6 +458,8 @@ export default function ServiceOrdersPage() {
     serviceOrders,
   ]);
 
+  const hasListFilters = Boolean(searchTerm.trim() || activeFilter !== 'all' || customerFilter !== 'all' || responsibleFilter !== 'all' || deadlineFilter !== 'all' || priorityFilter !== 'all' || urlCustomerId || urlServiceOrderId || urlAppointmentId);
+
   // Filtering never changes the relative order returned by the API.
   const filteredOrders = useMemo(() => {
     const normalizedTerm = searchTerm.trim().toLowerCase();
@@ -510,10 +515,8 @@ export default function ServiceOrdersPage() {
     searchTerm,
     urlCustomerId,
   ]);
-  const paginatedOrders = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredOrders.slice(start, start + pageSize);
-  }, [currentPage, filteredOrders, pageSize]);
+  const paginatedOrders = filteredOrders;
+
 
   useEffect(() => {
     setCurrentPage(1);
@@ -546,9 +549,10 @@ export default function ServiceOrdersPage() {
   ]);
 
   useEffect(() => {
-    const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
+    if (!serviceOrdersQuery.data) return;
+    const totalPages = Math.max(1, serviceOrdersQuery.data.meta.pages);
     if (currentPage > totalPages) setCurrentPage(1);
-  }, [currentPage, filteredOrders.length, pageSize]);
+  }, [currentPage, serviceOrdersQuery.data?.meta.pages, pageSize]);
 
   useEffect(() => {
     if (
@@ -646,6 +650,7 @@ export default function ServiceOrdersPage() {
   async function refreshEverything(orderId?: string) {
     await Promise.all([
       utils.serviceOrders.list.invalidate(),
+      utils.serviceOrders.page.invalidate(),
       ...(orderId
         ? [
             utils.serviceOrders.getById.invalidate({ id: orderId }),
@@ -994,11 +999,11 @@ export default function ServiceOrdersPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {[
-            { key: "all", label: `Todas (${counts.all})` },
-            { key: "open", label: `Abertas (${counts.open})` },
-            { key: "in_progress", label: `Em andamento (${counts.progress})` },
-            { key: "overdue", label: `Atrasadas (${counts.overdue})` },
-            { key: "done", label: `Concluídas (${counts.done})` },
+            { key: "all", label: "Todas" },
+            { key: "open", label: "Abertas" },
+            { key: "in_progress", label: "Em andamento" },
+            { key: "overdue", label: "Atrasadas" },
+            { key: "done", label: "Concluídas" },
           ].map(filter => (
             <button
               key={filter.key}
@@ -1033,13 +1038,13 @@ export default function ServiceOrdersPage() {
                     "font-semibold text-[var(--accent-primary)]"
                 )}
               >
-                Concluídas sem cobrança ({counts.doneWithoutCharge})
+                Concluídas sem cobrança
               </AppDropdownItem>
             </AppDropdownContent>
           </AppDropdown>
         </div>
         <span className="rounded-md border border-[var(--border-subtle)] px-2 py-1 text-xs text-[var(--text-muted)]">
-          {filteredOrders.length} / {counts.all} O.S.
+          {filteredOrders.length} exibidas de {serviceOrdersQuery.data?.meta.total ?? 0} O.S.
         </span>
       </AppFiltersBar>
 
@@ -1064,9 +1069,9 @@ export default function ServiceOrdersPage() {
               />
             ) : filteredOrders.length === 0 ? (
               <AppPageEmptyState
-                title={enrichedOrders.length === 0 ? "Nenhuma ordem de serviço" : "Nenhum resultado para os filtros"}
-                description={enrichedOrders.length === 0 ? "Crie a primeira O.S. para iniciar o atendimento." : "Limpe os filtros para ver as ordens."}
-                action={enrichedOrders.length === 0 ? (canCreateOrder && !customersQuery.isError ? <Button onClick={() => setOpenCreate(true)}>Nova O.S.</Button> : undefined) : <Button variant="outline" onClick={() => { setSearchTerm(""); setActiveFilter("all"); setCustomerFilter("all"); setResponsibleFilter("all"); setDeadlineFilter("all"); setPriorityFilter("all"); setCurrentPage(1); }}>Limpar filtros</Button>}
+                title={enrichedOrders.length === 0 && !hasListFilters ? "Nenhuma ordem de serviço" : "Nenhum resultado para os filtros"}
+                description={enrichedOrders.length === 0 && !hasListFilters ? "Crie a primeira O.S. para iniciar o atendimento." : "Limpe os filtros para ver as ordens."}
+                action={enrichedOrders.length === 0 && !hasListFilters ? (canCreateOrder && !customersQuery.isError ? <Button onClick={() => setOpenCreate(true)}>Nova O.S.</Button> : undefined) : <Button variant="outline" onClick={() => { setSearchTerm(""); setActiveFilter("all"); setCustomerFilter("all"); setResponsibleFilter("all"); setDeadlineFilter("all"); setPriorityFilter("all"); setCurrentPage(1); }}>Limpar filtros</Button>}
               />
             ) : (
               <div className="space-y-3">
@@ -1237,7 +1242,7 @@ export default function ServiceOrdersPage() {
                 </div>
                 <AppPagination
                   currentPage={currentPage}
-                  totalItems={filteredOrders.length}
+                  totalItems={serviceOrdersQuery.data?.meta.total ?? 0}
                   pageSize={pageSize}
                   onPageChange={setCurrentPage}
                 />

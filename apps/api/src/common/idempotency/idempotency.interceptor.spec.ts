@@ -4,7 +4,7 @@ import { IdempotencyInterceptor } from './idempotency.interceptor'
 
 describe('IdempotencyInterceptor', () => {
   function makeContext(key = 'abc') {
-    const req: any = { method: 'POST', originalUrl: '/x', headers: { 'x-idempotency-key': key } }
+    const req: any = { method: 'POST', originalUrl: '/x', headers: { 'x-idempotency-key': key }, user: {orgId:'org'}, body:{content:'QA'} }
     const res: any = { statusCode: 201, status: jest.fn().mockReturnThis() }
     const ctx = {
       switchToHttp: () => ({ getRequest: () => req, getResponse: () => res }),
@@ -15,6 +15,7 @@ describe('IdempotencyInterceptor', () => {
   it('executes once and caches response', async () => {
     const cache: any = {
       acquireLock: jest.fn().mockResolvedValue(true),
+      getResponse: jest.fn().mockResolvedValue(null),
       releaseLock: jest.fn().mockResolvedValue(undefined),
       setResponse: jest.fn().mockResolvedValue(undefined),
     }

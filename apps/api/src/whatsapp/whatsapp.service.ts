@@ -63,8 +63,12 @@ export class WhatsAppService {
     return this.conversationRead.getConversation(orgId, conversationId)
   }
 
-  async getMessages(orgId: string, conversationId: string) {
-    return this.conversationRead.getMessages(orgId, conversationId)
+  getConversationMessagesPage(orgId: string, conversationId: string, options: { limit?: number; cursor?: string }) {
+    return this.conversationRead.getConversationMessagesPage(orgId, conversationId, options)
+  }
+
+  async getMessages(orgId: string, conversationId: string, options: { limit?: number; cursor?: string } = {}) {
+    return this.conversationRead.getMessages(orgId, conversationId, options)
   }
 
   async getContext(orgId: string, conversationId: string) {
@@ -173,8 +177,15 @@ export class WhatsAppService {
 
   async enqueueMessage(orgIdOrInput: string | any, maybeInput?: any) {
     const orgId = typeof orgIdOrInput === "string" ? orgIdOrInput : orgIdOrInput.orgId
-    const input = typeof orgIdOrInput === "string" ? maybeInput : orgIdOrInput
+    const requested = typeof orgIdOrInput === "string" ? maybeInput : orgIdOrInput
     if (!orgId) throw new BadRequestException('orgId é obrigatório')
+    const boundConversation = requested.conversationId
+      ? await this.prisma.whatsAppConversation.findFirst({ where: { id: String(requested.conversationId), orgId } })
+      : null
+    if (requested.conversationId && !boundConversation) throw new BadRequestException('Conversa não encontrada para envio de WhatsApp')
+    if (boundConversation && requested.customerId && requested.customerId !== boundConversation.customerId) throw new BadRequestException('Cliente incompatível com a conversa')
+    // The conversation endpoint accepts content, not a second copy of its recipient.
+    const input = boundConversation ? { ...requested, customerId: boundConversation.customerId ?? undefined, toPhone: boundConversation.phone ?? requested.toPhone } : requested
 
     const customer = input.customerId
       ? await this.prisma.customer.findFirst({ where: { id: input.customerId, orgId }, select: { id: true, phone: true } })
@@ -193,16 +204,10 @@ export class WhatsAppService {
       throw new BadRequestException(`Envio bloqueado por política comercial: ${commercialLimit.reasonCode}`)
     }
 
-    const conversation = input.conversationId
-      ? await this.prisma.whatsAppConversation.findFirst({
-          where: { id: String(input.conversationId), orgId },
-        })
-      : await this.resolveOrCreateConversation(
-          orgId,
-          input.customerId ?? null,
-          toPhone,
-          { contextType: input.entityType ?? 'GENERAL', contextId: input.entityId ?? null },
-        )
+    const conversation = boundConversation ?? await this.resolveOrCreateConversation(
+      orgId, input.customerId ?? null, toPhone,
+      { contextType: input.entityType ?? 'GENERAL', contextId: input.entityId ?? null },
+    )
 
     if (!conversation) {
       throw new BadRequestException('Conversa não encontrada para envio de WhatsApp')
@@ -217,6 +222,9 @@ export class WhatsAppService {
       }
     }
 
+    // Reject admission before persistence: a 429 must not leave a QUEUED message
+    // that the recovery dispatcher could later send despite the failed request.
+    await this.queueService.reserveWhatsAppAdmission(orgId)
     let message
     try {
       message = await this.prisma.whatsAppMessage.create({
@@ -259,7 +267,7 @@ export class WhatsAppService {
     })
     this.logTransition('whatsapp.outbound', { conversationId: conversation.id, messageId: message.id, status: 'WAITING_CUSTOMER' })
 
-    await this.queueService.addJob(QUEUE_NAMES.WHATSAPP, WHATSAPP_QUEUE_JOB_NAMES.DISPATCH_MESSAGE, { messageId: message.id, orgId, requestId: this.requestContext.requestId, userId: this.requestContext.userId }, { jobId: `whatsapp-dispatch-${message.id}` })
+    await this.queueService.addJob(QUEUE_NAMES.WHATSAPP, WHATSAPP_QUEUE_JOB_NAMES.DISPATCH_MESSAGE, { messageId: message.id, orgId, requestId: this.requestContext.requestId, userId: this.requestContext.userId }, { jobId: `whatsapp-dispatch-${message.id}` }, true)
 
     this.waMetrics.incQueuedJobs()
     this.tenantOps.increment(orgId, 'whatsapp_queued')
@@ -334,8 +342,9 @@ export class WhatsAppService {
       throw new BadRequestException('Apenas mensagens com status FAILED podem ser reenviadas')
     }
 
+    await this.queueService.reserveWhatsAppAdmission(orgId)
     await this.prisma.whatsAppMessage.updateMany({ where: { id: messageId, orgId }, data: { status: 'QUEUED', failedAt: null, errorMessage: null, errorCode: null } })
-    await this.queueService.addJob(QUEUE_NAMES.WHATSAPP, WHATSAPP_QUEUE_JOB_NAMES.DISPATCH_MESSAGE, { messageId, orgId, requestId: this.requestContext.requestId, userId: this.requestContext.userId }, { jobId: `whatsapp-dispatch-retry-${messageId}` })
+    await this.queueService.addJob(QUEUE_NAMES.WHATSAPP, WHATSAPP_QUEUE_JOB_NAMES.DISPATCH_MESSAGE, { messageId, orgId, requestId: this.requestContext.requestId, userId: this.requestContext.userId }, { jobId: `whatsapp-dispatch-retry-${messageId}` }, true)
     this.waMetrics.incQueuedJobs()
     await this.logMessageTimelineEventOnce({
       orgId,

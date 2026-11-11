@@ -1,0 +1,6 @@
+
+Test Suites: 5 passed, 5 total
+Tests:       22 passed, 22 total
+Snapshots:   0 total
+Time:        5.186 s
+Ran all test suites matching src/customers/customers-operational-summary.service.spec.ts|src/dashboard/dashboard.service.spec.ts|src/common/tenant-ops/tenant-ops.service.spec.ts|src/common/metrics/otel-metrics.spec.ts|src/common/metrics/queue-metrics-exporter.service.spec.ts.

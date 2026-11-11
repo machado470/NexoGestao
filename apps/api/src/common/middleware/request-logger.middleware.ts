@@ -9,19 +9,8 @@ export class RequestLoggerMiddleware implements NestMiddleware {
   constructor(private readonly metrics: MetricsService) {}
 
   private endpointKey(method: string, originalUrl: string): string {
-    const path = originalUrl.split('?')[0] ?? '/'
-    const chunks = path.split('/').filter(Boolean)
-    const normalized = chunks
-      .map((chunk) =>
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(chunk)
-          ? ':id'
-          : /^\d+$/.test(chunk)
-            ? ':id'
-            : chunk,
-      )
-      .join('/')
-
-    return `${method} /${normalized}`
+    // Never use arbitrary incoming paths as metric dimensions.
+    return `${method} ${originalUrl || '/:unmatched'}`
   }
 
   use(req: Request, res: Response, next: NextFunction): void {
@@ -62,7 +51,7 @@ export class RequestLoggerMiddleware implements NestMiddleware {
         userAgent,
       }
 
-      const endpoint = this.endpointKey(method, originalUrl)
+      const endpoint = this.endpointKey(method, typeof req.route?.path === 'string' ? req.route.path : '/:unmatched')
       this.metrics.incrementRequestByEndpoint(endpoint)
       this.metrics.observeEndpointLatency(endpoint, duration)
       if (statusCode >= 400) {

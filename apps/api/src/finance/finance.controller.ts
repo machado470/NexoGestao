@@ -138,7 +138,7 @@ export class FinanceController {
       )
     }
 
-    const createChargeLimit = this.tenantOps.enforceLimit({
+    const createChargeLimit = await this.tenantOps.enforceLimit({
       orgId,
       scope: 'finance:create-charge',
       limit: 40,

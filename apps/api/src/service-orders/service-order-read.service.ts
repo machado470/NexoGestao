@@ -94,14 +94,41 @@ export class ServiceOrderReadService {
     })
   }
 
-  async list(orgId: string, filters: { status?: ServiceOrderStatus; customerId?: string; assignedToPersonId?: string; from?: string; to?: string; page?: number; limit?: number; search?: string }) {
+  async list(orgId: string, filters: { status?: ServiceOrderStatus; id?: string; appointmentId?: string; customerId?: string; assignedToPersonId?: string; from?: string; to?: string; page?: number; limit?: number; search?: string; operationalFilter?: string; priorityFilter?: string; deadlineFilter?: string; unassigned?: string }) {
     if (!orgId) throw new BadRequestException('orgId é obrigatório')
-    const page = Number(filters.page) || 1
-    const limit = Math.min(Number(filters.limit) || 20, 100)
+    const page = filters.page == null ? 1 : Number(filters.page)
+    const requestedLimit = filters.limit == null ? 20 : Number(filters.limit)
+    if (!Number.isSafeInteger(page) || page < 1 || page > 10000 || !Number.isSafeInteger(requestedLimit) || requestedLimit < 1) throw new BadRequestException('Página e limite devem ser inteiros positivos')
+    const limit = Math.min(requestedLimit, 100)
+    const now = new Date()
+    const active: Prisma.ServiceOrderWhereInput = { status: { in: ['OPEN', 'ASSIGNED', 'IN_PROGRESS'] } }
+    const overdue: Prisma.ServiceOrderWhereInput = { AND: [active, { OR: [{ dueDate: { not: null, lt: now } }, { dueDate: null, scheduledFor: { not: null, lt: now } }] }] }
+    const withoutCharge: Prisma.ServiceOrderWhereInput = { status: 'DONE', charges: { none: {} } }
+    const chargeOverdue: Prisma.ServiceOrderWhereInput = { charges: { some: { OR: [{ status: 'OVERDUE' }, { status: 'PENDING', dueDate: { lt: now } }] } } }
+    const withoutOwner: Prisma.ServiceOrderWhereInput = { ...active, assignedToPersonId: null }
+    const stalled: Prisma.ServiceOrderWhereInput = { status: 'IN_PROGRESS', dueDate: null, scheduledFor: null }
+    const p0: Prisma.ServiceOrderWhereInput = { OR: [overdue, withoutCharge, chargeOverdue] }
+    const p1: Prisma.ServiceOrderWhereInput = { OR: [withoutOwner, stalled] }
+    const additional: Prisma.ServiceOrderWhereInput[] = []
+    const operational: Record<string, Prisma.ServiceOrderWhereInput> = { open: { status: { in: ['OPEN', 'ASSIGNED'] } }, in_progress: { status: 'IN_PROGRESS' }, overdue, done: { status: 'DONE' }, without_charge: withoutCharge }
+    const priorities: Record<string, Prisma.ServiceOrderWhereInput> = { P0: p0, P1: { AND: [{ NOT: p0 }, p1] }, P2: { AND: [active, { NOT: p0 }, { NOT: p1 }] }, P3: { AND: [{ NOT: active }, { NOT: p0 }] } }
+    if (filters.operationalFilter && filters.operationalFilter !== 'all') {
+      if (!operational[filters.operationalFilter]) throw new BadRequestException('Filtro operacional inválido')
+      additional.push(operational[filters.operationalFilter])
+    }
+    if (filters.priorityFilter && filters.priorityFilter !== 'all') {
+      if (!priorities[filters.priorityFilter]) throw new BadRequestException('Prioridade operacional inválida')
+      additional.push(priorities[filters.priorityFilter])
+    }
+    if (filters.deadlineFilter === 'overdue') additional.push(overdue)
+    else if (filters.deadlineFilter === 'no_deadline') additional.push({ dueDate: null, scheduledFor: null })
+    if (filters.unassigned === 'true') additional.push({ assignedToPersonId: null })
     const from = parseOptionalDate('from', filters.from)
     const to = parseOptionalDate('to', filters.to)
     if (from && to && from.getTime() > to.getTime()) throw new BadRequestException('intervalo inválido: from não pode ser maior que to')
-    const where: Prisma.ServiceOrderWhereInput = { orgId }
+    const where: Prisma.ServiceOrderWhereInput = { orgId, ...(additional.length ? { AND: additional } : {}) }
+    if (filters.id) where.id = filters.id
+    if (filters.appointmentId) where.appointmentId = filters.appointmentId
     if (filters.customerId) where.customerId = filters.customerId
     if (filters.assignedToPersonId) where.assignedToPersonId = filters.assignedToPersonId
     if (filters.status != null) { if (!isStatus(filters.status)) throw new BadRequestException('status inválido'); where.status = filters.status }
@@ -111,7 +138,7 @@ export class ServiceOrderReadService {
       where.OR = [{ title: { contains: s, mode: 'insensitive' } }, { description: { contains: s, mode: 'insensitive' } }, { customer: { OR: [{ name: { contains: s, mode: 'insensitive' } }, { email: { contains: s, mode: 'insensitive' } }, { phone: { contains: s, mode: 'insensitive' } }] } }]
     }
     const [rows, total] = await Promise.all([
-      this.prisma.serviceOrder.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (page - 1) * limit, take: limit, include: { customer: { select: { id: true, name: true, phone: true } }, assignedTo: { select: { id: true, name: true } }, appointment: { select: { id: true, startsAt: true, endsAt: true, status: true } } } }),
+      this.prisma.serviceOrder.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (page - 1) * limit, take: limit, include: { customer: { select: { id: true, name: true, phone: true } }, assignedTo: { select: { id: true, name: true } }, appointment: { select: { id: true, startsAt: true, endsAt: true, status: true } } } }),
       this.prisma.serviceOrder.count({ where }),
     ])
     return { data: await this.attachFinancialSummary(orgId, rows), pagination: { page, limit, total, pages: Math.ceil(total / limit) } }

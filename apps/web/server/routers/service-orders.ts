@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
-import { authedGet, authedPatch, authedPost, type NexoContext } from "../_core/nexoTransport";
+import { authedGetPage, authedGet, authedPatch, authedPost, type NexoContext } from "../_core/nexoTransport";
 
 const uuid = z.string().uuid();
 const nullableUuid = uuid.nullable();
@@ -9,12 +9,18 @@ const nullableTimestamp = timestamp.nullable();
 const status = z.enum(["OPEN", "ASSIGNED", "IN_PROGRESS", "DONE", "CANCELED"]);
 
 const serviceOrderListInput = z.object({
+  id: uuid.optional(),
+  appointmentId: uuid.optional(),
+  operationalFilter: z.enum(['all', 'open', 'in_progress', 'overdue', 'done', 'without_charge']).optional(),
+  priorityFilter: z.enum(['all', 'P0', 'P1', 'P2', 'P3']).optional(),
+  deadlineFilter: z.enum(['all', 'overdue', 'no_deadline']).optional(),
+  unassigned: z.enum(['true']).optional(),
   status: status.optional(),
   customerId: uuid.optional(),
   assignedToPersonId: uuid.optional(),
   from: timestamp.optional(),
   to: timestamp.optional(),
-  page: z.number().int().positive().optional(),
+  page: z.number().int().positive().max(10000).optional(),
   limit: z.number().int().positive().max(500).optional(),
   search: z.string().max(200).optional(),
 }).strict().optional();
@@ -152,6 +158,10 @@ function parseOrder<T extends z.ZodType>(payload: unknown, schema: T): z.infer<T
 }
 
 export const serviceOrdersRouter = router({
+  page: protectedProcedure.input(serviceOrderListInput).query(async ({ctx, input}) => {
+    const page = await authedGetPage(ctx as NexoContext, '/service-orders', input);
+    return { ...page, items: parseList({ data: page.items, pagination: page.meta }).data };
+  }),
   list: protectedProcedure.input(serviceOrderListInput).output(serviceOrdersListOutputSchema).query(async ({ ctx, input }) => {
     return parseList(await authedGet(ctx as NexoContext, "/service-orders", input));
   }),

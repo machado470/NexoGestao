@@ -1,0 +1,6 @@
+
+Test Suites: 2 passed, 2 total
+Tests:       9 passed, 9 total
+Snapshots:   0 total
+Time:        14.929 s
+Ran all test suites matching test/integration/tenant-rate-limits-postgres.integration.spec.ts|test/integration/service-order-filters-postgres.integration.spec.ts.

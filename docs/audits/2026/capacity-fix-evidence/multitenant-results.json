@@ -1,0 +1,30 @@
+{
+  "method": "Direct services + real PostgreSQL + real Redis; webhook domain handler simulated; no external messages",
+  "results": [
+    {
+      "evidence": "history-multitenant",
+      "organizations": 3,
+      "messages": 10001,
+      "queryBatchMax": 1000,
+      "historyQueries": 11,
+      "durationMs": 200,
+      "isolationVerified": true
+    },
+    {
+      "evidence": "queue-multitenant",
+      "organizations": 3,
+      "workerReplicas": 2,
+      "jobs": 41,
+      "completed": 41,
+      "deferredAttempts": 33,
+      "durationMs": 3391,
+      "peerProgressBeforeNoisyCompletion": true
+    }
+  ],
+  "passed": 2,
+  "limitations": [
+    "Short local integration, not a saturation or soak benchmark",
+    "History duration excludes fixture insertion",
+    "No external provider latency or failures exercised"
+  ]
+}

@@ -10,6 +10,7 @@ import {
   Res,
   Headers,
 } from '@nestjs/common'
+import { Throttle } from '@nestjs/throttler'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
 import { Roles } from '../auth/decorators/roles.decorator'
@@ -20,6 +21,7 @@ import { CustomersService } from './customers.service'
 import { CustomersOperationalSummaryService } from './customers-operational-summary.service'
 import { CreateCustomerDto } from './dto/create-customer.dto'
 import { UpdateCustomerDto } from './dto/update-customer.dto'
+import { CustomerSummaryPageQueryDto } from './dto/customer-summary-page-query.dto'
 import { ListCustomersQueryDto } from './dto/list-customers-query.dto'
 import { QuotasService } from '../quotas/quotas.service'
 
@@ -33,8 +35,14 @@ export class CustomersController {
   ) {}
 
   @Get()
+  @Throttle({ default: { limit: 120, ttl: 60_000 } })
   @Roles('ADMIN', 'MANAGER', 'STAFF', 'VIEWER')
-  list(@Org() orgId: string, @Query() query: ListCustomersQueryDto) {
+  async list(@Org() orgId: string, @Query() query: ListCustomersQueryDto) {
+    if (query.priority || query.riskState) {
+      const summary = await this.operationalSummary.getSummary(orgId)
+      const ids = summary.customers.filter(item => (!query.priority || item.priority === query.priority) && (!query.riskState || item.riskState === query.riskState)).map(item => item.customerId)
+      return this.customers.list(orgId, query, ids)
+    }
     return this.customers.list(orgId, query)
   }
 
@@ -45,6 +53,13 @@ export class CustomersController {
     res.set('Content-Type', 'text/csv')
     res.attachment(`customers-${orgId}-${Date.now()}.csv`)
     return res.send(csv)
+  }
+
+  @Get('operational-summary/page')
+  @Throttle({ default: { limit: 120, ttl: 60_000 } })
+  @Roles('ADMIN', 'MANAGER', 'STAFF', 'VIEWER')
+  operationalSummaryPage(@Org() orgId: string, @Query() query: CustomerSummaryPageQueryDto) {
+    return this.operationalSummary.getSummaryPage(orgId, query.customerIds ?? [])
   }
 
   @Get('operational-summary')

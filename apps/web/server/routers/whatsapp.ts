@@ -247,6 +247,11 @@ export const whatsappRouter = router({
       .output(conversationOutput.nullable())
       .query(async ({ ctx, input }) => publicOutput(conversationOutput.nullable(), await authedGet(ctx as NexoContext, `/whatsapp/conversations/${input.id}`))),
 
+    conversationMessagesFeed: protectedProcedure
+      .input(z.object({ conversationId: id, cursor: id.optional(), limit: z.number().int().min(1).max(100).optional() }))
+      .output(messageFeedOutput)
+      .query(async ({ ctx, input }) => publicOutput(messageFeedOutput, await authedGet(ctx as NexoContext, `/whatsapp/conversations/${input.conversationId}/messages/feed`, { cursor: input.cursor, limit: input.limit }))),
+
     getMessages: protectedProcedure
       .input(z.object({ conversationId: z.string().min(1) }))
       .output(z.array(messageOutput))

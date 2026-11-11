@@ -163,7 +163,40 @@ function highestPortfolioStatus(
 export class CustomersOperationalSummaryService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getSummary(orgId: string, now = new Date()) {
+  private async *readRows<T extends { id: string }>(load: (page: { take: number; orderBy: { id: 'asc' }; cursor?: { id: string }; skip?: number }) => Promise<T[]>) {
+    let cursor: string | undefined
+    while (true) {
+      const rows = await load({ orderBy: { id: 'asc' }, take: 1000, ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}) })
+      for (const row of rows) yield row
+      if (rows.length < 1000) return
+      cursor = rows[rows.length - 1].id
+    }
+  }
+
+  getSummary(orgId: string, now = new Date()) {
+    return this.collectSummary(orgId, now)
+  }
+
+  getSummaryPage(orgId: string, customerIds: string[], now = new Date()) {
+    return this.collectSummary(orgId, now, new Set(customerIds))
+  }
+
+  private async collectSummary(orgId: string, now: Date, selectedIds?: Set<string>) {
+    let cursor: string | undefined
+    const customers: Awaited<ReturnType<CustomersOperationalSummaryService['getBatchSummary']>>['customers'] = []
+    const portfolio = { operationalStatus: 'NORMAL' as CustomerOperationalStatus, totalCustomers: 0, normalCustomers: 0, attentionCustomers: 0, riskCustomers: 0, criticalCustomers: 0 }
+    while (true) {
+      const batch = await this.getBatchSummary(orgId, now, cursor)
+      portfolio.operationalStatus = highestPortfolioStatus([portfolio.operationalStatus, batch.portfolio.operationalStatus])
+      for (const key of ['totalCustomers', 'normalCustomers', 'attentionCustomers', 'riskCustomers', 'criticalCustomers'] as const) portfolio[key] += batch.portfolio[key]
+      for (const customer of batch.customers) if (!selectedIds || selectedIds.has(customer.customerId)) customers.push(customer)
+      if (batch.customers.length < MAX_CUSTOMERS) break
+      cursor = batch.customers[batch.customers.length - 1].customerId
+    }
+    return { evaluatedAt: now.toISOString(), portfolio, customers }
+  }
+
+  private async getBatchSummary(orgId: string, now: Date, cursor?: string) {
     const recentSince = new Date(
       now.getTime() - RECENT_WINDOW_DAYS * DAY_MS,
     )
@@ -187,8 +220,9 @@ export class CustomersOperationalSummaryService {
         createdAt: true,
         updatedAt: true,
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: MAX_CUSTOMERS,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     })
 
     const customerIds = customers.map((customer) => customer.id)
@@ -209,16 +243,7 @@ export class CustomersOperationalSummaryService {
       }
     }
 
-    const [
-      charges,
-      recentPayments,
-      serviceOrders,
-      appointments,
-      failedMessages,
-      waitingConversations,
-      timelineEvents,
-    ] = await Promise.all([
-      this.prisma.charge.findMany({
+    const charges = this.readRows(page => this.prisma.charge.findMany({ ...page,
         where: {
           orgId,
           customerId: { in: customerIds },
@@ -231,11 +256,12 @@ export class CustomersOperationalSummaryService {
           amountCents: true,
           payments: {
             select: { id: true },
+            take: 1,
           },
         },
-      }),
+      }))
 
-      this.prisma.payment.findMany({
+    const recentPayments = this.readRows(page => this.prisma.payment.findMany({ ...page,
         where: {
           orgId,
           paidAt: { gte: recentSince },
@@ -245,14 +271,15 @@ export class CustomersOperationalSummaryService {
           },
         },
         select: {
+          id: true,
           paidAt: true,
           charge: {
             select: { customerId: true },
           },
         },
-      }),
+      }))
 
-      this.prisma.serviceOrder.findMany({
+    const serviceOrders = this.readRows(page => this.prisma.serviceOrder.findMany({ ...page,
         where: {
           orgId,
           customerId: { in: customerIds },
@@ -268,11 +295,12 @@ export class CustomersOperationalSummaryService {
           finishedAt: true,
           charges: {
             select: { id: true },
+            take: 1,
           },
         },
-      }),
+      }))
 
-      this.prisma.appointment.findMany({
+    const appointments = this.readRows(page => this.prisma.appointment.findMany({ ...page,
         where: {
           orgId,
           customerId: { in: customerIds },
@@ -288,32 +316,9 @@ export class CustomersOperationalSummaryService {
             select: { id: true },
           },
         },
-      }),
+      }))
 
-      this.prisma.whatsAppMessage.findMany({
-        where: {
-          orgId,
-          customerId: { in: customerIds },
-          status: 'FAILED',
-        },
-        select: {
-          customerId: true,
-        },
-      }),
-
-      this.prisma.whatsAppConversation.findMany({
-        where: {
-          orgId,
-          customerId: { in: customerIds },
-          status: 'WAITING_OPERATOR',
-          responseDueAt: { lt: now },
-        },
-        select: {
-          customerId: true,
-        },
-      }),
-
-      this.prisma.timelineEvent.findMany({
+    const timelineEvents = this.readRows(page => this.prisma.timelineEvent.findMany({ ...page,
         where: {
           orgId,
           customerId: { in: customerIds },
@@ -332,18 +337,18 @@ export class CustomersOperationalSummaryService {
           createdAt: { gte: timelineSince },
         },
         select: {
+          id: true,
           customerId: true,
           action: true,
           createdAt: true,
         },
-      }),
-    ])
+      }))
 
     const signals = new Map<string, CustomerRiskInput>(
       customerIds.map((id) => [id, createRiskInput()]),
     )
 
-    for (const charge of charges) {
+    for await (const charge of charges) {
       const customerId = charge.customerId
       if (!customerId) continue
 
@@ -363,7 +368,7 @@ export class CustomersOperationalSummaryService {
       }
     }
 
-    for (const payment of recentPayments) {
+    for await (const payment of recentPayments) {
       const customerId = payment.charge.customerId
       if (!customerId) continue
       const current = signals.get(customerId)
@@ -376,7 +381,7 @@ export class CustomersOperationalSummaryService {
       'IN_PROGRESS',
     ])
 
-    for (const order of serviceOrders) {
+    for await (const order of serviceOrders) {
       const customerId = order.customerId
       if (!customerId) continue
 
@@ -422,7 +427,7 @@ export class CustomersOperationalSummaryService {
       }
     }
 
-    for (const appointment of appointments) {
+    for await (const appointment of appointments) {
       const customerId = appointment.customerId
       if (!customerId) continue
 
@@ -462,19 +467,30 @@ export class CustomersOperationalSummaryService {
       }
     }
 
-    for (const message of failedMessages) {
-      if (!message.customerId) continue
-      const current = signals.get(message.customerId)
-      if (current) current.failedMessages += 1
+    // Only counts feed the risk policy: aggregate in PostgreSQL instead of
+    // transferring every historical message/conversation to the process.
+    // The customer batch bounds the number of groups to MAX_CUSTOMERS.
+    const failedMessageCounts = await this.prisma.whatsAppMessage.groupBy({
+      by: ['customerId'],
+      where: { orgId, customerId: { in: customerIds }, status: 'FAILED' },
+      _count: { _all: true },
+    })
+    for (const group of failedMessageCounts) {
+      const current = group.customerId && signals.get(group.customerId)
+      if (current) current.failedMessages += group._count._all
     }
 
-    for (const conversation of waitingConversations) {
-      if (!conversation.customerId) continue
-      const current = signals.get(conversation.customerId)
-      if (current) current.awaitingResponseConversations += 1
+    const waitingConversationCounts = await this.prisma.whatsAppConversation.groupBy({
+      by: ['customerId'],
+      where: { orgId, customerId: { in: customerIds }, status: 'WAITING_OPERATOR', responseDueAt: { lt: now } },
+      _count: { _all: true },
+    })
+    for (const group of waitingConversationCounts) {
+      const current = group.customerId && signals.get(group.customerId)
+      if (current) current.awaitingResponseConversations += group._count._all
     }
 
-    for (const event of timelineEvents) {
+    for await (const event of timelineEvents) {
       if (!event.customerId) continue
       const current = signals.get(event.customerId)
       if (!current) continue

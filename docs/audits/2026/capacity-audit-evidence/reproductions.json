@@ -1,0 +1,29 @@
+{
+  "method": "Service-level reproduction with mocks; compiled local modules, no HTTP, database or load",
+  "tenantLimit": {
+    "sameInstanceBlocksThird": true,
+    "secondInstanceAllowsAnother": true
+  },
+  "metrics": {
+    "distinctUnknownPaths": 1000,
+    "retainedRequestKeys": 1000
+  },
+  "conversationMessages": {
+    "hasTake": false,
+    "hasCursor": false
+  },
+  "pass": true,
+  "cacheMiss": {
+    "concurrentCalls": 20,
+    "factoryCalls": 20
+  },
+  "customerSummary": {
+    "availableFixtureCustomers": 501,
+    "reportedTotal": 500,
+    "returnedSummaries": 500
+  },
+  "appointments": {
+    "requestedLimit": 1000000,
+    "forwardedTake": 1000000
+  }
+}
