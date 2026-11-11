@@ -4,13 +4,13 @@ name: nexogestao-phase23c
 # no shared volumes and do not reuse the development ports or container names.
 services:
   postgres-phase23c:
-    image: postgres:15
+    image: ${PHASE23C_POSTGRES_IMAGE:-postgres:15}
     environment:
       POSTGRES_USER: phase23c
       POSTGRES_PASSWORD: phase23c-local-only
       POSTGRES_DB: phase23c
     ports:
-      - "${PHASE23C_POSTGRES_PORT:-55433}:5432"
+      - "127.0.0.1:${PHASE23C_POSTGRES_PORT:-55433}:5432"
     volumes:
       - phase23c-postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -23,7 +23,7 @@ services:
     image: redis:7
     command: ["redis-server", "--save", "", "--appendonly", "no"]
     ports:
-      - "${PHASE23C_REDIS_PORT:-56380}:6379"
+      - "127.0.0.1:${PHASE23C_REDIS_PORT:-56380}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 1s
