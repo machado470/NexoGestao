@@ -7,6 +7,7 @@ import { randomUUID } from 'crypto'
 import { AppModule } from '../../src/app.module'
 import { PrismaService } from '../../src/prisma/prisma.service'
 import { DashboardService } from '../../src/dashboard/dashboard.service'
+import { OperationalStateScheduler } from '../../src/people/operational-state.scheduler'
 import {
   describeRealIntegration,
   REAL_INTEGRATION_ENABLED_MESSAGE,
@@ -36,6 +37,7 @@ describeRealIntegration('Canonical Operational Workflow (e2e)', () => {
   let app: INestApplication
   let prisma: WorkflowPrisma
   let dashboard: DashboardService
+  const previousOperationalStateSchedule = process.env.DISABLE_OPERATIONAL_STATE_SCHEDULE
 
   if (!process.env.JWT_SECRET) {
     throw new Error('JWT_SECRET must be explicitly configured for integration tests')
@@ -55,6 +57,10 @@ describeRealIntegration('Canonical Operational Workflow (e2e)', () => {
   }
 
   beforeAll(async () => {
+    // This test invokes the recalculation endpoint explicitly. The global cron
+    // can otherwise evaluate both fixtures at a five-minute wall-clock boundary
+    // and create legitimate events in the organization expected to stay idle.
+    process.env.DISABLE_OPERATIONAL_STATE_SCHEDULE = 'true'
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile()
@@ -130,8 +136,16 @@ describeRealIntegration('Canonical Operational Workflow (e2e)', () => {
         await prisma.organization.deleteMany({ where: { id: { in: orgIds } } })
       }
     } finally {
-      if (app) {
-        await app.close()
+      try {
+        if (app) {
+          await app.close()
+        }
+      } finally {
+        if (previousOperationalStateSchedule === undefined) {
+          delete process.env.DISABLE_OPERATIONAL_STATE_SCHEDULE
+        } else {
+          process.env.DISABLE_OPERATIONAL_STATE_SCHEDULE = previousOperationalStateSchedule
+        }
       }
     }
   })
@@ -139,6 +153,11 @@ describeRealIntegration('Canonical Operational Workflow (e2e)', () => {
   it('runs end-to-end operational flow with timeline, finance transitions, risk recalculation, and org isolation', async () => {
     const mainAuth = authFor(primaryOrgId, primaryUserId, primaryPersonId)
     const otherAuth = authFor(secondaryOrgId, secondaryUserId, secondaryPersonId)
+
+    // Exercise a clock tick deterministically: only the explicit HTTP action
+    // below may recalculate these fixtures, even at a cron boundary.
+    await app.get(OperationalStateScheduler).tick()
+    expect(await prisma.timelineEvent.count({ where: { orgId: secondaryOrgId } })).toBe(0)
 
     // Establish the real, tenant-scoped read-model baseline before any workflow
     // mutation. Dashboard reads are cached by contract, so later reads use the
