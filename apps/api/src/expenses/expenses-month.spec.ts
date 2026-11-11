@@ -14,7 +14,7 @@ describe('Monthly financial reporting uses the organization calendar', () => {
     expense.findMany.mockResolvedValue([])
     payment.aggregate.mockResolvedValue({ _sum: { amountCents: 0 } })
     charge.aggregate.mockResolvedValue({ _sum: { amountCents: 0 } })
-    service = new ExpensesService({ organization: org, expense, payment, charge } as any, timeline as any)
+    service = new ExpensesService({ organization: org, expense, payment, charge, $queryRaw:jest.fn().mockResolvedValue([{amountCents:0n}]), paymentRefund:{aggregate:jest.fn().mockResolvedValue({_sum:{amountCents:0}})} } as any, timeline as any)
   })
   afterEach(() => jest.restoreAllMocks())
   it('uses the same tenant month for expenses and received payments, with exclusive upper bounds', async () => {

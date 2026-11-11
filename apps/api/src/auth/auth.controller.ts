@@ -14,6 +14,7 @@ import { Throttle } from '@nestjs/throttler'
 
 import { AuthService } from './auth.service'
 import { GoogleLoginDto } from './dto/google-login.dto'
+import { AuthEmailDto, AuthTokenDto, LoginDto, RegisterDto, ResetPasswordDto } from './dto/auth-request.dto'
 import { GoogleIdTokenVerifier } from './google-id-token-verifier'
 import { Public } from './decorators/public.decorator'
 import { readGoogleOAuthEnv } from '../common/config/google-oauth-env'
@@ -68,12 +69,7 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   async register(
     @Body()
-    body: {
-      orgName: string
-      adminName: string
-      email: string
-      password: string
-    },
+    body: RegisterDto,
   ) {
     return this.auth.register(body)
   }
@@ -81,7 +77,7 @@ export class AuthController {
   @Public()
   @Post('login')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
-  async login(@Body() body: { email: string; password: string }) {
+  async login(@Body() body: LoginDto) {
     return this.auth.login(body.email, body.password)
   }
 
@@ -149,28 +145,28 @@ export class AuthController {
   @Public()
   @Post('forgot-password')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
-  async forgotPassword(@Body() body: { email: string }) {
+  async forgotPassword(@Body() body: AuthEmailDto) {
     return this.auth.forgotPassword(body.email)
   }
 
   @Public()
   @Post('reset-password')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
-  async resetPassword(@Body() body: { token: string; password: string }) {
+  async resetPassword(@Body() body: ResetPasswordDto) {
     return this.auth.resetPassword(body.token, body.password)
   }
 
   @Public()
   @Post('verify-email')
   @Throttle({ default: { limit: 10, ttl: 60000 } })
-  async verifyEmail(@Body() body: { token: string }) {
+  async verifyEmail(@Body() body: AuthTokenDto) {
     return this.auth.verifyEmail(body.token)
   }
 
   @Public()
   @Post('resend-email-verification')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
-  async resendEmailVerification(@Body() body: { email: string }) {
+  async resendEmailVerification(@Body() body: AuthEmailDto) {
     return this.auth.resendEmailVerification(body.email)
   }
 }

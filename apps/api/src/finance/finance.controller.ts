@@ -131,7 +131,7 @@ export class FinanceController {
     @Headers('idempotency-key') idempotencyKeyHeader: string | undefined,
     @Body() body: CreateChargeDto,
   ) {
-    const commercialLimit = await this.commercial.enforceMeter(orgId, 'finance_critical_actions')
+    const commercialLimit = await this.commercial.enforceMeter(orgId, 'finance_critical_actions', { admissionOnly: true })
     if (isCommercialBlocked(commercialLimit)) {
       throw new BadRequestException(
         `Criação de cobrança bloqueada por política comercial: ${commercialLimit.reasonCode}`,
@@ -160,6 +160,7 @@ export class FinanceController {
     if (!dueDate) throw new BadRequestException('dueDate é obrigatório')
 
     const data = await this.finance.createCharge({
+      commercialAdmission: tx => this.commercial.assertMeterInTransaction(tx, orgId, 'finance_critical_actions'),
       orgId,
       customerId: body.customerId,
       amountCents: body.amountCents,

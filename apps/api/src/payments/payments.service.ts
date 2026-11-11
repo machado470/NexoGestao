@@ -1,5 +1,7 @@
+import { PaymentRefundsService } from '../finance/payment-refunds.service'
 import {
   Injectable,
+  Optional,
   Logger,
   BadRequestException,
   ServiceUnavailableException,
@@ -30,6 +32,7 @@ export class PaymentsService {
     private configService: ConfigService,
     private prisma: PrismaService,
     private finance: FinanceService,
+    @Optional() private readonly refunds?: PaymentRefundsService,
   ) {
     const secretKey =
       this.configService.get<string>('STRIPE_SECRET_KEY') ||
@@ -166,6 +169,19 @@ export class PaymentsService {
 
     this.logger.log(`Webhook Stripe recebido: ${event.type}`)
 
+    if (['refund.created', 'refund.updated', 'refund.failed', 'charge.refund.updated'].includes(event.type)) {
+      await this.reconcileRefund((event.data.object as Stripe.Refund).id, event.id)
+      return { received: true }
+    }
+    if (event.type === 'charge.refunded') {
+      const charge = event.data.object as Stripe.Charge
+      // A charge's embedded refunds list may be truncated; iterate the provider.
+      for await (const refund of this.stripe.refunds.list({ charge: charge.id, limit: 100 }, { timeout: 5000, maxNetworkRetries: 0 })) {
+        await this.reconcileRefund(refund.id, event.id)
+      }
+      return { received: true }
+    }
+
     if (
       event.type === 'charge.succeeded' ||
       event.type === 'checkout.session.completed' ||
@@ -214,6 +230,23 @@ export class PaymentsService {
     }
 
     return { received: true }
+  }
+
+  private async reconcileRefund(refundId: string, providerEventId: string) {
+    if (!this.refunds) throw new ServiceUnavailableException('Conciliação de estornos indisponível')
+    const refund = await this.stripe!.refunds.retrieve(refundId, {}, { timeout: 5000, maxNetworkRetries: 0 })
+    if (!['succeeded', 'failed', 'canceled'].includes(refund.status ?? '')) return
+    const intentId = typeof refund.payment_intent === 'string' ? refund.payment_intent : refund.payment_intent?.id
+    if (!intentId) throw new BadRequestException('Estorno sem PaymentIntent; conciliação necessária')
+    const intent = await this.stripe!.paymentIntents.retrieve(intentId, {}, { timeout: 5000, maxNetworkRetries: 0 })
+    const { orgId, chargeId } = intent.metadata
+    if (!orgId || !chargeId) return // A payment outside this product's tenant mapping.
+    if (refund.status === 'failed' || refund.status === 'canceled') {
+      await this.refunds.reverse({ orgId, chargeId, paymentIntentId: intentId, providerRefundId: refund.id, providerEventId })
+      return
+    }
+    await this.refunds.record({ orgId, chargeId, paymentIntentId: intentId, providerRefundId: refund.id, providerEventId,
+      amountCents: refund.amount, currency: refund.currency, refundedAt: new Date(refund.created * 1000) })
   }
 
   /**

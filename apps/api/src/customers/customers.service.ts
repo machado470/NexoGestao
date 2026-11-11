@@ -1,3 +1,4 @@
+import { refundedAmount } from '../common/finance/refunded-amount'
 import {
   BadRequestException,
   ConflictException,
@@ -224,7 +225,7 @@ export class CustomersService {
       appointments,
       serviceOrders,
       charges,
-      totalSpentCents: paymentsAggregate._sum.amountCents ?? 0,
+      totalSpentCents: (paymentsAggregate._sum.amountCents ?? 0) - await refundedAmount(this.prisma, { orgId, charge: { orgId, customerId: id } }),
     }
   }
 

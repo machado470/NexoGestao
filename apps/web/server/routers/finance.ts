@@ -118,6 +118,7 @@ const serviceOrderSchema = z
 const chargePaymentSchema = z
   .object({
     amountCents: moneyCentsSchema,
+    refunds: z.array(z.object({ amountCents: moneyCentsSchema, reversedAt: isoDateSchema.nullable().optional() }).strict()).optional(),
     paidAt: isoDateSchema,
     method: z.enum(["PIX", "CASH", "CARD", "TRANSFER", "OTHER"]),
   })
@@ -145,6 +146,8 @@ const chargeSchema = z
     serviceOrder: serviceOrderSchema.nullable(),
     payments: z.array(chargePaymentSchema),
     paidAmountCents: moneyCentsSchema,
+    refundedAmountCents: moneyCentsSchema.optional(),
+    netReceivedAmountCents: moneyCentsSchema.optional(),
     balanceCents: moneyCentsSchema,
     daysOverdue: z.number().int().nonnegative().nullable(),
     evaluatedAt: isoDateSchema,

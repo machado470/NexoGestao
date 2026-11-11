@@ -124,7 +124,7 @@ describe('FinanceService hardening', () => {
     })
     expect(prisma.charge.findFirst).toHaveBeenCalledWith({
       where: { id: 'charge-1', orgId: 'org-1' },
-      include: { customer: true, serviceOrder: true, payments: true },
+      include: { customer: true, serviceOrder: true, payments: { include: { refunds: { select: { amountCents: true, reversedAt: true } } } } },
     })
   })
 

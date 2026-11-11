@@ -125,10 +125,10 @@ export class AuthService {
     email: string
     password: string
   }) {
-    const orgName = (params.orgName ?? '').trim()
-    const adminName = (params.adminName ?? '').trim()
-    const email = (params.email ?? '').trim().toLowerCase()
-    const password = params.password ?? ''
+    const orgName = typeof params?.orgName === 'string' ? params.orgName.trim() : ''
+    const adminName = typeof params?.adminName === 'string' ? params.adminName.trim() : ''
+    const email = typeof params?.email === 'string' ? params.email.trim().toLowerCase() : ''
+    const password = typeof params?.password === 'string' ? params.password : ''
 
     if (!orgName) {
       throw new BadRequestException('Nome da empresa é obrigatório')
@@ -196,8 +196,7 @@ export class AuthService {
       'provider_unavailable'
 
     try {
-      await this.sendVerificationEmail(createdUser.id, email)
-      verificationEmailStatus = this.resend ? 'sent' : 'provider_unavailable'
+      verificationEmailStatus = await this.sendVerificationEmail(createdUser.id, email)
     } catch (error) {
       verificationEmailStatus = 'failed'
       this.logger.warn(
@@ -265,28 +264,17 @@ export class AuthService {
   }
 
   async forgotPassword(email: string) {
-    const normalizedEmail = (email ?? '').trim().toLowerCase()
+    const normalizedEmail = (typeof email === 'string' ? email : '').trim().toLowerCase()
 
     if (!normalizedEmail) {
       throw new BadRequestException('Email é obrigatório')
     }
 
-    const user = await this.prisma.user.findUnique({
-      where: { email: normalizedEmail },
-    })
-
-    if (!user) {
-      return {
-        success: true,
-        message: 'Se o e-mail existir, um link de recuperação será enviado.',
-      }
-    }
-
-    if (!this.resend) {
-      throw new ServiceUnavailableException(
-        'Recuperação de senha por e-mail não está disponível no momento.',
-      )
-    }
+    // Availability is global: check it before looking up an account so this
+    // failure cannot distinguish registered from unregistered email addresses.
+    this.ensureEmailAvailable()
+    const user = await this.prisma.user.findUnique({ where: { email: normalizedEmail } })
+    if (!user) return this.emailRequestAcknowledgement()
 
     const rawToken = uuidv4()
     const tokenHash = this.hashToken(rawToken)
@@ -297,41 +285,31 @@ export class AuthService {
       this.config.get<string>('FRONTEND_URL') || 'http://localhost:3010'
     const resetLink = `${frontendUrl}/reset-password?token=${rawToken}`
 
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        resetToken: tokenHash,
-        resetTokenExpiresAt: expiresAt,
-      },
-    })
-
     try {
-      await this.resend.emails.send({
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          resetToken: tokenHash,
+          resetTokenExpiresAt: expiresAt,
+        },
+      })
+      await this.deliverAuthEmail({
         from: this.config.get<string>('EMAIL_FROM') || 'onboarding@resend.dev',
         to: normalizedEmail,
         subject: 'Recuperação de Senha - NexoGestao',
         html: `<p>Você solicitou a recuperação de senha. Clique no link abaixo para redefinir:</p><a href="${resetLink}">${resetLink}</a><p>Este link expira em 1 hora.</p>`,
       })
-    } catch (error) {
-      this.logger.error(
-        `Erro ao enviar e-mail de recuperação: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      )
-
-      throw new ServiceUnavailableException(
-        'Não foi possível enviar o e-mail de recuperação no momento.',
-      )
+    } catch {
+      // A per-recipient/provider failure is observable internally, but public
+      // recovery responses must not disclose whether an account exists.
+      this.logger.error('[auth-email] password_reset_delivery_failed')
     }
 
-    return {
-      success: true,
-      message: 'Se o e-mail existir, um link de recuperação será enviado.',
-    }
+    return this.emailRequestAcknowledgement()
   }
 
   async resetPassword(token: string, password: string) {
-    const normalizedToken = (token ?? '').trim()
+    const normalizedToken = (typeof token === 'string' ? token : '').trim()
 
     if (!normalizedToken) {
       throw new BadRequestException('Token é obrigatório')
@@ -380,7 +358,7 @@ export class AuthService {
   }
 
   async login(email: string, password: string) {
-    const normalizedEmail = (email ?? '').trim().toLowerCase()
+    const normalizedEmail = (typeof email === 'string' ? email : '').trim().toLowerCase()
 
     if (!normalizedEmail) {
       throw new BadRequestException('Email é obrigatório')
@@ -492,37 +470,52 @@ export class AuthService {
   }
 
   async resendEmailVerification(email: string) {
-    const normalizedEmail = (email ?? '').trim().toLowerCase()
+    const normalizedEmail = (typeof email === 'string' ? email : '').trim().toLowerCase()
     if (!normalizedEmail) {
       throw new BadRequestException('Email é obrigatório')
     }
 
+    this.ensureEmailAvailable()
     const user = await this.prisma.user.findUnique({
       where: { email: normalizedEmail },
       select: { id: true, email: true, emailVerifiedAt: true },
     })
-
-    if (!user || user.emailVerifiedAt) {
-      return {
-        success: true,
-        message: 'Se o e-mail existir, um novo link de verificação será enviado.',
+    if (user && !user.emailVerifiedAt) {
+      try {
+        await this.sendVerificationEmail(user.id, normalizedEmail)
+      } catch {
+        this.logger.error('[auth-email] verification_delivery_failed')
       }
     }
+    return this.emailRequestAcknowledgement()
+  }
 
-    await this.sendVerificationEmail(user.id, normalizedEmail)
+  private ensureEmailAvailable() {
+    if (!this.resend) throw new ServiceUnavailableException('Serviço de e-mail indisponível no momento. Tente novamente mais tarde.')
+  }
 
-    return {
-      success: true,
-      message: 'Se o e-mail existir, um novo link de verificação será enviado.',
+  private emailRequestAcknowledgement() {
+    return { success: true, message: 'Solicitação recebida. Verifique seu e-mail e a pasta de spam. Se o link não chegar, tente novamente mais tarde.' }
+  }
+
+  private async deliverAuthEmail(input: Parameters<Resend['emails']['send']>[0]) {
+    this.ensureEmailAvailable()
+    try {
+      const result = await this.resend!.emails.send(input)
+      if (result.error || !result.data?.id) throw new Error('delivery_rejected')
+    } catch {
+      // Never log provider response bodies or exception text: they may contain
+      // recipients, links or credentials. Callers record a bounded reason code.
+      throw new ServiceUnavailableException('Não foi possível enviar o e-mail no momento.')
     }
   }
 
-  async sendVerificationEmail(userId: string, email: string) {
+  async sendVerificationEmail(userId: string, email: string): Promise<'sent' | 'provider_unavailable'> {
     if (!this.resend) {
       this.logger.warn(
         `RESEND_API_KEY ausente. Verificação de e-mail não enviada para ${email}.`,
       )
-      return
+      return 'provider_unavailable'
     }
 
     const rawToken = uuidv4()
@@ -542,11 +535,12 @@ export class AuthService {
       this.config.get<string>('FRONTEND_URL') || 'http://localhost:3010'
     const verifyLink = `${frontendUrl}/auth/confirm-email?token=${rawToken}`
 
-    await this.resend.emails.send({
+    await this.deliverAuthEmail({
       from: this.config.get<string>('EMAIL_FROM') || 'onboarding@resend.dev',
       to: email,
       subject: 'Confirme seu e-mail - NexoGestao',
       html: `<p>Confirme seu e-mail para proteger sua conta:</p><a href="${verifyLink}">${verifyLink}</a><p>Este link expira em 24 horas.</p>`,
     })
+    return 'sent'
   }
 }

@@ -9,6 +9,8 @@ const mockGovernanceReadService = {
 }
 
 const mockPrisma = {
+  $queryRaw: jest.fn().mockResolvedValue([{amountCents:0n}]),
+  paymentRefund: { aggregate: jest.fn().mockResolvedValue({_sum:{amountCents:0}}), count: jest.fn().mockResolvedValue(0), findMany: jest.fn().mockResolvedValue([]) },
   customer: {
     count: jest.fn(),
     findMany: jest.fn(),
@@ -347,4 +349,18 @@ describe('DashboardService', () => {
       expect(cache.get('dashboard:alerts:org-1')).toBeNull()
     })
   })
+  it('invalidates a cached financial snapshot when a refund appears in the shared ledger', async () => {
+    mockPrisma.payment.aggregate.mockResolvedValue({_sum:{amountCents:1000}})
+    mockPrisma.charge.aggregate.mockResolvedValue({_sum:{amountCents:1000}})
+    expect((await service.getMetrics('org-1')).netWeeklyRevenueInCents).toBe(1000)
+    mockPrisma.paymentRefund.count.mockResolvedValue(1)
+    mockPrisma.$queryRaw.mockResolvedValue([{amountCents:300n}])
+    const refreshed=await service.getMetrics('org-1')
+    expect(refreshed.weeklyRevenueInCents).toBe(1000)
+    expect(refreshed.netWeeklyRevenueInCents).toBe(700)
+    expect(refreshed.paidRevenueInCents).toBe(700)
+    mockPrisma.paymentRefund.count.mockResolvedValue(0)
+    mockPrisma.$queryRaw.mockResolvedValue([{amountCents:0n}])
+  })
+
 })

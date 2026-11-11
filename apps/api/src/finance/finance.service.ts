@@ -1,3 +1,4 @@
+import { refundedAmount } from '../common/finance/refunded-amount'
 import {
   BadRequestException,
   ConflictException,
@@ -236,7 +237,7 @@ export class FinanceService {
       overdueCount: overdueAgg._count._all ?? 0,
       overdueAmountCents: overdueAgg._sum.amountCents ?? 0,
       paidCount: paidAgg._count._all ?? 0,
-      paidAmountCents: paidAgg._sum.amountCents ?? 0,
+      paidAmountCents: (paidAgg._sum.amountCents ?? 0) - await refundedAmount(this.prisma, { orgId }),
     }
   }
 
@@ -413,7 +414,7 @@ export class FinanceService {
         include: {
           customer: true,
           serviceOrder: true,
-          payments: { select: { amountCents: true, paidAt: true, method: true } },
+          payments: { select: { amountCents: true, paidAt: true, method: true, refunds: { select: { amountCents: true, reversedAt: true } } } },
         },
         orderBy: { createdAt: 'desc' },
         take: limit,
@@ -426,10 +427,13 @@ export class FinanceService {
     return {
       items: items.map((charge) => {
         const paidAmountCents = charge.payments.reduce((total, payment) => total + payment.amountCents, 0)
+        const refundedAmountCents = charge.payments.reduce((sum, payment) => sum + (payment.refunds ?? []).reduce((value, refund) => value + (refund.reversedAt ? 0 : refund.amountCents), 0), 0)
         const daysOverdue = charge.status === 'OVERDUE' ? daysBetweenUtc(charge.dueDate, evaluatedAt) : null
         return {
           ...charge,
           paidAmountCents,
+          refundedAmountCents,
+          netReceivedAmountCents: paidAmountCents - refundedAmountCents,
           balanceCents: Math.max(0, charge.amountCents - paidAmountCents),
           daysOverdue,
           evaluatedAt,
@@ -447,15 +451,18 @@ export class FinanceService {
   async getCharge(orgId: string, id: string) {
     const charge = await this.prisma.charge.findFirst({
       where: { id, orgId },
-      include: { customer: true, serviceOrder: true, payments: true },
+      include: { customer: true, serviceOrder: true, payments: { include: { refunds: { select: { amountCents: true, reversedAt: true } } } } },
     })
 
     if (!charge) throw new NotFoundException('Charge não encontrada')
     const paidAmountCents = charge.payments.reduce((total, payment) => total + payment.amountCents, 0)
+    const refundedAmountCents = charge.payments.reduce((sum, payment) => sum + (payment.refunds ?? []).reduce((value, refund) => value + (refund.reversedAt ? 0 : refund.amountCents), 0), 0)
     const evaluatedAt = new Date()
     return {
       ...charge,
       paidAmountCents,
+      refundedAmountCents,
+      netReceivedAmountCents: paidAmountCents - refundedAmountCents,
       balanceCents: Math.max(0, charge.amountCents - paidAmountCents),
       daysOverdue: charge.status === 'OVERDUE' ? daysBetweenUtc(charge.dueDate, evaluatedAt) : null,
       evaluatedAt,
@@ -480,6 +487,7 @@ export class FinanceService {
   // CREATE
   // =========================
   async createCharge(input: {
+    commercialAdmission?: (tx: Prisma.TransactionClient) => Promise<unknown>
     orgId: string
     customerId: string
     amountCents: number
@@ -549,6 +557,7 @@ export class FinanceService {
       let charge: any = null
       try {
         charge = await this.prisma.$transaction(async tx => {
+          await input.commercialAdmission?.(tx)
           const created = await tx.charge.create({
             data: {
               orgId: input.orgId,
@@ -899,6 +908,7 @@ export class FinanceService {
   // PAYMENT
   // =========================
   async payCharge(input: {
+    commercialAdmission?: (tx: Prisma.TransactionClient) => Promise<unknown>
     orgId: string
     chargeId: string
     amountCents: number
@@ -1038,6 +1048,7 @@ export class FinanceService {
         return { charge: alreadyPaid, payment: latestPayment, idempotent: true }
       }
 
+      await input.commercialAdmission?.(tx)
       const payment = await tx.payment.create({
         data: {
           orgId: input.orgId,
@@ -1412,7 +1423,7 @@ export class FinanceService {
       },
       paid: {
         count: paid._count._all ?? 0,
-        amountCents: paid._sum.amountCents ?? 0,
+        amountCents: (paid._sum.amountCents ?? 0) - await refundedAmount(this.prisma, { orgId }),
       },
     }
   }
@@ -1429,9 +1440,20 @@ export class FinanceService {
       months[month] = (months[month] || 0) + p.amountCents
     }
 
-    return Object.entries(months)
-      .map(([month, amountCents]) => ({ month, amountCents }))
-      .sort((a, b) => a.month.localeCompare(b.month))
+    const refunds = await this.prisma.paymentRefund.findMany({ where: { orgId }, select: { amountCents: true, refundedAt: true, reversedAt: true } })
+    const refundedMonths: Record<string, number> = {}
+    for (const refund of refunds) {
+      const month = refund.refundedAt.toISOString().slice(0, 7)
+      refundedMonths[month] = (refundedMonths[month] ?? 0) + refund.amountCents
+      if (refund.reversedAt) {
+        const reversedMonth = refund.reversedAt.toISOString().slice(0, 7)
+        refundedMonths[reversedMonth] = (refundedMonths[reversedMonth] ?? 0) - refund.amountCents
+      }
+    }
+    return [...new Set([...Object.keys(months), ...Object.keys(refundedMonths)])].sort().map(month => ({
+      month, amountCents: months[month] ?? 0, refundedAmountCents: refundedMonths[month] ?? 0,
+      netAmountCents: (months[month] ?? 0) - (refundedMonths[month] ?? 0),
+    }))
   }
 
   async createAutomationCharge(_data: Record<string, string | number | boolean | null>) {

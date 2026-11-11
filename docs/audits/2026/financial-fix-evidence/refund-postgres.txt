@@ -1,0 +1,14 @@
+[Nest] 50554  - 11/11/2026, 9:47:22 PM     LOG [BillingService] [BOOT][Billing] Stripe inicializado
+[Nest] 50554  - 11/11/2026, 9:47:22 PM     LOG [BillingService] Webhook recebido: checkout.session.completed
+[Nest] 50554  - 11/11/2026, 9:47:22 PM     LOG [BillingService] Webhook recebido: invoice.paid
+[Nest] 50554  - 11/11/2026, 9:47:22 PM     LOG [BillingService] [BOOT][Billing] Stripe inicializado
+[Nest] 50554  - 11/11/2026, 9:47:22 PM     LOG [BillingService] Webhook recebido: invoice.paid
+[Nest] 50554  - 11/11/2026, 9:47:22 PM     LOG [BillingService] [BOOT][Billing] Stripe inicializado
+[Nest] 50554  - 11/11/2026, 9:47:22 PM     LOG [BillingService] Webhook recebido: invoice.paid
+[Nest] 50554  - 11/11/2026, 9:47:22 PM     LOG [BillingService] [BOOT][Billing] Stripe inicializado
+[Nest] 50554  - 11/11/2026, 9:47:22 PM     LOG [BillingService] Webhook recebido: invoice.paid
+Test Suites: 1 passed, 1 total
+Tests:       14 passed, 14 total
+Snapshots:   0 total
+Time:        9.221 s
+Ran all test suites matching test/integration/payment-refunds-postgres.integration.spec.ts.

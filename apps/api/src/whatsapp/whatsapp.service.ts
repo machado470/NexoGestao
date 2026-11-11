@@ -1,3 +1,4 @@
+import { subscriptionAllowsDispatch } from '../common/commercial/subscription-access'
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
 import {
   Prisma,
@@ -198,7 +199,7 @@ export class WhatsAppService {
     const toPhone = normalizePhone(String(input.toPhone ?? customer?.phone ?? '').trim())
     if (!toPhone) throw new BadRequestException('Telefone de destino não informado')
 
-    const commercialLimit = await this.commercial.enforceMeter(orgId, 'message_sends')
+    const commercialLimit = await this.commercial.enforceMeter(orgId, 'message_sends', { admissionOnly: true })
     if (isCommercialBlocked(commercialLimit)) {
       this.tenantOps.increment(orgId, 'whatsapp_blocked')
       throw new BadRequestException(`Envio bloqueado por política comercial: ${commercialLimit.reasonCode}`)
@@ -227,24 +228,35 @@ export class WhatsAppService {
     await this.queueService.reserveWhatsAppAdmission(orgId)
     let message
     try {
-      message = await this.prisma.whatsAppMessage.create({
-        data: {
-          orgId,
-          conversationId: conversation.id,
-          customerId: input.customerId ?? conversation.customerId ?? null,
-          direction: 'OUTBOUND',
-          entityType: (input.entityType ?? 'GENERAL') as WhatsAppEntityType,
-          entityId: String(input.entityId ?? input.customerId ?? conversation.customerId ?? conversation.id),
-          messageType: (input.messageType ?? 'MANUAL') as WhatsAppMessageType,
-          messageKey: input.messageKey ?? null,
-          toPhone,
-          fromPhone: input.fromPhone ?? null,
-          renderedText: String(input.content ?? input.renderedText ?? '').trim(),
-          content: String(input.content ?? input.renderedText ?? '').trim(),
-          status: 'QUEUED',
-          metadata: input.metadata ?? Prisma.JsonNull,
-        },
+      const admitted = await this.prisma.$transaction(async tx => {
+        await this.commercial.lockMeterInTransaction(tx, orgId, 'message_sends')
+        if (input.messageKey) {
+          const existing = await tx.whatsAppMessage.findFirst({ where: { orgId, messageKey: String(input.messageKey) } })
+          if (existing) return { created: false, message: existing }
+        }
+        await this.commercial.assertMeterInTransaction(tx, orgId, 'message_sends')
+        const created = await tx.whatsAppMessage.create({
+          data: {
+            orgId,
+            conversationId: conversation.id,
+            customerId: input.customerId ?? conversation.customerId ?? null,
+            direction: 'OUTBOUND',
+            entityType: (input.entityType ?? 'GENERAL') as WhatsAppEntityType,
+            entityId: String(input.entityId ?? input.customerId ?? conversation.customerId ?? conversation.id),
+            messageType: (input.messageType ?? 'MANUAL') as WhatsAppMessageType,
+            messageKey: input.messageKey ?? null,
+            toPhone,
+            fromPhone: input.fromPhone ?? null,
+            renderedText: String(input.content ?? input.renderedText ?? '').trim(),
+            content: String(input.content ?? input.renderedText ?? '').trim(),
+            status: 'QUEUED',
+            metadata: input.metadata ?? Prisma.JsonNull,
+          },
+        })
+        return { created: true, message: created }
       })
+      if (!admitted.created) return admitted
+      message = admitted.message
     } catch (err: any) {
       if (input.messageKey && err?.code === 'P2002') {
         const existing = await this.prisma.whatsAppMessage.findFirst({
@@ -717,6 +729,7 @@ export class WhatsAppService {
         "failedAt" = NULL
       WHERE id = ${id}
         AND "orgId" = ${orgId}
+        AND ${subscriptionAllowsDispatch(Prisma.sql`${orgId}`)}
           AND status = 'QUEUED'::"WhatsAppMessageStatus"
           AND (
             "lockedAt" IS NULL
@@ -743,8 +756,9 @@ export class WhatsAppService {
     return this.prisma.$queryRaw<Prisma.WhatsAppMessageGetPayload<{}>[]>(Prisma.sql`
       WITH picked AS (
         SELECT id
-        FROM "WhatsAppMessage"
+        FROM "WhatsAppMessage" AS candidate
           WHERE status = 'QUEUED'::"WhatsAppMessageStatus"
+            AND ${subscriptionAllowsDispatch(Prisma.sql`candidate."orgId"`)}
             AND (
               "lockedAt" IS NULL
               OR "lockedAt" < NOW() - (${lockTimeoutMinutes}::int * INTERVAL '1 minute')
