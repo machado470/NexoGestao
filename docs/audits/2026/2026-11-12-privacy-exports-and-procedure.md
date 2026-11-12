@@ -52,3 +52,7 @@ A primeira checagem visual também mostrou autoria gravada só com usuário, apa
 5. Tratamento e prova de execução em provedores, observabilidade, backups e restauração futura.
 
 Não se declara conformidade legal ou ciclo encerrado apenas por haver exports/testes. Permanecem três achados originais: AU08, AU11 (parcial) e AU12. Verificação nativa iOS/Android, testes de carga, sandbox financeiro externo e configuração de Pages continuam com as pendências registradas anteriormente.
+
+## Acompanhamento do CI após publicação
+
+O PR #1046 foi integrado, mas os dois quality-gates falharam na limpeza da suíte SSE, apesar de seus 151 testes passarem. Compose passou. O [diagnóstico e correção da limpeza](2026-11-12-notification-test-cleanup.md) registra a reprodução, o isolamento do agendador e a nova validação local. Os resultados locais acima permanecem válidos para os comandos e ambiente registrados; não representam aprovação daquele CI.
