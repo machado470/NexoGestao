@@ -37,4 +37,3 @@ Tip: Interested in query caching in just a few lines of code? Try Accelerate tod
 
 > @nexogestao/api@0.1.0 build /workspace/NexoGestao/apps/api
 > rm -rf dist && pnpm exec nest build
-
