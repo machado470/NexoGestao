@@ -1,0 +1,14 @@
+{
+  "method": "Real Chromium login + authorized API CSV + BFF Audit UI + PostgreSQL, synthetic subject and organization",
+  "customerExportScoped": true,
+  "chargeExportScoped": true,
+  "noStoreHeader": true,
+  "otherSubjectExcluded": true,
+  "auditEvents": 2,
+  "actorAndSubjectValidated": true,
+  "readableEventLabelsVisible": true,
+  "actorNameVisible": true,
+  "personalCSVNotCopiedToAuditMetadata": true,
+  "pageErrors": [],
+  "pass": true
+}

@@ -1,0 +1,278 @@
+  console.warn
+    {"event":"http_request","requestId":"5abbe766-cd45-42d1-8f0f-0f8c727780e2","correlationId":"5abbe766-cd45-42d1-8f0f-0f8c727780e2","userId":"e00e58f5-261a-437f-b0c8-cef6de151544","orgId":"339cd982-122a-4188-81ec-cd5f94f7428e","traceId":null,"route":"POST /customers","status":403,"latencyMs":33,"contentLength":"135","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.warn
+    {"event":"http_request","requestId":"027979b9-783c-434c-8ef0-d8c482881ded","correlationId":"027979b9-783c-434c-8ef0-d8c482881ded","userId":"e00e58f5-261a-437f-b0c8-cef6de151544","orgId":"339cd982-122a-4188-81ec-cd5f94f7428e","traceId":null,"route":"POST /finance/charges","status":400,"latencyMs":17,"contentLength":"140","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.warn
+    {"event":"http_request","requestId":"dc5ab967-579d-46cd-a26c-ef13750e8a32","correlationId":"dc5ab967-579d-46cd-a26c-ef13750e8a32","userId":"e00e58f5-261a-437f-b0c8-cef6de151544","orgId":"339cd982-122a-4188-81ec-cd5f94f7428e","traceId":null,"route":"POST /finance/charges/b1f6acea-0f16-4cfc-b07e-46f1e0c24699/pay","status":400,"latencyMs":7,"contentLength":"127","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.warn
+    {"event":"http_request","requestId":"c15e3501-683d-4040-9857-5cdec172cfaa","correlationId":"c15e3501-683d-4040-9857-5cdec172cfaa","userId":"e00e58f5-261a-437f-b0c8-cef6de151544","orgId":"339cd982-122a-4188-81ec-cd5f94f7428e","traceId":null,"route":"POST /whatsapp/messages","status":403,"latencyMs":6,"contentLength":"135","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.log
+    {"event":"http_request","requestId":"15efe07d-8cf7-4c09-ade7-e776302a1c8b","correlationId":"15efe07d-8cf7-4c09-ade7-e776302a1c8b","userId":"e00e58f5-261a-437f-b0c8-cef6de151544","orgId":"339cd982-122a-4188-81ec-cd5f94f7428e","traceId":null,"route":"GET /customers/f53dbc61-3f1b-42cb-8c21-f5d061102878","status":200,"latencyMs":7,"contentLength":"289","ip":"127.0.0.1","userAgent":""}
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:67:17)
+
+  console.log
+    {"event":"http_request","requestId":"fbb0569c-6bd0-4d99-a149-80a2c82d2fc6","correlationId":"fbb0569c-6bd0-4d99-a149-80a2c82d2fc6","userId":"e00e58f5-261a-437f-b0c8-cef6de151544","orgId":"339cd982-122a-4188-81ec-cd5f94f7428e","traceId":null,"route":"GET /billing/subscription","status":200,"latencyMs":4,"contentLength":"916","ip":"127.0.0.1","userAgent":""}
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:67:17)
+
+  console.log
+    {"event":"http_request","requestId":"07672ee7-602d-4235-8eb3-c8a259c21937","correlationId":"07672ee7-602d-4235-8eb3-c8a259c21937","userId":"e00e58f5-261a-437f-b0c8-cef6de151544","orgId":"339cd982-122a-4188-81ec-cd5f94f7428e","traceId":null,"route":"GET /commercial/context","status":200,"latencyMs":4,"contentLength":"540","ip":"127.0.0.1","userAgent":""}
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:67:17)
+
+  console.warn
+    {"event":"http_request","requestId":"4d1853b8-688d-462a-938b-a34ce5c07924","correlationId":"4d1853b8-688d-462a-938b-a34ce5c07924","userId":"e00e58f5-261a-437f-b0c8-cef6de151544","orgId":"339cd982-122a-4188-81ec-cd5f94f7428e","traceId":null,"route":"POST /customers","status":403,"latencyMs":5,"contentLength":"124","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.warn
+    {"event":"http_request","requestId":"85560511-ef63-49dc-a78d-dfe40575b415","correlationId":"85560511-ef63-49dc-a78d-dfe40575b415","userId":"e00e58f5-261a-437f-b0c8-cef6de151544","orgId":"339cd982-122a-4188-81ec-cd5f94f7428e","traceId":null,"route":"POST /finance/charges","status":400,"latencyMs":7,"contentLength":"139","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.warn
+    {"event":"http_request","requestId":"6c912c1a-fa64-4e10-a7e2-0b4d0e443bff","correlationId":"6c912c1a-fa64-4e10-a7e2-0b4d0e443bff","userId":"e00e58f5-261a-437f-b0c8-cef6de151544","orgId":"339cd982-122a-4188-81ec-cd5f94f7428e","traceId":null,"route":"POST /finance/charges/b1f6acea-0f16-4cfc-b07e-46f1e0c24699/pay","status":400,"latencyMs":6,"contentLength":"126","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.warn
+    {"event":"http_request","requestId":"b1f15c79-8f4e-41e7-be52-4d19e6c7805d","correlationId":"b1f15c79-8f4e-41e7-be52-4d19e6c7805d","userId":"e00e58f5-261a-437f-b0c8-cef6de151544","orgId":"339cd982-122a-4188-81ec-cd5f94f7428e","traceId":null,"route":"POST /whatsapp/messages","status":403,"latencyMs":3,"contentLength":"124","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.log
+    {"event":"http_request","requestId":"7e653524-3065-452b-a756-df7605d94333","correlationId":"7e653524-3065-452b-a756-df7605d94333","userId":"e00e58f5-261a-437f-b0c8-cef6de151544","orgId":"339cd982-122a-4188-81ec-cd5f94f7428e","traceId":null,"route":"GET /customers/f53dbc61-3f1b-42cb-8c21-f5d061102878","status":200,"latencyMs":3,"contentLength":"289","ip":"127.0.0.1","userAgent":""}
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:67:17)
+
+  console.log
+    {"event":"http_request","requestId":"692be65d-00a9-485c-8ea7-678fe3e5a1e6","correlationId":"692be65d-00a9-485c-8ea7-678fe3e5a1e6","userId":"e00e58f5-261a-437f-b0c8-cef6de151544","orgId":"339cd982-122a-4188-81ec-cd5f94f7428e","traceId":null,"route":"GET /billing/subscription","status":200,"latencyMs":3,"contentLength":"915","ip":"127.0.0.1","userAgent":""}
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:67:17)
+
+  console.log
+    {"event":"http_request","requestId":"86829b72-7145-4bc5-b355-79d3eeba0fa1","correlationId":"86829b72-7145-4bc5-b355-79d3eeba0fa1","userId":"e00e58f5-261a-437f-b0c8-cef6de151544","orgId":"339cd982-122a-4188-81ec-cd5f94f7428e","traceId":null,"route":"GET /commercial/context","status":200,"latencyMs":4,"contentLength":"539","ip":"127.0.0.1","userAgent":""}
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:67:17)
+
+  console.warn
+    {"event":"http_request","requestId":"d0726e4c-028b-4912-8524-6a1e5385402c","correlationId":"d0726e4c-028b-4912-8524-6a1e5385402c","userId":"e00e58f5-261a-437f-b0c8-cef6de151544","orgId":"339cd982-122a-4188-81ec-cd5f94f7428e","traceId":null,"route":"POST /customers","status":403,"latencyMs":4,"contentLength":"154","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.warn
+    {"event":"http_request","requestId":"98d30b2a-b49a-4898-bab7-c57aff745c0d","correlationId":"98d30b2a-b49a-4898-bab7-c57aff745c0d","userId":"e00e58f5-261a-437f-b0c8-cef6de151544","orgId":"339cd982-122a-4188-81ec-cd5f94f7428e","traceId":null,"route":"POST /finance/charges","status":400,"latencyMs":5,"contentLength":"140","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.warn
+    {"event":"http_request","requestId":"ccfbd0d9-195e-4e7e-ad47-8e939a958f9c","correlationId":"ccfbd0d9-195e-4e7e-ad47-8e939a958f9c","userId":"e00e58f5-261a-437f-b0c8-cef6de151544","orgId":"339cd982-122a-4188-81ec-cd5f94f7428e","traceId":null,"route":"POST /finance/charges/b1f6acea-0f16-4cfc-b07e-46f1e0c24699/pay","status":400,"latencyMs":5,"contentLength":"127","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.warn
+    {"event":"http_request","requestId":"79702b86-a29c-4228-b964-67c330c54907","correlationId":"79702b86-a29c-4228-b964-67c330c54907","userId":"e00e58f5-261a-437f-b0c8-cef6de151544","orgId":"339cd982-122a-4188-81ec-cd5f94f7428e","traceId":null,"route":"POST /whatsapp/messages","status":403,"latencyMs":3,"contentLength":"154","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.log
+    {"event":"http_request","requestId":"18b41c9f-0ec6-4402-ac2b-4b208a0358e3","correlationId":"18b41c9f-0ec6-4402-ac2b-4b208a0358e3","userId":"e00e58f5-261a-437f-b0c8-cef6de151544","orgId":"339cd982-122a-4188-81ec-cd5f94f7428e","traceId":null,"route":"GET /customers/f53dbc61-3f1b-42cb-8c21-f5d061102878","status":200,"latencyMs":3,"contentLength":"289","ip":"127.0.0.1","userAgent":""}
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:67:17)
+
+  console.log
+    {"event":"http_request","requestId":"ac5e36a3-341f-4b9b-af8c-4bf28a66e92c","correlationId":"ac5e36a3-341f-4b9b-af8c-4bf28a66e92c","userId":"e00e58f5-261a-437f-b0c8-cef6de151544","orgId":"339cd982-122a-4188-81ec-cd5f94f7428e","traceId":null,"route":"GET /billing/subscription","status":200,"latencyMs":3,"contentLength":"915","ip":"127.0.0.1","userAgent":""}
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:67:17)
+
+  console.log
+    {"event":"http_request","requestId":"e455592b-e644-4a17-8edc-701c73da68c0","correlationId":"e455592b-e644-4a17-8edc-701c73da68c0","userId":"e00e58f5-261a-437f-b0c8-cef6de151544","orgId":"339cd982-122a-4188-81ec-cd5f94f7428e","traceId":null,"route":"GET /commercial/context","status":200,"latencyMs":4,"contentLength":"539","ip":"127.0.0.1","userAgent":""}
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:67:17)
+
+  console.warn
+    {"event":"http_request","requestId":"07165c89-0eb3-4b15-b7fd-bc245b2a9354","correlationId":"07165c89-0eb3-4b15-b7fd-bc245b2a9354","userId":"e00e58f5-261a-437f-b0c8-cef6de151544","orgId":"339cd982-122a-4188-81ec-cd5f94f7428e","traceId":null,"route":"POST /customers","status":403,"latencyMs":3,"contentLength":"138","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.warn
+    {"event":"http_request","requestId":"ca83cef1-14c7-4b28-9293-bdbdef00dc17","correlationId":"ca83cef1-14c7-4b28-9293-bdbdef00dc17","userId":"e00e58f5-261a-437f-b0c8-cef6de151544","orgId":"339cd982-122a-4188-81ec-cd5f94f7428e","traceId":null,"route":"POST /finance/charges","status":400,"latencyMs":5,"contentLength":"131","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.warn
+    {"event":"http_request","requestId":"65b90542-64ff-4d9b-9d4a-727b896e6746","correlationId":"65b90542-64ff-4d9b-9d4a-727b896e6746","userId":"e00e58f5-261a-437f-b0c8-cef6de151544","orgId":"339cd982-122a-4188-81ec-cd5f94f7428e","traceId":null,"route":"POST /finance/charges/b1f6acea-0f16-4cfc-b07e-46f1e0c24699/pay","status":400,"latencyMs":4,"contentLength":"118","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.warn
+    {"event":"http_request","requestId":"c2e7fffa-381e-424a-b9ad-121dbc5d09e4","correlationId":"c2e7fffa-381e-424a-b9ad-121dbc5d09e4","userId":"e00e58f5-261a-437f-b0c8-cef6de151544","orgId":"339cd982-122a-4188-81ec-cd5f94f7428e","traceId":null,"route":"POST /whatsapp/messages","status":403,"latencyMs":3,"contentLength":"138","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.log
+    {"event":"http_request","requestId":"f4889ff5-9495-43ee-b519-33a84b66e4a3","correlationId":"f4889ff5-9495-43ee-b519-33a84b66e4a3","userId":"e00e58f5-261a-437f-b0c8-cef6de151544","orgId":"339cd982-122a-4188-81ec-cd5f94f7428e","traceId":null,"route":"GET /customers/f53dbc61-3f1b-42cb-8c21-f5d061102878","status":200,"latencyMs":3,"contentLength":"289","ip":"127.0.0.1","userAgent":""}
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:67:17)
+
+  console.log
+    {"event":"http_request","requestId":"d24e1a20-fd1c-4d6f-90f4-d8dacdca14ed","correlationId":"d24e1a20-fd1c-4d6f-90f4-d8dacdca14ed","userId":"e00e58f5-261a-437f-b0c8-cef6de151544","orgId":"339cd982-122a-4188-81ec-cd5f94f7428e","traceId":null,"route":"GET /billing/subscription","status":200,"latencyMs":3,"contentLength":"915","ip":"127.0.0.1","userAgent":""}
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:67:17)
+
+  console.log
+    {"event":"http_request","requestId":"4ccd138b-ba6d-4156-a302-b2b2dbd8276a","correlationId":"4ccd138b-ba6d-4156-a302-b2b2dbd8276a","userId":"e00e58f5-261a-437f-b0c8-cef6de151544","orgId":"339cd982-122a-4188-81ec-cd5f94f7428e","traceId":null,"route":"GET /commercial/context","status":200,"latencyMs":4,"contentLength":"539","ip":"127.0.0.1","userAgent":""}
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:67:17)
+
+  console.log
+    {"event":"http_request","requestId":"5d11f426-699d-49a9-8dff-9595b5f5c99a","correlationId":"5d11f426-699d-49a9-8dff-9595b5f5c99a","userId":"e00e58f5-261a-437f-b0c8-cef6de151544","orgId":"339cd982-122a-4188-81ec-cd5f94f7428e","traceId":null,"route":"POST /customers","status":201,"latencyMs":141,"contentLength":"292","ip":"127.0.0.1","userAgent":""}
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:67:17)
+
+Test Suites: 1 passed, 1 total
+Tests:       13 passed, 13 total
+Snapshots:   0 total
+Time:        10.995 s, estimated 39 s
+Ran all test suites matching test/integration/commercial-subscription-postgres.integration.spec.ts.

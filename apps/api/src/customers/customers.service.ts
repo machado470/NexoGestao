@@ -137,10 +137,12 @@ export class CustomersService {
     }
   }
 
-  async exportCsv(orgId: string) {
+  async exportCsv(orgId: string, customerId?: string, actorUserId?: string, actorPersonId?: string) {
+    if (customerId && !await this.prisma.customer.findFirst({ where: { id: customerId, orgId }, select: { id: true } })) throw new NotFoundException('Cliente não encontrado')
     const customers = await this.prisma.customer.findMany({
-      where: { orgId },
+      where: { orgId, ...(customerId ? { id: customerId } : {}) },
       orderBy: { name: 'asc' },
+      select: { id: true, name: true, email: true, phone: true, active: true, createdAt: true },
     })
 
     const header = 'ID,Nome,Email,Telefone,Ativo,Criado Em\n'
@@ -150,6 +152,12 @@ export class CustomersService {
       })
       .join('\n')
 
+    if (actorUserId) await this.audit.log({
+      orgId, actorUserId, actorPersonId, personId: actorPersonId, action: AUDIT_ACTIONS.CUSTOMERS_EXPORTED,
+      entityType: customerId ? 'CUSTOMER' : 'ORGANIZATION', entityId: customerId ?? orgId,
+      context: 'Exportação de cadastro de clientes gerada',
+      metadata: { scope: customerId ? 'customer' : 'organization', format: 'csv', recordCount: customers.length },
+    })
     return header + rows
   }
 
