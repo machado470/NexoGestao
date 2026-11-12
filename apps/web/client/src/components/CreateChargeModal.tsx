@@ -1,6 +1,6 @@
 import { parseMoneyInputToCents as parseAmountToCents } from "@/lib/money-input";
 import { Button } from "@/components/ui/button";
-import { useMemo, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 
@@ -59,7 +59,7 @@ const INITIAL_FORM: FormState = {
 
 const chargeModeLabels: Record<ChargeMode, string> = {
   MANUAL: "Cobrança manual",
-  RECURRING: "Cobrança recorrente",
+  RECURRING: "Recorrência (indisponível)",
   SERVICE: "Ligada a serviço",
 };
 
@@ -97,6 +97,7 @@ export function CreateChargeModal({
   onClose,
   onSuccess,
 }: CreateChargeModalProps) {
+  const fieldId = useId();
   const [, navigate] = useLocation();
   const [formData, setFormData] = useState<FormState>(INITIAL_FORM);
   const customerSelectRef = useRef<HTMLButtonElement | null>(null);
@@ -342,7 +343,8 @@ export function CreateChargeModal({
               <button
                 key={mode}
                 type="button"
-                disabled={createCharge.isPending}
+                aria-pressed={formData.mode === mode}
+                disabled={createCharge.isPending || mode === "RECURRING"}
                 onClick={() => setFormData(state => ({ ...state, mode }))}
                 className="rounded-[0.82rem] nexo-field border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-2 text-left text-sm text-[var(--modal-section-text)] transition hover:border-[var(--accent-primary)]/50 disabled:cursor-not-allowed disabled:opacity-60"
               >
@@ -351,7 +353,7 @@ export function CreateChargeModal({
                   {mode === "MANUAL" &&
                     "Fluxo direto para cobrança fora da rotina."}
                   {mode === "RECURRING" &&
-                    "Mantém padrão mensal com vencimento previsível."}
+                    "Indisponível. A criação atual gera apenas cobranças avulsas."}
                   {mode === "SERVICE" &&
                     "Vincule ao contexto de execução do serviço."}
                 </p>
@@ -366,7 +368,7 @@ export function CreateChargeModal({
           </p>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-[var(--modal-section-muted)]">
+            <label htmlFor={`${fieldId}-customer`} className="text-sm font-medium text-[var(--modal-section-muted)]">
               Cliente *
             </label>
             <Select
@@ -376,7 +378,7 @@ export function CreateChargeModal({
               }
               disabled={createCharge.isPending}
             >
-              <SelectTrigger ref={customerSelectRef}>
+              <SelectTrigger id={`${fieldId}-customer`} ref={customerSelectRef}>
                 <SelectValue placeholder="Busque e selecione um cliente" />
               </SelectTrigger>
               <SelectContent>
@@ -396,13 +398,14 @@ export function CreateChargeModal({
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-[var(--modal-section-muted)]">
+              <label htmlFor={`${fieldId}-amount`} className="text-sm font-medium text-[var(--modal-section-muted)]">
                 Valor *
               </label>
               <Input
                 inputMode="decimal"
                 placeholder="100,00"
                 aria-label="Valor em reais"
+                id={`${fieldId}-amount`}
                 value={formData.amount}
                 onChange={e =>
                   setFormData(state => ({ ...state, amount: e.target.value }))
@@ -415,11 +418,12 @@ export function CreateChargeModal({
               </p>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-[var(--modal-section-muted)]">
+              <label htmlFor={`${fieldId}-due-date`} className="text-sm font-medium text-[var(--modal-section-muted)]">
                 Vencimento *
               </label>
               <Input
                 type="date"
+                id={`${fieldId}-due-date`}
                 value={formData.dueDate}
                 onChange={e =>
                   setFormData(state => ({ ...state, dueDate: e.target.value }))
@@ -445,11 +449,12 @@ export function CreateChargeModal({
 
           {formData.mode === "SERVICE" ? (
             <div className="space-y-2">
-              <label className="text-sm font-medium text-[var(--modal-section-muted)]">
+              <label htmlFor={`${fieldId}-service-reference`} className="text-sm font-medium text-[var(--modal-section-muted)]">
                 Referência do serviço
               </label>
               <Input
                 placeholder="Ex.: OS #1042 · Troca de compressor"
+                id={`${fieldId}-service-reference`}
                 value={formData.serviceReference}
                 onChange={e =>
                   setFormData(state => ({
@@ -463,13 +468,14 @@ export function CreateChargeModal({
           ) : null}
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-[var(--modal-section-muted)]">
+            <label htmlFor={`${fieldId}-notes`} className="text-sm font-medium text-[var(--modal-section-muted)]">
               Observações
             </label>
             <Textarea
               rows={3}
               placeholder="Ex.: combinado com cliente para envio até 18h"
               className="max-h-32 resize-y"
+              id={`${fieldId}-notes`}
               value={formData.notes}
               onChange={e =>
                 setFormData(state => ({ ...state, notes: e.target.value }))

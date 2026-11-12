@@ -1,0 +1,144 @@
+{
+  "checks": [
+    {
+      "name": "manual-1440",
+      "fields": [
+        {
+          "id": "_r_f_-customer",
+          "label": "Cliente *"
+        },
+        {
+          "id": "_r_f_-amount",
+          "label": "Valor em reais"
+        },
+        {
+          "id": "_r_f_-due-date",
+          "label": "Vencimento *"
+        },
+        {
+          "id": "_r_f_-notes",
+          "label": "Observações"
+        }
+      ]
+    },
+    {
+      "name": "service-1440",
+      "fields": [
+        {
+          "id": "_r_f_-customer",
+          "label": "Cliente *"
+        },
+        {
+          "id": "_r_f_-amount",
+          "label": "Valor em reais"
+        },
+        {
+          "id": "_r_f_-due-date",
+          "label": "Vencimento *"
+        },
+        {
+          "id": "_r_f_-service-reference",
+          "label": "Referência do serviço"
+        },
+        {
+          "id": "_r_f_-notes",
+          "label": "Observações"
+        }
+      ]
+    },
+    {
+      "name": "payment-1440",
+      "fields": [
+        {
+          "id": "payment-amount",
+          "label": "Valor exato em centavos"
+        },
+        {
+          "id": "payment-method",
+          "label": "Método do pagamento"
+        }
+      ]
+    },
+    {
+      "name": "cancel-1440",
+      "fields": [
+        {
+          "id": "cancellation-reason",
+          "label": "Motivo do cancelamento"
+        }
+      ]
+    },
+    {
+      "name": "manual-390",
+      "fields": [
+        {
+          "id": "_r_f_-customer",
+          "label": "Cliente *"
+        },
+        {
+          "id": "_r_f_-amount",
+          "label": "Valor em reais"
+        },
+        {
+          "id": "_r_f_-due-date",
+          "label": "Vencimento *"
+        },
+        {
+          "id": "_r_f_-notes",
+          "label": "Observações"
+        }
+      ]
+    },
+    {
+      "name": "service-390",
+      "fields": [
+        {
+          "id": "_r_f_-customer",
+          "label": "Cliente *"
+        },
+        {
+          "id": "_r_f_-amount",
+          "label": "Valor em reais"
+        },
+        {
+          "id": "_r_f_-due-date",
+          "label": "Vencimento *"
+        },
+        {
+          "id": "_r_f_-service-reference",
+          "label": "Referência do serviço"
+        },
+        {
+          "id": "_r_f_-notes",
+          "label": "Observações"
+        }
+      ]
+    },
+    {
+      "name": "payment-390",
+      "fields": [
+        {
+          "id": "payment-amount",
+          "label": "Valor exato em centavos"
+        },
+        {
+          "id": "payment-method",
+          "label": "Método do pagamento"
+        }
+      ]
+    },
+    {
+      "name": "cancel-390",
+      "fields": [
+        {
+          "id": "cancellation-reason",
+          "label": "Motivo do cancelamento"
+        }
+      ]
+    }
+  ],
+  "manualCreationAndCancellationPersisted": true,
+  "recurrenceDisabled": true,
+  "pageErrors": [],
+  "pass": true
+}

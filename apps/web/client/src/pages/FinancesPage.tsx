@@ -563,8 +563,9 @@ export default function FinancesPage() {
               placeholder="Nome ou número da O.S."
             />
           </AppField>
-          <AppField label="Status oficial">
+          <AppField label="Status oficial" htmlFor="finance-status">
             <AppSelect
+              id="finance-status"
               ariaLabel="Filtrar por status oficial"
               value={status}
               onValueChange={setStatus}
@@ -760,6 +761,7 @@ export default function FinancesPage() {
             </AppField>
             <AppField label="Método" htmlFor="payment-method">
               <AppSelect
+                id="payment-method"
                 ariaLabel="Método do pagamento"
                 value={method}
                 onValueChange={value => {
