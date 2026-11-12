@@ -1,5 +1,6 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common'
 import { Test } from '@nestjs/testing'
+import { SchedulerRegistry } from '@nestjs/schedule'
 import { JwtService } from '@nestjs/jwt'
 import { randomUUID } from 'crypto'
 import request from 'supertest'
@@ -41,6 +42,8 @@ describeRealIntegration('Phase 2 Execution tenant isolation (Postgres e2e)', () 
     app = module.createNestApplication()
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }))
     await app.init()
+    // Isolate request-attributed mutation assertions from independent cron writes.
+    for (const job of app.get(SchedulerRegistry).getCronJobs().values()) await job.stop()
     prisma = app.get(PrismaService)
 
     await prisma.organization.createMany({ data: [
@@ -78,6 +81,12 @@ describeRealIntegration('Phase 2 Execution tenant isolation (Postgres e2e)', () 
       await prisma.organization.deleteMany({ where: { id: { in: orgIds } } })
     }
     await app?.close()
+  })
+
+  it('keeps background cron jobs stopped while asserting execution isolation', () => {
+    const jobs = app.get(SchedulerRegistry).getCronJobs()
+    expect(jobs.size).toBeGreaterThan(0)
+    for (const job of jobs.values()) expect(job.isActive).toBe(false)
   })
 
   it('nega start cross-tenant sem criar execução, Timeline ou efeito na O.S. alheia', async () => {
