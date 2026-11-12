@@ -1,7 +1,7 @@
 import { parseMoneyInputToCents } from "@/lib/money-input";
 import { parseLocalDateTimeInput } from "@/lib/local-date-time";
 import { Button } from "@/components/ui/button";
-import { useEffect, useMemo, useState } from "react";
+import { useId, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 
@@ -93,6 +93,7 @@ export default function CreateServiceOrderModal({
   initialCustomerId,
   appointmentId,
 }: Props) {
+  const fieldId = useId();
   const [, navigate] = useLocation();
   const utils = trpc.useUtils();
   const { track } = useProductAnalytics();
@@ -449,8 +450,9 @@ export default function CreateServiceOrderModal({
                 </span>
               </AccordionTrigger>
               <AccordionContent className="space-y-4 pb-4">
-                <AppField label="Cliente *">
+                <AppField label="Cliente *" htmlFor={`${fieldId}-field-0`}>
                   <AppSelect
+                    id={`${fieldId}-field-0`}
                     value={formData.customerId}
                     onValueChange={customerId =>
                       setFormData(state => ({ ...state, customerId }))
@@ -463,9 +465,10 @@ export default function CreateServiceOrderModal({
                   />
                 </AppField>
 
-                <AppField label="Responsável pela execução">
+                <AppField label="Responsável pela execução" htmlFor={`${fieldId}-field-1`}>
                   <div className="space-y-1.5">
                     <AppSelect
+                      id={`${fieldId}-field-1`}
                       value={formData.assignedToPersonId || undefined}
                       onValueChange={assignedToPersonId =>
                         setFormData(state => ({ ...state, assignedToPersonId }))
@@ -497,8 +500,9 @@ export default function CreateServiceOrderModal({
                   </div>
                 </AppField>
 
-                <AppField label="Serviço que será feito *">
+                <AppField label="Serviço que será feito *" htmlFor={`${fieldId}-field-2`}>
                   <AppInput
+                    id={`${fieldId}-field-2`}
                     placeholder="Ex: Manutenção elétrica no quadro do condomínio"
                     value={formData.title}
                     onChange={e =>
@@ -511,8 +515,9 @@ export default function CreateServiceOrderModal({
                   />
                 </AppField>
 
-                <AppField label="Detalhes para a equipe">
+                <AppField label="Detalhes para a equipe" htmlFor={`${fieldId}-field-3`}>
                   <AppTextarea
+                    id={`${fieldId}-field-3`}
                     placeholder="Ex: Levar escada, trocar disjuntor e testar iluminação da área comum."
                     rows={3}
                     value={formData.description}
@@ -540,8 +545,9 @@ export default function CreateServiceOrderModal({
               </AccordionTrigger>
               <AccordionContent className="pb-4">
                 <AppFieldGroup>
-                  <AppField label="Data prevista (opcional)">
+                  <AppField label="Data prevista (opcional)" htmlFor={`${fieldId}-field-4`}>
                     <AppInput
+                      id={`${fieldId}-field-4`}
                       type="datetime-local"
                       value={formData.scheduledFor}
                       onChange={e =>
@@ -559,8 +565,9 @@ export default function CreateServiceOrderModal({
                       </AppInlineHint>
                     ) : null}
                   </AppField>
-                  <AppField label="Valor (R$)">
+                  <AppField label="Valor (R$)" htmlFor={`${fieldId}-field-5`}>
                     <AppInput
+                      id={`${fieldId}-field-5`}
                       inputMode="decimal"
                       placeholder="Ex: 890,00"
                       value={formData.amount}
@@ -591,8 +598,9 @@ export default function CreateServiceOrderModal({
                 </span>
               </AccordionTrigger>
               <AccordionContent className="pb-4">
-                <AppField label="Vencimento">
+                <AppField label="Vencimento" htmlFor={`${fieldId}-field-6`}>
                   <AppInput
+                    id={`${fieldId}-field-6`}
                     type="datetime-local"
                     value={formData.dueDate}
                     onChange={e =>
