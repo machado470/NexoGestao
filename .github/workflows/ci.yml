@@ -61,7 +61,7 @@ jobs:
 
       - name: Backup state and runner regressions
         run: |
-          node --test scripts/check-backup-state.test.mjs
+          node --test scripts/check-backup-state.test.mjs scripts/restore-checksum.test.mjs
           bash scripts/test-production-backup.sh
 
       - name: Generate Prisma Client

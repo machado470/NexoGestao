@@ -43,7 +43,16 @@ case "${NODE_ENV:-}" in production) fail "production restore is prohibited in Ph
 case "${TARGET_HOST,,}:${TARGET_DB,,}" in *prod*|*production*) fail "target resembles production and is prohibited";; esac
 log restore_started started "host=$(printf %q "$TARGET_HOST") port=$TARGET_PORT database=$(printf %q "$TARGET_DB") artifact=$(printf %q "$BACKUP_FILE")"
 
-(cd "$(dirname "$BACKUP_FILE")" && sha256sum -c -- "$(basename "$CHECKSUM_FILE")") >/dev/null || fail "checksum verification failed"
+# Bind the sidecar to this exact dump, not to arbitrary paths listed inside it.
+mapfile -t checksum_lines < "$CHECKSUM_FILE"
+[[ "${#checksum_lines[@]}" == 1 ]] || fail "checksum sidecar must contain exactly one entry"
+[[ "${checksum_lines[0]}" =~ ^([[:xdigit:]]{64})\ \ (.*)$ ]] || fail "invalid canonical checksum sidecar"
+expected_hash="${BASH_REMATCH[1]}"
+expected_name="${BASH_REMATCH[2]}"
+[[ "$expected_name" == "$(basename -- "$BACKUP_FILE")" ]] || fail "checksum sidecar names a different artifact"
+actual_checksum="$(sha256sum -- "$BACKUP_FILE")" || fail "cannot checksum backup artifact"
+actual_hash="${actual_checksum%% *}"
+[[ "${actual_hash,,}" == "${expected_hash,,}" ]] || fail "checksum verification failed"
 gzip -t -- "$BACKUP_FILE" || fail "gzip integrity verification failed"
 log checksum_verified success "artifact=$(printf %q "$BACKUP_FILE")"
 
