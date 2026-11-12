@@ -11,6 +11,7 @@ export const PRESENTATION_LABELS: Record<string, string> = {
   UNKNOWN: "Não informado", NORMAL: "Operação normal", WARNING: "Em atenção", RESTRICTED: "Operação restrita", SUSPENDED: "Operação suspensa",
   AVAILABLE: "Disponível", NO_DATA: "Sem avaliação", UNAVAILABLE: "Indisponível",
   UNDER_CAPACITY: "Abaixo da capacidade", AT_CAPACITY: "Na capacidade", OVER_CAPACITY: "Acima da capacidade",
+  CUSTOMERS_EXPORTED: "Clientes exportados", CHARGES_EXPORTED: "Cobranças exportadas",
   CUSTOMER_CREATED: "Cliente cadastrado", CUSTOMER_UPDATED: "Cliente atualizado", CUSTOMER_DELETED: "Cliente removido",
   APPOINTMENT_CREATED: "Agendamento criado", APPOINTMENT_UPDATED: "Agendamento atualizado", APPOINTMENT_CANCELED: "Agendamento cancelado",
   SERVICE_ORDER_CREATED: "O.S. criada", SERVICE_ORDER_UPDATED: "O.S. atualizada", SERVICE_ORDER_STARTED: "O.S. iniciada", SERVICE_ORDER_DONE: "O.S. concluída",

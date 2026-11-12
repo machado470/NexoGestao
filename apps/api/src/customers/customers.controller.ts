@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -48,9 +49,13 @@ export class CustomersController {
 
   @Get('export')
   @Roles('ADMIN', 'MANAGER')
-  async export(@Org() orgId: string, @Res() res) {
-    const csv = await this.customers.exportCsv(orgId)
+  async export(@Org() orgId: string, @Res() res,
+    @Query('customerId', new ParseUUIDPipe({ optional: true })) customerId?: string,
+    @User() actor?: { userId?: string; sub?: string; personId?: string },
+  ) {
+    const csv = await this.customers.exportCsv(orgId, customerId, actor?.userId ?? actor?.sub, actor?.personId)
     res.set('Content-Type', 'text/csv')
+    res.set('Cache-Control', 'no-store')
     res.attachment(`customers-${orgId}-${Date.now()}.csv`)
     return res.send(csv)
   }

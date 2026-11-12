@@ -1375,10 +1375,11 @@ export class FinanceService {
   // =========================
   // STATS & REPORTS
   // =========================
-  async exportChargesCsv(orgId: string) {
+  async exportChargesCsv(orgId: string, customerId?: string, actorUserId?: string, actorPersonId?: string) {
+    if (customerId && !await this.prisma.customer.findFirst({ where: { id: customerId, orgId }, select: { id: true } })) throw new NotFoundException('Cliente não encontrado')
     const charges = await this.prisma.charge.findMany({
-      where: { orgId },
-      include: { customer: true },
+      where: { orgId, customer: { orgId }, ...(customerId ? { customerId } : {}) },
+      include: { customer: { select: { name: true } } },
       orderBy: { createdAt: 'desc' },
     })
 
@@ -1386,6 +1387,12 @@ export class FinanceService {
     for (const c of charges) {
       csv += csvRow([c.id, c.customer?.name ?? '', c.amountCents / 100, c.dueDate.toISOString(), c.status, c.createdAt.toISOString()]) + '\n'
     }
+    if (actorUserId) await this.audit.log({
+      orgId, actorUserId, actorPersonId, personId: actorPersonId, action: 'CHARGES_EXPORTED',
+      entityType: customerId ? 'CUSTOMER' : 'ORGANIZATION', entityId: customerId ?? orgId,
+      context: 'Exportação de cobranças gerada',
+      metadata: { scope: customerId ? 'customer' : 'organization', format: 'csv', recordCount: charges.length },
+    })
     return csv
   }
 

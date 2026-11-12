@@ -7,6 +7,7 @@ import {
   Get,
   Headers,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -88,9 +89,13 @@ export class FinanceController {
 
   @Get('charges/export')
   @Roles('ADMIN', 'MANAGER')
-  async exportCharges(@Org() orgId: string, @Res() res: Response) {
-    const csv = await this.finance.exportChargesCsv(orgId)
+  async exportCharges(@Org() orgId: string, @Res() res: Response,
+    @Query('customerId', new ParseUUIDPipe({ optional: true })) customerId?: string,
+    @User() actor?: { userId?: string; sub?: string; personId?: string },
+  ) {
+    const csv = await this.finance.exportChargesCsv(orgId, customerId, actor?.userId ?? actor?.sub, actor?.personId)
     res.set('Content-Type', 'text/csv')
+    res.set('Cache-Control', 'no-store')
     res.attachment(`charges-${orgId}-${Date.now()}.csv`)
     return res.send(csv)
   }
