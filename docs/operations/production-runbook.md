@@ -59,7 +59,7 @@ A checagem avalia **o estado registrado pelo runner**, não verifica arquivo rem
 
 ## Restore, migration recovery, rollback e cleanup
 
-Restore em produção exige aprovação do DR owner, alvo confirmado, artefato e sidecar baixados, checksum pós-download, janela e rollback. Esses controles são `NOT_PROVED`; `scripts/restore-db.sh` bloqueia produção e não deve ser contornado. Drills ocorrem somente em infraestrutura descartável.
+Restore em produção exige aprovação do DR owner, alvo confirmado, artefato e sidecar baixados, checksum pós-download, janela e rollback. Esses controles são `NOT_PROVED`; `scripts/restore-db.sh` bloqueia produção e não deve ser contornado. Drills ocorrem somente em infraestrutura descartável. O sidecar deve conter exatamente uma entrada canônica (`SHA-256`, dois espaços e basename do dump solicitado); o restore compara o hash desse arquivo diretamente, sem seguir outros caminhos do sidecar. Checksum não autentica a origem do pacote.
 
 Em migration falha, interrompa rollout, preserve logs/banco, não edite histórico aplicado e escolha roll-forward ou procedimento Prisma aprovado (`DECISION_REQUIRED`). Para rollback da aplicação, reimplante revisão/imagem aprovada após verificar compatibilidade da migration (`NOT_PROVED`). No cleanup, remova somente recursos descartáveis identificados; artefatos reais obedecem à política aprovada.
 
