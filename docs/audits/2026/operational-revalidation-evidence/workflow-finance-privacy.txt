@@ -1,0 +1,60 @@
+[Nest] 24168  - 11/12/2026, 2:48:21 PM   ERROR [ExceptionsHandler] Error: synthetic audit outage
+    at Object.<anonymous> (/workspace/NexoGestao/apps/api/test/integration/privacy-exports-postgres.integration.spec.ts:66:73)
+    at Promise.finally.completed (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:1834:28)
+    at new Promise (<anonymous>)
+    at callAsyncCircusFn (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:1774:10)
+    at _callCircusTest (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:1167:40)
+    at _runTestInContext (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:1103:3)
+    at runTestWithContext (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:996:5)
+    at _runTestsForDescribeBlockOnce (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:1008:11)
+    at _runTestsForDescribeBlock (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:824:5)
+    at _runTestsForDescribeBlockOnce (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:1003:11)
+    at _runTestsForDescribeBlock (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:824:5)
+    at run (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:789:3)
+    at runAndTransformResultsToJestFormat (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:2300:21)
+    at jestAdapter (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/runner.js:111:19)
+    at runTestInternal (/workspace/NexoGestao/node_modules/.pnpm/jest-runner@30.5.2/node_modules/jest-runner/build/index.js:247:16)
+    at runTest (/workspace/NexoGestao/node_modules/.pnpm/jest-runner@30.5.2/node_modules/jest-runner/build/index.js:315:7)
+[Nest] 24168  - 11/12/2026, 2:48:21 PM   ERROR [ExceptionsHandler] Error: synthetic audit outage
+    at Object.<anonymous> (/workspace/NexoGestao/apps/api/test/integration/privacy-exports-postgres.integration.spec.ts:66:73)
+    at Promise.finally.completed (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:1834:28)
+    at new Promise (<anonymous>)
+    at callAsyncCircusFn (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:1774:10)
+    at _callCircusTest (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:1167:40)
+    at _runTestInContext (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:1103:3)
+    at runTestWithContext (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:996:5)
+    at _runTestsForDescribeBlockOnce (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:1008:11)
+    at _runTestsForDescribeBlock (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:824:5)
+    at _runTestsForDescribeBlockOnce (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:1003:11)
+    at _runTestsForDescribeBlock (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:824:5)
+    at run (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:789:3)
+    at runAndTransformResultsToJestFormat (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:2300:21)
+    at jestAdapter (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/runner.js:111:19)
+    at runTestInternal (/workspace/NexoGestao/node_modules/.pnpm/jest-runner@30.5.2/node_modules/jest-runner/build/index.js:247:16)
+    at runTest (/workspace/NexoGestao/node_modules/.pnpm/jest-runner@30.5.2/node_modules/jest-runner/build/index.js:315:7)
+[Nest] 24168  - 11/12/2026, 2:48:21 PM   ERROR [FinanceService] Erro overdue WhatsApp: Não foi possível confirmar o enfileiramento do lembrete.
+[Nest] 24168  - 11/12/2026, 2:48:21 PM   ERROR [FinanceService] Erro overdue WhatsApp: Não foi possível confirmar o enfileiramento do lembrete.
+[Nest] 24168  - 11/12/2026, 2:48:21 PM   ERROR [FinanceService] Erro overdue WhatsApp: Não foi possível confirmar o enfileiramento do lembrete.
+[Nest] 24168  - 11/12/2026, 2:48:21 PM     LOG [PaymentsService] [BOOT][Payments] Stripe inicializado no PaymentsService
+[Nest] 24168  - 11/12/2026, 2:48:21 PM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.completed
+[Nest] 24168  - 11/12/2026, 2:48:21 PM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.completed
+[Nest] 24168  - 11/12/2026, 2:48:21 PM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.completed
+[Nest] 24168  - 11/12/2026, 2:48:21 PM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.completed
+[Nest] 24168  - 11/12/2026, 2:48:21 PM     LOG [FinanceService] {"requestId":"gap-integration","action":"PAY_CHARGE_START","entityId":"8d80ee88-a544-4d53-993a-63d3d61e8a7a","orgId":"508fe068-caf5-4368-b554-b9850ff7cc6a","amountCents":1000,"method":"CARD","message":"Iniciando payCharge"}
+[Nest] 24168  - 11/12/2026, 2:48:21 PM     LOG [FinanceService] {"requestId":"gap-integration","action":"PAY_CHARGE_RESULT","entityId":"8d80ee88-a544-4d53-993a-63d3d61e8a7a","paymentId":"3b1cc1d5-b52d-4a6b-8480-17db5bd7d264","orgId":"508fe068-caf5-4368-b554-b9850ff7cc6a","message":"Pagamento registrado com sucesso"}
+[Nest] 24168  - 11/12/2026, 2:48:21 PM     LOG [PaymentsService] Pagamento processado com sucesso via Stripe. event=checkout.session.completed chargeId=8d80ee88-a544-4d53-993a-63d3d61e8a7a externalRef=stripe:pi_0be58181-d664-43c4-98c8-05bd9dcc2cd2
+[Nest] 24168  - 11/12/2026, 2:48:21 PM     LOG [PaymentsService] Webhook Stripe recebido: charge.succeeded
+[Nest] 24168  - 11/12/2026, 2:48:21 PM     LOG [FinanceService] {"requestId":"gap-integration","action":"PAY_CHARGE_START","entityId":"8d80ee88-a544-4d53-993a-63d3d61e8a7a","orgId":"508fe068-caf5-4368-b554-b9850ff7cc6a","amountCents":1000,"method":"CARD","message":"Iniciando payCharge"}
+[Nest] 24168  - 11/12/2026, 2:48:21 PM     LOG [IdempotencyService] {"requestId":"gap-integration","action":"IDEMPOTENCY_REPLAY","orgId":"508fe068-caf5-4368-b554-b9850ff7cc6a","scope":"finance.pay_charge","key":"stripe-payment:pi_0be58181-d664-43c4-98c8-05bd9dcc2cd2"}
+[Nest] 24168  - 11/12/2026, 2:48:21 PM     LOG [PaymentsService] Pagamento processado com sucesso via Stripe. event=charge.succeeded chargeId=8d80ee88-a544-4d53-993a-63d3d61e8a7a externalRef=stripe:pi_0be58181-d664-43c4-98c8-05bd9dcc2cd2
+[Nest] 24168  - 11/12/2026, 2:48:21 PM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.async_payment_succeeded
+[Nest] 24168  - 11/12/2026, 2:48:21 PM     LOG [FinanceService] {"requestId":"gap-integration","action":"PAY_CHARGE_START","entityId":"8d80ee88-a544-4d53-993a-63d3d61e8a7a","orgId":"508fe068-caf5-4368-b554-b9850ff7cc6a","amountCents":1000,"method":"CARD","message":"Iniciando payCharge"}
+[Nest] 24168  - 11/12/2026, 2:48:21 PM     LOG [IdempotencyService] {"requestId":"gap-integration","action":"IDEMPOTENCY_REPLAY","orgId":"508fe068-caf5-4368-b554-b9850ff7cc6a","scope":"finance.pay_charge","key":"stripe-payment:pi_0be58181-d664-43c4-98c8-05bd9dcc2cd2"}
+[Nest] 24168  - 11/12/2026, 2:48:21 PM     LOG [PaymentsService] Pagamento processado com sucesso via Stripe. event=checkout.session.async_payment_succeeded chargeId=8d80ee88-a544-4d53-993a-63d3d61e8a7a externalRef=stripe:pi_0be58181-d664-43c4-98c8-05bd9dcc2cd2
+[Nest] 24168  - 11/12/2026, 2:48:21 PM     LOG [FinanceService] {"requestId":"gap-integration","action":"PAY_CHARGE_START","entityId":"14cc34f4-aa1a-40dd-8fa1-e7ed6a64caa1","orgId":"508fe068-caf5-4368-b554-b9850ff7cc6a","amountCents":1000,"method":"CARD","message":"Iniciando payCharge"}
+
+Test Suites: 3 passed, 3 total
+Tests:       21 passed, 21 total
+Snapshots:   0 total
+Time:        15.589 s
+Ran all test suites matching test/integration/canonical-operational-workflow.spec.ts|test/integration/gaps-financial-integrity-postgres.integration.spec.ts|test/integration/privacy-exports-postgres.integration.spec.ts.
