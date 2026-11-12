@@ -7,8 +7,8 @@ import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
 const engine=fileURLToPath(new URL('./backup-db.sh',import.meta.url));
 function fixture(run){const dir=mkdtempSync(join(tmpdir(),'nexo-backup-source-')),bin=join(dir,'bin'),artifacts=join(dir,'artifacts'),calls=join(dir,'calls');mkdirSync(bin);
- writeFileSync(join(bin,'docker'),`#!/usr/bin/env bash\ncase "$1" in\ninspect) printf '%s\\n' "\${QA_RUNNING:-true}";;\nexec) printf 'container\\n' >> "$QA_CALLS"; printf 'SELECT 2;\\n';;\n*) exit 1;;\nesac\n`,{mode:0o700});
- writeFileSync(join(bin,'pg_dump'),`#!/usr/bin/env bash\n[[ -z "\${PGHOSTADDR:-}\${PGSERVICE:-}\${PGSERVICEFILE:-}" ]] || exit 88\nprintf 'host\\n' >> "$QA_CALLS"\nprintf 'SELECT 1;\\n'\n`,{mode:0o700});
+ writeFileSync(join(bin,'docker'),`#!/usr/bin/env bash\ncase "$1" in\ninspect) printf '%s\\n' "\${QA_RUNNING:-true}";;\nexec) printf 'container\\n' >> "$QA_CALLS"; [[ \"\${QA_EMPTY:-}\" != yes ]] || exit 0; printf 'SELECT 2;\\n';;\n*) exit 1;;\nesac\n`,{mode:0o700});
+ writeFileSync(join(bin,'pg_dump'),`#!/usr/bin/env bash\n[[ -z "\${PGHOSTADDR:-}\${PGSERVICE:-}\${PGSERVICEFILE:-}" ]] || exit 88\nprintf 'host\\n' >> "$QA_CALLS"\n[[ \"\${QA_EMPTY:-}\" != yes ]] || exit 0\n[[ \"\${QA_FAIL:-}\" != yes ]] || { printf 'SELECT partial;\\n'; exit 17; }\nprintf 'SELECT 1;\\n'\n`,{mode:0o700});
  const check=(overrides={},args=[])=>spawnSync('bash',[engine,...args],{encoding:'utf8',env:{...process.env,PATH:bin+':'+process.env.PATH,DB_CONTAINER:'',BACKUP_DIR:artifacts,POSTGRES_USER:'qa',POSTGRES_DB:'qa',POSTGRES_HOST:'127.0.0.1',POSTGRES_PORT:'55490',QA_CALLS:calls,...overrides},timeout:5000});
  try{run({check,calls,artifacts,called:()=>existsSync(calls)});}finally{rmSync(dir,{recursive:true,force:true});}}
 test('host configuration does not auto-select a default container',()=>fixture(({check,calls})=>{const r=check();assert.equal(r.status,0,r.stderr);assert.equal(readFileSync(calls,'utf8'),'host\n');}));
@@ -18,3 +18,6 @@ test('missing source cannot auto-select a container',()=>fixture(({check,called}
 test('ambient libpq routing does not override host source',()=>fixture(({check,calls})=>{const r=check({PGHOSTADDR:'203.0.113.1',PGSERVICE:'synthetic-remote',PGSERVICEFILE:'/nonexistent/synthetic'});assert.equal(r.status,0,r.stderr);assert.equal(readFileSync(calls,'utf8'),'host\n');}));
 
 test('empty container CLI selection cannot fall back to host',()=>fixture(({check,called})=>{assert.notEqual(check({},['--container','']).status,0);assert(!called());}));
+
+for(const source of ['host','container'])test('empty SQL stream is not published in '+source+' mode',()=>fixture(({check,artifacts})=>{const r=check({QA_EMPTY:'yes',...(source==='container'?{DB_CONTAINER:'synthetic-container'}:{})});if(r.status===0){const file=readdirSync(artifacts).find(x=>x.endsWith('.sql.gz'));assert.equal(spawnSync('gzip',['-cd',join(artifacts,file)]).stdout.length,0);}assert.notEqual(r.status,0);assert(!readdirSync(artifacts).some(x=>x.endsWith('.sql.gz')||x.includes('.partial.')||x.endsWith('.lock')));}));
+test('partial dump from failing pg_dump is not published',()=>fixture(({check,artifacts})=>{const r=check({QA_FAIL:'yes'});assert.notEqual(r.status,0);assert(!readdirSync(artifacts).some(x=>x.endsWith('.sql.gz')||x.includes('.partial.')||x.endsWith('.lock')));}));

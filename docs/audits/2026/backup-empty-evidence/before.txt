@@ -1,0 +1,59 @@
+✔ host configuration does not auto-select a default container (50.852198ms)
+✔ explicit running container is used (41.331135ms)
+✔ stopped explicit container cannot fall back to host (19.526876ms)
+✔ missing source cannot auto-select a container (20.40302ms)
+✔ ambient libpq routing does not override host source (59.435266ms)
+✔ empty container CLI selection cannot fall back to host (7.648901ms)
+✖ empty SQL stream is not published in host mode (56.031607ms)
+✖ empty SQL stream is not published in container mode (58.967028ms)
+✔ partial dump from failing pg_dump is not published (29.654548ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 7
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 434.782102
+
+✖ failing tests:
+
+test at scripts/backup-source.test.mjs:22:42
+✖ empty SQL stream is not published in host mode (56.031607ms)
+  AssertionError [ERR_ASSERTION]: Expected "actual" to be strictly unequal to: 0
+      at file:///workspace/NexoGestao/scripts/backup-source.test.mjs:22:401
+      at fixture (file:///workspace/NexoGestao/scripts/backup-source.test.mjs:13:6)
+      at TestContext.<anonymous> (file:///workspace/NexoGestao/scripts/backup-source.test.mjs:22:106)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 0,
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/backup-source.test.mjs:22:42
+✖ empty SQL stream is not published in container mode (58.967028ms)
+  AssertionError [ERR_ASSERTION]: Expected "actual" to be strictly unequal to: 0
+      at file:///workspace/NexoGestao/scripts/backup-source.test.mjs:22:401
+      at fixture (file:///workspace/NexoGestao/scripts/backup-source.test.mjs:13:6)
+      at TestContext.<anonymous> (file:///workspace/NexoGestao/scripts/backup-source.test.mjs:22:106)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 0,
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
