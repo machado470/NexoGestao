@@ -17,6 +17,11 @@ const PLAN_ORDER: Record<BillingPlanName, number> = {
   BUSINESS: 3,
 };
 
+// Release availability is independent of a plan entitlement. The generic executor
+// currently returns 503; do not advertise an upgrade as enabling it.
+export const CONFIGURABLE_AUTOMATION_NOTICE =
+  "Automações com regras e gatilhos personalizados estão em desenvolvimento e ainda não estão disponíveis em nenhum plano. As rotinas automáticas específicas de cobrança e WhatsApp são recursos separados.";
+
 const FEATURE_LABELS: Record<string, string> = {
   advanced_automation: "Automação avançada",
   premium_integrations: "Integrações premium",
@@ -101,7 +106,7 @@ export function listEnabledPlanFeatures(
   features: Record<string, unknown>
 ): string[] {
   return Object.entries(features)
-    .filter(([, enabled]) => enabled === true)
+    .filter(([key, enabled]) => enabled === true && key !== "advanced_automation")
     .map(
       ([key]) =>
         FEATURE_LABELS[key] ??

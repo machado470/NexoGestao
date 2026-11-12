@@ -41,13 +41,14 @@ describe("billing canonical plan catalog", () => {
     expect(formatPlanQuota(undefined)).toBe("Não informado");
   });
 
-  it("humaniza apenas features habilitadas", () => {
+  it("omite o motor indisponível mesmo com entitlement e preserva os demais recursos habilitados", () => {
     expect(
       listEnabledPlanFeatures({
         advanced_automation: true,
+        premium_integrations: true,
         priority_support: false,
       })
-    ).toEqual(["Automação avançada"]);
+    ).toEqual(["Integrações premium"]);
   });
   it.each([["month", "Mensal"], ["year", "Anual"], [null, "Sem cobrança recorrente"], [undefined, "Periodicidade não informada pelo catálogo"]] as const)("formats the authoritative interval %s", (interval, label) => {
     expect(formatPlanPeriod(interval)).toBe(label);

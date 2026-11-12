@@ -21,6 +21,7 @@ import {
 } from "@/components/internal-page-system";
 import { Button } from "@/components/ui/button";
 import {
+  CONFIGURABLE_AUTOMATION_NOTICE,
   formatPlanPrice,
   formatPlanPeriod,
   formatPlanQuota,
@@ -293,6 +294,11 @@ export default function BillingPage() {
           />
         )}
       </AppSectionBlock>
+
+      <AppAlert>
+        <AppAlertTitle>Disponibilidade de automações</AppAlertTitle>
+        <AppAlertDescription>{CONFIGURABLE_AUTOMATION_NOTICE}</AppAlertDescription>
+      </AppAlert>
 
       <AppSectionBlock
         title="Planos disponíveis"

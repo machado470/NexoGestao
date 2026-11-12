@@ -61,7 +61,7 @@ const features = [
   {
     icon: Bot,
     title: "Automações futuras",
-    text: "Base preparada para automações operacionais com regras e gatilhos por etapa.",
+    text: "Regras e gatilhos personalizados estão em desenvolvimento e ainda não estão disponíveis. Rotinas específicas de cobrança e WhatsApp são recursos separados.",
   },
 ];
 
