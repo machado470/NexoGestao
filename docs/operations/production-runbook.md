@@ -108,3 +108,7 @@ O evento `backup_created` mantém `artifact=` para o caminho escapado e inclui `
 Configure `DB_CONTAINER` (ou `--container`) somente para o contêiner confirmado de PostgreSQL; se estiver ausente/parado, a execução falha e não usa o host como alternativa. O modo contêiner usa socket padrão `/var/run/postgresql` e porta interna 5432. Sem DB_CONTAINER, configure POSTGRES_HOST/POSTGRES_PORT explicitamente (porta padrão 5432). O script não procura mais um contêiner de nome fixo. Remova DB_CONTAINER para escolher o modo host.
 
 Ambos os modos usam POSTGRES_USER/POSTGRES_DB; configurações libpq de redirecionamento/serviço/opções são removidas antes do dump. Revise arquivos de ambiente antigos que dependiam da descoberta automática ou fallback. [Correção, testes e drill](../audits/2026/2026-11-12-backup-explicit-source.md).
+
+### Stream vazio
+
+O engine rejeita saída SQL de zero bytes, mesmo que pg_dump retorne zero e o gzip seja válido. Valida a descompressão inteira sem criar cópia SQL em disco e só então publica o artefato. Isso não substitui o drill de restauração nem verifica completude semântica. [Regressões](../audits/2026/2026-11-12-backup-empty-stream.md).

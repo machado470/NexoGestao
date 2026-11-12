@@ -70,7 +70,10 @@ else
     -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --no-acl --clean --if-exists | gzip -9 >"$TMP_BACKUP"
 fi
 [[ -s "$TMP_BACKUP" ]] || die "pg_dump produced an empty artifact"
-gzip -t -- "$TMP_BACKUP"
+# gzip headers make even an empty SQL stream non-empty on disk.
+# Consume the whole stream: validate gzip integrity and require actual dump bytes.
+uncompressed_bytes="$(gzip -cd -- "$TMP_BACKUP" | wc -c)" || die "gzip integrity verification failed"
+((uncompressed_bytes > 0)) || die "pg_dump produced an empty SQL stream"
 log integrity_verified success "artifact=$(printf %q "$BACKUP_FILE")"
 HASH="$(sha256sum "$TMP_BACKUP" | awk '{print $1}')"
 printf '%s  %s\n' "$HASH" "$(basename "$TMP_BACKUP")" >"$TMP_CHECKSUM"
