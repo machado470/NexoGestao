@@ -59,6 +59,11 @@ jobs:
       - name: Security dependency regressions
         run: pnpm test:security:dependencies
 
+      - name: Backup state and runner regressions
+        run: |
+          node --test scripts/check-backup-state.test.mjs
+          bash scripts/test-production-backup.sh
+
       - name: Generate Prisma Client
         run: pnpm --filter ./apps/api prisma:generate
 
