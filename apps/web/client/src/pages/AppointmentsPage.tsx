@@ -3,7 +3,7 @@ import {
   toLocalDateTimeInput,
   parseLocalDateTimeInput,
 } from "@/lib/local-date-time";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useId, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useSearch } from "wouter";
 import { toast } from "sonner";
 import { can } from "@/lib/rbac";
@@ -102,6 +102,7 @@ function dateValue(value?: string | null) {
 }
 
 export default function AppointmentsPage() {
+  const fieldId = useId();
   // Marcador tipado exigido pelo guardrail do Operating System. A página não
   // possui fonte oficial de severidade e, por isso, não renderiza nem deriva uma.
   const officialOperationalSeverity: OperationalSeverity | null = null;
@@ -976,8 +977,9 @@ export default function AppointmentsPage() {
                 sem atribuição.
               </p>
             ) : null}
-            <AppField label="Cliente">
+            <AppField label="Cliente" htmlFor={`${fieldId}-field-0`}>
               <AppSelect
+                id={`${fieldId}-field-0`}
                 value={form.customerId}
                 onValueChange={customerId =>
                   setForm(value => ({ ...value, customerId }))
@@ -990,8 +992,9 @@ export default function AppointmentsPage() {
               />
             </AppField>
             <div className="grid gap-3 md:grid-cols-2">
-              <AppField label="Data">
+              <AppField label="Data" htmlFor={`${fieldId}-field-1`}>
                 <AppInput
+                  id={`${fieldId}-field-1`}
                   type="date"
                   value={form.date}
                   onChange={event =>
@@ -999,8 +1002,9 @@ export default function AppointmentsPage() {
                   }
                 />
               </AppField>
-              <AppField label="Hora">
+              <AppField label="Hora" htmlFor={`${fieldId}-field-2`}>
                 <AppInput
+                  id={`${fieldId}-field-2`}
                   type="time"
                   value={form.time}
                   onChange={event =>
@@ -1010,8 +1014,9 @@ export default function AppointmentsPage() {
               </AppField>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
-              <AppField label="Status">
+              <AppField label="Status" htmlFor={`${fieldId}-field-3`}>
                 <AppSelect
+                  id={`${fieldId}-field-3`}
                   value={form.status}
                   onValueChange={status =>
                     setForm(value => ({
@@ -1028,8 +1033,9 @@ export default function AppointmentsPage() {
                   ]}
                 />
               </AppField>
-              <AppField label="Duração (min)">
+              <AppField label="Duração (min)" htmlFor={`${fieldId}-field-4`}>
                 <AppInput
+                  id={`${fieldId}-field-4`}
                   type="number"
                   min={15}
                   value={form.durationMinutes}
@@ -1042,8 +1048,9 @@ export default function AppointmentsPage() {
                 />
               </AppField>
             </div>
-            <AppField label="Responsável">
+            <AppField label="Responsável" htmlFor={`${fieldId}-field-5`}>
               <AppSelect
+                id={`${fieldId}-field-5`}
                 value={form.assignedToPersonId}
                 onValueChange={assignedToPersonId =>
                   setForm(value => ({ ...value, assignedToPersonId }))
@@ -1065,8 +1072,9 @@ export default function AppointmentsPage() {
                 onWarningShown={assigneeWarningTelemetry.trackShown}
               />
             </AppField>
-            <AppField label="Observação">
+            <AppField label="Observação" htmlFor={`${fieldId}-field-6`}>
               <AppTextarea
+                id={`${fieldId}-field-6`}
                 value={form.notes}
                 onChange={event =>
                   setForm(value => ({ ...value, notes: event.target.value }))

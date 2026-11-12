@@ -1,0 +1,276 @@
+{
+  "checks": [
+    {
+      "name": "appointments-1440",
+      "fields": [
+        {
+          "id": "_r_8_-field-0",
+          "tag": "BUTTON",
+          "label": "Cliente",
+          "placeholder": null
+        },
+        {
+          "id": "_r_8_-field-1",
+          "tag": "INPUT",
+          "label": "Data",
+          "placeholder": null
+        },
+        {
+          "id": "_r_8_-field-2",
+          "tag": "INPUT",
+          "label": "Hora",
+          "placeholder": null
+        },
+        {
+          "id": "_r_8_-field-3",
+          "tag": "BUTTON",
+          "label": "Status",
+          "placeholder": null
+        },
+        {
+          "id": "_r_8_-field-4",
+          "tag": "INPUT",
+          "label": "Duração (min)",
+          "placeholder": null
+        },
+        {
+          "id": "_r_8_-field-5",
+          "tag": "BUTTON",
+          "label": "Responsável",
+          "placeholder": null
+        },
+        {
+          "id": "_r_8_-field-6",
+          "tag": "TEXTAREA",
+          "label": "Observação",
+          "placeholder": null
+        }
+      ]
+    },
+    {
+      "name": "calendar-1440",
+      "fields": [
+        {
+          "id": "_r_8_-field-0",
+          "tag": "BUTTON",
+          "label": "Cliente *",
+          "placeholder": null
+        },
+        {
+          "id": "_r_8_-field-1",
+          "tag": "BUTTON",
+          "label": "Responsável pelo atendimento",
+          "placeholder": null
+        },
+        {
+          "id": "_r_8_-field-2",
+          "tag": "INPUT",
+          "label": "Data *",
+          "placeholder": null
+        },
+        {
+          "id": "_r_8_-field-3",
+          "tag": "INPUT",
+          "label": "Hora *",
+          "placeholder": null
+        },
+        {
+          "id": "_r_8_-field-4",
+          "tag": "BUTTON",
+          "label": "Duração",
+          "placeholder": null
+        },
+        {
+          "id": "_r_8_-field-5",
+          "tag": "INPUT",
+          "label": "Serviço (opcional)",
+          "placeholder": "Ex.: Instalação, Manutenção, Revisão"
+        },
+        {
+          "id": "_r_8_-field-6",
+          "tag": "TEXTAREA",
+          "label": "Observações",
+          "placeholder": "Observação curta para execução"
+        }
+      ]
+    },
+    {
+      "name": "service-orders-1440",
+      "fields": [
+        {
+          "id": "_r_e_-field-0",
+          "tag": "BUTTON",
+          "label": "Cliente *",
+          "placeholder": null
+        },
+        {
+          "id": "_r_e_-field-1",
+          "tag": "BUTTON",
+          "label": "Responsável pela execução",
+          "placeholder": null
+        },
+        {
+          "id": "_r_e_-field-2",
+          "tag": "INPUT",
+          "label": "Serviço que será feito *",
+          "placeholder": "Ex: Manutenção elétrica no quadro do condomínio"
+        },
+        {
+          "id": "_r_e_-field-3",
+          "tag": "TEXTAREA",
+          "label": "Detalhes para a equipe",
+          "placeholder": "Ex: Levar escada, trocar disjuntor e testar iluminação da área comum."
+        },
+        {
+          "id": "_r_e_-field-4",
+          "tag": "INPUT",
+          "label": "Data prevista (opcional)",
+          "placeholder": null
+        },
+        {
+          "id": "_r_e_-field-5",
+          "tag": "INPUT",
+          "label": "Valor (R$)",
+          "placeholder": "Ex: 890,00"
+        }
+      ]
+    },
+    {
+      "name": "appointments-390",
+      "fields": [
+        {
+          "id": "_r_8_-field-0",
+          "tag": "BUTTON",
+          "label": "Cliente",
+          "placeholder": null
+        },
+        {
+          "id": "_r_8_-field-1",
+          "tag": "INPUT",
+          "label": "Data",
+          "placeholder": null
+        },
+        {
+          "id": "_r_8_-field-2",
+          "tag": "INPUT",
+          "label": "Hora",
+          "placeholder": null
+        },
+        {
+          "id": "_r_8_-field-3",
+          "tag": "BUTTON",
+          "label": "Status",
+          "placeholder": null
+        },
+        {
+          "id": "_r_8_-field-4",
+          "tag": "INPUT",
+          "label": "Duração (min)",
+          "placeholder": null
+        },
+        {
+          "id": "_r_8_-field-5",
+          "tag": "BUTTON",
+          "label": "Responsável",
+          "placeholder": null
+        },
+        {
+          "id": "_r_8_-field-6",
+          "tag": "TEXTAREA",
+          "label": "Observação",
+          "placeholder": null
+        }
+      ]
+    },
+    {
+      "name": "calendar-390",
+      "fields": [
+        {
+          "id": "_r_8_-field-0",
+          "tag": "BUTTON",
+          "label": "Cliente *",
+          "placeholder": null
+        },
+        {
+          "id": "_r_8_-field-1",
+          "tag": "BUTTON",
+          "label": "Responsável pelo atendimento",
+          "placeholder": null
+        },
+        {
+          "id": "_r_8_-field-2",
+          "tag": "INPUT",
+          "label": "Data *",
+          "placeholder": null
+        },
+        {
+          "id": "_r_8_-field-3",
+          "tag": "INPUT",
+          "label": "Hora *",
+          "placeholder": null
+        },
+        {
+          "id": "_r_8_-field-4",
+          "tag": "BUTTON",
+          "label": "Duração",
+          "placeholder": null
+        },
+        {
+          "id": "_r_8_-field-5",
+          "tag": "INPUT",
+          "label": "Serviço (opcional)",
+          "placeholder": "Ex.: Instalação, Manutenção, Revisão"
+        },
+        {
+          "id": "_r_8_-field-6",
+          "tag": "TEXTAREA",
+          "label": "Observações",
+          "placeholder": "Observação curta para execução"
+        }
+      ]
+    },
+    {
+      "name": "service-orders-390",
+      "fields": [
+        {
+          "id": "_r_e_-field-0",
+          "tag": "BUTTON",
+          "label": "Cliente *",
+          "placeholder": null
+        },
+        {
+          "id": "_r_e_-field-1",
+          "tag": "BUTTON",
+          "label": "Responsável pela execução",
+          "placeholder": null
+        },
+        {
+          "id": "_r_e_-field-2",
+          "tag": "INPUT",
+          "label": "Serviço que será feito *",
+          "placeholder": "Ex: Manutenção elétrica no quadro do condomínio"
+        },
+        {
+          "id": "_r_e_-field-3",
+          "tag": "TEXTAREA",
+          "label": "Detalhes para a equipe",
+          "placeholder": "Ex: Levar escada, trocar disjuntor e testar iluminação da área comum."
+        },
+        {
+          "id": "_r_e_-field-4",
+          "tag": "INPUT",
+          "label": "Data prevista (opcional)",
+          "placeholder": null
+        },
+        {
+          "id": "_r_e_-field-5",
+          "tag": "INPUT",
+          "label": "Valor (R$)",
+          "placeholder": "Ex: 890,00"
+        }
+      ]
+    }
+  ],
+  "pageErrors": [],
+  "pass": true
+}
