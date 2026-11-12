@@ -14,7 +14,7 @@ describe('JwtStrategy persisted session validation', () => {
   it('preserves exp and returns the persisted active identity', async () => {
     await expect(subject().validate(payload)).resolves.toEqual({
       sub: user.id, userId: user.id, orgId: user.orgId, role: user.role,
-      personId: user.person.id, exp: payload.exp,
+      personId: user.person.id, sessionVersion: user.sessionVersion, exp: payload.exp,
     })
   })
   it.each([
