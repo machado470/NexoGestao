@@ -32,8 +32,24 @@ CHECKSUM_FILE="$BACKUP_FILE.sha256"
 [[ -f "$CHECKSUM_FILE" ]] || fail "required checksum sidecar not found"
 [[ -n "${DATABASE_URL:-}" ]] || fail "DATABASE_URL is required"
 
-TARGET="$(node -e 'const u=new URL(process.env.DATABASE_URL); if(u.protocol!=="postgresql:"&&u.protocol!=="postgres:")process.exit(2); console.log(`${u.hostname}|${u.port||"5432"}|${u.pathname.slice(1)}`)' 2>/dev/null)" || fail "DATABASE_URL is not a valid PostgreSQL URL"
-IFS='|' read -r TARGET_HOST TARGET_PORT TARGET_DB <<<"$TARGET"
+TARGET="$(node <<'NODE'
+try {
+  const u = new URL(process.env.DATABASE_URL);
+  const safeParams = new Set(['schema', 'sslmode', 'sslcert', 'sslkey', 'sslrootcert', 'connect_timeout', 'connection_limit', 'pool_timeout', 'application_name', 'pgbouncer']);
+  if (!['postgresql:', 'postgres:'].includes(u.protocol) || u.hash) throw new Error();
+  const seen = new Set();
+  for (const key of u.searchParams.keys()) {
+    if (!safeParams.has(key) || seen.has(key)) throw new Error();
+    seen.add(key);
+  }
+  const database = decodeURIComponent(u.pathname.slice(1));
+  const user = decodeURIComponent(u.username);
+  if (!/^[A-Za-z0-9_-]+$/.test(database) || !/^[A-Za-z0-9_-]+$/.test(user)) throw new Error();
+  console.log(`${u.hostname}|${u.port || '5432'}|${database}|${user}`);
+} catch { process.exitCode = 2; }
+NODE
+)" || fail "DATABASE_URL has an invalid or unsupported restore target"
+IFS='|' read -r TARGET_HOST TARGET_PORT TARGET_DB TARGET_USER <<<"$TARGET"
 [[ -n "$TARGET_HOST" && -n "$TARGET_DB" ]] || fail "DATABASE_URL target is incomplete"
 case "${TARGET_HOST,,}" in
   localhost|127.0.0.1) ;;
@@ -41,6 +57,17 @@ case "${TARGET_HOST,,}" in
 esac
 case "${NODE_ENV:-}" in production) fail "production restore is prohibited in Phase 2.4";; esac
 case "${TARGET_HOST,,}:${TARGET_DB,,}" in *prod*|*production*) fail "target resembles production and is prohibited";; esac
+CONTAINER_RESTORE=false
+if [[ -n "$DB_CONTAINER" ]]; then
+  command -v docker >/dev/null || fail "docker is required for the explicitly selected container"
+  docker inspect -f '{{.State.Running}}' "$DB_CONTAINER" 2>/dev/null | grep -qx true || fail "selected restore container is not running"
+  binding="$(docker port "$DB_CONTAINER" 5432/tcp)" || fail "cannot verify container PostgreSQL binding"
+  [[ "$binding" == "127.0.0.1:$TARGET_PORT" ]] || fail "container PostgreSQL binding differs from DATABASE_URL loopback target"
+  [[ "${POSTGRES_USER:-}" == "$TARGET_USER" ]] || fail "POSTGRES_USER differs from DATABASE_URL user"
+  CONTAINER_RESTORE=true
+fi
+# Do not let ambient libpq routing settings override the validated URL.
+run_host_psql() { env -u PGHOSTADDR -u PGSERVICE -u PGSERVICEFILE -u PGHOST -u PGPORT -u PGDATABASE -u PGUSER -u PGOPTIONS psql "$@"; }
 log restore_started started "host=$(printf %q "$TARGET_HOST") port=$TARGET_PORT database=$(printf %q "$TARGET_DB") artifact=$(printf %q "$BACKUP_FILE")"
 
 # Bind the sidecar to this exact dump, not to arbitrary paths listed inside it.
@@ -65,20 +92,20 @@ else
 fi
 
 FAIL_REASON="database_restore_failed"
-if [[ -n "$DB_CONTAINER" ]] && command -v docker >/dev/null 2>&1 && docker inspect -f '{{.State.Running}}' "$DB_CONTAINER" 2>/dev/null | grep -qx true; then
-  gzip -cd -- "$BACKUP_FILE" | docker exec -i "$DB_CONTAINER" psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER:?POSTGRES_USER is required}" -d "$TARGET_DB"
+if [[ "$CONTAINER_RESTORE" == true ]]; then
+  gzip -cd -- "$BACKUP_FILE" | docker exec -i "$DB_CONTAINER" env -u PGHOSTADDR -u PGSERVICE -u PGSERVICEFILE -u PGOPTIONS psql -h /var/run/postgresql -p 5432 -v ON_ERROR_STOP=1 -U "${POSTGRES_USER:?POSTGRES_USER is required}" -d "$TARGET_DB"
 else
   command -v psql >/dev/null || fail "psql is unavailable and DB_CONTAINER is not running"
-  gzip -cd -- "$BACKUP_FILE" | psql -v ON_ERROR_STOP=1 "$DATABASE_URL"
+  gzip -cd -- "$BACKUP_FILE" | run_host_psql -v ON_ERROR_STOP=1 "$DATABASE_URL"
 fi
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 FAIL_REASON="post_restore_migration_failed"
 pnpm exec prisma migrate deploy --schema prisma/schema.prisma
 FAIL_REASON="post_restore_smoke_failed"
-if [[ -n "$DB_CONTAINER" ]]; then
-  docker exec "$DB_CONTAINER" psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER:?}" -d "$TARGET_DB" -Atqc 'SELECT count(*) FROM "_prisma_migrations"' | grep -Eq '^[1-9][0-9]*$'
+if [[ "$CONTAINER_RESTORE" == true ]]; then
+  docker exec "$DB_CONTAINER" env -u PGHOSTADDR -u PGSERVICE -u PGSERVICEFILE -u PGOPTIONS psql -h /var/run/postgresql -p 5432 -v ON_ERROR_STOP=1 -U "${POSTGRES_USER:?}" -d "$TARGET_DB" -Atqc 'SELECT count(*) FROM "_prisma_migrations"' | grep -Eq '^[1-9][0-9]*$'
 else
-  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -Atqc 'SELECT count(*) FROM "_prisma_migrations"' | grep -Eq '^[1-9][0-9]*$'
+  run_host_psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -Atqc 'SELECT count(*) FROM "_prisma_migrations"' | grep -Eq '^[1-9][0-9]*$'
 fi
 log restore_completed success "host=$(printf %q "$TARGET_HOST") database=$(printf %q "$TARGET_DB")"

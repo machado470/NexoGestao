@@ -80,3 +80,11 @@ Antes de qualquer execução real, ainda faltam: provedor/servidor/domínio,
 identificação do daemon e dos volumes existentes, responsáveis, backup aprovado,
 janela, firewall/TLS e critérios de smoke/rollback. O CI valida a base Compose;
 não executa publicação, migrations remotas ou promoção real.
+
+### Destino consistente no restore de teste
+
+Quando `DB_CONTAINER`/`--container` estiver informado, o contêiner deve estar em execução e publicar PostgreSQL interno 5432 exclusivamente em `127.0.0.1:<porta de DATABASE_URL>`. `POSTGRES_USER` deve coincidir com o usuário da URL. Não há fallback para outro banco se o contêiner estiver parado ou divergente. Restore e smoke usam socket padrão `/var/run/postgresql` no contêiner; migrations usam a URL correspondente à porta publicada.
+
+Banco/usuário da URL são decodificados e devem usar letras, números, `_` ou `-`. Parâmetros aceitos: `schema`, `sslmode`, `sslcert`, `sslkey`, `sslrootcert`, `connect_timeout`, `connection_limit`, `pool_timeout`, `application_name`, `pgbouncer`; desconhecidos/repetidos e fragmentos são recusados. Configurações libpq herdadas de roteamento/serviço/opções são removidas antes do psql. Isso não substitui confirmar que o alvo é descartável e autorizado.
+
+[Correção e drill local de consistência do destino](../audits/2026/2026-11-12-restore-target-consistency.md). O drill local não comprova offsite ou alerta.

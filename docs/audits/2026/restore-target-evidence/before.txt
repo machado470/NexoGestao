@@ -1,0 +1,121 @@
+✔ valid canonical sidecar reaches simulated restore and migration (95.64543ms)
+✔ a checksum for another valid file cannot authorize restoring the requested dump (73.44796ms)
+✔ mismatched hash never invokes database commands (80.099365ms)
+✔ multiple checksum entries are rejected (72.504488ms)
+✔ missing and malformed sidecars never invoke database commands (61.256419ms)
+✖ container bound to another port fails before database commands (81.019673ms)
+✖ stopped explicitly selected container fails before database commands (79.710752ms)
+✖ container bound publicly fails before database commands (65.289115ms)
+✖ URL host query override fails before database commands (75.925957ms)
+✖ encoded production database fails before database commands (68.970824ms)
+✔ matching loopback container target reaches simulated restore (84.242548ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 6
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 941.769988
+
+✖ failing tests:
+
+test at scripts/restore-checksum.test.mjs:32:4
+✖ container bound to another port fails before database commands (81.019673ms)
+  AssertionError [ERR_ASSERTION]: Expected "actual" to be strictly unequal to: 0
+      at file:///workspace/NexoGestao/scripts/restore-checksum.test.mjs:32:134
+      at fixture (file:///workspace/NexoGestao/scripts/restore-checksum.test.mjs:18:6)
+      at TestContext.<anonymous> (file:///workspace/NexoGestao/scripts/restore-checksum.test.mjs:32:52)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 0,
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/restore-checksum.test.mjs:32:4
+✖ stopped explicitly selected container fails before database commands (79.710752ms)
+  AssertionError [ERR_ASSERTION]: Expected "actual" to be strictly unequal to: 0
+      at file:///workspace/NexoGestao/scripts/restore-checksum.test.mjs:32:134
+      at fixture (file:///workspace/NexoGestao/scripts/restore-checksum.test.mjs:18:6)
+      at TestContext.<anonymous> (file:///workspace/NexoGestao/scripts/restore-checksum.test.mjs:32:52)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 0,
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/restore-checksum.test.mjs:32:4
+✖ container bound publicly fails before database commands (65.289115ms)
+  AssertionError [ERR_ASSERTION]: Expected "actual" to be strictly unequal to: 0
+      at file:///workspace/NexoGestao/scripts/restore-checksum.test.mjs:32:134
+      at fixture (file:///workspace/NexoGestao/scripts/restore-checksum.test.mjs:18:6)
+      at TestContext.<anonymous> (file:///workspace/NexoGestao/scripts/restore-checksum.test.mjs:32:52)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 0,
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/restore-checksum.test.mjs:32:4
+✖ URL host query override fails before database commands (75.925957ms)
+  AssertionError [ERR_ASSERTION]: Expected "actual" to be strictly unequal to: 0
+      at file:///workspace/NexoGestao/scripts/restore-checksum.test.mjs:32:134
+      at fixture (file:///workspace/NexoGestao/scripts/restore-checksum.test.mjs:18:6)
+      at TestContext.<anonymous> (file:///workspace/NexoGestao/scripts/restore-checksum.test.mjs:32:52)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 0,
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/restore-checksum.test.mjs:32:4
+✖ encoded production database fails before database commands (68.970824ms)
+  AssertionError [ERR_ASSERTION]: Expected "actual" to be strictly unequal to: 0
+      at file:///workspace/NexoGestao/scripts/restore-checksum.test.mjs:32:134
+      at fixture (file:///workspace/NexoGestao/scripts/restore-checksum.test.mjs:18:6)
+      at TestContext.<anonymous> (file:///workspace/NexoGestao/scripts/restore-checksum.test.mjs:32:52)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 0,
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
