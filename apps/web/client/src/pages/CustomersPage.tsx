@@ -963,6 +963,76 @@ export default function CustomersPage() {
     return priority ? <AppPriorityBadge priority={priority} /> : null;
   };
 
+  const renderCustomerSecondaryActions = (
+    profile: (typeof operationalProfiles)[number]
+  ) => (
+    <AppRowActionsDropdown
+      triggerLabel="Mais ações"
+      contentClassName="min-w-[220px]"
+      items={[
+        {
+          label: "Abrir cliente",
+          tone: "primary",
+          onSelect: () =>
+            setActiveCustomerId(profile.customerId),
+        },
+        {
+          label: "Agendar",
+          disabled: !canCreateAppointment,
+          onSelect: () =>
+            navigate(
+              `/appointments?customerId=${profile.customerId}`
+            ),
+        },
+        {
+          label: "Nova O.S.",
+          disabled: !canCreateOrder,
+          onSelect: () =>
+            navigate(
+              `/service-orders?customerId=${profile.customerId}`
+            ),
+        },
+        {
+          label: "Cobrar",
+          disabled: !canReadFinance,
+          onSelect: () =>
+            navigate(
+              `/finances?customerId=${profile.customerId}`
+            ),
+        },
+        {
+          label: "WhatsApp",
+          onSelect: () =>
+            openCustomerWhatsApp(
+              profile.customer,
+              profile.pendingChargeId
+            ),
+        },
+        {
+          type: "separator",
+          label: "Cadastro",
+        },
+        {
+          label:
+            pendingEditCustomerId === profile.customerId
+              ? "Editando..."
+              : "Editar dados",
+          onSelect: () => {
+            setPendingEditCustomerId(
+              profile.customerId
+            );
+            setEditingCustomerId(profile.customerId);
+            toast.success("Editor de cliente aberto.");
+          },
+          disabled:
+            !canEditCustomer ||
+            pendingEditCustomerId ===
+              profile.customerId,
+        },
+      ]}
+    />
+  );
+
   return (
     <AppPageShell className="gap-3">
       <AppOperationalHeader
@@ -1257,19 +1327,22 @@ export default function CustomersPage() {
                       </p>
                     </div>
 
-                    <div className="mt-3 flex items-center justify-between gap-2">
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                       <span className="text-sm font-medium text-[var(--text-primary)]">
                         {isChargesUnavailable ? "Consulte o financeiro do cliente" : formatCurrency(profile.pendingCents)}
                       </span>
-                      <Button
-                        size="sm"
-                        onClick={event => {
-                          event.stopPropagation();
-                          runAuthoritativeCustomerAction(profile);
-                        }}
-                      >
-                        {getAuthoritativeCustomerActionLabel(profile)}
-                      </Button>
+                      <div className="flex flex-wrap items-center justify-end gap-2" onClick={event => event.stopPropagation()}>
+                        <Button
+                          size="sm"
+                          onClick={event => {
+                            event.stopPropagation();
+                            runAuthoritativeCustomerAction(profile);
+                          }}
+                        >
+                          {getAuthoritativeCustomerActionLabel(profile)}
+                        </Button>
+                        {renderCustomerSecondaryActions(profile)}
+                      </div>
                     </div>
                   </article>
                 ))}
@@ -1414,71 +1487,7 @@ export default function CustomersPage() {
                             >
                               {getAuthoritativeCustomerActionLabel(profile)}
                             </Button>
-                            <AppRowActionsDropdown
-                              triggerLabel="Mais ações"
-                              contentClassName="min-w-[220px]"
-                              items={[
-                                {
-                                  label: "Abrir cliente",
-                                  tone: "primary",
-                                  onSelect: () =>
-                                    setActiveCustomerId(profile.customerId),
-                                },
-                                {
-                                  label: "Agendar",
-                                  disabled: !canCreateAppointment,
-                                  onSelect: () =>
-                                    navigate(
-                                      `/appointments?customerId=${profile.customerId}`
-                                    ),
-                                },
-                                {
-                                  label: "Nova O.S.",
-                                  disabled: !canCreateOrder,
-                                  onSelect: () =>
-                                    navigate(
-                                      `/service-orders?customerId=${profile.customerId}`
-                                    ),
-                                },
-                                {
-                                  label: "Cobrar",
-                                  disabled: !canReadFinance,
-                                  onSelect: () =>
-                                    navigate(
-                                      `/finances?customerId=${profile.customerId}`
-                                    ),
-                                },
-                                {
-                                  label: "WhatsApp",
-                                  onSelect: () =>
-                                    openCustomerWhatsApp(
-                                      profile.customer,
-                                      profile.pendingChargeId
-                                    ),
-                                },
-                                {
-                                  type: "separator",
-                                  label: "Cadastro",
-                                },
-                                {
-                                  label:
-                                    pendingEditCustomerId === profile.customerId
-                                      ? "Editando..."
-                                      : "Editar dados",
-                                  onSelect: () => {
-                                    setPendingEditCustomerId(
-                                      profile.customerId
-                                    );
-                                    setEditingCustomerId(profile.customerId);
-                                    toast.success("Editor de cliente aberto.");
-                                  },
-                                  disabled:
-                                    !canEditCustomer ||
-                                    pendingEditCustomerId ===
-                                      profile.customerId,
-                                },
-                              ]}
-                            />
+                            {renderCustomerSecondaryActions(profile)}
                           </div>
                         </td>
                       </tr>
