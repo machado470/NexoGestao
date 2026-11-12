@@ -1,0 +1,65 @@
+{
+  "checks": [
+    {
+      "name": "order-390",
+      "fields": [
+        {
+          "id": "_r_i_-field-0",
+          "label": "Título *"
+        },
+        {
+          "id": "_r_i_-field-1",
+          "label": "Descrição"
+        },
+        {
+          "id": "_r_i_-field-2",
+          "label": "Prioridade"
+        },
+        {
+          "id": "_r_i_-field-3",
+          "label": "Agendada para"
+        },
+        {
+          "id": "_r_i_-field-4",
+          "label": "Responsável"
+        },
+        {
+          "id": "_r_i_-field-5",
+          "label": "Status"
+        },
+        {
+          "id": "_r_i_-field-6",
+          "label": "Valor (R$)"
+        },
+        {
+          "id": "_r_i_-field-7",
+          "label": "Vencimento"
+        }
+      ]
+    },
+    {
+      "name": "customer-390",
+      "fields": [
+        {
+          "id": "edit-customer-name",
+          "label": "Nome *"
+        },
+        {
+          "id": "edit-customer-phone",
+          "label": "Telefone / WhatsApp *"
+        },
+        {
+          "id": "edit-customer-email",
+          "label": "Email"
+        },
+        {
+          "id": "edit-customer-notes",
+          "label": "Observações"
+        }
+      ]
+    }
+  ],
+  "orderAndCustomerEditsPersisted": true,
+  "pageErrors": [],
+  "pass": true
+}

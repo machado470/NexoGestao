@@ -4,7 +4,7 @@ import {
   parseLocalDateTimeInput,
 } from "@/lib/local-date-time";
 import { Button } from "@/components/ui/button";
-import { useEffect, useMemo, useState } from "react";
+import { useId, useEffect, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
@@ -204,6 +204,7 @@ export default function EditServiceOrderModal({
   serviceOrderId,
   people,
 }: EditServiceOrderModalProps) {
+  const fieldId = useId();
   const [, navigate] = useLocation();
   const utils = trpc.useUtils();
   const assigneeWarningTelemetry = useAssigneeWarningTelemetry("SERVICE_ORDER");
@@ -667,10 +668,11 @@ export default function EditServiceOrderModal({
 
                 <div className="space-y-4">
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-[var(--modal-section-text)]">
+                    <label htmlFor={`${fieldId}-field-0`} className="mb-2 block text-sm font-medium text-[var(--modal-section-text)]">
                       Título *
                     </label>
                     <input
+                      id={`${fieldId}-field-0`}
                       className="w-full rounded-lg nexo-field border border-[var(--field-border)] bg-[var(--field-bg)] p-2.5 text-[var(--modal-section-text)] placeholder:text-[var(--modal-section-text)]/40 focus:border-orange-500/40 focus:outline-none focus:ring-1 focus:ring-orange-500/40 hover:border-[var(--accent-primary)]/40"
                       value={formData.title}
                       onChange={e =>
@@ -686,10 +688,11 @@ export default function EditServiceOrderModal({
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-[var(--modal-section-text)]">
+                    <label htmlFor={`${fieldId}-field-1`} className="mb-2 block text-sm font-medium text-[var(--modal-section-text)]">
                       Descrição
                     </label>
                     <textarea
+                      id={`${fieldId}-field-1`}
                       className="w-full rounded-lg nexo-field border border-[var(--field-border)] bg-[var(--field-bg)] p-2.5 text-[var(--modal-section-text)] placeholder:text-[var(--modal-section-text)]/40 focus:border-orange-500/40 focus:outline-none focus:ring-1 focus:ring-orange-500/40 hover:border-[var(--accent-primary)]/40"
                       rows={4}
                       value={formData.description}
@@ -707,11 +710,12 @@ export default function EditServiceOrderModal({
 
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
-                      <label className="mb-2 flex items-center gap-2 text-sm font-medium text-[var(--modal-section-text)]">
+                      <label htmlFor={`${fieldId}-field-2`} className="mb-2 flex items-center gap-2 text-sm font-medium text-[var(--modal-section-text)]">
                         <Flag className="h-4 w-4 text-gray-500" />
                         Prioridade
                       </label>
                       <select
+                        id={`${fieldId}-field-2`}
                         className="w-full rounded-lg nexo-field border border-[var(--field-border)] bg-[var(--field-bg)] p-2.5 text-[var(--modal-section-text)] placeholder:text-[var(--modal-section-text)]/40 focus:border-orange-500/40 focus:outline-none focus:ring-1 focus:ring-orange-500/40 hover:border-[var(--accent-primary)]/40"
                         value={formData.priority}
                         onChange={e =>
@@ -736,11 +740,12 @@ export default function EditServiceOrderModal({
                     </div>
 
                     <div>
-                      <label className="mb-2 flex items-center gap-2 text-sm font-medium text-[var(--modal-section-text)]">
+                      <label htmlFor={`${fieldId}-field-3`} className="mb-2 flex items-center gap-2 text-sm font-medium text-[var(--modal-section-text)]">
                         <CalendarDays className="h-4 w-4 text-gray-500" />
                         Agendada para
                       </label>
                       <input
+                        id={`${fieldId}-field-3`}
                         type="datetime-local"
                         className="w-full rounded-lg nexo-field border border-[var(--field-border)] bg-[var(--field-bg)] p-2.5 text-[var(--modal-section-text)] placeholder:text-[var(--modal-section-text)]/40 focus:border-orange-500/40 focus:outline-none focus:ring-1 focus:ring-orange-500/40 hover:border-[var(--accent-primary)]/40"
                         value={formData.scheduledFor}
@@ -758,11 +763,12 @@ export default function EditServiceOrderModal({
                   </div>
 
                   <div>
-                    <label className="mb-2 flex items-center gap-2 text-sm font-medium text-[var(--modal-section-text)]">
+                    <label htmlFor={`${fieldId}-field-4`} className="mb-2 flex items-center gap-2 text-sm font-medium text-[var(--modal-section-text)]">
                       <User className="h-4 w-4 text-gray-500" />
                       Responsável
                     </label>
                     <select
+                      id={`${fieldId}-field-4`}
                       value={formData.assignedToPersonId}
                       onChange={e => {
                         const nextAssignedToPersonId = e.target.value;
@@ -814,10 +820,11 @@ export default function EditServiceOrderModal({
                   ) : null}
 
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-[var(--modal-section-text)]">
+                    <label htmlFor={`${fieldId}-field-5`} className="mb-2 block text-sm font-medium text-[var(--modal-section-text)]">
                       Status
                     </label>
                     <select
+                      id={`${fieldId}-field-5`}
                       value={formData.status}
                       onChange={e =>
                         setFormData(state => ({
@@ -868,6 +875,8 @@ export default function EditServiceOrderModal({
                   <textarea
                     className="w-full rounded-lg nexo-field border border-[var(--field-border)] bg-[var(--field-bg)] p-2.5 text-[var(--modal-section-text)] placeholder:text-[var(--modal-section-text)]/40 focus:border-orange-500/40 focus:outline-none focus:ring-1 focus:ring-orange-500/40 hover:border-[var(--accent-primary)]/40"
                     rows={4}
+                    id={`${fieldId}-cancellation-reason`}
+                    aria-label="Motivo do cancelamento"
                     value={formData.cancellationReason}
                     onChange={e =>
                       setFormData(state => ({
@@ -898,6 +907,8 @@ export default function EditServiceOrderModal({
                   <textarea
                     className="w-full rounded-lg nexo-field border border-[var(--field-border)] bg-[var(--field-bg)] p-2.5 text-[var(--modal-section-text)] placeholder:text-[var(--modal-section-text)]/40 focus:border-orange-500/40 focus:outline-none focus:ring-1 focus:ring-orange-500/40 hover:border-[var(--accent-primary)]/40"
                     rows={5}
+                    id={`${fieldId}-outcome-summary`}
+                    aria-label="Resumo final da execução"
                     value={formData.outcomeSummary}
                     onChange={e =>
                       setFormData(state => ({
@@ -924,10 +935,11 @@ export default function EditServiceOrderModal({
                 </summary>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-[var(--modal-section-text)]">
+                    <label htmlFor={`${fieldId}-field-6`} className="mb-2 block text-sm font-medium text-[var(--modal-section-text)]">
                       Valor (R$)
                     </label>
                     <input
+                      id={`${fieldId}-field-6`}
                       inputMode="decimal"
                       className="w-full rounded-lg nexo-field border border-[var(--field-border)] bg-[var(--field-bg)] p-2.5 text-[var(--modal-section-text)] placeholder:text-[var(--modal-section-text)]/40 focus:border-orange-500/40 focus:outline-none focus:ring-1 focus:ring-orange-500/40 hover:border-[var(--accent-primary)]/40"
                       value={formData.amount}
@@ -947,11 +959,12 @@ export default function EditServiceOrderModal({
                     </p>
                   </div>
                   <div>
-                    <label className="mb-2 flex items-center gap-2 text-sm font-medium text-[var(--modal-section-text)]">
+                    <label htmlFor={`${fieldId}-field-7`} className="mb-2 flex items-center gap-2 text-sm font-medium text-[var(--modal-section-text)]">
                       <CalendarDays className="h-4 w-4 text-gray-500" />
                       Vencimento
                     </label>
                     <input
+                      id={`${fieldId}-field-7`}
                       type="datetime-local"
                       className="w-full rounded-lg nexo-field border border-[var(--field-border)] bg-[var(--field-bg)] p-2.5 text-[var(--modal-section-text)] placeholder:text-[var(--modal-section-text)]/40 focus:border-orange-500/40 focus:outline-none focus:ring-1 focus:ring-orange-500/40 hover:border-[var(--accent-primary)]/40"
                       value={formData.dueDate}
