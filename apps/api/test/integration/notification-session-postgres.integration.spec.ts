@@ -1,3 +1,4 @@
+import { PrismaClient } from '@prisma/client'
 import { INestApplication, ValidationPipe } from '@nestjs/common'
 import { Test } from '@nestjs/testing'
 import { JwtService } from '@nestjs/jwt'
@@ -7,6 +8,8 @@ import { setTimeout as delay } from 'node:timers/promises'
 import request from 'supertest'
 import { AppModule } from '../../src/app.module'
 import { PrismaService } from '../../src/prisma/prisma.service'
+import { OperationalStateService } from '../../src/people/operational-state.service'
+import { OperationalStateScheduler } from '../../src/people/operational-state.scheduler'
 import { NotificationStreamHub } from '../../src/notifications/notification-stream-hub.service'
 
 const suite = process.env.RUN_REAL_INTEGRATION === 'true' ? describe : describe.skip
@@ -16,15 +19,30 @@ suite('Open notification stream revocation / real HTTP and PostgreSQL', () => {
   const orgIds: string[] = [], userIds: string[] = [], streams: ClientRequest[] = []
   const jwt = new JwtService({ secret: process.env.JWT_SECRET })
   beforeAll(async () => {
-    const module = await Test.createTestingModule({ imports: [AppModule] }).compile()
+    const module = await Test.createTestingModule({ imports: [AppModule] })
+      // This suite tests session revocation, independently of the wall-clock cron boundary.
+      .overrideProvider(OperationalStateScheduler).useValue({ tick: jest.fn() }).compile()
     app = module.createNestApplication(); app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true })); app.setGlobalPrefix('v1'); await app.listen(0, '127.0.0.1')
     baseUrl = await app.getUrl(); db = app.get(PrismaService); hub = app.get(NotificationStreamHub)
   })
   afterEach(() => { for (const stream of streams.splice(0)) stream.destroy() })
   afterAll(async () => {
+    // Stop cron jobs, stream timers and listeners before removing their fixtures.
+    await app?.close()
+    const cleanup = new PrismaClient()
+    const where = { orgId: { in: orgIds } }
     try {
-      await db.person.deleteMany({ where: { userId: { in: userIds } } }); await db.user.deleteMany({ where: { id: { in: userIds } } }); await db.organization.deleteMany({ where: { id: { in: orgIds } } })
-    } finally { await app?.close() }
+      await cleanup.timelineEvent.deleteMany({ where })
+      await cleanup.auditEvent.deleteMany({ where })
+      await cleanup.subscription.deleteMany({ where })
+      await cleanup.usageMetric.deleteMany({ where })
+      await cleanup.idempotencyRecord.deleteMany({ where })
+      await cleanup.tenantRateLimitBucket.deleteMany({ where })
+      await cleanup.person.deleteMany({ where: { userId: { in: userIds }, ...where } })
+      await cleanup.user.deleteMany({ where: { id: { in: userIds }, ...where } })
+      await cleanup.organization.deleteMany({ where: { id: { in: orgIds } } })
+      expect(await cleanup.organization.count({ where: { id: { in: orgIds } } })).toBe(0)
+    } finally { await cleanup.$disconnect() }
   })
   async function fixture() {
     const orgId = randomUUID(), userId = randomUUID(), personId = randomUUID(); orgIds.push(orgId); userIds.push(userId)
@@ -66,6 +84,17 @@ suite('Open notification stream revocation / real HTTP and PostgreSQL', () => {
     const f = await fixture(), stream = await open(f), delivered = await notify(f)
     await eventually(() => stream.frames.join('').includes(delivered))
     await revoke[kind](f); const withheld = await notify(f)
+    await eventually(stream.ended)
+    expect(stream.frames.join('')).not.toContain(withheld)
+    await request(app.getHttpServer()).get('/v1/notifications').auth(f.token, { type: 'bearer' }).expect(401)
+  })
+  it('keeps revocation checks valid with an operational Timeline event in the fixture', async () => {
+    const f = await fixture()
+    await app.get(OperationalStateService).syncAndLogStateChange(f.orgId, f.personId)
+    expect(await db.timelineEvent.count({ where: { orgId: f.orgId, personId: f.personId } })).toBeGreaterThan(0)
+    const stream = await open(f)
+    await revoke['session version'](f)
+    const withheld = await notify(f)
     await eventually(stream.ended)
     expect(stream.frames.join('')).not.toContain(withheld)
     await request(app.getHttpServer()).get('/v1/notifications').auth(f.token, { type: 'bearer' }).expect(401)
