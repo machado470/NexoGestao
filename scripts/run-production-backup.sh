@@ -78,8 +78,12 @@ esac
 
 event scheduled_backup_started started BACKUP_SUCCESS
 output="$(mktemp)" || config_failure UNKNOWN_FAILURE 70
-"$ENGINE" "${args[@]}" > >(tee "$output") 2> >(tee -a "$output" >&2)
-rc=$?
+# A single foreground pipeline waits for the logger and avoids competing writers.
+# Capture PIPESTATUS immediately; preserve the engine's nonzero exit code.
+"$ENGINE" "${args[@]}" 2>&1 | tee "$output"
+pipeline_status=("${PIPESTATUS[@]}")
+rc="${pipeline_status[0]}"
+if ((rc == 0 && pipeline_status[1] != 0)); then rc=70; fi
 artifact="$(sed -n 's/.* event=backup_created .* artifact=\([^ ]*\).*/\1/p' "$output" | tail -1)"
 artifact="$(basename -- "$artifact" 2>/dev/null || true)"
 if ((rc == 0)); then
@@ -87,7 +91,8 @@ if ((rc == 0)); then
   event scheduled_backup_completed success BACKUP_SUCCESS
   exit 0
 fi
-if grep -Eq 'OFFSITE_UPLOAD_FAILED|event=offsite_failed' "$output"; then reason=OFFSITE_UPLOAD_FAILED
+if ((pipeline_status[1] != 0)); then reason=UNKNOWN_FAILURE
+elif grep -Eq 'OFFSITE_UPLOAD_FAILED|event=offsite_failed' "$output"; then reason=OFFSITE_UPLOAD_FAILED
 elif grep -q 'canonical.*backup.*already.*running' "$output"; then reason=LOCKED
 elif grep -q 'is required\|unavailable' "$output"; then reason=DEPENDENCY_MISSING
 elif grep -q 'event=backup_created' "$output"; then reason=UNKNOWN_FAILURE

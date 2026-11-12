@@ -94,3 +94,7 @@ Banco/usuário da URL são decodificados e devem usar letras, números, `_` ou `
 O runner mantém `.backup-runner.lock` em BACKUP_STATE_DIR durante validação, execução e publicação dos snapshots. Uma chamada concorrente ao mesmo diretório retorna **75**, registra `LOCKED` e não substitui o estado da execução ativa. O lock do engine continua protegendo o dump separadamente. A trava é local ao filesystem, não coordena hosts com diretórios independentes.
 
 Travas remanescentes após SIGKILL/quebra de energia exigem confirmar que não há execução ativa antes da recuperação manual; não remova trava de um backup em andamento. [Correção e provas de concorrência](../audits/2026/2026-11-12-backup-runner-concurrency.md).
+
+### Captura do resultado
+
+O runner aguarda o término do engine e da captura antes de publicar estado. A saída stdout/stderr do engine é combinada e transmitida ao vivo pelo stdout do runner; eventos próprios de falha continuam no stderr. Se o engine falhar, preserva seu código; se apenas a captura falhar, retorna 70/UNKNOWN_FAILURE e não registra sucesso. [Diagnóstico e regressões](../audits/2026/2026-11-12-backup-output-capture.md).
