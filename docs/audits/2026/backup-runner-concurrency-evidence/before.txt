@@ -1,0 +1,47 @@
+✖ concurrent local invocation cannot overwrite in-flight state (208.536315ms)
+✖ concurrent invalid invocation cannot overwrite in-flight state (158.897815ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 451.745051
+
+✖ failing tests:
+
+test at scripts/backup-runner-concurrency.test.mjs:11:41
+✖ concurrent local invocation cannot overwrite in-flight state (208.536315ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  0 !== 75
+
+      at TestContext.<anonymous> (file:///workspace/NexoGestao/scripts/backup-runner-concurrency.test.mjs:22:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 75,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/backup-runner-concurrency.test.mjs:11:41
+✖ concurrent invalid invocation cannot overwrite in-flight state (158.897815ms)
+  AssertionError [ERR_ASSERTION]: timestamp=2026-11-12T13:30:19Z component=scheduled_backup event=scheduled_backup_failed status=failed reason_code=CONFIG_INVALID
+
+
+  64 !== 75
+
+      at TestContext.<anonymous> (file:///workspace/NexoGestao/scripts/backup-runner-concurrency.test.mjs:22:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 64,
+    expected: 75,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
