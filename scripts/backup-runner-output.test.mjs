@@ -25,3 +25,18 @@ for(const mode of ['success','offsite-failure','tee-failure'])test('captures com
   }
  }finally{rmSync(dir,{recursive:true,force:true});}
 });
+for(const folder of ['artifacts','artifacts with spaces'])test('canonical engine artifact name is preserved in '+folder,()=>{
+ const dir=mkdtempSync(join(tmpdir(),'nexo-backup-artifact-')),scripts=join(dir,'scripts'),bin=join(dir,'bin'),state=join(dir,'state'),artifacts=join(dir,folder);mkdirSync(scripts);mkdirSync(bin);
+ try{
+  copyFileSync(source,join(scripts,'run-production-backup.sh'));
+  copyFileSync(fileURLToPath(new URL('./backup-db.sh',import.meta.url)),join(scripts,'backup-db.sh'));
+  writeFileSync(join(bin,'docker'),'#!/usr/bin/env bash\nexit 1\n',{mode:0o700});
+  writeFileSync(join(bin,'pg_dump'),'#!/usr/bin/env bash\nprintf "SELECT 1;\\n"\n',{mode:0o700});
+  const config=join(dir,'backup.env');writeFileSync(config,`BACKUP_MODE=local\nBACKUP_STATE_DIR=${state}\nBACKUP_DIR="${artifacts}"\nPOSTGRES_USER=synthetic\nPOSTGRES_DB=synthetic\nPOSTGRES_HOST=127.0.0.1\n`);
+  const result=spawnSync('bash',[join(scripts,'run-production-backup.sh')],{env:{...process.env,PATH:bin+':'+process.env.PATH,NEXO_BACKUP_ENV_FILE:config},encoding:'utf8',timeout:5000});
+  assert.equal(result.status,0,result.stderr);
+  const snapshot=JSON.parse(readFileSync(join(state,'last-success.json'),'utf8'));
+  assert.match(snapshot.artifactName,/^nexogestao_backup_[A-Za-z0-9_]+\.sql\.gz$/);
+  const gzip=readFileSync(join(artifacts,snapshot.artifactName));assert.equal(spawnSync('gzip',['-cd'],{input:gzip,encoding:'utf8'}).stdout,'SELECT 1;\n');
+ }finally{rmSync(dir,{recursive:true,force:true});}
+});

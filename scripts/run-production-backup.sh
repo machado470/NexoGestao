@@ -84,8 +84,13 @@ output="$(mktemp)" || config_failure UNKNOWN_FAILURE 70
 pipeline_status=("${PIPESTATUS[@]}")
 rc="${pipeline_status[0]}"
 if ((rc == 0 && pipeline_status[1] != 0)); then rc=70; fi
-artifact="$(sed -n 's/.* event=backup_created .* artifact=\([^ ]*\).*/\1/p' "$output" | tail -1)"
-artifact="$(basename -- "$artifact" 2>/dev/null || true)"
+# Prefer the canonical basename field; do not evaluate shell-escaped paths.
+artifact="$(sed -n 's/.* event=backup_created .* artifact_name=\([^ ]*\).*/\1/p' "$output" | tail -1)"
+if [[ -z "$artifact" ]]; then
+  # Compatibility with existing engines/fixtures using the original log field.
+  artifact="$(sed -n 's/.* event=backup_created .* artifact=\([^ ]*\).*/\1/p' "$output" | tail -1)"
+  artifact="$(basename -- "$artifact" 2>/dev/null || true)"
+fi
 if ((rc == 0)); then
   write_state success created "$expected_offsite" "$artifact" 0 BACKUP_SUCCESS || { event scheduled_backup_failed failed UNKNOWN_FAILURE >&2; exit 70; }
   event scheduled_backup_completed success BACKUP_SUCCESS

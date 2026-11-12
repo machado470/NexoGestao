@@ -98,3 +98,7 @@ Travas remanescentes após SIGKILL/quebra de energia exigem confirmar que não h
 ### Captura do resultado
 
 O runner aguarda o término do engine e da captura antes de publicar estado. A saída stdout/stderr do engine é combinada e transmitida ao vivo pelo stdout do runner; eventos próprios de falha continuam no stderr. Se o engine falhar, preserva seu código; se apenas a captura falhar, retorna 70/UNKNOWN_FAILURE e não registra sucesso. [Diagnóstico e regressões](../audits/2026/2026-11-12-backup-output-capture.md).
+
+### Referência do artefato
+
+O evento `backup_created` mantém `artifact=` para o caminho escapado e inclui `artifact_name=` para o nome canônico usado no estado. Atualize engine e runner juntos para preservar essa referência em diretórios com espaços; o fallback para logs antigos conserva suas limitações. [Regressão e evidências](../audits/2026/2026-11-12-backup-artifact-name.md).
