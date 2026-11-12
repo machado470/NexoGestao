@@ -1,0 +1,12 @@
+ Network nexogestao-outbox-dec7fb4fc3564220be7640e14f9d2e41_default  Creating
+ Network nexogestao-outbox-dec7fb4fc3564220be7640e14f9d2e41_default  Created
+ Container nexogestao-outbox-dec7fb4fc3564220be7640e14f9d2e41-postgres-outbox-test-1  Creating
+ Container nexogestao-outbox-dec7fb4fc3564220be7640e14f9d2e41-postgres-outbox-test-1  Created
+ Container nexogestao-outbox-dec7fb4fc3564220be7640e14f9d2e41-postgres-outbox-test-1  Starting
+Error response from daemon: failed to set up container networking: driver failed programming external connectivity on endpoint nexogestao-outbox-dec7fb4fc3564220be7640e14f9d2e41-postgres-outbox-test-1 (34ee4cc59e4b758ab5c595bf5c1d95d09989777cfb3e641dbbd07d9b1cc29e97): error while calling RootlessKit PortManager.AddPort(): listen tcp4 127.0.0.1:55432: bind: address already in use
+ Container nexogestao-outbox-dec7fb4fc3564220be7640e14f9d2e41-postgres-outbox-test-1  Stopping
+ Container nexogestao-outbox-dec7fb4fc3564220be7640e14f9d2e41-postgres-outbox-test-1  Stopped
+ Container nexogestao-outbox-dec7fb4fc3564220be7640e14f9d2e41-postgres-outbox-test-1  Removing
+ Container nexogestao-outbox-dec7fb4fc3564220be7640e14f9d2e41-postgres-outbox-test-1  Removed
+ Network nexogestao-outbox-dec7fb4fc3564220be7640e14f9d2e41_default  Removing
+ Network nexogestao-outbox-dec7fb4fc3564220be7640e14f9d2e41_default  Removed
