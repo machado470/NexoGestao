@@ -1,0 +1,40 @@
+{
+  "method": "Real Chromium + BFF + API + PostgreSQL, synthetic account/customer; viewport emulation only",
+  "attributes": [
+    {
+      "mode": "create-desktop",
+      "type": "tel",
+      "inputMode": "tel",
+      "tag": "INPUT",
+      "labelled": true
+    },
+    {
+      "mode": "create-mobile",
+      "type": "tel",
+      "inputMode": "tel",
+      "tag": "INPUT",
+      "labelled": true
+    },
+    {
+      "mode": "edit-desktop",
+      "type": "tel",
+      "inputMode": "tel",
+      "tag": "INPUT",
+      "labelled": true
+    },
+    {
+      "mode": "edit-mobile",
+      "type": "tel",
+      "inputMode": "tel",
+      "tag": "INPUT",
+      "labelled": true
+    }
+  ],
+  "formattedInputAccepted": true,
+  "normalizedAfterCreate": "5547999999999",
+  "normalizedAfterEdit": "5547988887777",
+  "persistedAfterReload": true,
+  "pageErrors": [],
+  "realIOSAndroidKeyboard": "not tested",
+  "pass": true
+}

@@ -363,7 +363,7 @@ export default function CreateCustomerModal({
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="customer-phone">Telefone / WhatsApp *</Label>
-                    <Input id="customer-phone" className="border-[var(--field-border)] bg-[var(--field-bg)] text-[var(--modal-section-text)] placeholder:text-[var(--modal-section-muted)] hover:border-[var(--accent-primary)]/40 focus-visible:border-orange-500/40 focus-visible:ring-[3px] focus-visible:ring-orange-500/30" value={phone} onChange={e => setPhone(e.target.value)} placeholder="Ex: +5547999999999" />
+                    <Input id="customer-phone" type="tel" inputMode="tel" className="border-[var(--field-border)] bg-[var(--field-bg)] text-[var(--modal-section-text)] placeholder:text-[var(--modal-section-muted)] hover:border-[var(--accent-primary)]/40 focus-visible:border-orange-500/40 focus-visible:ring-[3px] focus-visible:ring-orange-500/30" value={phone} onChange={e => setPhone(e.target.value)} placeholder="Ex: +5547999999999" />
                     <p className="text-xs text-[var(--modal-section-muted)]">Pode mandar com +55 ou só números. O backend normaliza.</p>
                   </div>
                   <div className="space-y-2">
