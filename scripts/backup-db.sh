@@ -79,7 +79,7 @@ mv -- "$TMP_BACKUP" "$BACKUP_PATH"; TMP_BACKUP=""
 mv -- "$TMP_CHECKSUM" "$CHECKSUM_PATH"; TMP_CHECKSUM=""
 (cd "$BACKUP_DIR" && sha256sum -c -- "$(basename "$CHECKSUM_PATH")" >/dev/null) || die "published checksum verification failed"
 log checksum_verified success "sha256=$HASH"
-log backup_created success "result=LOCAL_BACKUP_SUCCESS artifact=$(printf %q "$BACKUP_PATH")"
+log backup_created success "result=LOCAL_BACKUP_SUCCESS artifact=$(printf %q "$BACKUP_PATH") artifact_name=$BACKUP_FILE"
 
 find "$BACKUP_DIR" -maxdepth 1 -type f \( -name 'nexogestao_backup_*.sql.gz' -o -name 'nexogestao_backup_*.sql.gz.sha256' \) \
   -mtime "+$RETENTION_DAYS" -delete
