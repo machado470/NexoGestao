@@ -8,6 +8,15 @@ ENGINE="$SCRIPT_DIR/backup-db.sh"
 STARTED_AT="$(date -u +%FT%TZ)"
 STATE_DIR=""
 MODE=""
+output=""
+RUNNER_LOCK=""
+cleanup() {
+  [[ -z "$output" ]] || rm -f -- "$output"
+  [[ -z "$RUNNER_LOCK" ]] || rmdir -- "$RUNNER_LOCK"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 event() { printf 'timestamp=%s component=scheduled_backup event=%s status=%s reason_code=%s\n' "$(date -u +%FT%TZ)" "$1" "$2" "$3"; }
 write_state() {
@@ -46,6 +55,15 @@ source "$NEXO_BACKUP_ENV_FILE"
 set +a
 STATE_DIR="${BACKUP_STATE_DIR:-}"
 [[ -n "$STATE_DIR" ]] || config_failure CONFIG_INVALID
+# Serialize the whole runner, including state publication and configuration failures.
+# A losing invocation must never replace the in-flight owner's state.
+mkdir -p -- "$STATE_DIR" && chmod 700 "$STATE_DIR" || { event scheduled_backup_failed failed UNKNOWN_FAILURE >&2; exit 70; }
+lock_path="$STATE_DIR/.backup-runner.lock"
+if ! mkdir -- "$lock_path" 2>/dev/null; then
+  event scheduled_backup_failed failed LOCKED >&2
+  exit 75
+fi
+RUNNER_LOCK="$lock_path"
 command -v node >/dev/null 2>&1 || config_failure DEPENDENCY_MISSING 69
 [[ -x "$ENGINE" ]] || config_failure DEPENDENCY_MISSING 69
 MODE="${BACKUP_MODE:-}"
@@ -60,7 +78,6 @@ esac
 
 event scheduled_backup_started started BACKUP_SUCCESS
 output="$(mktemp)" || config_failure UNKNOWN_FAILURE 70
-trap 'rm -f -- "$output"' EXIT
 "$ENGINE" "${args[@]}" > >(tee "$output") 2> >(tee -a "$output" >&2)
 rc=$?
 artifact="$(sed -n 's/.* event=backup_created .* artifact=\([^ ]*\).*/\1/p' "$output" | tail -1)"

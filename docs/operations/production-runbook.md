@@ -88,3 +88,9 @@ Quando `DB_CONTAINER`/`--container` estiver informado, o contêiner deve estar e
 Banco/usuário da URL são decodificados e devem usar letras, números, `_` ou `-`. Parâmetros aceitos: `schema`, `sslmode`, `sslcert`, `sslkey`, `sslrootcert`, `connect_timeout`, `connection_limit`, `pool_timeout`, `application_name`, `pgbouncer`; desconhecidos/repetidos e fragmentos são recusados. Configurações libpq herdadas de roteamento/serviço/opções são removidas antes do psql. Isso não substitui confirmar que o alvo é descartável e autorizado.
 
 [Correção e drill local de consistência do destino](../audits/2026/2026-11-12-restore-target-consistency.md). O drill local não comprova offsite ou alerta.
+
+### Concorrência do runner
+
+O runner mantém `.backup-runner.lock` em BACKUP_STATE_DIR durante validação, execução e publicação dos snapshots. Uma chamada concorrente ao mesmo diretório retorna **75**, registra `LOCKED` e não substitui o estado da execução ativa. O lock do engine continua protegendo o dump separadamente. A trava é local ao filesystem, não coordena hosts com diretórios independentes.
+
+Travas remanescentes após SIGKILL/quebra de energia exigem confirmar que não há execução ativa antes da recuperação manual; não remova trava de um backup em andamento. [Correção e provas de concorrência](../audits/2026/2026-11-12-backup-runner-concurrency.md).
