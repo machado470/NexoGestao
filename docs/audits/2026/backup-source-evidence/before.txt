@@ -1,0 +1,103 @@
+✖ host configuration does not auto-select a default container (64.513227ms)
+✔ explicit running container is used (51.612256ms)
+✖ stopped explicit container cannot fall back to host (53.473673ms)
+✖ missing source cannot auto-select a container (48.354959ms)
+✖ ambient libpq routing does not override host source (57.705283ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 1
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 374.807489
+
+✖ failing tests:
+
+test at scripts/backup-source.test.mjs:14:1
+✖ host configuration does not auto-select a default container (64.513227ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+
+  + 'container\n'
+  - 'host\n'
+
+      at file:///workspace/NexoGestao/scripts/backup-source.test.mjs:14:155
+      at fixture (file:///workspace/NexoGestao/scripts/backup-source.test.mjs:13:6)
+      at TestContext.<anonymous> (file:///workspace/NexoGestao/scripts/backup-source.test.mjs:14:72)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'container\n',
+    expected: 'host\n',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/backup-source.test.mjs:16:1
+✖ stopped explicit container cannot fall back to host (53.473673ms)
+  AssertionError [ERR_ASSERTION]: Expected "actual" to be strictly unequal to: 0
+      at file:///workspace/NexoGestao/scripts/backup-source.test.mjs:16:98
+      at fixture (file:///workspace/NexoGestao/scripts/backup-source.test.mjs:13:6)
+      at TestContext.<anonymous> (file:///workspace/NexoGestao/scripts/backup-source.test.mjs:16:64)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 0,
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/backup-source.test.mjs:17:1
+✖ missing source cannot auto-select a container (48.354959ms)
+  AssertionError [ERR_ASSERTION]: Expected "actual" to be strictly unequal to: 0
+      at file:///workspace/NexoGestao/scripts/backup-source.test.mjs:17:92
+      at fixture (file:///workspace/NexoGestao/scripts/backup-source.test.mjs:13:6)
+      at TestContext.<anonymous> (file:///workspace/NexoGestao/scripts/backup-source.test.mjs:17:58)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 0,
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/backup-source.test.mjs:18:1
+✖ ambient libpq routing does not override host source (57.705283ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+
+  + 'container\n'
+  - 'host\n'
+
+      at file:///workspace/NexoGestao/scripts/backup-source.test.mjs:18:241
+      at fixture (file:///workspace/NexoGestao/scripts/backup-source.test.mjs:13:6)
+      at TestContext.<anonymous> (file:///workspace/NexoGestao/scripts/backup-source.test.mjs:18:64)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'container\n',
+    expected: 'host\n',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
