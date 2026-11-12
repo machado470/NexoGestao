@@ -1,0 +1,20 @@
+
+> @nexogestao/api@0.1.0 pretypecheck /workspace/NexoGestao/apps/api
+> pnpm --dir ../.. prepare:workspace
+
+
+> nexogestao@1.0.0 prepare:workspace /workspace/NexoGestao
+> pnpm prepare:common
+
+
+> nexogestao@1.0.0 prepare:common /workspace/NexoGestao
+> pnpm --filter @nexogestao/common build
+
+
+> @nexogestao/common@1.0.0 build /workspace/NexoGestao/packages/common
+> tsc --build tsconfig.json
+
+
+> @nexogestao/api@0.1.0 typecheck /workspace/NexoGestao/apps/api
+> pnpm exec tsc -p tsconfig.json --noEmit
+

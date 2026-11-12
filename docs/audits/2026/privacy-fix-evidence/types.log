@@ -1,0 +1,15 @@
+Scope: 3 of 4 workspace projects
+apps/web typecheck$ tsc --noEmit
+packages/common typecheck$ tsc -p tsconfig.json --noEmit
+packages/common typecheck: Done
+apps/web typecheck: Done
+apps/api pretypecheck$ pnpm --dir ../.. prepare:workspace
+apps/api pretypecheck: > nexogestao@1.0.0 prepare:workspace /workspace/NexoGestao
+apps/api pretypecheck: > pnpm prepare:common
+apps/api pretypecheck: > nexogestao@1.0.0 prepare:common /workspace/NexoGestao
+apps/api pretypecheck: > pnpm --filter @nexogestao/common build
+apps/api pretypecheck: > @nexogestao/common@1.0.0 build /workspace/NexoGestao/packages/common
+apps/api pretypecheck: > tsc --build tsconfig.json
+apps/api pretypecheck: Done
+apps/api typecheck$ pnpm exec tsc -p tsconfig.json --noEmit
+apps/api typecheck: Done

@@ -1,0 +1,303 @@
+  console.warn
+    {"event":"http_request","requestId":"79ce1f88-5c98-4d03-89e2-90209be58758","correlationId":"79ce1f88-5c98-4d03-89e2-90209be58758","userId":null,"orgId":null,"traceId":null,"route":"GET /customers/export","status":401,"latencyMs":49,"contentLength":"43","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.warn
+    {"event":"http_request","requestId":"ffb39e01-0b3e-4804-82c2-7bd80d81675e","correlationId":"ffb39e01-0b3e-4804-82c2-7bd80d81675e","userId":null,"orgId":null,"traceId":null,"route":"GET /finance/charges/export","status":401,"latencyMs":2,"contentLength":"43","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.log
+    {"event":"http_request","requestId":"fe042a1b-8969-4b74-9b90-8cc0c4669bb3","correlationId":"fe042a1b-8969-4b74-9b90-8cc0c4669bb3","userId":"de8c1d7e-cc75-48e3-9cd8-2315affb05ce","orgId":"ecc96a62-911f-4e29-ade1-3dfb1c7e3107","traceId":null,"route":"GET /customers/export","status":200,"latencyMs":88,"contentLength":"288","ip":"127.0.0.1","userAgent":""}
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:67:17)
+
+  console.log
+    {"event":"http_request","requestId":"d4c81755-33a3-436a-bc55-b8e440aae529","correlationId":"d4c81755-33a3-436a-bc55-b8e440aae529","userId":"de8c1d7e-cc75-48e3-9cd8-2315affb05ce","orgId":"ecc96a62-911f-4e29-ade1-3dfb1c7e3107","traceId":null,"route":"GET /finance/charges/export","status":200,"latencyMs":71,"contentLength":"292","ip":"127.0.0.1","userAgent":""}
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:67:17)
+
+  console.log
+    {"event":"http_request","requestId":"5e46601a-d2b9-4004-a1af-e4ad98cf65ef","correlationId":"5e46601a-d2b9-4004-a1af-e4ad98cf65ef","userId":"de8c1d7e-cc75-48e3-9cd8-2315affb05ce","orgId":"ecc96a62-911f-4e29-ade1-3dfb1c7e3107","traceId":null,"route":"GET /customers/export?customerId=cafece1f-4ff8-458f-9907-f13af8adabb6&orgId=fcbc704c-7ec2-4549-91df-ddf65a7a747d","status":200,"latencyMs":68,"contentLength":"161","ip":"127.0.0.1","userAgent":""}
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:67:17)
+
+  console.log
+    {"event":"http_request","requestId":"626338f7-41ba-4da2-969a-3dcc2f28e458","correlationId":"626338f7-41ba-4da2-969a-3dcc2f28e458","userId":"de8c1d7e-cc75-48e3-9cd8-2315affb05ce","orgId":"ecc96a62-911f-4e29-ade1-3dfb1c7e3107","traceId":null,"route":"GET /finance/charges/export?customerId=cafece1f-4ff8-458f-9907-f13af8adabb6&orgId=fcbc704c-7ec2-4549-91df-ddf65a7a747d","status":200,"latencyMs":65,"contentLength":"166","ip":"127.0.0.1","userAgent":""}
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:67:17)
+
+  console.warn
+    {"event":"http_request","requestId":"f978a4d3-fc85-4349-99e1-d2bbab83f87b","correlationId":"f978a4d3-fc85-4349-99e1-d2bbab83f87b","userId":"de8c1d7e-cc75-48e3-9cd8-2315affb05ce","orgId":"ecc96a62-911f-4e29-ade1-3dfb1c7e3107","traceId":null,"route":"GET /customers/export?customerId=9acf0747-472d-4cf2-a28a-819bf3a5677b","status":404,"latencyMs":22,"contentLength":"74","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.warn
+    {"event":"http_request","requestId":"99453088-2b09-4ac1-8d4a-18fea40eca84","correlationId":"99453088-2b09-4ac1-8d4a-18fea40eca84","userId":"de8c1d7e-cc75-48e3-9cd8-2315affb05ce","orgId":"ecc96a62-911f-4e29-ade1-3dfb1c7e3107","traceId":null,"route":"GET /customers/export?customerId=e399fd65-bc74-4398-9024-8b43de569227","status":404,"latencyMs":48,"contentLength":"74","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.warn
+    {"event":"http_request","requestId":"35c3282d-4bfd-4f00-8590-ab79e461ed72","correlationId":"35c3282d-4bfd-4f00-8590-ab79e461ed72","userId":"de8c1d7e-cc75-48e3-9cd8-2315affb05ce","orgId":"ecc96a62-911f-4e29-ade1-3dfb1c7e3107","traceId":null,"route":"GET /finance/charges/export?customerId=9acf0747-472d-4cf2-a28a-819bf3a5677b","status":404,"latencyMs":9,"contentLength":"74","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.warn
+    {"event":"http_request","requestId":"95577415-dbdd-4c80-972b-d0cf9d6a35b3","correlationId":"95577415-dbdd-4c80-972b-d0cf9d6a35b3","userId":"de8c1d7e-cc75-48e3-9cd8-2315affb05ce","orgId":"ecc96a62-911f-4e29-ade1-3dfb1c7e3107","traceId":null,"route":"GET /finance/charges/export?customerId=0a7ef95e-bf43-4c4c-b2ab-4fb3fbb30ff0","status":404,"latencyMs":9,"contentLength":"74","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.warn
+    {"event":"http_request","requestId":"a2907f73-9444-4ce3-a9d9-df66db0b1d33","correlationId":"a2907f73-9444-4ce3-a9d9-df66db0b1d33","userId":"de8c1d7e-cc75-48e3-9cd8-2315affb05ce","orgId":"ecc96a62-911f-4e29-ade1-3dfb1c7e3107","traceId":null,"route":"GET /customers/export?customerId=invalid","status":400,"latencyMs":9,"contentLength":"89","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.warn
+    {"event":"http_request","requestId":"50145876-e761-4e90-8c3b-0d5959ae1910","correlationId":"50145876-e761-4e90-8c3b-0d5959ae1910","userId":"de8c1d7e-cc75-48e3-9cd8-2315affb05ce","orgId":"ecc96a62-911f-4e29-ade1-3dfb1c7e3107","traceId":null,"route":"GET /customers/export?customerId=","status":400,"latencyMs":7,"contentLength":"89","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.warn
+    {"event":"http_request","requestId":"f517c021-5bf3-4c12-95aa-12f8be0a98f5","correlationId":"f517c021-5bf3-4c12-95aa-12f8be0a98f5","userId":"de8c1d7e-cc75-48e3-9cd8-2315affb05ce","orgId":"ecc96a62-911f-4e29-ade1-3dfb1c7e3107","traceId":null,"route":"GET /customers/export?customerId=cafece1f-4ff8-458f-9907-f13af8adabb6&customerId=b7c48234-5874-4e0d-8d58-c88e688f0dd4","status":400,"latencyMs":4,"contentLength":"89","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.warn
+    {"event":"http_request","requestId":"9397f21a-777d-42fc-8167-0668ce1d20e5","correlationId":"9397f21a-777d-42fc-8167-0668ce1d20e5","userId":"de8c1d7e-cc75-48e3-9cd8-2315affb05ce","orgId":"ecc96a62-911f-4e29-ade1-3dfb1c7e3107","traceId":null,"route":"GET /finance/charges/export?customerId=invalid","status":400,"latencyMs":3,"contentLength":"89","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.warn
+    {"event":"http_request","requestId":"3252c83b-1115-4aa6-9119-f583bbb47271","correlationId":"3252c83b-1115-4aa6-9119-f583bbb47271","userId":"de8c1d7e-cc75-48e3-9cd8-2315affb05ce","orgId":"ecc96a62-911f-4e29-ade1-3dfb1c7e3107","traceId":null,"route":"GET /finance/charges/export?customerId=","status":400,"latencyMs":2,"contentLength":"89","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.warn
+    {"event":"http_request","requestId":"334f8be1-ecaf-424d-bbac-a59b448359d4","correlationId":"334f8be1-ecaf-424d-bbac-a59b448359d4","userId":"de8c1d7e-cc75-48e3-9cd8-2315affb05ce","orgId":"ecc96a62-911f-4e29-ade1-3dfb1c7e3107","traceId":null,"route":"GET /finance/charges/export?customerId=cafece1f-4ff8-458f-9907-f13af8adabb6&customerId=b7c48234-5874-4e0d-8d58-c88e688f0dd4","status":400,"latencyMs":4,"contentLength":"89","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.log
+    {"event":"http_request","requestId":"667ee90d-1688-4826-9bd3-e391b5ef3395","correlationId":"667ee90d-1688-4826-9bd3-e391b5ef3395","userId":"42418078-7f2b-4b89-a77c-329d96cc2972","orgId":"ecc96a62-911f-4e29-ade1-3dfb1c7e3107","traceId":null,"route":"GET /customers/export?customerId=cafece1f-4ff8-458f-9907-f13af8adabb6","status":200,"latencyMs":6,"contentLength":"161","ip":"127.0.0.1","userAgent":""}
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:67:17)
+
+  console.warn
+    {"event":"http_request","requestId":"00113daf-16a7-48f0-8967-0c3ff249a44d","correlationId":"00113daf-16a7-48f0-8967-0c3ff249a44d","userId":"daa13f3e-cc27-4f01-96cf-c9155ae33585","orgId":"ecc96a62-911f-4e29-ade1-3dfb1c7e3107","traceId":null,"route":"GET /customers/export","status":403,"latencyMs":2,"contentLength":"73","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.warn
+    {"event":"http_request","requestId":"7214014f-c1d7-44c2-be6f-1fba1f7c86d2","correlationId":"7214014f-c1d7-44c2-be6f-1fba1f7c86d2","userId":"8a67923b-cdfe-4a8e-8213-2662f2d8f583","orgId":"ecc96a62-911f-4e29-ade1-3dfb1c7e3107","traceId":null,"route":"GET /customers/export","status":403,"latencyMs":35,"contentLength":"73","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.log
+    {"event":"http_request","requestId":"139d7550-aab5-4d50-b0d5-0ac1897c1217","correlationId":"139d7550-aab5-4d50-b0d5-0ac1897c1217","userId":"42418078-7f2b-4b89-a77c-329d96cc2972","orgId":"ecc96a62-911f-4e29-ade1-3dfb1c7e3107","traceId":null,"route":"GET /finance/charges/export?customerId=cafece1f-4ff8-458f-9907-f13af8adabb6","status":200,"latencyMs":193,"contentLength":"166","ip":"127.0.0.1","userAgent":""}
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:67:17)
+
+  console.warn
+    {"event":"http_request","requestId":"19c4a59c-3d43-4704-9a82-66cfe52e4bb0","correlationId":"19c4a59c-3d43-4704-9a82-66cfe52e4bb0","userId":"daa13f3e-cc27-4f01-96cf-c9155ae33585","orgId":"ecc96a62-911f-4e29-ade1-3dfb1c7e3107","traceId":null,"route":"GET /finance/charges/export","status":403,"latencyMs":9,"contentLength":"73","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.warn
+    {"event":"http_request","requestId":"8713504a-ac00-4343-8a10-dd64a59cbfac","correlationId":"8713504a-ac00-4343-8a10-dd64a59cbfac","userId":"8a67923b-cdfe-4a8e-8213-2662f2d8f583","orgId":"ecc96a62-911f-4e29-ade1-3dfb1c7e3107","traceId":null,"route":"GET /finance/charges/export","status":403,"latencyMs":3,"contentLength":"73","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+[Nest] 79558  - 11/12/2026, 3:16:33 AM   ERROR [ExceptionsHandler] Error: synthetic audit outage
+    at Object.<anonymous> (/workspace/NexoGestao/apps/api/test/integration/privacy-exports-postgres.integration.spec.ts:66:73)
+    at Promise.finally.completed (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:1834:28)
+    at new Promise (<anonymous>)
+    at callAsyncCircusFn (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:1774:10)
+    at _callCircusTest (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:1167:40)
+    at _runTestInContext (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:1103:3)
+    at runTestWithContext (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:996:5)
+    at _runTestsForDescribeBlockOnce (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:1008:11)
+    at _runTestsForDescribeBlock (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:824:5)
+    at _runTestsForDescribeBlockOnce (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:1003:11)
+    at _runTestsForDescribeBlock (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:824:5)
+    at run (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:789:3)
+    at runAndTransformResultsToJestFormat (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:2300:21)
+    at jestAdapter (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/runner.js:111:19)
+    at runTestInternal (/workspace/NexoGestao/node_modules/.pnpm/jest-runner@30.5.2/node_modules/jest-runner/build/index.js:247:16)
+    at runTest (/workspace/NexoGestao/node_modules/.pnpm/jest-runner@30.5.2/node_modules/jest-runner/build/index.js:315:7)
+  console.error
+    {"event":"http_request","requestId":"ac240ca6-0544-443d-a231-ce7fabd1e255","correlationId":"ac240ca6-0544-443d-a231-ce7fabd1e255","userId":"de8c1d7e-cc75-48e3-9cd8-2315affb05ce","orgId":"ecc96a62-911f-4e29-ade1-3dfb1c7e3107","traceId":null,"route":"GET /customers/export?customerId=cafece1f-4ff8-458f-9907-f13af8adabb6","status":500,"latencyMs":6,"contentLength":"52","ip":"127.0.0.1","userAgent":""}
+
+      61 |       const line = JSON.stringify(logData)
+      62 |       if (statusCode >= 500) {
+    > 63 |         console.error(line)
+         |                 ^
+      64 |       } else if (statusCode >= 400) {
+      65 |         console.warn(line)
+      66 |       } else {
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:63:17)
+
+[Nest] 79558  - 11/12/2026, 3:16:33 AM   ERROR [ExceptionsHandler] Error: synthetic audit outage
+    at Object.<anonymous> (/workspace/NexoGestao/apps/api/test/integration/privacy-exports-postgres.integration.spec.ts:66:73)
+    at Promise.finally.completed (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:1834:28)
+    at new Promise (<anonymous>)
+    at callAsyncCircusFn (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:1774:10)
+    at _callCircusTest (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:1167:40)
+    at _runTestInContext (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:1103:3)
+    at runTestWithContext (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:996:5)
+    at _runTestsForDescribeBlockOnce (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:1008:11)
+    at _runTestsForDescribeBlock (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:824:5)
+    at _runTestsForDescribeBlockOnce (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:1003:11)
+    at _runTestsForDescribeBlock (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:824:5)
+    at run (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:789:3)
+    at runAndTransformResultsToJestFormat (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:2300:21)
+    at jestAdapter (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/runner.js:111:19)
+    at runTestInternal (/workspace/NexoGestao/node_modules/.pnpm/jest-runner@30.5.2/node_modules/jest-runner/build/index.js:247:16)
+    at runTest (/workspace/NexoGestao/node_modules/.pnpm/jest-runner@30.5.2/node_modules/jest-runner/build/index.js:315:7)
+  console.error
+    {"event":"http_request","requestId":"0fabbf8e-3204-42dd-abf8-93dcd80d86c6","correlationId":"0fabbf8e-3204-42dd-abf8-93dcd80d86c6","userId":"de8c1d7e-cc75-48e3-9cd8-2315affb05ce","orgId":"ecc96a62-911f-4e29-ade1-3dfb1c7e3107","traceId":null,"route":"GET /finance/charges/export?customerId=cafece1f-4ff8-458f-9907-f13af8adabb6","status":500,"latencyMs":46,"contentLength":"52","ip":"127.0.0.1","userAgent":""}
+
+      61 |       const line = JSON.stringify(logData)
+      62 |       if (statusCode >= 500) {
+    > 63 |         console.error(line)
+         |                 ^
+      64 |       } else if (statusCode >= 400) {
+      65 |         console.warn(line)
+      66 |       } else {
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:63:17)
+
+Test Suites: 1 passed, 1 total
+Tests:       14 passed, 14 total
+Snapshots:   0 total
+Time:        25.059 s
+Ran all test suites matching test/integration/privacy-exports-postgres.integration.spec.ts.
