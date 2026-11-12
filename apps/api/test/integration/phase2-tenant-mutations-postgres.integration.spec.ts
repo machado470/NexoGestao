@@ -1,6 +1,7 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { Test } from '@nestjs/testing'
+import { SchedulerRegistry } from '@nestjs/schedule'
 import { randomUUID } from 'crypto'
 import request from 'supertest'
 
@@ -43,6 +44,10 @@ describeRealIntegration('Phase 2 tenant mutation isolation (Postgres e2e)', () =
     app = module.createNestApplication()
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }))
     await app.init()
+    // These assertions attribute every mutation to an HTTP request. Clock-driven
+    // jobs can legitimately append events independently, so stop them before fixtures.
+    // Keep all services and guards real; do not change global scheduling defaults.
+    for (const job of app.get(SchedulerRegistry).getCronJobs().values()) await job.stop()
     prisma = app.get(PrismaService)
 
     await prisma.organization.createMany({ data: [
@@ -113,6 +118,12 @@ describeRealIntegration('Phase 2 tenant mutation isolation (Postgres e2e)', () =
         await app.close()
       }
     }
+  })
+
+  it('keeps background cron jobs stopped while asserting mutation side effects', () => {
+    const jobs = app.get(SchedulerRegistry).getCronJobs()
+    expect(jobs.size).toBeGreaterThan(0)
+    for (const job of jobs.values()) expect(job.isActive).toBe(false)
   })
 
   it('não atualiza customer nem O.S. da Org B', async () => {
