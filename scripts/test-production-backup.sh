@@ -54,7 +54,7 @@ assert_file_contains "$TMP/state/last-failure.json" '"exitCode":23'
 ! grep -Eq 'pg_dump|gzip|sha256sum|RETENTION_DAYS|aws s3' "$ROOT/infra/backup/run-backup.sh" || fail 'legacy shim contains engine behavior'
 assert_file_contains "$ROOT/infra/cron/nexogestao-backup.cron" 'scripts/run-production-backup.sh'
 ! grep -q '/home/ubuntu' "$ROOT/infra/cron/nexogestao-backup.cron" || fail 'cron hardcodes /home/ubuntu'
-[[ "$(rg -l 'RETENTION_DAYS=' "$ROOT/scripts/backup-db.sh" "$ROOT/infra/backup/run-backup.sh" | wc -l)" == 1 ]] || fail 'retention has multiple engines'
+[[ "$(grep -l 'RETENTION_DAYS=' "$ROOT/scripts/backup-db.sh" "$ROOT/infra/backup/run-backup.sh" | wc -l)" == 1 ]] || fail 'retention has multiple engines'
 
 # The canonical lock admits only one dump. The losing invocation is fail-closed.
 mkdir -p "$TMP/lock-bin" "$TMP/lock-backups"

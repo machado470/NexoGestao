@@ -22,3 +22,11 @@ Arquivos: script de status, novo checker e `scripts/check-backup-state.test.mjs`
 ## Pendências exatas
 
 Checagem de estado não consulta bucket nem valida artefato. Faltam DR owner/substituto, idade máxima/RPO/RTO aprovados, ambiente/canal de monitoramento, entrega comprovada de alerta e drill com upload/download/checksum/restore e controles de retenção/acesso. Nenhum nome, prazo ou canal foi inventado; nenhum cron foi instalado. AU08 e AU11 seguem parciais.
+
+## Acompanhamento: dependência do teste no CI
+
+O PR #1050 foi integrado, mas os dois quality-gates falharam no teste shell legado. No job [131120280112](https://github.com/machado470/NexoGestao/actions/runs/43199903482/job/131120280112), os 12 testes novos passaram; a suíte shell encontrou `rg: command not found` na verificação de retenção e reportou indevidamente `retention has multiple engines`. Compose passou.
+
+Na base `8c2c1f35`, branch `fix/ci-backup-sem-ripgrep`, foi trocado somente `rg -l` por `grep -l` nessa verificação. Os dois comandos retornam os nomes dos arquivos correspondentes, mantendo a exigência de exatamente um motor. O teste já depende de grep em várias outras asserções; nenhum pacote extra foi adicionado ao CI. O código de backup/status não mudou.
+
+Repetidos os 12 testes Node e a suíte shell com uma função Bash exportada `rg` que retorna 127 (simulação de comando indisponível): ambos passaram. [Checker](backup-check-evidence/portable-checker.txt), [runner](backup-check-evidence/portable-runner.txt). `bash -n scripts/test-production-backup.sh` e `git diff --check` passaram. A aprovação remota desta correção será conferida separadamente; AU12 continua parcial.
