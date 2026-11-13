@@ -8,8 +8,15 @@ permissions:
   contents: read
 jobs:
   disposable-compose:
+    name: disposable-${{ matrix.target }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [compose, railway]
+    env:
+      NEXO_DOCKER_TARGET: ${{ matrix.target }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

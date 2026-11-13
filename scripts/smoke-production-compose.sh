@@ -44,6 +44,43 @@ CORS_ORIGINS=https://app.nexo.test
 WHATSAPP_PROVIDER=meta_cloud
 ENV
 chmod 600 "$NEXO_ENV_FILE"
+if [ "${NEXO_DOCKER_TARGET:-compose}" = 'railway' ]; then
+  # Exercise Railway's PORT at non-default values through the real proxy/BFF.
+  sed -e 's/server api:3000;/server api:4317;/' \
+      -e 's/server web:3010;/server web:4318;/' \
+      infra/nginx/nginx.prod.conf > "$smoke_dir/railway-nginx.conf"
+  cat > "$smoke_dir/railway.yml" <<RAILWAY
+services:
+  api:
+    build:
+      dockerfile: apps/api/Dockerfile.railway
+    environment:
+      API_PORT: ""
+      PORT: "4317"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4317/v1/health/readiness"]
+  web:
+    build:
+      dockerfile: apps/web/Dockerfile.railway
+    environment:
+      WEB_PORT: ""
+      PORT: "4318"
+      NEXO_API_URL: http://api:4317
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4318"]
+  nginx:
+    volumes:
+      - $smoke_dir/railway-nginx.conf:/etc/nginx/templates/nginx.conf.template:ro
+  migrate:
+    build:
+      dockerfile: apps/api/Dockerfile.railway
+    command: ["pnpm", "prisma:migrate:deploy"]
+RAILWAY
+  compose+=(-f "$smoke_dir/railway.yml")
+elif [ "${NEXO_DOCKER_TARGET:-compose}" != 'compose' ]; then
+  echo 'NEXO_DOCKER_TARGET must be compose or railway' >&2
+  exit 1
+fi
 # The optional session CA is mounted only during networked build steps.
 if [ -n "${CODEX_PROXY_CERT:-}" ]; then
   cat > "$smoke_dir/build-ca.yml" <<CA
@@ -94,5 +131,5 @@ login_status="$(curl --silent --show-error --cacert "$smoke_dir/tls/fullchain.pe
   "https://localhost:${https_endpoint##*:}/api/trpc/auth.login")"
 test "$login_status" = 401
 grep -q 'UNAUTHORIZED' "$smoke_dir/login.json"
-"${compose[@]}" exec -T api node -e 'require("@nexogestao/common"); require("@sentry/profiling-node").nodeProfilingIntegration(); require("./dist/app.module"); if(typeof require("@prisma/client").PrismaClient!=="function") process.exit(1)'
+"${compose[@]}" exec -T --workdir /app/apps/api api node -e 'require("@nexogestao/common"); require("@sentry/profiling-node").nodeProfilingIntegration(); require("./dist/app.module"); if(typeof require("@prisma/client").PrismaClient!=="function") process.exit(1)'
 echo 'Disposable production Compose smoke passed; no external deployment performed.'
