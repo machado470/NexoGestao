@@ -115,11 +115,11 @@ export function AppOperationalHeader({
     >
       <div
         className={cn(
-          "flex flex-wrap items-start justify-between",
+          "flex flex-col items-start justify-between sm:flex-row sm:flex-wrap",
           isCompact ? "gap-2.5" : "gap-3"
         )}
       >
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 w-full flex-1 sm:w-auto">
           <h1 className="nexo-page-header-title">{title}</h1>
           {description ? (
             <p
@@ -132,7 +132,7 @@ export function AppOperationalHeader({
             </p>
           ) : null}
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="flex w-full flex-wrap items-center justify-start gap-2 sm:w-auto sm:justify-end">
           {secondaryActions}
           {primaryAction}
         </div>
