@@ -33,6 +33,7 @@ jobs:
       - name: Build web
         env:
           VITE_BASE: "/NexoGestao/"
+          VITE_STATIC_HOSTING: "true"
         run: |
           pnpm --filter ./apps/web build
           node --test apps/web/scripts/prepare-static-hosting.test.mjs

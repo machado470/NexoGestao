@@ -21,7 +21,7 @@ function createMemoryStorage(): MemoryStorage {
 
   return {
     clear: () => store.clear(),
-    getItem: key => (store.has(key) ? store.get(key) ?? null : null),
+    getItem: key => (store.has(key) ? (store.get(key) ?? null) : null),
     removeItem: key => {
       store.delete(key);
     },
@@ -81,5 +81,17 @@ describe("ConsentBanner.storage", () => {
       analytics: false,
       cookies: true,
     });
+  });
+
+  it("mantém a página disponível quando a leitura do armazenamento é bloqueada", () => {
+    Object.assign(globalThis, {
+      window: {
+        get localStorage() {
+          throw new DOMException("Storage blocked", "SecurityError");
+        },
+      },
+    });
+
+    expect(readStoredConsent()).toBeNull();
   });
 });
