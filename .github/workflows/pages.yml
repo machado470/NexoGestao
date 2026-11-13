@@ -1,6 +1,7 @@
 name: pages
 
 on:
+  pull_request:
   push:
     branches: [ "main" ]
 
@@ -32,7 +33,10 @@ jobs:
       - name: Build web
         env:
           VITE_BASE: "/NexoGestao/"
-        run: pnpm --filter ./apps/web build
+        run: |
+          pnpm --filter ./apps/web build
+          node --test apps/web/scripts/prepare-static-hosting.test.mjs
+          node apps/web/scripts/prepare-static-hosting.mjs
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
@@ -40,6 +44,7 @@ jobs:
           path: apps/web/dist/public
 
   deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
