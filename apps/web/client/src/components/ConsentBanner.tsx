@@ -5,7 +5,7 @@ import { Link } from "wouter";
 
 
 import { saveConsent, type ConsentPreferences } from "./ConsentBanner.logic";
-import { persistLocalConsent, readStoredConsent } from "./ConsentBanner.storage";
+import { readStoredConsent } from "./ConsentBanner.storage";
 
 export function ConsentBanner() {
   const [isVisible, setIsVisible] = useState(false);
@@ -34,11 +34,7 @@ export function ConsentBanner() {
     setIsSubmitting(true);
 
     try {
-      const ok = await saveConsent(prefs);
-      if (ok) {
-        persistLocalConsent(prefs);
-      }
-      return ok;
+      return await saveConsent(prefs);
     } finally {
       setIsSubmitting(false);
     }
