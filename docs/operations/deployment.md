@@ -26,6 +26,22 @@ Este documento permanece em **review**: há mais de um alvo de implantação ver
 
 ## Base Compose reproduzível
 
+### GitHub Pages e acesso à plataforma
+
+O workflow `pages` publica somente o frontend estático, com
+`VITE_BASE=/NexoGestao/` e `VITE_STATIC_HOSTING=true`. Nesse build, as rotas de
+autenticação informam que o acesso está indisponível, sem montar formulários,
+enviar credenciais ou consultar sessões em uma API inexistente. Preferências
+de cookies são salvas no navegador.
+
+Login, cadastro e recuperação de senha exigem uma implantação do web/BFF e
+da API com seus serviços de dados. O cliente tRPC chama `/api/trpc` na mesma
+origem do web/BFF; apontar uma variável para a API Nest diretamente não
+substitui esse serviço. O destino e a URL pública da implantação completa
+ainda precisam ser definidos. O build normal mantém a autenticação real.
+
+### Serviços e imagens
+
 `docker-compose.prod.yml`, `apps/api/Dockerfile.prod`, `apps/web/Dockerfile.prod`
 e `infra/nginx/nginx.prod.conf` definem esta base. O `Dockerfile` raiz continua
 sendo o alvo de build do workflow legado de imagem da API; não prova deploy.

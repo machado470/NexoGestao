@@ -21,6 +21,7 @@ import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { AppLayout } from "./components/AppLayout";
 import { PublicLayout } from "./components/PublicLayout";
 import { AuthLayout } from "./components/AuthLayout";
+import { AuthServiceGate } from "./components/AuthServiceGate";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import {
   BootProbeProvider,
@@ -369,6 +370,14 @@ function ProtectedRoute({
 }
 
 function AuthRoute({ component: Component }: { component: ComponentType }) {
+  return (
+    <AuthServiceGate>
+      <ConnectedAuthRoute component={Component} />
+    </AuthServiceGate>
+  );
+}
+
+function ConnectedAuthRoute({ component: Component }: { component: ComponentType }) {
   const { authState, isAuthenticated, redirectTo } = useAuth();
   const [location, navigate] = useLocation();
   const redirectParam = readSafeRedirectFromPath(location);
