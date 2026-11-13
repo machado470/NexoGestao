@@ -40,7 +40,53 @@ origem do web/BFF; apontar uma variável para a API Nest diretamente não
 substitui esse serviço. O destino e a URL pública da implantação completa
 ainda precisam ser definidos. O build normal mantém a autenticação real.
 
-### Serviços e imagens
+### Railway: API e web/BFF no mesmo projeto
+
+Os serviços detectados pelo Railway precisam de configurações separadas. Em
+**Settings**, mantenha **Root Directory** em `/` nos dois serviços: o lockfile,
+as migrations e o pacote comum ficam na raiz do monorepo. Em **Config as Code**,
+configure **Railway Config File** assim:
+
+| Serviço | Arquivo de configuração |
+| --- | --- |
+| API | `/apps/api/railway.json` |
+| Web/BFF | `/apps/web/railway.json` |
+
+Esses arquivos selecionam `Dockerfile.railway` próprios, sem secret mounts,
+e substituem os comandos de inicialização detectados automaticamente. Os
+Dockerfiles de Compose preservam seus mounts opcionais de CA para ambientes
+com proxy. Nenhum build desativa a validação TLS.
+
+A imagem Railway da API mantém o Prisma CLI para executar
+`pnpm prisma:migrate:deploy` como **pre-deploy**, com `DATABASE_URL` disponível.
+O startup apenas espera o banco e valida o schema; não aplica migrations nem
+seeds. A imagem web compila a aplicação completa em `/`, com
+`VITE_STATIC_HOSTING=false`, e serve o BFF na mesma origem. A API adapta `PORT`
+para `API_PORT`, e o web usa `PORT` quando `WEB_PORT` não estiver definido.
+
+Antes de publicar, conecte os serviços ao Postgres e a um serviço Redis do
+mesmo projeto, por referências de variáveis do Railway. Na API, configure
+`DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`, as variáveis de produção/integradores
+de `.env.prod.example` e a URL pública do web em `APP_URL`, `FRONTEND_URL` e
+`CORS_ORIGINS`. O contrato atual exige uma chave Stripe em produção; uma chave
+fictícia não configura a integração. Configure verificação e envio de e-mail
+antes de habilitar o cadastro público com verificação obrigatória.
+
+No web, configure `NEXO_API_URL` para a URL da API acessível pelo BFF e
+`JWT_SECRET` por referência à API. Defina as URLs públicas coerentemente e gere
+o domínio HTTPS do serviço web. A configuração de build não fornece variáveis
+secretas nem cria os serviços de dados. Chaves reais ficam somente no Railway.
+O GitHub Pages continua sendo uma publicação estática separada.
+
+O CI executa `NEXO_DOCKER_TARGET=railway bash scripts/smoke-production-compose.sh`
+em banco/Redis/containers descartáveis, incluindo migrations, readiness e a
+chamada de login inválido pelo BFF à API. As credenciais de teste e a chave
+Stripe de fixture pertencem somente a essa prova isolada. Ela não comprova
+deploy remoto. No ambiente cloud com proxy e espaço VFS limitado, execute a
+variante de build no CI; a configuração pode ser verificada localmente com
+`NEXO_DOCKER_TARGET=railway bash scripts/smoke-production-compose.sh --config-only`.
+
+### Compose: serviços e imagens
 
 `docker-compose.prod.yml`, `apps/api/Dockerfile.prod`, `apps/web/Dockerfile.prod`
 e `infra/nginx/nginx.prod.conf` definem esta base. O `Dockerfile` raiz continua

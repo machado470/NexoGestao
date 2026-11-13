@@ -1,0 +1,30 @@
+FROM node:24-bookworm-slim AS base
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
+RUN npm install -g pnpm@10.30.3
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY patches ./patches
+COPY apps/web/package.json apps/web/package.json
+
+FROM base AS builder
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
+RUN pnpm install --frozen-lockfile
+COPY . .
+# The BFF serves the full app at / and implements /api/trpc on the same origin.
+ENV VITE_BASE=/ VITE_STATIC_HOSTING=false
+ARG VITE_SENTRY_DSN
+ENV VITE_SENTRY_DSN=$VITE_SENTRY_DSN
+RUN pnpm --filter ./apps/web build
+
+FROM base AS production-deps
+ENV PRISMA_SKIP_POSTINSTALL_GENERATE=true
+RUN pnpm install --prod --frozen-lockfile
+
+FROM production-deps AS runtime
+ENV NODE_ENV=production
+COPY --from=builder /app/apps/web/dist ./apps/web/dist
+WORKDIR /app/apps/web
+EXPOSE 3010
+CMD ["node", "dist/index.js"]
