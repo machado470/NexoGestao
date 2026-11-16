@@ -73,7 +73,7 @@ const messageFeedOutput = z.object({ items: z.array(messageOutput), nextCursor: 
 const retryOutput = z.object({ ok: z.literal(true), messageId: id }).strict();
 const updateCountOutput = z.object({ count: z.number().int().nonnegative() }).strict();
 const healthOutput = z.object({
-  provider: z.string(), status: z.enum(['configured_mock', 'configured', 'misconfigured']), missingEnv: z.array(z.string()),
+  provider: z.string(), status: z.enum(['configured_mock', 'configured', 'misconfigured', 'disabled']), missingEnv: z.array(z.string()),
   queueAvailable: z.boolean(), evaluatedAt: isoDate,
 }).strict();
 const suggestedAction = z.enum(['SEND_PAYMENT_LINK', 'CONFIRM_APPOINTMENT', 'RESCHEDULE_APPOINTMENT', 'OPEN_SERVICE_ORDER', 'SEND_SERVICE_UPDATE', 'ESCALATE_TO_OPERATOR', 'MARK_RESOLVED', 'REPLY_WITH_TEMPLATE']);

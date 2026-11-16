@@ -1,4 +1,4 @@
-export type ProviderHealthStatus = 'configured' | 'misconfigured' | 'configured_mock'
+export type ProviderHealthStatus = 'configured' | 'misconfigured' | 'configured_mock' | 'disabled'
 
 export type WhatsAppProviderHealth = {
   provider: string

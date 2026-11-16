@@ -133,11 +133,7 @@ export class HealthController {
     const whatsappReadiness = getWhatsAppProviderReadiness(process.env)
     const notificationReadiness = this.notificationPubSub?.readiness()
 
-    const whatsappIntegrationStatus = whatsappReadiness.mode === 'mock'
-      ? 'configured_mock'
-      : whatsappReadiness.isReady
-        ? 'configured'
-        : 'misconfigured'
+    const whatsappIntegrationStatus = whatsappReadiness.status
 
     return {
       stripe: stripeConfigured ? 'configured' : 'missing',
