@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common'
 // import {
 //   AutomationActionType,
 //   AutomationTrigger,
@@ -18,7 +18,6 @@ import { NotificationsService } from '../notifications/notifications.service'
 import { RiskService } from '../risk/risk.service'
 import { WhatsAppService } from '../whatsapp/whatsapp.service'
 import { QueueService } from '../queue/queue.service'
-import { QUEUE_NAMES } from '../queue/queue.constants'
 import { TenantOperationsService } from '../common/tenant-ops/tenant-ops.service'
 import {
   CommercialPolicyService,
@@ -103,7 +102,9 @@ export class AutomationService {
       }
     }
 
-    return delegate.create({
+    return this.prisma.$transaction(async tx => {
+      await this.commercial.assertMeterInTransaction(tx, orgId, 'configurable_automations')
+      return (tx as any).automationRule.create({
       data: {
         orgId,
         name: dto.name.trim(),
@@ -114,6 +115,7 @@ export class AutomationService {
         active: dto.active ?? true,
         createdByUserId: actorUserId,
       },
+      })
     })
   }
 
@@ -194,7 +196,7 @@ export class AutomationService {
         continue
       }
 
-      const planLimit = await this.commercial.enforceMeter(context.orgId, 'automation_executions')
+      const planLimit = await this.commercial.enforceMeter(context.orgId, 'automation_executions', { admissionOnly: true })
       if (isCommercialBlocked(planLimit)) {
         this.tenantOps.increment(context.orgId, 'automation_blocked')
         results.push({
@@ -208,7 +210,7 @@ export class AutomationService {
         continue
       }
 
-      const limit = this.tenantOps.enforceLimit({
+      const limit = await this.tenantOps.enforceLimit({
         orgId: context.orgId,
         scope: 'automation:execute-trigger',
         limit: 100,
@@ -233,7 +235,9 @@ export class AutomationService {
         continue
       }
 
-      const execution = await executionDelegate.create({
+      const execution = await this.prisma.$transaction(async tx => {
+        await this.commercial.assertMeterInTransaction(tx, context.orgId, 'automation_executions')
+      return (tx as any).automationExecution.create({
         data: {
           orgId: context.orgId,
           ruleId: rule.id,
@@ -241,6 +245,7 @@ export class AutomationService {
           eventPayload: context.payload,
           status: 'PENDING',
         },
+      })
       })
 
       try {
@@ -307,38 +312,16 @@ export class AutomationService {
     action: Record<string, any>
     payload: Record<string, any>
   }) {
-    await this.executeAction(input)
-  }
-
-  private async executeAction(input: {
-    orgId: string
-    action: Record<string, any>
-    payload: Record<string, any>
-  }) {
-    const actionType = String(input.action?.type ?? '').trim() as AutomationActionType
-
-    if (!Object.values(AutomationActionType).includes(actionType)) {
-      this.logger.warn(`Unknown automation action type: ${actionType}`)
-      return false
-    }
-
-    await this.queueService.addJob(QUEUE_NAMES.AUTOMATION, 'execute-action', input)
-    return true
+    // The canonical schema has no automation persistence or action executor yet.
+    // Fail the job explicitly instead of reporting success and enqueueing it forever.
+    throw new ServiceUnavailableException('Execução de automações indisponível neste ambiente.')
   }
 
   private async enqueueAutomationAction(input: {
     orgId: string
     action: Record<string, any>
     payload: Record<string, any>
-  }) {
-    const actionType = String(input.action?.type ?? '').trim() as AutomationActionType
-
-    if (!Object.values(AutomationActionType).includes(actionType)) {
-      return false
-    }
-
-    await this.queueService.addJob(QUEUE_NAMES.AUTOMATION, 'execute-action', input)
-
-    return true
+  }): Promise<boolean> {
+    throw new ServiceUnavailableException('Execução de automações indisponível neste ambiente.')
   }
 }

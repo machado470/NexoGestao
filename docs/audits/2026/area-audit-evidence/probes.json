@@ -1,0 +1,64 @@
+{
+  "method": "isolated executable service probes, synthetic persistence and provider responses; no external calls",
+  "observations": [
+    {
+      "id": "AUTH_INPUT",
+      "observed": "non-string organization name throws TypeError before validation",
+      "confirmed": true
+    },
+    {
+      "id": "EMAIL_RESULT",
+      "observed": "registration reports sent and password-reset reports success after resolved provider error",
+      "verificationStatus": "sent",
+      "resetSuccess": true,
+      "tokensPersisted": 2,
+      "confirmed": true
+    },
+    {
+      "id": "AUTH_ENUMERATION",
+      "observed": "without email provider, known and unknown accounts produce different outcomes",
+      "unknownSuccess": true,
+      "knownStatus": 503,
+      "confirmed": true
+    },
+    {
+      "id": "BILLING_UNPAID",
+      "observed": "unpaid subscription checkout activates local plan",
+      "status": "ACTIVE",
+      "confirmed": true
+    },
+    {
+      "id": "BILLING_ORDER",
+      "observed": "older paid invoice reactivates subscription after newer cancellation",
+      "finalStatus": "ACTIVE",
+      "confirmed": true
+    },
+    {
+      "id": "PAYMENT_REFUND",
+      "observed": "refund event is acknowledged without a local refund/reconciliation handler",
+      "confirmed": true
+    },
+    {
+      "id": "COMMERCIAL_MEMORY",
+      "observed": "commercial meter exhausted in one instance is available in another",
+      "firstAllowed": false,
+      "secondAllowed": true,
+      "confirmed": true
+    },
+    {
+      "id": "COMMERCIAL_SUSPENDED",
+      "observed": "suspended subscription blocks feature but permits meter and retains paid resource quotas",
+      "featureAllowed": false,
+      "meterAllowed": true,
+      "quotaPlan": "PRO",
+      "confirmed": true
+    },
+    {
+      "id": "SSE_REVOCATION",
+      "observed": "open stream revalidation checks active user only; active account with changed sessionVersion, role or inactive person remains connected until token expiry",
+      "streamClosed": false,
+      "confirmed": true
+    }
+  ],
+  "pass": true
+}

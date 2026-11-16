@@ -1,0 +1,179 @@
+  console.info
+    [integration-run] Real integration/e2e tests enabled (RUN_REAL_INTEGRATION=true). Expecting live Postgres/Redis.
+
+      at Object.<anonymous> (test/integration/phase2-tenant-mutations-postgres.integration.spec.ts:18:14)
+
+  console.warn
+    {"event":"http_request","requestId":"e8811ca2-e987-4b5b-a0c4-c082eedbb3a4","correlationId":"e8811ca2-e987-4b5b-a0c4-c082eedbb3a4","userId":"5a62dd9d-19dd-4371-8214-84a5183deaa9","orgId":"cac9d6dd-234b-4a9f-95fb-747eacc335c1","traceId":null,"route":"PATCH /customers/29f22b81-cb38-420e-b265-533d6a84da56","status":404,"latencyMs":22,"contentLength":"74","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.warn
+    {"event":"http_request","requestId":"f902b853-9af9-4e65-b8e6-a9e672f58ef6","correlationId":"f902b853-9af9-4e65-b8e6-a9e672f58ef6","userId":"5a62dd9d-19dd-4371-8214-84a5183deaa9","orgId":"cac9d6dd-234b-4a9f-95fb-747eacc335c1","traceId":null,"route":"PATCH /service-orders/b185068e-3962-4c7f-8574-9ce83145797b","status":404,"latencyMs":9,"contentLength":"84","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.warn
+    {"event":"http_request","requestId":"f893058a-81be-4f1a-8aeb-bb0398c89398","correlationId":"f893058a-81be-4f1a-8aeb-bb0398c89398","userId":"5a62dd9d-19dd-4371-8214-84a5183deaa9","orgId":"cac9d6dd-234b-4a9f-95fb-747eacc335c1","traceId":null,"route":"POST /service-orders/b185068e-3962-4c7f-8574-9ce83145797b/generate-charge","status":404,"latencyMs":5,"contentLength":"84","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.warn
+    {"event":"http_request","requestId":"0568f412-7677-4864-866a-2cc65dd1327b","correlationId":"0568f412-7677-4864-866a-2cc65dd1327b","userId":"5a62dd9d-19dd-4371-8214-84a5183deaa9","orgId":"cac9d6dd-234b-4a9f-95fb-747eacc335c1","traceId":null,"route":"POST /executions/start","status":404,"latencyMs":6,"contentLength":"79","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.warn
+    {"event":"http_request","requestId":"61779d9f-3145-45af-b835-a8a63c901878","correlationId":"61779d9f-3145-45af-b835-a8a63c901878","userId":"5a62dd9d-19dd-4371-8214-84a5183deaa9","orgId":"cac9d6dd-234b-4a9f-95fb-747eacc335c1","traceId":null,"route":"POST /executions/14be0ecc-d3bd-4fe0-b1fe-c80a575add98/complete","status":404,"latencyMs":5,"contentLength":"76","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.warn
+    {"event":"http_request","requestId":"bcf351d8-f2cc-4231-89d8-37516360b67a","correlationId":"bcf351d8-f2cc-4231-89d8-37516360b67a","userId":"5a62dd9d-19dd-4371-8214-84a5183deaa9","orgId":"cac9d6dd-234b-4a9f-95fb-747eacc335c1","traceId":null,"route":"POST /finance/charges/db4483a9-30a5-4270-bda1-fc7bb12597db/pay","status":404,"latencyMs":28,"contentLength":"73","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.warn
+    {"event":"http_request","requestId":"15f05a09-a02e-4332-91ec-f526a1a6ec42","correlationId":"15f05a09-a02e-4332-91ec-f526a1a6ec42","userId":"5a62dd9d-19dd-4371-8214-84a5183deaa9","orgId":"cac9d6dd-234b-4a9f-95fb-747eacc335c1","traceId":null,"route":"POST /finance/charges/db4483a9-30a5-4270-bda1-fc7bb12597db/cancel","status":404,"latencyMs":5,"contentLength":"73","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.warn
+    {"event":"http_request","requestId":"00cdad5b-c6ba-45b9-9b54-b9e060f67bc4","correlationId":"00cdad5b-c6ba-45b9-9b54-b9e060f67bc4","userId":"5a62dd9d-19dd-4371-8214-84a5183deaa9","orgId":"cac9d6dd-234b-4a9f-95fb-747eacc335c1","traceId":null,"route":"POST /whatsapp/action-executions/cf539c4c-b778-429a-b755-a0b40dd5b339/approve","status":404,"latencyMs":5,"contentLength":"103","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.warn
+    {"event":"http_request","requestId":"c422907f-8199-4f81-aee0-b7c249ab21f3","correlationId":"c422907f-8199-4f81-aee0-b7c249ab21f3","userId":"5a62dd9d-19dd-4371-8214-84a5183deaa9","orgId":"cac9d6dd-234b-4a9f-95fb-747eacc335c1","traceId":null,"route":"POST /whatsapp/action-executions/f59aae58-d9e6-4afc-845e-28bf5bf8aee9/execute","status":404,"latencyMs":4,"contentLength":"103","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.warn
+    {"event":"http_request","requestId":"9e3cb0a7-030d-4c4d-a34c-e434e0c5de97","correlationId":"9e3cb0a7-030d-4c4d-a34c-e434e0c5de97","userId":"5a62dd9d-19dd-4371-8214-84a5183deaa9","orgId":"cac9d6dd-234b-4a9f-95fb-747eacc335c1","traceId":null,"route":"POST /whatsapp/action-executions/07f4ad4f-317a-4979-bfa7-0a51002a94ea/cancel","status":404,"latencyMs":4,"contentLength":"103","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.warn
+    {"event":"http_request","requestId":"a818baa8-f7fe-43fb-8fb8-e748d625582d","correlationId":"a818baa8-f7fe-43fb-8fb8-e748d625582d","userId":"5a62dd9d-19dd-4371-8214-84a5183deaa9","orgId":"cac9d6dd-234b-4a9f-95fb-747eacc335c1","traceId":null,"route":"POST /onboarding/complete","status":400,"latencyMs":37,"contentLength":"154","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.log
+    {"event":"http_request","requestId":"4edcad1e-86dc-44dd-812b-e70e5cf287a2","correlationId":"4edcad1e-86dc-44dd-812b-e70e5cf287a2","userId":"5a62dd9d-19dd-4371-8214-84a5183deaa9","orgId":"cac9d6dd-234b-4a9f-95fb-747eacc335c1","traceId":null,"route":"POST /onboarding/complete","status":201,"latencyMs":12,"contentLength":"101","ip":"127.0.0.1","userAgent":""}
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:67:17)
+
+FAIL test/integration/phase2-tenant-mutations-postgres.integration.spec.ts (7.19 s)
+  ● Phase 2 tenant mutation isolation (Postgres e2e) › keeps background cron jobs stopped while asserting mutation side effects
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: false
+    Received: true
+
+      120 |     const jobs = app.get(SchedulerRegistry).getCronJobs()
+      121 |     expect(jobs.size).toBeGreaterThan(0)
+    > 122 |     for (const job of jobs.values()) expect(job.isActive).toBe(false)
+          |                                                           ^
+      123 |   })
+      124 |
+      125 |   it('não atualiza customer nem O.S. da Org B', async () => {
+
+      at Object.<anonymous> (test/integration/phase2-tenant-mutations-postgres.integration.spec.ts:122:59)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 8 passed, 9 total
+Snapshots:   0 total
+Time:        7.553 s
+Ran all test suites matching test/integration/phase2-tenant-mutations-postgres.integration.spec.ts.
+undefined
+/workspace/NexoGestao/apps/api:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: jest --config jest.config.js --runInBand test/integration/phase2-tenant-mutations-postgres.integration.spec.ts

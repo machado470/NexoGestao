@@ -13,6 +13,9 @@ import { AuthGuard } from '@nestjs/passport'
 import { Throttle } from '@nestjs/throttler'
 
 import { AuthService } from './auth.service'
+import { GoogleLoginDto } from './dto/google-login.dto'
+import { AuthEmailDto, AuthTokenDto, LoginDto, RegisterDto, ResetPasswordDto } from './dto/auth-request.dto'
+import { GoogleIdTokenVerifier } from './google-id-token-verifier'
 import { Public } from './decorators/public.decorator'
 import { readGoogleOAuthEnv } from '../common/config/google-oauth-env'
 
@@ -21,6 +24,7 @@ export class AuthController {
   constructor(
     private readonly auth: AuthService,
     private readonly config: ConfigService,
+    private readonly googleTokens: GoogleIdTokenVerifier,
   ) {}
 
   private ensureGoogleOAuthEnabled() {
@@ -62,23 +66,18 @@ export class AuthController {
 
   @Public()
   @Post('register')
-  @Throttle({ short: { limit: 5, ttl: 60000 } })
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   async register(
     @Body()
-    body: {
-      orgName: string
-      adminName: string
-      email: string
-      password: string
-    },
+    body: RegisterDto,
   ) {
     return this.auth.register(body)
   }
 
   @Public()
   @Post('login')
-  @Throttle({ short: { limit: 5, ttl: 60000 } })
-  async login(@Body() body: { email: string; password: string }) {
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  async login(@Body() body: LoginDto) {
     return this.auth.login(body.email, body.password)
   }
 
@@ -92,19 +91,12 @@ export class AuthController {
 
   @Public()
   @Post('google/bff-login')
-  @Throttle({ short: { limit: 10, ttl: 60000 } })
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async googleBffLogin(
-    @Body()
-    body: {
-      email: string
-      firstName?: string
-      lastName?: string
-      picture?: string
-      sub?: string
-      emailVerified?: boolean
-    },
+    @Body() body: GoogleLoginDto,
   ) {
-    return this.auth.loginWithGoogleProfile(body)
+    const profile = await this.googleTokens.verify(body.idToken)
+    return this.auth.validateGoogleUser(profile)
   }
 
   @Public()
@@ -152,29 +144,29 @@ export class AuthController {
 
   @Public()
   @Post('forgot-password')
-  @Throttle({ short: { limit: 5, ttl: 60000 } })
-  async forgotPassword(@Body() body: { email: string }) {
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  async forgotPassword(@Body() body: AuthEmailDto) {
     return this.auth.forgotPassword(body.email)
   }
 
   @Public()
   @Post('reset-password')
-  @Throttle({ short: { limit: 5, ttl: 60000 } })
-  async resetPassword(@Body() body: { token: string; password: string }) {
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  async resetPassword(@Body() body: ResetPasswordDto) {
     return this.auth.resetPassword(body.token, body.password)
   }
 
   @Public()
   @Post('verify-email')
-  @Throttle({ short: { limit: 10, ttl: 60000 } })
-  async verifyEmail(@Body() body: { token: string }) {
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  async verifyEmail(@Body() body: AuthTokenDto) {
     return this.auth.verifyEmail(body.token)
   }
 
   @Public()
   @Post('resend-email-verification')
-  @Throttle({ short: { limit: 5, ttl: 60000 } })
-  async resendEmailVerification(@Body() body: { email: string }) {
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  async resendEmailVerification(@Body() body: AuthEmailDto) {
     return this.auth.resendEmailVerification(body.email)
   }
 }

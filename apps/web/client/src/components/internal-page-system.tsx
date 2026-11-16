@@ -115,11 +115,11 @@ export function AppOperationalHeader({
     >
       <div
         className={cn(
-          "flex flex-wrap items-start justify-between",
+          "flex flex-col items-start justify-between sm:flex-row sm:flex-wrap",
           isCompact ? "gap-2.5" : "gap-3"
         )}
       >
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 w-full flex-1 sm:w-auto">
           <h1 className="nexo-page-header-title">{title}</h1>
           {description ? (
             <p
@@ -132,7 +132,7 @@ export function AppOperationalHeader({
             </p>
           ) : null}
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="flex w-full flex-wrap items-center justify-start gap-2 sm:w-auto sm:justify-end">
           {secondaryActions}
           {primaryAction}
         </div>
@@ -1213,9 +1213,11 @@ export function AppPageErrorState({
 export function AppPageEmptyState({
   title,
   description,
+  action,
 }: {
   title: string;
   description: string;
+  action?: ReactNode;
 }) {
   return (
     <AppSectionCard className="flex flex-col items-center justify-center gap-2.5 p-8 text-center">
@@ -1228,6 +1230,7 @@ export function AppPageEmptyState({
       <p className="max-w-xl text-sm leading-6 text-[var(--text-secondary)]">
         {description}
       </p>
+      {action ? <div className="mt-2">{action}</div> : null}
     </AppSectionCard>
   );
 }

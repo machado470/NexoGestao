@@ -204,8 +204,8 @@ describe("ExecutiveDashboard decision center", () => {
     expect(source).not.toContain("new Date()");
   });
 
-  it("shows the authoritative state verbatim and contextualizes the current role", () => {
-    expect(source).toContain("Estado: {operationLevel}");
+  it("translates the authoritative state without changing it and contextualizes the current role", () => {
+    expect(source).toContain("Estado: {presentationLabel(operationLevel)}");
     expect(source).toContain("Visão administrativa");
     expect(source).toContain("Visão de gestão");
     expect(source).toContain("Visão operacional");

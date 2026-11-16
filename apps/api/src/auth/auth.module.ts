@@ -7,6 +7,7 @@ import { PrismaModule } from '../prisma/prisma.module'
 import { AnalyticsModule } from '../analytics/analytics.module'
 
 import { AuthService } from './auth.service'
+import { GoogleIdTokenVerifier } from './google-id-token-verifier'
 import { AuthController } from './auth.controller'
 import { JwtStrategy } from './jwt.strategy'
 import { GoogleStrategy } from './google.strategy'
@@ -30,7 +31,7 @@ export const createJwtModuleOptions = (config: ConfigService) => ({
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, GoogleStrategy],
+  providers: [AuthService, JwtStrategy, GoogleStrategy, GoogleIdTokenVerifier],
   exports: [AuthService],
 })
 export class AuthModule {}

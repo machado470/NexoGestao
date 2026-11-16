@@ -1,0 +1,25 @@
+{
+  "checks": [
+    {
+      "name": "manual-1440",
+      "fields": [
+        {
+          "id": "",
+          "label": ""
+        },
+        {
+          "id": "",
+          "label": "Valor em reais"
+        },
+        {
+          "id": "",
+          "label": ""
+        },
+        {
+          "id": "",
+          "label": ""
+        }
+      ]
+    }
+  ]
+}

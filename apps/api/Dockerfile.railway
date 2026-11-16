@@ -1,0 +1,20 @@
+# Railway accepts cache mounts, but rejects secret mounts in Dockerfiles.
+FROM node:24-bookworm-slim AS builder
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openssl ca-certificates curl postgresql-client python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
+RUN npm install -g pnpm@10.30.3
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY patches ./patches
+COPY apps/api/package.json apps/api/package.json
+COPY packages/common/package.json packages/common/package.json
+RUN pnpm install --frozen-lockfile
+COPY . .
+RUN pnpm prepare:workspace && pnpm --filter ./apps/api build
+
+# Keep Prisma CLI and schema for Railway's separate pre-deploy migration job.
+FROM builder AS runtime
+ENV NODE_ENV=production
+EXPOSE 3000
+CMD ["sh", "scripts/start-railway-api.sh"]

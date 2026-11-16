@@ -50,6 +50,15 @@ export function parseStoredConsent(raw: string): ConsentStorage | null {
 }
 
 export function readStoredConsent(): ConsentStorage | null {
+  try {
+    return readAvailableConsent();
+  } catch {
+    // Blocked browser storage must not crash the public page.
+    return null;
+  }
+}
+
+function readAvailableConsent(): ConsentStorage | null {
   if (typeof window === "undefined") return null;
 
   const primaryRaw = window.localStorage.getItem(CONSENT_STORAGE_KEY);

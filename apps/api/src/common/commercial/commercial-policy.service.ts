@@ -1,7 +1,9 @@
-import { Injectable } from '@nestjs/common'
-import { PlanName, SubscriptionStatus } from '@prisma/client'
+import { BadRequestException, Injectable } from '@nestjs/common'
+import { PlanName, Prisma, SubscriptionStatus } from '@prisma/client'
 import { PrismaService } from '../../prisma/prisma.service'
 import { TenantOperationsService } from '../tenant-ops/tenant-ops.service'
+import { CommercialDecision, subscriptionAccess } from './subscription-access'
+export type { CommercialDecision } from './subscription-access'
 
 export type CommercialMeterKey =
   | 'automation_executions'
@@ -20,15 +22,6 @@ type PlanPolicy = {
   limits: Record<CommercialMeterKey, number>
   features: Record<CommercialFeatureKey, boolean>
 }
-
-export type CommercialDecision =
-  | { allowed: true }
-  | {
-      allowed: false
-      reasonCode: string
-      reasonMessage: string
-      policyType: 'commercial_block'
-    }
 
 export function isCommercialBlocked(
   decision: CommercialDecision | (CommercialDecision & { limit?: number; used?: number }),
@@ -106,13 +99,13 @@ export class CommercialPolicyService {
     private readonly tenantOps: TenantOperationsService,
   ) {}
 
-  async getContext(orgId: string) {
+  async getContext(orgId: string, database: Prisma.TransactionClient = this.prisma) {
     const subscription =
-      (await this.prisma.subscription.findUnique({
+      (await database.subscription.findUnique({
         where: { orgId },
         include: { plan: true },
       })) ??
-      (await this.ensureDefaultSubscription(orgId))
+      (await this.ensureDefaultSubscription(orgId, database))
 
     const planName = subscription.plan.name
     const defaultPolicy = this.defaultPolicies[planName]
@@ -127,7 +120,7 @@ export class CommercialPolicyService {
       defaultPolicy.features,
     )
 
-    const overrides = await this.prisma.tenantFeatureOverride.findMany({
+    const overrides = await database.tenantFeatureOverride.findMany({
       where: { orgId },
     })
 
@@ -151,46 +144,8 @@ export class CommercialPolicyService {
 
   async canUseFeature(orgId: string, feature: CommercialFeatureKey): Promise<CommercialDecision> {
     const context = await this.getContext(orgId)
-    const status = context.subscription.status
-
-    if (status === SubscriptionStatus.SUSPENDED) {
-      return {
-        allowed: false,
-        policyType: 'commercial_block',
-        reasonCode: 'tenant_subscription_suspended',
-        reasonMessage: 'Assinatura suspensa por política comercial.',
-      }
-    }
-
-    if (status === SubscriptionStatus.CANCELED) {
-      return {
-        allowed: false,
-        policyType: 'commercial_block',
-        reasonCode: 'tenant_subscription_cancelled',
-        reasonMessage: 'Assinatura cancelada. Faça upgrade para reativar este recurso.',
-      }
-    }
-
-    if (status === SubscriptionStatus.PAST_DUE) {
-      return {
-        allowed: false,
-        policyType: 'commercial_block',
-        reasonCode: 'tenant_subscription_past_due',
-        reasonMessage: 'Assinatura com pagamento pendente.',
-      }
-    }
-
-    if (
-      status === SubscriptionStatus.TRIALING &&
-      context.subscription.currentPeriodEnd < new Date()
-    ) {
-      return {
-        allowed: false,
-        policyType: 'commercial_block',
-        reasonCode: 'tenant_trial_expired',
-        reasonMessage: 'Trial expirado. Recurso restrito até atualizar o plano.',
-      }
-    }
+    const access = subscriptionAccess(context.subscription)
+    if (isCommercialBlocked(access)) return access
 
     if (!context.features[feature]) {
       if (process.env.NODE_ENV === 'development') {
@@ -207,10 +162,14 @@ export class CommercialPolicyService {
     return { allowed: true }
   }
 
-  async enforceMeter(orgId: string, meter: CommercialMeterKey): Promise<CommercialDecision & { limit?: number; used?: number }> {
+  async enforceMeter(orgId: string, meter: CommercialMeterKey, options?: { admissionOnly?: boolean }): Promise<CommercialDecision & { limit?: number; used?: number }> {
     const context = await this.getContext(orgId)
+    const access = subscriptionAccess(context.subscription)
+    if (isCommercialBlocked(access)) return access
     const limit = context.limits[meter]
-    const used = this.estimateUsage(orgId, meter)
+    if (meter === 'configurable_automations' && !(this.prisma as any).automationRule?.count) return { allowed: false, policyType: 'commercial_block', reasonCode: 'commercial_meter_unavailable', reasonMessage: 'Configuração de automações indisponível nesta versão.' }
+    if (options?.admissionOnly) return { allowed: true }
+    const used = await this.readUsage(this.prisma, orgId, meter)
 
     if (used >= limit) {
       return {
@@ -240,10 +199,10 @@ export class CommercialPolicyService {
       tenants.map(async (tenant) => {
         const context = await this.getContext(tenant.id)
         const usage = {
-          automation_executions: this.estimateUsage(tenant.id, 'automation_executions'),
-          message_sends: this.estimateUsage(tenant.id, 'message_sends'),
-          finance_critical_actions: this.estimateUsage(tenant.id, 'finance_critical_actions'),
-          configurable_automations: this.estimateUsage(tenant.id, 'configurable_automations'),
+          automation_executions: await this.readUsage(this.prisma, tenant.id, 'automation_executions'),
+          message_sends: await this.readUsage(this.prisma, tenant.id, 'message_sends'),
+          finance_critical_actions: await this.readUsage(this.prisma, tenant.id, 'finance_critical_actions'),
+          configurable_automations: await this.readUsage(this.prisma, tenant.id, 'configurable_automations'),
         }
 
         const nearLimit = Object.entries(context.limits).some(([key, value]) => {
@@ -251,10 +210,7 @@ export class CommercialPolicyService {
           return Number(value) > 0 && current / Number(value) >= 0.8
         })
 
-        const commerciallyBlocked =
-          context.subscription.status === SubscriptionStatus.SUSPENDED
-          || context.subscription.status === SubscriptionStatus.PAST_DUE
-          || context.subscription.status === SubscriptionStatus.CANCELED
+        const commerciallyBlocked = !subscriptionAccess(context.subscription).allowed
 
         return {
           tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug },
@@ -270,6 +226,8 @@ export class CommercialPolicyService {
           features: context.features,
           nearLimit,
           commerciallyBlocked,
+          usagePeriod: commercialUsagePeriod(),
+          meterAvailability: { configurable_automations: Boolean((this.prisma as any).automationRule?.count) },
         }
       }),
     )
@@ -308,22 +266,38 @@ export class CommercialPolicyService {
     })
   }
 
-  private estimateUsage(orgId: string, meter: CommercialMeterKey): number {
-    const snapshot = this.tenantOps.snapshot()
-    const tenant = snapshot.perTenant.find((item) => item.orgId === orgId)
-    if (!tenant) return 0
+  async lockMeterInTransaction(tx: Prisma.TransactionClient, orgId: string, meter: CommercialMeterKey) {
+    // One tenant/meter lock across periods also serializes operations crossing midnight.
+    await tx.$queryRaw`SELECT 1::int AS "locked" FROM pg_advisory_xact_lock(hashtextextended(${`commercial:v1:${orgId}:${meter}`}, 0))`
+  }
 
+  async assertMeterInTransaction(tx: Prisma.TransactionClient, orgId: string, meter: CommercialMeterKey) {
+    await this.lockMeterInTransaction(tx, orgId, meter)
+    const context = await this.getContext(orgId, tx)
+    const access = subscriptionAccess(context.subscription)
+    if (isCommercialBlocked(access)) throw new BadRequestException({ message: access.reasonMessage, reasonCode: access.reasonCode, policyType: access.policyType })
+    if (meter === 'configurable_automations' && !(tx as any).automationRule?.count) throw new BadRequestException({ message: 'Configuração de automações indisponível nesta versão.', reasonCode: 'commercial_meter_unavailable' })
+    const used = await this.readUsage(tx, orgId, meter), limit = context.limits[meter]
+    if (used >= limit) throw new BadRequestException({ message: `Limite do plano ${context.planDisplayName} atingido.`, reasonCode: 'plan_limit_reached', policyType: 'commercial_block', used, limit })
+    return { used, limit, period: commercialUsagePeriod() }
+  }
+
+  private async readUsage(database: Prisma.TransactionClient, orgId: string, meter: CommercialMeterKey): Promise<number> {
+    const period = commercialUsagePeriod(), createdAt = { gte: period.start, lt: period.end }
     switch (meter) {
-      case 'automation_executions':
-        return Number(tenant.counters.automation_execution ?? 0)
-      case 'message_sends':
-        return Number(tenant.counters.whatsapp_queued ?? 0)
-      case 'finance_critical_actions':
-        return Number(tenant.counters.finance_charge_create ?? 0) + Number(tenant.counters.finance_charge_pay ?? 0)
-      case 'configurable_automations':
-        return Number(tenant.counters.automation_execution ?? 0)
-      default:
-        return 0
+      case 'message_sends': return database.whatsAppMessage.count({ where: { orgId, direction: 'OUTBOUND', createdAt } })
+      case 'finance_critical_actions': {
+        const [charges, payments] = await Promise.all([
+          database.charge.count({ where: { orgId, createdAt } }),
+          database.payment.count({ where: { orgId, createdAt, OR: [{ externalRef: null }, { NOT: { externalRef: { startsWith: 'stripe:' } } }] } }),
+        ])
+        return charges + payments
+      }
+      case 'automation_executions': {
+        const started = await database.timelineEvent.count({ where: { orgId, action: 'EXECUTION_EVENT', createdAt, metadata: { path: ['eventType'], equals: 'EXECUTION_STARTED' } } })
+        return started + ((database as any).automationExecution?.count ? await (database as any).automationExecution.count({ where: { orgId, createdAt } }) : 0)
+      }
+      case 'configurable_automations': return (database as any).automationRule?.count ? (database as any).automationRule.count({ where: { orgId } }) : 0
     }
   }
 
@@ -336,7 +310,7 @@ export class CommercialPolicyService {
     const output: Record<string, number> = { ...fallback }
 
     for (const key of Object.keys(fallback)) {
-      if (typeof payload[key] === 'number') {
+      if (typeof payload[key] === 'number' && Number.isSafeInteger(payload[key]) && Number(payload[key]) >= 0) {
         output[key] = payload[key] as number
       }
     }
@@ -361,8 +335,8 @@ export class CommercialPolicyService {
     return output as Record<T, boolean>
   }
 
-  private async ensureDefaultSubscription(orgId: string) {
-    const freePlan = await this.prisma.plan.findUnique({ where: { name: PlanName.FREE } })
+  private async ensureDefaultSubscription(orgId: string, database: Prisma.TransactionClient) {
+    const freePlan = await database.plan.findUnique({ where: { name: PlanName.FREE } })
     if (!freePlan) {
       throw new Error('Plano FREE não encontrado. Inicialização de planos é obrigatória.')
     }
@@ -371,8 +345,9 @@ export class CommercialPolicyService {
     const periodEnd = new Date(now)
     periodEnd.setMonth(periodEnd.getMonth() + 1)
 
-    return this.prisma.subscription.create({
-      data: {
+    return database.subscription.upsert({
+      where: { orgId }, update: {},
+      create: {
         orgId,
         planId: freePlan.id,
         status: SubscriptionStatus.ACTIVE,
@@ -382,4 +357,9 @@ export class CommercialPolicyService {
       include: { plan: true },
     })
   }
+}
+
+/** Consumption is monthly by UTC calendar, independent of provider invoice/proration dates. */
+export function commercialUsagePeriod(now = new Date()) {
+  return { start: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)), end: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)), timezone: 'UTC' as const }
 }

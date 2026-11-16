@@ -1,6 +1,7 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { Test } from '@nestjs/testing'
+import { SchedulerRegistry } from '@nestjs/schedule'
 import { randomUUID } from 'crypto'
 import request from 'supertest'
 
@@ -35,7 +36,7 @@ describeRealIntegration('Phase 2 tenant mutation isolation (Postgres e2e)', () =
   }
   const orgIds = [ids.orgA, ids.orgB]
   const authA = () => ({
-    Authorization: `Bearer ${jwt.sign({ sub: ids.userA, role: 'ADMIN', orgId: ids.orgA, personId: ids.personA })}`,
+    Authorization: `Bearer ${jwt.sign({ sessionVersion: 0, sub: ids.userA, role: 'ADMIN', orgId: ids.orgA, personId: ids.personA })}`,
   })
 
   beforeAll(async () => {
@@ -43,6 +44,10 @@ describeRealIntegration('Phase 2 tenant mutation isolation (Postgres e2e)', () =
     app = module.createNestApplication()
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }))
     await app.init()
+    // These assertions attribute every mutation to an HTTP request. Clock-driven
+    // jobs can legitimately append events independently, so stop them before fixtures.
+    // Keep all services and guards real; do not change global scheduling defaults.
+    for (const job of app.get(SchedulerRegistry).getCronJobs().values()) await job.stop()
     prisma = app.get(PrismaService)
 
     await prisma.organization.createMany({ data: [
@@ -113,6 +118,12 @@ describeRealIntegration('Phase 2 tenant mutation isolation (Postgres e2e)', () =
         await app.close()
       }
     }
+  })
+
+  it('keeps background cron jobs stopped while asserting mutation side effects', () => {
+    const jobs = app.get(SchedulerRegistry).getCronJobs()
+    expect(jobs.size).toBeGreaterThan(0)
+    for (const job of jobs.values()) expect(job.isActive).toBe(false)
   })
 
   it('não atualiza customer nem O.S. da Org B', async () => {
@@ -188,7 +199,17 @@ describeRealIntegration('Phase 2 tenant mutation isolation (Postgres e2e)', () =
     expect(await prisma.auditEvent.count({ where: { orgId: { in: orgIds } } })).toBe(auditBefore)
   })
 
-  it('completa onboarding somente para a organização autenticada', async () => {
+  it('exige evidência própria antes de completar onboarding somente para a organização autenticada', async () => {
+    // A ordem concluída e a cobrança de B não podem liberar A.
+    await request(app.getHttpServer()).post('/onboarding/complete').set(authA()).send({}).expect(400)
+    expect(await prisma.organization.findUnique({ where: { id: ids.orgA } })).toMatchObject({ requiresOnboarding: true })
+    expect(await prisma.organization.findUnique({ where: { id: ids.orgB } })).toMatchObject({ requiresOnboarding: true })
+
+    await prisma.serviceOrder.update({ where: { id: ids.serviceOrderA }, data: { status: 'DONE' } })
+    await prisma.charge.create({ data: {
+      orgId: ids.orgA, customerId: ids.customerA, serviceOrderId: ids.serviceOrderA,
+      amountCents: 12500, dueDate: new Date(Date.now() + 86_400_000), status: 'PENDING',
+    } })
     await request(app.getHttpServer()).post('/onboarding/complete').set(authA()).send({}).expect(201)
 
     expect(await prisma.organization.findUnique({ where: { id: ids.orgA } })).toMatchObject({ requiresOnboarding: false })

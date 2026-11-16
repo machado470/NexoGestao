@@ -1,13 +1,26 @@
-name: Deploy Production
+name: Production Compose validation
 on:
-   push:
-    branches:
-      - main
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
 jobs:
-  deploy:
+  disposable-compose:
+    name: disposable-${{ matrix.target }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [compose, railway]
+    env:
+      NEXO_DOCKER_TARGET: ${{ matrix.target }}
     steps:
-      - uses: actions/checkout@v3
-      - name: Deploy to Production
-        run: |
-          echo "Deploying to production environment..."
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Build, migrate and smoke isolated local Compose (no publication)
+        run: bash scripts/smoke-production-compose.sh

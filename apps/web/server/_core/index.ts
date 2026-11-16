@@ -9,7 +9,7 @@ import { getNexoApiResolutionMetadata } from "./nexoApiUrl";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { registerExecutionLogRoutes } from "./executionLog";
-import { serveStatic, setupVite } from "./vite";
+import { serveStatic } from "./static";
 import { registerNotificationStreamRoute } from "./notificationStream";
 
 async function startServer() {
@@ -34,6 +34,7 @@ async function startServer() {
 
   if (process.env.NODE_ENV === "development") {
     console.log("[BFF] NODE_ENV=development, habilitando Vite middleware");
+    const { setupVite } = await import("./vite");
     await setupVite(app, server);
   } else {
     console.log("[BFF] NODE_ENV!=development, servindo frontend estático");

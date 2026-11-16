@@ -1,0 +1,36 @@
+✔ concurrent local invocation cannot overwrite in-flight state (109.460926ms)
+✔ concurrent invalid invocation cannot overwrite in-flight state (113.555863ms)
+✔ recent local success (40.616857ms)
+✔ stale backup (41.538348ms)
+✔ failed last attempt (35.333315ms)
+✔ future timestamp (53.232967ms)
+✔ invalid timestamp (60.380842ms)
+✔ success without created dump (42.90105ms)
+✔ requires explicit age policy (293.715426ms)
+✔ missing or corrupt state fails without copying raw data (98.370259ms)
+✔ requires a matching success snapshot (84.883073ms)
+✔ offsite requirement is opt-in and must be confirmed (97.579842ms)
+✔ a recent failed attempt is not masked by an older success (38.551718ms)
+✔ default mode preserves the original factual JSON (4.488619ms)
+✔ valid canonical sidecar reaches simulated restore and migration (79.247276ms)
+✔ a checksum for another valid file cannot authorize restoring the requested dump (51.774318ms)
+✔ mismatched hash never invokes database commands (44.756285ms)
+✔ multiple checksum entries are rejected (56.632406ms)
+✔ missing and malformed sidecars never invoke database commands (48.790286ms)
+✔ container bound to another port fails before database commands (49.705969ms)
+✔ stopped explicitly selected container fails before database commands (49.258458ms)
+✔ container bound publicly fails before database commands (45.898397ms)
+✔ container user mismatch fails before database commands (43.752648ms)
+✔ URL repeated schema fails before database commands (40.359107ms)
+✔ URL host query override fails before database commands (39.775014ms)
+✔ encoded production database fails before database commands (36.200005ms)
+✔ matching loopback container target reaches simulated restore (67.290675ms)
+✔ ambient libpq routing is cleared before host restore and smoke (81.526171ms)
+ℹ tests 28
+ℹ suites 0
+ℹ pass 28
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2032.52235

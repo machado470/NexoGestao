@@ -44,10 +44,10 @@ describe('CustomersOperationalSummaryService', () => {
         findMany: jest.fn().mockResolvedValue([]),
       },
       whatsAppMessage: {
-        findMany: jest.fn().mockResolvedValue([]),
+        groupBy: jest.fn().mockResolvedValue([]),
       },
       whatsAppConversation: {
-        findMany: jest.fn().mockResolvedValue([]),
+        groupBy: jest.fn().mockResolvedValue([]),
       },
       timelineEvent: {
         findMany: jest.fn().mockResolvedValue([]),
@@ -68,8 +68,8 @@ describe('CustomersOperationalSummaryService', () => {
     expect(prisma.payment.findMany).toHaveBeenCalledTimes(1)
     expect(prisma.serviceOrder.findMany).toHaveBeenCalledTimes(1)
     expect(prisma.appointment.findMany).toHaveBeenCalledTimes(1)
-    expect(prisma.whatsAppMessage.findMany).toHaveBeenCalledTimes(1)
-    expect(prisma.whatsAppConversation.findMany).toHaveBeenCalledTimes(1)
+    expect(prisma.whatsAppMessage.groupBy).toHaveBeenCalledTimes(1)
+    expect(prisma.whatsAppConversation.groupBy).toHaveBeenCalledTimes(1)
     expect(prisma.timelineEvent.findMany).toHaveBeenCalledTimes(1)
 
     expect(result.customers).toHaveLength(2)

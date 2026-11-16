@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable, NotFoundException, MethodNotAllowedException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { PlansService } from '../plans/plans.service'
 import {
@@ -53,81 +53,14 @@ export class SubscriptionsService {
   }
 
   async checkSubscriptionStatus(orgId: string) {
-    const subscription = await this.prisma.subscription.findUnique({
-      where: { orgId },
-      include: { plan: true },
-    })
-
-    if (!subscription) {
-      return this.createTrialSubscription(orgId)
-    }
-
-    if (
-      subscription.status === SubscriptionStatus.TRIALING &&
-      subscription.currentPeriodEnd < new Date()
-    ) {
-      return this.prisma.subscription.update({
-        where: { id: subscription.id },
-        data: { status: SubscriptionStatus.CANCELED },
-        include: { plan: true },
-      })
-    }
-
-    return subscription
+    // Reads must not create trials or override a provider-managed lifecycle.
+    return this.getOrganizationSubscription(orgId)
   }
 
-  async updateSubscription(orgId: string, planName: PlanName) {
-    const currentSubscription = await this.prisma.subscription.findUnique({
-      where: { orgId },
-    })
-
-    if (!currentSubscription) {
-      throw new NotFoundException(
-        'Nenhuma assinatura encontrada para esta organização.',
-      )
-    }
-
-    const newPlan = await this.plansService.findPlanByName(planName)
-
-    if (!newPlan) {
-      throw new NotFoundException(`Plano ${planName} não encontrado.`)
-    }
-
-    const now = new Date()
-    const nextPeriodEnd = new Date(now)
-    nextPeriodEnd.setMonth(nextPeriodEnd.getMonth() + 1)
-
-    return this.prisma.subscription.update({
-      where: { id: currentSubscription.id },
-      data: {
-        planId: newPlan.id,
-        status: SubscriptionStatus.ACTIVE,
-        currentPeriodStart: now,
-        currentPeriodEnd: nextPeriodEnd,
-      },
-      include: { plan: true },
-    })
-  }
-
-  async cancelSubscription(orgId: string) {
-    const currentSubscription = await this.prisma.subscription.findUnique({
-      where: { orgId },
-    })
-
-    if (!currentSubscription) {
-      throw new NotFoundException(
-        'Nenhuma assinatura encontrada para esta organização.',
-      )
-    }
-
-    return this.prisma.subscription.update({
-      where: { id: currentSubscription.id },
-      data: {
-        status: SubscriptionStatus.CANCELED,
-        canceledAt: new Date(),
-      },
-      include: { plan: true },
-    })
+  async updateSubscription(_orgId: string, _planName: PlanName) {
+    throw new MethodNotAllowedException(
+      'Ativação direta de plano desativada. Use POST /billing/create-checkout-session; a confirmação do provedor ativa a assinatura.',
+    )
   }
 
   async getOrganizationSubscription(orgId: string) {

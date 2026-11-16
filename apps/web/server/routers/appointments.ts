@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
-import { authedGet, authedPatch, authedPost, type NexoContext } from "../_core/nexoTransport";
+import { authedGetPage, authedGet, authedPatch, authedPost, type NexoContext } from "../_core/nexoTransport";
 
 const appointmentCreateInput = z.object({
   customerId: z.string().min(1),
@@ -22,14 +22,29 @@ const appointmentUpdateInput = z.object({
 });
 
 export const appointmentsRouter = router({
+    page: protectedProcedure.input(z.object({
+      from: z.string().optional(),
+      to: z.string().optional(),
+      status: z.enum(["SCHEDULED", "CONFIRMED", "CANCELED", "DONE", "NO_SHOW"]).optional(),
+      customerId: z.string().optional(),
+      id: z.string().uuid().optional(),
+      assignedToPersonId: z.string().optional(),
+      page: z.number().int().positive().max(10_000).optional(),
+      limit: z.number().int().positive().max(1000).optional(),
+      search: z.string().optional(),
+    }).optional()).query(async ({ ctx, input }) => {
+      return authedGetPage(ctx as NexoContext, "/appointments", input);
+    }),
+
     list: protectedProcedure.input(z.object({
       from: z.string().optional(),
       to: z.string().optional(),
       status: z.enum(["SCHEDULED", "CONFIRMED", "CANCELED", "DONE", "NO_SHOW"]).optional(),
       customerId: z.string().optional(),
+      id: z.string().uuid().optional(),
       assignedToPersonId: z.string().optional(),
-      page: z.number().int().positive().optional(),
-      limit: z.number().int().positive().optional(),
+      page: z.number().int().positive().max(10_000).optional(),
+      limit: z.number().int().positive().max(1000).optional(),
       search: z.string().optional(),
     }).optional()).query(async ({ ctx, input }) => {
       return authedGet(ctx as NexoContext, "/appointments", input);

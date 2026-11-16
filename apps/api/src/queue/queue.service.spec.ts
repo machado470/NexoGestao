@@ -109,7 +109,7 @@ describe('QueueService factual queue snapshot', () => {
       { requestId: null, correlationId: null } as any,
     ) as any
     const queue = { getJobCounts: jest.fn().mockResolvedValue({ waiting: 1, active: 2, completed: 3, failed: 4, delayed: 5 }) }
-    for (const name of ['automation', 'notifications', 'whatsapp', 'whatsapp-dlq', 'finance', 'webhooks', 'webhooks-dlq']) {
+    for (const name of ['automation', 'notifications', 'whatsapp', 'whatsapp-inbound', 'whatsapp-dlq', 'finance', 'webhooks', 'webhooks-dlq']) {
       service.queueMap.set(name, queue)
     }
     service.stalledEvents.set('notifications', { count: 2, lastStalledAt: '2026-09-13T10:00:00.000Z' })

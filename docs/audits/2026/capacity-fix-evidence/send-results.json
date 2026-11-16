@@ -1,0 +1,12 @@
+{
+  "method": "HTTP + PostgreSQL + Redis worker + mock provider",
+  "conversationRecipientResolved": true,
+  "messageId": "1e940840-dd61-4127-b894-10727ef1a03a",
+  "provider": "mock",
+  "status": "SENT",
+  "idempotentReplaySingleMessage": true,
+  "conflictingPayloadHTTP": 409,
+  "admissionRejectedHTTP": 429,
+  "rejectedMessagePersisted": false,
+  "pass": true
+}

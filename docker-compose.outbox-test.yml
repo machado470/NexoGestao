@@ -6,7 +6,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: nexogestao_outbox_test
     ports:
-      - "${OUTBOX_TEST_POSTGRES_PORT:-55432}:5432"
+      - "127.0.0.1:${OUTBOX_TEST_POSTGRES_PORT:-0}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d nexogestao_outbox_test"]
       interval: 1s

@@ -1,0 +1,12 @@
+{
+  "method": "Real PostgreSQL + API + BFF + Chromium; synthetic organization and account",
+  "existingDataReadableWhileSuspended": true,
+  "customerCreateBlockedHTTPStatus": 403,
+  "restrictionMessageVisible": true,
+  "noBlockedRecordPersisted": true,
+  "sameSessionAfterRegularization": true,
+  "customerCreatedAfterRegularization": true,
+  "persistedAfterReload": true,
+  "pageErrors": [],
+  "pass": true
+}

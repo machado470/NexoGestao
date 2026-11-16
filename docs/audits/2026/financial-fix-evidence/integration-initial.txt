@@ -1,0 +1,159 @@
+[Nest] 51309  - 11/11/2026, 9:54:48 PM     LOG [BillingService] [BOOT][Billing] Stripe inicializado
+[Nest] 51309  - 11/11/2026, 9:54:48 PM     LOG [BillingService] Webhook recebido: checkout.session.completed
+[Nest] 51309  - 11/11/2026, 9:54:48 PM     LOG [BillingService] Webhook recebido: invoice.paid
+[Nest] 51309  - 11/11/2026, 9:54:48 PM     LOG [BillingService] [BOOT][Billing] Stripe inicializado
+[Nest] 51309  - 11/11/2026, 9:54:48 PM     LOG [BillingService] Webhook recebido: invoice.paid
+[Nest] 51309  - 11/11/2026, 9:54:49 PM     LOG [BillingService] [BOOT][Billing] Stripe inicializado
+[Nest] 51309  - 11/11/2026, 9:54:49 PM     LOG [BillingService] Webhook recebido: invoice.paid
+[Nest] 51309  - 11/11/2026, 9:54:49 PM     LOG [BillingService] [BOOT][Billing] Stripe inicializado
+[Nest] 51309  - 11/11/2026, 9:54:49 PM     LOG [BillingService] Webhook recebido: invoice.paid
+FAIL test/integration/whatsapp-public-webhook-tenant-postgres.integration.spec.ts (5.932 s)
+  ● Console
+
+    console.log
+      {"event":"http_request","requestId":"4c4aa856-c7ea-478c-9ae0-72ca94338d8b","correlationId":"4c4aa856-c7ea-478c-9ae0-72ca94338d8b","userId":null,"orgId":"acb35928-435f-4b09-9133-c687e3afcfbe","traceId":null,"route":"POST /whatsapp/webhooks/meta_cloud","status":200,"latencyMs":65,"contentLength":"136","ip":"127.0.0.1","userAgent":""}
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:67:17)
+
+    console.log
+      {"event":"http_request","requestId":"33bb5497-7973-47ef-8821-5d5665284006","correlationId":"33bb5497-7973-47ef-8821-5d5665284006","userId":null,"orgId":null,"traceId":null,"route":"POST /whatsapp/webhooks/meta_cloud","status":200,"latencyMs":55,"contentLength":"136","ip":"127.0.0.1","userAgent":""}
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:67:17)
+
+    console.warn
+      {"event":"http_request","requestId":"5cda6401-eea5-476b-bed8-8a720251f27b","correlationId":"5cda6401-eea5-476b-bed8-8a720251f27b","userId":null,"orgId":null,"traceId":null,"route":"POST /whatsapp/webhooks/meta_cloud","status":400,"latencyMs":17,"contentLength":"118","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+    console.warn
+      {"event":"http_request","requestId":"d8b1863d-e8ca-4729-a939-45387e8e730f","correlationId":"d8b1863d-e8ca-4729-a939-45387e8e730f","userId":null,"orgId":null,"traceId":null,"route":"POST /whatsapp/webhooks/meta_cloud","status":400,"latencyMs":13,"contentLength":"118","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+    console.log
+      {"event":"http_request","requestId":"4f02669f-5b3d-4cd3-bf15-7b3a778e0503","correlationId":"4f02669f-5b3d-4cd3-bf15-7b3a778e0503","userId":null,"orgId":null,"traceId":null,"route":"POST /whatsapp/webhooks/meta_cloud","status":200,"latencyMs":18,"contentLength":"136","ip":"127.0.0.1","userAgent":""}
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:67:17)
+
+    console.log
+      {"event":"http_request","requestId":"057c7733-d5a4-44d5-8c4d-8d08fe7cca67","correlationId":"057c7733-d5a4-44d5-8c4d-8d08fe7cca67","userId":"61be6045-46ce-40aa-863b-d76b00d398c4","orgId":"1de8b2db-399b-48f9-8096-a07af8bce422","traceId":null,"route":"POST /whatsapp/webhook-events/3433cdd1-3518-4ebb-bf11-325b9a54bfe7/replay","status":201,"latencyMs":11,"contentLength":"297","ip":"127.0.0.1","userAgent":""}
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:67:17)
+
+    console.log
+      {"event":"http_request","requestId":"fe9304e9-e92f-4f1e-aad1-74b300ef07f5","correlationId":"fe9304e9-e92f-4f1e-aad1-74b300ef07f5","userId":null,"orgId":null,"traceId":null,"route":"POST /whatsapp/webhooks/meta_cloud","status":200,"latencyMs":14,"contentLength":"136","ip":"127.0.0.1","userAgent":""}
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:67:17)
+
+    console.log
+      {"event":"http_request","requestId":"33413697-7d85-42b2-8895-2607206ec3e8","correlationId":"33413697-7d85-42b2-8895-2607206ec3e8","userId":null,"orgId":null,"traceId":null,"route":"POST /whatsapp/webhooks/meta_cloud","status":200,"latencyMs":17,"contentLength":"136","ip":"127.0.0.1","userAgent":""}
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:67:17)
+
+    console.log
+      [OperationalStateJob] evaluated=2 changed=2 at=2026-11-11T21:55:00.397Z
+
+      at OperationalStateJob.run (src/people/operational-state.job.ts:110:13)
+
+  ● Phase 2.2 WhatsApp public webhook tenant isolation (Postgres/Redis e2e) › mantém replay e providerMessageId tenant-safe sem efeitos derivados extras
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 1
+
+      Object {
+        "actions": 0,
+        "conversations": 1,
+        "events": 2,
+        "messages": 1,
+    -   "timeline": 5,
+    +   "timeline": 6,
+      }
+
+      69 |     expect(after[tenantId].timeline - before[tenantId].timeline).toBeGreaterThanOrEqual(1)
+      70 |     expect(after[tenantId].actions - before[tenantId].actions).toBe(0)
+    > 71 |     expect(after[otherTenantId]).toEqual(before[otherTenantId])
+         |                                  ^
+      72 |   }
+      73 |
+      74 |   beforeAll(async () => {
+
+      at expectInboundDelta (test/integration/whatsapp-public-webhook-tenant-postgres.integration.spec.ts:71:34)
+      at Object.<anonymous> (test/integration/whatsapp-public-webhook-tenant-postgres.integration.spec.ts:173:5)
+
+[Nest] 51309  - 11/11/2026, 9:55:13 PM    WARN [ExecutionService] {"event":"execution_start_fallback","orgId":"org-1","serviceOrderId":"exec-start-1","customerId":"cust-1","executorPersonId":"person-1"}
+[Nest] 51309  - 11/11/2026, 9:55:13 PM    WARN [ExecutionService] {"event":"execution_completion_fallback","requestId":"req-1","userId":"user-1","orgId":"org-1","executionId":"exec-1","serviceOrderId":"exec-1"}
+[Nest] 51309  - 11/11/2026, 9:55:17 PM   ERROR [FinanceService] Erro overdue WhatsApp: Não foi possível confirmar o enfileiramento do lembrete.
+[Nest] 51309  - 11/11/2026, 9:55:17 PM   ERROR [FinanceService] Erro overdue WhatsApp: Não foi possível confirmar o enfileiramento do lembrete.
+[Nest] 51309  - 11/11/2026, 9:55:17 PM   ERROR [FinanceService] Erro overdue WhatsApp: Não foi possível confirmar o enfileiramento do lembrete.
+[Nest] 51309  - 11/11/2026, 9:55:17 PM     LOG [PaymentsService] [BOOT][Payments] Stripe inicializado no PaymentsService
+[Nest] 51309  - 11/11/2026, 9:55:17 PM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.completed
+[Nest] 51309  - 11/11/2026, 9:55:17 PM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.completed
+[Nest] 51309  - 11/11/2026, 9:55:17 PM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.completed
+[Nest] 51309  - 11/11/2026, 9:55:17 PM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.completed
+[Nest] 51309  - 11/11/2026, 9:55:17 PM     LOG [FinanceService] {"requestId":"gap-integration","action":"PAY_CHARGE_START","entityId":"3e5a62a2-05eb-4cf0-9e7a-dc61e66f1aa6","orgId":"9185a664-ee44-4ccf-b3d5-6b7209f1ace9","amountCents":1000,"method":"CARD","message":"Iniciando payCharge"}
+[Nest] 51309  - 11/11/2026, 9:55:17 PM     LOG [FinanceService] {"requestId":"gap-integration","action":"PAY_CHARGE_RESULT","entityId":"3e5a62a2-05eb-4cf0-9e7a-dc61e66f1aa6","paymentId":"f80b13d6-4b32-4553-862d-4c074c647315","orgId":"9185a664-ee44-4ccf-b3d5-6b7209f1ace9","message":"Pagamento registrado com sucesso"}
+[Nest] 51309  - 11/11/2026, 9:55:17 PM     LOG [PaymentsService] Pagamento processado com sucesso via Stripe. event=checkout.session.completed chargeId=3e5a62a2-05eb-4cf0-9e7a-dc61e66f1aa6 externalRef=stripe:pi_be93cf84-ec7f-4ff3-81da-42a611db2262
+[Nest] 51309  - 11/11/2026, 9:55:17 PM     LOG [PaymentsService] Webhook Stripe recebido: charge.succeeded
+[Nest] 51309  - 11/11/2026, 9:55:17 PM     LOG [FinanceService] {"requestId":"gap-integration","action":"PAY_CHARGE_START","entityId":"3e5a62a2-05eb-4cf0-9e7a-dc61e66f1aa6","orgId":"9185a664-ee44-4ccf-b3d5-6b7209f1ace9","amountCents":1000,"method":"CARD","message":"Iniciando payCharge"}
+[Nest] 51309  - 11/11/2026, 9:55:17 PM     LOG [IdempotencyService] {"requestId":"gap-integration","action":"IDEMPOTENCY_REPLAY","orgId":"9185a664-ee44-4ccf-b3d5-6b7209f1ace9","scope":"finance.pay_charge","key":"stripe-payment:pi_be93cf84-ec7f-4ff3-81da-42a611db2262"}
+[Nest] 51309  - 11/11/2026, 9:55:17 PM     LOG [PaymentsService] Pagamento processado com sucesso via Stripe. event=charge.succeeded chargeId=3e5a62a2-05eb-4cf0-9e7a-dc61e66f1aa6 externalRef=stripe:pi_be93cf84-ec7f-4ff3-81da-42a611db2262
+[Nest] 51309  - 11/11/2026, 9:55:17 PM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.async_payment_succeeded
+[Nest] 51309  - 11/11/2026, 9:55:17 PM     LOG [FinanceService] {"requestId":"gap-integration","action":"PAY_CHARGE_START","entityId":"3e5a62a2-05eb-4cf0-9e7a-dc61e66f1aa6","orgId":"9185a664-ee44-4ccf-b3d5-6b7209f1ace9","amountCents":1000,"method":"CARD","message":"Iniciando payCharge"}
+[Nest] 51309  - 11/11/2026, 9:55:17 PM     LOG [IdempotencyService] {"requestId":"gap-integration","action":"IDEMPOTENCY_REPLAY","orgId":"9185a664-ee44-4ccf-b3d5-6b7209f1ace9","scope":"finance.pay_charge","key":"stripe-payment:pi_be93cf84-ec7f-4ff3-81da-42a611db2262"}
+[Nest] 51309  - 11/11/2026, 9:55:17 PM     LOG [PaymentsService] Pagamento processado com sucesso via Stripe. event=checkout.session.async_payment_succeeded chargeId=3e5a62a2-05eb-4cf0-9e7a-dc61e66f1aa6 externalRef=stripe:pi_be93cf84-ec7f-4ff3-81da-42a611db2262
+[Nest] 51309  - 11/11/2026, 9:55:17 PM     LOG [FinanceService] {"requestId":"gap-integration","action":"PAY_CHARGE_START","entityId":"8fcb6d9e-52bf-4915-8343-17e975bd0f26","orgId":"9185a664-ee44-4ccf-b3d5-6b7209f1ace9","amountCents":1000,"method":"CARD","message":"Iniciando payCharge"}
+[Nest] 51309  - 11/11/2026, 9:55:18 PM     LOG [FinanceService] {"action":"PAY_CHARGE_START","entityId":"92f727ea-b6ab-4b9b-8202-f2b3ef3f29b3","orgId":"a2a613fc-bf5c-450f-891c-9466c0f42a06","amountCents":1000,"method":"PIX","message":"Iniciando payCharge"}
+
+Summary of all failing tests
+FAIL test/integration/whatsapp-public-webhook-tenant-postgres.integration.spec.ts (5.932 s)
+  ● Phase 2.2 WhatsApp public webhook tenant isolation (Postgres/Redis e2e) › mantém replay e providerMessageId tenant-safe sem efeitos derivados extras
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 1
+
+      Object {
+        "actions": 0,
+        "conversations": 1,
+        "events": 2,
+        "messages": 1,
+    -   "timeline": 5,
+    +   "timeline": 6,
+      }
+
+      69 |     expect(after[tenantId].timeline - before[tenantId].timeline).toBeGreaterThanOrEqual(1)
+      70 |     expect(after[tenantId].actions - before[tenantId].actions).toBe(0)
+    > 71 |     expect(after[otherTenantId]).toEqual(before[otherTenantId])
+         |                                  ^
+      72 |   }
+      73 |
+      74 |   beforeAll(async () => {
+
+      at expectInboundDelta (test/integration/whatsapp-public-webhook-tenant-postgres.integration.spec.ts:71:34)
+      at Object.<anonymous> (test/integration/whatsapp-public-webhook-tenant-postgres.integration.spec.ts:173:5)
+
+
+Test Suites: 1 failed, 10 skipped, 23 passed, 24 of 34 total
+Tests:       1 failed, 20 skipped, 121 passed, 142 total
+Snapshots:   0 total
+Time:        143.996 s
+Ran all test suites matching test/integration/.

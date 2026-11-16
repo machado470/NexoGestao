@@ -15,6 +15,7 @@ import { Roles } from '../auth/decorators/roles.decorator'
 import { Org } from '../auth/decorators/org.decorator'
 import { User } from '../auth/decorators/user.decorator'
 import { LaunchesService } from './launches.service'
+import { UpdateLaunchDto } from './dto/update-launch.dto'
 import { CreateLaunchDto, LaunchType } from './dto/create-launch.dto'
 
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -63,7 +64,7 @@ export class LaunchesController {
   async update(
     @Org() orgId: string,
     @Param('id') id: string,
-    @Body() body: Partial<CreateLaunchDto>,
+    @Body() body: UpdateLaunchDto,
   ) {
     return this.launches.update(orgId, id, body)
   }

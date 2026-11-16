@@ -1,0 +1,8 @@
+Login passed
+Customer passed
+Notifications passed
+Appointment passed
+Order passed
+Execution passed
+Finance passed
+UI stages completed

@@ -68,8 +68,8 @@ export class LaunchesService {
 
   async create(orgId: string, userId: string | null, dto: CreateLaunchDto) {
     // ✅ Validação: valor deve ser positivo
-    if (dto.amountCents <= 0) {
-      throw new BadRequestException('O valor do lançamento deve ser maior que zero')
+    if (!Number.isInteger(dto.amountCents) || dto.amountCents < 1 || dto.amountCents > 2_147_483_647) {
+      throw new BadRequestException('O valor do lançamento deve ser inteiro entre 1 e 2147483647 centavos')
     }
 
     // ✅ Validação: tipo válido (INCOME, EXPENSE, TRANSFER)
@@ -104,8 +104,8 @@ export class LaunchesService {
     if (!launch) throw new NotFoundException('Lançamento não encontrado')
 
     // ✅ Validação: valor deve ser positivo se fornecido
-    if (dto.amountCents !== undefined && dto.amountCents <= 0) {
-      throw new BadRequestException('O valor do lançamento deve ser maior que zero')
+    if (dto.amountCents !== undefined && (!Number.isInteger(dto.amountCents) || dto.amountCents < 1 || dto.amountCents > 2_147_483_647)) {
+      throw new BadRequestException('O valor do lançamento deve ser inteiro entre 1 e 2147483647 centavos')
     }
 
     // ✅ Validação: tipo válido se fornecido

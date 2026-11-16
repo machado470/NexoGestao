@@ -151,7 +151,7 @@ describe('ExecutionRunner multi-instance concurrency', () => {
               jest.fn().mockResolvedValue({
                 allowed: true,
               }),
-            enforceMeter:
+            assertMeterInTransaction: jest.fn(), enforceMeter:
               jest.fn().mockResolvedValue({
                 allowed: true,
               }),

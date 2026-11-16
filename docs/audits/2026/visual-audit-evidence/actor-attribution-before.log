@@ -1,0 +1,59 @@
+FAIL src/audit/audit-admin.service.spec.ts
+  ● Audit actor attribution › preserves attribution for missing person in list and detail
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 1
+
+      Object {
+    -   "actorName": "Ator não identificado",
+    +   "actorName": "Sistema",
+        "actorPersonId": "person",
+        "id": "event",
+        "orgId": "org",
+        "person": null,
+      }
+
+      38 |     const db = { auditEvent: { findMany: jest.fn().mockResolvedValue([event]), count: jest.fn().mockResolvedValue(1), findFirst: jest.fn().mockResolvedValue(event) } }
+      39 |     const service = new AuditAdminService(db as any)
+    > 40 |     expect((await service.listEvents({ orgId: 'org' })).data[0]).toEqual({ ...event, actorName: expected })
+         |                                                                  ^
+      41 |     expect(await service.getEventDetail('org', 'event')).toEqual({ ...event, actorName: expected })
+      42 |   })
+      43 | })
+
+      at src/audit/audit-admin.service.spec.ts:40:66
+
+  ● Audit actor attribution › preserves attribution for user without person in list and detail
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,7 +1,7 @@
+      Object {
+    -   "actorName": "Ator não identificado",
+    +   "actorName": "Sistema",
+        "actorPersonId": null,
+        "actorUserId": "user",
+        "id": "event",
+        "orgId": "org",
+        "person": null,
+
+      38 |     const db = { auditEvent: { findMany: jest.fn().mockResolvedValue([event]), count: jest.fn().mockResolvedValue(1), findFirst: jest.fn().mockResolvedValue(event) } }
+      39 |     const service = new AuditAdminService(db as any)
+    > 40 |     expect((await service.listEvents({ orgId: 'org' })).data[0]).toEqual({ ...event, actorName: expected })
+         |                                                                  ^
+      41 |     expect(await service.getEventDetail('org', 'event')).toEqual({ ...event, actorName: expected })
+      42 |   })
+      43 | })
+
+      at src/audit/audit-admin.service.spec.ts:40:66
+
+Test Suites: 1 failed, 1 total
+Tests:       2 failed, 5 passed, 7 total
+Snapshots:   0 total
+Time:        4.729 s, estimated 5 s
+Ran all test suites matching src/audit/audit-admin.service.spec.ts.

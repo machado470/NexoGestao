@@ -61,12 +61,12 @@ O entrypoint usa `prisma migrate deploy` quando `AUTO_MIGRATE=1`. Antes, qualque
 
 ### PostgreSQL isolado e reprodução
 
-O ambiente exclusivo usa PostgreSQL 15, projeto Compose `nexogestao_outbox_test`, banco `nexogestao_outbox_test`, porta 55432 e volume removido no encerramento. O teste recusa uma `DATABASE_URL` cujo nome não contenha `outbox_test`/`test_outbox`.
+Atualização de 12/11/2026: o ambiente exclusivo usa PostgreSQL 15 e banco `nexogestao_outbox_test`, com projeto Compose único por execução e porta livre de loopback atribuída pelo Docker. O script imprime projeto/porta e encerra somente seu projeto, preservando volumes. O teste recusa uma `DATABASE_URL` cujo nome não contenha `outbox_test`/`test_outbox`. O projeto/porta fixos e o cleanup com `down -v` da versão anterior foram substituídos após colisão no CI.
 
 ```bash
 ./scripts/run-outbox-integration.sh
-DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:55432/nexogestao_outbox_test?schema=public' RUN_REAL_OUTBOX_INTEGRATION=true pnpm --filter ./apps/api test -- test/integration/outbox-postgres.integration.spec.ts
-docker compose -p nexogestao_outbox_test -f docker-compose.outbox-test.yml down -v
+# Opcional: porta fixa explicitamente escolhida, sem encerrar quem já a utiliza.
+OUTBOX_TEST_POSTGRES_PORT=55433 ./scripts/run-outbox-integration.sh
 ```
 
 ### Decisões e riscos residuais

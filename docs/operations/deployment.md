@@ -23,3 +23,143 @@ Migrations canônicas devem ser aplicadas com `pnpm prisma:migrate:deploy`; não
 ## Estado da documentação
 
 Este documento permanece em **review**: há mais de um alvo de implantação versionado (Compose e Railway), e a autoridade operacional de produção ainda precisa ser definida. Até essa decisão, valide variáveis contra os arquivos `.env.*.example` e o artefato do ambiente escolhido, sem inferir valores de documentos arquivados.
+
+## Base Compose reproduzível
+
+### GitHub Pages e acesso à plataforma
+
+O workflow `pages` publica somente o frontend estático, com
+`VITE_BASE=/NexoGestao/` e `VITE_STATIC_HOSTING=true`. Nesse build, as rotas de
+autenticação informam que o acesso está indisponível, sem montar formulários,
+enviar credenciais ou consultar sessões em uma API inexistente. Preferências
+de cookies são salvas no navegador.
+
+Login, cadastro e recuperação de senha exigem uma implantação do web/BFF e
+da API com seus serviços de dados. O cliente tRPC chama `/api/trpc` na mesma
+origem do web/BFF; apontar uma variável para a API Nest diretamente não
+substitui esse serviço. O destino e a URL pública da implantação completa
+ainda precisam ser definidos. O build normal mantém a autenticação real.
+
+### Railway: API e web/BFF no mesmo projeto
+
+Os serviços detectados pelo Railway precisam de configurações separadas. Em
+**Settings**, mantenha **Root Directory** em `/` nos dois serviços: o lockfile,
+as migrations e o pacote comum ficam na raiz do monorepo. Em **Config as Code**,
+configure **Railway Config File** assim:
+
+| Serviço | Arquivo de configuração |
+| --- | --- |
+| API | `/apps/api/railway.json` |
+| Web/BFF | `/apps/web/railway.json` |
+
+Esses arquivos selecionam `Dockerfile.railway` próprios, sem secret mounts,
+e substituem os comandos de inicialização detectados automaticamente. Os
+Dockerfiles de Compose preservam seus mounts opcionais de CA para ambientes
+com proxy. Nenhum build desativa a validação TLS.
+
+A imagem Railway da API mantém o Prisma CLI para executar
+`pnpm prisma:migrate:deploy` como **pre-deploy**, com `DATABASE_URL` disponível.
+O startup apenas espera o banco e valida o schema; não aplica migrations nem
+seeds. A imagem web compila a aplicação completa em `/`, com
+`VITE_STATIC_HOSTING=false`, e serve o BFF na mesma origem. A API adapta `PORT`
+para `API_PORT`, e o web usa `PORT` quando `WEB_PORT` não estiver definido.
+
+Antes de publicar, conecte os serviços ao Postgres e a um serviço Redis do
+mesmo projeto, por referências de variáveis do Railway. Na API, configure
+`DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`, as variáveis de produção/integradores
+de `.env.prod.example` e a URL pública do web em `APP_URL`, `FRONTEND_URL` e
+`CORS_ORIGINS`. O contrato atual exige uma chave Stripe em produção; uma chave
+fictícia não configura a integração. Configure verificação e envio de e-mail
+antes de habilitar o cadastro público com verificação obrigatória.
+
+No web, configure `NEXO_API_URL` para a URL da API acessível pelo BFF e
+`JWT_SECRET` por referência à API. Defina as URLs públicas coerentemente e gere
+o domínio HTTPS do serviço web. A configuração de build não fornece variáveis
+secretas nem cria os serviços de dados. Chaves reais ficam somente no Railway.
+O GitHub Pages continua sendo uma publicação estática separada.
+
+O CI executa `NEXO_DOCKER_TARGET=railway bash scripts/smoke-production-compose.sh`
+em banco/Redis/containers descartáveis, incluindo migrations, readiness e a
+chamada de login inválido pelo BFF à API. As credenciais de teste e a chave
+Stripe de fixture pertencem somente a essa prova isolada. Ela não comprova
+deploy remoto. No ambiente cloud com proxy e espaço VFS limitado, execute a
+variante de build no CI; a configuração pode ser verificada localmente com
+`NEXO_DOCKER_TARGET=railway bash scripts/smoke-production-compose.sh --config-only`.
+
+### Compose: serviços e imagens
+
+`docker-compose.prod.yml`, `apps/api/Dockerfile.prod`, `apps/web/Dockerfile.prod`
+e `infra/nginx/nginx.prod.conf` definem esta base. O `Dockerfile` raiz continua
+sendo o alvo de build do workflow legado de imagem da API; não prova deploy.
+Node 24 e pnpm 10.30.3 são usados com lockfile imutável. Tags de imagens base
+continuam móveis; esta base não promete builds idênticos byte a byte.
+
+A API escuta em 3000 e o web/BFF em 3010. O BFF usa `http://api:3000` na rede
+Compose; `VITE_API_URL` é configuração pública de build. As imagens finais
+instalam somente dependências de produção e recebem o pacote comum compilado
+(API) e o Prisma Client gerado no build. Vite permanece ferramenta de build;
+o bundle do BFF em produção serve arquivos estáticos sem importar Vite.
+
+Migrations usam um alvo separado `builder`, com Prisma CLI e schema; a imagem
+runtime não gera código, não compila e não aplica migrations/seeds ao iniciar.
+O startup falha quando PostgreSQL não responde ou o smoke canônico do banco falha.
+
+### Configuração e TLS
+
+1. Crie fora do Git um arquivo modo `0600` baseado em `.env.prod.example`.
+2. Configure `DATABASE_URL` para o serviço `postgres`, usando percent-encoding
+   nas credenciais e nome do banco; a senha `POSTGRES_PASSWORD` contém o valor
+   original. Configure `REDIS_URL` para `redis` com senha aleatória URL-safe.
+3. Configure `DOMAIN` como hostname DNS simples (sem protocolo, porta ou path).
+   Providencie `fullchain.pem` e `privkey.pem` no diretório absoluto `TLS_CERT_DIR`.
+   O certificado deve cobrir domínio raiz, `app.DOMAIN` e `api.DOMAIN`.
+4. `HTTP_BIND`/`HTTPS_BIND` usam loopback por padrão, em 80/443. Portas públicas,
+   firewall, DNS e certificados reais dependem do destino ainda não identificado.
+
+Nginx usa o mecanismo de templates da imagem oficial, substituindo apenas
+`DOMAIN`. Variáveis nativas como `$host` e `$request_uri` são preservadas.
+O perfil `certificates` é opcional e apenas renova certificados já provisionados;
+a emissão, a cópia para `TLS_CERT_DIR` e o reload do Nginx são responsabilidade
+operacional explícita. Não habilite esse perfil como solução automática de TLS.
+
+### Sequência a revisar para um destino autorizado
+
+Os comandos abaixo são procedimento, não autorização para produção:
+
+```bash
+export NEXO_ENV_FILE=/absolute/path/outside/git/compose.env
+compose=(docker compose --env-file "$NEXO_ENV_FILE" -f docker-compose.prod.yml)
+"${compose[@]}" config --quiet
+# config completo contém segredos: revisar somente em terminal protegido.
+"${compose[@]}" build api web migrate
+"${compose[@]}" up -d --wait postgres redis
+# Somente após backup, destino e janela aprovados:
+"${compose[@]}" run --rm migrate
+"${compose[@]}" up -d --wait api web nginx
+"${compose[@]}" exec -T nginx nginx -t
+```
+
+Defina um nome de projeto Compose estável para o destino: volumes são isolados
+por projeto. Antes de trocar de um deployment existente, inventarie os volumes
+reais e fixe o mapeamento; não presuma que novos volumes contêm dados anteriores.
+Nunca use `down --volumes` em dados reais. Rollback da aplicação exige conferir
+compatibilidade do schema; rollback de dados não é automatizado por esta base.
+
+### Prova descartável e CI
+
+```bash
+bash scripts/smoke-production-compose.sh --config-only
+bash scripts/smoke-production-compose.sh
+```
+
+O segundo comando constrói ambas as imagens e o alvo de migrations, cria projeto,
+volumes, portas locais aleatórias e TLS autoassinado exclusivos, aplica migrations
+somente nesse banco e valida health, HTML, redirect e módulos runtime. O cleanup
+remove somente os recursos desse projeto. Requer Docker Compose v2, Node, curl
+e OpenSSL. Em ambiente cloud, `CODEX_PROXY_CERT`, quando disponível, entra como
+build secret; TLS permanece verificado. Não executar builds completos se o
+armazenamento VFS disponível for insuficiente.
+
+`Production Compose validation` executa essa prova em PRs e na main, sem push de
+imagens ou deploy. `Staging deployment status` é manual e falha explicitamente
+porque o destino não está configurado. Nenhum desses workflows prova produção.

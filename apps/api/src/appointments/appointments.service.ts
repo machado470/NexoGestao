@@ -169,6 +169,7 @@ export class AppointmentsService {
       to?: string
       status?: AppointmentStatus
       customerId?: string
+      id?: string
       assignedToPersonId?: string
       page?: number
       limit?: number
@@ -179,12 +180,17 @@ export class AppointmentsService {
     const from = parseISODate('from', filters.from)
     const to = parseISODate('to', filters.to)
 
-    const page = Number(filters.page) || 1
-    const limit = Number(filters.limit) || 20
+    const page = filters.page == null ? 1 : Number(filters.page)
+    const requestedLimit = filters.limit == null ? 20 : Number(filters.limit)
+    if (!Number.isSafeInteger(page) || page < 1 || page > 10_000 || !Number.isSafeInteger(requestedLimit) || requestedLimit < 1) {
+      throw new BadRequestException('Página e limite devem ser inteiros positivos; página máxima: 10000')
+    }
+    const limit = Math.min(requestedLimit, 1000)
     const skip = (page - 1) * limit
 
     const where: Prisma.AppointmentWhereInput = { orgId }
 
+    if (filters.id) where.id = filters.id
     if (filters.customerId) where.customerId = filters.customerId
     if (filters.assignedToPersonId) where.assignedToPersonId = filters.assignedToPersonId
 
@@ -218,7 +224,7 @@ export class AppointmentsService {
     const [items, total] = await Promise.all([
       this.prisma.appointment.findMany({
         where,
-        orderBy: { startsAt: 'asc' },
+        orderBy: [{ startsAt: 'asc' }, { id: 'asc' }],
         take: limit,
         skip,
         include: {

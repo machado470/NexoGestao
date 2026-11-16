@@ -1,10 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
+import { Link } from "wouter";
 
 
 import { saveConsent, type ConsentPreferences } from "./ConsentBanner.logic";
-import { persistLocalConsent, readStoredConsent } from "./ConsentBanner.storage";
+import { readStoredConsent } from "./ConsentBanner.storage";
 
 export function ConsentBanner() {
   const [isVisible, setIsVisible] = useState(false);
@@ -33,11 +34,7 @@ export function ConsentBanner() {
     setIsSubmitting(true);
 
     try {
-      const ok = await saveConsent(prefs);
-      if (ok) {
-        persistLocalConsent(prefs);
-      }
-      return ok;
+      return await saveConsent(prefs);
     } finally {
       setIsSubmitting(false);
     }
@@ -84,12 +81,12 @@ export function ConsentBanner() {
             <p className="mt-1 text-xs leading-5 text-slate-600 sm:text-sm">
               Usamos cookies essenciais para funcionamento da plataforma. Você
               pode aceitar categorias opcionais ou personalizar. Leia a nossa{" "}
-              <a
+              <Link
                 href="/privacidade"
                 className="font-medium text-orange-600 hover:text-orange-700"
               >
                 Política de Privacidade
-              </a>
+              </Link>
               .
             </p>
           </div>

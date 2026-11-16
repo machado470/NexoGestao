@@ -74,6 +74,7 @@ describe('BillingService Stripe synchronization', () => {
 
   function makePrisma(overrides: Record<string, any> = {}) {
     const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([{id:'org-1'}]),
       billingEvent: {
         findUnique: jest.fn().mockResolvedValue(null),
         create: jest.fn().mockResolvedValue({ id: 'evt-local' }),
@@ -94,14 +95,14 @@ describe('BillingService Stripe synchronization', () => {
   }
 
   function stripeEvent(type: string, object: Record<string, any>, id = `evt_${type}`) {
-    return { id, type, data: { object } } as any
+    return { id, type, created: 1777593600, data: { object } } as any
   }
 
   function makeService(prisma: any, event?: any) {
     const service = new BillingService(prisma, config, {} as any)
     ;(service as any).stripe = {
       webhooks: { constructEvent: jest.fn().mockReturnValue(event) },
-      subscriptions: { cancel: jest.fn() },
+      subscriptions: { cancel: jest.fn(), retrieve: jest.fn().mockResolvedValue({ id:'sub_1', status: event?.type === 'invoice.payment_failed' ? 'past_due' : event?.type === 'customer.subscription.deleted' ? 'canceled' : 'active', customer:'cus_1', current_period_start:1777593600,current_period_end:1780272000,canceled_at:1780272000, items:{data:[{price:{id:'price_pro_real'}}]},metadata:{} }) },
     }
     return service
   }
@@ -120,6 +121,7 @@ describe('BillingService Stripe synchronization', () => {
   it('processa checkout.session.completed criando ou ativando assinatura Stripe', async () => {
     const prisma = makePrisma()
     const event = stripeEvent('checkout.session.completed', {
+      mode: 'subscription', payment_status: 'paid',
       metadata: { orgId: 'org-1', planName: 'PRO' },
       subscription: 'sub_1',
       customer: 'cus_1',

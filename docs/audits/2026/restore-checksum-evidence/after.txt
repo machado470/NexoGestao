@@ -1,0 +1,25 @@
+✔ recent local success (79.505038ms)
+✔ stale backup (45.521065ms)
+✔ failed last attempt (36.828753ms)
+✔ future timestamp (54.624908ms)
+✔ invalid timestamp (38.619477ms)
+✔ success without created dump (45.007356ms)
+✔ requires explicit age policy (276.703015ms)
+✔ missing or corrupt state fails without copying raw data (75.534432ms)
+✔ requires a matching success snapshot (75.964101ms)
+✔ offsite requirement is opt-in and must be confirmed (77.536362ms)
+✔ a recent failed attempt is not masked by an older success (35.413314ms)
+✔ default mode preserves the original factual JSON (5.149602ms)
+✔ valid canonical sidecar reaches simulated restore and migration (68.317529ms)
+✔ a checksum for another valid file cannot authorize restoring the requested dump (53.531414ms)
+✔ mismatched hash never invokes database commands (52.320505ms)
+✔ multiple checksum entries are rejected (44.412068ms)
+✔ missing and malformed sidecars never invoke database commands (57.481499ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 17
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1244.650166

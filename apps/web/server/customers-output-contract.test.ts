@@ -252,3 +252,28 @@ describe("customers output contracts", () => {
     ).rejects.toBeTruthy();
   });
 });
+
+describe("customer optional field updates", () => {
+  beforeEach(() => vi.restoreAllMocks());
+
+  it("forwards explicit null to clear email and notes", async () => {
+    const fetch = respond(customer);
+    await appRouter.createCaller(context).customers.update({ id: customerId, email: null, notes: null, expectedUpdatedAt: customer.updatedAt });
+    const body = JSON.parse(String(fetch.mock.calls[0][1]?.body));
+    expect(body).toEqual({ email: null, notes: null, expectedUpdatedAt: customer.updatedAt });
+  });
+
+  it("preserves omitted fields in a partial update", async () => {
+    const fetch = respond(customer);
+    await appRouter.createCaller(context).customers.update({ id: customerId, name: "Nome novo", expectedUpdatedAt: customer.updatedAt });
+    const body = JSON.parse(String(fetch.mock.calls[0][1]?.body));
+    expect(body).not.toHaveProperty("email");
+    expect(body).not.toHaveProperty("notes");
+  });
+
+  it("rejects malformed email without calling the API", async () => {
+    const fetch = respond(customer);
+    await expect(appRouter.createCaller(context).customers.update({ id: customerId, email: "invalid" })).rejects.toThrow();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+});

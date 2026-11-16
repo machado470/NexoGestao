@@ -1,0 +1,11 @@
+{
+  "method": "Real Chromium login + BFF EventSource + API + Redis PubSub + PostgreSQL; synthetic account and event envelopes",
+  "initialStreamReady": true,
+  "validEventDelivered": true,
+  "revocationSource": "sessionVersion increment on synthetic fixture",
+  "eventAfterRevocationWithheld": true,
+  "openStreamEnded": true,
+  "reconnectHTTPStatus": 401,
+  "pageErrors": [],
+  "pass": true
+}

@@ -1,0 +1,16 @@
+Login passed
+AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  assert(fields.every(f=>f.label&&f.id))
+
+    at inspect (/tmp/nexo-edit-labels-browser.cjs:11:519)
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at process.processImmediate (node:internal/timers:541:9)
+    at async /tmp/nexo-edit-labels-browser.cjs:12:480 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}

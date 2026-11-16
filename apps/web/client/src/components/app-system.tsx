@@ -463,12 +463,14 @@ export const AppCheckbox = Checkbox;
 export const AppRadio = RadioGroup;
 
 export function AppSelect({
+  id,
   value,
   onValueChange,
   placeholder,
   options,
   ariaLabel,
 }: {
+  id?: string;
   value?: string;
   onValueChange?: (value: string) => void;
   placeholder?: string;
@@ -477,7 +479,7 @@ export function AppSelect({
 }) {
   return (
     <Select value={value} onValueChange={onValueChange}>
-      <SelectTrigger aria-label={ariaLabel}>
+      <SelectTrigger id={id} aria-label={ariaLabel}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>

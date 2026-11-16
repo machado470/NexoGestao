@@ -6,3 +6,15 @@ node_modules
 dist
 apps/**/dist
 **/*.log
+
+**/node_modules
+.env
+.env.*
+**/.env
+**/.env.*
+**/coverage
+**/.turbo
+
+work
+**/dist
+**/*.tsbuildinfo

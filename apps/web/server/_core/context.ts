@@ -12,6 +12,8 @@ export type TrpcUser = {
   role?: string;
   email?: string;
   name?: string;
+  requiresOnboarding?: boolean;
+  redirect?: string;
 };
 
 export type TrpcContext = {
@@ -207,6 +209,10 @@ function normalizeMePayload(payload: unknown): Omit<TrpcUser, "token" | "validat
     role,
     email,
     name,
+    ...(typeof root.requiresOnboarding === "boolean" ? {
+      requiresOnboarding: root.requiresOnboarding,
+      redirect: root.requiresOnboarding ? "/onboarding" : "/executive-dashboard",
+    } : {}),
   };
 }
 

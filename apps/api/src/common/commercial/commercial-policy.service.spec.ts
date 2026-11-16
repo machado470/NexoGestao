@@ -14,6 +14,10 @@ describe('CommercialPolicyService', () => {
     tenantOps.increment('org-1', 'automation_execution', 210)
 
     const prisma = {
+      timelineEvent: { count: jest.fn().mockResolvedValue(210) },
+      whatsAppMessage: { count: jest.fn().mockResolvedValue(0) },
+      charge: { count: jest.fn().mockResolvedValue(0) },
+      payment: { count: jest.fn().mockResolvedValue(0) },
       subscription: {
         findUnique: jest.fn().mockResolvedValue({
           id: 'sub-1',

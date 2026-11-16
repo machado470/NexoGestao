@@ -65,7 +65,6 @@ const rolePermissions: Record<Role, Permission[]> = {
     'governance:read',
     'reports:read',
     'reports:export',
-    'settings:manage',
   ],
   STAFF: [
     'customers:read',
@@ -77,14 +76,12 @@ const rolePermissions: Record<Role, Permission[]> = {
     'orders:read',
     'orders:create',
     'orders:update',
-    'finance:read',
     'reports:read',
   ],
   VIEWER: [
     'customers:read',
     'appointments:read',
     'orders:read',
-    'finance:read',
     'governance:read',
     'reports:read',
   ],

@@ -5,7 +5,7 @@ umask 077
 
 BACKUP_DIR="${BACKUP_DIR:-/backups}"
 RETENTION_DAYS="${RETENTION_DAYS:-30}"
-DB_CONTAINER="${DB_CONTAINER:-nexogestao_postgres_prod}"
+DB_CONTAINER="${DB_CONTAINER:-}"
 POSTGRES_USER="${POSTGRES_USER:-}"
 POSTGRES_DB="${POSTGRES_DB:-}"
 POSTGRES_HOST="${POSTGRES_HOST:-}"
@@ -32,7 +32,7 @@ trap cleanup EXIT INT TERM
 while (($#)); do
   case "$1" in
     --upload) UPLOAD=true; shift ;;
-    --container) [[ $# -ge 2 ]] || die "--container requires a value"; DB_CONTAINER="$2"; shift 2 ;;
+    --container) [[ $# -ge 2 && -n "$2" && "$2" != --* ]] || die "--container requires a value"; DB_CONTAINER="$2"; shift 2 ;;
     *) die "unknown argument: $1" ;;
   esac
 done
@@ -58,17 +58,22 @@ TMP_BACKUP="$(mktemp "$BACKUP_DIR/.${BACKUP_FILE}.partial.XXXXXX")"
 TMP_CHECKSUM="$(mktemp "$BACKUP_DIR/.${BACKUP_FILE}.sha256.partial.XXXXXX")"
 log backup_started started "database=$(printf %q "$POSTGRES_DB") destination=$(printf %q "$BACKUP_PATH")"
 
-if command -v docker >/dev/null 2>&1 && docker inspect -f '{{.State.Running}}' "$DB_CONTAINER" 2>/dev/null | grep -qx true; then
-  docker exec "$DB_CONTAINER" pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+if [[ -n "$DB_CONTAINER" ]]; then
+  command -v docker >/dev/null || die "docker is required for the selected DB_CONTAINER"
+  docker inspect -f '{{.State.Running}}' "$DB_CONTAINER" 2>/dev/null | grep -qx true || die "selected DB_CONTAINER is not running; host fallback is prohibited"
+  docker exec "$DB_CONTAINER" env -u PGHOSTADDR -u PGSERVICE -u PGSERVICEFILE -u PGOPTIONS pg_dump -h /var/run/postgresql -p 5432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
     --no-owner --no-acl --clean --if-exists | gzip -9 >"$TMP_BACKUP"
 else
-  [[ -n "$POSTGRES_HOST" ]] || die "POSTGRES_HOST is required when DB_CONTAINER is unavailable"
+  [[ -n "$POSTGRES_HOST" ]] || die "POSTGRES_HOST is required when DB_CONTAINER is not configured"
   command -v pg_dump >/dev/null || die "pg_dump is required when DB_CONTAINER is unavailable"
-  PGPASSWORD="${POSTGRES_PASSWORD:-}" pg_dump -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" \
+  PGPASSWORD="${POSTGRES_PASSWORD:-}" env -u PGHOSTADDR -u PGSERVICE -u PGSERVICEFILE -u PGOPTIONS pg_dump -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" \
     -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --no-acl --clean --if-exists | gzip -9 >"$TMP_BACKUP"
 fi
 [[ -s "$TMP_BACKUP" ]] || die "pg_dump produced an empty artifact"
-gzip -t -- "$TMP_BACKUP"
+# gzip headers make even an empty SQL stream non-empty on disk.
+# Consume the whole stream: validate gzip integrity and require actual dump bytes.
+uncompressed_bytes="$(gzip -cd -- "$TMP_BACKUP" | wc -c)" || die "gzip integrity verification failed"
+((uncompressed_bytes > 0)) || die "pg_dump produced an empty SQL stream"
 log integrity_verified success "artifact=$(printf %q "$BACKUP_FILE")"
 HASH="$(sha256sum "$TMP_BACKUP" | awk '{print $1}')"
 printf '%s  %s\n' "$HASH" "$(basename "$TMP_BACKUP")" >"$TMP_CHECKSUM"
@@ -79,7 +84,7 @@ mv -- "$TMP_BACKUP" "$BACKUP_PATH"; TMP_BACKUP=""
 mv -- "$TMP_CHECKSUM" "$CHECKSUM_PATH"; TMP_CHECKSUM=""
 (cd "$BACKUP_DIR" && sha256sum -c -- "$(basename "$CHECKSUM_PATH")" >/dev/null) || die "published checksum verification failed"
 log checksum_verified success "sha256=$HASH"
-log backup_created success "result=LOCAL_BACKUP_SUCCESS artifact=$(printf %q "$BACKUP_PATH")"
+log backup_created success "result=LOCAL_BACKUP_SUCCESS artifact=$(printf %q "$BACKUP_PATH") artifact_name=$BACKUP_FILE"
 
 find "$BACKUP_DIR" -maxdepth 1 -type f \( -name 'nexogestao_backup_*.sql.gz' -o -name 'nexogestao_backup_*.sql.gz.sha256' \) \
   -mtime "+$RETENTION_DAYS" -delete

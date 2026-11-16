@@ -1,0 +1,46 @@
+
+ RUN  v4.1.12 /workspace/NexoGestao/apps/web
+
+ ❯ server/operational-notifications.integration.test.ts (5 tests | 2 failed) 17ms
+     × uses /v1 API and session bearer instead of Prisma or memory 11ms
+     × uses exactly one API prefix for count and mark-read 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  server/operational-notifications.integration.test.ts > notification BFF persistent authority > uses /v1 API and session bearer instead of Prisma or memory
+AssertionError: expected '/v1/v1/notifications' to be '/v1/notifications' // Object.is equality
+
+Expected: "/v1/notifications"
+Received: "/v1/v1/notifications"
+
+ ❯ server/operational-notifications.integration.test.ts:22:58
+     20|     const result = await appRouter.createCaller(createCtx()).dashboard…
+     21|     expect(result.items).toHaveLength(1);
+     22|     expect(new URL(fetchMock.mock.calls[0][0]).pathname).toBe("/v1/not…
+       |                                                          ^
+     23|     expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/v…
+     24|       headers: expect.objectContaining({ Authorization: "Bearer sessio…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  server/operational-notifications.integration.test.ts > notification BFF persistent authority > uses exactly one API prefix for count and mark-read
+AssertionError: expected '/v1/v1/notifications/unread-count' to be '/v1/notifications/unread-count' // Object.is equality
+
+Expected: "/v1/notifications/unread-count"
+Received: "/v1/v1/notifications/unread-count"
+
+ ❯ server/operational-notifications.integration.test.ts:32:58
+     30|     fetchMock.mockResolvedValueOnce({ ok: true, text: async () => JSON…
+     31|     await caller.dashboard.notificationCenter.unreadCount();
+     32|     expect(new URL(fetchMock.mock.calls[0][0]).pathname).toBe("/v1/not…
+       |                                                          ^
+     33|     fetchMock.mockResolvedValueOnce({ ok: true, text: async () => JSON…
+     34|     await caller.dashboard.notificationCenter.markRead({ id: item.id }…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 3 passed (5)
+   Start at  14:57:01
+   Duration  856ms (transform 501ms, setup 0ms, import 701ms, tests 17ms, environment 0ms)

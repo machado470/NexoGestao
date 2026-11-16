@@ -7,13 +7,10 @@ import {
 import { Reflector } from '@nestjs/core'
 import { ROLES_KEY, AppRole } from '../decorators/roles.decorator'
 
-const ROLE_NORMALIZATION: Record<string, 'ADMIN' | 'OPERADOR' | 'FINANCEIRO'> = {
-  ADMIN: 'ADMIN',
-  MANAGER: 'OPERADOR',
-  STAFF: 'OPERADOR',
-  OPERADOR: 'OPERADOR',
-  VIEWER: 'FINANCEIRO',
-  FINANCEIRO: 'FINANCEIRO',
+// Canonical operator grants must never erase an explicit MANAGER restriction.
+const CANONICAL_MEMBERS: Partial<Record<AppRole, string[]>> = {
+  OPERADOR: ['OPERADOR', 'MANAGER', 'STAFF'],
+  FINANCEIRO: ['FINANCEIRO', 'VIEWER'],
 }
 
 @Injectable()
@@ -37,9 +34,9 @@ export class RolesGuard implements CanActivate {
       throw new ForbiddenException('Sem permissão (role ausente).')
     }
 
-    const userRole = ROLE_NORMALIZATION[user.role] ?? user.role
+    const userRole = user.role
     const acceptedRoles = new Set(
-      requiredRoles.map((role) => ROLE_NORMALIZATION[role] ?? role),
+      requiredRoles.flatMap((role) => CANONICAL_MEMBERS[role] ?? [role]),
     )
 
     if (userRole === 'ADMIN') return true

@@ -1,3 +1,4 @@
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
@@ -8,8 +9,9 @@ import {
   ShieldAlert,
   Wrench,
 } from "lucide-react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { toast } from "sonner";
+import { can } from "@/lib/rbac";
 import { useAuth } from "@/contexts/AuthContext";
 import { trpc } from "@/lib/trpc";
 import CreateCustomerModal from "@/components/CreateCustomerModal";
@@ -419,8 +421,16 @@ function buildCustomerProfiles(input: {
 }
 
 export default function CustomersPage() {
-  const [location, navigate] = useLocation();
-  const { isAuthenticated } = useAuth();
+  const [, navigate] = useLocation();
+  const routeSearch = useSearch();
+  const { isAuthenticated, role } = useAuth();
+  const canCreateCustomer = Boolean(role && can(role, "customers:create"));
+  const canEditCustomer = Boolean(role && can(role, "customers:update"));
+  const canCreateAppointment = Boolean(
+    role && can(role, "appointments:create")
+  );
+  const canCreateOrder = Boolean(role && can(role, "orders:create"));
+  const canReadFinance = Boolean(role && can(role, "finance:read"));
   const [searchTerm, setSearchTerm] = useOperationalMemoryState(
     "nexo.customers.search.v2",
     ""
@@ -456,28 +466,30 @@ export default function CustomersPage() {
   const [showInlineCharges, setShowInlineCharges] = useState(false);
   const timelineAnchorRef = useRef<HTMLDivElement | null>(null);
 
-  const customersQuery = trpc.customers.list.useQuery(
-    { page: 1, limit: 300 },
+  const debouncedSearch = useDebouncedValue(searchTerm);
+
+  const customersQuery = trpc.customers.page.useQuery(
+    { page: currentPage, focusId: currentPage === 1 && !searchTerm && activeFilter === "all" && priorityFilter === "all" && riskFilter === "all" ? new URLSearchParams(routeSearch).get("customerId") || undefined : undefined, limit: pageSize, search: debouncedSearch || undefined, active: activeFilter === "all" ? undefined : activeFilter, priority: priorityFilter === "all" ? undefined : priorityFilter, riskState: riskFilter === "all" ? undefined : riskFilter },
     { enabled: isAuthenticated, retry: false }
   );
   const customersOperationalSummaryQuery =
-    trpc.customers.operationalSummary.useQuery(undefined, {
-      enabled: isAuthenticated,
+    trpc.customers.operationalSummaryPage.useQuery({ customerIds: customersQuery.data?.items.map(customer => customer.id) ?? [] }, {
+      enabled: isAuthenticated && Boolean(customersQuery.data),
       retry: false,
     });
-  const appointmentsQuery = trpc.appointments.list.useQuery(
-    { page: 1, limit: 500 },
+  const appointmentsQuery = trpc.appointments.page.useQuery(
+    { page: 1, limit: 200 },
     { enabled: isAuthenticated, retry: false }
   );
-  const serviceOrdersQuery = trpc.serviceOrders.list.useQuery(
-    { page: 1, limit: 500 },
+  const serviceOrdersQuery = trpc.serviceOrders.page.useQuery(
+    { page: 1, limit: 100 },
     { enabled: isAuthenticated, retry: false }
   );
   const chargesQuery = trpc.finance.charges.list.useQuery(
     { page: 1, limit: 500 },
-    { enabled: isAuthenticated, retry: false }
+    { enabled: isAuthenticated && canReadFinance, retry: false }
   );
-  const peopleQuery = trpc.people.list.useQuery(undefined, {
+  const peopleQuery = trpc.people.assignees.useQuery(undefined, {
     enabled: isAuthenticated,
     retry: false,
   });
@@ -485,15 +497,15 @@ export default function CustomersPage() {
   const [isRefreshingWorkspace, setIsRefreshingWorkspace] = useState(false);
 
   const customers = useMemo(
-    () => normalizeArrayPayload<Customer>(customersQuery.data),
+    () => normalizeArrayPayload<Customer>(customersQuery.data?.items),
     [customersQuery.data]
   );
   const appointments = useMemo(
-    () => normalizeArrayPayload<Appointment>(appointmentsQuery.data),
+    () => normalizeArrayPayload<Appointment>(appointmentsQuery.data?.items),
     [appointmentsQuery.data]
   );
   const serviceOrders = useMemo(
-    () => normalizeArrayPayload<ServiceOrder>(serviceOrdersQuery.data),
+    () => normalizeArrayPayload<ServiceOrder>(serviceOrdersQuery.data?.items),
     [serviceOrdersQuery.data]
   );
   const charges = useMemo(
@@ -534,14 +546,6 @@ export default function CustomersPage() {
           operationalSummaryByCustomerId.get(profile.customerId) ?? null,
       })),
     [operationalSummaryByCustomerId, profiles]
-  );
-
-  const profileById = useMemo(
-    () =>
-      new Map(
-        operationalProfiles.map(profile => [profile.customerId, profile])
-      ),
-    [operationalProfiles]
   );
 
   const workspaceQuery = trpc.customers.workspace.useQuery(
@@ -614,17 +618,14 @@ export default function CustomersPage() {
   const hasIncompleteOperationalData =
     customers.length > 0 &&
     (unavailableAuxiliaryData.length > 0 || pendingAuxiliaryData.length > 0);
-  const isChargesUnavailable = Boolean(chargesQuery.error);
-  const isServiceOrdersUnavailable = Boolean(serviceOrdersQuery.error);
-  const isAppointmentsUnavailable = Boolean(appointmentsQuery.error);
-  const paginatedProfiles = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredProfiles.slice(start, start + pageSize);
-  }, [currentPage, filteredProfiles]);
+  const isChargesUnavailable = !canReadFinance || Boolean(chargesQuery.error) || (chargesQuery.data?.pagination.total ?? 0) > charges.length;
+  const isServiceOrdersUnavailable = Boolean(serviceOrdersQuery.error) || (serviceOrdersQuery.data?.meta.total ?? 0) > serviceOrders.length;
+  const isAppointmentsUnavailable = Boolean(appointmentsQuery.error) || (appointmentsQuery.data?.meta.total ?? 0) > appointments.length;
+  const paginatedProfiles = filteredProfiles;
 
-  const selectedProfile = activeCustomerId
-    ? (profileById.get(String(activeCustomerId)) ?? null)
-    : null;
+  const selectedProfile = filteredProfiles.find(
+    profile => profile.customerId === activeCustomerId
+  ) ?? null;
 
   const selectedCustomer = selectedProfile?.customer ?? null;
 
@@ -636,6 +637,10 @@ export default function CustomersPage() {
 
     switch (target) {
       case "FINANCES":
+        if (!canReadFinance) {
+          setActiveCustomerId(profile.customerId);
+          return;
+        }
         navigate(`/finances?customerId=${profile.customerId}`);
         return;
       case "SERVICE_ORDERS":
@@ -654,7 +659,11 @@ export default function CustomersPage() {
 
   const getAuthoritativeCustomerActionLabel = (
     profile: (typeof operationalProfiles)[number]
-  ) => profile.operationalSummary?.recommendedActionLabel ?? "Abrir cliente";
+  ) =>
+    profile.operationalSummary?.recommendedActionTarget === "FINANCES" &&
+    !canReadFinance
+      ? "Abrir cliente"
+      : (profile.operationalSummary?.recommendedActionLabel ?? "Abrir cliente");
   const people = useMemo(
     () =>
       normalizeArrayPayload<any>(peopleQuery.data).map(person => ({
@@ -727,10 +736,10 @@ export default function CustomersPage() {
       type: humanizeCustomerTimelineEvent(event).type,
       occurredAt: formatDateTime(event.occurredAt ?? event.createdAt),
       entity: String(
-        event.entity ?? event.entityType ?? event.target ?? selectedCustomerName
+        (typeof event.entity === "object" ? event.entity?.type : event.entity) ?? event.entityType ?? event.target ?? selectedCustomerName
       ),
       actor: String(
-        event.actor ?? event.author ?? event.createdBy ?? "Sistema"
+        (typeof event.actor === "object" ? event.actor?.name : event.actor) ?? event.author ?? event.createdBy ?? "Ator não informado"
       ),
       summary: humanizeCustomerTimelineEvent(event).summary,
     }));
@@ -762,10 +771,14 @@ export default function CustomersPage() {
       const includeTimeline = options?.includeTimeline ?? false;
       const operations: Promise<unknown>[] = [
         trpcUtils.customers.list.invalidate(),
+      trpcUtils.customers.page.invalidate(),
         trpcUtils.customers.operationalSummary.invalidate(),
+        trpcUtils.customers.operationalSummaryPage.invalidate(),
         trpcUtils.customers.workspace.invalidate({ id: customerId }),
         trpcUtils.appointments.list.invalidate(),
+      trpcUtils.appointments.page.invalidate(),
         trpcUtils.serviceOrders.list.invalidate(),
+      trpcUtils.serviceOrders.page.invalidate(),
         trpcUtils.finance.charges.list.invalidate(),
       ];
       if (includeTimeline) {
@@ -803,12 +816,15 @@ export default function CustomersPage() {
       };
 
       safePush(trpcUtils.customers.list.invalidate());
+      safePush(trpcUtils.customers.page.invalidate());
       safePush(trpcUtils.customers.operationalSummary.invalidate());
+      safePush(trpcUtils.customers.operationalSummaryPage.invalidate());
       safePush(trpcUtils.customers.workspace.invalidate({ id: customerId }));
 
       switch (eventType) {
         case "CUSTOMER_APPOINTMENT_CREATED":
           safePush(trpcUtils.appointments.list.invalidate());
+      safePush(trpcUtils.appointments.page.invalidate());
           safePush(dashboardUtils?.kpis?.invalidate?.());
           safePush(dashboardUtils?.alerts?.invalidate?.());
           safePush(timelineUtils?.listByCustomer?.invalidate?.({ customerId }));
@@ -816,7 +832,9 @@ export default function CustomersPage() {
           break;
         case "CUSTOMER_SERVICE_ORDER_CREATED":
           safePush(trpcUtils.serviceOrders.list.invalidate());
+      safePush(trpcUtils.serviceOrders.page.invalidate());
           safePush(trpcUtils.appointments.list.invalidate());
+      safePush(trpcUtils.appointments.page.invalidate());
           safePush(dashboardUtils?.kpis?.invalidate?.());
           safePush(dashboardUtils?.alerts?.invalidate?.());
           safePush(timelineUtils?.listByCustomer?.invalidate?.({ customerId }));
@@ -861,17 +879,21 @@ export default function CustomersPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeFilter, searchTerm]);
+  }, [activeFilter, searchTerm, priorityFilter, riskFilter]);
+
+  useEffect(() => { setCurrentPage(1); }, [routeSearch]);
 
   useEffect(() => {
+    if (!customersQuery.data) return;
+    if (customersQuery.data.meta.page !== currentPage) { setCurrentPage(customersQuery.data.meta.page); return; }
     const totalPages = Math.max(
       1,
-      Math.ceil(filteredProfiles.length / pageSize)
+      Math.ceil((customersQuery.data?.meta.total ?? 0) / pageSize)
     );
     if (currentPage > totalPages) {
       setCurrentPage(1);
     }
-  }, [currentPage, filteredProfiles.length]);
+  }, [currentPage, customersQuery.data?.meta.total]);
 
   usePageDiagnostics({
     page: "customers",
@@ -882,9 +904,7 @@ export default function CustomersPage() {
   });
 
   useEffect(() => {
-    const queryCustomerId = new URLSearchParams(
-      location.split("?")[1] ?? ""
-    ).get("customerId");
+    const queryCustomerId = new URLSearchParams(routeSearch).get("customerId");
     if (queryCustomerId) {
       setActiveCustomerId(queryCustomerId);
       return;
@@ -892,7 +912,7 @@ export default function CustomersPage() {
     if (!activeCustomerId && filteredProfiles.length > 0) {
       setActiveCustomerId(filteredProfiles[0].customerId);
     }
-  }, [activeCustomerId, filteredProfiles, location, setActiveCustomerId]);
+  }, [activeCustomerId, filteredProfiles, routeSearch, setActiveCustomerId]);
 
   const customersOperationalStatus =
     customersOperationalSummary?.portfolio.operationalStatus ?? null;
@@ -943,6 +963,76 @@ export default function CustomersPage() {
     return priority ? <AppPriorityBadge priority={priority} /> : null;
   };
 
+  const renderCustomerSecondaryActions = (
+    profile: (typeof operationalProfiles)[number]
+  ) => (
+    <AppRowActionsDropdown
+      triggerLabel="Mais ações"
+      contentClassName="min-w-[220px]"
+      items={[
+        {
+          label: "Abrir cliente",
+          tone: "primary",
+          onSelect: () =>
+            setActiveCustomerId(profile.customerId),
+        },
+        {
+          label: "Agendar",
+          disabled: !canCreateAppointment,
+          onSelect: () =>
+            navigate(
+              `/appointments?customerId=${profile.customerId}`
+            ),
+        },
+        {
+          label: "Nova O.S.",
+          disabled: !canCreateOrder,
+          onSelect: () =>
+            navigate(
+              `/service-orders?customerId=${profile.customerId}`
+            ),
+        },
+        {
+          label: "Cobrar",
+          disabled: !canReadFinance,
+          onSelect: () =>
+            navigate(
+              `/finances?customerId=${profile.customerId}`
+            ),
+        },
+        {
+          label: "WhatsApp",
+          onSelect: () =>
+            openCustomerWhatsApp(
+              profile.customer,
+              profile.pendingChargeId
+            ),
+        },
+        {
+          type: "separator",
+          label: "Cadastro",
+        },
+        {
+          label:
+            pendingEditCustomerId === profile.customerId
+              ? "Editando..."
+              : "Editar dados",
+          onSelect: () => {
+            setPendingEditCustomerId(
+              profile.customerId
+            );
+            setEditingCustomerId(profile.customerId);
+            toast.success("Editor de cliente aberto.");
+          },
+          disabled:
+            !canEditCustomer ||
+            pendingEditCustomerId ===
+              profile.customerId,
+        },
+      ]}
+    />
+  );
+
   return (
     <AppPageShell className="gap-3">
       <AppOperationalHeader
@@ -950,13 +1040,18 @@ export default function CustomersPage() {
         description="Memória viva do relacionamento: decisão, fluxo, execução e auditoria em uma leitura compacta."
         density="compact"
         primaryAction={
-          <Button onClick={() => setCreateOpen(true)}>Novo cliente</Button>
+          <Button
+            disabled={!canCreateCustomer}
+            onClick={() => setCreateOpen(true)}
+          >
+            Novo cliente
+          </Button>
         }
         contextChips={
           <>
             {portfolioOperationalStatusBadge}
             <AppStatusBadge
-              label={`${customers.length} clientes na carteira`}
+              label={`${customersQuery.data?.meta.total ?? 0} clientes no resultado`}
               tone="neutral"
             />
             <AppStatusBadge
@@ -974,7 +1069,7 @@ export default function CustomersPage() {
               label={
                 isServiceOrdersUnavailable
                   ? "O.S. indisponíveis"
-                  : `${profiles.filter(profile => profile.hasOpenServiceOrder).length} com O.S. aberta`
+                  : `${profiles.filter(profile => profile.hasOpenServiceOrder).length} com O.S. aberta nesta página`
               }
               tone="info"
             />
@@ -1037,6 +1132,7 @@ export default function CustomersPage() {
         </AppAlert>
       ) : null}
 
+      {(isServiceOrdersUnavailable || isAppointmentsUnavailable || isChargesUnavailable) && !hasBlockingError ? <p role="status" className="text-sm text-[var(--text-muted)]">O contexto relacionado pode estar parcial ou indisponível. Consulte os módulos do cliente para acessar todo o histórico; ausência neste recorte não confirma ausência de registros.</p> : null}
       <AppFiltersBar
         aria-label="Filtros de apresentação"
         className={cn(
@@ -1136,7 +1232,7 @@ export default function CustomersPage() {
           className={cn(
             selectedProfile
               ? "order-2 2xl:col-span-12"
-              : "order-1 2xl:col-span-8"
+              : "order-1 2xl:col-span-12"
           )}
           compact
         >
@@ -1150,23 +1246,14 @@ export default function CustomersPage() {
               actionLabel="Tentar novamente"
               onAction={() => void customersQuery.refetch()}
             />
-          ) : customers.length === 0 ? (
-            <div className="space-y-3">
-              <AppPageEmptyState
-                title="Nenhum cliente cadastrado"
-                description="Cadastre o primeiro cliente para iniciar a memória operacional de relacionamento."
-              />
-              <div className="flex justify-center">
-                <Button onClick={() => setCreateOpen(true)}>
-                  Criar primeiro cliente
-                </Button>
-              </div>
-            </div>
+          ) : customers.length === 0 && !searchTerm && activeFilter === "all" && priorityFilter === "all" && riskFilter === "all" ? (
+            <AppPageEmptyState title="Nenhum cliente cadastrado"
+              description="Cadastre o primeiro cliente para começar."
+              action={canCreateCustomer ? <Button onClick={() => setCreateOpen(true)}>Criar primeiro cliente</Button> : undefined} />
           ) : filteredProfiles.length === 0 ? (
-            <AppPageEmptyState
-              title="Busca sem resultado"
-              description="Nenhum cliente corresponde aos filtros ativos e termo pesquisado."
-            />
+            <AppPageEmptyState title="Nenhum resultado para os filtros"
+              description="Limpe os filtros para ver a carteira."
+              action={<Button variant="outline" onClick={() => { setSearchTerm(""); setActiveFilter("all"); setPriorityFilter("all"); setRiskFilter("all"); setCurrentPage(1); }}>Limpar filtros</Button>} />
           ) : (
             <div className="space-y-3">
               <div className="grid gap-2 md:hidden">
@@ -1240,19 +1327,22 @@ export default function CustomersPage() {
                       </p>
                     </div>
 
-                    <div className="mt-3 flex items-center justify-between gap-2">
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                       <span className="text-sm font-medium text-[var(--text-primary)]">
-                        {formatCurrency(profile.pendingCents)}
+                        {isChargesUnavailable ? "Consulte o financeiro do cliente" : formatCurrency(profile.pendingCents)}
                       </span>
-                      <Button
-                        size="sm"
-                        onClick={event => {
-                          event.stopPropagation();
-                          runAuthoritativeCustomerAction(profile);
-                        }}
-                      >
-                        {getAuthoritativeCustomerActionLabel(profile)}
-                      </Button>
+                      <div className="flex flex-wrap items-center justify-end gap-2" onClick={event => event.stopPropagation()}>
+                        <Button
+                          size="sm"
+                          onClick={event => {
+                            event.stopPropagation();
+                            runAuthoritativeCustomerAction(profile);
+                          }}
+                        >
+                          {getAuthoritativeCustomerActionLabel(profile)}
+                        </Button>
+                        {renderCustomerSecondaryActions(profile)}
+                      </div>
                     </div>
                   </article>
                 ))}
@@ -1367,7 +1457,7 @@ export default function CustomersPage() {
                         <td>
                           <div className="min-w-[150px] space-y-2">
                             <p className="font-medium text-[var(--text-primary)]">
-                              {formatCurrency(profile.pendingCents)}
+                              {isChargesUnavailable ? "Consulte o financeiro do cliente" : formatCurrency(profile.pendingCents)}
                             </p>
                             {isChargesUnavailable ? (
                               <AppStatusBadge
@@ -1397,67 +1487,7 @@ export default function CustomersPage() {
                             >
                               {getAuthoritativeCustomerActionLabel(profile)}
                             </Button>
-                            <AppRowActionsDropdown
-                              triggerLabel="Mais ações"
-                              contentClassName="min-w-[220px]"
-                              items={[
-                                {
-                                  label: "Abrir cliente",
-                                  tone: "primary",
-                                  onSelect: () =>
-                                    setActiveCustomerId(profile.customerId),
-                                },
-                                {
-                                  label: "Agendar",
-                                  onSelect: () =>
-                                    navigate(
-                                      `/appointments?customerId=${profile.customerId}`
-                                    ),
-                                },
-                                {
-                                  label: "Nova O.S.",
-                                  onSelect: () =>
-                                    navigate(
-                                      `/service-orders?customerId=${profile.customerId}`
-                                    ),
-                                },
-                                {
-                                  label: "Cobrar",
-                                  onSelect: () =>
-                                    navigate(
-                                      `/finances?customerId=${profile.customerId}`
-                                    ),
-                                },
-                                {
-                                  label: "WhatsApp",
-                                  onSelect: () =>
-                                    openCustomerWhatsApp(
-                                      profile.customer,
-                                      profile.pendingChargeId
-                                    ),
-                                },
-                                {
-                                  type: "separator",
-                                  label: "Cadastro",
-                                },
-                                {
-                                  label:
-                                    pendingEditCustomerId === profile.customerId
-                                      ? "Editando..."
-                                      : "Editar dados",
-                                  onSelect: () => {
-                                    setPendingEditCustomerId(
-                                      profile.customerId
-                                    );
-                                    setEditingCustomerId(profile.customerId);
-                                    toast.success("Editor de cliente aberto.");
-                                  },
-                                  disabled:
-                                    pendingEditCustomerId ===
-                                    profile.customerId,
-                                },
-                              ]}
-                            />
+                            {renderCustomerSecondaryActions(profile)}
                           </div>
                         </td>
                       </tr>
@@ -1467,7 +1497,7 @@ export default function CustomersPage() {
               </div>
               <AppPagination
                 currentPage={currentPage}
-                totalItems={filteredProfiles.length}
+                totalItems={customersQuery.data?.meta.total ?? 0}
                 pageSize={pageSize}
                 onPageChange={setCurrentPage}
               />
@@ -1475,7 +1505,7 @@ export default function CustomersPage() {
           )}
         </AppSectionBlock>
 
-        <AppContextWorkspace
+        {filteredProfiles.length > 0 && !isLoading && !hasBlockingError ? (<AppContextWorkspace
           title="Centro Operacional do Cliente"
           subtitle="Decisão, fluxo, execução e auditoria do cliente selecionado."
           className={cn(
@@ -1588,6 +1618,7 @@ export default function CustomersPage() {
                         : "Pagamentos registrados"
                     }
                     ctaLabel="Ver financeiro"
+                    disabled={!canReadFinance}
                     onClick={() =>
                       navigate(`/finances?customerId=${activeCustomerId}`)
                     }
@@ -1599,6 +1630,7 @@ export default function CustomersPage() {
                     )}
                     context={`Vencidas: ${workspaceOverdueCharges.length}`}
                     ctaLabel="Cobrar"
+                    disabled={!canReadFinance}
                     onClick={() =>
                       navigate(`/finances?customerId=${activeCustomerId}`)
                     }
@@ -1624,6 +1656,7 @@ export default function CustomersPage() {
                     }
                     context={`Agendamentos: ${workspaceAppointments.length}`}
                     ctaLabel="Agendar"
+                    disabled={!canCreateAppointment}
                     onClick={() => setCreateAppointmentOpen(true)}
                   />
                   <NexoExecutiveMetric
@@ -1662,6 +1695,7 @@ export default function CustomersPage() {
                   <Button
                     size="sm"
                     variant="outline"
+                    disabled={!canCreateAppointment}
                     onClick={() => setCreateAppointmentOpen(true)}
                   >
                     <CalendarClock className="mr-1.5 h-3.5 w-3.5" />
@@ -1670,6 +1704,7 @@ export default function CustomersPage() {
                   <Button
                     size="sm"
                     variant="outline"
+                    disabled={!canCreateOrder}
                     onClick={() => setCreateServiceOrderOpen(true)}
                   >
                     <Wrench className="mr-1.5 h-3.5 w-3.5" />
@@ -1678,6 +1713,7 @@ export default function CustomersPage() {
                   <Button
                     size="sm"
                     variant="outline"
+                    disabled={!canReadFinance}
                     onClick={() =>
                       navigate(`/finances?customerId=${activeCustomerId}`)
                     }
@@ -1861,18 +1897,18 @@ export default function CustomersPage() {
               </div>
             </div>
           )}
-        </AppContextWorkspace>
+        </AppContextWorkspace>) : null}
       </div>
 
       <CreateCustomerModal
-        open={createOpen}
+        open={createOpen && canCreateCustomer}
         onOpenChange={setCreateOpen}
         onCreated={async created => {
           setCreateOpen(false);
           await customersQuery.refetch();
           await appointmentsQuery.refetch();
           await serviceOrdersQuery.refetch();
-          await chargesQuery.refetch();
+          if (canReadFinance) await chargesQuery.refetch();
           if (created?.id) {
             setActiveCustomerId(created.id);
             await refreshCustomerWorkspace(String(created.id));
@@ -1881,7 +1917,7 @@ export default function CustomersPage() {
       />
 
       <EditCustomerModal
-        open={Boolean(editingCustomerId)}
+        open={Boolean(editingCustomerId) && canEditCustomer}
         customerId={editingCustomerId}
         onClose={() => {
           setEditingCustomerId(null);
@@ -1896,7 +1932,7 @@ export default function CustomersPage() {
         }}
       />
       <CreateAppointmentModal
-        isOpen={createAppointmentOpen}
+        isOpen={createAppointmentOpen && canCreateAppointment}
         onClose={() => setCreateAppointmentOpen(false)}
         onSuccess={async () => {
           setCreateAppointmentOpen(false);
@@ -1917,7 +1953,7 @@ export default function CustomersPage() {
         initialCustomerId={activeCustomerId}
       />
       <CreateServiceOrderModal
-        isOpen={createServiceOrderOpen}
+        isOpen={createServiceOrderOpen && canCreateOrder}
         onClose={() => setCreateServiceOrderOpen(false)}
         onSuccess={async () => {
           setCreateServiceOrderOpen(false);

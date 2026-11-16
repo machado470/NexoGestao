@@ -1,3 +1,4 @@
+import { subscriptionAllowsDispatch } from '../common/commercial/subscription-access'
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
 import {
   Prisma,
@@ -63,8 +64,12 @@ export class WhatsAppService {
     return this.conversationRead.getConversation(orgId, conversationId)
   }
 
-  async getMessages(orgId: string, conversationId: string) {
-    return this.conversationRead.getMessages(orgId, conversationId)
+  getConversationMessagesPage(orgId: string, conversationId: string, options: { limit?: number; cursor?: string }) {
+    return this.conversationRead.getConversationMessagesPage(orgId, conversationId, options)
+  }
+
+  async getMessages(orgId: string, conversationId: string, options: { limit?: number; cursor?: string } = {}) {
+    return this.conversationRead.getMessages(orgId, conversationId, options)
   }
 
   async getContext(orgId: string, conversationId: string) {
@@ -173,8 +178,15 @@ export class WhatsAppService {
 
   async enqueueMessage(orgIdOrInput: string | any, maybeInput?: any) {
     const orgId = typeof orgIdOrInput === "string" ? orgIdOrInput : orgIdOrInput.orgId
-    const input = typeof orgIdOrInput === "string" ? maybeInput : orgIdOrInput
+    const requested = typeof orgIdOrInput === "string" ? maybeInput : orgIdOrInput
     if (!orgId) throw new BadRequestException('orgId é obrigatório')
+    const boundConversation = requested.conversationId
+      ? await this.prisma.whatsAppConversation.findFirst({ where: { id: String(requested.conversationId), orgId } })
+      : null
+    if (requested.conversationId && !boundConversation) throw new BadRequestException('Conversa não encontrada para envio de WhatsApp')
+    if (boundConversation && requested.customerId && requested.customerId !== boundConversation.customerId) throw new BadRequestException('Cliente incompatível com a conversa')
+    // The conversation endpoint accepts content, not a second copy of its recipient.
+    const input = boundConversation ? { ...requested, customerId: boundConversation.customerId ?? undefined, toPhone: boundConversation.phone ?? requested.toPhone } : requested
 
     const customer = input.customerId
       ? await this.prisma.customer.findFirst({ where: { id: input.customerId, orgId }, select: { id: true, phone: true } })
@@ -187,22 +199,16 @@ export class WhatsAppService {
     const toPhone = normalizePhone(String(input.toPhone ?? customer?.phone ?? '').trim())
     if (!toPhone) throw new BadRequestException('Telefone de destino não informado')
 
-    const commercialLimit = await this.commercial.enforceMeter(orgId, 'message_sends')
+    const commercialLimit = await this.commercial.enforceMeter(orgId, 'message_sends', { admissionOnly: true })
     if (isCommercialBlocked(commercialLimit)) {
       this.tenantOps.increment(orgId, 'whatsapp_blocked')
       throw new BadRequestException(`Envio bloqueado por política comercial: ${commercialLimit.reasonCode}`)
     }
 
-    const conversation = input.conversationId
-      ? await this.prisma.whatsAppConversation.findFirst({
-          where: { id: String(input.conversationId), orgId },
-        })
-      : await this.resolveOrCreateConversation(
-          orgId,
-          input.customerId ?? null,
-          toPhone,
-          { contextType: input.entityType ?? 'GENERAL', contextId: input.entityId ?? null },
-        )
+    const conversation = boundConversation ?? await this.resolveOrCreateConversation(
+      orgId, input.customerId ?? null, toPhone,
+      { contextType: input.entityType ?? 'GENERAL', contextId: input.entityId ?? null },
+    )
 
     if (!conversation) {
       throw new BadRequestException('Conversa não encontrada para envio de WhatsApp')
@@ -217,26 +223,40 @@ export class WhatsAppService {
       }
     }
 
+    // Reject admission before persistence: a 429 must not leave a QUEUED message
+    // that the recovery dispatcher could later send despite the failed request.
+    await this.queueService.reserveWhatsAppAdmission(orgId)
     let message
     try {
-      message = await this.prisma.whatsAppMessage.create({
-        data: {
-          orgId,
-          conversationId: conversation.id,
-          customerId: input.customerId ?? conversation.customerId ?? null,
-          direction: 'OUTBOUND',
-          entityType: (input.entityType ?? 'GENERAL') as WhatsAppEntityType,
-          entityId: String(input.entityId ?? input.customerId ?? conversation.customerId ?? conversation.id),
-          messageType: (input.messageType ?? 'MANUAL') as WhatsAppMessageType,
-          messageKey: input.messageKey ?? null,
-          toPhone,
-          fromPhone: input.fromPhone ?? null,
-          renderedText: String(input.content ?? input.renderedText ?? '').trim(),
-          content: String(input.content ?? input.renderedText ?? '').trim(),
-          status: 'QUEUED',
-          metadata: input.metadata ?? Prisma.JsonNull,
-        },
+      const admitted = await this.prisma.$transaction(async tx => {
+        await this.commercial.lockMeterInTransaction(tx, orgId, 'message_sends')
+        if (input.messageKey) {
+          const existing = await tx.whatsAppMessage.findFirst({ where: { orgId, messageKey: String(input.messageKey) } })
+          if (existing) return { created: false, message: existing }
+        }
+        await this.commercial.assertMeterInTransaction(tx, orgId, 'message_sends')
+        const created = await tx.whatsAppMessage.create({
+          data: {
+            orgId,
+            conversationId: conversation.id,
+            customerId: input.customerId ?? conversation.customerId ?? null,
+            direction: 'OUTBOUND',
+            entityType: (input.entityType ?? 'GENERAL') as WhatsAppEntityType,
+            entityId: String(input.entityId ?? input.customerId ?? conversation.customerId ?? conversation.id),
+            messageType: (input.messageType ?? 'MANUAL') as WhatsAppMessageType,
+            messageKey: input.messageKey ?? null,
+            toPhone,
+            fromPhone: input.fromPhone ?? null,
+            renderedText: String(input.content ?? input.renderedText ?? '').trim(),
+            content: String(input.content ?? input.renderedText ?? '').trim(),
+            status: 'QUEUED',
+            metadata: input.metadata ?? Prisma.JsonNull,
+          },
+        })
+        return { created: true, message: created }
       })
+      if (!admitted.created) return admitted
+      message = admitted.message
     } catch (err: any) {
       if (input.messageKey && err?.code === 'P2002') {
         const existing = await this.prisma.whatsAppMessage.findFirst({
@@ -259,7 +279,7 @@ export class WhatsAppService {
     })
     this.logTransition('whatsapp.outbound', { conversationId: conversation.id, messageId: message.id, status: 'WAITING_CUSTOMER' })
 
-    await this.queueService.addJob(QUEUE_NAMES.WHATSAPP, WHATSAPP_QUEUE_JOB_NAMES.DISPATCH_MESSAGE, { messageId: message.id, orgId, requestId: this.requestContext.requestId, userId: this.requestContext.userId }, { jobId: `whatsapp-dispatch-${message.id}` })
+    await this.queueService.addJob(QUEUE_NAMES.WHATSAPP, WHATSAPP_QUEUE_JOB_NAMES.DISPATCH_MESSAGE, { messageId: message.id, orgId, requestId: this.requestContext.requestId, userId: this.requestContext.userId }, { jobId: `whatsapp-dispatch-${message.id}` }, true)
 
     this.waMetrics.incQueuedJobs()
     this.tenantOps.increment(orgId, 'whatsapp_queued')
@@ -304,6 +324,10 @@ export class WhatsAppService {
         errorMessage: input.errorMessage ?? updated.errorMessage ?? null,
       })
     }
+    if (input.status === 'SENT') {
+      const byTypeAction = this.getMessageTypeTimelineAction(updated.messageType)
+      if (byTypeAction) await this.logMessageTimelineEventOnce({ orgId, messageId: updated.id, action: byTypeAction })
+    }
     return updated
   }
 
@@ -330,8 +354,9 @@ export class WhatsAppService {
       throw new BadRequestException('Apenas mensagens com status FAILED podem ser reenviadas')
     }
 
+    await this.queueService.reserveWhatsAppAdmission(orgId)
     await this.prisma.whatsAppMessage.updateMany({ where: { id: messageId, orgId }, data: { status: 'QUEUED', failedAt: null, errorMessage: null, errorCode: null } })
-    await this.queueService.addJob(QUEUE_NAMES.WHATSAPP, WHATSAPP_QUEUE_JOB_NAMES.DISPATCH_MESSAGE, { messageId, orgId, requestId: this.requestContext.requestId, userId: this.requestContext.userId }, { jobId: `whatsapp-dispatch-retry-${messageId}` })
+    await this.queueService.addJob(QUEUE_NAMES.WHATSAPP, WHATSAPP_QUEUE_JOB_NAMES.DISPATCH_MESSAGE, { messageId, orgId, requestId: this.requestContext.requestId, userId: this.requestContext.userId }, { jobId: `whatsapp-dispatch-retry-${messageId}` }, true)
     this.waMetrics.incQueuedJobs()
     await this.logMessageTimelineEventOnce({
       orgId,
@@ -448,10 +473,22 @@ export class WhatsAppService {
       return { associated: true, orgId, customerId: duplicated.customerId ?? null, messageId: duplicated.id, duplicated: true }
     }
 
-    const customer = await this.prisma.customer.findFirst({
+    let customer = await this.prisma.customer.findFirst({
       where: { orgId, phone },
       select: { id: true, orgId: true, phone: true },
     })
+    if (!customer) {
+      // Registration stores digits; providers supply E.164. Ambiguous legacy
+      // national/international duplicates must not select an arbitrary person.
+      const digits = phone.replace(/\D/g, '')
+      const variants = [digits, ...(phone.startsWith('+55') && [12, 13].includes(digits.length) ? [digits.slice(2)] : [])]
+      const matches = await this.prisma.customer.findMany({
+        where: { orgId, phone: { in: variants } },
+        select: { id: true, orgId: true, phone: true },
+        take: 2,
+      })
+      customer = matches.length === 1 ? matches[0] : null
+    }
 
     const resolution = await this.resolveOperationalContext(orgId, customer?.id ?? null)
     const conversation = await this.resolveOrCreateConversation(orgId, customer?.id ?? null, customer?.phone ?? phone, {
@@ -610,7 +647,18 @@ export class WhatsAppService {
       orderBy: { updatedAt: 'desc' },
     })
 
-    if (existing) return existing
+    if (existing) {
+      if (customerId && !existing.customerId && normalizedPhone && existing.phone === normalizedPhone) {
+        // A first inbound message can precede customer registration. Bind only
+        // an unassociated conversation, guarding against concurrent assignment.
+        const linked = await this.prisma.whatsAppConversation.updateMany({
+          where: { id: existing.id, orgId, customerId: null, phone: normalizedPhone },
+          data: { customerId, contextType: normalizedContextType, contextId: context.contextId ?? null },
+        })
+        if (linked.count > 0) return { ...existing, customerId, contextType: normalizedContextType, contextId: context.contextId ?? null }
+      }
+      return existing
+    }
 
     return this.prisma.whatsAppConversation.create({
       data: {
@@ -681,6 +729,7 @@ export class WhatsAppService {
         "failedAt" = NULL
       WHERE id = ${id}
         AND "orgId" = ${orgId}
+        AND ${subscriptionAllowsDispatch(Prisma.sql`${orgId}`)}
           AND status = 'QUEUED'::"WhatsAppMessageStatus"
           AND (
             "lockedAt" IS NULL
@@ -707,8 +756,9 @@ export class WhatsAppService {
     return this.prisma.$queryRaw<Prisma.WhatsAppMessageGetPayload<{}>[]>(Prisma.sql`
       WITH picked AS (
         SELECT id
-        FROM "WhatsAppMessage"
+        FROM "WhatsAppMessage" AS candidate
           WHERE status = 'QUEUED'::"WhatsAppMessageStatus"
+            AND ${subscriptionAllowsDispatch(Prisma.sql`candidate."orgId"`)}
             AND (
               "lockedAt" IS NULL
               OR "lockedAt" < NOW() - (${lockTimeoutMinutes}::int * INTERVAL '1 minute')
@@ -1251,6 +1301,9 @@ export class WhatsAppService {
 
   private getMessageTypeTimelineAction(messageType: WhatsAppMessageType | null | undefined): string | null {
     if (messageType === 'PAYMENT_LINK') return 'PAYMENT_LINK_SENT'
+    if (messageType === 'APPOINTMENT_CONFIRMATION') return 'APPOINTMENT_CONFIRMATION_SENT'
+    if (messageType === 'PAYMENT_REMINDER') return 'PAYMENT_REMINDER_SENT'
+    if (messageType === 'PAYMENT_CONFIRMATION') return 'PAYMENT_CONFIRMATION_SENT'
     if (messageType === 'APPOINTMENT_REMINDER') return 'APPOINTMENT_REMINDER_SENT'
     if (messageType === 'SERVICE_UPDATE') return 'SERVICE_UPDATE_SENT'
     return null

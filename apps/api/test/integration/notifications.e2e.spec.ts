@@ -21,8 +21,8 @@ describeRealIntegration('Notifications persistence and authorization (e2e)', () 
   const orgA = randomUUID(), orgB = randomUUID()
   const userA1 = randomUUID(), userA2 = randomUUID(), userA3 = randomUUID(), userB1 = randomUUID()
   const jwt = new JwtService({ secret: process.env.JWT_SECRET })
-  const auth = (userId: string, orgId: string, role = 'ADMIN') => ({
-    Authorization: `Bearer ${jwt.sign({ sub: userId, orgId, role })}`,
+  const auth = (userId: string, orgId: string, role = (userId === userA2 || userId === userA3) ? 'STAFF' : 'ADMIN') => ({
+    Authorization: `Bearer ${jwt.sign({ sessionVersion: 0, sub: userId, personId: userId, orgId, role })}`,
   })
   const input = (eventKey: string, audience: CreateNotificationInput['audience'], overrides: Partial<CreateNotificationInput> = {}): CreateNotificationInput => ({
     orgId: orgA, eventKey, type: 'CUSTOMER_CREATED', title: 'Novo cliente', message: 'Cliente criado.',
@@ -49,10 +49,17 @@ describeRealIntegration('Notifications persistence and authorization (e2e)', () 
       { id: userA3, orgId: orgA, email: `${userA3}@test.invalid`, role: 'STAFF', active: false },
       { id: userB1, orgId: orgB, email: `${userB1}@test.invalid`, role: 'ADMIN', active: true },
     ] })
+    await prisma.person.createMany({ data: [
+      { id: userA1, userId: userA1, orgId: orgA, name: 'Admin A', role: 'ADMIN' },
+      { id: userA2, userId: userA2, orgId: orgA, name: 'Staff A', role: 'STAFF' },
+      { id: userA3, userId: userA3, orgId: orgA, name: 'Disabled A', role: 'STAFF' },
+      { id: userB1, userId: userB1, orgId: orgB, name: 'Admin B', role: 'ADMIN' },
+    ] })
   })
 
   afterAll(async () => {
     await prisma?.notification.deleteMany({ where: { orgId: { in: [orgA, orgB] } } })
+    await prisma?.person.deleteMany({ where: { orgId: { in: [orgA, orgB] } } })
     await prisma?.user.deleteMany({ where: { orgId: { in: [orgA, orgB] } } })
     await prisma?.organization.deleteMany({ where: { id: { in: [orgA, orgB] } } })
     await app?.close()
@@ -61,7 +68,7 @@ describeRealIntegration('Notifications persistence and authorization (e2e)', () 
   it('uses real JWT and ActiveUserGuard without allowing the request to select a tenant', async () => {
     await request(app.getHttpServer()).get('/v1/notifications').expect(401)
     await request(app.getHttpServer()).get('/v1/notifications').set('Authorization', 'Bearer invalid').expect(401)
-    await request(app.getHttpServer()).get('/v1/notifications').set(auth(userA3, orgA)).expect(403)
+    await request(app.getHttpServer()).get('/v1/notifications').set(auth(userA3, orgA)).expect(401)
     await request(app.getHttpServer()).get('/v1/notifications?orgId=' + orgB).set(auth(userA1, orgA)).set('x-org-id', orgB).expect(200)
     await request(app.getHttpServer()).get('/v1/notifications').set(auth(userB1, orgB)).expect(200)
   })

@@ -1,0 +1,50 @@
+[Nest] 72636  - 11/12/2026, 2:36:51 AM     LOG [WhatsAppService] {"requestId":"meter-QA","action":"whatsapp.outbound","conversationId":"523dbcd9-58f1-436b-aa47-058a2b589c04","messageId":"2112b1c6-1b09-47ec-8f6b-836143aa85da","status":"WAITING_CUSTOMER"}
+[Nest] 72636  - 11/12/2026, 2:36:51 AM     LOG [WhatsAppService] {"requestId":"meter-QA","action":"whatsapp.outbound","conversationId":"b3c05d2e-5440-47c8-8957-69781cb24c01","messageId":"172fb1a3-b4c8-424e-be3e-1b5a72868798","status":"WAITING_CUSTOMER"}
+[Nest] 72636  - 11/12/2026, 2:36:51 AM     LOG [FinanceService] {"requestId":"meter-QA","action":"CREATE_CHARGE_START","entityId":"3a90ad33-a06e-469c-96eb-ad34813974fc","orgId":"25747fda-8fc2-4e20-8c7f-19d570556d92","customerId":"3a90ad33-a06e-469c-96eb-ad34813974fc","message":"Iniciando createCharge"}
+[Nest] 72636  - 11/12/2026, 2:36:51 AM     LOG [FinanceService] {"requestId":"meter-QA","action":"CREATE_CHARGE_START","entityId":"3a90ad33-a06e-469c-96eb-ad34813974fc","orgId":"25747fda-8fc2-4e20-8c7f-19d570556d92","customerId":"3a90ad33-a06e-469c-96eb-ad34813974fc","message":"Iniciando createCharge"}
+[Nest] 72636  - 11/12/2026, 2:36:51 AM    WARN [FinanceService] {"requestId":"meter-QA","action":"WHATSAPP_SEND_CHARGE","entityId":"7048f859-6282-4813-bd6c-f75288d24102","error":"this.whatsapp.enqueueMessage is not a function","message":"Falha de integração no envio de cobrança. Fluxo seguirá em modo degradado"}
+[Nest] 72636  - 11/12/2026, 2:36:51 AM    WARN [FinanceService] {"requestId":"meter-QA","action":"CREATE_CHARGE_RESULT","entityId":"7048f859-6282-4813-bd6c-f75288d24102","chargeId":"7048f859-6282-4813-bd6c-f75288d24102","orgId":"25747fda-8fc2-4e20-8c7f-19d570556d92","message":"Cobrança criada com fallback de WhatsApp (mensagem em fila/pendente)"}
+[Nest] 72636  - 11/12/2026, 2:36:51 AM     LOG [FinanceService] {"requestId":"meter-QA","action":"CREATE_CHARGE_START","entityId":"3a90ad33-a06e-469c-96eb-ad34813974fc","orgId":"25747fda-8fc2-4e20-8c7f-19d570556d92","customerId":"3a90ad33-a06e-469c-96eb-ad34813974fc","message":"Iniciando createCharge"}
+[Nest] 72636  - 11/12/2026, 2:36:51 AM     LOG [IdempotencyService] {"requestId":"meter-QA","action":"IDEMPOTENCY_REPLAY","orgId":"25747fda-8fc2-4e20-8c7f-19d570556d92","scope":"finance.create_charge","key":"3913dbad-1818-4b9e-a3e5-75ab59efbe21"}
+[Nest] 72636  - 11/12/2026, 2:36:51 AM     LOG [FinanceService] {"requestId":"meter-QA","action":"PAY_CHARGE_START","entityId":"1d102bdd-01f5-429f-b5ae-c59f88759680","orgId":"9d22f236-0bdb-44c0-ae87-7b88f6d145df","amountCents":100,"method":"CASH","message":"Iniciando payCharge"}
+[Nest] 72636  - 11/12/2026, 2:36:51 AM     LOG [FinanceService] {"requestId":"meter-QA","action":"PAY_CHARGE_START","entityId":"1d102bdd-01f5-429f-b5ae-c59f88759680","orgId":"9d22f236-0bdb-44c0-ae87-7b88f6d145df","amountCents":100,"method":"CARD","message":"Iniciando payCharge"}
+[Nest] 72636  - 11/12/2026, 2:36:51 AM    WARN [FinanceService] {"requestId":"meter-QA","action":"WHATSAPP_SEND_PAYMENT_CONFIRMATION","entityId":"1d102bdd-01f5-429f-b5ae-c59f88759680","error":"this.whatsapp.enqueueMessage is not a function","message":"Falha de integração no envio do recibo. Fluxo principal seguirá"}
+[Nest] 72636  - 11/12/2026, 2:36:51 AM    WARN [FinanceService] {"requestId":"meter-QA","action":"PAY_CHARGE_RESULT","entityId":"1d102bdd-01f5-429f-b5ae-c59f88759680","paymentId":"b2c709cf-089b-4ca6-9028-67c678f10f10","orgId":"9d22f236-0bdb-44c0-ae87-7b88f6d145df","message":"Pagamento registrado com fallback de notificação WhatsApp"}
+[Nest] 72636  - 11/12/2026, 2:36:52 AM     LOG [FinanceService] {"action":"PAY_CHARGE_START","entityId":"304a7bd7-5201-4b77-a9bc-02bc527c6d26","orgId":"94d2559c-f276-4368-b128-a0f4811f2aef","amountCents":1000,"method":"PIX","message":"Iniciando payCharge"}
+[Nest] 72636  - 11/12/2026, 2:36:54 AM     LOG [BillingService] [BOOT][Billing] Stripe inicializado
+[Nest] 72636  - 11/12/2026, 2:36:54 AM     LOG [BillingService] Webhook recebido: checkout.session.completed
+[Nest] 72636  - 11/12/2026, 2:36:54 AM     LOG [BillingService] Webhook recebido: invoice.paid
+[Nest] 72636  - 11/12/2026, 2:36:54 AM     LOG [BillingService] [BOOT][Billing] Stripe inicializado
+[Nest] 72636  - 11/12/2026, 2:36:54 AM     LOG [BillingService] Webhook recebido: invoice.paid
+[Nest] 72636  - 11/12/2026, 2:36:54 AM     LOG [BillingService] [BOOT][Billing] Stripe inicializado
+[Nest] 72636  - 11/12/2026, 2:36:54 AM     LOG [BillingService] Webhook recebido: invoice.paid
+[Nest] 72636  - 11/12/2026, 2:36:54 AM     LOG [BillingService] [BOOT][Billing] Stripe inicializado
+[Nest] 72636  - 11/12/2026, 2:36:54 AM     LOG [BillingService] Webhook recebido: invoice.paid
+[Nest] 72636  - 11/12/2026, 2:36:56 AM   ERROR [FinanceService] Erro overdue WhatsApp: Não foi possível confirmar o enfileiramento do lembrete.
+[Nest] 72636  - 11/12/2026, 2:36:56 AM   ERROR [FinanceService] Erro overdue WhatsApp: Não foi possível confirmar o enfileiramento do lembrete.
+[Nest] 72636  - 11/12/2026, 2:36:56 AM   ERROR [FinanceService] Erro overdue WhatsApp: Não foi possível confirmar o enfileiramento do lembrete.
+[Nest] 72636  - 11/12/2026, 2:36:56 AM     LOG [PaymentsService] [BOOT][Payments] Stripe inicializado no PaymentsService
+[Nest] 72636  - 11/12/2026, 2:36:56 AM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.completed
+[Nest] 72636  - 11/12/2026, 2:36:56 AM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.completed
+[Nest] 72636  - 11/12/2026, 2:36:56 AM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.completed
+[Nest] 72636  - 11/12/2026, 2:36:56 AM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.completed
+[Nest] 72636  - 11/12/2026, 2:36:56 AM     LOG [FinanceService] {"requestId":"gap-integration","action":"PAY_CHARGE_START","entityId":"c9d7a204-b5b0-42f7-ad5c-7ba891df3473","orgId":"be5aadd0-e218-4781-9851-2305cf07caec","amountCents":1000,"method":"CARD","message":"Iniciando payCharge"}
+[Nest] 72636  - 11/12/2026, 2:36:56 AM     LOG [FinanceService] {"requestId":"gap-integration","action":"PAY_CHARGE_RESULT","entityId":"c9d7a204-b5b0-42f7-ad5c-7ba891df3473","paymentId":"332ec38a-56c8-4943-a7bb-c09f1b62a71e","orgId":"be5aadd0-e218-4781-9851-2305cf07caec","message":"Pagamento registrado com sucesso"}
+[Nest] 72636  - 11/12/2026, 2:36:56 AM     LOG [PaymentsService] Pagamento processado com sucesso via Stripe. event=checkout.session.completed chargeId=c9d7a204-b5b0-42f7-ad5c-7ba891df3473 externalRef=stripe:pi_4cd45280-181c-4c4d-9962-946d17eeaf62
+[Nest] 72636  - 11/12/2026, 2:36:56 AM     LOG [PaymentsService] Webhook Stripe recebido: charge.succeeded
+[Nest] 72636  - 11/12/2026, 2:36:56 AM     LOG [FinanceService] {"requestId":"gap-integration","action":"PAY_CHARGE_START","entityId":"c9d7a204-b5b0-42f7-ad5c-7ba891df3473","orgId":"be5aadd0-e218-4781-9851-2305cf07caec","amountCents":1000,"method":"CARD","message":"Iniciando payCharge"}
+[Nest] 72636  - 11/12/2026, 2:36:56 AM     LOG [IdempotencyService] {"requestId":"gap-integration","action":"IDEMPOTENCY_REPLAY","orgId":"be5aadd0-e218-4781-9851-2305cf07caec","scope":"finance.pay_charge","key":"stripe-payment:pi_4cd45280-181c-4c4d-9962-946d17eeaf62"}
+[Nest] 72636  - 11/12/2026, 2:36:56 AM     LOG [PaymentsService] Pagamento processado com sucesso via Stripe. event=charge.succeeded chargeId=c9d7a204-b5b0-42f7-ad5c-7ba891df3473 externalRef=stripe:pi_4cd45280-181c-4c4d-9962-946d17eeaf62
+[Nest] 72636  - 11/12/2026, 2:36:56 AM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.async_payment_succeeded
+[Nest] 72636  - 11/12/2026, 2:36:56 AM     LOG [FinanceService] {"requestId":"gap-integration","action":"PAY_CHARGE_START","entityId":"c9d7a204-b5b0-42f7-ad5c-7ba891df3473","orgId":"be5aadd0-e218-4781-9851-2305cf07caec","amountCents":1000,"method":"CARD","message":"Iniciando payCharge"}
+[Nest] 72636  - 11/12/2026, 2:36:56 AM     LOG [IdempotencyService] {"requestId":"gap-integration","action":"IDEMPOTENCY_REPLAY","orgId":"be5aadd0-e218-4781-9851-2305cf07caec","scope":"finance.pay_charge","key":"stripe-payment:pi_4cd45280-181c-4c4d-9962-946d17eeaf62"}
+[Nest] 72636  - 11/12/2026, 2:36:56 AM     LOG [PaymentsService] Pagamento processado com sucesso via Stripe. event=checkout.session.async_payment_succeeded chargeId=c9d7a204-b5b0-42f7-ad5c-7ba891df3473 externalRef=stripe:pi_4cd45280-181c-4c4d-9962-946d17eeaf62
+[Nest] 72636  - 11/12/2026, 2:36:56 AM     LOG [FinanceService] {"requestId":"gap-integration","action":"PAY_CHARGE_START","entityId":"c5447396-a1ad-4142-b0f2-5faa4bc8497a","orgId":"be5aadd0-e218-4781-9851-2305cf07caec","amountCents":1000,"method":"CARD","message":"Iniciando payCharge"}
+[Nest] 72636  - 11/12/2026, 2:37:02 AM    WARN [ExecutionService] {"event":"execution_start_fallback","orgId":"org-1","serviceOrderId":"exec-start-1","customerId":"cust-1","executorPersonId":"person-1"}
+[Nest] 72636  - 11/12/2026, 2:37:02 AM    WARN [ExecutionService] {"event":"execution_completion_fallback","requestId":"req-1","userId":"user-1","orgId":"org-1","executionId":"exec-1","serviceOrderId":"exec-1"}
+
+Test Suites: 11 skipped, 26 passed, 26 of 37 total
+Tests:       33 skipped, 137 passed, 170 total
+Snapshots:   0 total
+Time:        56.459 s, estimated 119 s
+Ran all test suites matching test/integration/.

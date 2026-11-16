@@ -47,7 +47,8 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       REDIS_URL: redis://redis:6379
-      AUTO_MIGRATE: "1"
+      # Apply migrations explicitly with pnpm prisma:migrate:deploy before starting the API.
+      AUTO_MIGRATE: "0"
       DB_WAIT_SECONDS: "40"
       SEED_MODE: ""
     depends_on:

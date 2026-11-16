@@ -1,0 +1,47 @@
+{
+  "fixture": {
+    "orgId": "92f5d8a8-6cbb-43f2-a9f2-d9ba91a382dd",
+    "customerId": "8ef543e7-73be-44e0-a3a5-9acf740e9aec",
+    "conversationId": "e77eadfe-17ce-4718-a53e-15d7330e1517",
+    "orderId": "3a408f33-7617-4e1e-a2dc-d478cd390076",
+    "personId": "55bf492e-66e8-48b9-a699-c37a89f4a758",
+    "customers": 501,
+    "appointments": 1001,
+    "orders": 501,
+    "conversations": 55,
+    "messages": 101
+  },
+  "api": {
+    "customersPage63": 5,
+    "totalCustomers": 501,
+    "summaryComplete": true,
+    "summaryProjection": {
+      "customers": 8,
+      "globalPortfolioPreserved": true,
+      "bytes": 10784
+    },
+    "appointmentsCap": 1000,
+    "appointmentsTotal": 1001,
+    "invalidLimitStatus": 400,
+    "oldOrderSearch": true,
+    "withoutChargeFilter": true,
+    "messagePages": [
+      50,
+      50,
+      1
+    ],
+    "noDuplicateMessages": true,
+    "inboxPages": [
+      50,
+      5
+    ]
+  },
+  "browser": {
+    "oldCustomerSearch": true,
+    "oldOrderSearch": true,
+    "inboxLoadMore": true,
+    "olderMessagesLoaded": 101
+  },
+  "pageErrors": [],
+  "pass": true
+}

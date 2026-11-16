@@ -21,6 +21,7 @@ import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { AppLayout } from "./components/AppLayout";
 import { PublicLayout } from "./components/PublicLayout";
 import { AuthLayout } from "./components/AuthLayout";
+import { AuthServiceGate } from "./components/AuthServiceGate";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import {
   BootProbeProvider,
@@ -369,6 +370,14 @@ function ProtectedRoute({
 }
 
 function AuthRoute({ component: Component }: { component: ComponentType }) {
+  return (
+    <AuthServiceGate>
+      <ConnectedAuthRoute component={Component} />
+    </AuthServiceGate>
+  );
+}
+
+function ConnectedAuthRoute({ component: Component }: { component: ComponentType }) {
   const { authState, isAuthenticated, redirectTo } = useAuth();
   const [location, navigate] = useLocation();
   const redirectParam = readSafeRedirectFromPath(location);
@@ -472,12 +481,9 @@ function publicPage(Page: ComponentType) {
 }
 
 function authPage(Page: LazyExoticComponent<ComponentType>) {
+  const Content = () => <LazyPage component={Page} fallback={<AuthRouteLoader />} />;
   return function AuthPageRoute() {
-    return (
-      <AuthRoute
-        component={() => <LazyPage component={Page} fallback={<AuthRouteLoader />} />}
-      />
-    );
+    return <AuthRoute component={Content} />;
   };
 }
 
@@ -497,6 +503,16 @@ function directAuthPage(Page: ComponentType) {
     return <AuthRoute component={Page} />;
   };
 }
+
+// Keep route/component identity stable across auth-context updates so pending
+// submissions and errors do not remount forms and erase their local state.
+const LoginRoute = authPage(Login);
+const RegisterRoute = directAuthPage(RegisterPage);
+const ForgotPasswordRoute = authPage(ForgotPasswordPage);
+const ResetPasswordRoute = authPage(ResetPasswordPage);
+const AcceptInviteRoute = authPage(AcceptInvitePage);
+const AuthCallbackRoute = authPage(AuthCallbackPage);
+const ConfirmEmailRoute = authPage(ConfirmEmailPage);
 
 const CustomersRoute = lazyProtectedPage(CustomersPage, {
   permissions: ["customers:read"],
@@ -645,19 +661,19 @@ function Router() {
         <RootRoute />
       </Route>
 
-      <Route path="/login">{authPage(Login)()}</Route>
+      <Route path="/login" component={LoginRoute} />
 
-      <Route path="/register" component={directAuthPage(RegisterPage)} />
+      <Route path="/register" component={RegisterRoute} />
 
-      <Route path="/forgot-password">{authPage(ForgotPasswordPage)()}</Route>
+      <Route path="/forgot-password" component={ForgotPasswordRoute} />
 
-      <Route path="/reset-password">{authPage(ResetPasswordPage)()}</Route>
+      <Route path="/reset-password" component={ResetPasswordRoute} />
 
-      <Route path="/auth/accept-invite">{authPage(AcceptInvitePage)()}</Route>
+      <Route path="/auth/accept-invite" component={AcceptInviteRoute} />
 
-      <Route path="/auth/callback">{authPage(AuthCallbackPage)()}</Route>
+      <Route path="/auth/callback" component={AuthCallbackRoute} />
 
-      <Route path="/auth/confirm-email">{authPage(ConfirmEmailPage)()}</Route>
+      <Route path="/auth/confirm-email" component={ConfirmEmailRoute} />
 
       <Route path="/onboarding">{onboardingPage(Onboarding)()}</Route>
 

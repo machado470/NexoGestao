@@ -266,7 +266,7 @@ describeReal(
                   allowed: true,
                 }),
 
-              enforceMeter:
+              assertMeterInTransaction: jest.fn(), enforceMeter:
                 jest.fn().mockResolvedValue({
                   allowed: true,
                 }),

@@ -1,7 +1,9 @@
 import {
   IsNotEmpty,
-  IsNumber,
+  Matches,
+  IsInt,
   IsOptional,
+  ValidateIf,
   IsString,
   IsDateString,
   IsEnum,
@@ -37,6 +39,7 @@ export enum ExpenseCategory {
 export class CreateExpenseDto {
   @IsString()
   @IsNotEmpty()
+  @Matches(/\S/, { message: "O texto deve conter caracteres além de espaços" })
   @MaxLength(255)
   title!: string
 
@@ -45,8 +48,9 @@ export class CreateExpenseDto {
   @MaxLength(255)
   description?: string
 
-  @IsNumber()
+  @IsInt()
   @Min(1)
+  @Max(2_147_483_647)
   amountCents!: number
 
   @IsEnum(ExpenseCategory)
@@ -56,7 +60,7 @@ export class CreateExpenseDto {
   type!: ExpenseTypeDto
 
   @IsEnum(ExpenseRecurrenceDto)
-  @IsOptional()
+  @ValidateIf((_object, value) => value !== undefined)
   recurrence?: ExpenseRecurrenceDto
 
   @IsDateString()
@@ -64,13 +68,13 @@ export class CreateExpenseDto {
   occurredAt!: string
 
   @IsOptional()
-  @IsNumber()
+  @IsInt()
   @Min(1)
   @Max(31)
   dueDay?: number
 
   @IsBoolean()
-  @IsOptional()
+  @ValidateIf((_object, value) => value !== undefined)
   isActive?: boolean
 
   @IsString()

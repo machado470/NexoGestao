@@ -14,12 +14,12 @@ export class UpdateCustomerDto {
   @IsOptional()
   @IsEmail()
   @MaxLength(160)
-  email?: string
+  email?: string | null
 
   @IsOptional()
   @IsString()
   @MaxLength(2000)
-  notes?: string
+  notes?: string | null
 
   @IsOptional()
   @IsBoolean()

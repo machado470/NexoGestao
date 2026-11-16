@@ -1,6 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useLocation } from "wouter";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import {
+  toLocalDateTimeInput,
+  parseLocalDateTimeInput,
+} from "@/lib/local-date-time";
+import { useId, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useSearch } from "wouter";
 import { toast } from "sonner";
+import { can } from "@/lib/rbac";
 import { useAuth } from "@/contexts/AuthContext";
 import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
@@ -96,17 +102,21 @@ function dateValue(value?: string | null) {
 }
 
 export default function AppointmentsPage() {
+  const fieldId = useId();
   // Marcador tipado exigido pelo guardrail do Operating System. A página não
   // possui fonte oficial de severidade e, por isso, não renderiza nem deriva uma.
   const officialOperationalSeverity: OperationalSeverity | null = null;
   void officialOperationalSeverity;
-  const [location, navigate] = useLocation();
-  const { isAuthenticated } = useAuth();
-  const utils = trpc.useUtils();
-  const params = useMemo(
-    () => new URLSearchParams(location.split("?")[1] ?? ""),
-    [location]
+  const [, navigate] = useLocation();
+  const routeSearch = useSearch();
+  const { isAuthenticated, role } = useAuth();
+  const canCreateAppointment = Boolean(
+    role && can(role, "appointments:create")
   );
+  const canEditAppointment = Boolean(role && can(role, "appointments:update"));
+  const canCreateOrder = Boolean(role && can(role, "orders:create"));
+  const utils = trpc.useUtils();
+  const params = useMemo(() => new URLSearchParams(routeSearch), [routeSearch]);
   const routeCustomerId = params.get("customerId");
   const routeAppointmentId = params.get("appointmentId") ?? params.get("id");
   const routeAction = params.get("action");
@@ -126,17 +136,25 @@ export default function AppointmentsPage() {
   const openedRouteAction = useRef<string | null>(null);
   const pageSize = 8;
 
+  const debouncedSearch = useDebouncedValue(queryText);
+
   const appointmentListInput = useMemo(
     () => ({
-      limit: 100,
+      page,
+      id: routeAppointmentId || undefined,
+      limit: pageSize,
+      search: debouncedSearch || undefined,
+      status: statusFilter === 'all' ? undefined : statusFilter as 'SCHEDULED' | 'CONFIRMED' | 'CANCELED' | 'DONE' | 'NO_SHOW',
+      from: dateFilter ? new Date(`${dateFilter}T00:00:00`).toISOString() : undefined,
+      to: dateFilter ? new Date(`${dateFilter}T23:59:59.999`).toISOString() : undefined,
       ...(responsibleFilter === "all"
         ? {}
         : { assignedToPersonId: responsibleFilter }),
       ...(routeCustomerId ? { customerId: routeCustomerId } : {}),
     }),
-    [responsibleFilter, routeCustomerId]
+    [responsibleFilter, routeCustomerId, routeAppointmentId, page, debouncedSearch, statusFilter, dateFilter]
   );
-  const appointmentsQuery = trpc.appointments.list.useQuery(
+  const appointmentsQuery = trpc.appointments.page.useQuery(
     appointmentListInput,
     { enabled: isAuthenticated, retry: false }
   );
@@ -144,7 +162,7 @@ export default function AppointmentsPage() {
     enabled: isAuthenticated,
     retry: false,
   });
-  const peopleQuery = trpc.people.list.useQuery(undefined, {
+  const peopleQuery = trpc.people.assignees.useQuery(undefined, {
     enabled: isAuthenticated,
     retry: false,
   });
@@ -154,7 +172,7 @@ export default function AppointmentsPage() {
   );
 
   const appointments = useMemo(
-    () => normalizeArrayPayload<AppointmentRow>(appointmentsQuery.data),
+    () => normalizeArrayPayload<AppointmentRow>(appointmentsQuery.data?.items),
     [appointmentsQuery.data]
   );
   const customers = useMemo(
@@ -240,11 +258,8 @@ export default function AppointmentsPage() {
       return true;
     });
   }, [dateFilter, queryText, routeCustomerId, rows, statusFilter]);
-  const paginatedRows = filteredRows.slice(
-    (page - 1) * pageSize,
-    page * pageSize
-  );
-  const selected = rows.find(row => row.id === selectedId) ?? null;
+  const paginatedRows = filteredRows;
+  const selected = filteredRows.find(row => row.id === selectedId) ?? null;
 
   useEffect(
     () => setPage(1),
@@ -256,6 +271,7 @@ export default function AppointmentsPage() {
   useEffect(() => {
     const key = `${routeAppointmentId ?? ""}:${routeAction ?? ""}`;
     if (
+      !canEditAppointment ||
       routeAction !== "reschedule" ||
       !selected ||
       openedRouteAction.current === key
@@ -264,7 +280,7 @@ export default function AppointmentsPage() {
     openedRouteAction.current = key;
     setEditing(selected.item);
     setOpenModal(true);
-  }, [routeAction, routeAppointmentId, selected]);
+  }, [routeAction, routeAppointmentId, selected, canEditAppointment]);
 
   const timelineQuery = trpc.timeline.listByCustomer.useQuery(
     { customerId: selected?.customerId ?? "", limit: 25 },
@@ -298,8 +314,8 @@ export default function AppointmentsPage() {
       customerId: String(
         editing?.customerId ?? editing?.customer?.id ?? routeCustomerId ?? ""
       ),
-      date: start ? start.toISOString().slice(0, 10) : "",
-      time: start ? start.toISOString().slice(11, 16) : "",
+      date: toLocalDateTimeInput(start).slice(0, 10),
+      time: toLocalDateTimeInput(start).slice(11, 16),
       status: String(
         editing?.status ?? "SCHEDULED"
       ).toUpperCase() as AppointmentStatus,
@@ -321,8 +337,11 @@ export default function AppointmentsPage() {
 
   async function saveAppointment(event: React.FormEvent) {
     event.preventDefault();
-    const startsAt = new Date(`${form.date}T${form.time}`);
-    if (!form.customerId || Number.isNaN(startsAt.getTime())) {
+    const startsAt = parseLocalDateTimeInput(
+      `${form.date}T${form.time}`,
+      editing?.startsAt
+    );
+    if (!form.customerId || !startsAt) {
       toast.error("Cliente, data e hora são obrigatórios.");
       return;
     }
@@ -360,6 +379,7 @@ export default function AppointmentsPage() {
         });
       }
       await utils.appointments.list.invalidate();
+      await utils.appointments.page.invalidate();
       setSuccessMessage(
         editing
           ? "Agendamento atualizado com sucesso."
@@ -373,6 +393,7 @@ export default function AppointmentsPage() {
   }
 
   async function updateStatus(id: string, status: AppointmentStatus) {
+    if (!canEditAppointment) return;
     const appointment = appointments.find(item => String(item.id) === id);
     try {
       await updateMutation.mutateAsync({
@@ -381,6 +402,7 @@ export default function AppointmentsPage() {
         expectedUpdatedAt: appointment?.updatedAt ?? undefined,
       });
       await utils.appointments.list.invalidate();
+      await utils.appointments.page.invalidate();
       setSuccessMessage(
         status === "CONFIRMED"
           ? "Agendamento confirmado."
@@ -426,6 +448,7 @@ export default function AppointmentsPage() {
           }
           primaryAction={
             <Button
+              disabled={!canCreateAppointment}
               onClick={() => {
                 setEditing(null);
                 setOpenModal(true);
@@ -608,15 +631,17 @@ export default function AppointmentsPage() {
                 actionLabel="Tentar novamente"
                 onAction={() => void appointmentsQuery.refetch()}
               />
-            ) : appointments.length === 0 ? (
+            ) : appointments.length === 0 && !queryText && !dateFilter && statusFilter === "all" && responsibleFilter === "all" && !routeCustomerId ? (
               <AppPageEmptyState
                 title="Sem agendamentos"
-                description="Nenhum agendamento foi retornado pela fonte oficial."
+                description="Crie o primeiro agendamento para organizar os atendimentos."
+                action={canCreateAppointment ? <Button onClick={() => { setEditing(null); setOpenModal(true); }}>Novo agendamento</Button> : undefined}
               />
             ) : filteredRows.length === 0 ? (
               <AppPageEmptyState
-                title="Nenhum resultado"
-                description="Nenhum fato persistido corresponde aos filtros de apresentação."
+                title="Nenhum resultado para os filtros"
+                description="Limpe os filtros para ver a agenda."
+                action={<Button variant="outline" onClick={() => { setQueryText(""); setDateFilter(""); setStatusFilter("all"); setResponsibleFilter("all"); setPage(1); }}>Limpar filtros</Button>}
               />
             ) : (
               <>
@@ -665,7 +690,9 @@ export default function AppointmentsPage() {
                               onClick={() =>
                                 void updateStatus(row.id, "CONFIRMED")
                               }
-                              disabled={updateMutation.isPending}
+                              disabled={
+                                !canEditAppointment || updateMutation.isPending
+                              }
                             >
                               Confirmar
                             </Button>
@@ -696,13 +723,16 @@ export default function AppointmentsPage() {
                                   setEditing(row.item);
                                   setOpenModal(true);
                                 },
-                                disabled: !row.id,
+                                disabled: !canEditAppointment || !row.id,
                               },
                               {
                                 label: "Cancelar",
                                 onSelect: () =>
                                   void updateStatus(row.id, "CANCELED"),
-                                disabled: !row.id || row.status === "CANCELED",
+                                disabled:
+                                  !canEditAppointment ||
+                                  !row.id ||
+                                  row.status === "CANCELED",
                               },
                               {
                                 label: row.order?.id
@@ -715,7 +745,10 @@ export default function AppointmentsPage() {
                                       )
                                     : (setSelectedId(row.id),
                                       setOpenServiceOrderModal(true)),
-                                disabled: !row.id || serviceOrdersQuery.isError,
+                                disabled:
+                                  !row.id ||
+                                  serviceOrdersQuery.isError ||
+                                  (!row.order?.id && !canCreateOrder),
                               },
                               { type: "separator" },
                               {
@@ -743,7 +776,7 @@ export default function AppointmentsPage() {
                 </div>
                 <AppPagination
                   currentPage={page}
-                  totalItems={filteredRows.length}
+                  totalItems={appointmentsQuery.data?.meta.total ?? 0}
                   pageSize={pageSize}
                   onPageChange={setPage}
                 />
@@ -751,7 +784,7 @@ export default function AppointmentsPage() {
             )}
           </AppSectionBlock>
 
-          <AppSectionBlock
+          {filteredRows.length > 0 && !appointmentsQuery.isLoading && !appointmentsQuery.isError ? (          <AppSectionBlock
             title="Detalhe e evidências"
             subtitle="Fatos do agendamento em foco e histórico oficial relacionado."
             compact
@@ -820,6 +853,7 @@ export default function AppointmentsPage() {
                   <div className="mt-4 flex flex-wrap gap-2">
                     <Button
                       variant="outline"
+                      disabled={!canEditAppointment}
                       onClick={() => {
                         setEditing(selected.item);
                         setOpenModal(true);
@@ -875,7 +909,7 @@ export default function AppointmentsPage() {
                 </div>
               </div>
             )}
-          </AppSectionBlock>
+          </AppSectionBlock>) : null}
 
           <nav
             aria-label="Navegação contextual de agendamentos"
@@ -895,7 +929,9 @@ export default function AppointmentsPage() {
         </div>
 
         <FormModal
-          open={openModal}
+          open={
+            openModal && (editing ? canEditAppointment : canCreateAppointment)
+          }
           onOpenChange={next => {
             setOpenModal(next);
             if (!next) setEditing(null);
@@ -941,8 +977,9 @@ export default function AppointmentsPage() {
                 sem atribuição.
               </p>
             ) : null}
-            <AppField label="Cliente">
+            <AppField label="Cliente" htmlFor={`${fieldId}-field-0`}>
               <AppSelect
+                id={`${fieldId}-field-0`}
                 value={form.customerId}
                 onValueChange={customerId =>
                   setForm(value => ({ ...value, customerId }))
@@ -955,8 +992,9 @@ export default function AppointmentsPage() {
               />
             </AppField>
             <div className="grid gap-3 md:grid-cols-2">
-              <AppField label="Data">
+              <AppField label="Data" htmlFor={`${fieldId}-field-1`}>
                 <AppInput
+                  id={`${fieldId}-field-1`}
                   type="date"
                   value={form.date}
                   onChange={event =>
@@ -964,8 +1002,9 @@ export default function AppointmentsPage() {
                   }
                 />
               </AppField>
-              <AppField label="Hora">
+              <AppField label="Hora" htmlFor={`${fieldId}-field-2`}>
                 <AppInput
+                  id={`${fieldId}-field-2`}
                   type="time"
                   value={form.time}
                   onChange={event =>
@@ -975,8 +1014,9 @@ export default function AppointmentsPage() {
               </AppField>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
-              <AppField label="Status">
+              <AppField label="Status" htmlFor={`${fieldId}-field-3`}>
                 <AppSelect
+                  id={`${fieldId}-field-3`}
                   value={form.status}
                   onValueChange={status =>
                     setForm(value => ({
@@ -993,8 +1033,9 @@ export default function AppointmentsPage() {
                   ]}
                 />
               </AppField>
-              <AppField label="Duração (min)">
+              <AppField label="Duração (min)" htmlFor={`${fieldId}-field-4`}>
                 <AppInput
+                  id={`${fieldId}-field-4`}
                   type="number"
                   min={15}
                   value={form.durationMinutes}
@@ -1007,8 +1048,9 @@ export default function AppointmentsPage() {
                 />
               </AppField>
             </div>
-            <AppField label="Responsável">
+            <AppField label="Responsável" htmlFor={`${fieldId}-field-5`}>
               <AppSelect
+                id={`${fieldId}-field-5`}
                 value={form.assignedToPersonId}
                 onValueChange={assignedToPersonId =>
                   setForm(value => ({ ...value, assignedToPersonId }))
@@ -1030,8 +1072,9 @@ export default function AppointmentsPage() {
                 onWarningShown={assigneeWarningTelemetry.trackShown}
               />
             </AppField>
-            <AppField label="Observação">
+            <AppField label="Observação" htmlFor={`${fieldId}-field-6`}>
               <AppTextarea
+                id={`${fieldId}-field-6`}
                 value={form.notes}
                 onChange={event =>
                   setForm(value => ({ ...value, notes: event.target.value }))
@@ -1043,7 +1086,7 @@ export default function AppointmentsPage() {
         </FormModal>
       </div>
       <CreateServiceOrderModal
-        isOpen={openServiceOrderModal}
+        isOpen={openServiceOrderModal && canCreateOrder}
         onClose={() => setOpenServiceOrderModal(false)}
         onSuccess={() => {
           setSuccessMessage("O.S. criada com sucesso.");

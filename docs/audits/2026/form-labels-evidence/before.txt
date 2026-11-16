@@ -1,0 +1,11 @@
+Login passed
+AssertionError [ERR_ASSERTION]: appointments-1440 has unlabeled fields
+    at inspect (/tmp/nexo-form-labels-browser.cjs:12:568)
+    at async /tmp/nexo-form-labels-browser.cjs:13:217 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}

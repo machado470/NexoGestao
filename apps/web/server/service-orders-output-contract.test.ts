@@ -44,6 +44,11 @@ describe("service-order output contracts", () => {
     await expect(caller().serviceOrders.list()).resolves.toEqual(list);
   });
 
+  it("serves the additive page contract with validated items and real totals", async () => {
+    respond({ ...list, data: [{ ...order, orgId: customerId, idempotencyKey: "private" }], pagination: { page: 63, limit: 8, total: 501, pages: 63 } });
+    await expect(caller().serviceOrders.page({page:63,limit:8})).resolves.toEqual({items:[order],meta:{page:63,limit:8,total:501,pages:63}});
+  });
+
   it("validates detail through the nexo alias", async () => {
     respond(order);
     await expect(caller().nexo.serviceOrders.getById({ id: orderId })).resolves.toEqual(order);

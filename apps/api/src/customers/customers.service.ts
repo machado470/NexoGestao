@@ -1,3 +1,4 @@
+import { refundedAmount } from '../common/finance/refunded-amount'
 import {
   BadRequestException,
   ConflictException,
@@ -5,6 +6,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common'
+import { csvRow } from '../common/csv'
 import { PrismaService } from '../prisma/prisma.service'
 import { TimelineService } from '../timeline/timeline.service'
 import { AuditService } from '../audit/audit.service'
@@ -88,14 +90,13 @@ export class CustomersService {
     ].join(':')
   }
 
-  async list(orgId: string, query?: ListCustomersQueryDto) {
+  async list(orgId: string, query?: ListCustomersQueryDto, customerIds?: string[]) {
     if (!orgId) throw new BadRequestException('orgId é obrigatório')
 
-    const page = Number(query?.page) || 1
+    let page = Number(query?.page) || 1
     const limit = Number(query?.limit) || 20
-    const skip = (page - 1) * limit
 
-    const where: Prisma.CustomerWhereInput = { orgId }
+    const where: Prisma.CustomerWhereInput = { orgId, ...(customerIds ? { id: { in: customerIds } } : {}), ...(query?.active ? { active: query.active === 'active' } : {}) }
 
     if (query?.search) {
       const s = String(query.search)
@@ -106,10 +107,19 @@ export class CustomersService {
       ]
     }
 
+    if (query?.focusId) {
+      const focused = await this.prisma.customer.findFirst({ where: { AND: [where, { id: query.focusId }] }, select: { id: true, createdAt: true } })
+      if (focused) {
+        const before = await this.prisma.customer.count({ where: { AND: [where, { OR: [{ createdAt: { gt: focused.createdAt } }, { createdAt: focused.createdAt, id: { gt: focused.id } }] }] } })
+        page = Math.floor(before / limit) + 1
+      }
+    }
+    const skip = (page - 1) * limit
+
     const [items, total] = await Promise.all([
       this.prisma.customer.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         take: limit,
         skip,
       }),
@@ -127,21 +137,27 @@ export class CustomersService {
     }
   }
 
-  async exportCsv(orgId: string) {
+  async exportCsv(orgId: string, customerId?: string, actorUserId?: string, actorPersonId?: string) {
+    if (customerId && !await this.prisma.customer.findFirst({ where: { id: customerId, orgId }, select: { id: true } })) throw new NotFoundException('Cliente não encontrado')
     const customers = await this.prisma.customer.findMany({
-      where: { orgId },
+      where: { orgId, ...(customerId ? { id: customerId } : {}) },
       orderBy: { name: 'asc' },
+      select: { id: true, name: true, email: true, phone: true, active: true, createdAt: true },
     })
 
     const header = 'ID,Nome,Email,Telefone,Ativo,Criado Em\n'
     const rows = customers
       .map((c) => {
-        return `"${c.id}","${c.name}","${c.email || ''}","${c.phone}","${
-          c.active ? 'Sim' : 'Não'
-        }","${c.createdAt.toISOString()}"`
+        return csvRow([c.id, c.name, c.email || '', c.phone, c.active ? 'Sim' : 'Não', c.createdAt.toISOString()])
       })
       .join('\n')
 
+    if (actorUserId) await this.audit.log({
+      orgId, actorUserId, actorPersonId, personId: actorPersonId, action: AUDIT_ACTIONS.CUSTOMERS_EXPORTED,
+      entityType: customerId ? 'CUSTOMER' : 'ORGANIZATION', entityId: customerId ?? orgId,
+      context: 'Exportação de cadastro de clientes gerada',
+      metadata: { scope: customerId ? 'customer' : 'organization', format: 'csv', recordCount: customers.length },
+    })
     return header + rows
   }
 
@@ -217,7 +233,7 @@ export class CustomersService {
       appointments,
       serviceOrders,
       charges,
-      totalSpentCents: paymentsAggregate._sum.amountCents ?? 0,
+      totalSpentCents: (paymentsAggregate._sum.amountCents ?? 0) - await refundedAmount(this.prisma, { orgId, charge: { orgId, customerId: id } }),
     }
   }
 
@@ -396,8 +412,8 @@ export class CustomersService {
     data: {
       name?: string
       phone?: string
-      email?: string
-      notes?: string
+      email?: string | null
+      notes?: string | null
       active?: boolean
       expectedUpdatedAt?: string
     }
@@ -434,7 +450,9 @@ export class CustomersService {
       data.phone = v
     }
 
-    if (typeof params.data.email === 'string') {
+    if (params.data.email === null) {
+      data.email = null
+    } else if (typeof params.data.email === 'string') {
       const v = normalizeEmail(params.data.email)
 
       if (v && v !== before.email) {
@@ -455,7 +473,9 @@ export class CustomersService {
       data.email = v
     }
 
-    if (typeof params.data.notes === 'string') {
+    if (params.data.notes === null) {
+      data.notes = null
+    } else if (typeof params.data.notes === 'string') {
       const v = params.data.notes.trim()
       data.notes = v ? v : null
     }

@@ -1,5 +1,8 @@
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useAuth } from "@/contexts/AuthContext";
+import { can } from "@/lib/rbac";
 import { useEffect, useMemo, useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { toast } from "sonner";
 
 import { trpc } from "@/lib/trpc";
@@ -197,14 +200,17 @@ function safeText(value: unknown, fallback = "—") {
 }
 
 export default function ServiceOrdersPage() {
+  const { role } = useAuth();
+  const canCreateOrder = Boolean(role && can(role, "orders:create"));
+  const canEditOrder = Boolean(role && can(role, "orders:update"));
+  const canManageFinance = Boolean(role && can(role, "finance:update"));
+  const canReadFinance = Boolean(role && can(role, "finance:read"));
   const pageSize = 8;
   const _operationalSeverityContract: OperationalSeverity = "healthy";
   void _operationalSeverityContract;
-  const [location, navigate] = useLocation();
-  const params = useMemo(
-    () => new URLSearchParams(location.split("?")[1] ?? ""),
-    [location]
-  );
+  const [, navigate] = useLocation();
+  const routeSearch = useSearch();
+  const params = useMemo(() => new URLSearchParams(routeSearch), [routeSearch]);
 
   const urlServiceOrderId =
     params.get("id") ?? params.get("serviceOrderId") ?? params.get("os");
@@ -238,8 +244,10 @@ export default function ServiceOrdersPage() {
 
   const utils = trpc.useUtils();
 
-  const serviceOrdersQuery = trpc.serviceOrders.list.useQuery(
-    { page: 1, limit: 500 },
+  const debouncedSearch = useDebouncedValue(searchTerm);
+
+  const serviceOrdersQuery = trpc.serviceOrders.page.useQuery(
+    { page: currentPage, limit: pageSize, id: urlServiceOrderId || undefined, appointmentId: urlAppointmentId || undefined, search: debouncedSearch || undefined, customerId: urlCustomerId || (customerFilter === 'all' ? undefined : customerFilter), assignedToPersonId: ['all', 'unassigned'].includes(responsibleFilter) ? undefined : responsibleFilter, unassigned: responsibleFilter === 'unassigned' ? 'true' : undefined, operationalFilter: activeFilter, priorityFilter, deadlineFilter },
     { retry: false }
   );
   const customersQuery = trpc.customers.list.useQuery(
@@ -252,9 +260,11 @@ export default function ServiceOrdersPage() {
   );
   const chargesQuery = trpc.finance.charges.list.useQuery(
     { page: 1, limit: 500 },
-    { retry: false }
+    { enabled: canReadFinance, retry: false }
   );
-  const peopleQuery = trpc.people.list.useQuery(undefined, { retry: false });
+  const peopleQuery = trpc.people.assignees.useQuery(undefined, {
+    retry: false,
+  });
   const timelineQuery = trpc.timeline.listByServiceOrder.useQuery(
     { serviceOrderId: String(selectedOrderId ?? ""), limit: 20 },
     { enabled: Boolean(selectedOrderId), retry: false }
@@ -270,14 +280,14 @@ export default function ServiceOrdersPage() {
     trpc.serviceOrders.generateCharge.useMutation();
 
   const capabilities = {
-    start: Boolean(startExecutionMutation),
-    complete: Boolean(completeExecutionMutation),
-    generateCharge: Boolean(generateChargeMutation),
-    edit: true,
+    start: canEditOrder && Boolean(startExecutionMutation),
+    complete: canEditOrder && Boolean(completeExecutionMutation),
+    generateCharge: canManageFinance && Boolean(generateChargeMutation),
+    edit: canEditOrder,
   };
 
   const serviceOrders = useMemo(
-    () => normalizeArrayPayload<any>(serviceOrdersQuery.data),
+    () => normalizeArrayPayload<any>(serviceOrdersQuery.data?.items),
     [serviceOrdersQuery.data]
   );
   const customers = useMemo(
@@ -448,6 +458,8 @@ export default function ServiceOrdersPage() {
     serviceOrders,
   ]);
 
+  const hasListFilters = Boolean(searchTerm.trim() || activeFilter !== 'all' || customerFilter !== 'all' || responsibleFilter !== 'all' || deadlineFilter !== 'all' || priorityFilter !== 'all' || urlCustomerId || urlServiceOrderId || urlAppointmentId);
+
   // Filtering never changes the relative order returned by the API.
   const filteredOrders = useMemo(() => {
     const normalizedTerm = searchTerm.trim().toLowerCase();
@@ -503,10 +515,8 @@ export default function ServiceOrdersPage() {
     searchTerm,
     urlCustomerId,
   ]);
-  const paginatedOrders = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredOrders.slice(start, start + pageSize);
-  }, [currentPage, filteredOrders, pageSize]);
+  const paginatedOrders = filteredOrders;
+
 
   useEffect(() => {
     setCurrentPage(1);
@@ -527,7 +537,7 @@ export default function ServiceOrdersPage() {
     );
     if (linkedOrder) {
       setSelectedOrderId(linkedOrder.id);
-    } else if (!serviceOrdersQuery.isLoading) {
+    } else if (canCreateOrder && !serviceOrdersQuery.isLoading) {
       setOpenCreate(true);
     }
   }, [
@@ -535,12 +545,14 @@ export default function ServiceOrdersPage() {
     serviceOrdersQuery.isLoading,
     setSelectedOrderId,
     urlAppointmentId,
+    canCreateOrder,
   ]);
 
   useEffect(() => {
-    const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
+    if (!serviceOrdersQuery.data) return;
+    const totalPages = Math.max(1, serviceOrdersQuery.data.meta.pages);
     if (currentPage > totalPages) setCurrentPage(1);
-  }, [currentPage, filteredOrders.length, pageSize]);
+  }, [currentPage, serviceOrdersQuery.data?.meta.pages, pageSize]);
 
   useEffect(() => {
     if (
@@ -638,6 +650,7 @@ export default function ServiceOrdersPage() {
   async function refreshEverything(orderId?: string) {
     await Promise.all([
       utils.serviceOrders.list.invalidate(),
+      utils.serviceOrders.page.invalidate(),
       ...(orderId
         ? [
             utils.serviceOrders.getById.invalidate({ id: orderId }),
@@ -655,7 +668,7 @@ export default function ServiceOrdersPage() {
     ]);
     await Promise.all([
       serviceOrdersQuery.refetch(),
-      chargesQuery.refetch(),
+      ...(canReadFinance ? [chargesQuery.refetch()] : []),
       appointmentsQuery.refetch(),
       timelineQuery.refetch(),
     ]);
@@ -772,6 +785,7 @@ export default function ServiceOrdersPage() {
       return;
     }
     if (item.nextAction.type === "edit") {
+      if (!capabilities.edit) return;
       setEditingId(item.id);
       return;
     }
@@ -870,7 +884,7 @@ export default function ServiceOrdersPage() {
           <Button
             type="button"
             onClick={() => setOpenCreate(true)}
-            disabled={customersQuery.isError}
+            disabled={!canCreateOrder || customersQuery.isError}
             title={
               customersQuery.isError
                 ? "Nova O.S. indisponível enquanto clientes não puderem ser carregados"
@@ -905,7 +919,7 @@ export default function ServiceOrdersPage() {
               void Promise.all([
                 customersQuery.refetch(),
                 appointmentsQuery.refetch(),
-                chargesQuery.refetch(),
+                ...(canReadFinance ? [chargesQuery.refetch()] : []),
                 peopleQuery.refetch(),
               ])
             }
@@ -960,9 +974,7 @@ export default function ServiceOrdersPage() {
         <div className="w-full md:w-auto md:min-w-[150px]">
           <AppSelect
             value={deadlineFilter}
-            onValueChange={value =>
-              setDeadlineFilter(value as DeadlineFilter)
-            }
+            onValueChange={value => setDeadlineFilter(value as DeadlineFilter)}
             ariaLabel="Filtrar por prazo"
             options={[
               { value: "all", label: "Todos os prazos" },
@@ -974,9 +986,7 @@ export default function ServiceOrdersPage() {
         <div className="w-full md:w-auto md:min-w-[170px]">
           <AppSelect
             value={priorityFilter}
-            onValueChange={value =>
-              setPriorityFilter(value as PriorityFilter)
-            }
+            onValueChange={value => setPriorityFilter(value as PriorityFilter)}
             ariaLabel="Filtrar por prioridade"
             options={[
               { value: "all", label: "Todas as prioridades" },
@@ -989,11 +999,11 @@ export default function ServiceOrdersPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {[
-            { key: "all", label: `Todas (${counts.all})` },
-            { key: "open", label: `Abertas (${counts.open})` },
-            { key: "in_progress", label: `Em andamento (${counts.progress})` },
-            { key: "overdue", label: `Atrasadas (${counts.overdue})` },
-            { key: "done", label: `Concluídas (${counts.done})` },
+            { key: "all", label: "Todas" },
+            { key: "open", label: "Abertas" },
+            { key: "in_progress", label: "Em andamento" },
+            { key: "overdue", label: "Atrasadas" },
+            { key: "done", label: "Concluídas" },
           ].map(filter => (
             <button
               key={filter.key}
@@ -1028,13 +1038,13 @@ export default function ServiceOrdersPage() {
                     "font-semibold text-[var(--accent-primary)]"
                 )}
               >
-                Concluídas sem cobrança ({counts.doneWithoutCharge})
+                Concluídas sem cobrança
               </AppDropdownItem>
             </AppDropdownContent>
           </AppDropdown>
         </div>
         <span className="rounded-md border border-[var(--border-subtle)] px-2 py-1 text-xs text-[var(--text-muted)]">
-          {filteredOrders.length} / {counts.all} O.S.
+          {filteredOrders.length} exibidas de {serviceOrdersQuery.data?.meta.total ?? 0} O.S.
         </span>
       </AppFiltersBar>
 
@@ -1059,16 +1069,9 @@ export default function ServiceOrdersPage() {
               />
             ) : filteredOrders.length === 0 ? (
               <AppPageEmptyState
-                title={
-                  searchTerm.trim()
-                    ? "Busca sem resultado"
-                    : "Nenhuma ordem encontrada"
-                }
-                description={
-                  searchTerm.trim()
-                    ? "Ajuste o termo de busca ou os filtros para continuar."
-                    : "Crie uma nova O.S. para iniciar o fluxo operacional."
-                }
+                title={enrichedOrders.length === 0 && !hasListFilters ? "Nenhuma ordem de serviço" : "Nenhum resultado para os filtros"}
+                description={enrichedOrders.length === 0 && !hasListFilters ? "Crie a primeira O.S. para iniciar o atendimento." : "Limpe os filtros para ver as ordens."}
+                action={enrichedOrders.length === 0 && !hasListFilters ? (canCreateOrder && !customersQuery.isError ? <Button onClick={() => setOpenCreate(true)}>Nova O.S.</Button> : undefined) : <Button variant="outline" onClick={() => { setSearchTerm(""); setActiveFilter("all"); setCustomerFilter("all"); setResponsibleFilter("all"); setDeadlineFilter("all"); setPriorityFilter("all"); setCurrentPage(1); }}>Limpar filtros</Button>}
               />
             ) : (
               <div className="space-y-3">
@@ -1151,6 +1154,15 @@ export default function ServiceOrdersPage() {
                           >
                             <Button
                               size="sm"
+                              disabled={
+                                anyActionPending ||
+                                !item.nextAction ||
+                                (item.nextAction.type === "charge"
+                                  ? !capabilities.generateCharge
+                                  : ["start", "complete", "edit"].includes(
+                                      item.nextAction.type
+                                    ) && !canEditOrder)
+                              }
                               onClick={() => runPrimaryAction(item)}
                             >
                               {item.nextAction?.label ?? "Decisão indisponível"}
@@ -1230,7 +1242,7 @@ export default function ServiceOrdersPage() {
                 </div>
                 <AppPagination
                   currentPage={currentPage}
-                  totalItems={filteredOrders.length}
+                  totalItems={serviceOrdersQuery.data?.meta.total ?? 0}
                   pageSize={pageSize}
                   onPageChange={setCurrentPage}
                 />
@@ -1238,7 +1250,7 @@ export default function ServiceOrdersPage() {
             )}
           </AppSectionBlock>
 
-          <AppSectionBlock
+          {filteredOrders.length > 0 && !isLoading && !hasBlockingError ? (          <AppSectionBlock
             title="Detalhe da O.S."
             subtitle="Status, cliente, serviço, responsável, prazo, ações, financeiro e timeline curta."
             className="flex flex-col"
@@ -1532,12 +1544,12 @@ export default function ServiceOrdersPage() {
                 ) : null}
               </div>
             )}
-          </AppSectionBlock>
+          </AppSectionBlock>) : null}
         </div>
       </div>
 
       <CreateServiceOrderModal
-        open={openCreate}
+        open={openCreate && canCreateOrder}
         onClose={() => setOpenCreate(false)}
         onSuccess={() => void refreshEverything()}
         customers={customers.map(item => ({
@@ -1555,7 +1567,7 @@ export default function ServiceOrdersPage() {
       />
 
       <EditServiceOrderModal
-        isOpen={Boolean(editingId)}
+        isOpen={Boolean(editingId) && canEditOrder}
         onClose={() => setEditingId(null)}
         onSuccess={() => {
           setEditingId(null);

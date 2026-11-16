@@ -1,11 +1,12 @@
 import {
   IsNotEmpty,
-  IsNumber,
+  IsInt,
   IsOptional,
   IsString,
   IsEnum,
   IsUUID,
   Min,
+  Max,
   MaxLength,
 } from 'class-validator'
 
@@ -31,8 +32,9 @@ export class CreateInvoiceDto {
   @MaxLength(500)
   description?: string
 
-  @IsNumber()
+  @IsInt()
   @Min(1)
+  @Max(2_147_483_647)
   amountCents!: number
 
   @IsEnum(InvoiceStatus)

@@ -1,0 +1,14 @@
+{
+  "method": "Real Chromium UI, BFF/API and PostgreSQL; synthetic data",
+  "steps": [
+    "login",
+    "customer created from empty state and reloaded",
+    "notification list, counter and mark-read persisted",
+    "appointment created and reloaded",
+    "service order created from appointment with persisted links",
+    "service order started and completed from UI",
+    "charge created, manual payment registered, finance metrics reloaded and single payment persisted"
+  ],
+  "pageErrors": [],
+  "pass": true
+}

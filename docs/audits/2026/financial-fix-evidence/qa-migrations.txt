@@ -1,0 +1,14 @@
+Prisma schema loaded from ../../prisma/schema.prisma
+Datasource "db": PostgreSQL database "nexo_capacity_test", schema "public" at "127.0.0.1:55449"
+
+76 migrations found in prisma/migrations
+
+Applying migration `20261111215000_refund_reversal`
+
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20261111215000_refund_reversal/
+    └─ migration.sql
+
+All migrations have been successfully applied.

@@ -7,7 +7,6 @@ import { resolveNexoApiUrl } from "./nexoApiUrl";
 const NEXO_API_URL = resolveNexoApiUrl();
 const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
-const GOOGLE_USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo";
 
 const GOOGLE_STATE_COOKIE = "oauth_google_state";
 const NEXO_TOKEN_COOKIE = "nexo_token";
@@ -212,52 +211,13 @@ async function exchangeCodeForTokens(code: string) {
   };
 }
 
-async function fetchGoogleUser(accessToken: string) {
-  const response = await fetch(GOOGLE_USERINFO_URL, {
-    method: "GET",
-    headers: {
-      authorization: `Bearer ${accessToken}`,
-    },
-  });
-
-  const payload = await response.json().catch(() => null);
-
-  if (!response.ok || !payload?.email) {
-    throw new Error("google_userinfo_failed");
-  }
-
-  return payload as {
-    sub?: string;
-    email: string;
-    email_verified?: boolean;
-    given_name?: string;
-    family_name?: string;
-    picture?: string;
-    name?: string;
-  };
-}
-
-async function establishSessionInApi(googleUser: {
-  sub?: string;
-  email: string;
-  email_verified?: boolean;
-  given_name?: string;
-  family_name?: string;
-  picture?: string;
-}) {
+async function establishSessionInApi(idToken: string) {
   const upstream = await fetch(`${NEXO_API_URL}/auth/google/bff-login`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
     },
-    body: JSON.stringify({
-      sub: googleUser.sub,
-      email: googleUser.email,
-      firstName: googleUser.given_name,
-      lastName: googleUser.family_name,
-      picture: googleUser.picture,
-      emailVerified: googleUser.email_verified,
-    }),
+    body: JSON.stringify({ idToken }),
   });
 
   const payload = await upstream.json().catch(() => null);
@@ -301,13 +261,10 @@ async function handleGoogleCallback(req: Request, res: Response) {
 
   try {
     const tokenPayload = await exchangeCodeForTokens(code);
-    const googleUser = await fetchGoogleUser(tokenPayload.access_token);
-
-    if (googleUser.email_verified === false) {
-      return redirectToLoginWithError(res, "google_email_not_verified");
+    if (!tokenPayload.id_token) {
+      throw new Error("google_id_token_missing");
     }
-
-    const session = await establishSessionInApi(googleUser);
+    const session = await establishSessionInApi(tokenPayload.id_token);
     setSessionCookie(req, res, session.token);
 
     const redirectTarget = decodedState.r || "/executive-dashboard";

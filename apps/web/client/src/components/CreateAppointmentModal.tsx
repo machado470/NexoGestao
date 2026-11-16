@@ -1,5 +1,9 @@
+import {
+  toLocalDateTimeInput,
+  parseLocalDateTimeInput,
+} from "@/lib/local-date-time";
 import { Button } from "@/components/ui/button";
-import { useEffect, useMemo, useState } from "react";
+import { useId, useEffect, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 
 import { Loader2 } from "lucide-react";
@@ -51,10 +55,12 @@ export function CreateAppointmentModal({
   initialStartsAt,
   initialEndsAt,
 }: CreateAppointmentModalProps) {
+  const fieldId = useId();
   const [formData, setFormData] = useState(INITIAL_FORM);
   const assigneeWarningTelemetry = useAssigneeWarningTelemetry("APPOINTMENT");
   const utils = trpc.useUtils();
-  const peopleQuery = trpc.people.list.useQuery(undefined, {
+  const peopleQuery = trpc.people.assignees.useQuery(undefined, {
+    enabled: isOpen,
     retry: false,
     refetchOnWindowFocus: false,
   });
@@ -79,8 +85,8 @@ export function CreateAppointmentModal({
     setFormData({
       ...INITIAL_FORM,
       customerId: initialCustomerId ? String(initialCustomerId) : "",
-      date: initialStartsAt ? initialStartsAt.slice(0, 10) : "",
-      time: initialStartsAt ? initialStartsAt.slice(11, 16) : "",
+      date: toLocalDateTimeInput(initialStartsAt).slice(0, 10),
+      time: toLocalDateTimeInput(initialStartsAt).slice(11, 16),
       durationMinutes:
         initialStartsAt && initialEndsAt
           ? String(
@@ -95,7 +101,13 @@ export function CreateAppointmentModal({
             )
           : "60",
     });
-  }, [assigneeWarningTelemetry.reset, initialCustomerId, initialEndsAt, initialStartsAt, isOpen]);
+  }, [
+    assigneeWarningTelemetry.reset,
+    initialCustomerId,
+    initialEndsAt,
+    initialStartsAt,
+    isOpen,
+  ]);
 
   const createAppointment = trpc.appointments.create.useMutation();
 
@@ -114,12 +126,18 @@ export function CreateAppointmentModal({
       return;
     }
 
-    const startsAt = new Date(`${formData.date}T${formData.time}`);
-    if (Number.isNaN(startsAt.getTime())) {
+    const startsAt = parseLocalDateTimeInput(
+      `${formData.date}T${formData.time}`,
+      initialStartsAt
+    );
+    if (!startsAt) {
       toast.error("Data e hora inválidas");
       return;
     }
-    const durationMinutes = Math.max(15, Number(formData.durationMinutes) || 60);
+    const durationMinutes = Math.max(
+      15,
+      Number(formData.durationMinutes) || 60
+    );
     const endsAt = new Date(startsAt.getTime() + durationMinutes * 60000);
 
     if (
@@ -142,8 +160,7 @@ export function CreateAppointmentModal({
       notes: formData.notes.trim() || undefined,
     };
 
-    const previousAppointments =
-      utils.appointments.list.getData(undefined);
+    const previousAppointments = utils.appointments.list.getData(undefined);
     const tempId = `temp-appointment-${Date.now()}`;
     const selectedCustomer = customers.find(
       item => String(item.id) === payload.customerId
@@ -197,10 +214,7 @@ export function CreateAppointmentModal({
         onClose();
       },
       onError: error => {
-        utils.appointments.list.setData(
-          undefined,
-          previousAppointments as any
-        );
+        utils.appointments.list.setData(undefined, previousAppointments as any);
         toast.error(error.message || "Erro ao criar agendamento");
       },
     });
@@ -241,8 +255,9 @@ export function CreateAppointmentModal({
       }
     >
       <AppForm id="create-appointment-form" onSubmit={handleSubmit}>
-        <AppField label="Cliente *">
+        <AppField label="Cliente *" htmlFor={`${fieldId}-field-0`}>
           <AppSelect
+            id={`${fieldId}-field-0`}
             value={formData.customerId}
             onValueChange={customerId =>
               setFormData({ ...formData, customerId })
@@ -255,9 +270,10 @@ export function CreateAppointmentModal({
           />
         </AppField>
 
-        <AppField label="Responsável pelo atendimento">
+        <AppField label="Responsável pelo atendimento" htmlFor={`${fieldId}-field-1`}>
           <div className="space-y-1.5">
             <AppSelect
+              id={`${fieldId}-field-1`}
               value={formData.assignedToPersonId || undefined}
               onValueChange={assignedToPersonId =>
                 setFormData({ ...formData, assignedToPersonId })
@@ -284,22 +300,25 @@ export function CreateAppointmentModal({
         </AppField>
 
         <div className="grid gap-3 md:grid-cols-3">
-          <AppField label="Data *">
+          <AppField label="Data *" htmlFor={`${fieldId}-field-2`}>
             <Input
+              id={`${fieldId}-field-2`}
               type="date"
               value={formData.date}
               onChange={e => setFormData({ ...formData, date: e.target.value })}
             />
           </AppField>
-          <AppField label="Hora *">
+          <AppField label="Hora *" htmlFor={`${fieldId}-field-3`}>
             <Input
+              id={`${fieldId}-field-3`}
               type="time"
               value={formData.time}
               onChange={e => setFormData({ ...formData, time: e.target.value })}
             />
           </AppField>
-          <AppField label="Duração">
+          <AppField label="Duração" htmlFor={`${fieldId}-field-4`}>
             <AppSelect
+              id={`${fieldId}-field-4`}
               value={formData.durationMinutes}
               onValueChange={durationMinutes =>
                 setFormData({ ...formData, durationMinutes })
@@ -315,8 +334,9 @@ export function CreateAppointmentModal({
           </AppField>
         </div>
 
-        <AppField label="Serviço (opcional)">
+        <AppField label="Serviço (opcional)" htmlFor={`${fieldId}-field-5`}>
           <Input
+            id={`${fieldId}-field-5`}
             value={formData.serviceType}
             onChange={e =>
               setFormData({ ...formData, serviceType: e.target.value })
@@ -325,8 +345,9 @@ export function CreateAppointmentModal({
           />
         </AppField>
 
-        <AppField label="Observações">
+        <AppField label="Observações" htmlFor={`${fieldId}-field-6`}>
           <Textarea
+            id={`${fieldId}-field-6`}
             value={formData.notes}
             onChange={e => setFormData({ ...formData, notes: e.target.value })}
             placeholder="Observação curta para execução"
@@ -334,7 +355,8 @@ export function CreateAppointmentModal({
           />
         </AppField>
         <p className="text-xs text-[var(--modal-section-muted)]">
-          Dica operacional: a página sinaliza conflitos e próximos horários após criar.
+          Dica operacional: a página sinaliza conflitos e próximos horários após
+          criar.
         </p>
       </AppForm>
     </FormModal>

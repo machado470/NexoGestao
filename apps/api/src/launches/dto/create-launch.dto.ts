@@ -1,11 +1,13 @@
 import {
   IsNotEmpty,
-  IsNumber,
+  Matches,
+  IsInt,
   IsOptional,
   IsString,
   IsDateString,
   IsEnum,
   Min,
+  Max,
   MaxLength,
 } from 'class-validator'
 
@@ -18,11 +20,13 @@ export enum LaunchType {
 export class CreateLaunchDto {
   @IsString()
   @IsNotEmpty()
+  @Matches(/\S/, { message: "O texto deve conter caracteres além de espaços" })
   @MaxLength(255)
   description!: string
 
-  @IsNumber()
+  @IsInt()
   @Min(1)
+  @Max(2_147_483_647)
   amountCents!: number
 
   @IsEnum(LaunchType)
@@ -30,6 +34,7 @@ export class CreateLaunchDto {
 
   @IsString()
   @IsNotEmpty()
+  @Matches(/\S/, { message: "O texto deve conter caracteres além de espaços" })
   @MaxLength(100)
   category!: string
 

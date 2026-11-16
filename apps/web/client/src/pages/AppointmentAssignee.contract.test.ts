@@ -10,7 +10,7 @@ describe("appointment assignee UI contract", () => {
     const normalizedCalendar = compact(calendar);
 
     expect(normalizedCalendar).toContain(
-      'teamFilter === "all" ? { limit: 1000 } : { assignedToPersonId: teamFilter, limit: 1000 }'
+      "teamFilter === 'all' ? {} : { assignedToPersonId: teamFilter }"
     );
     expect(calendar).not.toContain("conflictIds");
     expect(calendar).not.toContain("hasConflict");

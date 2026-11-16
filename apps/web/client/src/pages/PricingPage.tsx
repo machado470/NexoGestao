@@ -5,6 +5,7 @@ import { MarketingLayout } from "@/components/MarketingLayout";
 import { usePageMeta } from "@/hooks/usePageMeta";
 import { trpc } from "@/lib/trpc";
 import {
+  CONFIGURABLE_AUTOMATION_NOTICE,
   formatPlanPrice,
   formatPlanQuota,
   listEnabledPlanFeatures,
@@ -98,6 +99,9 @@ export default function PricingPage() {
       </section>
 
       <section className="container pb-16 md:pb-20">
+        <p className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+          {CONFIGURABLE_AUTOMATION_NOTICE}
+        </p>
         {plansQuery.isLoading ? (
           <article className="rounded-3xl border border-slate-200 bg-white p-8 text-center">
             <p className="text-slate-600">Carregando catálogo comercial...</p>

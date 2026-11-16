@@ -2,6 +2,7 @@ export const QUEUE_NAMES = {
   AUTOMATION: 'automation',
   NOTIFICATIONS: 'notifications',
   WHATSAPP: 'whatsapp',
+  WHATSAPP_INBOUND: 'whatsapp-inbound',
   WHATSAPP_DLQ: 'whatsapp-dlq',
   FINANCE: 'finance',
   WEBHOOKS: 'webhooks',

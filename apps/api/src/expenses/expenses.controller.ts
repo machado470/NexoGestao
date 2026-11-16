@@ -15,6 +15,7 @@ import { Roles } from '../auth/decorators/roles.decorator'
 import { Org } from '../auth/decorators/org.decorator'
 import { User } from '../auth/decorators/user.decorator'
 import { ExpensesService } from './expenses.service'
+import { UpdateExpenseDto } from './dto/update-expense.dto'
 import { CreateExpenseDto } from './dto/create-expense.dto'
 import { ExpensesQueryDto } from './dto/expenses-query.dto'
 
@@ -58,7 +59,7 @@ export class ExpensesController {
     @Org() orgId: string,
     @User() user: any,
     @Param('id') id: string,
-    @Body() body: Partial<CreateExpenseDto>,
+    @Body() body: UpdateExpenseDto,
   ) {
     const userId = user?.userId ?? user?.sub ?? null
     return this.expenses.update(orgId, id, userId, body)

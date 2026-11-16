@@ -1,3 +1,4 @@
+import { presentationLabel } from "@/lib/presentation-labels";
 import { useMemo } from "react";
 import {
   ArrowRight,
@@ -846,15 +847,17 @@ export default function ExecutiveDashboard() {
   const officialReference = operationalStateQuery.data?.evidenceAt
     ? `Referência oficial: ${formatEventDateTime(operationalStateQuery.data.evidenceAt)}`
     : "Referência temporal oficial indisponível";
-  const weeklyRevenueInCents = readNumber(metrics, "weeklyRevenueInCents");
+  const weeklyRevenueInCents = readNumber(metrics, metrics?.netWeeklyRevenueInCents !== undefined ? "netWeeklyRevenueInCents" : "weeklyRevenueInCents");
   const kpiCards = [
     {
       label: "Receita da semana",
       value: formatCurrencyFromCents(weeklyRevenueInCents),
       context:
-        weeklyRevenueInCents > 0
-          ? `Pagamentos registrados no período atual. ${revenueTrend}.`
-          : `Sem pagamentos registrados. Sem pagamentos registrados no período. ${revenueTrend}.`,
+        weeklyRevenueInCents !== 0
+          ? `Recebimentos líquidos dos estornos confirmados no período. ${revenueTrend}.`
+          : readNumber(metrics, "paymentsReceivedCount") === 0 && readNumber(metrics, "refundedWeeklyAmountInCents") === 0
+            ? `Sem pagamentos registrados no período. ${revenueTrend}.`
+            : `Saldo zerado após recebimentos e estornos do período. ${revenueTrend}.`,
       cta: "Ver pagamentos",
       path: "/finances?view=paid",
       Icon: WalletCards,
@@ -1053,7 +1056,7 @@ export default function ExecutiveDashboard() {
             <AppContextChip
               tone={operationLevel === "NORMAL" ? "success" : "accent"}
             >
-              Estado: {operationLevel}
+              Estado: {presentationLabel(operationLevel)}
             </AppContextChip>
             <AppContextChip>{roleContext}</AppContextChip>
             <AppContextChip tone={criticalCount > 0 ? "danger" : "neutral"}>

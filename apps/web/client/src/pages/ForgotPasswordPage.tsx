@@ -40,7 +40,6 @@ export default function ForgotPasswordPage() {
 
   const [email, setEmail] = useState("");
   const [done, setDone] = useState(false);
-  const [warning, setWarning] = useState<string | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
 
   const errorText = useMemo(() => {
@@ -53,7 +52,6 @@ export default function ForgotPasswordPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError(null);
-    setWarning(null);
 
     const normalizedEmail = email.trim().toLowerCase();
     if (!normalizedEmail) {
@@ -66,13 +64,6 @@ export default function ForgotPasswordPage() {
       setDone(true);
     } catch (err) {
       const normalized = normalizeErrorMessage(err);
-      if (normalized.includes("ainda não está disponível")) {
-        setDone(true);
-        setWarning(
-          "Recuperação por e-mail indisponível neste ambiente. Peça ao administrador para redefinir sua senha."
-        );
-        return;
-      }
       setLocalError(normalized);
     }
   };
@@ -105,8 +96,7 @@ export default function ForgotPasswordPage() {
       {done ? (
         <div className="space-y-4">
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-            {warning ??
-              "Se esse email existir, você vai receber um link de redefinição."}
+            Solicitação recebida. Verifique seu e-mail e a pasta de spam. Se o link não chegar, tente novamente mais tarde.
           </div>
           <Button
             className="w-full bg-orange-500 hover:bg-orange-600"

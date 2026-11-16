@@ -1,0 +1,31 @@
+2026-11-12T03:25:20.9785150Z
+2026-11-12T03:25:20.9785154Z
+2026-11-12T03:25:20.9785276Z   ● Test suite failed to run
+2026-11-12T03:25:20.9785406Z
+2026-11-12T03:25:20.9785516Z     PrismaClientKnownRequestError:
+2026-11-12T03:25:20.9785796Z     Invalid `db.person.deleteMany()` invocation in
+2026-11-12T03:25:20.9786460Z     /home/runner/work/NexoGestao/NexoGestao/apps/api/test/integration/notification-session-postgres.integration.spec.ts:26:159
+2026-11-12T03:25:20.9786857Z
+2026-11-12T03:25:20.9787056Z       23 afterEach(() => { for (const stream of streams.splice(0)) stream.destroy() })
+2026-11-12T03:25:20.9787394Z       24 afterAll(async () => {
+2026-11-12T03:25:20.9787589Z       25   try {
+2026-11-12T03:25:20.9787830Z     → 26     await db.person.deleteMany(
+2026-11-12T03:25:20.9788165Z     Foreign key constraint violated: `TimelineEvent_orgId_fkey (index)`
+2026-11-12T03:25:20.9788396Z
+2026-11-12T03:25:20.9788586Z       24 |   afterAll(async () => {
+2026-11-12T03:25:20.9788896Z       25 |     try {
+2026-11-12T03:25:20.9790337Z     > 26 |       await db.person.deleteMany({ where: { userId: { in: userIds } } }); await db.user.deleteMany({ where: { id: { in: userIds } } }); await db.organization.deleteMany({ where: { id: { in: orgIds } } })
+2026-11-12T03:25:20.9791625Z          |                                                                                                                                         ^
+2026-11-12T03:25:20.9792160Z       27 |     } finally { await app?.close() }
+2026-11-12T03:25:20.9792604Z       28 |   })
+2026-11-12T03:25:20.9792907Z       29 |   async function fixture() {
+2026-11-12T03:25:20.9793104Z
+2026-11-12T03:25:20.9793495Z       at $n.handleRequestError (../../node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0/node_modules/@prisma/client/runtime/library.js:121:7315)
+2026-11-12T03:25:20.9794265Z       at $n.handleAndLogRequestError (../../node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0/node_modules/@prisma/client/runtime/library.js:121:6623)
+2026-11-12T03:25:20.9794990Z       at $n.request (../../node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0/node_modules/@prisma/client/runtime/library.js:121:6307)
+2026-11-12T03:25:20.9795630Z       at l (../../node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0/node_modules/@prisma/client/runtime/library.js:130:9633)
+2026-11-12T03:25:20.9796322Z       at Object.<anonymous> (test/integration/notification-session-postgres.integration.spec.ts:26:137)
+2026-11-12T03:25:20.9796644Z
+2026-11-12T03:24:33.9379506Z Test Suites: 1 passed, 1 total
+2026-11-12T03:25:27.9295029Z Test Suites: 1 failed, 11 skipped, 26 passed, 27 of 38 total
+2026-11-12T03:25:27.9295369Z Tests:       33 skipped, 151 passed, 184 total

@@ -31,23 +31,20 @@ const checks = [
     label: 'índice único parcial REQUESTED por (orgId, logicalKey)',
     query: `SELECT 1
       FROM pg_index i
+      JOIN pg_class t ON t.oid = i.indrelid
+      JOIN pg_namespace n ON n.oid = t.relnamespace
       JOIN pg_class idx ON idx.oid = i.indexrelid
-      JOIN pg_class tbl ON tbl.oid = i.indrelid
-      JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
-      WHERE ns.nspname = 'public'
-        AND tbl.relname = 'OperationalActionExecution'
+      WHERE n.nspname = 'public'
+        AND t.relname = 'OperationalActionExecution'
         AND idx.relname = 'OperationalActionExecution_unique_requested_per_key'
         AND i.indisunique AND i.indisvalid AND i.indisready
         AND i.indnkeyatts = 2
-        AND ARRAY(
-          SELECT a.attname::text
-          FROM unnest(i.indkey::smallint[]) WITH ORDINALITY AS k(attnum, position)
-          JOIN pg_attribute a ON a.attrelid = tbl.oid AND a.attnum = k.attnum
-          WHERE k.position <= i.indnkeyatts
-          ORDER BY k.position
-        ) = ARRAY['orgId', 'logicalKey']::text[]
+        AND (SELECT array_agg(a.attname::text ORDER BY k.ordinality)
+             FROM unnest(i.indkey) WITH ORDINALITY AS k(attnum, ordinality)
+             JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum
+             WHERE k.ordinality <= i.indnkeyatts) = ARRAY['orgId', 'logicalKey']
         AND regexp_replace(pg_get_expr(i.indpred, i.indrelid), '[()[:space:]]', '', 'g')
-          = 'status=''REQUESTED''::"OperationalActionExecutionStatus"'
+            = 'status=''REQUESTED''::"OperationalActionExecutionStatus"'
       LIMIT 1`,
   },
 ] as const

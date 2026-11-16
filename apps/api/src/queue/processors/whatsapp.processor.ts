@@ -4,8 +4,10 @@ import {
   Logger,
   OnModuleDestroy,
   OnModuleInit,
+  Optional,
 } from '@nestjs/common'
-import { Job, Worker } from 'bullmq'
+import { DelayedError, Job, Worker } from 'bullmq'
+import { TenantOperationsService } from '../../common/tenant-ops/tenant-ops.service'
 import IORedis from 'ioredis'
 import { WhatsAppService } from '../../whatsapp/whatsapp.service'
 import {
@@ -28,6 +30,7 @@ export class WhatsAppProcessor implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(WhatsAppProcessor.name)
   private readonly provider = createWhatsAppProvider()
   private worker?: Worker
+  private inboundWorker?: Worker
 
   constructor(
     @Inject(QUEUE_CONNECTION) private readonly connection: IORedis,
@@ -35,7 +38,22 @@ export class WhatsAppProcessor implements OnModuleInit, OnModuleDestroy {
     private readonly queueService: QueueService,
     private readonly waMetrics: WhatsAppObservabilityService,
     private readonly queueMetrics: QueueObservabilityService,
+    @Optional() private readonly tenantOps?: TenantOperationsService,
   ) {}
+
+  async processQueuedJob(job: Job<any>, token?: string) {
+    const inbound = job.name === WHATSAPP_QUEUE_JOB_NAMES.INBOUND_WEBHOOK
+    if (this.tenantOps && job.data?.orgId) {
+      const result = await this.tenantOps.enforceLimit({ orgId: job.data.orgId, scope: inbound ? 'whatsapp:inbound-jobs' : 'whatsapp:outbound-jobs', limit: inbound ? 10 : 5, windowMs: 1000, blockedReason: 'tenant_queue_budget' })
+      if (!result.allowed) {
+        // Yield the worker to another tenant without sending or consuming retries.
+        await job.moveToDelayed(Date.now() + 1000, token)
+        throw new DelayedError()
+      }
+    }
+    const queue = job.queueName === QUEUE_NAMES.WHATSAPP_INBOUND ? QUEUE_NAMES.WHATSAPP_INBOUND : QUEUE_NAMES.WHATSAPP
+    return this.queueService.processJobWithTracing(queue, job.name, job.data, () => this.process(job))
+  }
 
   async process(job: Job<any>) {
     if (job.name === WHATSAPP_QUEUE_JOB_NAMES.INBOUND_WEBHOOK) {
@@ -71,7 +89,7 @@ export class WhatsAppProcessor implements OnModuleInit, OnModuleDestroy {
     )
 
     await this.queueService.updateJobStatus({
-      queue: QUEUE_NAMES.WHATSAPP,
+      queue: job?.queueName === QUEUE_NAMES.WHATSAPP_INBOUND ? QUEUE_NAMES.WHATSAPP_INBOUND : QUEUE_NAMES.WHATSAPP,
       jobId: job.id?.toString() ?? '',
       status: 'ACTIVE',
     })
@@ -106,7 +124,7 @@ export class WhatsAppProcessor implements OnModuleInit, OnModuleDestroy {
       )
 
       await this.queueService.updateJobStatus({
-        queue: QUEUE_NAMES.WHATSAPP,
+        queue: job?.queueName === QUEUE_NAMES.WHATSAPP_INBOUND ? QUEUE_NAMES.WHATSAPP_INBOUND : QUEUE_NAMES.WHATSAPP,
         jobId: job.id?.toString() ?? '',
         status: 'COMPLETED',
         completed: true,
@@ -145,7 +163,7 @@ export class WhatsAppProcessor implements OnModuleInit, OnModuleDestroy {
     const orgId = job.data?.orgId ?? 'n/a'
 
     await this.queueService.updateJobStatus({
-      queue: QUEUE_NAMES.WHATSAPP,
+      queue: job?.queueName === QUEUE_NAMES.WHATSAPP_INBOUND ? QUEUE_NAMES.WHATSAPP_INBOUND : QUEUE_NAMES.WHATSAPP,
       jobId: job.id?.toString() ?? '',
       status: 'ACTIVE',
     })
@@ -160,7 +178,7 @@ export class WhatsAppProcessor implements OnModuleInit, OnModuleDestroy {
 
     if (!message) {
       await this.queueService.updateJobStatus({
-        queue: QUEUE_NAMES.WHATSAPP,
+        queue: job?.queueName === QUEUE_NAMES.WHATSAPP_INBOUND ? QUEUE_NAMES.WHATSAPP_INBOUND : QUEUE_NAMES.WHATSAPP,
         jobId: job.id?.toString() ?? '',
         status: 'COMPLETED',
         completed: true,
@@ -183,7 +201,7 @@ export class WhatsAppProcessor implements OnModuleInit, OnModuleDestroy {
       })
 
       await this.queueService.updateJobStatus({
-        queue: QUEUE_NAMES.WHATSAPP,
+        queue: job?.queueName === QUEUE_NAMES.WHATSAPP_INBOUND ? QUEUE_NAMES.WHATSAPP_INBOUND : QUEUE_NAMES.WHATSAPP,
         jobId: job.id?.toString() ?? '',
         status: 'COMPLETED',
         completed: true,
@@ -203,7 +221,7 @@ export class WhatsAppProcessor implements OnModuleInit, OnModuleDestroy {
         })
 
         await this.queueService.updateJobStatus({
-          queue: QUEUE_NAMES.WHATSAPP,
+          queue: job?.queueName === QUEUE_NAMES.WHATSAPP_INBOUND ? QUEUE_NAMES.WHATSAPP_INBOUND : QUEUE_NAMES.WHATSAPP,
           jobId: job.id?.toString() ?? '',
           status: 'COMPLETED',
           completed: true,
@@ -223,7 +241,7 @@ export class WhatsAppProcessor implements OnModuleInit, OnModuleDestroy {
       })
 
       await this.queueService.updateJobStatus({
-        queue: QUEUE_NAMES.WHATSAPP,
+        queue: job?.queueName === QUEUE_NAMES.WHATSAPP_INBOUND ? QUEUE_NAMES.WHATSAPP_INBOUND : QUEUE_NAMES.WHATSAPP,
         jobId: job.id?.toString() ?? '',
         status: 'COMPLETED',
         completed: true,
@@ -338,7 +356,7 @@ export class WhatsAppProcessor implements OnModuleInit, OnModuleDestroy {
     try {
       this.worker = new Worker(
         QUEUE_NAMES.WHATSAPP,
-        async (job: Job<any>) => this.queueService.processJobWithTracing(QUEUE_NAMES.WHATSAPP, job.name, job.data, () => this.process(job)),
+        async (job: Job<any>, token?: string) => this.processQueuedJob(job, token),
         {
           connection: this.connection,
           ...QUEUE_DEFAULT_WORKER_OPTIONS,
@@ -347,13 +365,16 @@ export class WhatsAppProcessor implements OnModuleInit, OnModuleDestroy {
         },
       )
 
-      this.worker.on('error', (error) => {
-        this.logger.error(`WhatsApp worker error: ${error.message}`)
-      })
-
-      this.worker.on('failed', async (job, err) =>
-        this.handleFailedJob(job ?? undefined, err),
+      // The legacy worker still accepts already queued inbound jobs during rollout.
+      this.inboundWorker = new Worker(
+        QUEUE_NAMES.WHATSAPP_INBOUND,
+        async (job: Job<any>, token?: string) => this.processQueuedJob(job, token),
+        { connection: this.connection, ...QUEUE_DEFAULT_WORKER_OPTIONS, concurrency: 5 },
       )
+      for (const worker of [this.worker, this.inboundWorker]) {
+        worker.on('error', error => this.logger.error(`WhatsApp worker error: ${error.message}`))
+        worker.on('failed', async (job, err) => this.handleFailedJob(job ?? undefined, err))
+      }
 
       this.logger.log('WhatsApp worker iniciado')
     } catch (error) {
@@ -364,7 +385,7 @@ export class WhatsAppProcessor implements OnModuleInit, OnModuleDestroy {
 
   async onModuleDestroy() {
     try {
-      await this.worker?.close()
+      await Promise.all([this.worker?.close(), this.inboundWorker?.close()])
     } catch (error) {
       const err = error as Error
       this.logger.error(`Erro ao fechar whatsapp worker: ${err.message}`)

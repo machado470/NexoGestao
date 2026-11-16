@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Request, UseGuards } from '@nestjs/common'
+import { Controller, ForbiddenException, Get, Query, Request, UseGuards } from '@nestjs/common'
 import { QueueMetricsExporterService } from '../common/metrics/queue-metrics-exporter.service'
 import { QueueService } from '../queue/queue.service'
 import { WhatsAppObservabilityService } from '../common/metrics/whatsapp-observability.service'
@@ -36,11 +36,13 @@ export class InternalStatsController {
   }
 
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, ActiveUserGuard, RolesGuard)
   @Roles('ADMIN')
   @Get('metrics')
   metrics() {
-    return this.queueMetricsExporter.exportJson()
+    // The exporter aggregates process-wide queues and has no tenant filter.
+    void this.queueMetricsExporter
+    throw new ForbiddenException('Telemetria global da plataforma não está disponível para usuários de organização.')
   }
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')

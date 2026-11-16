@@ -1,0 +1,60 @@
+FAIL src/audit/audit-admin.service.spec.ts
+  ● Audit date filters › rejects invalid ranges in list and summary before querying: {"from":"invalid"}
+
+    expect(received).rejects.toMatchObject()
+
+    Received promise resolved instead of rejected
+    Resolved to value: {"data": [], "pagination": {"limit": 50, "page": 1, "pages": 0, "total": 0}}
+
+      76 |     const db = makeDb()
+      77 |     const service = new AuditAdminService(db as any)
+    > 78 |     await expect(service.listEvents({ orgId: 'org', ...input })).rejects.toMatchObject({ status: 400 })
+         |           ^
+      79 |     await expect(service.getSummary({ orgId: 'org', ...input })).rejects.toMatchObject({ status: 400 })
+      80 |     expect(db.auditEvent.findMany).not.toHaveBeenCalled()
+      81 |     expect(db.auditEvent.groupBy).not.toHaveBeenCalled()
+
+      at expect (../../node_modules/.pnpm/expect@30.5.2/node_modules/expect/build/index.js:2116:15)
+      at src/audit/audit-admin.service.spec.ts:78:11
+
+  ● Audit date filters › rejects invalid ranges in list and summary before querying: {"to":"invalid"}
+
+    expect(received).rejects.toMatchObject()
+
+    Received promise resolved instead of rejected
+    Resolved to value: {"data": [], "pagination": {"limit": 50, "page": 1, "pages": 0, "total": 0}}
+
+      76 |     const db = makeDb()
+      77 |     const service = new AuditAdminService(db as any)
+    > 78 |     await expect(service.listEvents({ orgId: 'org', ...input })).rejects.toMatchObject({ status: 400 })
+         |           ^
+      79 |     await expect(service.getSummary({ orgId: 'org', ...input })).rejects.toMatchObject({ status: 400 })
+      80 |     expect(db.auditEvent.findMany).not.toHaveBeenCalled()
+      81 |     expect(db.auditEvent.groupBy).not.toHaveBeenCalled()
+
+      at expect (../../node_modules/.pnpm/expect@30.5.2/node_modules/expect/build/index.js:2116:15)
+      at src/audit/audit-admin.service.spec.ts:78:11
+
+  ● Audit date filters › rejects invalid ranges in list and summary before querying: {"from":"2026-11-11T00:00:00.000Z","to":"2026-11-10T23:59:59.999Z"}
+
+    expect(received).rejects.toMatchObject()
+
+    Received promise resolved instead of rejected
+    Resolved to value: {"data": [], "pagination": {"limit": 50, "page": 1, "pages": 0, "total": 0}}
+
+      76 |     const db = makeDb()
+      77 |     const service = new AuditAdminService(db as any)
+    > 78 |     await expect(service.listEvents({ orgId: 'org', ...input })).rejects.toMatchObject({ status: 400 })
+         |           ^
+      79 |     await expect(service.getSummary({ orgId: 'org', ...input })).rejects.toMatchObject({ status: 400 })
+      80 |     expect(db.auditEvent.findMany).not.toHaveBeenCalled()
+      81 |     expect(db.auditEvent.groupBy).not.toHaveBeenCalled()
+
+      at expect (../../node_modules/.pnpm/expect@30.5.2/node_modules/expect/build/index.js:2116:15)
+      at src/audit/audit-admin.service.spec.ts:78:11
+
+Test Suites: 1 failed, 1 total
+Tests:       3 failed, 21 passed, 24 total
+Snapshots:   0 total
+Time:        5.052 s, estimated 6 s
+Ran all test suites matching src/audit/audit-admin.service.spec.ts.

@@ -1,0 +1,306 @@
+ Network nexogestao-outbox-86f05c3adb3a4c9a9b877a7a914a038e_default  Creating
+ Network nexogestao-outbox-86f05c3adb3a4c9a9b877a7a914a038e_default  Created
+ Container nexogestao-outbox-86f05c3adb3a4c9a9b877a7a914a038e-postgres-outbox-test-1  Creating
+ Container nexogestao-outbox-86f05c3adb3a4c9a9b877a7a914a038e-postgres-outbox-test-1  Created
+ Container nexogestao-outbox-86f05c3adb3a4c9a9b877a7a914a038e-postgres-outbox-test-1  Starting
+ Container nexogestao-outbox-86f05c3adb3a4c9a9b877a7a914a038e-postgres-outbox-test-1  Started
+ Container nexogestao-outbox-86f05c3adb3a4c9a9b877a7a914a038e-postgres-outbox-test-1  Waiting
+ Container nexogestao-outbox-86f05c3adb3a4c9a9b877a7a914a038e-postgres-outbox-test-1  Healthy
+Outbox project=nexogestao-outbox-86f05c3adb3a4c9a9b877a7a914a038e postgres=32769
+
+> nexogestao@1.0.0 prisma:migrate:deploy /workspace/NexoGestao
+> pnpm --filter ./apps/api prisma:migrate:deploy
+
+
+> @nexogestao/api@0.1.0 prisma:migrate:deploy /workspace/NexoGestao/apps/api
+> prisma migrate deploy --schema ../../prisma/schema.prisma
+
+Prisma schema loaded from ../../prisma/schema.prisma
+Datasource "db": PostgreSQL database "nexogestao_outbox_test", schema "public" at "127.0.0.1:32769"
+
+77 migrations found in prisma/migrations
+
+Applying migration `20251231224003_add_person_user_relation`
+Applying migration `20260101175737_platform_core_v1`
+Applying migration `20260108045410_learning_core_v1`
+Applying migration `20260110234359_add_audit_event_metadata`
+Applying migration `20260214032447_governance_org_scope`
+Applying migration `20260214184808_add_orgid_to_timeline_event`
+Applying migration `20260217005445_add_customer`
+Applying migration `20260218031854_add_appointments`
+Applying migration `20260218184238_add_appointment_indexes`
+Applying migration `20260218185004_appointment_overlap_gist_index`
+Applying migration `20260218211130_appointment_endsat_not_null`
+Applying migration `20260218213000_appointment_exclude_no_overlap`
+Applying migration `20260219184553_service_orders`
+Applying migration `20260220040215_add_audit_org_actor_entity`
+Applying migration `20260222211815_add_finance_module`
+Applying migration `20260226190501_whatsapp_messages`
+Applying migration `20260226205005_whatsapp_sending_claim`
+Applying migration `20260226210000_whatsapp_sending_claim`
+Applying migration `20260302203058_init`
+Applying migration `20260304000000_add_expense_invoice_launch_referral`
+Applying migration `20260306000100_execution_and_operational_flow`
+Applying migration `20260306120000_concurrency_idempotency_hardening`
+Applying migration `20260306180000_automation_engine`
+Applying migration `20260307000000_queue_system`
+Applying migration `20260307010000_webhook_system`
+Applying migration `20260307051134_billing_v2_clean`
+Applying migration `20260311155211_add_amount_and_due_date_to_service_order`
+Applying migration `20260315010803_align_userrole_to_admin_manager_staff_viewer`
+Applying migration `20260315151030_add_organization_timezone_currency`
+Applying migration `20260320000541_add_service_order_outcome_and_cancellation_fields`
+Applying migration `20260402195502_whatsapp_tracking`
+Applying migration `20260404043252_timeline_relations`
+Applying migration `20260408120000_email_verification_fields`
+Applying migration `20260408173000_p1_idempotency_concurrency`
+Applying migration `20260409110000_execution_config_per_org`
+Applying migration `20260409153000_idempotency_records`
+Applying migration `20260410120000_wave6_commercial_readiness`
+Applying migration `20260418123000_customer_optional_cpfcnpj_address`
+Applying migration `20260419190000_finance_expenses_monthly_result`
+Applying migration `20260425120000_whatsapp_operational_base`
+Applying migration `20260425121000_whatsapp_operational_backfill`
+Applying migration `20260428143000_restore_whatsapp_message_dispatch_columns`
+Applying migration `20260429130000_whatsapp_phone_inbox_indexes`
+Applying migration `20260429143000_whatsapp_conversation_waiting_statuses`
+Applying migration `20260503193000_add_provider_to_whatsapp_conversations`
+Applying migration `20260506120000_whatsapp_inbound_webhook_queue`
+Applying migration `20260506150000_whatsapp_webhook_admin_visibility`
+Applying migration `20260506170000_whatsapp_operational_intelligence`
+Applying migration `20260506190000_whatsapp_action_execution`
+Applying migration `20260514120000_add_provider_conversation_id_to_whatsapp_conversations`
+Applying migration `20260514153000_add_assigned_user_id_to_whatsapp_conversations`
+Applying migration `20260523120000_operational_action_execution_materialized_state`
+Applying migration `20260523170000_operational_actions_idempotency`
+Applying migration `20260530120000_stripe_billing_event_idempotency`
+Applying migration `20260530180000_add_appointment_assignee`
+Applying migration `20260530210000_add_person_planned_workload_capacity`
+Applying migration `20260530230000_add_person_availability_exceptions`
+Applying migration `20260623120000_charge_auditable_cancellation`
+Applying migration `20260816120000_notification_recipients_foundation`
+Applying migration `20260816180000_operational_outbox`
+Applying migration `20260816205000_restore_webhook_system_for_outbox`
+Applying migration `20260816210000_outbox_webhook_idempotency`
+Applying migration `20260819011500_whatsapp_uncertain_delivery`
+Applying migration `20260819035500_whatsapp_stale_sending_reconciliation_index`
+Applying migration `20260913012000_add_whatsapp_conversation_priority_medium`
+Applying migration `20260913012100_set_whatsapp_conversation_priority_medium_default`
+Applying migration `20260913120000_whatsapp_webhook_tenant_authority`
+Applying migration `20261108000000_add_user_session_version`
+Applying migration `20261109170000_enforce_invoice_and_payment_integrity`
+Applying migration `20261109180000_align_operational_query_indexes`
+Applying migration `20261111040000_shared_tenant_rate_limits`
+Applying migration `20261111041000_audit_actor_index`
+Applying migration `20261111163000_billing_event_watermark`
+Applying migration `20261111164000_payment_refunds`
+Applying migration `20261111213000_refund_payment_tenant_fk`
+Applying migration `20261111215000_refund_reversal`
+Applying migration `20261111233000_commercial_message_usage_index`
+
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20251231224003_add_person_user_relation/
+    └─ migration.sql
+  └─ 20260101175737_platform_core_v1/
+    └─ migration.sql
+  └─ 20260108045410_learning_core_v1/
+    └─ migration.sql
+  └─ 20260110234359_add_audit_event_metadata/
+    └─ migration.sql
+  └─ 20260214032447_governance_org_scope/
+    └─ migration.sql
+  └─ 20260214184808_add_orgid_to_timeline_event/
+    └─ migration.sql
+  └─ 20260217005445_add_customer/
+    └─ migration.sql
+  └─ 20260218031854_add_appointments/
+    └─ migration.sql
+  └─ 20260218184238_add_appointment_indexes/
+    └─ migration.sql
+  └─ 20260218185004_appointment_overlap_gist_index/
+    └─ migration.sql
+  └─ 20260218211130_appointment_endsat_not_null/
+    └─ migration.sql
+  └─ 20260218213000_appointment_exclude_no_overlap/
+    └─ migration.sql
+  └─ 20260219184553_service_orders/
+    └─ migration.sql
+  └─ 20260220040215_add_audit_org_actor_entity/
+    └─ migration.sql
+  └─ 20260222211815_add_finance_module/
+    └─ migration.sql
+  └─ 20260226190501_whatsapp_messages/
+    └─ migration.sql
+  └─ 20260226205005_whatsapp_sending_claim/
+    └─ migration.sql
+  └─ 20260226210000_whatsapp_sending_claim/
+    └─ migration.sql
+  └─ 20260302203058_init/
+    └─ migration.sql
+  └─ 20260304000000_add_expense_invoice_launch_referral/
+    └─ migration.sql
+  └─ 20260306000100_execution_and_operational_flow/
+    └─ migration.sql
+  └─ 20260306120000_concurrency_idempotency_hardening/
+    └─ migration.sql
+  └─ 20260306180000_automation_engine/
+    └─ migration.sql
+  └─ 20260307000000_queue_system/
+    └─ migration.sql
+  └─ 20260307010000_webhook_system/
+    └─ migration.sql
+  └─ 20260307051134_billing_v2_clean/
+    └─ migration.sql
+  └─ 20260311155211_add_amount_and_due_date_to_service_order/
+    └─ migration.sql
+  └─ 20260315010803_align_userrole_to_admin_manager_staff_viewer/
+    └─ migration.sql
+  └─ 20260315151030_add_organization_timezone_currency/
+    └─ migration.sql
+  └─ 20260320000541_add_service_order_outcome_and_cancellation_fields/
+    └─ migration.sql
+  └─ 20260402195502_whatsapp_tracking/
+    └─ migration.sql
+  └─ 20260404043252_timeline_relations/
+    └─ migration.sql
+  └─ 20260408120000_email_verification_fields/
+    └─ migration.sql
+  └─ 20260408173000_p1_idempotency_concurrency/
+    └─ migration.sql
+  └─ 20260409110000_execution_config_per_org/
+    └─ migration.sql
+  └─ 20260409153000_idempotency_records/
+    └─ migration.sql
+  └─ 20260410120000_wave6_commercial_readiness/
+    └─ migration.sql
+  └─ 20260418123000_customer_optional_cpfcnpj_address/
+    └─ migration.sql
+  └─ 20260419190000_finance_expenses_monthly_result/
+    └─ migration.sql
+  └─ 20260425120000_whatsapp_operational_base/
+    └─ migration.sql
+  └─ 20260425121000_whatsapp_operational_backfill/
+    └─ migration.sql
+  └─ 20260428143000_restore_whatsapp_message_dispatch_columns/
+    └─ migration.sql
+  └─ 20260429130000_whatsapp_phone_inbox_indexes/
+    └─ migration.sql
+  └─ 20260429143000_whatsapp_conversation_waiting_statuses/
+    └─ migration.sql
+  └─ 20260503193000_add_provider_to_whatsapp_conversations/
+    └─ migration.sql
+  └─ 20260506120000_whatsapp_inbound_webhook_queue/
+    └─ migration.sql
+  └─ 20260506150000_whatsapp_webhook_admin_visibility/
+    └─ migration.sql
+  └─ 20260506170000_whatsapp_operational_intelligence/
+    └─ migration.sql
+  └─ 20260506190000_whatsapp_action_execution/
+    └─ migration.sql
+  └─ 20260514120000_add_provider_conversation_id_to_whatsapp_conversations/
+    └─ migration.sql
+  └─ 20260514153000_add_assigned_user_id_to_whatsapp_conversations/
+    └─ migration.sql
+  └─ 20260523120000_operational_action_execution_materialized_state/
+    └─ migration.sql
+  └─ 20260523170000_operational_actions_idempotency/
+    └─ migration.sql
+  └─ 20260530120000_stripe_billing_event_idempotency/
+    └─ migration.sql
+  └─ 20260530180000_add_appointment_assignee/
+    └─ migration.sql
+  └─ 20260530210000_add_person_planned_workload_capacity/
+    └─ migration.sql
+  └─ 20260530230000_add_person_availability_exceptions/
+    └─ migration.sql
+  └─ 20260623120000_charge_auditable_cancellation/
+    └─ migration.sql
+  └─ 20260816120000_notification_recipients_foundation/
+    └─ migration.sql
+  └─ 20260816180000_operational_outbox/
+    └─ migration.sql
+  └─ 20260816205000_restore_webhook_system_for_outbox/
+    └─ migration.sql
+  └─ 20260816210000_outbox_webhook_idempotency/
+    └─ migration.sql
+  └─ 20260819011500_whatsapp_uncertain_delivery/
+    └─ migration.sql
+  └─ 20260819035500_whatsapp_stale_sending_reconciliation_index/
+    └─ migration.sql
+  └─ 20260913012000_add_whatsapp_conversation_priority_medium/
+    └─ migration.sql
+  └─ 20260913012100_set_whatsapp_conversation_priority_medium_default/
+    └─ migration.sql
+  └─ 20260913120000_whatsapp_webhook_tenant_authority/
+    └─ migration.sql
+  └─ 20261108000000_add_user_session_version/
+    └─ migration.sql
+  └─ 20261109170000_enforce_invoice_and_payment_integrity/
+    └─ migration.sql
+  └─ 20261109180000_align_operational_query_indexes/
+    └─ migration.sql
+  └─ 20261111040000_shared_tenant_rate_limits/
+    └─ migration.sql
+  └─ 20261111041000_audit_actor_index/
+    └─ migration.sql
+  └─ 20261111163000_billing_event_watermark/
+    └─ migration.sql
+  └─ 20261111164000_payment_refunds/
+    └─ migration.sql
+  └─ 20261111213000_refund_payment_tenant_fk/
+    └─ migration.sql
+  └─ 20261111215000_refund_reversal/
+    └─ migration.sql
+  └─ 20261111233000_commercial_message_usage_index/
+    └─ migration.sql
+
+All migrations have been successfully applied.
+
+> nexogestao@1.0.0 prisma:generate /workspace/NexoGestao
+> pnpm --filter ./apps/api prisma:generate
+
+
+> @nexogestao/api@0.1.0 prisma:generate /workspace/NexoGestao/apps/api
+> prisma generate --schema ../../prisma/schema.prisma
+
+Prisma schema loaded from ../../prisma/schema.prisma
+
+✔ Generated Prisma Client (v5.22.0) to ./../../node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0/node_modules/@prisma/client in 584ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+Tip: Interested in query caching in just a few lines of code? Try Accelerate today! https://pris.ly/tip-3-accelerate
+
+
+> @nexogestao/api@0.1.0 pretest /workspace/NexoGestao/apps/api
+> pnpm --dir ../.. prepare:workspace
+
+
+> nexogestao@1.0.0 prepare:workspace /workspace/NexoGestao
+> pnpm prepare:common
+
+
+> nexogestao@1.0.0 prepare:common /workspace/NexoGestao
+> pnpm --filter @nexogestao/common build
+
+
+> @nexogestao/common@1.0.0 build /workspace/NexoGestao/packages/common
+> tsc --build tsconfig.json
+
+
+> @nexogestao/api@0.1.0 test /workspace/NexoGestao/apps/api
+> jest --config jest.config.js --runInBand -- test/integration/outbox-postgres.integration.spec.ts
+
+Test Suites: 1 passed, 1 total
+Tests:       3 passed, 3 total
+Snapshots:   0 total
+Time:        6.62 s, estimated 8 s
+Ran all test suites matching test/integration/outbox-postgres.integration.spec.ts.
+ Container nexogestao-outbox-86f05c3adb3a4c9a9b877a7a914a038e-postgres-outbox-test-1  Stopping
+ Container nexogestao-outbox-86f05c3adb3a4c9a9b877a7a914a038e-postgres-outbox-test-1  Stopped
+ Container nexogestao-outbox-86f05c3adb3a4c9a9b877a7a914a038e-postgres-outbox-test-1  Removing
+ Container nexogestao-outbox-86f05c3adb3a4c9a9b877a7a914a038e-postgres-outbox-test-1  Removed
+ Network nexogestao-outbox-86f05c3adb3a4c9a9b877a7a914a038e_default  Removing
+ Network nexogestao-outbox-86f05c3adb3a4c9a9b877a7a914a038e_default  Removed

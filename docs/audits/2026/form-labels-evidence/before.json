@@ -1,0 +1,51 @@
+{
+  "checks": [
+    {
+      "name": "appointments-1440",
+      "fields": [
+        {
+          "id": "",
+          "tag": "BUTTON",
+          "label": "",
+          "placeholder": null
+        },
+        {
+          "id": "",
+          "tag": "INPUT",
+          "label": "",
+          "placeholder": null
+        },
+        {
+          "id": "",
+          "tag": "INPUT",
+          "label": "",
+          "placeholder": null
+        },
+        {
+          "id": "",
+          "tag": "BUTTON",
+          "label": "",
+          "placeholder": null
+        },
+        {
+          "id": "",
+          "tag": "INPUT",
+          "label": "",
+          "placeholder": null
+        },
+        {
+          "id": "",
+          "tag": "BUTTON",
+          "label": "",
+          "placeholder": null
+        },
+        {
+          "id": "",
+          "tag": "TEXTAREA",
+          "label": "",
+          "placeholder": null
+        }
+      ]
+    }
+  ]
+}

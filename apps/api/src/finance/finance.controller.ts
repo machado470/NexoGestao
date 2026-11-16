@@ -7,6 +7,7 @@ import {
   Get,
   Headers,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -22,6 +23,7 @@ import { Org } from '../auth/decorators/org.decorator'
 import { User } from '../auth/decorators/user.decorator'
 import { OperationalStateGuard } from '../people/operational-state.guard'
 import { FinanceService } from './finance.service'
+import { ManualPaymentsService } from './manual-payments.service'
 import { CreatePaymentDto } from './dto/create-payment.dto'
 import { ChargesQueryDto } from './dto/charges-query.dto'
 import { CreateChargeDto } from './dto/create-charge.dto'
@@ -54,6 +56,7 @@ export class FinanceController {
     private readonly finance: FinanceService,
     private readonly tenantOps: TenantOperationsService,
     private readonly commercial: CommercialPolicyService,
+    private readonly manualPayments: ManualPaymentsService,
   ) {}
 
   @Get('overview')
@@ -86,9 +89,13 @@ export class FinanceController {
 
   @Get('charges/export')
   @Roles('ADMIN', 'MANAGER')
-  async exportCharges(@Org() orgId: string, @Res() res: Response) {
-    const csv = await this.finance.exportChargesCsv(orgId)
+  async exportCharges(@Org() orgId: string, @Res() res: Response,
+    @Query('customerId', new ParseUUIDPipe({ optional: true })) customerId?: string,
+    @User() actor?: { userId?: string; sub?: string; personId?: string },
+  ) {
+    const csv = await this.finance.exportChargesCsv(orgId, customerId, actor?.userId ?? actor?.sub, actor?.personId)
     res.set('Content-Type', 'text/csv')
+    res.set('Cache-Control', 'no-store')
     res.attachment(`charges-${orgId}-${Date.now()}.csv`)
     return res.send(csv)
   }
@@ -129,14 +136,14 @@ export class FinanceController {
     @Headers('idempotency-key') idempotencyKeyHeader: string | undefined,
     @Body() body: CreateChargeDto,
   ) {
-    const commercialLimit = await this.commercial.enforceMeter(orgId, 'finance_critical_actions')
+    const commercialLimit = await this.commercial.enforceMeter(orgId, 'finance_critical_actions', { admissionOnly: true })
     if (isCommercialBlocked(commercialLimit)) {
       throw new BadRequestException(
         `Criação de cobrança bloqueada por política comercial: ${commercialLimit.reasonCode}`,
       )
     }
 
-    const createChargeLimit = this.tenantOps.enforceLimit({
+    const createChargeLimit = await this.tenantOps.enforceLimit({
       orgId,
       scope: 'finance:create-charge',
       limit: 40,
@@ -158,6 +165,7 @@ export class FinanceController {
     if (!dueDate) throw new BadRequestException('dueDate é obrigatório')
 
     const data = await this.finance.createCharge({
+      commercialAdmission: tx => this.commercial.assertMeterInTransaction(tx, orgId, 'finance_critical_actions'),
       orgId,
       customerId: body.customerId,
       amountCents: body.amountCents,
@@ -235,43 +243,9 @@ export class FinanceController {
     @Param('chargeId') chargeId: string,
     @Body() body: CreatePaymentDto,
   ) {
-    const commercialLimit = await this.commercial.enforceMeter(orgId, 'finance_critical_actions')
-    if (isCommercialBlocked(commercialLimit)) {
-      throw new BadRequestException(
-        `Pagamento bloqueado por política comercial: ${commercialLimit.reasonCode}`,
-      )
-    }
-
-    const payLimit = this.tenantOps.enforceLimit({
-      orgId,
-      scope: 'finance:pay-charge',
-      limit: 30,
-      windowMs: 60_000,
-      blockedReason: 'tenant_finance_pay_charge_rate_limit',
-    })
-    if (!payLimit.allowed) {
-      this.tenantOps.recordCriticalEvent(orgId, 'finance_pay_charge_blocked', {
-        reason: payLimit.reason,
-        used: payLimit.used,
-      })
-      throw new BadRequestException(
-        `Pagamento bloqueado temporariamente: ${payLimit.reason}`,
-      )
-    }
-
-    const actorUserId = user?.userId ?? user?.sub ?? null
-
-    const data = await this.finance.payCharge({
-      orgId,
-      chargeId,
-      actorUserId,
-      method: body.method,
-      amountCents: body.amountCents,
-      paidAt: body.paidAt,
-      notes: body.notes,
-      idempotencyKey: body.idempotencyKey ?? idempotencyKeyHeader,
-    })
-    this.tenantOps.increment(orgId, 'finance_charge_pay')
+    const data = await this.manualPayments.pay(
+      orgId, user?.userId ?? user?.sub ?? null, chargeId, body, idempotencyKeyHeader,
+    )
 
     return { ok: true, data }
   }

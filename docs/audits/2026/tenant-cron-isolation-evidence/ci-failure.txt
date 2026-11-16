@@ -1,0 +1,20 @@
+2026-11-12T15:30:30.2933294Z   ● Phase 2 tenant mutation isolation (Postgres e2e) › não gera cobrança para O.S. da Org B
+2026-11-12T15:30:30.2933630Z
+2026-11-12T15:30:30.2933816Z     expect(received).toBe(expected) // Object.is equality
+2026-11-12T15:30:30.2934053Z
+2026-11-12T15:30:30.2934142Z     Expected: 0
+2026-11-12T15:30:30.2934350Z     Received: 1
+2026-11-12T15:30:30.2934469Z
+2026-11-12T15:30:30.2934608Z       136 |
+2026-11-12T15:30:30.2935470Z       137 |     expect(await prisma.charge.count({ where: { serviceOrderId: ids.serviceOrderB } })).toBe(chargesBefore)
+2026-11-12T15:30:30.2936816Z     > 138 |     expect(await prisma.timelineEvent.count({ where: { orgId: { in: orgIds } } })).toBe(timelineBefore)
+2026-11-12T15:30:30.2937755Z           |                                                                                    ^
+2026-11-12T15:30:30.2938157Z       139 |   })
+2026-11-12T15:30:30.2938402Z       140 |
+2026-11-12T15:30:30.2939004Z       141 |   it('não inicia nem completa execução da Org B', async () => {
+2026-11-12T15:30:30.2939691Z
+2026-11-12T15:30:30.2940211Z       at Object.<anonymous> (test/integration/phase2-tenant-mutations-postgres.integration.spec.ts:138:84)
+2026-11-12T15:30:30.2940801Z
+2026-11-12T15:30:31.2865590Z [Nest] 5791  - 11/12/2026, 3:30:31 PM     LOG [WhatsAppService] {"requestId":"meter-QA","action":"whatsapp.outbound","conversationId":"aab274a4-54fc-4c08-b7f8-86ed7330939e","messageId":"2ca926c3-413b-4445-9573-0172445d970d","status":"WAITING_CUSTOMER"}
+2026-11-12T15:30:31.2869610Z [Nest] 5791  - 11/12/2026, 3:30:31 PM     LOG [WhatsAppService] {"requestId":"meter-QA","action":"whatsapp.outbound","conversationId":"2a9c2969-0d3e-4b50-9acd-7cca4af08e4f","messageId":"748796b9-c04f-4c6b-9fea-b963055ee880","status":"WAITING_CUSTOMER"}
+2026-11-12T15:30:31.2873503Z [Nest] 5791  - 11/12/2026, 3:30:31 PM     LOG [FinanceService] {"requestId":"meter-QA","action":"CREATE_CHARGE_START","entityId":"9f3fc983-f851-48f5-ac04-e7cbab97078c","orgId":"32c96113-f805-40de-a3d1-8aac153ee958","customerId":"9f3fc983-f851-48f5-ac04-e7cbab97078c","message":"Iniciando createCharge"}

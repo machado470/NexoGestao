@@ -56,6 +56,14 @@ jobs:
       - name: Install with immutable lockfile
         run: pnpm install --frozen-lockfile
 
+      - name: Security dependency regressions
+        run: pnpm test:security:dependencies
+
+      - name: Backup state and runner regressions
+        run: |
+          node --test scripts/check-backup-state.test.mjs scripts/restore-checksum.test.mjs scripts/backup-runner-concurrency.test.mjs scripts/backup-runner-output.test.mjs scripts/backup-source.test.mjs
+          bash scripts/test-production-backup.sh
+
       - name: Generate Prisma Client
         run: pnpm --filter ./apps/api prisma:generate
 
@@ -64,6 +72,9 @@ jobs:
 
       - name: Apply migrations to disposable CI database
         run: pnpm --filter ./apps/api exec prisma migrate deploy --schema ../../prisma/schema.prisma
+
+      - name: Verify Prisma schema matches migrated database
+        run: pnpm prisma:check:drift
 
       - name: Preflight
         run: pnpm prisma:check
@@ -80,6 +91,10 @@ jobs:
         env:
           RUN_REAL_INTEGRATION: "true"
         run: pnpm --filter ./apps/api test:integration:real
+
+      # Recovery tests intentionally stop infrastructure and require their own exact endpoints.
+      - name: Real PostgreSQL and Redis recovery integration
+        run: bash scripts/run-phase23c-recovery.sh
 
       # Outbox requires an isolated PostgreSQL database and has its own safety guard.
       - name: Real PostgreSQL Outbox integration
@@ -118,3 +133,11 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      - name: Docker image and patched dependency smoke
+        run: |
+          docker build --tag nexogestao-api:ci .
+          docker run --rm --network none --entrypoint node nexogestao-api:ci \
+            --test /app/scripts/deepmerge-security.test.cjs
+          docker run --rm --network none --entrypoint node nexogestao-api:ci \
+            -e 'require("@sentry/profiling-node").nodeProfilingIntegration(); require("@nexogestao/common"); require("./dist/app.module"); if (typeof require("@prisma/client").PrismaClient !== "function") process.exit(1)'

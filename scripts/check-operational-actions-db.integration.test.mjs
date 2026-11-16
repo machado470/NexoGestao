@@ -29,8 +29,8 @@ test('Operational Actions index validation uses index metadata', {
       const end = text.indexOf('`', start + 1)
       assert.ok(label >= 0 && start >= 0 && end > start, `index query in ${source}`)
       const query = text.slice(start + 1, end)
-        .replace("ns.nspname = 'public'", 'ns.oid = pg_my_temp_schema()')
-      assert.ok(query.includes('ns.oid = pg_my_temp_schema()'))
+        .replace(/\b([a-z]+)\.nspname = 'public'/, '$1.oid = pg_my_temp_schema()')
+      assert.ok(query.includes('.oid = pg_my_temp_schema()'))
 
       for (const scenario of cases) {
         await prisma.$transaction(async (tx) => {

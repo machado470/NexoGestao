@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { Type } from 'class-transformer'
-import { IsArray, IsBoolean, IsEnum, IsIn, IsInt, IsISO8601, IsNotEmpty, IsOptional, IsString, Max, Min, Validate, ValidateNested, ValidatorConstraint, ValidatorConstraintInterface, ValidationArguments } from 'class-validator'
-import { WhatsAppConversationStatus, WhatsAppEntityType, WhatsAppMessageStatus, WhatsAppMessageType, WhatsAppSuggestedAction, WhatsAppWebhookStatus } from '@prisma/client'
+import { Transform, Type } from 'class-transformer'
+import { IsArray, IsBoolean, IsEnum, IsIn, IsInt, IsISO8601, MaxLength, IsNotEmpty, IsOptional, IsString, Max, Min, Validate, ValidateNested, ValidatorConstraint, ValidatorConstraintInterface, ValidationArguments } from 'class-validator'
+import { WhatsAppConversationPriority, WhatsAppContextType, WhatsAppConversationStatus, WhatsAppEntityType, WhatsAppMessageStatus, WhatsAppMessageType, WhatsAppSuggestedAction, WhatsAppWebhookStatus } from '@prisma/client'
 
 const EXECUTABLE_WHATSAPP_ACTIONS = [
   'SEND_PAYMENT_LINK', 'CONFIRM_APPOINTMENT', 'RESCHEDULE_APPOINTMENT', 'SEND_SERVICE_UPDATE',
@@ -82,17 +82,35 @@ export class RequestActionExecutionDto {
 }
 
 export class ListConversationsQueryDto {
+  @IsOptional() @IsString() @MaxLength(120)
+  search?: string
+
+  @IsOptional() @IsEnum(WhatsAppConversationStatus)
+  status?: WhatsAppConversationStatus
+
+  @IsOptional() @IsEnum(WhatsAppConversationPriority)
+  priority?: WhatsAppConversationPriority
+
+  @IsOptional() @IsEnum(WhatsAppContextType)
+  contextType?: WhatsAppContextType
+
+  @IsOptional() @IsString()
+  customerId?: string
+
+  @IsOptional() @Transform(({value}) => value === 'true' ? true : value === 'false' ? false : value) @IsBoolean()
+  onlyUnread?: boolean
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   cursor?: string
 
-  @ApiPropertyOptional({ minimum: 1, maximum: 100, default: 20 })
+  @ApiPropertyOptional({ minimum: 1, maximum: 200, default: 50 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(100)
+  @Max(200)
   limit?: number
 }
 

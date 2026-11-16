@@ -41,7 +41,9 @@ describe('WhatsAppProcessor Redis lifecycle', () => {
 
     await processor.onModuleInit()
 
-    expect(workerConstructor).toHaveBeenCalledTimes(1)
+    expect(workerConstructor).toHaveBeenCalledTimes(2)
+    expect(workerConstructor).toHaveBeenCalledWith('whatsapp', expect.any(Function), expect.objectContaining({ limiter: {max: 10, duration: 1000} }))
+    expect(workerConstructor).toHaveBeenCalledWith('whatsapp-inbound', expect.any(Function), expect.not.objectContaining({ limiter: expect.anything() }))
 
     await processor.onModuleDestroy()
   })

@@ -51,19 +51,19 @@ export class PeopleController {
   @Get('assignees')
   @Roles('ADMIN', 'MANAGER', 'STAFF', 'VIEWER')
   async listAssignees(@Org() orgId: string) {
-    return this.people.listActiveByOrg(orgId)
+    return this.people.listAssignees(orgId)
   }
 
   /**
-   * 👑 ADMIN — métrica institucional
+   * 👑 ADMIN — métrica da organização autenticada
    * GET /people/stats/linked
    * IMPORTANTE: rota estática deve vir ANTES de :id para não ser capturada como parâmetro dinâmico.
    */
   @Get('stats/linked')
   @Roles('ADMIN')
-  async countLinked() {
+  async countLinked(@Org() orgId: string) {
     return {
-      count: await this.people.countUsersWithPerson(),
+      count: await this.people.countUsersWithPerson(orgId),
     }
   }
 
@@ -146,8 +146,9 @@ export class PeopleController {
     @Param('id') id: string,
     @Org() orgId: string,
     @Body() body: any,
+    @User() user: any,
   ) {
-    return this.people.updatePerson(id, orgId, body)
+    return this.people.updatePerson(id, orgId, body, user?.userId ?? null)
   }
 
   /**

@@ -1,0 +1,36 @@
+✔ captures completed output before state publication: success (298.394775ms)
+✔ captures completed output before state publication: offsite-failure (349.83962ms)
+✔ captures completed output before state publication: tee-failure (107.253809ms)
+✔ canonical engine artifact name is preserved in artifacts (170.729954ms)
+✖ canonical engine artifact name is preserved in artifacts with spaces (150.43523ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 4
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1177.823001
+
+✖ failing tests:
+
+test at scripts/backup-runner-output.test.mjs:28:59
+✖ canonical engine artifact name is preserved in artifacts with spaces (150.43523ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /^nexogestao_backup_[A-Za-z0-9_]+\.sql\.gz$/. Input:
+
+  'artifacts\\'
+
+      at TestContext.<anonymous> (file:///workspace/NexoGestao/scripts/backup-runner-output.test.mjs:39:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'artifacts\\',
+    expected: /^nexogestao_backup_[A-Za-z0-9_]+\.sql\.gz$/,
+    operator: 'match',
+    diff: 'simple'
+  }

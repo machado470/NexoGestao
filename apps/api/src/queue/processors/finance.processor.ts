@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common'
+import { BadRequestException, Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common'
 import { Job, Worker } from 'bullmq'
 import IORedis from 'ioredis'
 import { FinanceService } from '../../finance/finance.service'
@@ -20,31 +20,9 @@ export class FinanceProcessor implements OnModuleInit, OnModuleDestroy {
     try {
       this.worker = new Worker(
         QUEUE_NAMES.FINANCE,
-        async (job: Job<any>) => this.queueService.processJobWithTracing(QUEUE_NAMES.FINANCE, job.name, job.data, async () => {
-          await this.queueService.updateJobStatus({
-            queue: QUEUE_NAMES.FINANCE,
-            jobId: job.id?.toString() ?? '',
-            status: 'ACTIVE',
-          })
-
-          if (job.name === 'create-charge') {
-            await this.financeService.createAutomationCharge(job.data)
-          }
-
-          if (job.name === 'payment-reminder') {
-            await this.financeService.sendPaymentReminder(job.data)
-            if (job.data.chargeId) {
-              await this.financeService.sendPaymentReminderWhatsApp(job.data.chargeId)
-            }
-          }
-
-          await this.queueService.updateJobStatus({
-            queue: QUEUE_NAMES.FINANCE,
-            jobId: job.id?.toString() ?? '',
-            status: 'COMPLETED',
-            completed: true,
-          })
-        }),
+        async (job: Job<any>) => this.queueService.processJobWithTracing(
+          QUEUE_NAMES.FINANCE, job.name, job.data, () => this.processJob(job),
+        ),
         { connection: this.connection, ...QUEUE_DEFAULT_WORKER_OPTIONS },
       )
 
@@ -57,6 +35,23 @@ export class FinanceProcessor implements OnModuleInit, OnModuleDestroy {
       const error = err as Error
       this.logger.error(`Falha ao iniciar finance worker: ${error.message}`)
     }
+  }
+
+  async processJob(job: Pick<Job<any>, 'id' | 'name' | 'data'>) {
+    await this.queueService.updateJobStatus({ queue: QUEUE_NAMES.FINANCE, jobId: job.id?.toString() ?? '', status: 'ACTIVE' })
+    let result: unknown
+    switch (job.name) {
+      case 'create-charge':
+        result = await this.financeService.createAutomationCharge(job.data)
+        break
+      case 'payment-reminder':
+        result = await this.financeService.sendPaymentReminder(job.data)
+        break
+      default:
+        throw new BadRequestException('Tipo de job financeiro não suportado.')
+    }
+    await this.queueService.updateJobStatus({ queue: QUEUE_NAMES.FINANCE, jobId: job.id?.toString() ?? '', status: 'COMPLETED', completed: true })
+    return result
   }
 
   async onModuleDestroy() {

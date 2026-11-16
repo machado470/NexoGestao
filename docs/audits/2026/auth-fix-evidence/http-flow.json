@@ -1,0 +1,15 @@
+{
+  "method": "Real HTTP + PostgreSQL + Redis; email provider unavailable; confirmation/reset token hashes inserted only in this disposable account",
+  "invalidInputHTTP": 400,
+  "registrationPersisted": true,
+  "registrationDelivery": "provider_unavailable",
+  "noSessionBeforeEmailConfirmation": true,
+  "knownAndUnknownRecoveryHTTP": 503,
+  "knownAndUnknownResendHTTP": 503,
+  "emailConfirmation": true,
+  "passwordReset": true,
+  "tokenReplayHTTP": 401,
+  "oldSessionHTTP": 401,
+  "newPasswordLogin": true,
+  "pass": true
+}

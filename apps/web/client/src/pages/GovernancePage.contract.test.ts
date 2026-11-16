@@ -61,6 +61,7 @@ describe("GovernancePage passive operational authority contract", () => {
     expect(source).toContain("signal.source");
     expect(source).toContain("signal.detectedAt");
     expect(source).toContain("navigate(nextAction.routeHint)");
+    expect(source).toContain('destination === "/governance" ? refresh()');
     expect(source).not.toContain("navigate(routeForSignal");
   });
 

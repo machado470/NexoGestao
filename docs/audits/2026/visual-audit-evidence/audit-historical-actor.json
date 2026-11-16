@@ -1,0 +1,12 @@
+{
+  "check": "Historical inactive audit actor selected by name",
+  "personId": "3a407bb4-9e65-4625-85e4-e00d893e3986",
+  "active": false,
+  "eventId": "dbfe1d2a-d6f1-43cd-9b43-69a02b4a0bdc",
+  "absentFromActiveDirectory": true,
+  "summaryActorName": "Ator histórico inativo QA",
+  "absentFromFirstEventPage": true,
+  "viewerSummaryStatus": 403,
+  "selectedFilter": "3a407bb4-9e65-4625-85e4-e00d893e3986",
+  "pass": true
+}

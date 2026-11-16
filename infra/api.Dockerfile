@@ -9,6 +9,7 @@ WORKDIR /app
 
 # Instala deps na raiz (monorepo)
 COPY package.json pnpm-lock.yaml* ./
+COPY patches ./patches
 RUN corepack enable && corepack install
 RUN pnpm install --frozen-lockfile
 

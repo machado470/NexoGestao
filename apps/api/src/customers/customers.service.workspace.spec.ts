@@ -3,6 +3,8 @@ import { CustomersService } from './customers.service'
 describe('CustomersService workspace financial summary', () => {
   it('calcula total gasto pela soma histórica de Payment do cliente', async () => {
     const prisma = {
+      $queryRaw:jest.fn().mockResolvedValue([{amountCents:0n}]),
+      paymentRefund: {aggregate:jest.fn().mockResolvedValue({_sum:{amountCents:0}})},
       customer: {
         findFirst: jest.fn().mockResolvedValue({
           id: 'customer-1',
@@ -59,6 +61,8 @@ describe('CustomersService workspace financial summary', () => {
 
   it('retorna zero quando não existem pagamentos', async () => {
     const prisma = {
+      $queryRaw:jest.fn().mockResolvedValue([{amountCents:0n}]),
+      paymentRefund: {aggregate:jest.fn().mockResolvedValue({_sum:{amountCents:0}})},
       customer: {
         findFirst: jest.fn().mockResolvedValue({
           id: 'customer-1',

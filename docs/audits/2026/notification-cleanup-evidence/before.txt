@@ -1,0 +1,175 @@
+  console.log
+    {"event":"http_request","requestId":"489cd6c4-b890-4ade-8eb1-dfef1eee2f27","correlationId":"489cd6c4-b890-4ade-8eb1-dfef1eee2f27","userId":"24bb949c-1813-45b1-aa0c-43f1ffbb0d55","orgId":"5d0f099b-96b3-4865-9e49-87da0e044dd9","traceId":null,"route":"GET /v1/notifications/stream","status":200,"latencyMs":42,"contentLength":"0","ip":"127.0.0.1","userAgent":""}
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:67:17)
+
+  console.warn
+    {"event":"http_request","requestId":"baa589a5-4915-4e42-8685-4513d4eedcb7","correlationId":"baa589a5-4915-4e42-8685-4513d4eedcb7","userId":null,"orgId":null,"traceId":null,"route":"GET /v1/notifications","status":401,"latencyMs":3,"contentLength":"88","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.log
+    {"event":"http_request","requestId":"69a5ed37-366a-431e-b2d5-b89c4b54d9e8","correlationId":"69a5ed37-366a-431e-b2d5-b89c4b54d9e8","userId":"c27e7d0e-8b43-4625-815d-1ef9024e17bf","orgId":"d69c3dec-7adf-4581-9c69-77a2b97b9ffd","traceId":null,"route":"GET /v1/notifications/stream","status":200,"latencyMs":30,"contentLength":"0","ip":"127.0.0.1","userAgent":""}
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:67:17)
+
+  console.warn
+    {"event":"http_request","requestId":"e0a727a8-79a4-4b3c-8168-f8396b35b0a3","correlationId":"e0a727a8-79a4-4b3c-8168-f8396b35b0a3","userId":null,"orgId":null,"traceId":null,"route":"GET /v1/notifications","status":401,"latencyMs":3,"contentLength":"88","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.log
+    {"event":"http_request","requestId":"d7865149-7ed5-4945-b9a9-c8ee137263dc","correlationId":"d7865149-7ed5-4945-b9a9-c8ee137263dc","userId":"84aaa5c9-1eda-45d9-933e-09c1c3308bd5","orgId":"a9f56faa-af4f-4bf6-ba78-4857e108ab80","traceId":null,"route":"GET /v1/notifications/stream","status":200,"latencyMs":30,"contentLength":"0","ip":"127.0.0.1","userAgent":""}
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:67:17)
+
+  console.warn
+    {"event":"http_request","requestId":"3c7a1d27-42ce-43ef-955f-d5f45e7f0e3e","correlationId":"3c7a1d27-42ce-43ef-955f-d5f45e7f0e3e","userId":null,"orgId":null,"traceId":null,"route":"GET /v1/notifications","status":401,"latencyMs":3,"contentLength":"88","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.log
+    {"event":"http_request","requestId":"87ff67e6-dd8c-4543-9802-0e0326f51dbf","correlationId":"87ff67e6-dd8c-4543-9802-0e0326f51dbf","userId":"13851d48-c437-4595-84cb-77a9630f2132","orgId":"0591ac33-f6d6-4807-bbd6-1662173c2aa6","traceId":null,"route":"GET /v1/notifications/stream","status":200,"latencyMs":31,"contentLength":"0","ip":"127.0.0.1","userAgent":""}
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:67:17)
+
+  console.warn
+    {"event":"http_request","requestId":"4533a760-f1ac-4449-9988-0475f6f15ad2","correlationId":"4533a760-f1ac-4449-9988-0475f6f15ad2","userId":null,"orgId":null,"traceId":null,"route":"GET /v1/notifications","status":401,"latencyMs":2,"contentLength":"88","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.log
+    {"event":"http_request","requestId":"9d5684b5-80c5-42c0-9625-3db4ff18a7f1","correlationId":"9d5684b5-80c5-42c0-9625-3db4ff18a7f1","userId":"be0224af-feb8-4ab0-8e8d-a0845414842a","orgId":"36579750-2ed7-425c-bf16-c3f56afe45e6","traceId":null,"route":"GET /v1/notifications/stream","status":200,"latencyMs":50,"contentLength":"0","ip":"127.0.0.1","userAgent":""}
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:67:17)
+
+  console.warn
+    {"event":"http_request","requestId":"ffc79f8c-6da9-4fcd-9fb8-62bb2d5bbbfe","correlationId":"ffc79f8c-6da9-4fcd-9fb8-62bb2d5bbbfe","userId":null,"orgId":null,"traceId":null,"route":"GET /v1/notifications","status":401,"latencyMs":3,"contentLength":"88","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.log
+    {"event":"http_request","requestId":"2890cf24-04ab-4fb7-be9f-3eb0eb2893a4","correlationId":"2890cf24-04ab-4fb7-be9f-3eb0eb2893a4","userId":"c33dfbb8-67f3-4626-9fb1-bf3a97c6259b","orgId":"bb37f19a-8d19-4e6a-bea9-092ca1e223bf","traceId":null,"route":"GET /v1/notifications/stream","status":200,"latencyMs":8,"contentLength":"0","ip":"127.0.0.1","userAgent":""}
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:67:17)
+
+  console.warn
+    {"event":"http_request","requestId":"3a4f9ed2-8c68-4593-b7a7-aeaee007f938","correlationId":"3a4f9ed2-8c68-4593-b7a7-aeaee007f938","userId":null,"orgId":null,"traceId":null,"route":"GET /v1/notifications","status":401,"latencyMs":3,"contentLength":"88","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.log
+    {"event":"http_request","requestId":"885bf9a9-b4bd-4aa5-9abe-3c6e0d1c6729","correlationId":"885bf9a9-b4bd-4aa5-9abe-3c6e0d1c6729","userId":"0288a8b4-07b5-42cf-bba5-158f3861ce2b","orgId":"55c9d0ad-4d79-4e7b-ae76-ad6106f4a2d4","traceId":null,"route":"GET /v1/notifications/stream","status":200,"latencyMs":25015,"contentLength":"0","ip":"127.0.0.1","userAgent":""}
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:67:17)
+
+  console.log
+    {"event":"http_request","requestId":"3d12aa5d-fa1d-4559-a879-70878f6bec04","correlationId":"3d12aa5d-fa1d-4559-a879-70878f6bec04","userId":null,"orgId":null,"traceId":null,"route":"POST /v1/auth/reset-password","status":201,"latencyMs":77,"contentLength":"58","ip":"127.0.0.1","userAgent":""}
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:67:17)
+
+  console.log
+    {"event":"http_request","requestId":"417c4797-32f6-47fa-b0f2-38ba90871a4f","correlationId":"417c4797-32f6-47fa-b0f2-38ba90871a4f","userId":"f4fc425d-cc55-48c3-aa76-9f7642fff714","orgId":"67279b80-1c1e-4b99-bed7-db5e4c604d6c","traceId":null,"route":"GET /v1/notifications/stream","status":200,"latencyMs":113,"contentLength":"0","ip":"127.0.0.1","userAgent":""}
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:67:17)
+
+  console.warn
+    {"event":"http_request","requestId":"ba29aa68-6da5-445a-aa15-744212550c5d","correlationId":"ba29aa68-6da5-445a-aa15-744212550c5d","userId":null,"orgId":null,"traceId":null,"route":"GET /v1/notifications","status":401,"latencyMs":2,"contentLength":"88","ip":"127.0.0.1","userAgent":""}
+
+      63 |         console.error(line)
+      64 |       } else if (statusCode >= 400) {
+    > 65 |         console.warn(line)
+         |                 ^
+      66 |       } else {
+      67 |         console.log(line)
+      68 |       }
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:65:17)
+
+  console.log
+    {"event":"http_request","requestId":"94985bbc-81db-4efc-b612-ab98fef30865","correlationId":"94985bbc-81db-4efc-b612-ab98fef30865","userId":"c64e357a-4cbe-4eff-bd8c-30e4d85feadb","orgId":"609bf096-4195-4578-a03c-efc4a9906a2b","traceId":null,"route":"GET /v1/notifications","status":200,"latencyMs":15,"contentLength":"57","ip":"127.0.0.1","userAgent":""}
+
+      at ServerResponse.<anonymous> (src/common/middleware/request-logger.middleware.ts:67:17)
+
+FAIL test/integration/notification-session-postgres.integration.spec.ts (31.371 s)
+
+
+  ● Test suite failed to run
+
+    PrismaClientKnownRequestError:
+    Invalid `db.person.deleteMany()` invocation in
+    /workspace/NexoGestao/apps/api/test/integration/notification-session-postgres.integration.spec.ts:31:159
+
+      28 afterEach(() => { for (const stream of streams.splice(0)) stream.destroy() })
+      29 afterAll(async () => {
+      30   try {
+    → 31     await db.person.deleteMany(
+    Foreign key constraint violated: `TimelineEvent_orgId_fkey (index)`
+
+      29 |   afterAll(async () => {
+      30 |     try {
+    > 31 |       await db.person.deleteMany({ where: { userId: { in: userIds } } }); await db.user.deleteMany({ where: { id: { in: userIds } } }); await db.organization.deleteMany({ where: { id: { in: orgIds } } })
+         |                                                                                                                                         ^
+      32 |     } finally { await app?.close() }
+      33 |   })
+      34 |   async function fixture() {
+
+      at $n.handleRequestError (../../node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0/node_modules/@prisma/client/runtime/library.js:121:7315)
+      at $n.handleAndLogRequestError (../../node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0/node_modules/@prisma/client/runtime/library.js:121:6623)
+      at $n.request (../../node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0/node_modules/@prisma/client/runtime/library.js:121:6307)
+      at l (../../node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0/node_modules/@prisma/client/runtime/library.js:130:9633)
+      at Object.<anonymous> (test/integration/notification-session-postgres.integration.spec.ts:31:137)
+
+Test Suites: 1 failed, 1 total
+Tests:       8 passed, 8 total
+Snapshots:   0 total
+Time:        31.59 s
+Ran all test suites matching test/integration/notification-session-postgres.integration.spec.ts.

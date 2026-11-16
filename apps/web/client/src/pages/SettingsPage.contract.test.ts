@@ -29,8 +29,8 @@ describe("SettingsPage golden-standard contract", () => {
   });
 
   it("edits only fields supported by the organization settings contract", () => {
-    expect(settingsPageSource).toContain(
-      "updateMutation.mutate({ name, timezone, currency })"
+    expect(settingsPageSource).toMatch(
+      /updateMutation\.mutate\(\{\s*name: name\.trim\(\),\s*timezone: timezone\.trim\(\),\s*currency,?\s*\}\)/
     );
     expect(settingsPageSource).toContain("value={settings.slug}");
     expect(settingsPageSource).toContain("readOnly");
@@ -69,7 +69,7 @@ describe("SettingsPage golden-standard contract", () => {
     expect(settingsPageSource).toContain("updateMutation.isError");
     expect(settingsPageSource).toContain("updateMutation.isSuccess");
     expect(settingsPageSource).toContain(
-      "await utils.settings.get.invalidate()"
+      "utils.settings.get.setData(undefined, data)"
     );
     expect(settingsPageSource).toContain('role="alert"');
     expect(settingsPageSource).toContain('role="status"');

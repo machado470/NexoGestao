@@ -31,9 +31,35 @@ Execute `BACKUP_STATE_DIR=/configured/state scripts/backup-status.sh`. O runner 
 
 Em falha, preserve logs e state, use o `reasonCode`, não trate upload ausente como sucesso e escale ao papel DR owner. Alerting externo é `MISSING`.
 
+### Checagem local para um monitor
+
+A consulta sem argumentos mantém o JSON factual anterior. Para uma checagem automatizável, defina explicitamente a idade máxima aprovada pelo responsável:
+
+```bash
+BACKUP_STATE_DIR=/configured/state scripts/backup-status.sh --check \
+  --max-age-seconds "$APPROVED_BACKUP_MAX_AGE_SECONDS" --require-offsite
+```
+
+`APPROVED_BACKUP_MAX_AGE_SECONDS` deve ser um inteiro positivo definido fora do Git. Não há default e isso não define RPO/RTO. Omita `--require-offsite` somente quando a checagem pretendida for local. Não se instala monitor, cron nem alerta por executar essa consulta.
+
+O modo `--check` lê `last-attempt.json` e `last-success.json`, exige snapshots coerentes, sucesso local e datas válidas/não futuras. Retorna JSON sanitizado (sem conteúdo bruto ou caminho de artefato) e código 0 somente se a checagem passar; código 1 significa estado insuficiente/falho/vencido; código 64 indica configuração/argumentos inválidos. O modo factual sem argumentos continua retornando o estado como antes, inclusive quando o último backup falhou.
+
+| reasonCode | Interpretação |
+| --- | --- |
+| `BACKUP_CHECK_PASSED` | Estado registrado atende aos critérios informados |
+| `BACKUP_ATTEMPT_UNAVAILABLE` | Última tentativa ausente, ilegível ou inválida |
+| `BACKUP_LAST_ATTEMPT_FAILED` | Última tentativa falhou, mesmo que exista sucesso anterior |
+| `BACKUP_SUCCESS_UNAVAILABLE` | Snapshot de sucesso ausente, ilegível ou inválido |
+| `BACKUP_STATE_INCONSISTENT` | Snapshots não correspondem à mesma execução/resultado |
+| `BACKUP_STALE` | Último sucesso excede a idade máxima informada |
+| `BACKUP_OFFSITE_UNCONFIRMED` | Upload não confirmado no estado e exigido na checagem |
+
+A checagem avalia **o estado registrado pelo runner**, não verifica arquivo remoto, checksum, restauração ou recebimento de alerta. `offsiteUpload=uploaded` não comprova durabilidade nem acesso ao bucket atual. Um monitor externo ainda precisa ser configurado, ter responsável e comprovar entrega; AU12 permanece parcial.
+
+
 ## Restore, migration recovery, rollback e cleanup
 
-Restore em produção exige aprovação do DR owner, alvo confirmado, artefato e sidecar baixados, checksum pós-download, janela e rollback. Esses controles são `NOT_PROVED`; `scripts/restore-db.sh` bloqueia produção e não deve ser contornado. Drills ocorrem somente em infraestrutura descartável.
+Restore em produção exige aprovação do DR owner, alvo confirmado, artefato e sidecar baixados, checksum pós-download, janela e rollback. Esses controles são `NOT_PROVED`; `scripts/restore-db.sh` bloqueia produção e não deve ser contornado. Drills ocorrem somente em infraestrutura descartável. O sidecar deve conter exatamente uma entrada canônica (`SHA-256`, dois espaços e basename do dump solicitado); o restore compara o hash desse arquivo diretamente, sem seguir outros caminhos do sidecar. Checksum não autentica a origem do pacote.
 
 Em migration falha, interrompa rollout, preserve logs/banco, não edite histórico aplicado e escolha roll-forward ou procedimento Prisma aprovado (`DECISION_REQUIRED`). Para rollback da aplicação, reimplante revisão/imagem aprovada após verificar compatibilidade da migration (`NOT_PROVED`). No cleanup, remova somente recursos descartáveis identificados; artefatos reais obedecem à política aprovada.
 
@@ -42,3 +68,47 @@ Em migration falha, interrompa rollout, preserve logs/banco, não edite históri
 O DR owner ainda não atribuído deverá aprovar restore, verificar backup, responder à falha, executar drill periódico, aprovar RPO/RTO e manter acesso controlado ao offsite.
 
 Uma prova futura deve verificar bucket real, TLS, criptografia em repouso, versionamento, lifecycle, retenção, IAM mínimo, upload de dump e checksum, download, checksum pós-download e restore do artefato baixado. Defaults AWS não provam esses controles.
+
+## Base executável de Compose (sem destino real)
+
+Siga a seção “Base Compose reproduzível” em `deployment.md` para configuração,
+TLS, build e comando one-shot `migrate`. `AUTO_MIGRATE=0` e `SEED_MODE` vazio
+são impostos no serviço API. O startup verifica banco e schema, mas não os altera.
+A prova `scripts/smoke-production-compose.sh` usa somente recursos descartáveis.
+
+Antes de qualquer execução real, ainda faltam: provedor/servidor/domínio,
+identificação do daemon e dos volumes existentes, responsáveis, backup aprovado,
+janela, firewall/TLS e critérios de smoke/rollback. O CI valida a base Compose;
+não executa publicação, migrations remotas ou promoção real.
+
+### Destino consistente no restore de teste
+
+Quando `DB_CONTAINER`/`--container` estiver informado, o contêiner deve estar em execução e publicar PostgreSQL interno 5432 exclusivamente em `127.0.0.1:<porta de DATABASE_URL>`. `POSTGRES_USER` deve coincidir com o usuário da URL. Não há fallback para outro banco se o contêiner estiver parado ou divergente. Restore e smoke usam socket padrão `/var/run/postgresql` no contêiner; migrations usam a URL correspondente à porta publicada.
+
+Banco/usuário da URL são decodificados e devem usar letras, números, `_` ou `-`. Parâmetros aceitos: `schema`, `sslmode`, `sslcert`, `sslkey`, `sslrootcert`, `connect_timeout`, `connection_limit`, `pool_timeout`, `application_name`, `pgbouncer`; desconhecidos/repetidos e fragmentos são recusados. Configurações libpq herdadas de roteamento/serviço/opções são removidas antes do psql. Isso não substitui confirmar que o alvo é descartável e autorizado.
+
+[Correção e drill local de consistência do destino](../audits/2026/2026-11-12-restore-target-consistency.md). O drill local não comprova offsite ou alerta.
+
+### Concorrência do runner
+
+O runner mantém `.backup-runner.lock` em BACKUP_STATE_DIR durante validação, execução e publicação dos snapshots. Uma chamada concorrente ao mesmo diretório retorna **75**, registra `LOCKED` e não substitui o estado da execução ativa. O lock do engine continua protegendo o dump separadamente. A trava é local ao filesystem, não coordena hosts com diretórios independentes.
+
+Travas remanescentes após SIGKILL/quebra de energia exigem confirmar que não há execução ativa antes da recuperação manual; não remova trava de um backup em andamento. [Correção e provas de concorrência](../audits/2026/2026-11-12-backup-runner-concurrency.md).
+
+### Captura do resultado
+
+O runner aguarda o término do engine e da captura antes de publicar estado. A saída stdout/stderr do engine é combinada e transmitida ao vivo pelo stdout do runner; eventos próprios de falha continuam no stderr. Se o engine falhar, preserva seu código; se apenas a captura falhar, retorna 70/UNKNOWN_FAILURE e não registra sucesso. [Diagnóstico e regressões](../audits/2026/2026-11-12-backup-output-capture.md).
+
+### Referência do artefato
+
+O evento `backup_created` mantém `artifact=` para o caminho escapado e inclui `artifact_name=` para o nome canônico usado no estado. Atualize engine e runner juntos para preservar essa referência em diretórios com espaços; o fallback para logs antigos conserva suas limitações. [Regressão e evidências](../audits/2026/2026-11-12-backup-artifact-name.md).
+
+### Origem explícita do backup
+
+Configure `DB_CONTAINER` (ou `--container`) somente para o contêiner confirmado de PostgreSQL; se estiver ausente/parado, a execução falha e não usa o host como alternativa. O modo contêiner usa socket padrão `/var/run/postgresql` e porta interna 5432. Sem DB_CONTAINER, configure POSTGRES_HOST/POSTGRES_PORT explicitamente (porta padrão 5432). O script não procura mais um contêiner de nome fixo. Remova DB_CONTAINER para escolher o modo host.
+
+Ambos os modos usam POSTGRES_USER/POSTGRES_DB; configurações libpq de redirecionamento/serviço/opções são removidas antes do dump. Revise arquivos de ambiente antigos que dependiam da descoberta automática ou fallback. [Correção, testes e drill](../audits/2026/2026-11-12-backup-explicit-source.md).
+
+### Stream vazio
+
+O engine rejeita saída SQL de zero bytes, mesmo que pg_dump retorne zero e o gzip seja válido. Valida a descompressão inteira sem criar cópia SQL em disco e só então publica o artefato. Isso não substitui o drill de restauração nem verifica completude semântica. [Regressões](../audits/2026/2026-11-12-backup-empty-stream.md).

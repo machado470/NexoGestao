@@ -1,0 +1,71 @@
+[Nest] 71887  - 11/12/2026, 12:00:00 PM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+[Nest] 71887  - 11/12/2026, 12:00:00 PM     LOG [NotificationStreamHub] Stream encerrado; conexões=0
+[Nest] 71887  - 11/12/2026, 12:00:00 PM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+[Nest] 71887  - 11/12/2026, 12:00:00 PM     LOG [NotificationStreamHub] Stream encerrado; conexões=0
+[Nest] 71887  - 11/12/2026, 12:00:00 PM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+[Nest] 71887  - 11/12/2026, 12:00:00 PM     LOG [NotificationStreamHub] Stream encerrado; conexões=0
+[Nest] 71887  - 11/12/2026, 12:00:00 PM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+[Nest] 71887  - 11/12/2026, 12:00:00 PM     LOG [NotificationStreamHub] Stream encerrado; conexões=0
+[Nest] 71887  - 11/12/2026, 12:00:00 PM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+[Nest] 71887  - 11/12/2026, 12:00:00 PM     LOG [NotificationStreamHub] Stream encerrado; conexões=0
+[Nest] 71887  - 11/12/2026, 12:00:00 PM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+[Nest] 71887  - 11/12/2026, 12:00:00 PM     LOG [NotificationStreamHub] Stream encerrado; conexões=0
+[Nest] 71887  - 11/12/2026, 12:00:00 PM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+[Nest] 71887  - 11/12/2026, 12:00:00 PM     LOG [NotificationStreamHub] Stream encerrado; conexões=0
+[Nest] 71887  - 11/12/2026, 12:00:00 PM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+[Nest] 71887  - 11/12/2026, 12:00:00 PM     LOG [NotificationStreamHub] Stream encerrado; conexões=0
+[Nest] 71887  - 11/12/2026, 12:00:00 PM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+[Nest] 71887  - 11/12/2026, 12:00:25 PM     LOG [NotificationStreamHub] Stream encerrado; conexões=0
+[Nest] 71887  - 11/12/2026, 12:00:00 PM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+[Nest] 71887  - 11/12/2026, 12:00:25 PM     LOG [NotificationStreamHub] Stream encerrado; conexões=0
+[Nest] 71887  - 11/12/2026, 12:00:00 PM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+[Nest] 71887  - 11/12/2026, 12:00:00 PM     LOG [NotificationStreamHub] Stream encerrado; conexões=0
+[Nest] 71887  - 11/12/2026, 12:00:00 PM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+[Nest] 71887  - 11/12/2026, 12:00:00 PM     LOG [NotificationStreamHub] Stream encerrado; conexões=0
+[Nest] 71887  - 11/12/2026, 12:00:00 PM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+[Nest] 71887  - 11/12/2026, 12:00:00 PM     LOG [NotificationStreamHub] Stream encerrado; conexões=0
+[Nest] 71887  - 11/12/2026, 12:00:00 PM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+[Nest] 71887  - 11/12/2026, 12:00:00 PM     LOG [NotificationStreamHub] Stream encerrado; conexões=0
+[Nest] 71887  - 11/12/2026, 12:00:00 PM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+[Nest] 71887  - 11/12/2026, 12:00:00 PM     LOG [NotificationStreamHub] Stream encerrado; conexões=0
+[Nest] 71887  - 11/12/2026, 12:00:00 PM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+[Nest] 71887  - 11/12/2026, 12:00:01 PM     LOG [NotificationStreamHub] Stream encerrado; conexões=0
+[Nest] 71887  - 11/12/2026, 2:34:22 AM     LOG [NotificationPubSubService] Redis Pub/Sub conectado
+[Nest] 71887  - 11/12/2026, 2:34:22 AM     LOG [NotificationPubSubService] Redis Pub/Sub conectado
+[Nest] 71887  - 11/12/2026, 2:34:22 AM    WARN [NotificationPubSubService] Publisher indisponível; persistência permanece ativa
+[Nest] 71887  - 11/12/2026, 2:34:22 AM    WARN [NotificationPubSubService] Subscriber indisponível; consultas persistentes permanecem ativas
+[Nest] 71887  - 11/12/2026, 2:34:22 AM     LOG [NotificationPubSubService] Redis Pub/Sub conectado
+[Nest] 71887  - 11/12/2026, 2:34:22 AM    WARN [NotificationPubSubService] Falha no publish de notificação (timeout); persistência preservada
+[Nest] 71887  - 11/12/2026, 2:34:22 AM    WARN [NotificationPubSubService] Publisher indisponível; persistência permanece ativa
+[Nest] 71887  - 11/12/2026, 2:34:22 AM    WARN [NotificationPubSubService] Subscriber indisponível; consultas persistentes permanecem ativas
+[Nest] 71887  - 11/12/2026, 2:34:22 AM     LOG [NotificationPubSubService] Redis Pub/Sub conectado
+[Nest] 71887  - 11/12/2026, 2:34:22 AM    WARN [NotificationPubSubService] Publish de notificação sem subscribers; persistência preservada
+[Nest] 71887  - 11/12/2026, 2:34:22 AM    WARN [NotificationPubSubService] Publisher indisponível; persistência permanece ativa
+[Nest] 71887  - 11/12/2026, 2:34:22 AM    WARN [NotificationPubSubService] Subscriber indisponível; consultas persistentes permanecem ativas
+[Nest] 71887  - 11/12/2026, 2:34:22 AM     LOG [NotificationPubSubService] Redis Pub/Sub conectado
+[Nest] 71887  - 11/12/2026, 2:34:22 AM    WARN [NotificationPubSubService] Redis Pub/Sub reconectando
+[Nest] 71887  - 11/12/2026, 2:34:22 AM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+[Nest] 71887  - 11/12/2026, 2:34:22 AM     LOG [NotificationStreamHub] Stream aberto; conexões=2
+[Nest] 71887  - 11/12/2026, 2:34:22 AM     LOG [NotificationStreamHub] Stream aberto; conexões=3
+[Nest] 71887  - 11/12/2026, 2:34:22 AM     LOG [NotificationStreamHub] Stream encerrado; conexões=2
+[Nest] 71887  - 11/12/2026, 2:34:22 AM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+[Nest] 71887  - 11/12/2026, 2:34:22 AM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+[Nest] 71887  - 11/12/2026, 2:34:22 AM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+[Nest] 71887  - 11/12/2026, 2:34:22 AM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+[Nest] 71887  - 11/12/2026, 2:34:22 AM     LOG [NotificationStreamHub] Stream aberto; conexões=2
+[Nest] 71887  - 11/12/2026, 2:34:22 AM     LOG [NotificationStreamHub] Stream aberto; conexões=3
+[Nest] 71887  - 11/12/2026, 2:34:22 AM     LOG [NotificationStreamHub] Stream aberto; conexões=4
+[Nest] 71887  - 11/12/2026, 2:34:22 AM     LOG [NotificationStreamHub] Stream aberto; conexões=5
+[Nest] 71887  - 11/12/2026, 2:34:22 AM     LOG [NotificationStreamHub] Stream encerrado; conexões=4
+[Nest] 71887  - 11/12/2026, 2:34:22 AM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+[Nest] 71887  - 11/12/2026, 2:34:22 AM     LOG [NotificationStreamHub] Stream encerrado; conexões=0
+[Nest] 71887  - 11/12/2026, 2:34:22 AM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+[Nest] 71887  - 11/12/2026, 2:34:22 AM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+[Nest] 71887  - 11/12/2026, 2:34:22 AM     LOG [NotificationStreamHub] Stream aberto; conexões=1
+[Nest] 71887  - 11/12/2026, 2:34:22 AM     LOG [NotificationStreamHub] Stream aberto; conexões=2
+
+Test Suites: 8 passed, 8 total
+Tests:       83 passed, 83 total
+Snapshots:   0 total
+Time:        5.847 s, estimated 7 s
+Ran all test suites matching src/auth/jwt.strategy.spec.ts|src/auth/auth.security-http.spec.ts|src/notifications/.

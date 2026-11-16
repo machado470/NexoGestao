@@ -1,0 +1,5 @@
+
+> nexogestao@1.0.0 prisma:check:drift /workspace/NexoGestao
+> pnpm --filter ./apps/api exec prisma migrate diff --from-schema-datasource ../../prisma/schema.prisma --to-schema-datamodel ../../prisma/schema.prisma --exit-code
+
+No difference detected.

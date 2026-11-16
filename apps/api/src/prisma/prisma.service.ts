@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common'
 import { Prisma, PrismaClient } from '@prisma/client'
 import { ClsService } from 'nestjs-cls'
+import { applySessionRevocation } from './session-revocation'
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit {
@@ -42,6 +43,8 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
       if (isOrgScopedModel && isHttpRequest && !orgId && !allowWithoutOrg) {
         throw new ForbiddenException('Contexto de organização ausente na requisição.')
       }
+
+      applySessionRevocation(params)
 
       if (!isOrgScopedModel || !orgId) {
         return next(params)

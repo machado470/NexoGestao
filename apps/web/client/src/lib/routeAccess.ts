@@ -37,5 +37,6 @@ export function isPublicOrAuthPath(pathname: string): boolean {
 }
 
 export function shouldBootstrapSessionForPath(pathname: string): boolean {
+  if (import.meta.env.VITE_STATIC_HOSTING === "true") return false;
   return pathname === "/" || isAuthPath(pathname) || !isMarketingPath(pathname);
 }

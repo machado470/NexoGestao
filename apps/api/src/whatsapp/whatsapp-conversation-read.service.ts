@@ -81,8 +81,22 @@ export class WhatsAppConversationReadService {
     return this.prisma.whatsAppConversation.findFirst({ where: { id: conversationId, orgId }, include: { customer: true } })
   }
 
-  getMessages(orgId: string, conversationId: string) {
-    return this.prisma.whatsAppMessage.findMany({ where: { orgId, conversationId }, orderBy: { createdAt: 'desc' } })
+  async getConversationMessagesPage(orgId: string, conversationId: string, options: { limit?: number; cursor?: string } = {}) {
+    const limit = Math.min(Math.max(Number(options.limit) || 50, 1), 100)
+    const rows = await this.prisma.whatsAppMessage.findMany({
+      where: { orgId, conversationId },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: limit + 1,
+      ...(options.cursor ? { cursor: { id: options.cursor }, skip: 1 } : {}),
+    })
+    const hasMore = rows.length > limit
+    const items = rows.slice(0, limit)
+    return { items, nextCursor: hasMore ? items[items.length - 1].id : null }
+  }
+
+  // Compatibility array endpoint: bounded page, with additive cursor/limit input.
+  async getMessages(orgId: string, conversationId: string, options: { limit?: number; cursor?: string } = {}) {
+    return (await this.getConversationMessagesPage(orgId, conversationId, options)).items
   }
 
   findById(id: string, orgId?: string) {

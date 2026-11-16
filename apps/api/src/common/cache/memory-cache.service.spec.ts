@@ -91,3 +91,30 @@ describe('MemoryCacheService', () => {
     })
   })
 })
+
+describe('MemoryCacheService concurrent computation', () => {
+  it('shares one computation per key, isolating tenants', async () => {
+    const cache = new MemoryCacheService()
+    const factory = jest.fn(async () => 'value')
+    expect(await Promise.all(Array.from({ length: 20 }, () => cache.getOrSet('org-a', factory, 1000)))).toEqual(Array(20).fill('value'))
+    expect(factory).toHaveBeenCalledTimes(1)
+    await cache.getOrSet('org-b', factory, 1000)
+    expect(factory).toHaveBeenCalledTimes(2)
+  })
+  it('releases failed computations for retry', async () => {
+    const cache = new MemoryCacheService()
+    await expect(cache.getOrSet('key', () => { throw new Error('failed') }, 1000)).rejects.toThrow('failed')
+    await expect(cache.getOrSet('key', async () => 'retry', 1000)).resolves.toBe('retry')
+  })
+  it('does not cache invalidated in-flight results over a newer computation', async () => {
+    const cache = new MemoryCacheService()
+    let resolve!: (value: string) => void
+    const old = cache.getOrSet('dashboard:org', () => new Promise<string>(r => { resolve = r }), 1000)
+    await Promise.resolve()
+    cache.deleteByPrefix('dashboard:')
+    await cache.getOrSet('dashboard:org', async () => 'new', 1000)
+    resolve('old')
+    await old
+    expect(cache.get('dashboard:org')).toBe('new')
+  })
+})

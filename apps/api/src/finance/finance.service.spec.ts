@@ -46,6 +46,102 @@ describe('FinanceService hardening', () => {
     return { service, prisma, idempotency, metrics, audit, timeline }
   }
 
+  it('requires the dedicated cancellation flow before any mutation', async () => {
+    const { service, prisma } = buildService()
+    await expect(service.updateCharge({ orgId: 'org-1', id: 'ch-1', status: 'CANCELED', expectedUpdatedAt: new Date().toISOString() }))
+      .rejects.toThrow('motivo obrigatório')
+    expect(prisma.charge.findFirst).not.toHaveBeenCalled()
+  })
+
+  it.each([0, -1, 1.5, NaN, Infinity, 2_147_483_648])('rejects invalid cents %p before reserving an operation', async amountCents => {
+    const { service, prisma, idempotency } = buildService()
+    await expect(service.createCharge({ orgId: 'org-1', customerId: 'c-1', amountCents, dueDate: new Date() })).rejects.toBeInstanceOf(BadRequestException)
+    await expect(service.updateCharge({ orgId: 'org-1', id: 'ch-1', amountCents, expectedUpdatedAt: new Date().toISOString() })).rejects.toBeInstanceOf(BadRequestException)
+    await expect(service.ensureChargeForServiceOrderDone({ orgId: 'org-1', customerId: 'c-1', serviceOrderId: 'os-1', amountCents })).rejects.toBeInstanceOf(BadRequestException)
+    expect(prisma.charge.findFirst).not.toHaveBeenCalled()
+    expect(idempotency.begin).not.toHaveBeenCalled()
+  })
+
+  it.each(['PAID', 'CANCELED'])('rejects manual reminders for %s charges', async status => {
+    const { service, prisma } = buildService()
+    prisma.charge.findFirst.mockResolvedValue({ id: 'ch-1', status })
+    const send = jest.spyOn(service, 'sendPaymentReminderWhatsApp')
+    await expect(service.remindChargeInOrg('org-1', 'ch-1')).rejects.toBeInstanceOf(BadRequestException)
+    expect(send).not.toHaveBeenCalled()
+  })
+
+  it.each(['PAID', 'CANCELED'])('does not enqueue a reminder if a delayed worker finds a %s charge', async status => {
+    const { service, prisma } = buildService()
+    prisma.charge.findUnique = jest.fn().mockResolvedValue({ id: 'ch-1', status, customer: { phone: '5511999999999' } })
+    const enqueue = jest.fn()
+    ;(service as any).whatsapp.enqueueMessage = enqueue
+    await service.sendPaymentReminderWhatsApp('ch-1')
+    expect(enqueue).not.toHaveBeenCalled()
+  })
+
+  it('rejects changing a settled charge amount without modifying the payment', async () => {
+    const { service, prisma } = buildService()
+    prisma.charge.findFirst.mockResolvedValue({ id: 'ch-1', status: 'PAID', amountCents: 1000, updatedAt: new Date() })
+    prisma.charge.updateMany = jest.fn()
+    await expect(service.updateCharge({ orgId: 'org-1', id: 'ch-1', amountCents: 20000, expectedUpdatedAt: new Date().toISOString() }))
+      .rejects.toThrow('cobrança paga')
+    expect(prisma.charge.updateMany).not.toHaveBeenCalled()
+  })
+
+  it('preserves note edits when the paid charge editor sends its unchanged amount', async () => {
+    const { service, prisma } = buildService()
+    const updatedAt = new Date()
+    prisma.charge.findFirst.mockResolvedValue({ id: 'ch-1', status: 'PAID', amountCents: 1000, updatedAt })
+    prisma.charge.updateMany = jest.fn().mockResolvedValue({ count: 1 })
+    await service.updateCharge({ orgId: 'org-1', id: 'ch-1', amountCents: 1000, notes: 'Recibo revisado', expectedUpdatedAt: updatedAt.toISOString() })
+    expect(prisma.charge.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ amountCents: 1000, notes: 'Recibo revisado' }) }))
+  })
+
+  it('does not create a payment when the charge changes after amount validation', async () => {
+    const { service, prisma, idempotency } = buildService()
+    const updatedAt = new Date('2026-11-09T00:00:00Z')
+    idempotency.begin.mockResolvedValue({ mode: 'execute', recordId: 'idem-1' })
+    const updateMany = jest.fn().mockResolvedValue({ count: 0 })
+    const create = jest.fn()
+    const findFirst = jest.fn().mockResolvedValueOnce({ id: 'ch-1', status: 'PENDING', amountCents: 1000, updatedAt }).mockResolvedValue(null)
+    prisma.$transaction.mockImplementation(async (cb: any) => cb({ charge: { findFirst, updateMany }, payment: { create } }))
+    await expect(service.payCharge({ orgId: 'org-1', chargeId: 'ch-1', amountCents: 1000, method: 'PIX' }))
+      .rejects.toThrow('Recarregue antes de registrar')
+    expect(updateMany).toHaveBeenCalledWith({ where: { id: 'ch-1', orgId: 'org-1', status: { in: ['PENDING', 'OVERDUE'] }, amountCents: 1000, updatedAt }, data: expect.objectContaining({ status: 'PAID' }) })
+    expect(create).not.toHaveBeenCalled()
+    expect(idempotency.complete).not.toHaveBeenCalled()
+    expect(idempotency.fail).toHaveBeenCalled()
+  })
+
+  it('carrega a cobrança focada somente no tenant e entrega saldo calculado pelo backend', async () => {
+    const { service, prisma } = buildService()
+    prisma.charge.findFirst.mockResolvedValue({
+      id: 'charge-1', orgId: 'org-1', amountCents: 10000, status: 'PENDING',
+      payments: [{ amountCents: 2500 }], dueDate: new Date('2026-11-01T00:00:00Z'),
+    })
+    await expect(service.getCharge('org-1', 'charge-1')).resolves.toMatchObject({
+      id: 'charge-1', paidAmountCents: 2500, balanceCents: 7500, daysOverdue: null,
+    })
+    expect(prisma.charge.findFirst).toHaveBeenCalledWith({
+      where: { id: 'charge-1', orgId: 'org-1' },
+      include: { customer: true, serviceOrder: true, payments: { include: { refunds: { select: { amountCents: true, reversedAt: true } } } } },
+    })
+  })
+
+  it('não expõe cobrança inexistente ou de outro tenant', async () => {
+    const { service, prisma } = buildService()
+    prisma.charge.findFirst.mockResolvedValue(null)
+    await expect(service.getCharge('org-1', 'other-charge')).rejects.toBeInstanceOf(NotFoundException)
+  })
+
+  it('preserva saldo zero quando pagamentos já cobrem a cobrança', async () => {
+    const { service, prisma } = buildService()
+    prisma.charge.findFirst.mockResolvedValue({
+      id: 'paid', amountCents: 500, status: 'PAID', payments: [{ amountCents: 600 }],
+    })
+    await expect(service.getCharge('org-1', 'paid')).resolves.toMatchObject({ paidAmountCents: 600, balanceCents: 0 })
+  })
+
   it('bloqueia geração de cobrança para O.S. cancelada', async () => {
     const { service, prisma, idempotency } = buildService()
     idempotency.begin.mockResolvedValue({ mode: 'execute', recordId: 'idem-1' })

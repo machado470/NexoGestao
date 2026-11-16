@@ -1,0 +1,19 @@
+{
+  "method": "Real HTTP+BFF+Chromium+PostgreSQL; original payment is synthetic fixture, refund recorded through real internal service; no Stripe calls",
+  "grossPaymentCents": 10000,
+  "refundedCents": 2500,
+  "netReceivedCents": 7500,
+  "paidStatusPreserved": true,
+  "noDebtReopened": true,
+  "duplicateRefund": true,
+  "reversalAndRepeatedReversalVerified": true,
+  "restoredNetReceivedCents": 10000,
+  "reversalAuditEvents": 1,
+  "auditEvents": 1,
+  "financeAndDashboardDeltaCents": 7500,
+  "refundBreakdownVisible": true,
+  "dashboardKpiVisible": true,
+  "governanceRunIsSyntheticFixture": true,
+  "pageErrors": [],
+  "pass": true
+}

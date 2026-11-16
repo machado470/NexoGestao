@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { toast } from "sonner";
 import {
   Bell,
@@ -470,6 +470,17 @@ export function mapConversation(item: any): Conversation {
   };
 }
 
+export function resolveRefreshedConversation(
+  payload: { items: unknown[] } | { pages: Array<{ items: unknown[] }> } | undefined,
+  customerId: string | undefined
+) {
+  if (!customerId) return undefined;
+  const items = payload && "pages" in payload ? payload.pages.flatMap(page => page.items) : payload?.items;
+  return items
+    ?.map(mapConversation)
+    .find(item => String(item.customerId ?? "") === customerId);
+}
+
 function mapMessage(item: any): ChatMessage {
   return {
     id: item.id,
@@ -526,7 +537,13 @@ export function buildWhatsAppSendPayload<
 }
 
 function resolveEntityFromContext(context?: WhatsAppContext | null): {
-  entityType: "CUSTOMER" | "APPOINTMENT" | "SERVICE_ORDER" | "CHARGE" | "PAYMENT" | "GENERAL";
+  entityType:
+    | "CUSTOMER"
+    | "APPOINTMENT"
+    | "SERVICE_ORDER"
+    | "CHARGE"
+    | "PAYMENT"
+    | "GENERAL";
   entityId?: string;
 } {
   if (context?.openCharge?.id)
@@ -783,13 +800,18 @@ function InboxQueueColumn({
     setViewportHeight(node.clientHeight);
   }, []);
 
+  useEffect(() => {
+    viewportRef.current?.scrollTo({ top: 0 });
+    setScrollTop(0);
+  }, [search]);
+
   const totalHeight = rows.length * ROW_HEIGHT;
   const startIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - 4);
   const visibleCount = Math.ceil(viewportHeight / ROW_HEIGHT) + 8;
   const visibleRows = rows.slice(startIndex, startIndex + visibleCount);
 
   return (
-    <aside className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-transparent xl:border-r xl:border-[var(--app-border)]/40 p-2.5 text-app-primary">
+    <aside className="flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden bg-transparent xl:border-r xl:border-[var(--app-border)]/40 p-2.5 text-app-primary">
       <div className="shrink-0 space-y-2 pb-2">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
@@ -831,7 +853,7 @@ function InboxQueueColumn({
               description={
                 search.trim()
                   ? "Limpe a busca ou altere os filtros."
-                  : "Conversas reais aparecerão aqui quando houver contato pelo canal."
+                  : "A primeira conversa aparecerá quando uma mensagem chegar pelo WhatsApp conectado. Você também pode iniciar o contato a partir de um cliente com telefone, se tiver permissão."
               }
             />
           )
@@ -866,6 +888,9 @@ function ExecutionChatColumn({
   isLoading,
   messagesError,
   onRetryMessages,
+  hasOlderMessages,
+  loadingOlderMessages,
+  onLoadOlderMessages,
   sendMessage,
   content,
   setContent,
@@ -894,6 +919,9 @@ function ExecutionChatColumn({
   isLoading: boolean;
   messagesError?: boolean;
   onRetryMessages: () => void;
+  hasOlderMessages?: boolean;
+  loadingOlderMessages?: boolean;
+  onLoadOlderMessages: () => void;
   sendMessage: () => void;
   content: string;
   setContent: (value: string) => void;
@@ -924,7 +952,7 @@ function ExecutionChatColumn({
     const node = messagesRef.current;
     if (!node) return;
     node.scrollTop = node.scrollHeight;
-  }, [conversation?.id, messages.length]);
+  }, [conversation?.id, messages[messages.length - 1]?.id]);
 
   const composerActionPalette = useMemo(() => {
     const {
@@ -1271,6 +1299,7 @@ function ExecutionChatColumn({
           </div>
         ) : (
           <div className="space-y-3">
+            {hasOlderMessages ? <Button variant="outline" disabled={loadingOlderMessages} onClick={onLoadOlderMessages}>Carregar mensagens anteriores</Button> : null}
             {messages.map(message => {
               const outgoing = message.direction === "OUTBOUND";
               const delivery = getMessageDeliveryPresentation(message);
@@ -1522,7 +1551,7 @@ function OperationalContextColumn({
               onClick={() =>
                 onNavigate(
                   context?.customer?.id
-                    ? `/customers?customerId=${context.customer.id}`
+                    ? `/customers?customerId=${encodeURIComponent(context.customer.id)}`
                     : "/customers"
                 )
               }
@@ -1677,10 +1706,27 @@ function OperationalContextColumn({
               disabled={!hasCharge}
               onClick={() =>
                 context?.openCharge?.id &&
-                onNavigate(`/finances?chargeId=${context.openCharge.id}`)
+                onNavigate(
+                  `/finances?chargeId=${encodeURIComponent(context.openCharge.id)}`
+                )
               }
             >
               Ver cobrança
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="mt-3 h-7 text-[11px]"
+              disabled={!hasCharge}
+              onClick={() =>
+                context?.openCharge?.id &&
+                onNavigate(
+                  `/finances?chargeId=${encodeURIComponent(context.openCharge.id)}&action=pay`
+                )
+              }
+            >
+              Registrar pagamento
             </Button>
           </OperationalInnerCard>
 
@@ -1711,10 +1757,11 @@ function OperationalContextColumn({
 }
 
 export default function WhatsAppPage() {
-  const [location, setLocation] = useLocation();
+  const [, setLocation] = useLocation();
+  const routeSearch = useSearch();
   const searchParams = useMemo(
-    () => new URLSearchParams(location.split("?")[1] ?? ""),
-    [location]
+    () => new URLSearchParams(routeSearch),
+    [routeSearch]
   );
   const queryConversationId = searchParams.get("conversationId");
   const queryCustomerId = searchParams.get("customerId");
@@ -1766,20 +1813,27 @@ export default function WhatsAppPage() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  const filtersInput = useMemo<Record<string, unknown>>(() => ({}), []);
+  const filtersInput = useMemo(() => ({
+    search: debouncedSearch || undefined,
+    status: activeFilter === "waiting_customer" ? "WAITING_CUSTOMER" as const : activeFilter === "resolved" ? "RESOLVED" as const : undefined,
+    priority: priorityFilter === "ALL" ? undefined : priorityFilter as WhatsAppPriority,
+  }), [debouncedSearch, activeFilter, priorityFilter]);
 
   const healthQuery = trpc.whatsapp.health.useQuery(undefined, {
     retry: false,
   });
-  const conversationsQuery = trpc.whatsapp.listConversations.useQuery(
+  const conversationsQuery = trpc.whatsapp.listConversations.useInfiniteQuery(
     filtersInput,
     {
+      getNextPageParam: page => page.nextCursor ?? undefined,
       retry: false,
     }
   );
 
   const conversations = useMemo<Conversation[]>(() => {
-    return conversationsQuery.data?.items.map(item => mapConversation(item)) ?? [];
+    return (
+      conversationsQuery.data?.pages.flatMap(page => page.items).map(item => mapConversation(item)) ?? []
+    );
   }, [conversationsQuery.data]);
   const customersQuery = trpc.customers.list.useQuery(
     { page: 1, limit: 300 },
@@ -2092,9 +2146,9 @@ export default function WhatsAppPage() {
     { enabled: Boolean(selectedConversationRecordId), retry: false }
   );
 
-  const messagesQuery = trpc.whatsapp.getMessages.useQuery(
-    { conversationId: selectedConversationRecordId ?? "" },
-    { enabled: Boolean(selectedConversationRecordId), retry: false }
+  const messagesQuery = trpc.whatsapp.conversationMessagesFeed.useInfiniteQuery(
+    { conversationId: selectedConversationRecordId ?? "", limit: 50 },
+    { enabled: Boolean(selectedConversationRecordId), retry: false, getNextPageParam: page => page.nextCursor ?? undefined }
   );
   const contextQuery = trpc.whatsapp.getContext.useQuery(
     { conversationId: selectedConversationRecordId ?? "" },
@@ -2140,7 +2194,7 @@ export default function WhatsAppPage() {
   const messages = useMemo(
     () =>
       selectedConversationRecordId && messagesQuery.data
-        ? messagesQuery.data.map(mapMessage).reverse()
+        ? messagesQuery.data.pages.flatMap(page => page.items).map(mapMessage).reverse()
         : [],
     [messagesQuery.data, selectedConversationRecordId]
   );
@@ -2464,16 +2518,13 @@ export default function WhatsAppPage() {
       setComposerMessageTypeOverride(null);
       shouldPromoteVirtualSelectionRef.current = !selectedConversationRecordId;
       const refreshedConversations = await conversationsQuery.refetch();
-      const refreshedRows = Array.isArray(refreshedConversations.data)
-        ? refreshedConversations.data.map(mapConversation)
-        : [];
-      const resolvedConversation = refreshedRows.find(
-        item => String(item.customerId ?? "") === String(customerId ?? "")
+      const resolvedConversation = resolveRefreshedConversation(
+        refreshedConversations.data,
+        customerId
       );
       if (resolvedConversation?.id) {
         setSelectedConversationId(resolvedConversation.id);
       }
-      // TODO(timeline): validar evento MESSAGE_SENT/PAYMENT_LINK_SENT quando endpoint de timeline expuser rastreamento dedicado.
       await Promise.all([
         messagesQuery.refetch(),
         contextQuery.refetch(),
@@ -2517,7 +2568,9 @@ export default function WhatsAppPage() {
     setComposerMessageTypeOverride(messageType ?? null);
   };
 
-  const handleSendTemplate = async (templateKey: "payment_link" | "payment_reminder") => {
+  const handleSendTemplate = async (
+    templateKey: "payment_link" | "payment_reminder"
+  ) => {
     if (!selectedConversationId) return;
     const customerId =
       context?.customer?.id ?? selectedConversation?.customerId ?? undefined;
@@ -2540,19 +2593,23 @@ export default function WhatsAppPage() {
           customerName: context?.customer?.name,
           appointmentDate: context?.nextAppointment?.scheduledAt,
           appointmentTime: context?.nextAppointment?.scheduledAt,
-          chargeAmount: context?.openCharge?.amount == null ? undefined : String(context.openCharge.amount),
+          chargeAmount:
+            context?.openCharge?.amount == null
+              ? undefined
+              : String(context.openCharge.amount),
           chargeDueDate: context?.openCharge?.dueDate,
           paymentLink: context?.openCharge?.paymentLink ?? undefined,
-          serviceOrderNumber: context?.activeServiceOrder?.number == null ? undefined : String(context.activeServiceOrder.number),
+          serviceOrderNumber:
+            context?.activeServiceOrder?.number == null
+              ? undefined
+              : String(context.activeServiceOrder.number),
         },
       });
       shouldPromoteVirtualSelectionRef.current = !selectedConversationRecordId;
       const refreshedConversations = await conversationsQuery.refetch();
-      const refreshedRows = Array.isArray(refreshedConversations.data)
-        ? refreshedConversations.data.map(mapConversation)
-        : [];
-      const resolvedConversation = refreshedRows.find(
-        item => String(item.customerId ?? "") === String(customerId ?? "")
+      const resolvedConversation = resolveRefreshedConversation(
+        refreshedConversations.data,
+        customerId
       );
       if (resolvedConversation?.id) {
         setSelectedConversationId(resolvedConversation.id);
@@ -2562,7 +2619,7 @@ export default function WhatsAppPage() {
         contextQuery.refetch(),
         conversationDetailsQuery.refetch(),
       ]);
-      toast.success("Template enviado.");
+      toast.success("Template adicionado à fila de envio.");
     } catch (error: any) {
       toast.error(error?.message ?? "Falha ao enviar template.");
     }
@@ -2598,7 +2655,9 @@ export default function WhatsAppPage() {
       toast.message("Nenhuma cobrança aberta para este cliente.");
       return;
     }
-    await handleSendTemplate(context.openCharge.paymentLink ? "payment_link" : "payment_reminder");
+    await handleSendTemplate(
+      context.openCharge.paymentLink ? "payment_link" : "payment_reminder"
+    );
   };
 
   return (
@@ -2715,11 +2774,11 @@ export default function WhatsAppPage() {
           compact
           className="min-h-0 overflow-hidden"
         >
-          <div className="grid min-h-[34rem] min-w-0 grid-cols-1 overflow-hidden md:h-[calc(100dvh-19rem)] md:max-h-[52rem] md:grid-cols-[minmax(17rem,20rem)_minmax(0,1fr)] xl:grid-cols-[minmax(18rem,21rem)_minmax(0,1fr)_minmax(18rem,20rem)]">
+          <div className={cn("grid min-h-[24rem] min-w-0 grid-cols-1 overflow-hidden md:h-[calc(100dvh-19rem)] md:max-h-[52rem]", selectedConversation ? "md:grid-cols-[minmax(17rem,20rem)_minmax(0,1fr)] xl:grid-cols-[minmax(18rem,21rem)_minmax(0,1fr)_minmax(18rem,20rem)]" : "grid-cols-1")}>
             <div
               className={cn(
-                "min-h-0 min-w-0 overflow-hidden md:block",
-                selectedConversationId ? "hidden" : "block"
+                "min-h-0 min-w-0 flex-col overflow-hidden md:flex",
+                selectedConversation ? "hidden" : "flex"
               )}
             >
               <InboxQueueColumn
@@ -2737,12 +2796,13 @@ export default function WhatsAppPage() {
                 emptyStateMessage={emptyStateMessage}
                 onRetry={() => void conversationsQuery.refetch()}
               />
+              {conversationsQuery.hasNextPage ? <Button variant="outline" disabled={conversationsQuery.isFetchingNextPage} onClick={() => void conversationsQuery.fetchNextPage()}>Carregar mais conversas</Button> : null}
             </div>
 
             <div
               className={cn(
-                "min-h-0 min-w-0 flex-col overflow-hidden md:flex",
-                selectedConversationId ? "flex" : "hidden"
+                "min-h-0 min-w-0 flex-col overflow-hidden",
+                selectedConversation ? "flex" : "hidden"
               )}
             >
               <ExecutionChatColumn
@@ -2754,6 +2814,9 @@ export default function WhatsAppPage() {
                 isLoading={messagesQuery.isLoading || messagesQuery.isFetching}
                 messagesError={Boolean(messagesQuery.error)}
                 onRetryMessages={() => void messagesQuery.refetch()}
+                hasOlderMessages={messagesQuery.hasNextPage}
+                loadingOlderMessages={messagesQuery.isFetchingNextPage}
+                onLoadOlderMessages={() => void messagesQuery.fetchNextPage()}
                 sendMessage={handleManualSend}
                 content={content}
                 setContent={value => setContent(value)}
@@ -2805,7 +2868,7 @@ export default function WhatsAppPage() {
             <div
               className={cn(
                 "min-h-0 min-w-0 overflow-hidden border-l border-[var(--border-subtle)]",
-                isContextVisible ? "hidden xl:block" : "hidden"
+                isContextVisible && selectedConversation ? "hidden xl:block" : "hidden"
               )}
             >
               <OperationalContextColumn
@@ -2846,8 +2909,6 @@ export default function WhatsAppPage() {
             </div>
           </div>
         </AppSectionBlock>
-        {/* TODO: Conectar registro direto quando finance.markAsPaid estiver exposto no BFF. */}
-        {/* TODO: Abrir detalhe de clientes/financeiro pelo query id caso a rota ainda não suporte foco automático. */}
       </AppPageShell>
       <ConfirmModal
         open={Boolean(executionToRun)}

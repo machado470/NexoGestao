@@ -1,13 +1,13 @@
-name: Deploy Staging
+name: Staging deployment status
 on:
-  push:
-    branches:
-      - development
+  workflow_dispatch:
+permissions:
+  contents: read
 jobs:
-  deploy:
+  unconfigured-target:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: Deploy to Staging
+      - name: Refuse deployment without a verified target
         run: |
-          echo "Deploying to staging environment..."
+          echo '::error::Staging deployment is not configured. This workflow performs no deployment.'
+          exit 1

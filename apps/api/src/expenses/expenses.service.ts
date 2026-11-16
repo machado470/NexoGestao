@@ -1,3 +1,4 @@
+import { refundedAmount } from '../common/finance/refunded-amount'
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
 import { ExpenseRecurrence, ExpenseType } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
@@ -9,18 +10,9 @@ import {
 } from './dto/create-expense.dto'
 import { ExpensesQueryDto } from './dto/expenses-query.dto'
 import { TimelineService } from '../timeline/timeline.service'
+import { zonedMonthBounds } from '../common/zoned-month'
 
 const VALID_CATEGORIES = Object.values(ExpenseCategory)
-
-function toDateRange(month?: string) {
-  const base = month ? new Date(`${month}-01T00:00:00.000Z`) : new Date()
-  if (Number.isNaN(base.getTime())) {
-    throw new BadRequestException('Mês inválido. Use YYYY-MM')
-  }
-  const start = new Date(base.getUTCFullYear(), base.getUTCMonth(), 1)
-  const end = new Date(base.getUTCFullYear(), base.getUTCMonth() + 1, 1)
-  return { start, end }
-}
 
 @Injectable()
 export class ExpensesService {
@@ -67,8 +59,23 @@ export class ExpensesService {
     }
   }
 
+  private async monthlyRange(orgId: string, month?: string) {
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: orgId }, select: { timezone: true },
+    })
+    try {
+      return zonedMonthBounds(organization?.timezone as string, month)
+    } catch {
+      throw new BadRequestException('Mês ou fuso da organização inválido. Use YYYY-MM e um fuso IANA válido.')
+    }
+  }
+
   async summary(orgId: string, month?: string) {
-    const { start, end } = toDateRange(month)
+    return this.summarizeRange(orgId, await this.monthlyRange(orgId, month))
+  }
+
+  private async summarizeRange(orgId: string, range: ReturnType<typeof zonedMonthBounds>) {
+    const { start, end } = range
 
     const monthlyOneOff = {
       orgId,
@@ -99,20 +106,9 @@ export class ExpensesService {
       else variableTotal += row.amountCents
     }
 
-    if (recurringRows.length > 0) {
-      await this.timeline.log({
-        orgId,
-        action: 'EXPENSE_RECURRING_APPLIED',
-        description: `Despesas recorrentes aplicadas no mês (${recurringRows.length})`,
-        metadata: {
-          recurringAppliedCount: recurringRows.length,
-          month: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`,
-        },
-      })
-    }
 
     return {
-      month: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`,
+      month: range.month,
       totalExpenses: total,
       totalFixedExpenses: fixedTotal,
       totalVariableExpenses: variableTotal,
@@ -123,8 +119,9 @@ export class ExpensesService {
   }
 
   async getMonthlyFinancialResult(orgId: string, month?: string) {
-    const { start, end } = toDateRange(month)
-    const expenses = await this.summary(orgId, `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`)
+    const range = await this.monthlyRange(orgId, month)
+    const { start, end } = range
+    const expenses = await this.summarizeRange(orgId, range)
 
     const paymentsAgg = await this.prisma.payment.aggregate({
       where: { orgId, paidAt: { gte: start, lt: end } },
@@ -142,12 +139,16 @@ export class ExpensesService {
     })
 
     const revenue = paymentsAgg._sum.amountCents ?? 0
-    const net = revenue - expenses.totalExpenses
-    const committedPercentage = revenue > 0 ? (expenses.totalExpenses / revenue) * 100 : 0
+    const refunded = await refundedAmount(this.prisma, { orgId, paidAt: { gte: start, lt: end } })
+    const netRevenue = revenue - refunded
+    const net = netRevenue - expenses.totalExpenses
+    const committedPercentage = netRevenue > 0 ? (expenses.totalExpenses / netRevenue) * 100 : 0
 
     return {
       month: expenses.month,
       totalRevenueMonth: revenue,
+      refundedAmountMonth: refunded,
+      netRevenueMonth: netRevenue,
       totalExpensesMonth: expenses.totalExpenses,
       totalFixedExpensesMonth: expenses.totalFixedExpenses,
       totalVariableExpensesMonth: expenses.totalVariableExpenses,
@@ -160,7 +161,7 @@ export class ExpensesService {
   }
 
   async create(orgId: string, userId: string | null, dto: CreateExpenseDto) {
-    if (dto.amountCents <= 0) throw new BadRequestException('O valor da despesa deve ser maior que zero')
+    if (!Number.isInteger(dto.amountCents) || dto.amountCents < 1 || dto.amountCents > 2_147_483_647) throw new BadRequestException('O valor da despesa deve ser inteiro entre 1 e 2147483647 centavos')
     if (!VALID_CATEGORIES.includes(dto.category)) throw new BadRequestException(`Categoria inválida: ${dto.category}`)
 
     const created = await this.prisma.expense.create({
@@ -201,8 +202,8 @@ export class ExpensesService {
     const expense = await this.prisma.expense.findFirst({ where: { id, orgId } })
     if (!expense) throw new NotFoundException('Despesa não encontrada')
 
-    if (dto.amountCents !== undefined && dto.amountCents <= 0) {
-      throw new BadRequestException('O valor da despesa deve ser maior que zero')
+    if (dto.amountCents !== undefined && (!Number.isInteger(dto.amountCents) || dto.amountCents < 1 || dto.amountCents > 2_147_483_647)) {
+      throw new BadRequestException('O valor da despesa deve ser inteiro entre 1 e 2147483647 centavos')
     }
     if (dto.category && !VALID_CATEGORIES.includes(dto.category)) {
       throw new BadRequestException(`Categoria inválida: ${dto.category}`)

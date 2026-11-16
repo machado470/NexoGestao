@@ -1,0 +1,47 @@
+✔ concurrent local invocation cannot overwrite in-flight state (155.266955ms)
+✔ concurrent invalid invocation cannot overwrite in-flight state (90.787915ms)
+✔ captures completed output before state publication: success (297.899645ms)
+✔ captures completed output before state publication: offsite-failure (269.909924ms)
+✔ captures completed output before state publication: tee-failure (65.45785ms)
+✔ canonical engine artifact name is preserved in artifacts (97.307503ms)
+✔ canonical engine artifact name is preserved in artifacts with spaces (97.902123ms)
+✔ host configuration does not auto-select a default container (42.566184ms)
+✔ explicit running container is used (45.391394ms)
+✔ stopped explicit container cannot fall back to host (19.713ms)
+✔ missing source cannot auto-select a container (15.034097ms)
+✔ ambient libpq routing does not override host source (39.310728ms)
+✔ empty container CLI selection cannot fall back to host (5.608395ms)
+✔ recent local success (39.018497ms)
+✔ stale backup (36.92055ms)
+✔ failed last attempt (40.202644ms)
+✔ future timestamp (35.720639ms)
+✔ invalid timestamp (33.855064ms)
+✔ success without created dump (34.336385ms)
+✔ requires explicit age policy (256.214819ms)
+✔ missing or corrupt state fails without copying raw data (70.291755ms)
+✔ requires a matching success snapshot (66.934554ms)
+✔ offsite requirement is opt-in and must be confirmed (70.457144ms)
+✔ a recent failed attempt is not masked by an older success (35.09199ms)
+✔ default mode preserves the original factual JSON (3.916241ms)
+✔ valid canonical sidecar reaches simulated restore and migration (59.236431ms)
+✔ a checksum for another valid file cannot authorize restoring the requested dump (42.592462ms)
+✔ mismatched hash never invokes database commands (41.204313ms)
+✔ multiple checksum entries are rejected (38.91949ms)
+✔ missing and malformed sidecars never invoke database commands (47.395958ms)
+✔ container bound to another port fails before database commands (80.860997ms)
+✔ stopped explicitly selected container fails before database commands (56.174957ms)
+✔ container bound publicly fails before database commands (44.242102ms)
+✔ container user mismatch fails before database commands (43.761008ms)
+✔ URL repeated schema fails before database commands (41.311061ms)
+✔ URL host query override fails before database commands (35.137418ms)
+✔ encoded production database fails before database commands (39.958554ms)
+✔ matching loopback container target reaches simulated restore (59.612026ms)
+✔ ambient libpq routing is cleared before host restore and smoke (61.686128ms)
+ℹ tests 39
+ℹ suites 0
+ℹ pass 39
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2944.130034

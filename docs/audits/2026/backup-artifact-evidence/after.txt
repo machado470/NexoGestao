@@ -1,0 +1,41 @@
+✔ concurrent local invocation cannot overwrite in-flight state (102.733252ms)
+✔ concurrent invalid invocation cannot overwrite in-flight state (101.681368ms)
+✔ captures completed output before state publication: success (288.418924ms)
+✔ captures completed output before state publication: offsite-failure (267.290888ms)
+✔ captures completed output before state publication: tee-failure (79.668727ms)
+✔ canonical engine artifact name is preserved in artifacts (114.269626ms)
+✔ canonical engine artifact name is preserved in artifacts with spaces (101.762359ms)
+✔ recent local success (40.678186ms)
+✔ stale backup (42.748851ms)
+✔ failed last attempt (49.173434ms)
+✔ future timestamp (44.08358ms)
+✔ invalid timestamp (42.926022ms)
+✔ success without created dump (34.536615ms)
+✔ requires explicit age policy (289.21383ms)
+✔ missing or corrupt state fails without copying raw data (66.51127ms)
+✔ requires a matching success snapshot (68.764649ms)
+✔ offsite requirement is opt-in and must be confirmed (84.758431ms)
+✔ a recent failed attempt is not masked by an older success (42.336337ms)
+✔ default mode preserves the original factual JSON (3.501076ms)
+✔ valid canonical sidecar reaches simulated restore and migration (73.953935ms)
+✔ a checksum for another valid file cannot authorize restoring the requested dump (45.504111ms)
+✔ mismatched hash never invokes database commands (43.658708ms)
+✔ multiple checksum entries are rejected (41.546903ms)
+✔ missing and malformed sidecars never invoke database commands (48.037188ms)
+✔ container bound to another port fails before database commands (45.795662ms)
+✔ stopped explicitly selected container fails before database commands (49.161482ms)
+✔ container bound publicly fails before database commands (49.516601ms)
+✔ container user mismatch fails before database commands (45.385716ms)
+✔ URL repeated schema fails before database commands (40.415363ms)
+✔ URL host query override fails before database commands (50.274064ms)
+✔ encoded production database fails before database commands (43.622245ms)
+✔ matching loopback container target reaches simulated restore (75.043698ms)
+✔ ambient libpq routing is cleared before host restore and smoke (71.175029ms)
+ℹ tests 33
+ℹ suites 0
+ℹ pass 33
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2867.602881

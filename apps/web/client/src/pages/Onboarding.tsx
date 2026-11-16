@@ -1,4 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { normalizeArrayPayload } from "@/lib/query-helpers";
+import { completeOnboardingService } from "@/lib/onboarding-service";
+import { parseMoneyInputToCents } from "@/lib/money-input";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import {
   ArrowRight,
@@ -17,6 +20,7 @@ import { trpc } from "@/lib/trpc";
 import {
   AppInfoCard,
   AppInput,
+  AppSelect,
   AppSectionCard,
   AppStatusBadge,
 } from "@/components/app-system";
@@ -131,7 +135,7 @@ function extractEntityId(payload: unknown, keys: string[] = ["id"]): string | nu
 export default function Onboarding() {
   const [, navigate] = useLocation();
   const { track } = useProductAnalytics();
-  const { user, isAuthenticated, isInitializing } = useAuth();
+  const { user, isAuthenticated, isInitializing, refresh } = useAuth();
   const utils = trpc.useUtils();
   const { isGenerating, generateDemoEnvironment } = useDemoEnvironment();
 
@@ -152,6 +156,10 @@ export default function Onboarding() {
   const [serviceOrderTitle, setServiceOrderTitle] = useState(
     "Execução inicial pronta para faturar"
   );
+  const serviceStepPending = useRef(false);
+  const [assigneeId, setAssigneeId] = useState("");
+  const assigneesQuery = trpc.people.assignees.useQuery(undefined, { enabled: canQuery, retry: false });
+  const assignees = Array.isArray(assigneesQuery.data) ? assigneesQuery.data : [];
   const [chargeAmount, setChargeAmount] = useState("150");
 
   const storageKey = useMemo(() => {
@@ -183,6 +191,8 @@ export default function Onboarding() {
     { page: 1, limit: 20 },
     { enabled: canQuery, retry: false, refetchOnWindowFocus: false }
   );
+
+  const statusQuery = trpc.onboarding.status.useQuery(undefined, { enabled: canQuery, retry: false });
 
   const customerMutation = trpc.customers.create.useMutation();
   const appointmentMutation = trpc.appointments.create.useMutation();
@@ -219,24 +229,14 @@ export default function Onboarding() {
       (appointmentsQuery.data as any)?.items ??
       appointmentsQuery.data ??
       [];
-    const serviceOrdersPayload =
-      (serviceOrdersQuery.data as any)?.data ??
-      (serviceOrdersQuery.data as any)?.items ??
-      serviceOrdersQuery.data ??
-      [];
-    const chargesPayload =
-      (chargesQuery.data as any)?.data ?? (chargesQuery.data as any)?.items ?? chargesQuery.data ?? [];
-
     const hasCustomer = Array.isArray(customersPayload) && customersPayload.length > 0;
     const hasAppointment = Array.isArray(appointmentsPayload) && appointmentsPayload.length > 0;
-    const hasServiceOrder = Array.isArray(serviceOrdersPayload) && serviceOrdersPayload.length > 0;
-    const hasCharge = Array.isArray(chargesPayload) && chargesPayload.length > 0;
     setProgress((prev) => ({
       ...prev,
-      customer: prev.customer || hasCustomer,
+      customer: statusQuery.data?.steps.createCustomer ?? hasCustomer,
       appointment: prev.appointment || hasAppointment,
-      serviceOrder: prev.serviceOrder || hasServiceOrder,
-      charge: prev.charge || hasCharge,
+      serviceOrder: statusQuery.data?.steps.createService ?? false,
+      charge: statusQuery.data?.steps.createCharge ?? false,
     }));
   }, [
     canQuery,
@@ -244,6 +244,7 @@ export default function Onboarding() {
     appointmentsQuery.data,
     serviceOrdersQuery.data,
     chargesQuery.data,
+    statusQuery.data,
   ]);
 
   const firstCustomer = ((customersQuery.data as any)?.data ?? customersQuery.data ?? [])[0];
@@ -274,6 +275,7 @@ export default function Onboarding() {
       if (storageKey) {
         localStorage.removeItem(storageKey);
       }
+      await refresh();
       navigate("/executive-dashboard");
     } catch (e) {
       setError((e as Error).message);
@@ -300,6 +302,12 @@ export default function Onboarding() {
 
   return (
     <div className="space-y-6 p-6">
+      {statusQuery.isError ? (
+        <AppInfoCard role="alert">
+          Não foi possível confirmar o progresso no servidor. Consulte novamente antes de finalizar.
+          <Button type="button" variant="outline" disabled={statusQuery.isFetching} onClick={() => void statusQuery.refetch()}>Consultar progresso</Button>
+        </AppInfoCard>
+      ) : null}
       <section className="relative overflow-hidden rounded-[1.8rem] border border-[var(--border-subtle)] bg-[var(--surface-base)] px-6 py-6 shadow-[var(--app-shadow-soft)]">
 
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
@@ -386,6 +394,7 @@ export default function Onboarding() {
               appointmentsQuery.refetch(),
               serviceOrdersQuery.refetch(),
               chargesQuery.refetch(),
+              statusQuery.refetch(),
             ]);
             setFlowMessage("Ambiente de demonstração pronto. Você já pode avançar pelas etapas sem bloqueios.");
             setDegradedMessage("Se o WhatsApp estiver em fila, continue o onboarding normalmente: o envio será processado em background.");
@@ -465,6 +474,7 @@ export default function Onboarding() {
                 const customerResult = await customerMutation.mutateAsync({ name: customerName.trim(), phone: customerPhone.trim() });
                 setJourneyIds((prev) => ({ ...prev, customerId: extractEntityId(customerResult, ["customerId", "id"]) ?? prev.customerId }));
                 await utils.customers.list.invalidate();
+                await utils.onboarding.status.invalidate();
                 completeStep("customer");
                 setFlowMessage("Cliente criado. Agora avance para o agendamento para mostrar previsibilidade operacional.");
               } catch (e) {
@@ -505,33 +515,36 @@ export default function Onboarding() {
 
           <AppSectionCard className="p-6">
             <h2 className="text-lg font-semibold">3. Concluir serviço</h2>
-            <p className="mt-1 text-sm text-[var(--text-secondary)]">Crie a O.S. e já conclua a execução para liberar cobrança sem etapas extras.</p>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">Escolha o responsável para criar, iniciar e concluir a O.S. na sequência operacional.</p>
             <AppInput className="mt-4 w-full" aria-label="Título da ordem de serviço" value={serviceOrderTitle} onChange={(e) => setServiceOrderTitle(e.target.value)} placeholder="Título da ordem de serviço" />
-            <Button className="mt-4" disabled={!canRun.serviceOrder || progress.serviceOrder || serviceOrderMutation.isPending || serviceOrderUpdateMutation.isPending} onClick={async () => {
+            <div className="mt-4">
+              <AppSelect ariaLabel="Responsável pela execução" value={assigneeId} onValueChange={setAssigneeId} placeholder="Selecione o responsável" options={assignees.map((person: any) => ({ value: person.id, label: person.name }))} />
+              {assigneesQuery.isError ? <p role="alert">Não foi possível consultar os responsáveis. Tente recarregar a página.</p> : null}
+            </div>
+            <Button className="mt-4" disabled={!assigneeId || !canRun.serviceOrder || progress.serviceOrder || serviceOrderMutation.isPending || serviceOrderUpdateMutation.isPending} onClick={async () => {
               track("cta_click", { screen: "onboarding", ctaId: "step_create_service_order" });
               setError(null);
               setFlowMessage("Registrando e concluindo serviço...");
               try {
                 if (!activeCustomerId) throw new Error("Crie um cliente primeiro.");
                 if (!serviceOrderTitle.trim()) throw new Error("Informe o título da ordem de serviço.");
-                const result = await serviceOrderMutation.mutateAsync({ customerId: String(activeCustomerId), title: serviceOrderTitle.trim(), priority: 2 });
-                const createdServiceOrderId = extractEntityId(result, ["serviceOrderId", "id"]);
-                if (!createdServiceOrderId) {
-                  throw new Error("Não foi possível identificar a O.S. criada.");
+                if (serviceStepPending.current) return;
+                serviceStepPending.current = true;
+                try {
+                  const result = await completeOnboardingService({
+                    existingId: journeyIds.serviceOrderId ?? normalizeArrayPayload<any>(serviceOrdersQuery.data).find((order: any) => order.customerId === activeCustomerId && order.title === serviceOrderTitle.trim() && order.status !== "CANCELED")?.id ?? null,
+                    assigneeId,
+                    create: () => serviceOrderMutation.mutateAsync({ customerId: String(activeCustomerId), title: serviceOrderTitle.trim(), priority: 2, assignedToPersonId: assigneeId }),
+                    load: id => utils.serviceOrders.getById.fetch({ id }, { staleTime: 0 }),
+                    update: input => serviceOrderUpdateMutation.mutateAsync(input),
+                    onCreated: id => setJourneyIds(prev => ({ ...prev, serviceOrderId: id })),
+                  });
+                  setJourneyIds(prev => ({ ...prev, serviceOrderId: result.id }));
+                } finally {
+                  serviceStepPending.current = false;
                 }
-                await serviceOrderUpdateMutation.mutateAsync({
-                  id: createdServiceOrderId,
-                  status: "DONE",
-                  outcomeSummary: "Serviço concluído durante onboarding guiado.",
-                  expectedUpdatedAt:
-                    typeof (result as any)?.updatedAt === "string"
-                      ? (result as any).updatedAt
-                      : typeof (result as any)?.data?.updatedAt === "string"
-                        ? (result as any).data.updatedAt
-                        : undefined,
-                });
-                setJourneyIds((prev) => ({ ...prev, serviceOrderId: createdServiceOrderId }));
                 await utils.serviceOrders.list.invalidate();
+                await utils.onboarding.status.invalidate();
                 completeStep("serviceOrder");
                 setFlowMessage("Execução registrada. Próximo passo: gerar cobrança para evidenciar valor financeiro.");
               } catch (e) {
@@ -544,18 +557,22 @@ export default function Onboarding() {
           <AppSectionCard className="p-6">
             <h2 className="text-lg font-semibold">4. Gerar cobrança</h2>
             <p className="mt-1 text-sm text-[var(--text-secondary)]">Mostre dinheiro em potencial pronto para entrar no caixa.</p>
-            <AppInput className="mt-4 w-full" aria-label="Valor da cobrança" type="number" min="1" value={chargeAmount} onChange={(e) => setChargeAmount(e.target.value)} placeholder="Valor da cobrança" />
+            <AppInput className="mt-4 w-full" aria-label="Valor da cobrança" inputMode="decimal" value={chargeAmount} onChange={(e) => setChargeAmount(e.target.value)} placeholder="Valor da cobrança" />
             <Button className="mt-4" disabled={!canRun.charge || progress.charge || chargeMutation.isPending} onClick={async () => {
               track("cta_click", { screen: "onboarding", ctaId: "step_generate_charge" });
               setError(null);
               setFlowMessage("Gerando cobrança e conectando operação ao caixa...");
               try {
                 if (!activeCustomerId) throw new Error("Crie um cliente primeiro.");
-                const amount = Number(chargeAmount);
-                if (!amount || amount <= 0) throw new Error("Informe um valor válido.");
-                const result = await chargeMutation.mutateAsync({ customerId: String(activeCustomerId), amount, dueDate: new Date(), notes: "Cobrança demo pronta para receber" });
+                const amountCents = parseMoneyInputToCents(chargeAmount);
+                if (amountCents === null) throw new Error("Informe um valor válido, como 150,00.");
+                const orders = (serviceOrdersQuery.data as any)?.data ?? (serviceOrdersQuery.data as any)?.items ?? serviceOrdersQuery.data ?? [];
+                const serviceOrderId = journeyIds.serviceOrderId ?? (Array.isArray(orders) ? orders.find((order: any) => order.customerId === activeCustomerId && order.status === "DONE")?.id : null);
+                if (!serviceOrderId) throw new Error("Conclua a O.S. deste cliente antes de gerar a cobrança.");
+                const result = await chargeMutation.mutateAsync({ customerId: String(activeCustomerId), serviceOrderId, amountCents, dueDate: new Date(), notes: "Cobrança demo pronta para receber" });
                 setJourneyIds((prev) => ({ ...prev, chargeId: extractEntityId(result, ["chargeId", "id"]) ?? prev.chargeId }));
                 await utils.finance.charges.list.invalidate();
+                await utils.onboarding.status.invalidate();
                 completeStep("charge");
                 setFlowMessage("Cobrança criada. Você já comprovou o primeiro valor gerado para o cliente.");
                 setDegradedMessage("Se houver envio WhatsApp em fila, o status é processado em segundo plano sem bloquear o fluxo.");
@@ -575,7 +592,7 @@ export default function Onboarding() {
                 </p>
               </div>
 
-              <Button disabled={!progress.charge || completeOnboardingMutation.isPending} onClick={() => void finish()} className="gap-2">
+              <Button disabled={!statusQuery.data?.steps.createCustomer || !statusQuery.data?.steps.createService || !statusQuery.data?.steps.createCharge || completeOnboardingMutation.isPending} onClick={() => void finish()} className="gap-2">
                 {completeOnboardingMutation.isPending ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />

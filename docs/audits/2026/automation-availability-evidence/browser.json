@@ -1,0 +1,11 @@
+{
+  "method": "Chromium with synthetic tRPC catalog fixture, not live API",
+  "desktopAndMobile": true,
+  "advancedEntitlementNotAdvertised": true,
+  "otherFeaturesPreserved": true,
+  "availabilityNoticeVisible": true,
+  "functionalitiesNoticeVisible": true,
+  "noHorizontalOverflow": true,
+  "pageErrors": [],
+  "pass": true
+}

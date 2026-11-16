@@ -1,4 +1,5 @@
-import { useMemo, useRef, useState } from "react";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   DatesSetArg,
   EventClickArg,
@@ -10,6 +11,7 @@ import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import { ChevronLeft, ChevronRight, Plus, RefreshCcw } from "lucide-react";
 import { useLocation } from "wouter";
+import { can } from "@/lib/rbac";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { CreateAppointmentModal } from "@/components/CreateAppointmentModal";
@@ -108,7 +110,11 @@ function officialLabel(value?: string | null) {
 
 export default function CalendarPage() {
   const [, navigate] = useLocation();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, role } = useAuth();
+  const canCreateAppointment = Boolean(
+    role && can(role, "appointments:create")
+  );
+  const canReadTeamSummary = Boolean(role && can(role, "people:manage"));
   const calendarRef = useRef<FullCalendar>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [periodTitle, setPeriodTitle] = useState("Período atual");
@@ -121,10 +127,17 @@ export default function CalendarPage() {
   const [teamFilter, setTeamFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  const appointmentsQuery = trpc.appointments.list.useQuery(
-    teamFilter === "all"
-      ? { limit: 1000 }
-      : { assignedToPersonId: teamFilter, limit: 1000 },
+  const [visibleRange, setVisibleRange] = useState(() => {
+    const start = new Date(); start.setDate(1); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() - 7);
+    const end = new Date(start); end.setDate(end.getDate() + 49);
+    return { from: start.toISOString(), to: end.toISOString() };
+  });
+  const [calendarPage, setCalendarPage] = useState(1);
+  const debouncedSearch = useDebouncedValue(textFilter);
+  useEffect(() => setCalendarPage(1), [teamFilter, statusFilter, debouncedSearch]);
+
+  const appointmentsQuery = trpc.appointments.page.useQuery(
+    { ...visibleRange, page: calendarPage, limit: 200, search: debouncedSearch || undefined, status: statusFilter === 'all' ? undefined : statusFilter as 'SCHEDULED' | 'CONFIRMED' | 'CANCELED' | 'DONE' | 'NO_SHOW', ...(teamFilter === 'all' ? {} : { assignedToPersonId: teamFilter }) },
     { enabled: isAuthenticated, retry: false }
   );
   const customersQuery = trpc.customers.list.useQuery(undefined, {
@@ -137,11 +150,11 @@ export default function CalendarPage() {
   });
   const officialCapacityQuery = trpc.people.operationalSummary.useQuery(
     undefined,
-    { enabled: isAuthenticated, retry: false }
+    { enabled: isAuthenticated && canReadTeamSummary, retry: false }
   );
 
   const appointments = useMemo(
-    () => normalizeArrayPayload<Appointment>(appointmentsQuery.data),
+    () => normalizeArrayPayload<Appointment>(appointmentsQuery.data?.items),
     [appointmentsQuery.data]
   );
   const customers = useMemo(
@@ -230,6 +243,8 @@ export default function CalendarPage() {
     calendarRef.current?.getApi()[direction]();
   };
   const onDatesSet = (arg: DatesSetArg) => {
+    const next = { from: arg.start.toISOString(), to: new Date(arg.end.getTime() - 1).toISOString() };
+    if (visibleRange.from !== next.from || visibleRange.to !== next.to) { setVisibleRange(next); setCalendarPage(1); }
     setPeriodTitle(arg.view.title);
     setViewMode(arg.view.type as ViewMode);
   };
@@ -238,7 +253,7 @@ export default function CalendarPage() {
       appointmentsQuery.refetch(),
       customersQuery.refetch(),
       peopleQuery.refetch(),
-      officialCapacityQuery.refetch(),
+      ...(canReadTeamSummary ? [officialCapacityQuery.refetch()] : []),
     ]);
   };
 
@@ -256,7 +271,10 @@ export default function CalendarPage() {
         title="Calendário"
         description="Exploração temporal dos agendamentos persistidos, sem decisões operacionais locais."
         primaryAction={
-          <Button onClick={() => setShowCreateModal(true)}>
+          <Button
+            disabled={!canCreateAppointment}
+            onClick={() => setShowCreateModal(true)}
+          >
             <Plus className="mr-1.5 h-4 w-4" /> Novo agendamento
           </Button>
         }
@@ -325,7 +343,12 @@ export default function CalendarPage() {
           title="Disponibilidade e capacidade oficiais"
           subtitle="Valores exibidos diretamente pelo resumo operacional; o calendário não calcula vagas, margem ou horário livre."
         >
-          {officialCapacityQuery.isLoading ? (
+          {!canReadTeamSummary ? (
+            <p role="status" className="text-sm text-[var(--text-secondary)]">
+              O resumo de capacidade da equipe está disponível para
+              administradores.
+            </p>
+          ) : officialCapacityQuery.isLoading ? (
             <AppPageLoadingState description="Carregando capacidade e disponibilidade oficiais..." />
           ) : officialCapacityQuery.isError || officialScope.length === 0 ? (
             <div
@@ -503,8 +526,9 @@ export default function CalendarPage() {
                   description="Ajuste os filtros factuais ou crie um agendamento."
                 />
               ) : null}
-              <div className="hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-2 md:block">
-                <FullCalendar
+              {(appointmentsQuery.data?.meta.pages ?? 0) > 1 ? <div className="flex items-center gap-3 pb-3"><Button variant="outline" disabled={calendarPage <= 1 || appointmentsQuery.isFetching} onClick={() => setCalendarPage(page => page - 1)}>Anterior</Button><span>Página {calendarPage} de {appointmentsQuery.data?.meta.pages} dos agendamentos deste período</span><Button variant="outline" disabled={calendarPage >= (appointmentsQuery.data?.meta.pages ?? 0) || appointmentsQuery.isFetching} onClick={() => setCalendarPage(page => page + 1)}>Próxima</Button></div> : null}
+              <div className="hidden overflow-x-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-2 md:block">
+                <div className="min-w-[640px]"><FullCalendar
                   ref={calendarRef}
                   plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
                   initialView={viewMode}
@@ -519,7 +543,8 @@ export default function CalendarPage() {
                   slotMinTime="07:00:00"
                   slotMaxTime="19:00:00"
                   nowIndicator
-                  height="auto"
+                  height="min(70vh, 720px)"
+                  stickyHeaderDates={true}
                   eventContent={info => (
                     <div className="p-1 text-xs">
                       <strong>{info.timeText}</strong>
@@ -531,7 +556,7 @@ export default function CalendarPage() {
                       </span>
                     </div>
                   )}
-                />
+                /></div>
               </div>
               <div
                 className="space-y-2 md:hidden"
@@ -705,7 +730,7 @@ export default function CalendarPage() {
       </div>
 
       <CreateAppointmentModal
-        isOpen={showCreateModal}
+        isOpen={showCreateModal && canCreateAppointment}
         onClose={() => setShowCreateModal(false)}
         onSuccess={refetchAll}
         customers={customers}

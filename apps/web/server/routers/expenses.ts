@@ -51,8 +51,8 @@ export const expensesRouter = router({
   }),
   summary: protectedProcedure.query(async ({ ctx }) => nexoFetch(ctx.req, `/expenses/summary`, { method: "GET" })),
   update: protectedProcedure.input(z.object({ id: zId, title: z.string().optional(), description: z.string().optional(), amount: z.number().positive().optional(), category: expenseCategoryEnum.optional(), notes: z.string().optional(), occurredAt: z.coerce.date().optional(), date: z.coerce.date().optional() })).mutation(async ({ ctx, input }) => {
-    const { id, amount, ...data } = input;
-    return nexoFetch(ctx.req, `/expenses/${id}`, { method: "PATCH", body: JSON.stringify({ ...data, amountCents: amount ? Math.round(amount * 100) : undefined, occurredAt: (data.occurredAt ?? data.date)?.toISOString() }) });
+    const { id, amount, date, occurredAt, ...data } = input;
+    return nexoFetch(ctx.req, `/expenses/${id}`, { method: "PATCH", body: JSON.stringify({ ...data, amountCents: amount !== undefined ? Math.round(amount * 100) : undefined, occurredAt: (occurredAt ?? date)?.toISOString() }) });
   }),
   delete: protectedProcedure.input(z.object({ id: zId })).mutation(async ({ input, ctx }) => nexoFetch(ctx.req, `/expenses/${input.id}`, { method: "DELETE" })),
 });

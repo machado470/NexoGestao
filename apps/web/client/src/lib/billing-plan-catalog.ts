@@ -4,6 +4,7 @@ export type BillingPlanCatalogEntry = {
   name: BillingPlanName;
   displayName: string;
   priceCents: number;
+  billingInterval?: "month" | "year" | null;
   quotas: Record<string, number>;
   commercialLimits: Record<string, unknown>;
   features: Record<string, unknown>;
@@ -15,6 +16,11 @@ const PLAN_ORDER: Record<BillingPlanName, number> = {
   PRO: 2,
   BUSINESS: 3,
 };
+
+// Release availability is independent of a plan entitlement. The generic executor
+// currently returns 503; do not advertise an upgrade as enabling it.
+export const CONFIGURABLE_AUTOMATION_NOTICE =
+  "Automações com regras e gatilhos personalizados estão em desenvolvimento e ainda não estão disponíveis em nenhum plano. As rotinas automáticas específicas de cobrança e WhatsApp são recursos separados.";
 
 const FEATURE_LABELS: Record<string, string> = {
   advanced_automation: "Automação avançada",
@@ -66,6 +72,8 @@ export function normalizeBillingPlanCatalog(
         displayName:
           String(item.displayName ?? "").trim() || name,
         priceCents,
+        ...(item.billingInterval === "month" || item.billingInterval === "year" || item.billingInterval === null
+          ? { billingInterval: item.billingInterval as "month" | "year" | null } : {}),
         quotas: normalizeQuotas(item.quotas),
         commercialLimits: asObject(item.commercialLimits),
         features: asObject(item.features),
@@ -98,7 +106,7 @@ export function listEnabledPlanFeatures(
   features: Record<string, unknown>
 ): string[] {
   return Object.entries(features)
-    .filter(([, enabled]) => enabled === true)
+    .filter(([key, enabled]) => enabled === true && key !== "advanced_automation")
     .map(
       ([key]) =>
         FEATURE_LABELS[key] ??
@@ -106,4 +114,11 @@ export function listEnabledPlanFeatures(
           .replace(/_/g, " ")
           .replace(/\b\w/g, character => character.toUpperCase())
     );
+}
+
+export function formatPlanPeriod(interval: BillingPlanCatalogEntry["billingInterval"]): string {
+  if (interval === "month") return "Mensal";
+  if (interval === "year") return "Anual";
+  if (interval === null) return "Sem cobrança recorrente";
+  return "Periodicidade não informada pelo catálogo";
 }

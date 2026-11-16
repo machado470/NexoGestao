@@ -8,6 +8,7 @@ import { WebhookService } from '../../webhooks/webhook.service'
 import { QueueObservabilityService } from '../../common/metrics/queue-observability.service'
 import { buildOperationalLogContext } from '../../common/logging/operational-log-context'
 import { webhookDlqJobId } from '../../webhooks/webhook-job-id'
+import { sendWebhook } from '../../webhooks/webhook-http'
 
 @Injectable()
 export class WebhookProcessor implements OnModuleInit, OnModuleDestroy {
@@ -36,13 +37,13 @@ export class WebhookProcessor implements OnModuleInit, OnModuleDestroy {
           const payloadText = JSON.stringify(delivery.payload)
           const signature = createHmac('sha256', delivery.endpoint.secret).update(payloadText).digest('hex')
           const webhookStartedAt = Date.now()
-          const response = await fetch(delivery.endpoint.url, {
-            signal: AbortSignal.timeout(15_000), method: 'POST', headers: { 'content-type': 'application/json', 'x-nexo-signature': signature, ...(correlationId ? { 'x-correlation-id': String(correlationId) } : {}) }, body: payloadText,
+          await sendWebhook(delivery.endpoint.url, payloadText, {
+            'content-type': 'application/json', 'x-nexo-signature': signature,
+            ...(correlationId ? { 'x-correlation-id': String(correlationId) } : {}),
           })
 
           const webhookLatencyMs = Date.now() - webhookStartedAt
           this.queueMetrics.observeDuration('webhook.dispatch.latency_ms', webhookLatencyMs)
-          if (!response.ok) throw new Error(`Webhook HTTP error status=${response.status}`)
 
           await this.webhookService.markDeliveryAttempt({ deliveryId: delivery.id, attempts: job.attemptsMade + 1, status: 'SUCCESS' })
           await this.queueService.updateJobStatus({ queue: QUEUE_NAMES.WEBHOOKS, jobId: job.id?.toString() ?? '', status: 'COMPLETED', completed: true })

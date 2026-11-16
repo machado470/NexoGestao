@@ -19,9 +19,33 @@ describe("notification BFF persistent authority", () => {
     fetchMock.mockResolvedValue({ ok: true, text: async () => JSON.stringify({ items: [item], total: 1, page: 1, pages: 1, unreadCount: 1 }) });
     const result = await appRouter.createCaller(createCtx()).dashboard.notificationCenter.list({ page: 1, limit: 10, category: "all" });
     expect(result.items).toHaveLength(1);
+    expect(new URL(fetchMock.mock.calls[0][0]).pathname).toBe("/v1/notifications");
     expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/v1/notifications?"), expect.objectContaining({
       headers: expect.objectContaining({ Authorization: "Bearer session-token" }),
     }));
+  });
+
+  it("uses exactly one API prefix for count and mark-read", async () => {
+    const caller = appRouter.createCaller(createCtx());
+    fetchMock.mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify({ unreadCount: 1 }) });
+    await caller.dashboard.notificationCenter.unreadCount();
+    expect(new URL(fetchMock.mock.calls[0][0]).pathname).toBe("/v1/notifications/unread-count");
+    fetchMock.mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify({ success: true }) });
+    await caller.dashboard.notificationCenter.markAsRead({ id: item.id });
+    expect(new URL(fetchMock.mock.calls[1][0]).pathname).toBe(`/v1/notifications/${item.id}/read`);
+    expect(fetchMock.mock.calls[1][1].method).toBe("PATCH");
+  });
+
+  it.each(["list", "count", "read"])("accepts the real API envelope for %s", async operation => {
+    const payload = operation === "list" ? { items: [item], total: 1, page: 1, pages: 1, unreadCount: 1 }
+      : operation === "count" ? { unreadCount: 1 } : { success: true };
+    fetchMock.mockResolvedValue({ ok: true, text: async () => JSON.stringify({ success: true, data: payload }) });
+    const caller = appRouter.createCaller(createCtx());
+    const result = operation === "list" ? await caller.dashboard.notificationCenter.list()
+      : operation === "count" ? await caller.dashboard.notificationCenter.unreadCount()
+      : await caller.dashboard.notificationCenter.markAsRead({ id: item.id });
+    if (operation === "list") expect(result).toMatchObject({ items: [expect.objectContaining({ id: item.id })], unreadCount: 1 });
+    else expect(result).toEqual(payload);
   });
 
   it("preserves upstream errors rather than returning empty/zero", async () => {

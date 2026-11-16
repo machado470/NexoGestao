@@ -9,7 +9,7 @@ describe("ServiceOrdersPage golden-standard composition", () => {
     expect(page).toContain("<AppPageShell");
     expect(page).toContain("<AppOperationalHeader");
     expect(page).toContain("Nova O.S.");
-    expect(page).toContain("disabled={customersQuery.isError}");
+    expect(page).toContain("disabled={!canCreateOrder || customersQuery.isError}");
     expect(page).not.toContain("Hero executivo da O.S.");
     expect(page).not.toContain("Saúde operacional");
     expect(page).not.toContain("Maior risco");
@@ -30,7 +30,7 @@ describe("ServiceOrdersPage golden-standard composition", () => {
     expect(page).toContain("<AppPageLoadingState");
     expect(page).toContain("<AppPageErrorState");
     expect(page).toContain("<AppPageEmptyState");
-    expect(page).toContain("Nenhuma ordem encontrada");
+    expect(page).toContain("Nenhuma ordem de serviço");
     expect(page).toContain("Falha ao carregar ordens de serviço.");
   });
 

@@ -7,6 +7,7 @@ import { randomUUID } from 'crypto'
 import { AppModule } from '../../src/app.module'
 import { PrismaService } from '../../src/prisma/prisma.service'
 import { DashboardService } from '../../src/dashboard/dashboard.service'
+import { OperationalStateScheduler } from '../../src/people/operational-state.scheduler'
 import {
   describeRealIntegration,
   REAL_INTEGRATION_ENABLED_MESSAGE,
@@ -36,6 +37,7 @@ describeRealIntegration('Canonical Operational Workflow (e2e)', () => {
   let app: INestApplication
   let prisma: WorkflowPrisma
   let dashboard: DashboardService
+  const previousOperationalStateSchedule = process.env.DISABLE_OPERATIONAL_STATE_SCHEDULE
 
   if (!process.env.JWT_SECRET) {
     throw new Error('JWT_SECRET must be explicitly configured for integration tests')
@@ -50,11 +52,15 @@ describeRealIntegration('Canonical Operational Workflow (e2e)', () => {
   const secondaryUserId = randomUUID()
 
   const authFor = (orgId: string, userId: string, personId: string) => {
-    const token = jwt.sign({ sub: userId, role: 'ADMIN', orgId, personId })
+    const token = jwt.sign({ sessionVersion: 0, sub: userId, role: 'ADMIN', orgId, personId })
     return { Authorization: `Bearer ${token}` }
   }
 
   beforeAll(async () => {
+    // This test invokes the recalculation endpoint explicitly. The global cron
+    // can otherwise evaluate both fixtures at a five-minute wall-clock boundary
+    // and create legitimate events in the organization expected to stay idle.
+    process.env.DISABLE_OPERATIONAL_STATE_SCHEDULE = 'true'
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile()
@@ -130,8 +136,16 @@ describeRealIntegration('Canonical Operational Workflow (e2e)', () => {
         await prisma.organization.deleteMany({ where: { id: { in: orgIds } } })
       }
     } finally {
-      if (app) {
-        await app.close()
+      try {
+        if (app) {
+          await app.close()
+        }
+      } finally {
+        if (previousOperationalStateSchedule === undefined) {
+          delete process.env.DISABLE_OPERATIONAL_STATE_SCHEDULE
+        } else {
+          process.env.DISABLE_OPERATIONAL_STATE_SCHEDULE = previousOperationalStateSchedule
+        }
       }
     }
   })
@@ -139,6 +153,11 @@ describeRealIntegration('Canonical Operational Workflow (e2e)', () => {
   it('runs end-to-end operational flow with timeline, finance transitions, risk recalculation, and org isolation', async () => {
     const mainAuth = authFor(primaryOrgId, primaryUserId, primaryPersonId)
     const otherAuth = authFor(secondaryOrgId, secondaryUserId, secondaryPersonId)
+
+    // Exercise a clock tick deterministically: only the explicit HTTP action
+    // below may recalculate these fixtures, even at a cron boundary.
+    await app.get(OperationalStateScheduler).tick()
+    expect(await prisma.timelineEvent.count({ where: { orgId: secondaryOrgId } })).toBe(0)
 
     // Establish the real, tenant-scoped read-model baseline before any workflow
     // mutation. Dashboard reads are cached by contract, so later reads use the
@@ -188,6 +207,19 @@ describeRealIntegration('Canonical Operational Workflow (e2e)', () => {
     const customerDb = await prisma.customer.findFirst({ where: { id: customerId, orgId: primaryOrgId } })
     expect(customerDb).toBeTruthy()
     expect(customerDb?.phone).toBe('5511999990000')
+
+    const reloadedCustomer = await request(app.getHttpServer()).get(`/customers/${customerId}`).set(mainAuth).expect(200)
+    expect(reloadedCustomer.body.id).toBe(customerId)
+    const customerAuditQuery = { action: 'CUSTOMER_CREATED', entityType: 'CUSTOMER', entityId: customerId, actorPersonId: primaryPersonId }
+    const customerAudit = await request(app.getHttpServer()).get('/audit/events').query(customerAuditQuery).set(mainAuth).expect(200)
+    expect(customerAudit.body.data).toHaveLength(1)
+    expect(customerAudit.body.data[0]).toEqual(expect.objectContaining({
+      actorUserId: primaryUserId, actorPersonId: primaryPersonId, actorName: 'Operator Main', entityId: customerId,
+    }))
+    expect(Number.isFinite(Date.parse(customerAudit.body.data[0].createdAt))).toBe(true)
+    const foreignAudit = await request(app.getHttpServer()).get('/audit/events').query(customerAuditQuery).set(otherAuth).expect(200)
+    expect(foreignAudit.body.data).toHaveLength(0)
+
 
     // forged orgId from client must not escape authenticated tenant
     const forgedCustomer = await request(app.getHttpServer())
@@ -305,6 +337,11 @@ describeRealIntegration('Canonical Operational Workflow (e2e)', () => {
     const serviceOrderId = createServiceOrder.body.id as string
     const serviceOrderDb = await prisma.serviceOrder.findFirst({ where: { id: serviceOrderId, orgId: primaryOrgId } })
     expect(serviceOrderDb?.status).toBe('ASSIGNED')
+    const reloadedAppointment = await request(app.getHttpServer()).get(`/appointments/${appointmentId}`).set(mainAuth).expect(200)
+    expect(reloadedAppointment.body).toEqual(expect.objectContaining({ id: appointmentId, customerId, status: 'CONFIRMED' }))
+    const reloadedOrder = await request(app.getHttpServer()).get(`/service-orders/${serviceOrderId}`).set(mainAuth).expect(200)
+    expect(reloadedOrder.body).toEqual(expect.objectContaining({ id: serviceOrderId, customerId, appointmentId }))
+
 
     await request(app.getHttpServer()).get('/service-orders').set(otherAuth).expect(200).expect((res) => {
       const serviceOrderItems = extractCollection(res.body)
@@ -464,6 +501,15 @@ describeRealIntegration('Canonical Operational Workflow (e2e)', () => {
       paymentId,
       amountCents: 15000,
     }))
+    expect(paymentEvents[0].personId).toBe(primaryPersonId)
+    expect(Number.isFinite(paymentEvents[0].createdAt.getTime())).toBe(true)
+    const paymentTimelineQuery = { action: 'PAYMENT_RECEIVED', personId: primaryPersonId }
+    const visibleTimeline = await request(app.getHttpServer()).get('/timeline').query(paymentTimelineQuery).set(mainAuth).expect(200)
+    expect(visibleTimeline.body.data).toEqual(expect.arrayContaining([expect.objectContaining({
+      id: paymentEvents[0].id, actor: { name: 'Operator Main' }, entity: expect.objectContaining({ id: customerId }),
+    })]))
+    const foreignTimeline = await request(app.getHttpServer()).get('/timeline').query(paymentTimelineQuery).set(otherAuth).expect(200)
+    expect(foreignTimeline.body.data).toHaveLength(0)
     expect(await paymentEventsFor(secondaryOrgId, chargeId)).toHaveLength(0)
     expect(await prisma.timelineEvent.count({
       where: { orgId: primaryOrgId, chargeId, action: 'CHARGE_PAID' },
@@ -704,5 +750,25 @@ describeRealIntegration('Canonical Operational Workflow (e2e)', () => {
 
     const isolatedOrgTimelineCount = await prisma.timelineEvent.count({ where: { orgId: secondaryOrgId } })
     expect(isolatedOrgTimelineCount).toBe(0)
+
+    // Company settings persist through a fresh read; a restricted profile cannot edit them.
+    const originalSettings = await request(app.getHttpServer()).get('/organization-settings').set(mainAuth).expect(200)
+    const updatedName = `Workflow QA ${primaryOrgId}`
+    try {
+      await request(app.getHttpServer()).patch('/organization-settings').set(mainAuth).send({ name: updatedName }).expect(200)
+      const reloadedSettings = await request(app.getHttpServer()).get('/organization-settings').set(mainAuth).expect(200)
+      expect(reloadedSettings.body.name).toBe(updatedName)
+      const viewerId = randomUUID(), viewerPersonId = randomUUID()
+      await prisma.user.create({ data: { id: viewerId, orgId: primaryOrgId, email: `${viewerId}@test.invalid`, role: 'VIEWER', active: true, emailVerifiedAt: new Date() } })
+      await prisma.person.create({ data: { id: viewerPersonId, userId: viewerId, orgId: primaryOrgId, name: 'Restricted QA', role: 'TECH' } })
+      const viewerToken = jwt.sign({ sessionVersion: 0, sub: viewerId, personId: viewerPersonId, orgId: primaryOrgId, role: 'VIEWER' })
+      await request(app.getHttpServer()).patch('/organization-settings').auth(viewerToken, { type: 'bearer' }).send({ name: 'Unauthorized edit' }).expect(403)
+      expect((await prisma.organization.findUniqueOrThrow({ where: { id: primaryOrgId } })).name).toBe(updatedName)
+    } finally {
+      await request(app.getHttpServer()).patch('/organization-settings').set(mainAuth).send({ name: originalSettings.body.name }).expect(200)
+    }
+    const restoredSettings = await request(app.getHttpServer()).get('/organization-settings').set(mainAuth).expect(200)
+    expect(restoredSettings.body.name).toBe(originalSettings.body.name)
+
   })
 })

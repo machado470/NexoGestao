@@ -1,0 +1,39 @@
+
+> nexogestao@1.0.0 lint /workspace/NexoGestao
+> turbo run lint
+
+
+   • turbo 2.11.10
+   • Packages in scope: @nexogestao/api, @nexogestao/common, @nexogestao/web
+   • Running lint in 3 packages
+   • Remote caching disabled
+
+@nexogestao/web:lint: cache miss, executing 922f980f22bc7ebe
+@nexogestao/web:lint:
+@nexogestao/web:lint: > @nexogestao/web@1.0.0 lint /workspace/NexoGestao/apps/web
+@nexogestao/web:lint: > pnpm run lint:os
+@nexogestao/web:lint:
+@nexogestao/web:lint:  ERR_PNPM_META_FETCH_FAIL  GET https://registry.npmjs.org/pnpm: request to https://registry.npmjs.org/pnpm failed, reason:
+@nexogestao/web:lint:  ECONNREFUSED  request to https://registry.npmjs.org/pnpm/-/pnpm-10.30.3.tgz failed, reason:
+@nexogestao/web:lint:
+@nexogestao/web:lint: FetchError: request to https://registry.npmjs.org/pnpm/-/pnpm-10.30.3.tgz failed, reason:
+@nexogestao/web:lint:     at ClientRequest.<anonymous> (/workspace/NexoGestao/node_modules/.pnpm/pnpm@10.34.9/node_modules/pnpm/dist/pnpm.cjs:39562:18)
+@nexogestao/web:lint:     at ClientRequest.emit (node:events:514:28)
+@nexogestao/web:lint:     at emitErrorEvent (node:_http_client:114:11)
+@nexogestao/web:lint:     at TLSSocket.socketErrorListener (node:_http_client:774:5)
+@nexogestao/web:lint:     at TLSSocket.emit (node:events:526:24)
+@nexogestao/web:lint:     at emitErrorNT (node:internal/streams/destroy:170:8)
+@nexogestao/web:lint:     at emitErrorCloseNT (node:internal/streams/destroy:129:3)
+@nexogestao/web:lint:     at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+@nexogestao/web:lint:  ERROR  Command failed with exit code 1: /opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node /workspace/NexoGestao/apps/web/node_modules/pnpm/bin/pnpm.cjs add pnpm@10.30.3 --loglevel=error --ignore-scripts --config.strict-dep-builds=false --config.node-linker=hoisted --config.bin=bin --ignore-workspace
+@nexogestao/web:lint: For help, run: pnpm help run
+@nexogestao/web:lint:  ELIFECYCLE  Command failed with exit code 1.
+@nexogestao/web#lint:  ERROR  command (/workspace/NexoGestao/apps/web) /home/agent/.npm/_npx/6f08beb95ac65f4b/node_modules/.bin/pnpm run lint exited (1)
+
+ Tasks:    0 successful, 1 total
+Cached:    0 cached, 1 total
+  Time:    1m31.467s
+Failed:    @nexogestao/web#lint
+
+ ERROR  run failed: command  exited (1)
+ ELIFECYCLE  Command failed with exit code 1.

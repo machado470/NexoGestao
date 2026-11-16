@@ -1,0 +1,20 @@
+✔ recent local success (82.215455ms)
+✔ stale backup (39.67261ms)
+✔ failed last attempt (36.978183ms)
+✔ future timestamp (40.875675ms)
+✔ invalid timestamp (57.743103ms)
+✔ success without created dump (41.404276ms)
+✔ requires explicit age policy (283.433902ms)
+✔ missing or corrupt state fails without copying raw data (75.791976ms)
+✔ requires a matching success snapshot (77.91608ms)
+✔ offsite requirement is opt-in and must be confirmed (77.341292ms)
+✔ a recent failed attempt is not masked by an older success (43.049213ms)
+✔ default mode preserves the original factual JSON (4.527587ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 959.31522

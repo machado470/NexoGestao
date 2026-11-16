@@ -1,0 +1,12 @@
+
+> @nexogestao/web@1.0.0 test /workspace/NexoGestao/apps/web
+> vitest run
+
+
+ RUN  v4.1.12 /workspace/NexoGestao/apps/web
+
+
+ Test Files  100 passed (100)
+      Tests  806 passed (806)
+   Start at  15:48:31
+   Duration  48.27s (transform 4.57s, setup 0ms, import 18.90s, tests 7.72s, environment 12ms)

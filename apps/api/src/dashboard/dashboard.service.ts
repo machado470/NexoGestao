@@ -1,3 +1,4 @@
+import { refundedAmount } from '../common/finance/refunded-amount'
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { MemoryCacheService } from '../common/cache/memory-cache.service'
@@ -75,12 +76,19 @@ export class DashboardService {
     }
   }
 
+  private async cachedFinancialRead<T>(orgId: string, key: string, load: () => Promise<T>, ttl: number): Promise<T> {
+    // Refund rows are append-only. A shared DB revision invalidates financial
+    // snapshots in every API replica without retaining a cache key per refund.
+    const [rows, reversed] = await Promise.all([this.prisma.paymentRefund.count({ where: { orgId } }), this.prisma.paymentRefund.count({ where: { orgId, reversedAt: { not: null } } })])
+    const revision = `${rows}:${reversed}`
+    const cached = this.cache.get<{ revision: string; value: T }>(key)
+    if (cached && cached.revision !== revision) this.cache.delete(key)
+    const snapshot = await this.cache.getOrSet(key, async () => ({ revision, value: await load() }), ttl)
+    return snapshot.value
+  }
+
   async getMetrics(orgId: string) {
-    return this.cache.getOrSet(
-      `dashboard:metrics:${orgId}`,
-      () => this.fetchMetrics(orgId),
-      CACHE_TTL_METRICS,
-    )
+    return this.cachedFinancialRead(orgId, `dashboard:metrics:${orgId}`, () => this.fetchMetrics(orgId), CACHE_TTL_METRICS)
   }
 
   private async fetchMetrics(orgId: string) {
@@ -190,6 +198,11 @@ export class DashboardService {
     const [totalRevenue, paidRevenue, autoScore, failedMessagesCount, customersNoResponseCount, ignoredChargesCount] = batch3
     const [paymentsReceivedCount, previousRevenueAgg, currentCompletedOrders, previousCompletedOrders, currentOverdueCharges, previousOverdueCharges, currentFailedMessages, previousFailedMessages] = comparisonBatch
 
+    const [weeklyRefunds, previousRefunds, totalRefunds] = await Promise.all([
+      refundedAmount(this.prisma, { orgId, paidAt: currentPeriod }),
+      refundedAmount(this.prisma, { orgId, paidAt: previousPeriod }),
+      refundedAmount(this.prisma, { orgId }),
+    ])
     // Reutiliza valores já calculados para evitar redundância
     const delayedOrders = overdueServiceOrders
     const pendingRevenue = pendingPaymentsAgg
@@ -201,11 +214,13 @@ export class DashboardService {
       openServiceOrders,
       overdueServiceOrders,
       weeklyRevenueInCents: weeklyRevenueAgg._sum.amountCents ?? 0,
+      refundedWeeklyAmountInCents: weeklyRefunds,
+      netWeeklyRevenueInCents: (weeklyRevenueAgg._sum.amountCents ?? 0) - weeklyRefunds,
       paymentsReceivedCount,
       comparison: {
         revenueReceivedPct: calculatePercentageChange(
-          weeklyRevenueAgg._sum.amountCents ?? 0,
-          previousRevenueAgg._sum.amountCents ?? 0,
+          (weeklyRevenueAgg._sum.amountCents ?? 0) - weeklyRefunds,
+          (previousRevenueAgg._sum.amountCents ?? 0) - previousRefunds,
         ),
         completedServiceOrdersPct: calculatePercentageChange(
           currentCompletedOrders,
@@ -228,7 +243,7 @@ export class DashboardService {
       delayedOrders,
       riskTickets,
       totalRevenueInCents: totalRevenue._sum.amountCents ?? 0,
-      paidRevenueInCents: paidRevenue._sum.amountCents ?? 0,
+      paidRevenueInCents: (paidRevenue._sum.amountCents ?? 0) - totalRefunds,
       pendingRevenueInCents: pendingRevenue._sum.amountCents ?? 0,
       governance: autoScore,
       whatsappSignals: {
@@ -522,8 +537,8 @@ export class DashboardService {
   }
 
   async getRevenueData(orgId: string) {
-    return this.cache.getOrSet(
-      `dashboard:revenue:${orgId}`,
+    return this.cachedFinancialRead(
+      orgId, `dashboard:revenue:${orgId}`,
       () => this.fetchRevenueData(orgId),
       CACHE_TTL_CHARTS,
     )
@@ -568,9 +583,21 @@ export class DashboardService {
       }
     }
 
+    const refunds = await this.prisma.paymentRefund.findMany({ where: { orgId, OR: [{ refundedAt: { gte: new Date(now.getFullYear(), now.getMonth() - 11, 1) } }, { reversedAt: { gte: new Date(now.getFullYear(), now.getMonth() - 11, 1) } }] } })
+    const refundMonths = new Map<string, number>()
+    for (const refund of refunds) {
+      const key = `${refund.refundedAt.getFullYear()}-${refund.refundedAt.getMonth()}`
+      refundMonths.set(key, (refundMonths.get(key) ?? 0) + refund.amountCents)
+      if (refund.reversedAt) {
+        const reversedKey = `${refund.reversedAt.getFullYear()}-${refund.reversedAt.getMonth()}`
+        refundMonths.set(reversedKey, (refundMonths.get(reversedKey) ?? 0) - refund.amountCents)
+      }
+    }
     return months.map(entry => ({
       month: entry.month,
       revenue: entry.revenue / 100,
+      refunded: (refundMonths.get(`${entry.date.getFullYear()}-${entry.date.getMonth()}`) ?? 0) / 100,
+      netRevenue: (entry.revenue - (refundMonths.get(`${entry.date.getFullYear()}-${entry.date.getMonth()}`) ?? 0)) / 100,
     }))
   }
 

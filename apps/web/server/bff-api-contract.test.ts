@@ -564,7 +564,7 @@ describe("BFF↔API contract - lote 1", () => {
       .spyOn(globalThis, "fetch")
       .mockResolvedValue(
         new Response(
-          JSON.stringify({ success: true, data: [{ id: "p1", name: "Ana" }] }),
+          JSON.stringify({ success: true, data: [{ id: "p1", name: "Ana", email: "private@example.test", workloadNotes: "Private", riskScore: 80, userId: "private-user" }] }),
           { status: 200 }
         )
       );

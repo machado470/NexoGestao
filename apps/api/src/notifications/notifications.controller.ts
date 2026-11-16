@@ -1,10 +1,11 @@
+import { validatePersistedSession } from '../auth/persisted-session'
 import { Controller, Get, Header, Param, Patch, Post, Query, Request, Res, UseGuards } from '@nestjs/common'
 import type { Response } from 'express'
 import { NotificationsService } from './notifications.service'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { ActiveUserGuard } from '../auth/guards/active-user.guard'
 import { PrismaService } from '../prisma/prisma.service'
-import { heartbeatFrame, NotificationStreamHub, notificationFrame } from './notification-stream-hub.service'
+import { heartbeatFrame, NotificationStreamHub, notificationFrame, StreamWriter } from './notification-stream-hub.service'
 import { isSafeLastEventId, NOTIFICATION_TRANSPORT_KIND, NOTIFICATION_TRANSPORT_VERSION } from './notification-transport'
 
 @Controller('notifications')
@@ -29,19 +30,27 @@ export class NotificationsController {
     res.flushHeaders()
     const orgId = req.user.orgId as string
     const userId = req.user.sub as string
+    // Capture the authenticated claims once; never adopt a newer role/version.
+    const session = { ...req.user }
     const marker = req.headers['last-event-id']
     let closed = false
-    const write = (frame: string) => this.writeFrame(res, frame, () => closed)
+    const write = async (frame: string) => {
+      if (closed) return false
+      try {
+        if (!Number.isFinite(session.exp) || session.exp * 1000 <= Date.now()) { close(); return false }
+        await validatePersistedSession(this.prisma, session)
+        if (closed || session.exp * 1000 <= Date.now()) { close(); return false }
+        return await this.writeFrame(res, frame, () => closed)
+      } catch { close(); return false }
+    }
     const registration = this.hub.add(orgId, userId, write, () => res.end())
     if (!registration) { res.statusCode = 429; res.end(); return }
     let heartbeat: NodeJS.Timeout | undefined
-    let revalidate: NodeJS.Timeout | undefined
     let expiry: NodeJS.Timeout | undefined
     const close = () => {
       if (closed) return
       closed = true
       if (heartbeat) clearInterval(heartbeat)
-      if (revalidate) clearInterval(revalidate)
       if (expiry) clearTimeout(expiry)
       registration.remove()
       if (!res.writableEnded) res.end()
@@ -50,19 +59,22 @@ export class NotificationsController {
     // a GET that happens immediately after the headers and is not a disconnect.
     req.once('aborted', close); res.once('close', close); res.once('error', close)
 
-    const replayed = await this.replay(orgId, userId, marker, res, () => closed)
-    if (closed) return
-    if (!replayed || !await registration.finishReplay(replayed)) {
-      await this.writeFrame(res, 'event: resync\ndata: {"kind":"resync"}\n\n', () => closed)
-      close(); return
-    }
-    heartbeat = setInterval(() => { void write(heartbeatFrame()).then(ok => { if (!ok) close() }) }, 25_000)
-    revalidate = setInterval(async () => {
-      const active = await this.prisma.user.count({ where: { id: userId, orgId, active: true } }).catch(() => 0)
-      if (!active) close()
-    }, 25_000)
-    const expiresIn = Math.max(0, Number(req.user.exp ?? 0) * 1000 - Date.now())
-    expiry = setTimeout(close, Math.min(expiresIn || 1, 2_147_483_647))
+    const expiresIn = Math.max(1, Number(session.exp ?? 0) * 1000 - Date.now())
+    expiry = setTimeout(close, Math.min(expiresIn, 2_147_483_647))
+    try {
+      const replayed = await this.replay(orgId, userId, marker, write)
+      if (closed) return
+      if (!replayed || !await registration.finishReplay(replayed)) {
+        await write('event: resync\ndata: {"kind":"resync"}\n\n')
+        close(); return
+      }
+      let heartbeatPending = false
+      heartbeat = setInterval(() => {
+        if (heartbeatPending || closed) return
+        heartbeatPending = true
+        void write(heartbeatFrame()).then(ok => { if (!ok) close() }).finally(() => { heartbeatPending = false })
+      }, 25_000)
+    } catch { close() }
   }
 
   private async writeFrame(res: Response, frame: string, closed: () => boolean) {
@@ -85,14 +97,14 @@ export class NotificationsController {
     } catch { return false }
   }
 
-  private async replay(orgId: string, userId: string, marker: unknown, res: Response, closed: () => boolean) {
+  private async replay(orgId: string, userId: string, marker: unknown, write: StreamWriter) {
     const replayed = new Set<string>()
-    if (marker === undefined) return await this.writeFrame(res, 'event: ready\ndata: {"kind":"ready"}\n\n', closed) ? replayed : null
-    if (!isSafeLastEventId(marker)) return await this.writeFrame(res, 'event: resync\ndata: {"kind":"resync"}\n\n', closed) ? replayed : null
+    if (marker === undefined) return await write('event: ready\ndata: {"kind":"ready"}\n\n') ? replayed : null
+    if (!isSafeLastEventId(marker)) return await write('event: resync\ndata: {"kind":"resync"}\n\n') ? replayed : null
     const cursor = await this.prisma.notificationRecipient.findFirst({
       where: { id: marker, userId, notification: { orgId } }, select: { id: true, createdAt: true },
     })
-    if (!cursor) return await this.writeFrame(res, 'event: resync\ndata: {"kind":"resync"}\n\n', closed) ? replayed : null
+    if (!cursor) return await write('event: resync\ndata: {"kind":"resync"}\n\n') ? replayed : null
     const rows = await this.prisma.notificationRecipient.findMany({
       where: { userId, notification: { orgId }, OR: [
         { createdAt: { gt: cursor.createdAt } },
@@ -101,14 +113,14 @@ export class NotificationsController {
       select: { id: true, userId: true, createdAt: true, notification: { select: { id: true, orgId: true } } },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], take: 101,
     })
-    if (rows.length > 100) return await this.writeFrame(res, 'event: resync\ndata: {"kind":"resync"}\n\n', closed) ? replayed : null
+    if (rows.length > 100) return await write('event: resync\ndata: {"kind":"resync"}\n\n') ? replayed : null
     for (const row of rows) {
       replayed.add(row.id)
-      if (!await this.writeFrame(res, notificationFrame({
+      if (!await write(notificationFrame({
       version: NOTIFICATION_TRANSPORT_VERSION, kind: NOTIFICATION_TRANSPORT_KIND,
       eventId: row.id, orgId: row.notification.orgId, userId: row.userId,
       notificationId: row.notification.id, createdAt: row.createdAt.toISOString(),
-      }), closed)) return null
+      }))) return null
     }
     return replayed
   }

@@ -1,3 +1,4 @@
+import { OrganizationMembersModule } from './organization-members/organization-members.module'
 import { Module, MiddlewareConsumer, NestModule, CanActivate } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
 import { ScheduleModule } from '@nestjs/schedule'
@@ -85,6 +86,7 @@ class AllowAllThrottlerGuard implements CanActivate {
 @Module({
   imports: [
     CoreModule,
+    OrganizationMembersModule,
 
     ConfigModule.forRoot({
       isGlobal: true,

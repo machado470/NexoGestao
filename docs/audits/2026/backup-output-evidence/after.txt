@@ -1,0 +1,39 @@
+✔ concurrent local invocation cannot overwrite in-flight state (119.278813ms)
+✔ concurrent invalid invocation cannot overwrite in-flight state (112.430285ms)
+✔ captures completed output before state publication: success (293.554024ms)
+✔ captures completed output before state publication: offsite-failure (269.572383ms)
+✔ captures completed output before state publication: tee-failure (68.178468ms)
+✔ recent local success (69.736199ms)
+✔ stale backup (42.198792ms)
+✔ failed last attempt (39.627916ms)
+✔ future timestamp (45.548746ms)
+✔ invalid timestamp (34.474246ms)
+✔ success without created dump (37.813051ms)
+✔ requires explicit age policy (257.709097ms)
+✔ missing or corrupt state fails without copying raw data (77.421813ms)
+✔ requires a matching success snapshot (68.319435ms)
+✔ offsite requirement is opt-in and must be confirmed (82.891773ms)
+✔ a recent failed attempt is not masked by an older success (34.927634ms)
+✔ default mode preserves the original factual JSON (4.191101ms)
+✔ valid canonical sidecar reaches simulated restore and migration (73.000418ms)
+✔ a checksum for another valid file cannot authorize restoring the requested dump (42.830248ms)
+✔ mismatched hash never invokes database commands (50.58688ms)
+✔ multiple checksum entries are rejected (45.02544ms)
+✔ missing and malformed sidecars never invoke database commands (48.477837ms)
+✔ container bound to another port fails before database commands (42.846923ms)
+✔ stopped explicitly selected container fails before database commands (37.894951ms)
+✔ container bound publicly fails before database commands (41.798131ms)
+✔ container user mismatch fails before database commands (53.182468ms)
+✔ URL repeated schema fails before database commands (49.283755ms)
+✔ URL host query override fails before database commands (50.526147ms)
+✔ encoded production database fails before database commands (41.2245ms)
+✔ matching loopback container target reaches simulated restore (73.506444ms)
+✔ ambient libpq routing is cleared before host restore and smoke (66.883316ms)
+ℹ tests 31
+ℹ suites 0
+ℹ pass 31
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2606.697743

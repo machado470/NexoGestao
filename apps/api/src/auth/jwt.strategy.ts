@@ -1,12 +1,14 @@
+import { validatePersistedSession } from './persisted-session'
 import { Injectable } from '@nestjs/common'
 import { PassportStrategy } from '@nestjs/passport'
 import { ExtractJwt, Strategy } from 'passport-jwt'
 import { ConfigService } from '@nestjs/config'
 import { resolveJwtSecret } from './jwt-secret'
+import { PrismaService } from '../prisma/prisma.service'
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor(config: ConfigService) {
+  constructor(config: ConfigService, private readonly prisma: PrismaService) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
@@ -15,13 +17,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: any) {
-    return {
-      sub: payload.sub,          // ✅ compat com MeController
-      userId: payload.sub,       // ✅ compat futura
-      role: payload.role,
-      orgId: payload.orgId,
-      personId: payload.personId ?? null,
-      exp: payload.exp,
-    }
+    return validatePersistedSession(this.prisma, payload)
   }
 }

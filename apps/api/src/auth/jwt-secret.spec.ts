@@ -47,7 +47,7 @@ describe('JWT secret resolution', () => {
     })
 
     const signingOptions = createJwtModuleOptions(environment)
-    const strategy = new JwtStrategy(environment)
+    const strategy = new JwtStrategy(environment, {} as any)
 
     expect(signingOptions.secret).toBe(configuredSecret)
     ;(strategy as any)._secretOrKeyProvider(

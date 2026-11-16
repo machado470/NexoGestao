@@ -1,24 +1,24 @@
 import { TenantOperationsService } from './tenant-ops.service'
 
 describe('TenantOperationsService', () => {
-  it('aplica limite por orgId e por escopo', () => {
+  it('aplica limite por orgId e por escopo', async () => {
     const service = new TenantOperationsService()
 
-    const first = service.enforceLimit({
+    const first = await service.enforceLimit({
       orgId: 'org-1',
       scope: 'automation:execute-trigger',
       limit: 2,
       windowMs: 60_000,
       blockedReason: 'limit',
     })
-    const second = service.enforceLimit({
+    const second = await service.enforceLimit({
       orgId: 'org-1',
       scope: 'automation:execute-trigger',
       limit: 2,
       windowMs: 60_000,
       blockedReason: 'limit',
     })
-    const third = service.enforceLimit({
+    const third = await service.enforceLimit({
       orgId: 'org-1',
       scope: 'automation:execute-trigger',
       limit: 2,

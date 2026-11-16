@@ -120,8 +120,8 @@ describe("passive manual assignee warning UI contract", () => {
     expect(createServiceOrderModal).toContain(
       "assigneeWarningTelemetry.trackConfirmed(payload.assignedToPersonId)"
     );
-    expect(editServiceOrderModal).toContain(
-      "assigneeWarningTelemetry.trackConfirmed(parsed.data.assignedToPersonId, serviceOrderId)"
+    expect(editServiceOrderModal).toMatch(
+      /assigneeWarningTelemetry\.trackConfirmed\(\s*parsed\.data\.assignedToPersonId,\s*serviceOrderId\s*\)/
     );
     expect(createServiceOrderModal).toContain(
       "assignedToPersonId: parsed.data.assignedToPersonId || undefined"

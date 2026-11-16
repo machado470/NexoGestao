@@ -1,0 +1,84 @@
+[Nest] 80285  - 11/12/2026, 3:19:13 AM   ERROR [ExceptionsHandler] Error: synthetic audit outage
+    at Object.<anonymous> (/workspace/NexoGestao/apps/api/test/integration/privacy-exports-postgres.integration.spec.ts:66:73)
+    at Promise.finally.completed (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:1834:28)
+    at new Promise (<anonymous>)
+    at callAsyncCircusFn (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:1774:10)
+    at _callCircusTest (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:1167:40)
+    at _runTestInContext (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:1103:3)
+    at runTestWithContext (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:996:5)
+    at _runTestsForDescribeBlockOnce (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:1008:11)
+    at _runTestsForDescribeBlock (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:824:5)
+    at _runTestsForDescribeBlockOnce (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:1003:11)
+    at _runTestsForDescribeBlock (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:824:5)
+    at run (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:789:3)
+    at runAndTransformResultsToJestFormat (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:2300:21)
+    at jestAdapter (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/runner.js:111:19)
+    at runTestInternal (/workspace/NexoGestao/node_modules/.pnpm/jest-runner@30.5.2/node_modules/jest-runner/build/index.js:247:16)
+    at runTest (/workspace/NexoGestao/node_modules/.pnpm/jest-runner@30.5.2/node_modules/jest-runner/build/index.js:315:7)
+[Nest] 80285  - 11/12/2026, 3:19:13 AM   ERROR [ExceptionsHandler] Error: synthetic audit outage
+    at Object.<anonymous> (/workspace/NexoGestao/apps/api/test/integration/privacy-exports-postgres.integration.spec.ts:66:73)
+    at Promise.finally.completed (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:1834:28)
+    at new Promise (<anonymous>)
+    at callAsyncCircusFn (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:1774:10)
+    at _callCircusTest (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:1167:40)
+    at _runTestInContext (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:1103:3)
+    at runTestWithContext (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:996:5)
+    at _runTestsForDescribeBlockOnce (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:1008:11)
+    at _runTestsForDescribeBlock (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:824:5)
+    at _runTestsForDescribeBlockOnce (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:1003:11)
+    at _runTestsForDescribeBlock (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:824:5)
+    at run (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:789:3)
+    at runAndTransformResultsToJestFormat (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/jestAdapterInit.js:2300:21)
+    at jestAdapter (/workspace/NexoGestao/node_modules/.pnpm/jest-circus@30.5.2/node_modules/jest-circus/build/runner.js:111:19)
+    at runTestInternal (/workspace/NexoGestao/node_modules/.pnpm/jest-runner@30.5.2/node_modules/jest-runner/build/index.js:247:16)
+    at runTest (/workspace/NexoGestao/node_modules/.pnpm/jest-runner@30.5.2/node_modules/jest-runner/build/index.js:315:7)
+[Nest] 80285  - 11/12/2026, 3:19:19 AM     LOG [BillingService] [BOOT][Billing] Stripe inicializado
+[Nest] 80285  - 11/12/2026, 3:19:19 AM     LOG [BillingService] Webhook recebido: checkout.session.completed
+[Nest] 80285  - 11/12/2026, 3:19:19 AM     LOG [BillingService] Webhook recebido: invoice.paid
+[Nest] 80285  - 11/12/2026, 3:19:19 AM     LOG [BillingService] [BOOT][Billing] Stripe inicializado
+[Nest] 80285  - 11/12/2026, 3:19:19 AM     LOG [BillingService] Webhook recebido: invoice.paid
+[Nest] 80285  - 11/12/2026, 3:19:19 AM     LOG [BillingService] [BOOT][Billing] Stripe inicializado
+[Nest] 80285  - 11/12/2026, 3:19:19 AM     LOG [BillingService] Webhook recebido: invoice.paid
+[Nest] 80285  - 11/12/2026, 3:19:19 AM     LOG [BillingService] [BOOT][Billing] Stripe inicializado
+[Nest] 80285  - 11/12/2026, 3:19:19 AM     LOG [BillingService] Webhook recebido: invoice.paid
+[Nest] 80285  - 11/12/2026, 3:19:21 AM     LOG [WhatsAppService] {"requestId":"meter-QA","action":"whatsapp.outbound","conversationId":"e2bf1ebd-51b8-44a7-a962-3219c7bbf315","messageId":"f57f69fb-cfa7-456b-bfea-1fa4fa1b3b19","status":"WAITING_CUSTOMER"}
+[Nest] 80285  - 11/12/2026, 3:19:21 AM     LOG [WhatsAppService] {"requestId":"meter-QA","action":"whatsapp.outbound","conversationId":"5aa48a38-f78b-431a-8547-37d4f864c3e4","messageId":"64fd3086-f0e3-49ba-89a2-be0ebe2f29bd","status":"WAITING_CUSTOMER"}
+[Nest] 80285  - 11/12/2026, 3:19:21 AM     LOG [FinanceService] {"requestId":"meter-QA","action":"CREATE_CHARGE_START","entityId":"c6a98909-8f99-4044-b2cc-820b8a226226","orgId":"18ebfe43-887e-4f6c-b70e-f6ee9c040298","customerId":"c6a98909-8f99-4044-b2cc-820b8a226226","message":"Iniciando createCharge"}
+[Nest] 80285  - 11/12/2026, 3:19:21 AM     LOG [FinanceService] {"requestId":"meter-QA","action":"CREATE_CHARGE_START","entityId":"c6a98909-8f99-4044-b2cc-820b8a226226","orgId":"18ebfe43-887e-4f6c-b70e-f6ee9c040298","customerId":"c6a98909-8f99-4044-b2cc-820b8a226226","message":"Iniciando createCharge"}
+[Nest] 80285  - 11/12/2026, 3:19:21 AM    WARN [FinanceService] {"requestId":"meter-QA","action":"WHATSAPP_SEND_CHARGE","entityId":"02fb4256-0a67-4add-a38f-6368bbb2b2cd","error":"this.whatsapp.enqueueMessage is not a function","message":"Falha de integração no envio de cobrança. Fluxo seguirá em modo degradado"}
+[Nest] 80285  - 11/12/2026, 3:19:21 AM    WARN [FinanceService] {"requestId":"meter-QA","action":"CREATE_CHARGE_RESULT","entityId":"02fb4256-0a67-4add-a38f-6368bbb2b2cd","chargeId":"02fb4256-0a67-4add-a38f-6368bbb2b2cd","orgId":"18ebfe43-887e-4f6c-b70e-f6ee9c040298","message":"Cobrança criada com fallback de WhatsApp (mensagem em fila/pendente)"}
+[Nest] 80285  - 11/12/2026, 3:19:21 AM     LOG [FinanceService] {"requestId":"meter-QA","action":"CREATE_CHARGE_START","entityId":"c6a98909-8f99-4044-b2cc-820b8a226226","orgId":"18ebfe43-887e-4f6c-b70e-f6ee9c040298","customerId":"c6a98909-8f99-4044-b2cc-820b8a226226","message":"Iniciando createCharge"}
+[Nest] 80285  - 11/12/2026, 3:19:21 AM     LOG [IdempotencyService] {"requestId":"meter-QA","action":"IDEMPOTENCY_REPLAY","orgId":"18ebfe43-887e-4f6c-b70e-f6ee9c040298","scope":"finance.create_charge","key":"69a3f8e8-94a1-4496-b597-d131e0fe527f"}
+[Nest] 80285  - 11/12/2026, 3:19:21 AM     LOG [FinanceService] {"requestId":"meter-QA","action":"PAY_CHARGE_START","entityId":"6e45809e-c329-40c0-8185-e3e92a00b5b7","orgId":"7f19f6fd-af05-49a9-b9fd-5aac93ff0160","amountCents":100,"method":"CASH","message":"Iniciando payCharge"}
+[Nest] 80285  - 11/12/2026, 3:19:21 AM     LOG [FinanceService] {"requestId":"meter-QA","action":"PAY_CHARGE_START","entityId":"6e45809e-c329-40c0-8185-e3e92a00b5b7","orgId":"7f19f6fd-af05-49a9-b9fd-5aac93ff0160","amountCents":100,"method":"CARD","message":"Iniciando payCharge"}
+[Nest] 80285  - 11/12/2026, 3:19:21 AM    WARN [FinanceService] {"requestId":"meter-QA","action":"WHATSAPP_SEND_PAYMENT_CONFIRMATION","entityId":"6e45809e-c329-40c0-8185-e3e92a00b5b7","error":"this.whatsapp.enqueueMessage is not a function","message":"Falha de integração no envio do recibo. Fluxo principal seguirá"}
+[Nest] 80285  - 11/12/2026, 3:19:21 AM    WARN [FinanceService] {"requestId":"meter-QA","action":"PAY_CHARGE_RESULT","entityId":"6e45809e-c329-40c0-8185-e3e92a00b5b7","paymentId":"28b13ece-1ac8-4dfb-9352-832d9002cc81","orgId":"7f19f6fd-af05-49a9-b9fd-5aac93ff0160","message":"Pagamento registrado com fallback de notificação WhatsApp"}
+[Nest] 80285  - 11/12/2026, 3:19:25 AM   ERROR [FinanceService] Erro overdue WhatsApp: Não foi possível confirmar o enfileiramento do lembrete.
+[Nest] 80285  - 11/12/2026, 3:19:25 AM   ERROR [FinanceService] Erro overdue WhatsApp: Não foi possível confirmar o enfileiramento do lembrete.
+[Nest] 80285  - 11/12/2026, 3:19:25 AM   ERROR [FinanceService] Erro overdue WhatsApp: Não foi possível confirmar o enfileiramento do lembrete.
+[Nest] 80285  - 11/12/2026, 3:19:25 AM     LOG [PaymentsService] [BOOT][Payments] Stripe inicializado no PaymentsService
+[Nest] 80285  - 11/12/2026, 3:19:25 AM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.completed
+[Nest] 80285  - 11/12/2026, 3:19:25 AM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.completed
+[Nest] 80285  - 11/12/2026, 3:19:25 AM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.completed
+[Nest] 80285  - 11/12/2026, 3:19:25 AM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.completed
+[Nest] 80285  - 11/12/2026, 3:19:25 AM     LOG [FinanceService] {"requestId":"gap-integration","action":"PAY_CHARGE_START","entityId":"11093dbd-3046-455e-be06-3ce2a19aa67c","orgId":"2d1e92e7-5026-4c29-879e-78e48bf7b475","amountCents":1000,"method":"CARD","message":"Iniciando payCharge"}
+[Nest] 80285  - 11/12/2026, 3:19:25 AM     LOG [FinanceService] {"requestId":"gap-integration","action":"PAY_CHARGE_RESULT","entityId":"11093dbd-3046-455e-be06-3ce2a19aa67c","paymentId":"59cc640d-9423-445e-b351-a0bac7cafb7f","orgId":"2d1e92e7-5026-4c29-879e-78e48bf7b475","message":"Pagamento registrado com sucesso"}
+[Nest] 80285  - 11/12/2026, 3:19:25 AM     LOG [PaymentsService] Pagamento processado com sucesso via Stripe. event=checkout.session.completed chargeId=11093dbd-3046-455e-be06-3ce2a19aa67c externalRef=stripe:pi_23642217-476c-4eff-92ed-dfe0747108e2
+[Nest] 80285  - 11/12/2026, 3:19:25 AM     LOG [PaymentsService] Webhook Stripe recebido: charge.succeeded
+[Nest] 80285  - 11/12/2026, 3:19:25 AM     LOG [FinanceService] {"requestId":"gap-integration","action":"PAY_CHARGE_START","entityId":"11093dbd-3046-455e-be06-3ce2a19aa67c","orgId":"2d1e92e7-5026-4c29-879e-78e48bf7b475","amountCents":1000,"method":"CARD","message":"Iniciando payCharge"}
+[Nest] 80285  - 11/12/2026, 3:19:25 AM     LOG [IdempotencyService] {"requestId":"gap-integration","action":"IDEMPOTENCY_REPLAY","orgId":"2d1e92e7-5026-4c29-879e-78e48bf7b475","scope":"finance.pay_charge","key":"stripe-payment:pi_23642217-476c-4eff-92ed-dfe0747108e2"}
+[Nest] 80285  - 11/12/2026, 3:19:25 AM     LOG [PaymentsService] Pagamento processado com sucesso via Stripe. event=charge.succeeded chargeId=11093dbd-3046-455e-be06-3ce2a19aa67c externalRef=stripe:pi_23642217-476c-4eff-92ed-dfe0747108e2
+[Nest] 80285  - 11/12/2026, 3:19:25 AM     LOG [PaymentsService] Webhook Stripe recebido: checkout.session.async_payment_succeeded
+[Nest] 80285  - 11/12/2026, 3:19:25 AM     LOG [FinanceService] {"requestId":"gap-integration","action":"PAY_CHARGE_START","entityId":"11093dbd-3046-455e-be06-3ce2a19aa67c","orgId":"2d1e92e7-5026-4c29-879e-78e48bf7b475","amountCents":1000,"method":"CARD","message":"Iniciando payCharge"}
+[Nest] 80285  - 11/12/2026, 3:19:25 AM     LOG [IdempotencyService] {"requestId":"gap-integration","action":"IDEMPOTENCY_REPLAY","orgId":"2d1e92e7-5026-4c29-879e-78e48bf7b475","scope":"finance.pay_charge","key":"stripe-payment:pi_23642217-476c-4eff-92ed-dfe0747108e2"}
+[Nest] 80285  - 11/12/2026, 3:19:25 AM     LOG [PaymentsService] Pagamento processado com sucesso via Stripe. event=checkout.session.async_payment_succeeded chargeId=11093dbd-3046-455e-be06-3ce2a19aa67c externalRef=stripe:pi_23642217-476c-4eff-92ed-dfe0747108e2
+[Nest] 80285  - 11/12/2026, 3:19:25 AM     LOG [FinanceService] {"requestId":"gap-integration","action":"PAY_CHARGE_START","entityId":"db2b7c3a-381b-47d8-8cae-0d71028ce620","orgId":"2d1e92e7-5026-4c29-879e-78e48bf7b475","amountCents":1000,"method":"CARD","message":"Iniciando payCharge"}
+[Nest] 80285  - 11/12/2026, 3:19:27 AM     LOG [FinanceService] {"action":"PAY_CHARGE_START","entityId":"19e5bac7-2de5-4449-8cd1-6198789bf917","orgId":"7be119d7-2884-459a-a06d-649c3cf7b67d","amountCents":1000,"method":"PIX","message":"Iniciando payCharge"}
+[Nest] 80285  - 11/12/2026, 3:19:30 AM    WARN [ExecutionService] {"event":"execution_start_fallback","orgId":"org-1","serviceOrderId":"exec-start-1","customerId":"cust-1","executorPersonId":"person-1"}
+[Nest] 80285  - 11/12/2026, 3:19:30 AM    WARN [ExecutionService] {"event":"execution_completion_fallback","requestId":"req-1","userId":"user-1","orgId":"org-1","executionId":"exec-1","serviceOrderId":"exec-1"}
+
+Test Suites: 11 skipped, 27 passed, 27 of 38 total
+Tests:       33 skipped, 151 passed, 184 total
+Snapshots:   0 total
+Time:        57.608 s, estimated 99 s
+Ran all test suites matching test/integration/.

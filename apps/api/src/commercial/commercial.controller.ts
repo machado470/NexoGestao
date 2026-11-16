@@ -3,7 +3,7 @@ import { Org } from '../auth/decorators/org.decorator'
 import { Roles } from '../auth/decorators/roles.decorator'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
-import { CommercialPolicyService } from '../common/commercial/commercial-policy.service'
+import { CommercialPolicyService, commercialUsagePeriod } from '../common/commercial/commercial-policy.service'
 import { UpsertFeatureOverrideDto } from './dto/upsert-feature-override.dto'
 
 @UseGuards(JwtAuthGuard)
@@ -27,6 +27,7 @@ export class CommercialController {
           currentPeriodEnd: context.subscription.currentPeriodEnd,
         },
         limits: context.limits,
+        usagePeriod: commercialUsagePeriod(),
         features: context.features,
         overrides: context.featureOverrides,
       },
