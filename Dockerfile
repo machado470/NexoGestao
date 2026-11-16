@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y \
   g++ \
   && rm -rf /var/lib/apt/lists/*
 
-RUN npm install -g pnpm @nestjs/cli
+RUN npm install -g pnpm@10.30.3 @nestjs/cli
 
 # manifests do workspace
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./

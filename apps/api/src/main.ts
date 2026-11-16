@@ -61,6 +61,13 @@ async function bootstrap() {
 
     app.useGlobalInterceptors(new ApiResponseInterceptor())
     app.useGlobalFilters(new ApiExceptionFilter())
+    // Keep the local Docker health URL on the same handler as /v1/health.
+    app.use((req: { method: string; url: string }, _res: unknown, next: () => void) => {
+      if (req.method === 'GET' && (req.url === '/health' || req.url.startsWith('/health?'))) {
+        req.url = `/v1${req.url}`
+      }
+      next()
+    })
     app.setGlobalPrefix('v1')
 
     app.useGlobalPipes(

@@ -37,13 +37,16 @@ services:
         required: false
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/nexogestao?schema=public
-      NODE_ENV: production
+      NODE_ENV: development
+      REQUIRE_DATABASE_SMOKE: "1"
+      OPERATIONAL_ACTIONS_DB_STARTUP_CHECK: "1"
       API_PORT: "3000"
       WEB_PORT: "3010"
       NEXO_API_URL: http://api:3000
       JWT_SECRET: ${JWT_SECRET:-change-me-docker-local}
       REDIS_HOST: redis
       REDIS_PORT: "6379"
+      REDIS_URL: redis://redis:6379
       AUTO_MIGRATE: "1"
       DB_WAIT_SECONDS: "40"
       SEED_MODE: ""
@@ -55,6 +58,11 @@ services:
     ports:
       - "3000:3000"
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     entrypoint: ["/app/apps/api/docker-entrypoint.sh"]
 
 volumes:

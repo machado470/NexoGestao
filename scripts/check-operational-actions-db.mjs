@@ -49,14 +49,25 @@ async function main() {
 
   await assertExists(
     'índice único parcial REQUESTED por (orgId, logicalKey)',
-    `SELECT 1 FROM pg_indexes
-      WHERE schemaname = 'public'
-        AND tablename = 'OperationalActionExecution'
-        AND indexname = 'OperationalActionExecution_unique_requested_per_key'
-        AND indexdef ILIKE '%UNIQUE%'
-        AND indexdef ILIKE '%"orgId"%'
-        AND indexdef ILIKE '%"logicalKey"%'
-        AND indexdef ILIKE '%WHERE ((status = ''REQUESTED''::"OperationalActionExecutionStatus"))%'
+    `SELECT 1
+      FROM pg_index i
+      JOIN pg_class idx ON idx.oid = i.indexrelid
+      JOIN pg_class tbl ON tbl.oid = i.indrelid
+      JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
+      WHERE ns.nspname = 'public'
+        AND tbl.relname = 'OperationalActionExecution'
+        AND idx.relname = 'OperationalActionExecution_unique_requested_per_key'
+        AND i.indisunique AND i.indisvalid AND i.indisready
+        AND i.indnkeyatts = 2
+        AND ARRAY(
+          SELECT a.attname::text
+          FROM unnest(i.indkey::smallint[]) WITH ORDINALITY AS k(attnum, position)
+          JOIN pg_attribute a ON a.attrelid = tbl.oid AND a.attnum = k.attnum
+          WHERE k.position <= i.indnkeyatts
+          ORDER BY k.position
+        ) = ARRAY['orgId', 'logicalKey']::text[]
+        AND regexp_replace(pg_get_expr(i.indpred, i.indrelid), '[()[:space:]]', '', 'g')
+          = 'status=''REQUESTED''::"OperationalActionExecutionStatus"'
       LIMIT 1`,
   )
 }

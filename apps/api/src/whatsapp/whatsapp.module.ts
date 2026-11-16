@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common'
+import { forwardRef, Module } from '@nestjs/common'
 import { PrismaModule } from '../prisma/prisma.module'
 import { WhatsAppService } from './whatsapp.service'
 import { WhatsAppConversationReadService } from './whatsapp-conversation-read.service'
@@ -23,7 +23,7 @@ import { HealthModule } from '../health/health.module'
 const testControllers = process.env.NODE_ENV === 'production' ? [] : [WhatsAppTestController]
 
 @Module({
-  imports: [PrismaModule, QueueModule, TimelineModule, QuotasModule, HealthModule],
+  imports: [PrismaModule, QueueModule, TimelineModule, QuotasModule, forwardRef(() => HealthModule)],
   controllers: [...testControllers, WhatsAppController],
   providers: [
     WhatsAppService,
