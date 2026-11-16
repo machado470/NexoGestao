@@ -127,6 +127,18 @@ describe('HealthController readiness factual dependency checks', () => {
     }
   })
 
+  it('identifica Stripe explicitamente desativado mesmo com chaves antigas no ambiente', async () => {
+    config.get.mockImplementation(key => key === 'STRIPE_ENABLED' ? 'false' : 'stale-placeholder')
+    try {
+      await expect(controller().health.readiness()).resolves.toMatchObject({
+        status: 'ready', integrations: { stripe: 'disabled' },
+      })
+      await expect(controller({ database: 'down' }).health.readiness()).rejects.toBeInstanceOf(ServiceUnavailableException)
+    } finally {
+      config.get.mockReset().mockReturnValue('')
+    }
+  })
+
   it('não declara ready quando Redis/fila está indisponível', async () => {
     const { health } = controller({
       queue: { ok: false, redisEnabled: false, reason: 'Redis indisponível', status: 'end' },

@@ -177,3 +177,20 @@ configurada. As validações obrigatórias do banco não são alteradas.
 Depois de contratar e configurar `meta_cloud` ou `zapi`, altere o provider e
 publique novamente; mensagens pendentes poderão ser retomadas. Revise essa fila
 antes de reativar. Não use `mock` ou `NODE_ENV=development` para produção.
+
+### Publicação sem cobrança online Stripe
+
+Para publicar sem Stripe, mantenha `NODE_ENV=production` e defina
+`STRIPE_ENABLED=false` no serviço da API. A opção vale para Billing e Payments,
+mesmo se houver chaves antigas no ambiente: nenhum SDK Stripe é inicializado.
+Checkout e webhooks Stripe retornam HTTP 503 com `INTEGRATION_DISABLED`, sem
+confirmar pagamentos, conceder assinaturas ou simular checkout. Cancelamentos de
+assinaturas Stripe também ficam bloqueados, preservando o estado persistido.
+Consultas e operações financeiras manuais mantêm suas regras e autorizações.
+O readiness identifica Stripe como `disabled`; banco, Prisma e filas continuam
+sendo validados normalmente.
+
+Não habilite `BILLING_ENABLE_SIMULATED_CHECKOUT` em produção. Para ativar Stripe
+posteriormente, configure as chaves, webhook e preços reais e altere
+`STRIPE_ENABLED` para `true` antes de publicar. Sem desativação explícita, a
+exigência atual de credenciais de produção permanece intacta.

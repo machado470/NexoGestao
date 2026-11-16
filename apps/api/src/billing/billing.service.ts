@@ -19,18 +19,21 @@ import {
 import Stripe from 'stripe'
 import { getDefaultPlanDefinition } from '../common/commercial/default-plan-definitions'
 import { QuotasService } from '../quotas/quotas.service'
+import { isStripeDisabled } from '../common/config/stripe-integration'
 
 @Injectable()
 export class BillingService {
 
   private readonly logger = new Logger(BillingService.name)
   private stripe: Stripe | null = null
+  private readonly stripeDisabled: boolean
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly quotasService: QuotasService,
   ) {
+    this.stripeDisabled = isStripeDisabled(this.config)
 
     const secretKey =
       this.config.get<string>('STRIPE_SECRET_KEY') ||
@@ -45,11 +48,13 @@ export class BillingService {
       throw new Error('[Billing] BILLING_ENABLE_SIMULATED_CHECKOUT não é permitido em produção')
     }
 
-    if (!secretKey && isProduction) {
+    if (!secretKey && isProduction && !this.stripeDisabled) {
       throw new Error('[Billing] STRIPE_SECRET_KEY/STRIPE_KEY é obrigatório em produção')
     }
 
-    if (secretKey) {
+    if (this.stripeDisabled) {
+      this.logger.log('[BOOT][Billing][disabled] Stripe explicitamente desativado')
+    } else if (secretKey) {
       this.stripe = new Stripe(secretKey, { apiVersion: '2024-06-20' })
       this.logger.log('[BOOT][Billing] Stripe inicializado')
     } else {
@@ -88,13 +93,14 @@ export class BillingService {
   }
 
   private assertStripeAvailable(operation: string) {
-    if (this.stripe) return
+    if (this.stripe && !this.stripeDisabled) return
     throw new ServiceUnavailableException({
-      code: 'INTEGRATION_NOT_CONFIGURED',
+      code: this.stripeDisabled ? 'INTEGRATION_DISABLED' : 'INTEGRATION_NOT_CONFIGURED',
       integration: 'stripe',
       operation,
-      message:
-        'Integração Stripe não configurada. Defina STRIPE_SECRET_KEY e STRIPE_WEBHOOK_SECRET para habilitar cobrança online.',
+      message: this.stripeDisabled
+        ? 'Integração Stripe desativada neste ambiente.'
+        : 'Integração Stripe não configurada. Defina STRIPE_SECRET_KEY e STRIPE_WEBHOOK_SECRET para habilitar cobrança online.',
     })
   }
 
@@ -127,6 +133,8 @@ export class BillingService {
   ) {
     this.assertCheckoutRedirectUrl(successUrl, 'successUrl')
     this.assertCheckoutRedirectUrl(cancelUrl, 'cancelUrl')
+
+    if (this.stripeDisabled) this.assertStripeAvailable('create_checkout_session')
 
     if (!this.stripe && this.isSimulatedCheckoutEnabled()) {
       return this.simulateCheckoutSession(orgId, planName)
@@ -491,6 +499,7 @@ export class BillingService {
   */
 
   async simulateCheckoutSession(orgId: string, planName: PlanName) {
+    if (this.stripeDisabled) this.assertStripeAvailable('simulate_checkout_session')
 
     const isProduction =
       (this.config.get<string>('NODE_ENV') || process.env.NODE_ENV || '')
