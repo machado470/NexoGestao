@@ -15,6 +15,7 @@ export class WhatsAppDlqProcessor implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   async onModuleInit() {
+    if (process.env.WHATSAPP_PROVIDER?.trim().toLowerCase() === 'disabled') return
     try {
       this.worker = new Worker(
         QUEUE_NAMES.WHATSAPP_DLQ,

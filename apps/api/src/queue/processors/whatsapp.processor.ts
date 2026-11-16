@@ -353,6 +353,10 @@ export class WhatsAppProcessor implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleInit() {
+    if (process.env.WHATSAPP_PROVIDER?.trim().toLowerCase() === 'disabled') {
+      this.logger.log('WhatsApp desativado; jobs pendentes preservados sem consumo')
+      return
+    }
     try {
       this.worker = new Worker(
         QUEUE_NAMES.WHATSAPP,

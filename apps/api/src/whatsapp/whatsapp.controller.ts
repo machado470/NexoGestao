@@ -300,7 +300,7 @@ export class WhatsAppController {
     const provider = createWhatsAppProvider()
     return {
       provider: provider.getProviderName(),
-      status: readiness.mode === 'mock' ? 'configured_mock' : readiness.isReady ? 'configured' : 'misconfigured',
+      status: readiness.status,
       missingEnv: readiness.missingEnv,
       queueAvailable: this.whatsapp.isQueueAvailable(),
       evaluatedAt: new Date().toISOString(),

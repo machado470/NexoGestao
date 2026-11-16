@@ -1,11 +1,12 @@
 import { Logger } from '@nestjs/common'
 import { MockWhatsAppProvider } from './mock.provider'
+import { DisabledWhatsAppProvider } from './disabled.provider'
 import { MetaCloudWhatsAppProvider } from './meta-cloud.provider'
 import { ZApiWhatsAppProvider } from './zapi.provider'
 import { WhatsAppProvider, WhatsAppProviderHealth } from './whatsapp.provider'
 
 const logger = new Logger('WhatsAppProviderFactory')
-const KNOWN_PROVIDERS = ['mock', 'zapi', 'meta_cloud'] as const
+const KNOWN_PROVIDERS = ['disabled', 'mock', 'zapi', 'meta_cloud'] as const
 
 function isProduction(env: NodeJS.ProcessEnv): boolean {
   return (env.NODE_ENV ?? '').toLowerCase().trim() === 'production'
@@ -30,6 +31,11 @@ export class WhatsAppProviderFactory {
         `[BOOT][WhatsApp][dev-fallback] WHATSAPP_PROVIDER desconhecido (${configured}); usando provider mock em desenvolvimento`,
       )
       return new MockWhatsAppProvider()
+    }
+
+    if (configured === 'disabled') {
+      logger.log('[BOOT][WhatsApp] provider=disabled; envios e webhooks indisponíveis')
+      return new DisabledWhatsAppProvider()
     }
 
     if (configured === 'mock') {
@@ -71,13 +77,15 @@ export function createWhatsAppProvider(): WhatsAppProvider {
 
 export function getWhatsAppProviderReadiness(env: NodeJS.ProcessEnv = process.env) {
   const health = WhatsAppProviderFactory.health(env)
+  const ready = health.status === 'configured' || health.status === 'configured_mock'
   return {
     providerRequested: health.configuredProvider,
     providerResolved: health.provider,
     isProviderKnown: KNOWN_PROVIDERS.includes(health.configuredProvider as any),
-    mode: health.provider === 'mock' ? 'mock' : 'real',
-    credentialsReady: health.status !== 'misconfigured',
+    status: health.status,
+    mode: health.provider === 'disabled' ? 'disabled' : health.provider === 'mock' ? 'mock' : 'real',
+    credentialsReady: ready,
     missingEnv: health.missingEnv,
-    isReady: health.status !== 'misconfigured',
+    isReady: ready,
   }
 }

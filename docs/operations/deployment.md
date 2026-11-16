@@ -163,3 +163,17 @@ armazenamento VFS disponível for insuficiente.
 `Production Compose validation` executa essa prova em PRs e na main, sem push de
 imagens ou deploy. `Staging deployment status` é manual e falha explicitamente
 porque o destino não está configurado. Nenhum desses workflows prova produção.
+
+### Publicação sem WhatsApp
+
+Para publicar sem um provedor contratado, mantenha `NODE_ENV=production` e defina
+`WHATSAPP_PROVIDER=disabled` no serviço da API. Esse modo não exige credenciais,
+não envia mensagens e recusa webhooks. Novos envios recebem erro
+`WHATSAPP_DISABLED` (HTTP 503); mensagens pendentes ficam preservadas, sem consumo
+pelos workers ou pelo dispatcher. O readiness crítico continua verificando banco,
+Prisma e filas e identifica a integração WhatsApp como `disabled`, nunca como
+configurada. As validações obrigatórias do banco não são alteradas.
+
+Depois de contratar e configurar `meta_cloud` ou `zapi`, altere o provider e
+publique novamente; mensagens pendentes poderão ser retomadas. Revise essa fila
+antes de reativar. Não use `mock` ou `NODE_ENV=development` para produção.

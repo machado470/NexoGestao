@@ -1,5 +1,5 @@
 import { subscriptionAllowsDispatch } from '../common/commercial/subscription-access'
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common'
 import {
   Prisma,
   WhatsAppContextType,
@@ -177,6 +177,9 @@ export class WhatsAppService {
   }
 
   async enqueueMessage(orgIdOrInput: string | any, maybeInput?: any) {
+    if (process.env.WHATSAPP_PROVIDER?.trim().toLowerCase() === 'disabled') {
+      throw new ServiceUnavailableException({ code: 'WHATSAPP_DISABLED', message: 'WhatsApp desativado neste ambiente' })
+    }
     const orgId = typeof orgIdOrInput === "string" ? orgIdOrInput : orgIdOrInput.orgId
     const requested = typeof orgIdOrInput === "string" ? maybeInput : orgIdOrInput
     if (!orgId) throw new BadRequestException('orgId é obrigatório')

@@ -19,6 +19,7 @@ export class WhatsAppDispatcherJob {
 
   @Cron(CronExpression.EVERY_MINUTE)
   async reconcileStaleSendingMessages() {
+    if (process.env.WHATSAPP_PROVIDER?.trim().toLowerCase() === 'disabled') return
     if (process.env.DISABLE_WHATSAPP_SCHEDULE === '1') return
 
     try {
@@ -40,6 +41,7 @@ export class WhatsAppDispatcherJob {
 
   @Cron(CronExpression.EVERY_10_SECONDS)
   async dispatchQueued() {
+    if (process.env.WHATSAPP_PROVIDER?.trim().toLowerCase() === 'disabled') return
     if (process.env.DISABLE_WHATSAPP_SCHEDULE === '1') return
 
     const maxMessagesPerRun = 50

@@ -105,6 +105,28 @@ describe('HealthController readiness factual dependency checks', () => {
     })
   })
 
+  it('permite readiness em produção com WhatsApp explicitamente desativado sem declará-lo configurado', async () => {
+    const previousProvider = process.env.WHATSAPP_PROVIDER
+    const previousNodeEnv = process.env.NODE_ENV
+    try {
+      process.env.NODE_ENV = 'production'
+      process.env.WHATSAPP_PROVIDER = 'disabled'
+      const { health } = controller()
+      await expect(health.readiness()).resolves.toMatchObject({
+        status: 'ready',
+        integrations: {
+          whatsapp: 'disabled',
+          whatsappDetails: { mode: 'disabled', credentialsReady: false, missingEnv: [] },
+        },
+      })
+    } finally {
+      if (previousProvider === undefined) delete process.env.WHATSAPP_PROVIDER
+      else process.env.WHATSAPP_PROVIDER = previousProvider
+      if (previousNodeEnv === undefined) delete process.env.NODE_ENV
+      else process.env.NODE_ENV = previousNodeEnv
+    }
+  })
+
   it('não declara ready quando Redis/fila está indisponível', async () => {
     const { health } = controller({
       queue: { ok: false, redisEnabled: false, reason: 'Redis indisponível', status: 'end' },
