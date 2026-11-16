@@ -65,6 +65,7 @@ services:
         max-size: "10m"
         max-file: "3"
     entrypoint: ["/app/apps/api/docker-entrypoint.sh"]
+    command: ["node", "dist/main.js"]
 
 volumes:
   pgdata:
