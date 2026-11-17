@@ -1,3 +1,4 @@
+import { useFormDiscardGuard } from "@/hooks/useFormDiscardGuard";
 import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
 import { parseMoneyInputToCents } from "@/lib/money-input";
 import { parseLocalDateTimeInput } from "@/lib/local-date-time";
@@ -124,11 +125,9 @@ export default function CreateServiceOrderModal({
       formData.title.trim().length > 0
     );
   }, [customers.length, formData.customerId, formData.title]);
-  const isDirty = useMemo(() => {
-    return Object.entries(formData).some(
-      ([, value]) => value.trim().length > 0
-    );
-  }, [formData]);
+  const isDirty = Object.entries(formData).some(([key, value]) =>
+    value !== (key === "customerId" ? String(initialCustomerId ?? "") : INITIAL_FORM[key as keyof FormState])
+  );
 
   const hasAmount = formData.amount.trim().length > 0;
   const selectedCustomerName =
@@ -136,22 +135,17 @@ export default function CreateServiceOrderModal({
     "Cliente não definido";
   const summaryAmount = formatCurrencyFromInput(formData.amount);
 
-  const handleClose = () => {
-    if (createMutation.isPending) return;
-    if (
-      !createdServiceOrder &&
-      isDirty &&
-      !window.confirm("Existem dados não salvos. Deseja fechar e descartar?")
-    ) {
-      return;
-    }
-    setCreatedServiceOrder(null);
-    setFormData({
-      ...INITIAL_FORM,
-      customerId: initialCustomerId ? String(initialCustomerId) : "",
-    });
-    onClose();
-  };
+  const discardGuard = useFormDiscardGuard({
+    open: resolvedOpen,
+    dirty: !createdServiceOrder && isDirty,
+    blocked: createMutation.isPending,
+    onDiscard: () => {
+      setCreatedServiceOrder(null);
+      setFormData({ ...INITIAL_FORM, customerId: initialCustomerId ? String(initialCustomerId) : "" });
+      onClose();
+    },
+  });
+  const handleClose = discardGuard.requestClose;
 
   useEffect(() => {
     if (!resolvedOpen) {
@@ -290,6 +284,7 @@ export default function CreateServiceOrderModal({
   };
 
   return (
+    <>
     <FormModal
       open={resolvedOpen}
       onOpenChange={open => (!open ? handleClose() : undefined)}
@@ -628,5 +623,7 @@ export default function CreateServiceOrderModal({
         </AppForm>
       ) : null}
     </FormModal>
+    {discardGuard.confirmation}
+    </>
   );
 }
