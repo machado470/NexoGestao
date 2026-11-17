@@ -1,3 +1,6 @@
+import { useIsMobile } from "@/hooks/useMobile";
+import { MobileHome } from "@/components/MobileHome";
+import { can } from "@/lib/rbac";
 import { presentationLabel } from "@/lib/presentation-labels";
 import { useMemo } from "react";
 import {
@@ -633,8 +636,9 @@ function AttentionRow({
 
 export default function ExecutiveDashboard() {
   useRenderWatchdog("ExecutiveDashboard");
+  const isMobile = useIsMobile();
   const [, navigate] = useLocation();
-  const { isAuthenticated, role } = useAuth();
+  const { isAuthenticated, role, user } = useAuth();
   const kpisQuery = trpc.dashboard.kpis.useQuery(undefined, {
     enabled: isAuthenticated,
     retry: false,
@@ -1045,6 +1049,69 @@ export default function ExecutiveDashboard() {
     .join(" · ");
   return (
     <AppPageShell className="gap-3 sm:gap-4">
+      <MobileHome
+        role={role}
+        name={user?.name}
+        navigate={navigate}
+        loading={pageLoading}
+        failed={pageError}
+        partial={isPartiallyUnavailable}
+        empty={!hasOperationalData}
+        action={recommendedAction}
+        actionLoading={nextBestActionQuery.isLoading}
+        actionError={nextBestActionQuery.isError}
+        attention={attention}
+        attentionError={operationalSignalsQuery.isError}
+        attentionLoading={operationalSignalsQuery.isLoading}
+        summary={[
+          ...(role && can(role, "finance:read")
+            ? [
+                {
+                  label: "Recebido na semana",
+                  value: kpisQuery.isLoading
+                    ? "…"
+                    : kpisQuery.isError
+                      ? "Indisponível"
+                      : readNullableNumber(
+                            metrics,
+                            metrics?.netWeeklyRevenueInCents !== undefined
+                              ? "netWeeklyRevenueInCents"
+                              : "weeklyRevenueInCents"
+                          ) === null
+                        ? "Não informado"
+                        : formatCurrencyFromCents(weeklyRevenueInCents),
+                  path: "/finances?view=paid",
+                },
+              ]
+            : []),
+          {
+            label: "O.S. em aberto",
+            value: kpisQuery.isLoading
+              ? "…"
+              : kpisQuery.isError
+                ? "Indisponível"
+                : readNullableNumber(metrics, "openServiceOrders") === null
+                  ? "Não informado"
+                  : String(readNullableNumber(metrics, "openServiceOrders")),
+            path: "/service-orders?status=open",
+          },
+        ]}
+        onRetry={() => {
+          void Promise.all([
+            kpisQuery.refetch(),
+            alertsQuery.refetch(),
+            executivePipelineQuery.refetch(),
+            operationalStateQuery.refetch(),
+            operationalSignalsQuery.refetch(),
+            nextBestActionQuery.refetch(),
+            timelineQuery.refetch(),
+            pendingWhatsAppApprovalsQuery.refetch(),
+          ]);
+        }}
+      />
+      <details open={!isMobile} className="min-w-0 md:contents">
+        <summary className="min-h-11 py-3 text-sm font-medium md:hidden">Indicadores e detalhes da operação</summary>
+        <div className="min-w-0 md:contents">
       <AppOperationalHeader
         className="px-4 sm:px-6"
         density="compact"
@@ -1605,6 +1672,8 @@ export default function ExecutiveDashboard() {
           </AppSectionBlock>
         </div>
       ) : null}
+        </div>
+      </details>
     </AppPageShell>
   );
 }

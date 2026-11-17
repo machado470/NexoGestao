@@ -3788,3 +3788,60 @@ html {
     }
   }
 }
+
+/* Mobile app shell: stable navigation, one-row header, safe-area spacing. */
+@layer components {
+  .mobile-app-nav {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 30;
+    display: flex;
+    padding: 0.375rem 0.5rem calc(0.375rem + env(safe-area-inset-bottom, 0px));
+    background: var(--app-topbar, var(--surface-primary));
+    border-top: 1px solid var(--border-subtle);
+  }
+  .mobile-app-nav button {
+    display: flex;
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 52px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    border-radius: 0.75rem;
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 600;
+  }
+  .mobile-app-nav button[aria-current="page"] {
+    background: var(--accent-soft);
+    color: var(--accent-primary);
+  }
+  .mobile-app-nav button:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: -2px;
+  }
+  @media (max-width: 767px) {
+    .app-root .nexo-app-content {
+      padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+      scroll-padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+    }
+    .app-root [data-mobile-header] .nexo-topbar-content-grid {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+    .app-root [data-mobile-header], .app-root [data-mobile-header] .nexo-topbar-grid {
+      min-height: 60px;
+    }
+    .mobile-home { padding: 0.25rem 0.25rem 1rem; }
+    .mobile-home button { touch-action: manipulation; }
+  }
+}
+
+/* Toasts belong above the phone navigation, including portaled notifications. */
+@media (max-width: 767px) {
+  body:has(.mobile-app-nav) [data-sonner-toaster][data-y-position="bottom"] {
+    bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+  }
+}

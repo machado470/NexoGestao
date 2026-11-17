@@ -1,3 +1,4 @@
+import { MobileAppNavigation } from "@/components/MobileAppNavigation";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -17,6 +18,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  Search,
   MessageCircle,
   Moon,
   Settings,
@@ -110,6 +112,7 @@ export function MainLayout({ children }: MainLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] =
     useOperationalMemoryState<boolean>(SIDEBAR_COLLAPSED_STORAGE_KEY, true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 
   if (import.meta.env.DEV && import.meta.env.VITE_BOOT_DIAGNOSTICS === "true") {
     // eslint-disable-next-line no-console
@@ -286,6 +289,7 @@ export function MainLayout({ children }: MainLayoutProps) {
   useEffect(() => {
     if (!isMobile) return;
     setMobileMenuOpen(false);
+    setMobileSearchOpen(false);
   }, [isMobile, location]);
 
   const handleNavigate = (route: string) => {
@@ -319,14 +323,6 @@ export function MainLayout({ children }: MainLayoutProps) {
         className={`nexo-app-shell nexo-app app-root ${theme === "dark" ? "dark" : ""} min-h-screen text-[var(--text-primary)]`}
         data-theme={theme}
       >
-        {isMobile && mobileMenuOpen ? (
-          <button
-            type="button"
-            aria-label="Fechar menu"
-            className="fixed inset-0 z-30 bg-[color-mix(in_srgb,var(--background-base)_84%,black)]/70 backdrop-blur-sm nexo-state-transition"
-            onClick={() => setMobileMenuOpen(false)}
-          />
-        ) : null}
         {!isMobile && !sidebarCollapsed ? (
           <button
             type="button"
@@ -337,7 +333,7 @@ export function MainLayout({ children }: MainLayoutProps) {
         ) : null}
 
         <div className="flex min-h-screen w-full">
-          <aside
+          {!isMobile ? <aside
             data-scrollbar="nexo"
             className={`nexo-sidebar z-40 flex shrink-0 flex-col overflow-hidden shadow-lg transition-[width,transform] duration-200 ease-out ${
               isMobile
@@ -480,7 +476,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                 ) : null}
               </button>
             </div>
-          </aside>
+          </aside> : null}
 
           <div
             data-sidebar-collapsed={
@@ -496,24 +492,14 @@ export function MainLayout({ children }: MainLayoutProps) {
                 : undefined
             }
           >
-            <header className="nexo-topbar z-20 nexo-state-transition">
+            <header className="nexo-topbar z-20 nexo-state-transition" data-mobile-header={isMobile || undefined}>
               <div className="nexo-topbar-grid">
                 <div className="nexo-topbar-content-grid">
                   <div className="flex min-w-0 items-center gap-2 md:gap-2.5">
-                    {isMobile ? (
-                      <button
-                        type="button"
-                        onClick={() => setMobileMenuOpen(prev => !prev)}
-                        aria-label="Abrir menu"
-                        aria-expanded={mobileMenuOpen}
-                        className="nexo-topbar-control"
-                      >
-                        <Menu className="h-5 w-5" />
-                      </button>
-                    ) : null}
-                    <div className="nexo-topbar-search-slot min-w-0 self-center">
-                      <GlobalSearch compact={isMobile} />
-                    </div>
+                    {isMobile ? <>
+                      <button type="button" onClick={() => handleNavigate("/executive-dashboard")} className="min-h-11 min-w-0 flex-1 truncate text-left text-base font-semibold tracking-tight" aria-label="NexoGestão, início">NexoGestão<span className="text-[var(--accent-primary)]">.</span></button>
+                      <button type="button" className="nexo-topbar-control" aria-label="Buscar" onClick={() => setMobileSearchOpen(true)}><Search className="h-5 w-5" /></button>
+                    </> : <div className="nexo-topbar-search-slot min-w-0 self-center"><GlobalSearch /></div>}
                   </div>
 
                   <div className="flex items-center justify-end gap-1.5 md:gap-2">
@@ -637,6 +623,7 @@ export function MainLayout({ children }: MainLayoutProps) {
 
             <main
               data-scrollbar="nexo"
+              style={isMobile ? { paddingBottom: "calc(88px + env(safe-area-inset-bottom, 0px))" } : undefined}
               className={cn(
                 "nexo-app-content nexo-section-reveal mt-0 min-h-0 flex-1 overflow-auto px-3 pb-4 md:mt-0 md:px-4 md:pb-5",
                 isWhatsAppRoute
@@ -648,6 +635,14 @@ export function MainLayout({ children }: MainLayoutProps) {
             </main>
           </div>
         </div>
+
+        {isMobile ? <MobileAppNavigation
+          sections={visibleSections} location={location}
+          financeAllowed={Boolean(role && canAny(role,["finance:read"]))}
+          onNavigate={handleNavigate} menuOpen={mobileMenuOpen} onMenuChange={setMobileMenuOpen}
+          searchOpen={mobileSearchOpen} onSearchChange={setMobileSearchOpen}
+          theme={theme} onThemeToggle={() => toggleTheme?.()}
+        /> : null}
       </div>
     </AppShell>
   );

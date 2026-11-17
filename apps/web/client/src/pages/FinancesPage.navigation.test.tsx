@@ -4,6 +4,8 @@ import { Router } from "wouter";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import FinancesPage from "./FinancesPage";
 
+vi.mock("@/hooks/useCreateFromRoute", () => ({ useCreateFromRoute: () => {} }));
+
 const state = vi.hoisted(() => ({
   focused: {} as any,
   list: {} as any,

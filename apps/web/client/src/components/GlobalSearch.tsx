@@ -35,7 +35,13 @@ function getResultIcon(type: SearchResult["type"]) {
   }
 }
 
-export function GlobalSearch({ compact = false }: { compact?: boolean }) {
+export function GlobalSearch({
+  compact = false,
+  onNavigate,
+}: {
+  compact?: boolean;
+  onNavigate?: () => void;
+}) {
   const { isAuthenticated, isInitializing } = useAuth();
   const canQuery = isAuthenticated && !isInitializing;
 
@@ -106,6 +112,7 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
 
   const handleSelectResult = (result: SearchResult) => {
     navigate(result.route);
+    onNavigate?.();
     setQuery("");
     setDebouncedQuery("");
     setIsOpen(false);
@@ -121,12 +128,14 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
           aria-label="Busca global"
           placeholder={
             canQuery
-              ? compact ? "Buscar..." : "Buscar clientes, agendamentos..."
+              ? compact
+                ? "Buscar..."
+                : "Buscar clientes, agendamentos..."
               : "Entre para pesquisar"
           }
           value={query}
           disabled={!canQuery}
-          onChange={(e) => {
+          onChange={e => {
             setQuery(e.target.value);
             setIsOpen(true);
           }}
@@ -157,8 +166,8 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
               <span className="text-sm">Buscando...</span>
             </div>
           ) : results.length > 0 ? (
-            <div className="max-h-96 overflow-y-auto" data-scrollbar="nexo">
-              {results.map((result) => (
+            <div className="max-h-[min(24rem,45dvh)] overflow-y-auto" data-scrollbar="nexo">
+              {results.map(result => (
                 <button
                   key={`${result.type}-${result.id}`}
                   type="button"

@@ -1,3 +1,4 @@
+import { useCreateFromRoute } from "@/hooks/useCreateFromRoute";
 import { useFormDiscardGuard } from "@/hooks/useFormDiscardGuard";
 import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
 import { formatOrganizationDate, type Instant } from "@/lib/organization-locale";
@@ -123,6 +124,7 @@ export default function AppointmentsPage() {
   );
   const [page, setPage] = useState(1);
   const [openModal, setOpenModal] = useState(false);
+  useCreateFromRoute("appointments:create", setOpenModal);
   const [editing, setEditing] = useState<AppointmentRow | null>(null);
   const [openServiceOrderModal, setOpenServiceOrderModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
