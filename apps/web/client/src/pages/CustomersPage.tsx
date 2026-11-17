@@ -1,3 +1,4 @@
+import { MobileModuleHeader } from "@/components/MobileModuleHeader";
 import { useCreateFromRoute } from "@/hooks/useCreateFromRoute";
 import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
 import { formatOrganizationDate, type Instant } from "@/lib/organization-locale";
@@ -433,7 +434,7 @@ export default function CustomersPage() {
   const routeSearch = useSearch();
   const isMobile = useIsMobile();
   const [mobileDetailsOpen, setMobileDetailsOpen] = useState(() => Boolean(new URLSearchParams(routeSearch).get("customerId")));
-  const pageAnchorRef = useRef<HTMLElement | null>(null);
+  const pageAnchorRef = useRef<HTMLDivElement | null>(null);
   const openMobileCustomer = (id: string) => {
     setActiveCustomerId(id);
     setMobileDetailsOpen(true);
@@ -1055,15 +1056,17 @@ export default function CustomersPage() {
   );
 
   return (
-    <AppPageShell className="customers-page min-w-0 gap-3">
-      <header ref={pageAnchorRef} className="flex min-w-0 items-center justify-between gap-3 md:hidden">
+    <AppPageShell className="customers-page mobile-module-page min-w-0 gap-3">
+      <div ref={pageAnchorRef} className="md:hidden">
         {mobileDetailsOpen ? <Button variant="ghost" className="min-h-11 px-0" onClick={() => {
           setMobileDetailsOpen(false);
           pageAnchorRef.current?.scrollIntoView({ block: "start" });
-        }}><ArrowLeft className="h-4 w-4" />Voltar aos clientes</Button> : (
-          <><h1 className="text-xl font-semibold">Clientes</h1><Button disabled={!canCreateCustomer} onClick={() => setCreateOpen(true)}>Novo cliente</Button></>
-        )}
-      </header>
+        }}><ArrowLeft className="h-4 w-4" />Voltar aos clientes</Button> : <MobileModuleHeader
+          title="Clientes" description="Relacionamentos e próximos atendimentos."
+          context={customersQuery.isSuccess ? `${customersQuery.data?.meta.total ?? 0} ${(customersQuery.data?.meta.total ?? 0) === 1 ? "cliente encontrado" : "clientes encontrados"}` : undefined}
+          primaryAction={canCreateCustomer ? <Button className="min-h-11" onClick={() => setCreateOpen(true)}>Novo cliente</Button> : undefined}
+        />}
+      </div>
       <div className="hidden md:block">
       <AppOperationalHeader
         title="Centro Operacional do Cliente"
@@ -1167,7 +1170,7 @@ export default function CustomersPage() {
       <AppFiltersBar
         aria-label="Filtros de apresentação"
         className={cn(
-          "min-w-0 shrink-0 flex-col items-stretch gap-2 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2 md:flex-row md:items-center",
+          "module-filters min-w-0 shrink-0 flex-col items-stretch gap-2 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2 md:flex-row md:items-center",
           mobileDetailsOpen ? "hidden md:flex" : undefined
         )}
       >
@@ -1266,7 +1269,7 @@ export default function CustomersPage() {
               : "Lista priorizada por contexto, pendência e próxima ação possível."
           }
           className={cn(
-            "min-w-0 2xl:col-span-12",
+            "min-w-0 2xl:col-span-12 mobile-flat-section",
             mobileDetailsOpen ? "hidden md:block" : "order-1 md:order-2"
           )}
           compact
@@ -1296,7 +1299,7 @@ export default function CustomersPage() {
                   <article
                     key={`card-${profile.customerId}`}
                     className={cn(
-                      "min-w-0 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3",
+                      "module-list-item min-w-0 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3",
                       profile.customerId === activeCustomerId
                         ? "bg-[var(--accent-soft)]/35"
                         : undefined
@@ -1322,6 +1325,8 @@ export default function CustomersPage() {
                       {profile.operationalSummary?.riskSignal ??
                         "Sinal operacional indisponível"}
                     </p>
+                    <details className="module-row-details mt-2">
+                      <summary className="min-h-11 py-3 text-sm text-[var(--text-secondary)]">Atendimentos e histórico</summary>
                     {profile.activeServiceOrder ? (
                       <p className="mt-2 text-xs text-[var(--text-secondary)]">
                         Responsável:{" "}
@@ -1361,6 +1366,7 @@ export default function CustomersPage() {
                       </p>
                     </div>
 
+                    </details>
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                       <span className="text-sm font-medium text-[var(--text-primary)]">
                         {isChargesUnavailable ? "Consulte o financeiro do cliente" : formatCurrency(profile.pendingCents)}
@@ -1545,7 +1551,7 @@ export default function CustomersPage() {
             "min-w-0 md:order-1",
             mobileDetailsOpen ? "order-1" : "hidden md:block",
             selectedProfile ? "2xl:col-span-12" : "2xl:col-span-4",
-            "customer-workspace [&>div:first-child]:hidden md:[&>div:first-child]:flex"
+            "mobile-flat-section customer-workspace [&>div:first-child]:hidden md:[&>div:first-child]:flex"
           )}
         >
           {!activeCustomerId || !selectedCustomer || !selectedProfile ? (

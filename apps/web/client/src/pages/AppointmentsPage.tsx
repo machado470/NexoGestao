@@ -1,3 +1,4 @@
+import { MobileModuleHeader } from "@/components/MobileModuleHeader";
 import { useCreateFromRoute } from "@/hooks/useCreateFromRoute";
 import { useFormDiscardGuard } from "@/hooks/useFormDiscardGuard";
 import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
@@ -434,11 +435,16 @@ export default function AppointmentsPage() {
   };
 
   return (
-    <AppPageShell ref={mobile.anchorRef} className="operational-mobile-page">
+    <AppPageShell ref={mobile.anchorRef} className="operational-mobile-page mobile-module-page">
       <MobileDetailBack visible={mobile.isOpen} onBack={mobile.back} label="Voltar aos agendamentos" />
       <MobileDetailState visible={mobile.isOpen && !selected} loading={appointmentsQuery.isLoading} failed={appointmentsQuery.isError} onRetry={() => void appointmentsQuery.refetch()} />
       <div data-testid="appointments-operational-page" className="contents">
         <div className={`${mobile.listClass} space-y-3`}>
+        <MobileModuleHeader title="Agenda" description="Atendimentos, horários e responsáveis."
+          context={appointmentsQuery.isSuccess ? `${appointments.length} ${appointments.length === 1 ? "agendamento" : "agendamentos"} nesta página` : undefined}
+          primaryAction={canCreateAppointment ? <Button className="min-h-11" onClick={() => {setEditing(null);setOpenModal(true);}}>Novo agendamento</Button> : undefined}
+        />
+        <div className="hidden md:block">
         <AppOperationalHeader
           title="Agendamentos"
           description="Organize o que vai acontecer, quando, com quem e o que precisa ser preparado."
@@ -468,12 +474,13 @@ export default function AppointmentsPage() {
             </Button>
           }
         />
+        </div>
 
         </div>
         <div className="grid min-w-0 gap-4">
           {appointmentsQuery.isSuccess ? (
             <AppSectionBlock
-              className={`${mobile.listClass} mobile-summary [&>div:first-child]:hidden md:[&>div:first-child]:flex`}
+              className={`${mobile.listClass} mobile-flat-section mobile-summary [&>div:first-child]:hidden md:[&>div:first-child]:flex`}
               title="Contexto da agenda"
               subtitle="Leitura factual do escopo retornado; nenhuma decisão é reconstruída no navegador."
               compact
@@ -500,7 +507,7 @@ export default function AppointmentsPage() {
           ) : null}
 
           <AppSectionBlock
-            className={mobile.listClass}
+            className={`${mobile.listClass} mobile-flat-section`}
             title="Filtros"
             subtitle="Refine apenas por fatos persistidos, sem alterar a ordem recebida."
             compact
@@ -618,7 +625,7 @@ export default function AppointmentsPage() {
           ) : null}
 
           <AppSectionBlock
-            className={mobile.listClass}
+            className={`${mobile.listClass} mobile-flat-section`}
             title="Agenda operacional"
             subtitle="Horário, cliente, serviço, responsável e execução em uma única leitura."
             compact
@@ -645,7 +652,7 @@ export default function AppointmentsPage() {
               <AppPageLoadingState description="Carregando agendamentos..." />
             ) : appointmentsQuery.isError ? (
               <AppPageErrorState
-                description="A fonte principal de agendamentos está indisponível."
+                description="Não foi possível carregar os agendamentos."
                 actionLabel="Tentar novamente"
                 onAction={() => void appointmentsQuery.refetch()}
               />
@@ -672,7 +679,7 @@ export default function AppointmentsPage() {
                     return (
                       <article
                         key={row.id}
-                        className="grid min-w-0 gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3 sm:p-4 lg:grid-cols-[minmax(130px,160px)_minmax(0,1fr)_minmax(120px,160px)_auto] lg:items-center"
+                        className="module-list-item module-appointment-row grid min-w-0 gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3 sm:p-4 lg:grid-cols-[minmax(130px,160px)_minmax(0,1fr)_minmax(120px,160px)_auto] lg:items-center"
                       >
                         <div className="min-w-0">
                           <p className="break-words font-semibold text-[var(--text-primary)]">
@@ -803,7 +810,7 @@ export default function AppointmentsPage() {
           </AppSectionBlock>
 
           {filteredRows.length > 0 && !appointmentsQuery.isLoading && !appointmentsQuery.isError ? (          <AppSectionBlock
-            className={mobile.detailClass}
+            className={`${mobile.detailClass} mobile-flat-section`}
             title="Detalhe e evidências"
             subtitle="Fatos do agendamento em foco e histórico oficial relacionado."
             compact
