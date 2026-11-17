@@ -1,3 +1,4 @@
+import { requestAppNavigation } from "@/lib/navigation-guard";
 import { MobileAppNavigation } from "@/components/MobileAppNavigation";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
@@ -297,7 +298,7 @@ export function MainLayout({ children }: MainLayoutProps) {
     if (isMobile) setMobileMenuOpen(false);
   };
 
-  const handleLogout = async () => {
+  const performLogout = async () => {
     try {
       await Promise.race([
         logout(),
@@ -316,6 +317,11 @@ export function MainLayout({ children }: MainLayoutProps) {
       );
     }
   };
+
+  const handleLogout = () =>
+    requestAppNavigation(() => {
+      void performLogout();
+    });
 
   return (
     <AppShell>
