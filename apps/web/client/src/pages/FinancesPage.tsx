@@ -1,3 +1,4 @@
+import { MobileModuleHeader } from "@/components/MobileModuleHeader";
 import { useCreateFromRoute } from "@/hooks/useCreateFromRoute";
 import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
 import { formatOrganizationDate, formatRecordedMoney, formatRecordedTotal, type Instant } from "@/lib/organization-locale";
@@ -391,7 +392,13 @@ export default function FinancesPage() {
   }
 
   return (
-    <AppPageShell className="operational-mobile-page min-w-0 gap-4" data-testid="finances-authoritative-page">
+    <AppPageShell className="operational-mobile-page mobile-module-page min-w-0 gap-4" data-testid="finances-authoritative-page">
+      <MobileModuleHeader title="Financeiro" description="Cobranças, recebimentos e pendências."
+        context={chargesQuery.isSuccess ? `${charges.length} ${charges.length === 1 ? "cobrança carregada" : "cobranças carregadas"}` : undefined}
+        primaryAction={<Button className="min-h-11" onClick={() => setOpenCreate(true)}>Nova cobrança</Button>}
+        onRefresh={() => void refresh()}
+      />
+      <div className="hidden md:block">
       <AppOperationalHeader
         title="Financeiro operacional"
         description="Acompanhe cobranças, recebimentos e pendências."
@@ -412,6 +419,7 @@ export default function FinancesPage() {
           </>
         }
       />
+      </div>
 
       {focusedChargeId ? (
         <AppSectionBlock
@@ -463,7 +471,7 @@ export default function FinancesPage() {
       ) : null}
 
       <AppSectionBlock
-        className="[&>div:first-child]:hidden md:[&>div:first-child]:flex"
+        className="mobile-flat-section [&>div:first-child]:hidden md:[&>div:first-child]:flex"
         title="Indicadores oficiais"
         subtitle="Zero é exibido como valor legítimo; ausência e erro permanecem explícitos."
       >
@@ -503,7 +511,7 @@ export default function FinancesPage() {
         {Array.isArray(stats?.currencies) && stats.currencies.length > 1 ? <p className="mt-2 text-sm text-muted-foreground">Há cobranças em moedas diferentes. Consulte os valores por cobrança.</p> : null}
       </AppSectionBlock>
 
-      <ResponsiveDetails title="Pendências prioritárias">
+      <ResponsiveDetails title="Pendências prioritárias" controls>
       <AppSectionBlock
         title="Fila operacional oficial"
         subtitle="Pendências na ordem de prioridade da sua operação."
@@ -532,7 +540,7 @@ export default function FinancesPage() {
           <div className="space-y-3 md:hidden" aria-label="Fila financeira no celular">
             {queue.map(item => {
               const summary = item.financialOperationalSummary ?? {};
-              return <article key={String(item.id)} className="min-w-0 space-y-3 rounded-xl border border-[var(--border-subtle)] p-3" aria-label={`Pendência de ${factualLabel(item.customer?.name, "cliente não informado")}`}>
+              return <article key={String(item.id)} className="module-list-item min-w-0 space-y-3 rounded-xl border border-[var(--border-subtle)] p-3" aria-label={`Pendência de ${factualLabel(item.customer?.name, "cliente não informado")}`}>
                 <h3 className="break-words font-semibold">{factualLabel(item.customer?.name, "Cliente não informado")}</h3>
                 <div className="flex flex-wrap gap-2"><AppStatusBadge label={priorityLabel(summary.priority)} /><AppStatusBadge label={riskLabel(summary.riskLevel)} /></div>
                 <p className="break-words text-sm text-[var(--text-secondary)]">{factualLabel(summary.priorityReason, "Motivo não informado")}</p>
@@ -606,9 +614,10 @@ export default function FinancesPage() {
       </ResponsiveDetails>
       <AppSectionBlock
         title="Carteira oficial"
+        className="mobile-flat-section"
         subtitle="Encontre uma cobrança e consulte seus pagamentos."
       >
-        <AppFiltersBar className="mb-3 grid gap-2 sm:grid-cols-2">
+        <AppFiltersBar className="module-filters mb-3 grid gap-2 sm:grid-cols-2">
           <AppField label="Buscar cliente ou O.S." htmlFor="finance-search">
             <AppInput
               id="finance-search"
@@ -617,7 +626,7 @@ export default function FinancesPage() {
               placeholder="Nome ou número da O.S."
             />
           </AppField>
-          <AppField label="Status oficial" htmlFor="finance-status">
+          <AppField label="Status da cobrança" htmlFor="finance-status">
             <AppSelect
               id="finance-status"
               ariaLabel="Filtrar por status oficial"
@@ -650,11 +659,11 @@ export default function FinancesPage() {
         ) : (
           <>
           <div className="space-y-3 md:hidden" aria-label="Cobranças no celular">
-            {visibleCharges.map(charge => <article key={String(charge.id)} aria-label={`Cobrança de ${factualLabel(charge.customer?.name, "cliente não informado")}`} className="min-w-0 space-y-3 rounded-xl border border-[var(--border-subtle)] p-3">
+            {visibleCharges.map(charge => <article key={String(charge.id)} aria-label={`Cobrança de ${factualLabel(charge.customer?.name, "cliente não informado")}`} className="module-list-item min-w-0 space-y-3 rounded-xl border border-[var(--border-subtle)] p-3">
               <h3 className="break-words font-semibold">{factualLabel(charge.customer?.name, "Cliente não informado")}</h3>
               <AppStatusBadge label={statusLabel(charge.status)} tone={statusTone(charge.status)} />
               <p className="break-words text-xs text-[var(--text-muted)]">O.S.: {factualLabel(charge.serviceOrder?.number, "Não vinculada")} · Vence {date(charge.dueDate)}</p>
-              <dl className="grid grid-cols-2 gap-3 text-sm"><div className="min-w-0"><dt>Original</dt><dd className="break-words">{money(charge.amountCents, charge.currency)}</dd></div><div className="min-w-0"><dt>Saldo</dt><dd className="break-words font-semibold">{money(charge.balanceCents, charge.currency)}</dd></div></dl>
+              <dl className="space-y-2 text-sm"><div className="min-w-0"><dt className="text-xs text-[var(--text-muted)]">Saldo da cobrança</dt><dd className="mt-1 break-words text-2xl font-semibold tabular-nums">{money(charge.balanceCents, charge.currency)}</dd></div><div className="flex min-w-0 flex-wrap gap-x-2 text-xs text-[var(--text-muted)]"><dt>Valor original</dt><dd className="break-words">{money(charge.amountCents, charge.currency)}</dd></div></dl>
               <details className="rounded-lg border border-[var(--border-subtle)] p-2"><summary className="min-h-11 cursor-pointer py-2 text-sm">Pagamentos e detalhes</summary>
                 <div className="space-y-2 text-sm"><p>Pago: {money(charge.paidAmountCents, charge.currency)}</p>
                 {Number(charge.refundedAmountCents ?? 0) > 0 ? <p>Estornado: {money(charge.refundedAmountCents, charge.currency)} · Recebido líquido: {money(charge.netReceivedAmountCents, charge.currency)}</p> : null}

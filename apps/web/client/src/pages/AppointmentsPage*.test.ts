@@ -32,7 +32,7 @@ describe("AppointmentsPage operational contract", () => {
     expect(compact).toContain("appointmentsQuery.isSuccess ? (");
     expect(source).toContain("factualCounts.total");
     expect(source).toContain(
-      "A fonte principal de agendamentos está indisponível"
+      "Não foi possível carregar os agendamentos"
     );
   });
 

@@ -3845,3 +3845,68 @@ html {
     bottom: calc(88px + env(safe-area-inset-bottom, 0px));
   }
 }
+
+/* Consistent phone module surfaces; desktop workspaces retain their structure. */
+@media (max-width: 767px) {
+  .mobile-module-header { padding: 0.5rem 0.25rem 0.75rem; }
+  .mobile-module-header button { min-height: 44px; white-space: normal; }
+  .app-root .mobile-module-page .mobile-flat-section {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    border-radius: 0;
+  }
+  .mobile-module-page .mobile-flat-section > div:first-child { display: none; }
+  .mobile-module-page .module-list-item {
+    min-width: 0;
+    border: 0;
+    border-radius: 16px;
+    background: var(--surface-elevated);
+    padding: 16px;
+    box-shadow: none;
+  }
+  .mobile-module-page .module-list-item p,
+  .mobile-module-page .module-list-item dd { overflow-wrap: anywhere; }
+  .mobile-module-page .module-row-details { border-top: 1px solid var(--border-subtle); }
+  .mobile-module-page .module-row-details[open] { padding-bottom: 0.5rem; }
+  .mobile-module-page .finance-summary-grid > * {
+    background: var(--surface-elevated);
+    border: 0;
+    border-radius: 16px;
+    box-shadow: none;
+  }
+  .mobile-module-page .module-list-item > details {
+    border: 0;
+    border-top: 1px solid var(--border-subtle);
+    border-radius: 0;
+    padding-inline: 0;
+  }
+  .mobile-module-page .customer-mobile-detail > section {
+    background: var(--surface-elevated);
+    border: 0;
+    border-radius: 16px;
+    padding: 16px;
+  }
+}
+@media (max-width: 767px) {
+  .mobile-module-page .module-filters {
+    border: 0;
+    background: transparent;
+    padding-inline: 0;
+  }
+}
+@media (max-width: 767px) {
+  .mobile-module-page .module-filters:not(.hidden) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+  .mobile-module-page .module-filters > * { min-width: 0; width: 100%; }
+}
+@media (max-width: 767px) {
+  .mobile-module-page .module-list-item[role="button"]:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
+  }
+}

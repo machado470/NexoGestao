@@ -1,3 +1,4 @@
+import { MobileModuleHeader } from "@/components/MobileModuleHeader";
 import { useCreateFromRoute } from "@/hooks/useCreateFromRoute";
 import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
 import { formatOrganizationDate, type Instant } from "@/lib/organization-locale";
@@ -871,10 +872,15 @@ export default function ServiceOrdersPage() {
   }
 
   return (
-    <AppPageShell ref={mobile.anchorRef} className="operational-mobile-page gap-3">
+    <AppPageShell ref={mobile.anchorRef} className="operational-mobile-page mobile-module-page gap-3">
       <MobileDetailBack visible={mobile.isOpen} onBack={mobile.back} label="Voltar às ordens de serviço" />
       <MobileDetailState visible={mobile.isOpen && !selectedOrder} loading={serviceOrdersQuery.isLoading} failed={serviceOrdersQuery.isError} onRetry={() => void serviceOrdersQuery.refetch()} />
       <div className={`${mobile.listClass} space-y-3`}>
+      <MobileModuleHeader title="Serviços" description="Acompanhe suas ordens de serviço."
+        context={serviceOrdersQuery.isSuccess ? `${serviceOrders.length} ${serviceOrders.length === 1 ? "ordem" : "ordens"} nesta página` : undefined}
+        primaryAction={canCreateOrder ? <Button className="min-h-11" disabled={customersQuery.isError} onClick={() => setOpenCreate(true)}>Nova O.S.</Button> : undefined}
+      />
+      <div className="hidden md:block">
       <AppOperationalHeader
         title="Ordens de Serviço"
         description="Execute, acompanhe e conecte cada O.S. ao cliente, responsável e cobrança oficiais."
@@ -894,6 +900,7 @@ export default function ServiceOrdersPage() {
           </Button>
         }
       />
+      </div>
 
       {[customersQuery, appointmentsQuery, chargesQuery, peopleQuery].some(
         query => Boolean(query.error)
@@ -1057,7 +1064,7 @@ export default function ServiceOrdersPage() {
           <AppSectionBlock
             title="Carteira operacional de O.S."
             subtitle="Cliente, serviço, status, responsável, prazo e ação principal em linhas operacionais selecionáveis."
-            className={`flex flex-col ${mobile.listClass}`}
+            className={`mobile-flat-section flex flex-col ${mobile.listClass}`}
             compact
           >
             {isLoading ? (
@@ -1089,7 +1096,7 @@ export default function ServiceOrdersPage() {
                         aria-label={`Abrir ordem de serviço de ${item.customerName}`}
                         tabIndex={0}
                         className={cn(
-                          "rounded-xl border p-3 transition-colors hover:border-[var(--accent-primary)]/45",
+                          "module-list-item rounded-xl border p-3 transition-colors hover:border-[var(--accent-primary)]/45",
                           isSelected
                             ? "border-[var(--accent-primary)] bg-[var(--accent-soft)]/35"
                             : "border-[var(--border-subtle)] bg-[var(--surface-subtle)]"
@@ -1105,10 +1112,10 @@ export default function ServiceOrdersPage() {
                       >
                         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-[1.1fr_0.75fr_0.9fr_0.8fr_auto] lg:items-center">
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
+                            <p className="break-words text-sm font-semibold text-[var(--text-primary)] md:truncate">
                               {item.customerName}
                             </p>
-                            <p className="mt-1 truncate text-xs text-[var(--text-secondary)]">
+                            <p className="mt-1 break-words text-xs text-[var(--text-secondary)] md:truncate">
                               Serviço: {item.title}
                             </p>
                           </div>
@@ -1259,7 +1266,7 @@ export default function ServiceOrdersPage() {
           {filteredOrders.length > 0 && !isLoading && !hasBlockingError ? (          <AppSectionBlock
             title="Detalhe da O.S."
             subtitle="Status, cliente, serviço, responsável, prazo, ações, financeiro e timeline curta."
-            className={`flex flex-col ${mobile.detailClass}`}
+            className={`mobile-flat-section flex flex-col ${mobile.detailClass}`}
             compact
           >
             {!selectedOrder ? (

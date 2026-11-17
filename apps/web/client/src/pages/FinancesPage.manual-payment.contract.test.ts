@@ -1,3 +1,4 @@
+import { formatRecordedMoney } from "@/lib/organization-locale";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
@@ -30,7 +31,7 @@ describe("FinancesPage authoritative finance contract", () => {
   });
 
   it("mostra ausência honestamente e preserva retry independente", () => {
-    expect(source).toContain('"Indisponível"');
+    expect(source).toContain('"Moeda ou valor indisponível"');
     expect(source).toContain('"Atraso não calculado"');
     expect(source).toContain('"Não classificada"');
     expect(source).toContain('"Não informado"');
@@ -67,9 +68,11 @@ describe("FinancesPage authoritative finance contract", () => {
   });
 
   it("mantém zero distinto de indisponibilidade e usa formatação monetária canônica", () => {
-    expect(source).toContain(
-      'typeof value === "number" ? formatCurrency(value) : "Indisponível"'
-    );
+    expect(source).toContain("return formatRecordedMoney(value, currency");
+    expect(formatRecordedMoney(0, "BRL").replace(/\s/g, "")).toBe("R$0,00");
+    expect(formatRecordedMoney(1000, "USD")).toContain("US$");
+    expect(formatRecordedMoney(undefined, "BRL", "Indisponível")).toBe("Indisponível");
+    expect(formatRecordedMoney(1000, undefined, "Indisponível")).toBe("Indisponível");
     expect(source).toContain('typeof (metric as any)?.count === "number"');
     expect(source).not.toMatch(
       /(?:amountCents|balanceCents|paidAmountCents)\s*\|\|\s*0/
