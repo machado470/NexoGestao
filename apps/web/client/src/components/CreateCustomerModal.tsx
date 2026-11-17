@@ -1,3 +1,4 @@
+import { useFormDiscardGuard } from "@/hooks/useFormDiscardGuard";
 import { executeCustomerUpdate as executeCustomerCreation } from "@/lib/customer-update-flow";
 import { Button } from "@/components/ui/button";
 import { useMemo, useRef, useState } from "react";
@@ -84,21 +85,17 @@ export default function CreateCustomerModal({
     address.trim().length > 0 ||
     notes.trim().length > 0;
 
-  const close = () => {
-    if (createCustomer.isPending) return;
-    if (
-      !createdCustomer &&
-      hasDraft &&
-      !window.confirm(
-        "Existem dados não salvos. Deseja descartar este cadastro?"
-      )
-    ) {
-      return;
-    }
-    setCreatedCustomer(null);
-    reset();
-    onOpenChange(false);
-  };
+  const discardGuard = useFormDiscardGuard({
+    open,
+    dirty: !createdCustomer && (hasDraft || nextStep !== "schedule"),
+    blocked: createCustomer.isPending || submitting.current,
+    onDiscard: () => {
+      setCreatedCustomer(null);
+      reset();
+      onOpenChange(false);
+    },
+  });
+  const close = discardGuard.requestClose;
 
   const submit = async () => {
     if (submitting.current || createdCustomer) return;
@@ -224,6 +221,7 @@ export default function CreateCustomerModal({
   };
 
   return (
+    <>
     <ModalFlowShell
       open={open}
       onOpenChange={nextOpen => (nextOpen ? onOpenChange(nextOpen) : close())}
@@ -231,7 +229,7 @@ export default function CreateCustomerModal({
       description={`${name.trim() || "Cliente em cadastro"} · ${phone.trim() || "Sem telefone"}`}
       isSubmitting={createCustomer.isPending}
       closeBlocked={createCustomer.isPending}
-      hasDirtyState={hasDraft}
+      hasDirtyState={!createdCustomer && (hasDraft || nextStep !== "schedule")}
       contentClassName="w-full max-w-[760px] border border-[var(--app-overlay-border)] bg-[var(--app-overlay-surface)] shadow-[var(--app-overlay-shadow)]"
       footer={
         createdCustomer ? (
@@ -475,5 +473,7 @@ export default function CreateCustomerModal({
         ) : null}
       </div>
     </ModalFlowShell>
+    {discardGuard.confirmation}
+    </>
   );
 }

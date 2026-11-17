@@ -1,3 +1,4 @@
+import { useFormDiscardGuard } from "@/hooks/useFormDiscardGuard";
 import { parseLocalDateTimeInput } from "@/lib/local-date-time";
 import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
 import { parseMoneyInputToCents as parseAmountToCents } from "@/lib/money-input";
@@ -146,11 +147,13 @@ export function CreateChargeModal({
       ? `${shortNotes.slice(0, 57)}...`
       : shortNotes || "Sem observações";
 
-  const resetAndClose = () => {
-    if (createCharge.isPending) return;
-    setFormData(INITIAL_FORM);
-    onClose();
-  };
+  const discardGuard = useFormDiscardGuard({
+    open: isOpen,
+    dirty: JSON.stringify(formData) !== JSON.stringify(INITIAL_FORM),
+    blocked: createCharge.isPending,
+    onDiscard: () => { setFormData(INITIAL_FORM); onClose(); },
+  });
+  const resetAndClose = discardGuard.requestClose;
 
   const submitCharge = async () => {
     const customerId = formData.customerId.trim();
@@ -290,6 +293,7 @@ export function CreateChargeModal({
   };
 
   return (
+    <>
     <FormModal
       open={isOpen}
       onOpenChange={open => {
@@ -557,5 +561,7 @@ export function CreateChargeModal({
         </section>
       </div>
     </FormModal>
+    {discardGuard.confirmation}
+    </>
   );
 }

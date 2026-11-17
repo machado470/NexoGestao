@@ -1,3 +1,4 @@
+import { useFormDiscardGuard } from "@/hooks/useFormDiscardGuard";
 import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
 import { formatOrganizationDate, type Instant } from "@/lib/organization-locale";
 import { ResponsiveDetails } from "@/components/ResponsiveDetails";
@@ -295,6 +296,7 @@ export default function AppointmentsPage() {
     durationMinutes: "60",
   });
 
+  const initialForm = useRef(form);
   useEffect(() => {
     if (!openModal) {
       assigneeWarningTelemetry.reset();
@@ -302,7 +304,7 @@ export default function AppointmentsPage() {
     }
     const start = parseDate(editing?.startsAt);
     const end = parseDate(editing?.endsAt);
-    setForm({
+    const initial = {
       customerId: String(
         editing?.customerId ?? editing?.customer?.id ?? routeCustomerId ?? ""
       ),
@@ -324,8 +326,17 @@ export default function AppointmentsPage() {
               )
             )
           : "60",
-    });
+    };
+    initialForm.current = initial;
+    setForm(initial);
   }, [assigneeWarningTelemetry.reset, editing, openModal, routeCustomerId, timezone]);
+
+  const discardGuard = useFormDiscardGuard({
+    open: openModal,
+    dirty: JSON.stringify(form) !== JSON.stringify(initialForm.current),
+    blocked: createMutation.isPending || updateMutation.isPending,
+    onDiscard: () => { setOpenModal(false); setEditing(null); },
+  });
 
   async function saveAppointment(event: React.FormEvent) {
     event.preventDefault();
@@ -940,10 +951,7 @@ export default function AppointmentsPage() {
           open={
             openModal && (editing ? canEditAppointment : canCreateAppointment)
           }
-          onOpenChange={next => {
-            setOpenModal(next);
-            if (!next) setEditing(null);
-          }}
+          onOpenChange={next => { if (!next) discardGuard.requestClose(); }}
           title={editing ? "Editar agendamento" : "Novo agendamento"}
           description={localeReady ? `Horários em ${timezone}.` : "Aguarde a confirmação do fuso da empresa para salvar."}
           closeBlocked={createMutation.isPending || updateMutation.isPending}
@@ -952,7 +960,7 @@ export default function AppointmentsPage() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setOpenModal(false)}
+                onClick={discardGuard.requestClose}
               >
                 Cancelar
               </Button>
@@ -1093,6 +1101,7 @@ export default function AppointmentsPage() {
             </AppField>
           </AppForm>
         </FormModal>
+        {discardGuard.confirmation}
       </div>
       <CreateServiceOrderModal
         isOpen={openServiceOrderModal && canCreateOrder}

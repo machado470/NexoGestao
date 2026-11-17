@@ -1,10 +1,11 @@
+import { useFormDiscardGuard } from "@/hooks/useFormDiscardGuard";
 import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
 import {
   toLocalDateTimeInput,
   parseLocalDateTimeInput,
 } from "@/lib/local-date-time";
 import { Button } from "@/components/ui/button";
-import { useId, useEffect, useMemo, useState } from "react";
+import { useId, useEffect, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 
 import { Loader2 } from "lucide-react";
@@ -59,6 +60,7 @@ export function CreateAppointmentModal({
   const { timezone, ready: localeReady } = useOrganizationLocale();
   const fieldId = useId();
   const [formData, setFormData] = useState(INITIAL_FORM);
+  const initialForm = useRef(INITIAL_FORM);
   const assigneeWarningTelemetry = useAssigneeWarningTelemetry("APPOINTMENT");
   const utils = trpc.useUtils();
   const peopleQuery = trpc.people.assignees.useQuery(undefined, {
@@ -84,7 +86,7 @@ export function CreateAppointmentModal({
       return;
     }
 
-    setFormData({
+    const initial = {
       ...INITIAL_FORM,
       customerId: initialCustomerId ? String(initialCustomerId) : "",
       date: toLocalDateTimeInput(initialStartsAt, timezone).slice(0, 10),
@@ -102,7 +104,9 @@ export function CreateAppointmentModal({
               )
             )
           : "60",
-    });
+    };
+    initialForm.current = initial;
+    setFormData(initial);
   }, [
     assigneeWarningTelemetry.reset,
     initialCustomerId,
@@ -114,11 +118,13 @@ export function CreateAppointmentModal({
 
   const createAppointment = trpc.appointments.create.useMutation();
 
-  const handleClose = () => {
-    if (createAppointment.isPending) return;
-    setFormData(INITIAL_FORM);
-    onClose();
-  };
+  const discardGuard = useFormDiscardGuard({
+    open: isOpen,
+    dirty: JSON.stringify(formData) !== JSON.stringify(initialForm.current),
+    blocked: createAppointment.isPending,
+    onDiscard: () => { setFormData(INITIAL_FORM); onClose(); },
+  });
+  const handleClose = discardGuard.requestClose;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -226,6 +232,7 @@ export function CreateAppointmentModal({
   };
 
   return (
+    <>
     <FormModal
       open={isOpen}
       onOpenChange={nextOpen => (!nextOpen ? handleClose() : undefined)}
@@ -365,5 +372,7 @@ export function CreateAppointmentModal({
         </p>
       </AppForm>
     </FormModal>
+    {discardGuard.confirmation}
+    </>
   );
 }
