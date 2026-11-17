@@ -1,3 +1,4 @@
+import { requiresWhatsAppChannel, whatsappAvailability } from "@/lib/integration-availability";
 import {
   memo,
   type CSSProperties,
@@ -883,6 +884,7 @@ function ExecutionChatColumn({
   conversation,
   onBack,
   canCompose,
+  composeBlockedReason,
   composePlaceholder,
   messages,
   isLoading,
@@ -914,6 +916,7 @@ function ExecutionChatColumn({
   conversation?: Conversation;
   onBack: () => void;
   canCompose: boolean;
+  composeBlockedReason?: string;
   composePlaceholder: string;
   messages: ChatMessage[];
   isLoading: boolean;
@@ -1345,7 +1348,7 @@ function ExecutionChatColumn({
       <footer className="mt-0 shrink-0 border-t border-[var(--app-border)]/55 bg-transparent px-4 pb-2.5 pt-2">
         {hasConversation && !canCompose ? (
           <div className="mb-2 rounded-xl bg-[color-mix(in_srgb,var(--danger)_10%,var(--app-surface))] px-3 py-2 text-[11px] font-medium text-[var(--danger)]">
-            Envio bloqueado: cliente sem telefone cadastrado.
+            {composeBlockedReason ?? "Envio bloqueado: cliente sem telefone cadastrado."}
           </div>
         ) : null}
         <div className="rounded-2xl border border-[var(--app-border)]/40 bg-app-surface/75 p-2">
@@ -1822,6 +1825,7 @@ export default function WhatsAppPage() {
   const healthQuery = trpc.whatsapp.health.useQuery(undefined, {
     retry: false,
   });
+  const channelAvailability = whatsappAvailability(healthQuery.isError ? null : healthQuery.data);
   const conversationsQuery = trpc.whatsapp.listConversations.useInfiniteQuery(
     filtersInput,
     {
@@ -2318,6 +2322,7 @@ export default function WhatsAppPage() {
 
   const confirmExecuteExecution = useCallback(async () => {
     if (!executionToRun) return;
+    if (!channelAvailability.canSend && requiresWhatsAppChannel(executionToRun.suggestedAction)) { toast.error(channelAvailability.reason); return; }
     try {
       await executeExecutionMutation.mutateAsync({
         id: executionToRun.id,
@@ -2329,7 +2334,7 @@ export default function WhatsAppPage() {
     } catch (error: any) {
       toast.error(error?.message ?? "Falha ao executar workflow.");
     }
-  }, [executeExecutionMutation, executionToRun, refreshExecutionState]);
+  }, [executeExecutionMutation, executionToRun, refreshExecutionState, channelAvailability.canSend, channelAvailability.reason]);
 
   const handleCancelExecution = useCallback(
     (execution: WhatsAppActionExecution) => {
@@ -2364,6 +2369,7 @@ export default function WhatsAppPage() {
   ]);
 
   const handleRequestSuggestedExecution = useCallback(async () => {
+    if (!channelAvailability.canSend && requiresWhatsAppChannel(suggestedAction?.executableAction)) { toast.error(channelAvailability.reason); return; }
     if (!selectedConversationRecordId || !suggestedAction?.executableAction) {
       toast.message("A ação sugerida precisa de uma conversa ativa.");
       return;
@@ -2396,6 +2402,8 @@ export default function WhatsAppPage() {
     requestExecutionMutation,
     selectedConversationRecordId,
     suggestedAction,
+    channelAvailability.canSend,
+    channelAvailability.reason,
   ]);
 
   const handleResolveConversationExecution = useCallback(async () => {
@@ -2459,7 +2467,7 @@ export default function WhatsAppPage() {
     ]
   );
   const canComposeForSelected =
-    Boolean(selectedConversationId) && Boolean(destinationPhone);
+    channelAvailability.canSend && Boolean(selectedConversationId) && Boolean(destinationPhone);
   const composePlaceholder = selectedConversation
     ? selectedConversationRecordId
       ? "Responder conversa..."
@@ -2475,6 +2483,7 @@ export default function WhatsAppPage() {
   };
 
   const handleManualSend = async () => {
+    if (!channelAvailability.canSend) { setComposerError(channelAvailability.reason); return; }
     if (!selectedConversationId) {
       setComposerError("Selecione uma conversa antes de enviar.");
       return;
@@ -2585,6 +2594,7 @@ export default function WhatsAppPage() {
       return;
     }
     try {
+      if (!channelAvailability.canSend) { setComposerError(channelAvailability.reason); return; }
       await sendTemplateMutation.mutateAsync({
         templateKey,
         conversationId: selectedConversationRecordId ?? undefined,
@@ -2626,6 +2636,7 @@ export default function WhatsAppPage() {
   };
 
   const handleRetryLastFailed = async () => {
+    if (!channelAvailability.canSend) { setComposerError(channelAvailability.reason); return; }
     const failed = [...messages]
       .reverse()
       .find(item => item.status === "FAILED");
@@ -2672,21 +2683,16 @@ export default function WhatsAppPage() {
               <AppContextChip tone="neutral">
                 {conversations.length} conversa(s) no inbox
               </AppContextChip>
-              <AppContextChip tone={healthQuery.error ? "warning" : "success"}>
-                {healthQuery.error
-                  ? "Disponibilidade do canal indisponível"
-                  : healthQuery.isLoading
-                    ? "Verificando disponibilidade do canal"
-                    : "Canal verificado oficialmente"}
+              <AppContextChip tone={channelAvailability.canSend && healthQuery.data?.status === "configured" ? "success" : "warning"}>
+                {healthQuery.isLoading ? "Verificando disponibilidade do canal" : channelAvailability.label}
               </AppContextChip>
             </>
           }
         >
-          {healthQuery.error ? (
+          {channelAvailability.reason ? (
             <div className="flex flex-col gap-2 text-xs text-[var(--text-secondary)] sm:flex-row sm:items-center sm:justify-between">
               <span>
-                Não foi possível confirmar a disponibilidade do canal. O
-                histórico permanece acessível; novos envios podem falhar.
+                {channelAvailability.reason}
               </span>
               <Button
                 type="button"
@@ -2809,6 +2815,7 @@ export default function WhatsAppPage() {
                 conversation={selectedConversation}
                 onBack={() => setSelectedConversationId(null)}
                 canCompose={canComposeForSelected}
+                composeBlockedReason={!channelAvailability.canSend ? channelAvailability.reason : undefined}
                 composePlaceholder={composePlaceholder}
                 messages={messages}
                 isLoading={messagesQuery.isLoading || messagesQuery.isFetching}
@@ -2852,7 +2859,7 @@ export default function WhatsAppPage() {
                   void handleResolveConversationExecution()
                 }
                 onReviewAssistedExecution={handleReviewAssistedExecution}
-                officialActions={context?.officialActions ?? []}
+                officialActions={(context?.officialActions ?? []).map(action => !channelAvailability.canSend && requiresWhatsAppChannel(action.action) ? { ...action, disabled: true, availability: "unavailable" as const, reason: channelAvailability.reason } : action)}
                 suggestedActionLabel={suggestedAction?.label ?? null}
                 governanceAlert={governanceAlert}
                 onRunSuggestedAction={() => {
