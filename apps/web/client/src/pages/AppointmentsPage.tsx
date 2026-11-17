@@ -1,8 +1,11 @@
+import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
+import { formatOrganizationDate, type Instant } from "@/lib/organization-locale";
 import { ResponsiveDetails } from "@/components/ResponsiveDetails";
 import { useMobileDetailNavigation } from "@/hooks/useMobileDetailNavigation";
 import { MobileDetailBack, MobileDetailState } from "@/components/MobileDetailBack";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import {
+  organizationDayRange,
   toLocalDateTimeInput,
   parseLocalDateTimeInput,
 } from "@/lib/local-date-time";
@@ -66,16 +69,6 @@ function parseDate(value?: string | null) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function formatDateTime(value?: string | null) {
-  const date = parseDate(value);
-  return date
-    ? new Intl.DateTimeFormat("pt-BR", {
-        dateStyle: "short",
-        timeStyle: "short",
-      }).format(date)
-    : "Horário não informado";
-}
-
 function durationLabel(startsAt?: string | null, endsAt?: string | null) {
   const start = parseDate(startsAt);
   const end = parseDate(endsAt);
@@ -95,16 +88,11 @@ function statusPresentation(status?: string | null) {
   return { label: "Agendado", tone: "neutral" as const };
 }
 
-function dateValue(value?: string | null) {
-  const date = parseDate(value);
-  if (!date) return "";
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
 export default function AppointmentsPage() {
+  const { timezone, ready: localeReady } = useOrganizationLocale();
+  const formatDateTime = (value: unknown, fallback = "Não informado") => formatOrganizationDate(value as Instant, timezone, fallback);
+  const dateValue = (value?: string | null) => toLocalDateTimeInput(value, timezone).slice(0, 10);
+
   const fieldId = useId();
   // Marcador tipado exigido pelo guardrail do Operating System. A página não
   // possui fonte oficial de severidade e, por isso, não renderiza nem deriva uma.
@@ -149,14 +137,14 @@ export default function AppointmentsPage() {
       limit: pageSize,
       search: debouncedSearch || undefined,
       status: statusFilter === 'all' ? undefined : statusFilter as 'SCHEDULED' | 'CONFIRMED' | 'CANCELED' | 'DONE' | 'NO_SHOW',
-      from: dateFilter ? new Date(`${dateFilter}T00:00:00`).toISOString() : undefined,
-      to: dateFilter ? new Date(`${dateFilter}T23:59:59.999`).toISOString() : undefined,
+      from: dateFilter ? organizationDayRange(dateFilter, timezone)?.from : undefined,
+      to: dateFilter ? organizationDayRange(dateFilter, timezone)?.to : undefined,
       ...(responsibleFilter === "all"
         ? {}
         : { assignedToPersonId: responsibleFilter }),
       ...(routeCustomerId ? { customerId: routeCustomerId } : {}),
     }),
-    [responsibleFilter, routeCustomerId, routeAppointmentId, page, debouncedSearch, statusFilter, dateFilter]
+    [responsibleFilter, routeCustomerId, routeAppointmentId, page, debouncedSearch, statusFilter, dateFilter, timezone]
   );
   const appointmentsQuery = trpc.appointments.page.useQuery(
     appointmentListInput,
@@ -261,7 +249,7 @@ export default function AppointmentsPage() {
         return false;
       return true;
     });
-  }, [dateFilter, queryText, routeCustomerId, rows, statusFilter]);
+  }, [dateFilter, queryText, routeCustomerId, rows, statusFilter, timezone]);
   const paginatedRows = filteredRows;
   const selected = filteredRows.find(row => row.id === selectedId) ?? null;
 
@@ -318,8 +306,8 @@ export default function AppointmentsPage() {
       customerId: String(
         editing?.customerId ?? editing?.customer?.id ?? routeCustomerId ?? ""
       ),
-      date: toLocalDateTimeInput(start).slice(0, 10),
-      time: toLocalDateTimeInput(start).slice(11, 16),
+      date: toLocalDateTimeInput(start, timezone).slice(0, 10),
+      time: toLocalDateTimeInput(start, timezone).slice(11, 16),
       status: String(
         editing?.status ?? "SCHEDULED"
       ).toUpperCase() as AppointmentStatus,
@@ -337,16 +325,18 @@ export default function AppointmentsPage() {
             )
           : "60",
     });
-  }, [assigneeWarningTelemetry.reset, editing, openModal, routeCustomerId]);
+  }, [assigneeWarningTelemetry.reset, editing, openModal, routeCustomerId, timezone]);
 
   async function saveAppointment(event: React.FormEvent) {
     event.preventDefault();
+    if (!localeReady) { toast.error("Aguarde a confirmação do fuso da empresa."); return; }
     const startsAt = parseLocalDateTimeInput(
       `${form.date}T${form.time}`,
-      editing?.startsAt
+      editing?.startsAt,
+      timezone
     );
     if (!form.customerId || !startsAt) {
-      toast.error("Cliente, data e hora são obrigatórios.");
+      toast.error("Informe cliente, data e hora válidos no fuso da empresa. Horários ambíguos não são aceitos.");
       return;
     }
     const endsAt = new Date(
@@ -955,7 +945,7 @@ export default function AppointmentsPage() {
             if (!next) setEditing(null);
           }}
           title={editing ? "Editar agendamento" : "Novo agendamento"}
-          description="Operação conectada ao backend"
+          description={localeReady ? `Horários em ${timezone}.` : "Aguarde a confirmação do fuso da empresa para salvar."}
           closeBlocked={createMutation.isPending || updateMutation.isPending}
           footer={
             <>
@@ -970,6 +960,7 @@ export default function AppointmentsPage() {
                 type="submit"
                 form="appointment-form"
                 disabled={
+                  !localeReady ||
                   createMutation.isPending ||
                   updateMutation.isPending ||
                   (!editing && customersQuery.isError)

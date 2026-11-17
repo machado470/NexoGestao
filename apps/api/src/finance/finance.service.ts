@@ -1397,7 +1397,7 @@ export class FinanceService {
   }
 
   async getChargeStats(orgId: string) {
-    const [pending, overdue, paid] = await Promise.all([
+    const [pending, overdue, paid, denominations] = await Promise.all([
       this.prisma.charge.aggregate({
         where: { orgId, status: 'PENDING' },
         _count: { _all: true },
@@ -1413,11 +1413,13 @@ export class FinanceService {
         _count: { _all: true },
         _sum: { amountCents: true },
       }),
+      this.prisma.charge.findMany({ where: { orgId }, select: { currency: true }, distinct: ['currency'] }),
     ])
 
     const overdueCount = overdue._count._all ?? 0
     const pendingCount = pending._count._all ?? 0
     return {
+      currencies: denominations.map(item => item.currency),
       evaluatedAt: new Date(),
       operationalState: overdueCount >= 5 ? 'CRITICAL' : overdueCount > 0 ? 'RISK' : pendingCount > 0 ? 'ATTENTION' : 'NORMAL',
       pending: {

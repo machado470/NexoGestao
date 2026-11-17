@@ -1,3 +1,5 @@
+import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
+import { formatOrganizationDate, type Instant } from "@/lib/organization-locale";
 import { useIsMobile } from "@/hooks/useMobile";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -199,11 +201,6 @@ function toDate(value: unknown): Date | null {
 function formatMobileDate(value: unknown, fallback = "Não informado") {
   const date = toDate(value);
   return date ? date.toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : fallback;
-}
-
-function formatDateTime(value: unknown, fallback = "Não informado") {
-  const date = toDate(value);
-  return date ? date.toLocaleString("pt-BR") : fallback;
 }
 
 function normalizeWorkspace(input: unknown): Workspace {
@@ -428,6 +425,9 @@ function buildCustomerProfiles(input: {
 }
 
 export default function CustomersPage() {
+  const { timezone } = useOrganizationLocale();
+  const formatDateTime = (value: unknown, fallback = "Não informado") => formatOrganizationDate(value as Instant, timezone, fallback);
+
   const [, navigate] = useLocation();
   const routeSearch = useSearch();
   const isMobile = useIsMobile();

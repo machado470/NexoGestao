@@ -1,3 +1,5 @@
+import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
+import { formatOrganizationDate, type Instant } from "@/lib/organization-locale";
 import { ResponsiveDetails } from "@/components/ResponsiveDetails";
 import { useMobileDetailNavigation } from "@/hooks/useMobileDetailNavigation";
 import { MobileDetailBack, MobileDetailState } from "@/components/MobileDetailBack";
@@ -160,16 +162,6 @@ const loadLabels: Record<LoadStatus, string> = {
   OVERLOADED: "Sobrecarregado",
 };
 
-function formatDateTime(value?: string | null) {
-  if (!value) return "Não informado";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "Não informado";
-  return new Intl.DateTimeFormat("pt-BR", {
-    dateStyle: "short",
-    timeStyle: "short",
-  }).format(parsed);
-}
-
 function formatOfficialNumber(value: number | null | undefined, suffix = "") {
   return value === null || value === undefined
     ? "Indisponível"
@@ -216,6 +208,9 @@ function timelineTitle(event: TeamTimelineEvent) {
 }
 
 export default function PeoplePage() {
+  const { timezone, ready: localeReady } = useOrganizationLocale();
+  const formatDateTime = (value: unknown, fallback = "Não informado") => formatOrganizationDate(value as Instant, timezone, fallback);
+
   const [, navigate] = useLocation();
   const { isAuthenticated, isInitializing, role } = useAuth();
   const utils = trpc.useUtils();
@@ -327,7 +322,8 @@ export default function PeoplePage() {
   const refresh = () => void summaryQuery.refetch();
   const submitAvailability = () => {
     if (!selectedPersonId || availabilityPending.current || deletionPending.current || deleteAvailabilityException.isPending) return;
-    const interval = parseAvailabilityInterval(startsAt, endsAt);
+    if (!localeReady) { setAvailabilityError("Aguarde a confirmação do fuso da empresa."); return; }
+    const interval = parseAvailabilityInterval(startsAt, endsAt, timezone);
     if (!interval.ok) { setAvailabilityError(interval.message); return; }
     setAvailabilityError(null);
     availabilityPending.current = true;

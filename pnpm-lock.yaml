@@ -235,6 +235,9 @@ importers:
       '@fullcalendar/interaction':
         specifier: ^6.1.20
         version: 6.1.22(@fullcalendar/core@6.1.22)
+      '@fullcalendar/luxon3':
+        specifier: 6.1.22
+        version: 6.1.22(@fullcalendar/core@6.1.22)(luxon@3.7.2)
       '@fullcalendar/react':
         specifier: ^6.1.20
         version: 6.1.22(@fullcalendar/core@6.1.22)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -382,6 +385,9 @@ importers:
       lucide-react:
         specifier: ^0.453.0
         version: 0.453.0(react@19.3.1)
+      luxon:
+        specifier: ^3.7.2
+        version: 3.7.2
       nanoid:
         specifier: ^5.1.16
         version: 5.1.16
@@ -452,6 +458,9 @@ importers:
       '@types/google.maps':
         specifier: ^3.58.1
         version: 3.66.10
+      '@types/luxon':
+        specifier: ^3.7.1
+        version: 3.7.6
       '@types/node':
         specifier: ^24.7.0
         version: 24.19.2
@@ -1188,6 +1197,12 @@ packages:
     resolution: {integrity: sha512-r8Njw8aPNFGRwDjVAh9NTh3ZJib5tcUoLi/BM4uYJt5Cs9tDiirmImaqxhx56hclVFX7ktd5CdaMX0+ArSbm5A==}
     peerDependencies:
       '@fullcalendar/core': ~6.1.22
+
+  '@fullcalendar/luxon3@6.1.22':
+    resolution: {integrity: sha512-or43T5SQAzb3d8U6Th6Q3vclas8rGEYSsJsUohC+jySJyJuqCLcqgW+NnbrSYIYXx3MUUk32h8au+BEjfjuo1A==}
+    peerDependencies:
+      '@fullcalendar/core': ~6.1.22
+      luxon: ^3.0.0
 
   '@fullcalendar/react@6.1.22':
     resolution: {integrity: sha512-H7woM4nhvXjyM4Up2D3iSp5f8o3pRPGkiHRixvxxvIMdSMBxboGTqCI7T/vjnAfz5TCxXdeX5HxmSHeANsa6gg==}
@@ -8086,6 +8101,11 @@ snapshots:
   '@fullcalendar/interaction@6.1.22(@fullcalendar/core@6.1.22)':
     dependencies:
       '@fullcalendar/core': 6.1.22
+
+  '@fullcalendar/luxon3@6.1.22(@fullcalendar/core@6.1.22)(luxon@3.7.2)':
+    dependencies:
+      '@fullcalendar/core': 6.1.22
+      luxon: 3.7.2
 
   '@fullcalendar/react@6.1.22(@fullcalendar/core@6.1.22)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
     dependencies:

@@ -1,3 +1,4 @@
+import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
 import { parseMoneyInputToCents } from "@/lib/money-input";
 import { parseLocalDateTimeInput } from "@/lib/local-date-time";
 import { Button } from "@/components/ui/button";
@@ -93,6 +94,7 @@ export default function CreateServiceOrderModal({
   initialCustomerId,
   appointmentId,
 }: Props) {
+  const { timezone, ready: localeReady } = useOrganizationLocale();
   const fieldId = useId();
   const [, navigate] = useLocation();
   const utils = trpc.useUtils();
@@ -196,10 +198,11 @@ export default function CreateServiceOrderModal({
       return;
     }
 
+    if (!localeReady && (parsed.data.scheduledFor || parsed.data.dueDate)) { toast.error("Aguarde a confirmação do fuso da empresa."); return; }
     const scheduledFor = parseLocalDateTimeInput(
-      parsed.data.scheduledFor || ""
+      parsed.data.scheduledFor || "", undefined, timezone
     );
-    const dueDate = parseLocalDateTimeInput(parsed.data.dueDate || "");
+    const dueDate = parseLocalDateTimeInput(parsed.data.dueDate || "", undefined, timezone);
     if (
       (parsed.data.scheduledFor && !scheduledFor) ||
       (parsed.data.dueDate && !dueDate)
@@ -291,7 +294,7 @@ export default function CreateServiceOrderModal({
       open={resolvedOpen}
       onOpenChange={open => (!open ? handleClose() : undefined)}
       title="Nova O.S."
-      description={`${selectedCustomerName} · ${hasAmount ? summaryAmount : "Sem valor definido"}`}
+      description={`${selectedCustomerName} · ${hasAmount ? summaryAmount : "Sem valor definido"} · ${localeReady ? `Horários em ${timezone}` : "Aguardando fuso da empresa"}`}
       closeBlocked={createMutation.isPending}
       size="lg"
       contentClassName="w-full max-w-[820px] border border-[var(--app-overlay-border)] bg-[var(--app-overlay-surface)] shadow-[var(--app-overlay-shadow)]"

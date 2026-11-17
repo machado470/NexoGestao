@@ -1,3 +1,5 @@
+import { parseLocalDateTimeInput } from "@/lib/local-date-time";
+import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
 import { parseMoneyInputToCents as parseAmountToCents } from "@/lib/money-input";
 import { Button } from "@/components/ui/button";
 import { useId, useMemo, useRef, useState } from "react";
@@ -97,6 +99,7 @@ export function CreateChargeModal({
   onClose,
   onSuccess,
 }: CreateChargeModalProps) {
+  const { timezone, ready: localeReady } = useOrganizationLocale();
   const fieldId = useId();
   const [, navigate] = useLocation();
   const [formData, setFormData] = useState<FormState>(INITIAL_FORM);
@@ -176,10 +179,13 @@ export function CreateChargeModal({
       return;
     }
 
+    if (!localeReady) { toast.error("Aguarde a confirmação do fuso da empresa."); return; }
+    const dueInstant = parseLocalDateTimeInput(`${parsed.data.dueDate}T12:00`, undefined, timezone);
+    if (!dueInstant) { toast.error("Vencimento inválido no fuso da empresa."); return; }
     const payload = {
       customerId: parsed.data.customerId,
       amountCents: parsed.data.amountCents,
-      dueDate: new Date(`${parsed.data.dueDate}T12:00:00`).toISOString(),
+      dueDate: dueInstant.toISOString(),
       notes: parsed.data.notes || undefined,
       idempotencyKey: buildIdempotencyKey(
         "finance.create_charge",
@@ -298,7 +304,7 @@ export function CreateChargeModal({
           Nova cobrança
         </span>
       }
-      description="Use quando precisar registrar uma cobrança fora da ordem de serviço."
+      description={localeReady ? `Cobrança em reais (BRL). Vencimento no fuso ${timezone}.` : "Aguarde a confirmação do fuso da empresa para salvar."}
       footer={
         <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-[var(--modal-section-muted)]">
@@ -318,7 +324,7 @@ export function CreateChargeModal({
               type="button"
               className="min-w-[210px]"
               onClick={() => void submitCharge()}
-              disabled={createCharge.isPending || !canSubmit}
+              disabled={!localeReady || createCharge.isPending || !canSubmit}
             >
               {createCharge.isPending ? (
                 <span className="inline-flex items-center gap-2">
@@ -399,7 +405,7 @@ export function CreateChargeModal({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-2">
               <label htmlFor={`${fieldId}-amount`} className="text-sm font-medium text-[var(--modal-section-muted)]">
-                Valor *
+                Valor em reais (BRL) *
               </label>
               <Input
                 inputMode="decimal"
@@ -422,13 +428,13 @@ export function CreateChargeModal({
                 Vencimento *
               </label>
               <Input
+                disabled={!localeReady || createCharge.isPending}
                 type="date"
                 id={`${fieldId}-due-date`}
                 value={formData.dueDate}
                 onChange={e =>
                   setFormData(state => ({ ...state, dueDate: e.target.value }))
                 }
-                disabled={createCharge.isPending}
               />
               <p className="text-xs text-[var(--modal-section-muted)]">
                 Prévia: {formatDueDatePreview(formData.dueDate)}

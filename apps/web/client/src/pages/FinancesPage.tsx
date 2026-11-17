@@ -1,3 +1,5 @@
+import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
+import { formatOrganizationDate, formatRecordedMoney, formatRecordedTotal, type Instant } from "@/lib/organization-locale";
 import { ResponsiveDetails } from "@/components/ResponsiveDetails";
 import {
   createManualPaymentFlow,
@@ -35,8 +37,6 @@ import {
   normalizeArrayPayload,
   normalizeObjectPayload,
 } from "@/lib/query-helpers";
-import { safeDate } from "@/lib/operational/kpi";
-import { formatCurrency } from "@/lib/operations/operations.utils";
 import type { OperationalSeverity } from "@/lib/operations/operational-intelligence";
 import { trpc } from "@/lib/trpc";
 
@@ -51,13 +51,8 @@ const methodOptions = [
   { value: "OTHER", label: "Outro" },
 ];
 
-function money(value: unknown) {
-  return typeof value === "number" ? formatCurrency(value) : "Indisponível";
-}
-
-function date(value: unknown) {
-  const parsed = safeDate(value);
-  return parsed ? parsed.toLocaleDateString("pt-BR") : "Não informada";
+function money(value: unknown, currency?: unknown) {
+  return formatRecordedMoney(value, currency, "Moeda ou valor indisponível");
 }
 
 function factualLabel(value: unknown, fallback: string) {
@@ -130,6 +125,9 @@ function actionLabel(value: unknown) {
 }
 
 export default function FinancesPage() {
+  const { timezone, currency } = useOrganizationLocale();
+  const date = (value: unknown, fallback = "Não informado") => formatOrganizationDate(value as Instant, timezone, fallback, { dateStyle: "short" });
+
   const [, navigate] = useLocation();
   const routeSearch = useSearch();
   const routeParams = new URLSearchParams(routeSearch);
@@ -438,7 +436,7 @@ export default function FinancesPage() {
                 )}{" "}
                 · {statusLabel(focusedCharge.status)}
               </p>
-              <p>Saldo oficial: {money(focusedCharge.balanceCents)}</p>
+              <p>Saldo oficial: {money(focusedCharge.balanceCents, focusedCharge.currency)}</p>
               {["PENDING", "OVERDUE"].includes(String(focusedCharge.status)) ? (
                 <Button onClick={() => openPayment(focusedCharge)}>
                   Registrar pagamento
@@ -490,7 +488,7 @@ export default function FinancesPage() {
             ].map(([title, metric]) => (
               <AppInfoCard key={String(title)}>
                 <p className="text-sm text-muted-foreground">{String(title)}</p>
-                <strong>{money((metric as any)?.amountCents)}</strong>
+                <strong>{formatRecordedTotal((metric as any)?.amountCents, stats?.currencies, currency)}</strong>
                 <p>
                   {typeof (metric as any)?.count === "number"
                     ? `${(metric as any).count} ${(metric as any).count === 1 ? "item" : "itens"}`
@@ -500,6 +498,7 @@ export default function FinancesPage() {
             ))}
           </div>
         )}
+        {Array.isArray(stats?.currencies) && stats.currencies.length > 1 ? <p className="mt-2 text-sm text-muted-foreground">Há cobranças em moedas diferentes. Consulte os valores por cobrança.</p> : null}
       </AppSectionBlock>
 
       <ResponsiveDetails title="Pendências prioritárias">
@@ -535,7 +534,7 @@ export default function FinancesPage() {
                 <h3 className="break-words font-semibold">{factualLabel(item.customer?.name, "Cliente não informado")}</h3>
                 <div className="flex flex-wrap gap-2"><AppStatusBadge label={priorityLabel(summary.priority)} /><AppStatusBadge label={riskLabel(summary.riskLevel)} /></div>
                 <p className="break-words text-sm text-[var(--text-secondary)]">{factualLabel(summary.priorityReason, "Motivo não informado")}</p>
-                <dl className="grid grid-cols-2 gap-3 text-sm"><div className="min-w-0"><dt>Saldo</dt><dd className="break-words font-semibold">{money(item.balanceCents)}</dd></div><div className="min-w-0"><dt>Vencimento</dt><dd>{date(item.dueDate)}</dd></div></dl>
+                <dl className="grid grid-cols-2 gap-3 text-sm"><div className="min-w-0"><dt>Saldo</dt><dd className="break-words font-semibold">{money(item.balanceCents, item.currency)}</dd></div><div className="min-w-0"><dt>Vencimento</dt><dd>{date(item.dueDate)}</dd></div></dl>
                 <div>{renderQueueAction(item)}</div>
               </article>;
             })}
@@ -577,7 +576,7 @@ export default function FinancesPage() {
                       </span>
                     </td>
                     <td>
-                      {money(item.balanceCents)}
+                      {money(item.balanceCents, item.currency)}
                       <span className="block text-xs">
                         Vence {date(item.dueDate)}
                       </span>
@@ -653,12 +652,12 @@ export default function FinancesPage() {
               <h3 className="break-words font-semibold">{factualLabel(charge.customer?.name, "Cliente não informado")}</h3>
               <AppStatusBadge label={statusLabel(charge.status)} tone={statusTone(charge.status)} />
               <p className="break-words text-xs text-[var(--text-muted)]">O.S.: {factualLabel(charge.serviceOrder?.number, "Não vinculada")} · Vence {date(charge.dueDate)}</p>
-              <dl className="grid grid-cols-2 gap-3 text-sm"><div className="min-w-0"><dt>Original</dt><dd className="break-words">{money(charge.amountCents)}</dd></div><div className="min-w-0"><dt>Saldo</dt><dd className="break-words font-semibold">{money(charge.balanceCents)}</dd></div></dl>
+              <dl className="grid grid-cols-2 gap-3 text-sm"><div className="min-w-0"><dt>Original</dt><dd className="break-words">{money(charge.amountCents, charge.currency)}</dd></div><div className="min-w-0"><dt>Saldo</dt><dd className="break-words font-semibold">{money(charge.balanceCents, charge.currency)}</dd></div></dl>
               <details className="rounded-lg border border-[var(--border-subtle)] p-2"><summary className="min-h-11 cursor-pointer py-2 text-sm">Pagamentos e detalhes</summary>
-                <div className="space-y-2 text-sm"><p>Pago: {money(charge.paidAmountCents)}</p>
-                {Number(charge.refundedAmountCents ?? 0) > 0 ? <p>Estornado: {money(charge.refundedAmountCents)} · Recebido líquido: {money(charge.netReceivedAmountCents)}</p> : null}
+                <div className="space-y-2 text-sm"><p>Pago: {money(charge.paidAmountCents, charge.currency)}</p>
+                {Number(charge.refundedAmountCents ?? 0) > 0 ? <p>Estornado: {money(charge.refundedAmountCents, charge.currency)} · Recebido líquido: {money(charge.netReceivedAmountCents, charge.currency)}</p> : null}
                 <p>{typeof charge.daysOverdue === "number" ? `${charge.daysOverdue} dia(s) de atraso` : "Atraso não calculado"}</p>
-                {Array.isArray(charge.payments) && charge.payments.length ? charge.payments.map((payment: any, index: number) => <p key={index}>{money(payment.amountCents)} · {date(payment.paidAt)} · {methodOptions.find(option => option.value === payment.method)?.label ?? factualLabel(payment.method, "Método não informado")}</p>) : <p>Pagamentos não informados neste recorte.</p>}
+                {Array.isArray(charge.payments) && charge.payments.length ? charge.payments.map((payment: any, index: number) => <p key={index}>{money(payment.amountCents, charge.currency)} · {date(payment.paidAt)} · {methodOptions.find(option => option.value === payment.method)?.label ?? factualLabel(payment.method, "Método não informado")}</p>) : <p>Pagamentos não informados neste recorte.</p>}
                 </div>
               </details>
               {renderChargeActions(charge)}
@@ -710,15 +709,15 @@ export default function FinancesPage() {
                   </td>
                   <td>
                     <span className="block">
-                      Original: {money(charge.amountCents)}
+                      Original: {money(charge.amountCents, charge.currency)}
                     </span>
                     <span className="block">
-                      Pago: {money(charge.paidAmountCents)}
+                      Pago: {money(charge.paidAmountCents, charge.currency)}
                     </span>
                     {Number(charge.refundedAmountCents ?? 0) > 0 ? (
-                      <span className="block text-xs">Estornado: {money(charge.refundedAmountCents)} · Recebido líquido: {money(charge.netReceivedAmountCents)}</span>
+                      <span className="block text-xs">Estornado: {money(charge.refundedAmountCents, charge.currency)} · Recebido líquido: {money(charge.netReceivedAmountCents, charge.currency)}</span>
                     ) : null}
-                    <strong>Saldo: {money(charge.balanceCents)}</strong>
+                    <strong>Saldo: {money(charge.balanceCents, charge.currency)}</strong>
                   </td>
                   <td>
                     {Array.isArray(charge.payments) &&
@@ -728,7 +727,7 @@ export default function FinancesPage() {
                           className="block text-xs"
                           key={`${payment.paidAt ?? "payment"}-${index}`}
                         >
-                          {money(payment.amountCents)} · {date(payment.paidAt)}{" "}
+                          {money(payment.amountCents, charge.currency)} · {date(payment.paidAt)}{" "}
                           ·{" "}
                           {methodOptions.find(option => option.value === payment.method)?.label ?? factualLabel(payment.method, "Método não informado")}
                         </span>
@@ -755,7 +754,7 @@ export default function FinancesPage() {
           if (!open && !paymentFlow.pending) setPaying(null);
         }}
         title="Registrar pagamento manual"
-        description={`Cobrança de ${factualLabel(paying?.customer?.name, "cliente não informado")}. Saldo oficial: ${money(paying?.balanceCents)}`}
+        description={`Cobrança de ${factualLabel(paying?.customer?.name, "cliente não informado")}. Saldo oficial: ${money(paying?.balanceCents, paying?.currency)}`}
         closeBlocked={paymentSubmitting}
         initialFocusRef={paymentInputRef}
         footer={

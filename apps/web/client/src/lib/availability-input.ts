@@ -1,12 +1,13 @@
 import { parseLocalDateTimeInput } from "./local-date-time";
 export function parseAvailabilityInterval(
   start: string,
-  end: string
+  end: string,
+  timeZone?: string
 ):
   | { ok: true; startsAt: string; endsAt: string }
   | { ok: false; message: string } {
-  const startsAt = parseLocalDateTimeInput(start);
-  const endsAt = parseLocalDateTimeInput(end);
+  const startsAt = parseLocalDateTimeInput(start, undefined, timeZone);
+  const endsAt = parseLocalDateTimeInput(end, undefined, timeZone);
   if (!startsAt || !endsAt)
     return {
       ok: false,

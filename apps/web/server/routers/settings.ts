@@ -1,25 +1,59 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
-import { authedGet, authedPatch, authedPost, type NexoContext } from "../_core/nexoTransport";
+import {
+  authedGet,
+  authedPatch,
+  authedPost,
+  type NexoContext,
+} from "../_core/nexoTransport";
 
 export const settingsRouter = router({
-    get: protectedProcedure.query(async ({ ctx }) => {
-      return authedGet(ctx as NexoContext, "/organization-settings");
-    }),
-
-    administrativeSummary: protectedProcedure.query(async ({ ctx }) => {
-      return authedGet(ctx as NexoContext, "/organization-settings/administrative-summary");
-    }),
-
-    update: protectedProcedure
-      .input(
-        z.object({
-          name: z.string().optional(),
-          timezone: z.string().optional(),
-          currency: z.enum(["BRL", "USD", "EUR"]).optional(),
-        }),
+  displayPreferences: protectedProcedure
+    .output(
+      z
+        .object({
+          timezone: z
+            .string()
+            .min(1)
+            .refine(value => {
+              try {
+                new Intl.DateTimeFormat("pt-BR", { timeZone: value });
+                return true;
+              } catch {
+                return false;
+              }
+            }),
+          currency: z.enum(["BRL", "USD", "EUR"]),
+        })
+        .strict()
+    )
+    .query(({ ctx }) =>
+      authedGet(
+        ctx as NexoContext,
+        "/organization-settings/display-preferences"
       )
-      .mutation(async ({ ctx, input }) => {
-        return authedPatch(ctx as NexoContext, "/organization-settings", input);
-      }),
-  })
+    ),
+
+  get: protectedProcedure.query(async ({ ctx }) => {
+    return authedGet(ctx as NexoContext, "/organization-settings");
+  }),
+
+  administrativeSummary: protectedProcedure.query(async ({ ctx }) => {
+    return authedGet(
+      ctx as NexoContext,
+      "/organization-settings/administrative-summary"
+    );
+  }),
+
+  update: protectedProcedure
+    .input(
+      z.object({
+        name: z.string().optional(),
+        timezone: z.string().optional(),
+        currency: z.enum(["BRL", "USD", "EUR"]).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      return authedPatch(ctx as NexoContext, "/organization-settings", input);
+    }),
+});

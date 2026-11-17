@@ -1,3 +1,5 @@
+import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
+import { formatOrganizationDate, type Instant } from "@/lib/organization-locale";
 import { ResponsiveDetails } from "@/components/ResponsiveDetails";
 import { useMobileDetailNavigation } from "@/hooks/useMobileDetailNavigation";
 import { MobileDetailBack, MobileDetailState } from "@/components/MobileDetailBack";
@@ -67,18 +69,6 @@ function toDate(value: unknown): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function formatDate(value: unknown, fallback = "—") {
-  const date = toDate(value);
-  if (!date) return fallback;
-  return date.toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
 function formatCurrency(cents?: number | null) {
   if (cents === null || cents === undefined || !Number.isFinite(Number(cents)))
     return "—";
@@ -125,11 +115,6 @@ function hasPaymentEvidence(charge: any) {
     getChargeStatus(charge) === "PAID" ||
     (Array.isArray(charge?.payments) && charge.payments.length > 0)
   );
-}
-
-function getOperationalDateLabel(value: unknown) {
-  const date = toDate(value);
-  return date ? formatDate(date) : "Sem data oficial";
 }
 
 function isRawTechnicalId(value: unknown) {
@@ -203,6 +188,10 @@ function safeText(value: unknown, fallback = "—") {
 }
 
 export default function ServiceOrdersPage() {
+  const { timezone } = useOrganizationLocale();
+  const formatDate = (value: unknown, fallback = "Não informado") => formatOrganizationDate(value as Instant, timezone, fallback);
+  const getOperationalDateLabel = (value: unknown) => formatDate(value, "Sem data oficial");
+
   const { role } = useAuth();
   const canCreateOrder = Boolean(role && can(role, "orders:create"));
   const canEditOrder = Boolean(role && can(role, "orders:update"));
@@ -460,6 +449,7 @@ export default function ServiceOrdersPage() {
     customerById,
     peopleById,
     serviceOrders,
+    timezone,
   ]);
 
   const hasListFilters = Boolean(searchTerm.trim() || activeFilter !== 'all' || customerFilter !== 'all' || responsibleFilter !== 'all' || deadlineFilter !== 'all' || priorityFilter !== 'all' || urlCustomerId || urlServiceOrderId || urlAppointmentId);
@@ -638,7 +628,7 @@ export default function ServiceOrdersPage() {
       }));
     }
     return [];
-  }, [commandTarget, timeline]);
+  }, [commandTarget, timeline, timezone]);
 
   const anyActionPending =
     startExecutionMutation.isPending ||

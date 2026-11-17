@@ -12,6 +12,12 @@ import { UpdateOrganizationSettingsDto } from './dto/update-organization-setting
 export class OrganizationSettingsController {
   constructor(private readonly organizationSettingsService: OrganizationSettingsService) {}
 
+  @Get('display-preferences')
+  @Roles('ADMIN', 'MANAGER', 'STAFF', 'VIEWER', 'OPERADOR', 'FINANCEIRO')
+  async getDisplayPreferences(@Request() req) {
+    return this.organizationSettingsService.getDisplayPreferences(req.user.orgId);
+  }
+
   @Get()
   async getSettings(@Request() req) {
     const orgId = req.user.orgId;

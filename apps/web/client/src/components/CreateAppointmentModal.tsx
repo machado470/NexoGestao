@@ -1,3 +1,4 @@
+import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
 import {
   toLocalDateTimeInput,
   parseLocalDateTimeInput,
@@ -55,6 +56,7 @@ export function CreateAppointmentModal({
   initialStartsAt,
   initialEndsAt,
 }: CreateAppointmentModalProps) {
+  const { timezone, ready: localeReady } = useOrganizationLocale();
   const fieldId = useId();
   const [formData, setFormData] = useState(INITIAL_FORM);
   const assigneeWarningTelemetry = useAssigneeWarningTelemetry("APPOINTMENT");
@@ -85,8 +87,8 @@ export function CreateAppointmentModal({
     setFormData({
       ...INITIAL_FORM,
       customerId: initialCustomerId ? String(initialCustomerId) : "",
-      date: toLocalDateTimeInput(initialStartsAt).slice(0, 10),
-      time: toLocalDateTimeInput(initialStartsAt).slice(11, 16),
+      date: toLocalDateTimeInput(initialStartsAt, timezone).slice(0, 10),
+      time: toLocalDateTimeInput(initialStartsAt, timezone).slice(11, 16),
       durationMinutes:
         initialStartsAt && initialEndsAt
           ? String(
@@ -107,6 +109,7 @@ export function CreateAppointmentModal({
     initialEndsAt,
     initialStartsAt,
     isOpen,
+    timezone,
   ]);
 
   const createAppointment = trpc.appointments.create.useMutation();
@@ -120,6 +123,7 @@ export function CreateAppointmentModal({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (createAppointment.isPending) return;
+    if (!localeReady) { toast.error("Aguarde a confirmação do fuso da empresa."); return; }
 
     if (!formData.customerId || !formData.date || !formData.time) {
       toast.error("Cliente e data/hora de início são obrigatórios");
@@ -128,10 +132,11 @@ export function CreateAppointmentModal({
 
     const startsAt = parseLocalDateTimeInput(
       `${formData.date}T${formData.time}`,
-      initialStartsAt
+      initialStartsAt,
+      timezone
     );
     if (!startsAt) {
-      toast.error("Data e hora inválidas");
+      toast.error("Data ou hora inválida ou ambígua no fuso da empresa.");
       return;
     }
     const durationMinutes = Math.max(
@@ -225,7 +230,7 @@ export function CreateAppointmentModal({
       open={isOpen}
       onOpenChange={nextOpen => (!nextOpen ? handleClose() : undefined)}
       title="Novo Agendamento"
-      description="Crie em segundos: cliente, data, hora e contexto mínimo para executar."
+      description={localeReady ? `Crie o agendamento com horários em ${timezone}.` : "Aguarde a confirmação do fuso da empresa para salvar."}
       closeBlocked={createAppointment.isPending}
       footer={
         <>
@@ -240,7 +245,7 @@ export function CreateAppointmentModal({
           <Button
             type="submit"
             form="create-appointment-form"
-            disabled={createAppointment.isPending}
+            disabled={!localeReady || createAppointment.isPending}
           >
             {createAppointment.isPending ? (
               <>
