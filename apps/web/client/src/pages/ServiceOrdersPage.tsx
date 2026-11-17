@@ -1,3 +1,4 @@
+import { useCreateFromRoute } from "@/hooks/useCreateFromRoute";
 import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
 import { formatOrganizationDate, type Instant } from "@/lib/organization-locale";
 import { ResponsiveDetails } from "@/components/ResponsiveDetails";
@@ -211,6 +212,7 @@ export default function ServiceOrdersPage() {
   const urlAppointmentId = params.get("appointmentId");
 
   const [openCreate, setOpenCreate] = useState(false);
+  useCreateFromRoute("orders:create", setOpenCreate);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] =
     useOperationalMemoryState<ServiceOrdersFilter>(

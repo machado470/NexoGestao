@@ -1,3 +1,4 @@
+import { useCreateFromRoute } from "@/hooks/useCreateFromRoute";
 import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
 import { formatOrganizationDate, formatRecordedMoney, formatRecordedTotal, type Instant } from "@/lib/organization-locale";
 import { ResponsiveDetails } from "@/components/ResponsiveDetails";
@@ -143,6 +144,7 @@ export default function FinancesPage() {
   const paymentInputRef = useRef<HTMLInputElement>(null);
   const cancellationInputRef = useRef<HTMLInputElement>(null);
   const [openCreate, setOpenCreate] = useState(false);
+  useCreateFromRoute("finance:update", setOpenCreate);
   const [status, setStatus] = useState("all");
   const [search, setSearch] = useState("");
   const [paying, setPaying] = useState<Charge | null>(null);

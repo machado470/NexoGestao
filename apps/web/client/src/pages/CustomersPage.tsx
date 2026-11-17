@@ -1,3 +1,4 @@
+import { useCreateFromRoute } from "@/hooks/useCreateFromRoute";
 import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
 import { formatOrganizationDate, type Instant } from "@/lib/organization-locale";
 import { useIsMobile } from "@/hooks/useMobile";
@@ -469,6 +470,7 @@ export default function CustomersPage() {
     string | null
   >("nexo.customers.active-id.v2", null);
   const [createOpen, setCreateOpen] = useState(false);
+  useCreateFromRoute("customers:create", setCreateOpen);
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(
     null
   );
