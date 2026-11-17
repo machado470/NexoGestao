@@ -3941,3 +3941,21 @@ html {
   }
   .evidence-mobile-page .governance-next-action > div:first-child p { display: none; }
 }
+
+/* Account screens use the same spacing and touch targets as operational modules. */
+@media (max-width: 767px) {
+  .account-page { min-width: 0; }
+  .account-page input, .account-page [role="combobox"] {
+    min-height: 48px;
+    font-size: 16px;
+    max-width: 100%;
+    min-width: 0;
+  }
+  .account-page input[readonly] {
+    background: transparent;
+    color: var(--text-secondary);
+  }
+  .account-page .account-form-buttons { width: 100%; flex-direction: column-reverse; }
+  .account-page .account-form-buttons button { width: 100%; min-height: 48px; }
+  .account-page p, .account-page dd { overflow-wrap: anywhere; }
+}

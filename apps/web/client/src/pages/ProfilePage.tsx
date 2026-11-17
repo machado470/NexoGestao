@@ -1,3 +1,7 @@
+import { ResponsiveDetails } from "@/components/ResponsiveDetails";
+import { MobileModuleHeader } from "@/components/MobileModuleHeader";
+import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
+import { formatOrganizationDate } from "@/lib/organization-locale";
 import { RefreshCw } from "lucide-react";
 
 import {
@@ -78,18 +82,9 @@ function present(value: unknown) {
   return String(value);
 }
 
-function formatDateTime(value: string | null | undefined) {
-  if (!value) return "Não informada";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("pt-BR", {
-    dateStyle: "short",
-    timeStyle: "short",
-  }).format(date);
-}
-
 export default function ProfilePage() {
   const { isAuthenticated } = useAuth();
+  const { timezone } = useOrganizationLocale();
   const meQuery = trpc.auth.me.useQuery(undefined, {
     enabled: isAuthenticated,
     retry: false,
@@ -119,39 +114,48 @@ export default function ProfilePage() {
   };
 
   return (
-    <AppPageShell className="gap-4 p-3 md:p-5">
-      <AppOperationalHeader
-        title={name ?? "Perfil"}
-        description="Sua identidade e o contexto individual oficialmente disponíveis na operação."
-        secondaryActions={
-          <Button
-            type="button"
-            variant="outline"
-            disabled={meQuery.isFetching || operationalQuery.isFetching}
-            onClick={refresh}
-          >
-            <RefreshCw className="mr-2 size-4" aria-hidden="true" />
-            Atualizar
-          </Button>
-        }
-        contextChips={
-          profile ? (
-            <>
-              {role ? <AppStatusBadge label={role} /> : null}
-              {accountStatus === undefined || accountStatus === null ? null : (
-                <AppStatusBadge label={accountStatus ? "Ativo" : "Inativo"} />
-              )}
-              {organizationName ? (
-                <AppStatusBadge label={organizationName} />
-              ) : null}
-            </>
-          ) : undefined
-        }
+    <AppPageShell className="operational-mobile-page mobile-module-page account-page gap-4 p-3 md:p-5">
+      <MobileModuleHeader
+        title="Meu perfil"
+        description="Sua conta e seu vínculo com a organização."
+        context={organizationName ?? "Dados da conta"}
+        onRefresh={refresh}
       />
+      <div className="hidden md:block">
+        <AppOperationalHeader
+          title={name ?? "Perfil"}
+          description="Sua identidade e o contexto individual oficialmente disponíveis na operação."
+          secondaryActions={
+            <Button
+              type="button"
+              variant="outline"
+              disabled={meQuery.isFetching || operationalQuery.isFetching}
+              onClick={refresh}
+            >
+              <RefreshCw className="mr-2 size-4" aria-hidden="true" />
+              Atualizar
+            </Button>
+          }
+          contextChips={
+            profile ? (
+              <>
+                {role ? <AppStatusBadge label={role} /> : null}
+                {accountStatus === undefined ||
+                accountStatus === null ? null : (
+                  <AppStatusBadge label={accountStatus ? "Ativo" : "Inativo"} />
+                )}
+                {organizationName ? (
+                  <AppStatusBadge label={organizationName} />
+                ) : null}
+              </>
+            ) : undefined
+          }
+        />
+      </div>
 
       <AppSectionBlock
         title="Identidade"
-        subtitle="Dados factuais da conta e do vínculo da pessoa autenticada. Estes campos são somente leitura porque não existe mutation específica de Perfil."
+        subtitle="Confira os dados da sua conta. Estas informações são somente leitura."
       >
         {meQuery.isLoading ? (
           <AppPageLoadingState
@@ -213,7 +217,7 @@ export default function ProfilePage() {
 
       <AppSectionBlock
         title="Contexto operacional oficial"
-        subtitle="Leitura individual do resumo operacional de People, sem classificação ou recomendação calculada nesta página."
+        subtitle="Resumo da sua atividade e orientação para a próxima ação."
       >
         {operationalQuery.isLoading ? (
           <AppPageLoadingState
@@ -260,7 +264,7 @@ export default function ProfilePage() {
               ) : null}
             </div>
 
-            <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid min-w-0 grid-cols-2 gap-3 lg:grid-cols-4">
               {[
                 ["O.S. abertas", operationalProfile.openServiceOrdersCount],
                 ["O.S. vencidas", operationalProfile.overdueServiceOrdersCount],
@@ -293,7 +297,11 @@ export default function ProfilePage() {
                   Última atividade
                 </dt>
                 <dd className="mt-1 break-words text-[var(--text-secondary)]">
-                  {formatDateTime(operationalProfile.lastActivityAt)}
+                  {formatOrganizationDate(
+                    operationalProfile.lastActivityAt,
+                    timezone,
+                    "Não informada"
+                  )}
                 </dd>
               </div>
             </dl>
@@ -327,47 +335,49 @@ export default function ProfilePage() {
       </AppSectionBlock>
 
       {operationalProfile ? (
-        <AppSectionBlock
-          title="Capacidade profissional"
-          subtitle="Capacidades, uso e observações entregues diretamente pelo contrato operacional."
-        >
-          <dl className="grid min-w-0 gap-4 text-sm sm:grid-cols-2">
-            {[
-              [
-                "Capacidade diária de O.S.",
-                operationalProfile.dailyServiceOrderCapacity,
-              ],
-              [
-                "Capacidade diária de agenda",
-                operationalProfile.dailyAppointmentCapacity,
-              ],
-              [
-                "Uso da capacidade de O.S.",
-                operationalProfile.serviceOrderCapacityUsagePct,
-              ],
-              [
-                "Uso da capacidade de agenda",
-                operationalProfile.appointmentCapacityUsagePct,
-              ],
-              ["Estado de capacidade", operationalProfile.capacityStatus],
-              ["Observações de carga", operationalProfile.workloadNotes],
-            ].map(([label, value]) => (
-              <div key={label} className="min-w-0">
-                <dt className="font-medium text-[var(--text-primary)]">
-                  {label}
-                </dt>
-                <dd className="mt-1 break-words text-[var(--text-secondary)]">
-                  {present(value)}
-                </dd>
-              </div>
-            ))}
-          </dl>
-          {operationalProfile.capacitySummaryText ? (
-            <p className="mt-4 break-words border-t border-[var(--border-subtle)] pt-4 text-sm text-[var(--text-secondary)]">
-              {operationalProfile.capacitySummaryText}
-            </p>
-          ) : null}
-        </AppSectionBlock>
+        <ResponsiveDetails title="Capacidade profissional">
+          <AppSectionBlock
+            title="Capacidade profissional"
+            subtitle="Capacidades, uso e observações entregues diretamente pelo contrato operacional."
+          >
+            <dl className="grid min-w-0 gap-4 text-sm sm:grid-cols-2">
+              {[
+                [
+                  "Capacidade diária de O.S.",
+                  operationalProfile.dailyServiceOrderCapacity,
+                ],
+                [
+                  "Capacidade diária de agenda",
+                  operationalProfile.dailyAppointmentCapacity,
+                ],
+                [
+                  "Uso da capacidade de O.S.",
+                  operationalProfile.serviceOrderCapacityUsagePct,
+                ],
+                [
+                  "Uso da capacidade de agenda",
+                  operationalProfile.appointmentCapacityUsagePct,
+                ],
+                ["Estado de capacidade", operationalProfile.capacityStatus],
+                ["Observações de carga", operationalProfile.workloadNotes],
+              ].map(([label, value]) => (
+                <div key={label} className="min-w-0">
+                  <dt className="font-medium text-[var(--text-primary)]">
+                    {label}
+                  </dt>
+                  <dd className="mt-1 break-words text-[var(--text-secondary)]">
+                    {present(value)}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            {operationalProfile.capacitySummaryText ? (
+              <p className="mt-4 break-words border-t border-[var(--border-subtle)] pt-4 text-sm text-[var(--text-secondary)]">
+                {operationalProfile.capacitySummaryText}
+              </p>
+            ) : null}
+          </AppSectionBlock>
+        </ResponsiveDetails>
       ) : null}
     </AppPageShell>
   );
