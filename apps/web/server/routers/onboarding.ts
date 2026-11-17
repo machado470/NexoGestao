@@ -50,6 +50,15 @@ export const onboardingRouter = router({
       )
     ),
 
+  skip: protectedProcedure
+    .input(completeOnboardingInput)
+    .output(onboardingStatusOutput)
+    .mutation(({ ctx, input }) =>
+      parseOnboardingStatus(
+        authedPost(ctx as NexoContext, "/onboarding/skip", input)
+      )
+    ),
+
   complete: protectedProcedure
     .input(completeOnboardingInput)
     .output(onboardingStatusOutput)

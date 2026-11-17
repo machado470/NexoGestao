@@ -20,6 +20,7 @@ describe('onboarding completion HTTP boundary', () => {
     const module = await Test.createTestingModule({ controllers: [OnboardingController], providers: [RolesGuard, { provide: OnboardingService, useValue: new OnboardingService(prisma as any) }] })
       .overrideGuard(JwtAuthGuard).useValue({ canActivate: context => {
         const req = context.switchToHttp().getRequest()
+        if (req.headers['x-test-unauthenticated']) return false
         req.user = { orgId: 'authenticated-org', role: req.headers['x-test-role'] || 'ADMIN' }
         return true
       } }).compile()
@@ -51,4 +52,18 @@ describe('onboarding completion HTTP boundary', () => {
     expect(response.body.requiresOnboarding).toBe(false)
     expect(update).toHaveBeenCalledWith({ where: { id: 'authenticated-org' }, data: { requiresOnboarding: false } })
   })
+  it.each(['STAFF', 'VIEWER'])('does not let %s dismiss organization onboarding', async role => {
+    await request(app.getHttpServer()).post('/onboarding/skip').set('x-test-role', role).send({}).expect(403)
+    expect(update).not.toHaveBeenCalled()
+  })
+  it('requires authentication to skip', async () => {
+    await request(app.getHttpServer()).post('/onboarding/skip').set('x-test-unauthenticated', '1').send({}).expect(403)
+    expect(update).not.toHaveBeenCalled()
+  })
+  it.each(['ADMIN', 'MANAGER'])('allows %s to skip with no demo records, using only its authenticated tenant', async role => {
+    const response = await request(app.getHttpServer()).post('/onboarding/skip').set('x-test-role', role).send({ orgId: 'another-org' }).expect(201)
+    expect(response.body).toEqual({ requiresOnboarding: false, steps: { createCustomer: false, createService: false, createCharge: false } })
+    expect(update).toHaveBeenCalledWith({ where: { id: 'authenticated-org' }, data: { requiresOnboarding: false } })
+  })
+
 })

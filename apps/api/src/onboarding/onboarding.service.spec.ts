@@ -37,6 +37,22 @@ describe('persisted onboarding completion evidence', () => {
     expect((await service.completeOnboarding('org'))?.requiresOnboarding).toBe(false)
     expect(prisma.organization.update).toHaveBeenCalledWith({ where: { id: 'org' }, data: { requiresOnboarding: false } })
   })
+  it('skips an empty tour without fabricating execution evidence', async () => {
+    const { prisma, service } = setup([0, 0, 0])
+    expect(await service.skipOnboarding('org')).toEqual({ requiresOnboarding: false, steps: { createCustomer: false, createService: false, createCharge: false } })
+    expect(prisma.organization.update).toHaveBeenCalledWith({ where: { id: 'org' }, data: { requiresOnboarding: false } })
+  })
+  it('skipping is idempotent and preserves real partial progress', async () => {
+    const { prisma, service } = setup([1, 0, 0], false)
+    expect(await service.skipOnboarding('org')).toEqual({ requiresOnboarding: false, steps: { createCustomer: true, createService: false, createCharge: false } })
+    expect(prisma.organization.update).not.toHaveBeenCalled()
+  })
+  it('does not write when skipping an unknown organization', async () => {
+    const { prisma, service } = setup()
+    prisma.organization.findUnique.mockResolvedValue(null)
+    expect(await service.skipOnboarding('missing')).toBeNull()
+    expect(prisma.organization.update).not.toHaveBeenCalled()
+  })
   it('is idempotent for an organization already released and never reopens it', async () => {
     const { prisma, service } = setup([0, 0, 0], false)
     expect((await service.completeOnboarding('org'))?.requiresOnboarding).toBe(false)

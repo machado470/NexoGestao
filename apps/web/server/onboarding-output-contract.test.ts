@@ -71,6 +71,19 @@ describe("Onboarding output contracts", () => {
     ).resolves.toEqual(validStatus);
   });
 
+  it("persists skip through the API without fabricating completed steps", async () => {
+    const skipped = { requiresOnboarding: false, steps: { createCustomer: false, createService: false, createCharge: false } };
+    respond({ data: skipped });
+    await expect(appRouter.createCaller(context).onboarding.skip({})).resolves.toEqual(skipped);
+    expect(vi.mocked(fetch).mock.calls[0][0]).toContain("/onboarding/skip");
+  });
+
+  it("rejects a client-supplied tenant on skip", async () => {
+    respond(validStatus);
+    await expect(appRouter.createCaller(context).onboarding.skip({ orgId: "another-org" } as any)).rejects.toBeTruthy();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["campo obrigatório ausente", { steps: validStatus.steps }],
     ["step obrigatório ausente", { requiresOnboarding: true, steps: { createCustomer: true, createService: false } }],

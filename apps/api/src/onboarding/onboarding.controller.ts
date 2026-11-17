@@ -25,6 +25,13 @@ export class OnboardingController {
     return this.onboardingService.completeOnboarding(orgId);
   }
 
+  @Post("skip")
+  @Roles("ADMIN", "MANAGER")
+  @Throttle({ short: { limit: 10, ttl: 60000 } })
+  async skipOnboarding(@Req() req: any) {
+    return this.onboardingService.skipOnboarding(req.user.orgId);
+  }
+
   @Post("complete-step")
   @Roles("ADMIN", "MANAGER")
   @Throttle({ short: { limit: 10, ttl: 60000 } })
