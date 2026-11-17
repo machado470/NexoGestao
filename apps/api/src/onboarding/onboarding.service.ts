@@ -36,6 +36,14 @@ export class OnboardingService {
     return { ...status, requiresOnboarding: false }
   }
 
+  /** Dismiss the optional tour without creating demo records or claiming completed steps. */
+  async skipOnboarding(orgId: string) {
+    const status = await this.getOnboardingStatus(orgId)
+    if (!status || !status.requiresOnboarding) return status
+    await this.prisma.organization.update({ where: { id: orgId }, data: { requiresOnboarding: false } })
+    return { ...status, requiresOnboarding: false }
+  }
+
   async completeOnboardingStep(orgId: string, step: OnboardingStep) {
     return step === 'createCharge' ? this.completeOnboarding(orgId) : this.getOnboardingStatus(orgId)
   }

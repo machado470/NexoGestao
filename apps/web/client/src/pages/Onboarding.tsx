@@ -15,6 +15,7 @@ import {
   UserRound,
 } from "lucide-react";
 
+import { ThemeProvider, useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { trpc } from "@/lib/trpc";
 import {
@@ -133,7 +134,12 @@ function extractEntityId(payload: unknown, keys: string[] = ["id"]): string | nu
 }
 
 export default function Onboarding() {
+  return <ThemeProvider defaultTheme="light"><OnboardingJourney /></ThemeProvider>;
+}
+
+function OnboardingJourney() {
   const [, navigate] = useLocation();
+  const { theme, toggleTheme } = useTheme();
   const { track } = useProductAnalytics();
   const { user, isAuthenticated, isInitializing, refresh } = useAuth();
   const utils = trpc.useUtils();
@@ -141,6 +147,7 @@ export default function Onboarding() {
 
   const canQuery = isAuthenticated && !isInitializing;
 
+  const [hydratedKey, setHydratedKey] = useState<string | null>(null);
   const [progress, setProgress] = useState<Progress>(BASE_PROGRESS);
   const [journeyIds, setJourneyIds] = useState<JourneyIds>(BASE_IDS);
   const [error, setError] = useState<string | null>(null);
@@ -199,47 +206,52 @@ export default function Onboarding() {
   const serviceOrderMutation = trpc.serviceOrders.create.useMutation();
   const serviceOrderUpdateMutation = trpc.serviceOrders.update.useMutation();
   const chargeMutation = trpc.finance.charges.create.useMutation();
+  const skipOnboardingMutation = trpc.onboarding.skip.useMutation();
   const completeOnboardingMutation = trpc.onboarding.complete.useMutation();
 
   useEffect(() => {
     if (!storageKey) return;
 
-    const raw = localStorage.getItem(storageKey);
-    if (!raw) return;
-
     try {
-      setProgress({ ...BASE_PROGRESS, ...JSON.parse(raw) });
+      const raw = localStorage.getItem(storageKey);
+      const saved = raw ? JSON.parse(raw) : null;
+      const storedProgress = saved?.progress ?? saved;
+      setProgress(Object.fromEntries(Object.keys(BASE_PROGRESS).map(key => [key, storedProgress?.[key] === true])) as Progress);
+      setJourneyIds(Object.fromEntries(Object.keys(BASE_IDS).map(key => [key, extractId(saved?.ids?.[key])])) as JourneyIds);
     } catch {
       setProgress(BASE_PROGRESS);
+      setJourneyIds(BASE_IDS);
     }
+    setHydratedKey(storageKey);
   }, [storageKey]);
 
   useEffect(() => {
-    if (!storageKey) return;
-    localStorage.setItem(storageKey, JSON.stringify(progress));
-  }, [progress, storageKey]);
+    if (!storageKey || hydratedKey !== storageKey) return;
+    try {
+      localStorage.setItem(storageKey, JSON.stringify({ progress, ids: journeyIds }));
+    } catch {
+      // Storage may be unavailable; the server still supplies persisted progress.
+    }
+  }, [progress, journeyIds, storageKey, hydratedKey]);
 
   useEffect(() => {
-    if (!canQuery) return;
+    if (!canQuery || hydratedKey !== storageKey) return;
 
-    const customersPayload =
-      (customersQuery.data as any)?.data ?? customersQuery.data ?? [];
-    const appointmentsPayload =
-      (appointmentsQuery.data as any)?.data ??
-      (appointmentsQuery.data as any)?.items ??
-      appointmentsQuery.data ??
-      [];
+    const customersPayload = normalizeArrayPayload(customersQuery.data);
+    const appointmentsPayload = normalizeArrayPayload(appointmentsQuery.data);
     const hasCustomer = Array.isArray(customersPayload) && customersPayload.length > 0;
     const hasAppointment = Array.isArray(appointmentsPayload) && appointmentsPayload.length > 0;
     setProgress((prev) => ({
       ...prev,
-      customer: statusQuery.data?.steps.createCustomer ?? hasCustomer,
+      customer: prev.customer || statusQuery.data?.steps.createCustomer === true || hasCustomer,
       appointment: prev.appointment || hasAppointment,
-      serviceOrder: statusQuery.data?.steps.createService ?? false,
-      charge: statusQuery.data?.steps.createCharge ?? false,
+      serviceOrder: prev.serviceOrder || statusQuery.data?.steps.createService === true,
+      charge: prev.charge || statusQuery.data?.steps.createCharge === true,
     }));
   }, [
     canQuery,
+    hydratedKey,
+    storageKey,
     customersQuery.data,
     appointmentsQuery.data,
     serviceOrdersQuery.data,
@@ -247,12 +259,12 @@ export default function Onboarding() {
     statusQuery.data,
   ]);
 
-  const firstCustomer = ((customersQuery.data as any)?.data ?? customersQuery.data ?? [])[0];
+  const firstCustomer = normalizeArrayPayload<{ id: string }>(customersQuery.data)[0];
   const activeCustomerId = journeyIds.customerId ?? firstCustomer?.id ?? null;
 
   const canRun = {
     customer: true,
-    appointment: progress.customer,
+    appointment: progress.customer && Boolean(activeCustomerId),
     serviceOrder: progress.appointment,
     charge: progress.serviceOrder,
   } as const;
@@ -264,8 +276,33 @@ export default function Onboarding() {
 
   const percent = Math.round((completedCount / STEP_META.length) * 100);
 
-  const completeStep = (key: StepKey) =>
+  const stepRefs = useRef<Partial<Record<StepKey, HTMLDivElement | null>>>({});
+  const errorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (error) errorRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [error]);
+
+  const completeStep = (key: StepKey) => {
     setProgress((prev) => ({ ...prev, [key]: true }));
+    const next = STEP_META[STEP_META.findIndex(step => step.key === key) + 1];
+    if (next) stepRefs.current[next.key]?.scrollIntoView({ block: "center", behavior: "smooth" });
+  };
+
+  const isLeaving = completeOnboardingMutation.isPending || skipOnboardingMutation.isPending;
+  const isExecuting = isGenerating || customerMutation.isPending || appointmentMutation.isPending || serviceOrderMutation.isPending || serviceOrderUpdateMutation.isPending || chargeMutation.isPending;
+
+  const skip = async () => {
+    setError(null);
+    try {
+      const status = await skipOnboardingMutation.mutateAsync({});
+      if (!status || status.requiresOnboarding) throw new Error("Não foi possível liberar o painel. Tente novamente.");
+      if (storageKey) localStorage.removeItem(storageKey);
+      await refresh();
+      navigate("/executive-dashboard");
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
 
   const finish = async () => {
     setError(null);
@@ -301,7 +338,17 @@ export default function Onboarding() {
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className={`nexo-app nexo-app-shell app-root min-h-screen text-[var(--text-primary)] ${theme === "dark" ? "dark" : ""}`} data-theme={theme}>
+    <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
+      <nav aria-label="Opções da demonstração" className="flex flex-wrap items-center justify-between gap-3">
+        <span className="font-semibold">NexoGestão · Primeiros passos</span>
+        <div className="flex flex-wrap gap-2">
+          {toggleTheme ? <Button variant="outline" onClick={toggleTheme}>{theme === "dark" ? "Usar tema claro" : "Usar tema escuro"}</Button> : null}
+          <Button variant="outline" disabled={isLeaving || isExecuting} onClick={() => void skip()}>
+            {skipOnboardingMutation.isPending ? "Abrindo painel..." : "Pular demonstração"}
+          </Button>
+        </div>
+      </nav>
       {statusQuery.isError ? (
         <AppInfoCard role="alert">
           Não foi possível confirmar o progresso no servidor. Consulte novamente antes de finalizar.
@@ -314,7 +361,7 @@ export default function Onboarding() {
           <div className="max-w-2xl">
             <div className="mb-4 flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-[var(--accent-primary)]" />
-              <AppStatusBadge label="Demo guiada" tone="accent" />
+              <AppStatusBadge label="Demo guiada" tone="accent" className="text-[var(--text-primary)]" />
             </div>
 
             <h1 className="text-3xl font-semibold tracking-tight text-[var(--text-primary)] md:text-4xl">
@@ -325,6 +372,7 @@ export default function Onboarding() {
               O produto conduz automaticamente o caminho oficial: cliente → agendamento
               → serviço concluído → cobrança gerada.
             </p>
+            <p className="mt-2 text-sm text-[var(--text-secondary)]">Esta demonstração é opcional. Você pode pular e cadastrar seus dados depois no painel.</p>
           </div>
 
           <div className="min-w-[220px] rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
@@ -345,13 +393,15 @@ export default function Onboarding() {
       </section>
 
       {error ? (
-        <AppSectionCard variant="critical" className="p-4 text-sm text-[var(--text-primary)]">
+        <div ref={errorRef}>
+        <AppSectionCard role="alert" variant="critical" className="p-4 text-sm text-[var(--text-primary)]">
           {error}
         </AppSectionCard>
+        </div>
       ) : null}
 
       {flowMessage ? (
-        <AppInfoCard className="text-sm">
+        <AppInfoCard role="status" aria-live="polite" className="text-sm">
           {flowMessage}
         </AppInfoCard>
       ) : null}
@@ -396,11 +446,11 @@ export default function Onboarding() {
               chargesQuery.refetch(),
               statusQuery.refetch(),
             ]);
-            setFlowMessage("Ambiente de demonstração pronto. Você já pode avançar pelas etapas sem bloqueios.");
+            setFlowMessage("Ambiente de demonstração pronto. Confira as etapas concluídas abaixo ou continue no painel.");
             setDegradedMessage("Se o WhatsApp estiver em fila, continue o onboarding normalmente: o envio será processado em background.");
           } catch (e) {
             setError((e as Error).message);
-            setSeedFallback("A geração automática de dados falhou. Continue pela jornada manual abaixo: ela possui fallback completo e não quebra o fluxo da demo.");
+            setSeedFallback("A geração automática de dados falhou. Continue pela jornada manual abaixo: ela possui permite tentar novamente. Você também pode pular a demonstração e continuar no painel.");
             setFlowMessage(null);
           }
         }}>
@@ -445,6 +495,7 @@ export default function Onboarding() {
 
                     <div className="mt-2">
                       <AppStatusBadge
+                        className="text-[var(--text-primary)]"
                         label={getStepStatusLabel(done, enabled)}
                         tone={done ? "success" : enabled ? "accent" : "neutral"}
                       />
@@ -457,6 +508,7 @@ export default function Onboarding() {
         </aside>
 
         <div className="space-y-6">
+          <div ref={node => { stepRefs.current.customer = node; }}>
           <AppSectionCard className="p-6">
             <h2 className="text-lg font-semibold">1. Criar cliente</h2>
             <p className="mt-1 text-sm text-[var(--text-secondary)]">Cadastre um cliente e mostre onde a receita começa.</p>
@@ -483,11 +535,14 @@ export default function Onboarding() {
               }
             }}>{customerMutation.isPending ? "Criando..." : progress.customer ? "Concluído" : STEP_META[0].cta}</Button>
           </AppSectionCard>
+          </div>
 
+          <div ref={node => { stepRefs.current.appointment = node; }}>
           <AppSectionCard className="p-6">
             <h2 className="text-lg font-semibold">2. Criar agendamento</h2>
             <p className="mt-1 text-sm text-[var(--text-secondary)]">Marque o atendimento e mostre previsibilidade de operação.</p>
             <AppInput className="mt-4 w-full" aria-label="Observação do agendamento" value={appointmentNotes} onChange={(e) => setAppointmentNotes(e.target.value)} placeholder="Observação do agendamento" />
+            {!canRun.appointment ? <p className="mt-3 text-sm text-[var(--text-muted)]">Crie um cliente na etapa 1 para liberar o agendamento.</p> : null}
             <Button className="mt-4" disabled={!canRun.appointment || progress.appointment || appointmentMutation.isPending} onClick={async () => {
               setError(null);
               setFlowMessage("Registrando agendamento...");
@@ -512,15 +567,20 @@ export default function Onboarding() {
               }
             }}>{appointmentMutation.isPending ? "Criando..." : progress.appointment ? "Concluído" : STEP_META[1].cta}</Button>
           </AppSectionCard>
+          </div>
 
+          <div ref={node => { stepRefs.current.serviceOrder = node; }}>
           <AppSectionCard className="p-6">
             <h2 className="text-lg font-semibold">3. Concluir serviço</h2>
             <p className="mt-1 text-sm text-[var(--text-secondary)]">Escolha o responsável para criar, iniciar e concluir a O.S. na sequência operacional.</p>
             <AppInput className="mt-4 w-full" aria-label="Título da ordem de serviço" value={serviceOrderTitle} onChange={(e) => setServiceOrderTitle(e.target.value)} placeholder="Título da ordem de serviço" />
             <div className="mt-4">
               <AppSelect ariaLabel="Responsável pela execução" value={assigneeId} onValueChange={setAssigneeId} placeholder="Selecione o responsável" options={assignees.map((person: any) => ({ value: person.id, label: person.name }))} />
-              {assigneesQuery.isError ? <p role="alert">Não foi possível consultar os responsáveis. Tente recarregar a página.</p> : null}
+              {assigneesQuery.isLoading ? <p role="status" className="mt-2 text-sm">Carregando responsáveis...</p> : assigneesQuery.isError ? (
+                <div role="alert" className="mt-2 text-sm">Não foi possível consultar os responsáveis. <Button variant="outline" disabled={assigneesQuery.isFetching} onClick={() => void assigneesQuery.refetch()}>Tentar novamente</Button></div>
+              ) : assignees.length === 0 ? <p className="mt-2 text-sm text-[var(--text-secondary)]">Nenhum responsável cadastrado. Pule a demonstração para cadastrar sua equipe em Pessoas no painel.</p> : !assigneeId ? <p className="mt-2 text-sm text-[var(--text-muted)]">Selecione quem executará o serviço para continuar.</p> : null}
             </div>
+            {!canRun.serviceOrder ? <p className="mt-3 text-sm text-[var(--text-muted)]">Conclua o agendamento na etapa 2 para liberar o serviço.</p> : null}
             <Button className="mt-4" disabled={!assigneeId || !canRun.serviceOrder || progress.serviceOrder || serviceOrderMutation.isPending || serviceOrderUpdateMutation.isPending} onClick={async () => {
               track("cta_click", { screen: "onboarding", ctaId: "step_create_service_order" });
               setError(null);
@@ -553,11 +613,14 @@ export default function Onboarding() {
               }
             }}>{serviceOrderMutation.isPending || serviceOrderUpdateMutation.isPending ? "Concluindo..." : progress.serviceOrder ? "Concluído" : STEP_META[2].cta}</Button>
           </AppSectionCard>
+          </div>
 
+          <div ref={node => { stepRefs.current.charge = node; }}>
           <AppSectionCard className="p-6">
             <h2 className="text-lg font-semibold">4. Gerar cobrança</h2>
             <p className="mt-1 text-sm text-[var(--text-secondary)]">Mostre dinheiro em potencial pronto para entrar no caixa.</p>
             <AppInput className="mt-4 w-full" aria-label="Valor da cobrança" inputMode="decimal" value={chargeAmount} onChange={(e) => setChargeAmount(e.target.value)} placeholder="Valor da cobrança" />
+            {!canRun.charge ? <p className="mt-3 text-sm text-[var(--text-muted)]">Conclua o serviço na etapa 3 para liberar a cobrança.</p> : null}
             <Button className="mt-4" disabled={!canRun.charge || progress.charge || chargeMutation.isPending} onClick={async () => {
               track("cta_click", { screen: "onboarding", ctaId: "step_generate_charge" });
               setError(null);
@@ -566,7 +629,7 @@ export default function Onboarding() {
                 if (!activeCustomerId) throw new Error("Crie um cliente primeiro.");
                 const amountCents = parseMoneyInputToCents(chargeAmount);
                 if (amountCents === null) throw new Error("Informe um valor válido, como 150,00.");
-                const orders = (serviceOrdersQuery.data as any)?.data ?? (serviceOrdersQuery.data as any)?.items ?? serviceOrdersQuery.data ?? [];
+                const orders = normalizeArrayPayload<any>(serviceOrdersQuery.data);
                 const serviceOrderId = journeyIds.serviceOrderId ?? (Array.isArray(orders) ? orders.find((order: any) => order.customerId === activeCustomerId && order.status === "DONE")?.id : null);
                 if (!serviceOrderId) throw new Error("Conclua a O.S. deste cliente antes de gerar a cobrança.");
                 const result = await chargeMutation.mutateAsync({ customerId: String(activeCustomerId), serviceOrderId, amountCents, dueDate: new Date(), notes: "Cobrança demo pronta para receber" });
@@ -582,6 +645,7 @@ export default function Onboarding() {
               }
             }}>{chargeMutation.isPending ? "Gerando..." : progress.charge ? "Concluído" : STEP_META[3].cta}</Button>
           </AppSectionCard>
+          </div>
 
           <AppSectionCard className="p-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -592,7 +656,9 @@ export default function Onboarding() {
                 </p>
               </div>
 
-              <Button disabled={!statusQuery.data?.steps.createCustomer || !statusQuery.data?.steps.createService || !statusQuery.data?.steps.createCharge || completeOnboardingMutation.isPending} onClick={() => void finish()} className="gap-2">
+              <div className="flex flex-wrap gap-3">
+              <Button variant="outline" disabled={isLeaving || isExecuting} onClick={() => void skip()}>Continuar sem demonstração</Button>
+              <Button disabled={isLeaving || isExecuting || !statusQuery.data?.steps.createCustomer || !statusQuery.data?.steps.createService || !statusQuery.data?.steps.createCharge || completeOnboardingMutation.isPending} onClick={() => void finish()} className="gap-2">
                 {completeOnboardingMutation.isPending ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -605,10 +671,12 @@ export default function Onboarding() {
                   </>
                 )}
               </Button>
+              </div>
             </div>
           </AppSectionCard>
         </div>
       </div>
+    </div>
     </div>
   );
 }
