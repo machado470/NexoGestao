@@ -108,6 +108,7 @@ export default function SettingsPage() {
     dirty: hasChanges,
     blocked: updateMutation.isPending,
     onDiscard: resetForm,
+    guardNavigation: true,
   });
 
   return (
@@ -332,7 +333,7 @@ export default function SettingsPage() {
       </AppSectionBlock>
       <p className="text-sm text-[var(--text-muted)] md:hidden" role="status">
         {hasChanges
-          ? "Salve ou descarte suas alterações antes de trocar de tela."
+          ? "Suas alterações ainda não foram salvas."
           : "Tudo pronto. Nenhuma alteração pendente."}
       </p>
       <OrganizationAccessSection />

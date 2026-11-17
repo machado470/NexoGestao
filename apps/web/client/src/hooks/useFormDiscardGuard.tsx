@@ -1,3 +1,4 @@
+import { registerNavigationBlocker } from "@/lib/navigation-guard";
 import { useEffect, useRef, useState } from "react";
 import {
   AlertDialog,
@@ -16,19 +17,47 @@ export function useFormDiscardGuard({
   dirty,
   blocked,
   onDiscard,
+  guardNavigation = false,
 }: {
   open: boolean;
   dirty: boolean;
   blocked: boolean;
   onDiscard: () => void;
+  guardNavigation?: boolean;
 }) {
   const [confirming, setConfirming] = useState(false);
   const returnFocus = useRef<HTMLElement | null>(null);
   const discarding = useRef(false);
+  const pendingNavigation = useRef<(() => void) | undefined>(undefined);
+  const latest = useRef({ blocked, dirty });
+  latest.current = { blocked, dirty };
 
   useEffect(() => {
-    if (!open) setConfirming(false);
-  }, [open]);
+    if (!guardNavigation || !open || (!dirty && !blocked)) return;
+    return registerNavigationBlocker(proceed => {
+      if (latest.current.blocked) return;
+      if (!latest.current.dirty) {
+        proceed();
+        return;
+      }
+      // Keep the first destination until the person makes a decision.
+      if (pendingNavigation.current) return;
+      pendingNavigation.current = proceed;
+      returnFocus.current =
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
+      discarding.current = false;
+      setConfirming(true);
+    });
+  }, [guardNavigation, open, dirty, blocked]);
+
+  useEffect(() => {
+    if (!open || (guardNavigation && !dirty && !blocked)) {
+      pendingNavigation.current = undefined;
+      setConfirming(false);
+    }
+  }, [open, guardNavigation, dirty, blocked]);
 
   useEffect(() => {
     if (!open || !dirty) return;
@@ -41,7 +70,8 @@ export function useFormDiscardGuard({
   }, [open, dirty]);
 
   const requestClose = () => {
-    if (blocked) return;
+    // An underlying modal can receive the same Escape; preserve the original focus.
+    if (blocked || confirming) return;
     if (!dirty) {
       onDiscard();
       return;
@@ -55,8 +85,28 @@ export function useFormDiscardGuard({
   };
 
   const confirmation = (
-    <AlertDialog open={open && confirming} onOpenChange={setConfirming}>
+    <AlertDialog
+      open={open && confirming}
+      onOpenChange={next => {
+        setConfirming(next);
+        if (!next) pendingNavigation.current = undefined;
+      }}
+    >
       <AlertDialogContent
+        onKeyDownCapture={event => {
+          if (event.key !== "Escape") return;
+          event.preventDefault();
+          event.stopPropagation();
+          pendingNavigation.current = undefined;
+          setConfirming(false);
+        }}
+        onEscapeKeyDown={event => {
+          // Consume Escape here so an underlying form cannot reopen this prompt.
+          event.preventDefault();
+          event.stopPropagation();
+          pendingNavigation.current = undefined;
+          setConfirming(false);
+        }}
         onCloseAutoFocus={event => {
           if (!discarding.current && returnFocus.current?.isConnected) {
             event.preventDefault();
@@ -68,7 +118,7 @@ export function useFormDiscardGuard({
           <AlertDialogTitle>Descartar alterações?</AlertDialogTitle>
           <AlertDialogDescription>
             Há dados não salvos neste formulário. Continue editando para
-            mantê-los ou descarte para fechar.
+            mantê-los ou confirme o descarte para continuar.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -85,7 +135,10 @@ export function useFormDiscardGuard({
               }
               discarding.current = true;
               setConfirming(false);
+              const proceed = pendingNavigation.current;
+              pendingNavigation.current = undefined;
               onDiscard();
+              proceed?.();
             }}
           >
             Descartar alterações

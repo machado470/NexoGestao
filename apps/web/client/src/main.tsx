@@ -1,3 +1,7 @@
+import {
+  installNavigationGuard,
+  useGuardedBrowserLocation,
+} from "@/lib/navigation-guard";
 import { createRoot } from "react-dom/client";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Router as BrowserRouter } from "wouter";
@@ -12,6 +16,8 @@ import {
   setAuditField,
 } from "@/lib/renderAudit";
 import { getQueryClient, getTrpcClient, TRPCProvider } from "@/lib/trpc";
+
+installNavigationGuard();
 
 function nowIso() {
   return new Date().toISOString();
@@ -222,7 +228,10 @@ if (renderAuditMode === "bare-html") {
           return (
             <TRPCProvider client={trpcClient} queryClient={queryClient}>
               <ErrorBoundary routeContext="root">
-                <BrowserRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+                <BrowserRouter
+                  hook={useGuardedBrowserLocation}
+                  base={import.meta.env.BASE_URL.replace(/\/$/, "")}
+                >
                   {appNode}
                 </BrowserRouter>
               </ErrorBoundary>

@@ -212,11 +212,11 @@ let page;
       name: "Descartar alterações?",
     });
     await alert.waitFor();
-    assert.equal(
+    await page.waitForFunction(
+      (node) => node === document.activeElement,
       await alert
         .getByRole("button", { name: "Continuar editando" })
-        .evaluate((node) => node === document.activeElement),
-      true,
+        .elementHandle(),
     );
     assert.equal(
       await page.evaluate(
@@ -266,9 +266,10 @@ let page;
     await page.keyboard.press("Escape");
     await alert.waitFor({ state: "hidden" });
     assert.equal(await input.inputValue(), value);
-    assert.equal(
-      await input.evaluate((node) => node === document.activeElement),
-      true,
+    // Radix restores focus after the closing transition; wait for that result.
+    await page.waitForFunction(
+      (node) => node === document.activeElement,
+      await input.elementHandle(),
     );
     await form.getByRole("button", { name: "Close", exact: true }).click();
     alert = await expectConfirmation();
