@@ -1,3 +1,6 @@
+import { ResponsiveDetails } from "@/components/ResponsiveDetails";
+import { useMobileDetailNavigation } from "@/hooks/useMobileDetailNavigation";
+import { MobileDetailBack, MobileDetailState } from "@/components/MobileDetailBack";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useAuth } from "@/contexts/AuthContext";
 import { can } from "@/lib/rbac";
@@ -215,6 +218,7 @@ export default function ServiceOrdersPage() {
   const urlServiceOrderId =
     params.get("id") ?? params.get("serviceOrderId") ?? params.get("os");
   const urlCustomerId = params.get("customerId");
+  const mobile = useMobileDetailNavigation(urlServiceOrderId);
   const urlAppointmentId = params.get("appointmentId");
 
   const [openCreate, setOpenCreate] = useState(false);
@@ -875,7 +879,10 @@ export default function ServiceOrdersPage() {
   }
 
   return (
-    <AppPageShell className="gap-3">
+    <AppPageShell ref={mobile.anchorRef} className="operational-mobile-page gap-3">
+      <MobileDetailBack visible={mobile.isOpen} onBack={mobile.back} label="Voltar às ordens de serviço" />
+      <MobileDetailState visible={mobile.isOpen && !selectedOrder} loading={serviceOrdersQuery.isLoading} failed={serviceOrdersQuery.isError} onRetry={() => void serviceOrdersQuery.refetch()} />
+      <div className={`${mobile.listClass} space-y-3`}>
       <AppOperationalHeader
         title="Ordens de Serviço"
         description="Execute, acompanhe e conecte cada O.S. ao cliente, responsável e cobrança oficiais."
@@ -942,6 +949,8 @@ export default function ServiceOrdersPage() {
             className="h-9 w-full"
           />
         </div>
+<ResponsiveDetails title="Mais filtros" controls>
+
         <div className="w-full md:max-w-[190px]">
           <AppSelect
             value={customerFilter}
@@ -1046,14 +1055,17 @@ export default function ServiceOrdersPage() {
         <span className="rounded-md border border-[var(--border-subtle)] px-2 py-1 text-xs text-[var(--text-muted)]">
           {filteredOrders.length} exibidas de {serviceOrdersQuery.data?.meta.total ?? 0} O.S.
         </span>
-      </AppFiltersBar>
 
+</ResponsiveDetails>
+</AppFiltersBar>
+
+      </div>
       <div className="space-y-3">
         <div className="flex flex-col gap-3">
           <AppSectionBlock
             title="Carteira operacional de O.S."
             subtitle="Cliente, serviço, status, responsável, prazo e ação principal em linhas operacionais selecionáveis."
-            className="flex flex-col"
+            className={`flex flex-col ${mobile.listClass}`}
             compact
           >
             {isLoading ? (
@@ -1075,13 +1087,14 @@ export default function ServiceOrdersPage() {
               />
             ) : (
               <div className="space-y-3">
-                <div className="grid max-h-[560px] gap-2 overflow-auto pr-1">
+                <div className="grid gap-2 md:max-h-[560px] md:overflow-auto md:pr-1">
                   {paginatedOrders.map(item => {
                     const isSelected = selectedOrder?.id === item.id;
                     return (
                       <AppInfoCard
                         key={item.id}
                         role="button"
+                        aria-label={`Abrir ordem de serviço de ${item.customerName}`}
                         tabIndex={0}
                         className={cn(
                           "rounded-xl border p-3 transition-colors hover:border-[var(--accent-primary)]/45",
@@ -1089,11 +1102,12 @@ export default function ServiceOrdersPage() {
                             ? "border-[var(--accent-primary)] bg-[var(--accent-soft)]/35"
                             : "border-[var(--border-subtle)] bg-[var(--surface-subtle)]"
                         )}
-                        onClick={() => setSelectedOrderId(item.id)}
+                        onClick={() => { setSelectedOrderId(item.id); mobile.open(); }}
                         onKeyDown={event => {
-                          if (event.key === "Enter" || event.key === " ") {
+                          if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) {
                             event.preventDefault();
                             setSelectedOrderId(item.id);
+                            mobile.open();
                           }
                         }}
                       >
@@ -1215,7 +1229,7 @@ export default function ServiceOrdersPage() {
                                 { type: "separator", label: "Navegação" },
                                 {
                                   label: "Abrir O.S.",
-                                  onSelect: () => setSelectedOrderId(item.id),
+                                  onSelect: () => { setSelectedOrderId(item.id); mobile.open(); },
                                 },
                                 {
                                   label: "Enviar WhatsApp",
@@ -1253,7 +1267,7 @@ export default function ServiceOrdersPage() {
           {filteredOrders.length > 0 && !isLoading && !hasBlockingError ? (          <AppSectionBlock
             title="Detalhe da O.S."
             subtitle="Status, cliente, serviço, responsável, prazo, ações, financeiro e timeline curta."
-            className="flex flex-col"
+            className={`flex flex-col ${mobile.detailClass}`}
             compact
           >
             {!selectedOrder ? (
@@ -1293,6 +1307,91 @@ export default function ServiceOrdersPage() {
                   </div>
                 </AppInfoCard>
 
+                <AppActionBar className="gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2 py-2">
+                  <Button
+                    type="button"
+                    className={["OPEN", "ASSIGNED"].includes(selectedOrder.status) ? undefined : "hidden md:inline-flex"}
+                    title={getStartUnavailableReason(selectedOrder)}
+                    aria-label={getStartUnavailableReason(selectedOrder)}
+                    onClick={() => void handleStart(selectedOrder.id)}
+                    isLoading={isPendingAction(selectedOrder.id, "start")}
+                    loadingLabel="Iniciando..."
+                    disabled={
+                      !capabilities.start ||
+                      !["OPEN", "ASSIGNED"].includes(selectedOrder.status) ||
+                      anyActionPending
+                    }
+                  >
+                    {capabilities.start ? "Iniciar" : "Iniciar (indisponível)"}
+                  </Button>
+                  <Button
+                    type="button"
+                    className={selectedOrder.status === "IN_PROGRESS" ? undefined : "hidden md:inline-flex"}
+                    title={getCompleteUnavailableReason(selectedOrder)}
+                    aria-label={getCompleteUnavailableReason(selectedOrder)}
+                    onClick={() => void handleComplete(selectedOrder.id)}
+                    isLoading={isPendingAction(selectedOrder.id, "complete")}
+                    loadingLabel="Concluindo..."
+                    disabled={
+                      !capabilities.complete ||
+                      selectedOrder.status !== "IN_PROGRESS" ||
+                      anyActionPending
+                    }
+                  >
+                    {capabilities.complete
+                      ? "Concluir"
+                      : "Concluir (indisponível)"}
+                  </Button>
+                  <Button
+                    type="button"
+                    className={selectedOrder.nextAction?.type === "charge" ? undefined : "hidden md:inline-flex"}
+                    title={getChargeUnavailableReason(selectedOrder)}
+                    aria-label={getChargeUnavailableReason(selectedOrder)}
+                    onClick={() => void handleGenerateCharge(selectedOrder.id)}
+                    isLoading={isPendingAction(selectedOrder.id, "charge")}
+                    loadingLabel="Gerando..."
+                    disabled={
+                      !capabilities.generateCharge ||
+                      selectedOrder.nextAction?.type !== "charge" ||
+                      anyActionPending
+                    }
+                  >
+                    {capabilities.generateCharge
+                      ? "Cobrar / Gerar cobrança"
+                      : "Cobrança (indisponível)"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() =>
+                      goToWhatsAppServiceOrder(
+                        String(selectedOrder.customerId ?? ""),
+                        String(selectedOrder.id ?? "")
+                      )
+                    }
+                  >
+                    Enviar WhatsApp
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() =>
+                      navigate(
+                        `/customers?customerId=${selectedOrder.customerId}`
+                      )
+                    }
+                  >
+                    Abrir cliente
+                  </Button>
+                </AppActionBar>
+
+                {actionFeedback ? (
+                  <p className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-2 text-xs text-[var(--text-secondary)]">
+                    {actionFeedback}
+                  </p>
+                ) : null}
+
+                <ResponsiveDetails title="Contexto e histórico da O.S.">
                 <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
                   {[
                     {
@@ -1461,87 +1560,9 @@ export default function ServiceOrdersPage() {
                     />
                   )}
                 </section>
+                </ResponsiveDetails>
 
-                <AppActionBar className="gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2 py-2">
-                  <Button
-                    type="button"
-                    title={getStartUnavailableReason(selectedOrder)}
-                    aria-label={getStartUnavailableReason(selectedOrder)}
-                    onClick={() => void handleStart(selectedOrder.id)}
-                    isLoading={isPendingAction(selectedOrder.id, "start")}
-                    loadingLabel="Iniciando..."
-                    disabled={
-                      !capabilities.start ||
-                      !["OPEN", "ASSIGNED"].includes(selectedOrder.status) ||
-                      anyActionPending
-                    }
-                  >
-                    {capabilities.start ? "Iniciar" : "Iniciar (indisponível)"}
-                  </Button>
-                  <Button
-                    type="button"
-                    title={getCompleteUnavailableReason(selectedOrder)}
-                    aria-label={getCompleteUnavailableReason(selectedOrder)}
-                    onClick={() => void handleComplete(selectedOrder.id)}
-                    isLoading={isPendingAction(selectedOrder.id, "complete")}
-                    loadingLabel="Concluindo..."
-                    disabled={
-                      !capabilities.complete ||
-                      selectedOrder.status !== "IN_PROGRESS" ||
-                      anyActionPending
-                    }
-                  >
-                    {capabilities.complete
-                      ? "Concluir"
-                      : "Concluir (indisponível)"}
-                  </Button>
-                  <Button
-                    type="button"
-                    title={getChargeUnavailableReason(selectedOrder)}
-                    aria-label={getChargeUnavailableReason(selectedOrder)}
-                    onClick={() => void handleGenerateCharge(selectedOrder.id)}
-                    isLoading={isPendingAction(selectedOrder.id, "charge")}
-                    loadingLabel="Gerando..."
-                    disabled={
-                      !capabilities.generateCharge ||
-                      selectedOrder.nextAction?.type !== "charge" ||
-                      anyActionPending
-                    }
-                  >
-                    {capabilities.generateCharge
-                      ? "Cobrar / Gerar cobrança"
-                      : "Cobrança (indisponível)"}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() =>
-                      goToWhatsAppServiceOrder(
-                        String(selectedOrder.customerId ?? ""),
-                        String(selectedOrder.id ?? "")
-                      )
-                    }
-                  >
-                    Enviar WhatsApp
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() =>
-                      navigate(
-                        `/customers?customerId=${selectedOrder.customerId}`
-                      )
-                    }
-                  >
-                    Abrir cliente
-                  </Button>
-                </AppActionBar>
 
-                {actionFeedback ? (
-                  <p className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-subtle)] px-3 py-2 text-xs text-[var(--text-secondary)]">
-                    {actionFeedback}
-                  </p>
-                ) : null}
               </div>
             )}
           </AppSectionBlock>) : null}

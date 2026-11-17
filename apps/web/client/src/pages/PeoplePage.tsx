@@ -1,3 +1,6 @@
+import { ResponsiveDetails } from "@/components/ResponsiveDetails";
+import { useMobileDetailNavigation } from "@/hooks/useMobileDetailNavigation";
+import { MobileDetailBack, MobileDetailState } from "@/components/MobileDetailBack";
 import { parseAvailabilityInterval } from "@/lib/availability-input";
 import { useMemo, useRef, useState } from "react";
 import { CalendarClock, Trash2, Wrench } from "lucide-react";
@@ -216,6 +219,7 @@ export default function PeoplePage() {
   const [, navigate] = useLocation();
   const { isAuthenticated, isInitializing, role } = useAuth();
   const utils = trpc.useUtils();
+  const mobile = useMobileDetailNavigation();
   const [createOpen, setCreateOpen] = useState(false);
   const [editPersonId, setEditPersonId] = useState<string | null>(null);
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
@@ -351,7 +355,10 @@ export default function PeoplePage() {
   }
 
   return (
-    <AppPageShell className="gap-3">
+    <AppPageShell ref={mobile.anchorRef} className="operational-mobile-page gap-3">
+      <MobileDetailBack visible={mobile.isOpen} onBack={mobile.back} label="Voltar à equipe" />
+      <MobileDetailState visible={mobile.isOpen && !selectedPerson} loading={summaryQuery.isLoading} failed={summaryQuery.isError} onRetry={() => void summaryQuery.refetch()} />
+      <div className={`${mobile.listClass} space-y-3`}>
       <AppOperationalHeader
         title="Equipe"
         description="Disponibilidade, capacidade e recomendações oficiais para gerir responsáveis sem reconstruir decisões no navegador."
@@ -393,6 +400,8 @@ export default function PeoplePage() {
             className="h-9 w-full"
           />
         </div>
+<ResponsiveDetails title="Mais filtros" controls>
+
         <div className="w-full md:min-w-[160px] md:w-auto">
           <AppSelect
             value={roleFilter}
@@ -461,13 +470,16 @@ export default function PeoplePage() {
         <span className="text-xs text-[var(--text-muted)]">
           {filteredPeople.length} resultado(s)
         </span>
-      </AppFiltersBar>
 
+</ResponsiveDetails>
+</AppFiltersBar>
+
+      </div>
       <div className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-12">
         <AppSectionBlock
           title="Equipe operacional"
           subtitle="Pessoas na ordem oficial, com disponibilidade, capacidade, contexto e recomendação."
-          className="min-w-0 xl:col-span-7"
+          className={`min-w-0 xl:col-span-7 ${mobile.listClass}`}
           compact
         >
           {summaryQuery.isLoading ? (
@@ -508,10 +520,10 @@ export default function PeoplePage() {
                       <button
                         type="button"
                         className="min-w-0 flex-1 text-left"
-                        onClick={() => setSelectedPersonId(person.personId)}
+                        onClick={() => { setSelectedPersonId(person.personId); mobile.open(); }}
                       >
                         <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="truncate text-sm font-semibold text-[var(--text-primary)]">
+                          <h3 className="break-words text-sm font-semibold text-[var(--text-primary)]">
                             {person.name}
                           </h3>
                           <AppStatusBadge
@@ -569,7 +581,7 @@ export default function PeoplePage() {
                           onClick={() =>
                             runOfficialRecommendation(person, {
                               openPerson: () =>
-                                setSelectedPersonId(person.personId),
+                                (setSelectedPersonId(person.personId), mobile.open()),
                               navigate,
                             })
                           }
@@ -583,8 +595,7 @@ export default function PeoplePage() {
                             {
                               label: "Abrir detalhe",
                               tone: "primary",
-                              onSelect: () =>
-                                setSelectedPersonId(person.personId),
+                              onSelect: () => { setSelectedPersonId(person.personId); mobile.open(); },
                             },
                             {
                               label: "Editar pessoa",
@@ -618,7 +629,7 @@ export default function PeoplePage() {
         <AppContextWorkspace
           title="Detalhe da pessoa"
           subtitle="Contexto oficial e fatos relacionados à pessoa selecionada."
-          className="min-w-0 xl:col-span-5"
+          className={`min-w-0 xl:col-span-5 ${mobile.detailClass}`}
         >
           {!selectedPerson ? (
             <AppPageEmptyState
@@ -630,7 +641,7 @@ export default function PeoplePage() {
               <AppSectionCard className="min-w-0 space-y-3 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <h2 className="truncate text-xl font-semibold">
+                    <h2 className="break-words text-xl font-semibold">
                       {selectedPerson.name}
                     </h2>
                     <p className="text-sm text-[var(--text-secondary)]">
@@ -664,7 +675,7 @@ export default function PeoplePage() {
                     }
                   />
                 </div>
-                <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                <dl className="grid grid-cols-2 gap-3 text-sm">
                   <div>
                     <dt className="text-xs text-[var(--text-muted)]">
                       Capacidade de O.S.
@@ -804,6 +815,7 @@ export default function PeoplePage() {
                 </div>
               </AppSectionCard>
 
+              <ResponsiveDetails title="Disponibilidade e ausências">
               {role === "ADMIN" ? (
                 <AppSectionCard
                   className="space-y-3 p-4"
@@ -910,11 +922,13 @@ export default function PeoplePage() {
                   ))
                 )}
               </AppSectionCard>
+              </ResponsiveDetails>
             </div>
           )}
         </AppContextWorkspace>
       </div>
 
+      <ResponsiveDetails title="Histórico da equipe">
       <AppSectionBlock
         title="Evidências da equipe"
         subtitle="Timeline histórica; não participa da decisão operacional atual."
@@ -956,6 +970,7 @@ export default function PeoplePage() {
           </div>
         )}
       </AppSectionBlock>
+      </ResponsiveDetails>
 
       <CreatePersonModal
         open={createOpen}
