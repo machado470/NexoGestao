@@ -1,3 +1,5 @@
+import { MobileModuleHeader } from "@/components/MobileModuleHeader";
+import { useFormDiscardGuard } from "@/hooks/useFormDiscardGuard";
 import { FormEvent, useEffect, useReducer } from "react";
 import { Building2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
@@ -101,48 +103,63 @@ export default function SettingsPage() {
     updateMutation.reset();
   };
 
+  const discardGuard = useFormDiscardGuard({
+    open: true,
+    dirty: hasChanges,
+    blocked: updateMutation.isPending,
+    onDiscard: resetForm,
+  });
+
   return (
-    <AppPageShell className="gap-4 p-3 md:p-5">
-      <AppOperationalHeader
+    <AppPageShell className="operational-mobile-page mobile-module-page account-page gap-4 p-3 md:p-5">
+      {discardGuard.confirmation}
+      <MobileModuleHeader
         title="Configurações"
-        description="Defina os dados que orientam o funcionamento desta organização."
-        primaryAction={
-          <Button
-            type="submit"
-            form="organization-settings-form"
-            disabled={
-              !hasChanges || !hasRequiredValues || updateMutation.isPending
-            }
-          >
-            {updateMutation.isPending ? "Salvando..." : "Salvar alterações"}
-          </Button>
-        }
-        secondaryActions={
-          <Button
-            type="button"
-            variant="outline"
-            disabled={settingsQuery.isFetching || updateMutation.isPending}
-            onClick={() => void settingsQuery.refetch()}
-          >
-            <RefreshCw className="mr-2 size-4" aria-hidden="true" />
-            Atualizar
-          </Button>
-        }
-        contextChips={
-          settings ? (
-            <>
-              <AppStatusBadge label={settings.name} />
-              {hasChanges ? (
-                <AppStatusBadge label="Alterações não salvas" />
-              ) : null}
-            </>
-          ) : undefined
-        }
+        description="Preferências da sua organização."
+        context={hasChanges ? "Alterações não salvas" : settings?.name}
       />
+      <div className="hidden md:block">
+        <AppOperationalHeader
+          title="Configurações"
+          description="Defina os dados que orientam o funcionamento desta organização."
+          primaryAction={
+            <Button
+              type="submit"
+              form="organization-settings-form"
+              disabled={
+                !hasChanges || !hasRequiredValues || updateMutation.isPending
+              }
+            >
+              {updateMutation.isPending ? "Salvando..." : "Salvar alterações"}
+            </Button>
+          }
+          secondaryActions={
+            <Button
+              type="button"
+              variant="outline"
+              disabled={settingsQuery.isFetching || updateMutation.isPending}
+              onClick={() => void settingsQuery.refetch()}
+            >
+              <RefreshCw className="mr-2 size-4" aria-hidden="true" />
+              Atualizar
+            </Button>
+          }
+          contextChips={
+            settings ? (
+              <>
+                <AppStatusBadge label={settings.name} />
+                {hasChanges ? (
+                  <AppStatusBadge label="Alterações não salvas" />
+                ) : null}
+              </>
+            ) : undefined
+          }
+        />
+      </div>
 
       <AppSectionBlock
         title="Organização"
-        subtitle="Nome, fuso horário e moeda são as configurações atualmente persistidas para toda a organização."
+        subtitle="Estas preferências se aplicam a toda a organização."
       >
         {settingsQuery.isError && settings ? (
           <p role="alert" className="mb-4 text-sm text-destructive">
@@ -287,11 +304,11 @@ export default function SettingsPage() {
                 <Building2 className="size-4 shrink-0" aria-hidden="true" />
                 <span className="truncate">{settings.slug}</span>
               </div>
-              <div className="flex flex-wrap justify-end gap-2">
+              <div className="account-form-buttons flex flex-wrap justify-end gap-2">
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={resetForm}
+                  onClick={discardGuard.requestClose}
                   disabled={!hasChanges || updateMutation.isPending}
                 >
                   Descartar alterações
@@ -313,6 +330,11 @@ export default function SettingsPage() {
           </AppForm>
         )}
       </AppSectionBlock>
+      <p className="text-sm text-[var(--text-muted)] md:hidden" role="status">
+        {hasChanges
+          ? "Salve ou descarte suas alterações antes de trocar de tela."
+          : "Tudo pronto. Nenhuma alteração pendente."}
+      </p>
       <OrganizationAccessSection />
     </AppPageShell>
   );
