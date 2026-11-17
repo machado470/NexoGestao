@@ -1,3 +1,7 @@
+import { MobileModuleHeader } from "@/components/MobileModuleHeader";
+import { ResponsiveDetails } from "@/components/ResponsiveDetails";
+import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
+import { formatOrganizationDate } from "@/lib/organization-locale";
 import { presentationLabel, PRESENTATION_LABELS } from "@/lib/presentation-labels";
 import { useMemo, useState } from "react";
 import {
@@ -87,14 +91,9 @@ export function officialEventLabel(event: OfficialTimelineEvent) {
   );
 }
 
-export function formatDateTime(value: string | null | undefined) {
+export function formatDateTime(value: string | null | undefined, timeZone?: string) {
   if (!value) return "Data não informada";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Data não informada";
-  return new Intl.DateTimeFormat("pt-BR", {
-    dateStyle: "short",
-    timeStyle: "short",
-  }).format(date);
+  return formatOrganizationDate(value,timeZone,"Data indisponível",{dateStyle:"short",timeStyle:"medium"});
 }
 
 export function safeMetadataEntries(event: OfficialTimelineEvent) {
@@ -130,6 +129,7 @@ function eventMatchesSearch(event: OfficialTimelineEvent, search: string) {
 }
 
 export default function TimelinePage() {
+  const { timezone } = useOrganizationLocale();
   const { isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
   const [search, setSearch] = useState("");
@@ -186,7 +186,9 @@ export default function TimelinePage() {
   };
 
   return (
-    <AppPageShell>
+    <AppPageShell className="operational-mobile-page mobile-module-page evidence-mobile-page">
+      <MobileModuleHeader title="Timeline" description="Histórico dos acontecimentos da operação." context={query.isSuccess ? `${filteredEvents.length} ${filteredEvents.length === 1 ? "evento" : "eventos"} neste recorte` : undefined} onRefresh={() => void query.refetch()} />
+      <div className="hidden md:block">
       <AppOperationalHeader
         title="Timeline"
         description="Trilha cronológica de fatos e evidências oficiais para auditoria e rastreabilidade da operação."
@@ -221,8 +223,9 @@ export default function TimelinePage() {
           ) : null
         }
       />
+      </div>
 
-      <AppFiltersBar className="gap-3 p-3 md:p-4">
+      <AppFiltersBar className="module-filters gap-3 p-3 md:p-4">
         <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <div className="space-y-1.5 sm:col-span-2 xl:col-span-1">
             <Label htmlFor="timeline-search">Buscar nas evidências</Label>
@@ -237,6 +240,7 @@ export default function TimelinePage() {
               />
             </div>
           </div>
+          <ResponsiveDetails title="Mais filtros" controls>
           <div className="space-y-1.5">
             <Label>Tipo de evento</Label>
             <AppSelect
@@ -275,7 +279,8 @@ export default function TimelinePage() {
                 ...actors.map(value => ({ value, label: value })),
               ]}
             />
-          </div>
+          </div>          </ResponsiveDetails>
+
         </div>
         {hasActiveFilters ? (
           <Button variant="ghost" size="sm" onClick={clearFilters}>
@@ -285,6 +290,7 @@ export default function TimelinePage() {
       </AppFiltersBar>
 
       <AppSectionBlock
+        className="mobile-flat-section"
         title="Trilha de auditoria"
         subtitle="A ordem relativa é exatamente a recebida da fonte oficial."
       >
@@ -309,13 +315,13 @@ export default function TimelinePage() {
             }
           />
         ) : (
-          <ol className="relative" aria-label="Eventos da Timeline">
+          <ol className="timeline-event-list relative" aria-label="Eventos da Timeline">
             {filteredEvents.map((event, index) => {
               const metadata = safeMetadataEntries(event);
               return (
                 <li
                   key={event.id}
-                  className="relative flex min-w-0 flex-col gap-2 pb-5 pl-6 last:pb-0"
+                  className="timeline-event module-list-item relative flex min-w-0 flex-col gap-2 pb-5 pl-6 last:pb-0"
                 >
                   {index < filteredEvents.length - 1 ? (
                     <span
@@ -331,7 +337,7 @@ export default function TimelinePage() {
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="rounded-md bg-[var(--accent-soft)] px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--accent-primary)]">
-                        {presentationLabel(event.eventType)}
+                        {EVENT_LABELS[event.eventType] ?? PRESENTATION_LABELS[event.eventType] ?? presentationLabel(event.eventType)}
                       </span>
                       {event.severity ? (
                         <AppStatusBadge label={presentationLabel(event.severity)} />
@@ -342,7 +348,7 @@ export default function TimelinePage() {
                         </span>
                       ) : null}
                     </div>
-                    <h3 className="mt-2 text-sm font-semibold text-[var(--text-primary)] md:text-[15px]">
+                    <h3 className="mt-2 break-words text-sm font-semibold text-[var(--text-primary)] md:text-[15px]">
                       {officialEventLabel(event)}
                     </h3>
                   <time
@@ -350,7 +356,7 @@ export default function TimelinePage() {
                     className="flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-[var(--text-secondary)]"
                   >
                     <CalendarClock className="size-3.5" />
-                    {formatDateTime(event.occurredAt)}
+                    {formatDateTime(event.occurredAt, timezone)}
                   </time>
                     {event.description ? (
                       <p className="mt-1 break-words text-sm leading-6 text-[var(--text-secondary)]">
@@ -358,11 +364,12 @@ export default function TimelinePage() {
                       </p>
                     ) : null}
 
+                    <ResponsiveDetails title="Ator, entidade e origem" controls>
                     <dl className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs text-[var(--text-secondary)]">
                       <div className="flex min-w-0 items-center gap-1.5">
                         <UserRound className="size-3.5 shrink-0 text-[var(--text-muted)]" />
                         <dt className="sr-only">Ator</dt>
-                        <dd className="truncate">
+                        <dd className="break-words md:truncate">
                           {event.actor?.name ?? "Ator não informado"}
                         </dd>
                       </div>
@@ -382,6 +389,7 @@ export default function TimelinePage() {
                         </div>
                       ) : null}
                     </dl>
+                    </ResponsiveDetails>
 
                     {metadata.length > 0 ? (
                       <details className="mt-3 text-xs text-[var(--text-secondary)]">
@@ -405,7 +413,7 @@ export default function TimelinePage() {
 
                     {hasOfficialCta(event) ? (
                       <Button
-                        className="mt-3"
+                        className="mt-3 h-auto min-h-11 max-w-full whitespace-normal break-words"
                         size="sm"
                         variant="outline"
                         onClick={() => navigate(event.entity!.href)}

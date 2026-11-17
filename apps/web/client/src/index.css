@@ -3910,3 +3910,34 @@ html {
     outline-offset: 2px;
   }
 }
+
+/* Evidence stays complete while phone views emphasize the event and action. */
+@media (max-width: 767px) {
+  .evidence-mobile-page summary { min-height: 44px; }
+  .evidence-mobile-page h2, .evidence-mobile-page h3 { overflow-wrap: anywhere; }
+  .evidence-mobile-page .timeline-event-list { display: grid; gap: 12px; }
+  .evidence-mobile-page .timeline-event { padding: 16px; }
+  .evidence-mobile-page .timeline-event > span[aria-hidden="true"] { display: none; }
+  .app-root .evidence-mobile-page .governance-state {
+    padding: 16px;
+    border: 0;
+    border-radius: 16px;
+    background: var(--surface-elevated);
+    box-shadow: none;
+  }
+  .evidence-mobile-page .governance-state > div:first-child { display: none; }
+}
+@media (max-width: 767px) {
+  .app-root .evidence-mobile-page .governance-next-action {
+    border: 0;
+    border-radius: 16px;
+    background: var(--surface-elevated);
+    box-shadow: none;
+  }
+  .evidence-mobile-page .governance-next-action > div:first-child {
+    border-bottom: 0;
+    margin-bottom: 12px;
+    padding-bottom: 0;
+  }
+  .evidence-mobile-page .governance-next-action > div:first-child p { display: none; }
+}
