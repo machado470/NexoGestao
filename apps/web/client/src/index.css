@@ -3742,3 +3742,49 @@ html {
     }
   }
 }
+
+@layer utilities {
+  @media (max-width: 767px) {
+    .operational-mobile-page,
+    .operational-mobile-page article,
+    .operational-mobile-page .nexo-card-kpi {
+      min-width: 0;
+    }
+    .operational-mobile-page .finance-summary-grid > * {
+      padding: 0.625rem;
+      overflow-wrap: anywhere;
+      font-size: 12px;
+    }
+    .operational-mobile-page .finance-summary-grid p { font-size: 12px; }
+    .operational-mobile-page button,
+    .operational-mobile-page [role="button"] {
+      min-height: 44px;
+      max-width: 100%;
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+    .operational-mobile-page input,
+    .operational-mobile-page select,
+    .operational-mobile-page textarea,
+    .nexo-modal-content input,
+    .nexo-modal-content select,
+    .nexo-modal-content textarea {
+      font-size: 16px;
+      min-height: 44px;
+    }
+    .operational-mobile-page .nexo-badge {
+      max-width: 100%;
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+    .operational-mobile-page dd,
+    .operational-mobile-page h2,
+    .operational-mobile-page h3,
+    .operational-mobile-page p {
+      overflow-wrap: anywhere;
+    }
+    .operational-mobile-page .mobile-summary .grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+}

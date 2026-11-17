@@ -1,3 +1,6 @@
+import { ResponsiveDetails } from "@/components/ResponsiveDetails";
+import { useMobileDetailNavigation } from "@/hooks/useMobileDetailNavigation";
+import { MobileDetailBack, MobileDetailState } from "@/components/MobileDetailBack";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import {
   toLocalDateTimeInput,
@@ -120,6 +123,7 @@ export default function AppointmentsPage() {
   const routeCustomerId = params.get("customerId");
   const routeAppointmentId = params.get("appointmentId") ?? params.get("id");
   const routeAction = params.get("action");
+  const mobile = useMobileDetailNavigation(routeAppointmentId);
 
   const [queryText, setQueryText] = useState("");
   const [dateFilter, setDateFilter] = useState("");
@@ -427,8 +431,11 @@ export default function AppointmentsPage() {
   };
 
   return (
-    <AppPageShell>
+    <AppPageShell ref={mobile.anchorRef} className="operational-mobile-page">
+      <MobileDetailBack visible={mobile.isOpen} onBack={mobile.back} label="Voltar aos agendamentos" />
+      <MobileDetailState visible={mobile.isOpen && !selected} loading={appointmentsQuery.isLoading} failed={appointmentsQuery.isError} onRetry={() => void appointmentsQuery.refetch()} />
       <div data-testid="appointments-operational-page" className="contents">
+        <div className={`${mobile.listClass} space-y-3`}>
         <AppOperationalHeader
           title="Agendamentos"
           description="Organize o que vai acontecer, quando, com quem e o que precisa ser preparado."
@@ -459,9 +466,11 @@ export default function AppointmentsPage() {
           }
         />
 
+        </div>
         <div className="grid min-w-0 gap-4">
           {appointmentsQuery.isSuccess ? (
             <AppSectionBlock
+              className={`${mobile.listClass} mobile-summary [&>div:first-child]:hidden md:[&>div:first-child]:flex`}
               title="Contexto da agenda"
               subtitle="Leitura factual do escopo retornado; nenhuma decisão é reconstruída no navegador."
               compact
@@ -488,6 +497,7 @@ export default function AppointmentsPage() {
           ) : null}
 
           <AppSectionBlock
+            className={mobile.listClass}
             title="Filtros"
             subtitle="Refine apenas por fatos persistidos, sem alterar a ordem recebida."
             compact
@@ -509,6 +519,8 @@ export default function AppointmentsPage() {
                     onChange={event => setQueryText(event.target.value)}
                   />
                 </div>
+<ResponsiveDetails title="Mais filtros" controls>
+
                 <div className="min-w-0 flex-1 basis-36 sm:max-w-48">
                   <label
                     className="mb-1 block text-xs font-medium text-[var(--text-secondary)]"
@@ -590,7 +602,9 @@ export default function AppointmentsPage() {
                     Limpar filtros
                   </Button>
                 ) : null}
-              </AppFiltersBar>
+
+</ResponsiveDetails>
+</AppFiltersBar>
             </div>
           </AppSectionBlock>
 
@@ -601,6 +615,7 @@ export default function AppointmentsPage() {
           ) : null}
 
           <AppSectionBlock
+            className={mobile.listClass}
             title="Agenda operacional"
             subtitle="Horário, cliente, serviço, responsável e execução em uma única leitura."
             compact
@@ -700,7 +715,7 @@ export default function AppointmentsPage() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => setSelectedId(row.id)}
+                              onClick={() => { setSelectedId(row.id); mobile.open(); }}
                             >
                               Abrir detalhe
                             </Button>
@@ -709,7 +724,7 @@ export default function AppointmentsPage() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => setSelectedId(row.id)}
+                              onClick={() => { setSelectedId(row.id); mobile.open(); }}
                             >
                               Abrir
                             </Button>
@@ -785,6 +800,7 @@ export default function AppointmentsPage() {
           </AppSectionBlock>
 
           {filteredRows.length > 0 && !appointmentsQuery.isLoading && !appointmentsQuery.isError ? (          <AppSectionBlock
+            className={mobile.detailClass}
             title="Detalhe e evidências"
             subtitle="Fatos do agendamento em foco e histórico oficial relacionado."
             compact
@@ -872,6 +888,7 @@ export default function AppointmentsPage() {
                     </Button>
                   </div>
                 </div>
+                <ResponsiveDetails title="Histórico do agendamento">
                 <div className="min-w-0 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4">
                   <h3 className="font-semibold text-[var(--text-primary)]">
                     Evidências oficiais
@@ -907,6 +924,7 @@ export default function AppointmentsPage() {
                     </ul>
                   )}
                 </div>
+              </ResponsiveDetails>
               </div>
             )}
           </AppSectionBlock>) : null}

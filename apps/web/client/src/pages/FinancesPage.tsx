@@ -1,3 +1,4 @@
+import { ResponsiveDetails } from "@/components/ResponsiveDetails";
 import {
   createManualPaymentFlow,
   parseManualPaymentCents,
@@ -316,6 +317,61 @@ export default function FinancesPage() {
     }
   };
 
+  const renderQueueAction = (item: Charge) => {
+    const summary = item.financialOperationalSummary ?? {};
+    return (<>
+{summary.recommendedActionTarget === "CUSTOMER" &&
+                      item.customerId ? (
+                        <Button
+                          size="sm"
+                          onClick={() =>
+                            navigate(
+                              `/whatsapp?customerId=${item.customerId}&chargeId=${item.id}`
+                            )
+                          }
+                        >
+                          {actionLabel(summary.recommendedAction)}
+                        </Button>
+                      ) : summary.recommendedActionTarget === "CHARGE" ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openPayment(item)}
+                        >
+                          Abrir cobrança
+                        </Button>
+                      ) : (
+                        <span>Sem destino oficial</span>
+                      )}
+    </>);
+  };
+  const renderChargeActions = (charge: Charge) => (
+<div className="flex flex-wrap gap-2">
+                      {["PENDING", "OVERDUE"].includes(
+                        String(charge.status)
+                      ) ? (
+                        <>
+                          <Button size="sm" onClick={() => openPayment(charge)}>
+                            Registrar pagamento
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setCancellationError(null);
+                              setCancellationReason("");
+                              setCanceling(charge);
+                            }}
+                          >
+                            Cancelar
+                          </Button>
+                        </>
+                      ) : (
+                        <span>Sem ação disponível</span>
+                      )}
+                    </div>
+  );
+
   if (chargesQuery.isLoading && !focusedChargeId)
     return (
       <AppPageShell>
@@ -335,10 +391,10 @@ export default function FinancesPage() {
   }
 
   return (
-    <AppPageShell className="gap-4" data-testid="finances-authoritative-page">
+    <AppPageShell className="operational-mobile-page min-w-0 gap-4" data-testid="finances-authoritative-page">
       <AppOperationalHeader
         title="Financeiro operacional"
-        description="Cobranças, pagamentos e decisões fornecidos pelos contratos financeiros oficiais."
+        description="Acompanhe cobranças, recebimentos e pendências."
         primaryAction={
           <Button onClick={() => setOpenCreate(true)}>Nova cobrança</Button>
         }
@@ -407,6 +463,7 @@ export default function FinancesPage() {
       ) : null}
 
       <AppSectionBlock
+        className="[&>div:first-child]:hidden md:[&>div:first-child]:flex"
         title="Indicadores oficiais"
         subtitle="Zero é exibido como valor legítimo; ausência e erro permanecem explícitos."
       >
@@ -425,7 +482,7 @@ export default function FinancesPage() {
             </AppAlertDescription>
           </AppAlert>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="finance-summary-grid grid grid-cols-3 gap-2">
             {[
               ["Recebido", stats?.paid],
               ["A receber", stats?.pending],
@@ -436,7 +493,7 @@ export default function FinancesPage() {
                 <strong>{money((metric as any)?.amountCents)}</strong>
                 <p>
                   {typeof (metric as any)?.count === "number"
-                    ? `${(metric as any).count} cobrança(s)`
+                    ? `${(metric as any).count} ${(metric as any).count === 1 ? "item" : "itens"}`
                     : "Quantidade indisponível"}
                 </p>
               </AppInfoCard>
@@ -445,9 +502,10 @@ export default function FinancesPage() {
         )}
       </AppSectionBlock>
 
+      <ResponsiveDetails title="Pendências prioritárias">
       <AppSectionBlock
         title="Fila operacional oficial"
-        subtitle="A ordem, prioridade, risco, motivo, ação e destino são apresentados exatamente como recebidos."
+        subtitle="Pendências na ordem de prioridade da sua operação."
       >
         {queueQuery.isError ? (
           <AppAlert>
@@ -469,6 +527,20 @@ export default function FinancesPage() {
             description="O serviço financeiro não retornou recomendações operacionais para este recorte."
           />
         ) : (
+          <>
+          <div className="space-y-3 md:hidden" aria-label="Fila financeira no celular">
+            {queue.map(item => {
+              const summary = item.financialOperationalSummary ?? {};
+              return <article key={String(item.id)} className="min-w-0 space-y-3 rounded-xl border border-[var(--border-subtle)] p-3" aria-label={`Pendência de ${factualLabel(item.customer?.name, "cliente não informado")}`}>
+                <h3 className="break-words font-semibold">{factualLabel(item.customer?.name, "Cliente não informado")}</h3>
+                <div className="flex flex-wrap gap-2"><AppStatusBadge label={priorityLabel(summary.priority)} /><AppStatusBadge label={riskLabel(summary.riskLevel)} /></div>
+                <p className="break-words text-sm text-[var(--text-secondary)]">{factualLabel(summary.priorityReason, "Motivo não informado")}</p>
+                <dl className="grid grid-cols-2 gap-3 text-sm"><div className="min-w-0"><dt>Saldo</dt><dd className="break-words font-semibold">{money(item.balanceCents)}</dd></div><div className="min-w-0"><dt>Vencimento</dt><dd>{date(item.dueDate)}</dd></div></dl>
+                <div>{renderQueueAction(item)}</div>
+              </article>;
+            })}
+          </div>
+          <div className="hidden md:block">
           <AppDataTable className="min-w-[900px]">
             <thead>
               <tr>
@@ -518,41 +590,22 @@ export default function FinancesPage() {
                     </td>
                     <td>{actionLabel(summary.recommendedAction)}</td>
                     <td>
-                      {summary.recommendedActionTarget === "CUSTOMER" &&
-                      item.customerId ? (
-                        <Button
-                          size="sm"
-                          onClick={() =>
-                            navigate(
-                              `/whatsapp?customerId=${item.customerId}&chargeId=${item.id}`
-                            )
-                          }
-                        >
-                          {actionLabel(summary.recommendedAction)}
-                        </Button>
-                      ) : summary.recommendedActionTarget === "CHARGE" ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => openPayment(item)}
-                        >
-                          Abrir cobrança
-                        </Button>
-                      ) : (
-                        <span>Sem destino oficial</span>
-                      )}
+                      {renderQueueAction(item)}
                     </td>
                   </tr>
                 );
               })}
             </tbody>
           </AppDataTable>
+          </div>
+          </>
         )}
       </AppSectionBlock>
 
+      </ResponsiveDetails>
       <AppSectionBlock
         title="Carteira oficial"
-        subtitle="Os filtros atuam apenas sobre campos factuais já recebidos."
+        subtitle="Encontre uma cobrança e consulte seus pagamentos."
       >
         <AppFiltersBar className="mb-3 grid gap-2 sm:grid-cols-2">
           <AppField label="Buscar cliente ou O.S." htmlFor="finance-search">
@@ -594,6 +647,24 @@ export default function FinancesPage() {
             description="A carteira oficial não contém itens para os filtros selecionados."
           />
         ) : (
+          <>
+          <div className="space-y-3 md:hidden" aria-label="Cobranças no celular">
+            {visibleCharges.map(charge => <article key={String(charge.id)} aria-label={`Cobrança de ${factualLabel(charge.customer?.name, "cliente não informado")}`} className="min-w-0 space-y-3 rounded-xl border border-[var(--border-subtle)] p-3">
+              <h3 className="break-words font-semibold">{factualLabel(charge.customer?.name, "Cliente não informado")}</h3>
+              <AppStatusBadge label={statusLabel(charge.status)} tone={statusTone(charge.status)} />
+              <p className="break-words text-xs text-[var(--text-muted)]">O.S.: {factualLabel(charge.serviceOrder?.number, "Não vinculada")} · Vence {date(charge.dueDate)}</p>
+              <dl className="grid grid-cols-2 gap-3 text-sm"><div className="min-w-0"><dt>Original</dt><dd className="break-words">{money(charge.amountCents)}</dd></div><div className="min-w-0"><dt>Saldo</dt><dd className="break-words font-semibold">{money(charge.balanceCents)}</dd></div></dl>
+              <details className="rounded-lg border border-[var(--border-subtle)] p-2"><summary className="min-h-11 cursor-pointer py-2 text-sm">Pagamentos e detalhes</summary>
+                <div className="space-y-2 text-sm"><p>Pago: {money(charge.paidAmountCents)}</p>
+                {Number(charge.refundedAmountCents ?? 0) > 0 ? <p>Estornado: {money(charge.refundedAmountCents)} · Recebido líquido: {money(charge.netReceivedAmountCents)}</p> : null}
+                <p>{typeof charge.daysOverdue === "number" ? `${charge.daysOverdue} dia(s) de atraso` : "Atraso não calculado"}</p>
+                {Array.isArray(charge.payments) && charge.payments.length ? charge.payments.map((payment: any, index: number) => <p key={index}>{money(payment.amountCents)} · {date(payment.paidAt)} · {methodOptions.find(option => option.value === payment.method)?.label ?? factualLabel(payment.method, "Método não informado")}</p>) : <p>Pagamentos não informados neste recorte.</p>}
+                </div>
+              </details>
+              {renderChargeActions(charge)}
+            </article>)}
+          </div>
+          <div className="hidden md:block">
           <AppDataTable className="min-w-[980px]">
             <thead>
               <tr>
@@ -667,35 +738,14 @@ export default function FinancesPage() {
                     )}
                   </td>
                   <td>
-                    <div className="flex flex-wrap gap-2">
-                      {["PENDING", "OVERDUE"].includes(
-                        String(charge.status)
-                      ) ? (
-                        <>
-                          <Button size="sm" onClick={() => openPayment(charge)}>
-                            Registrar pagamento
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setCancellationError(null);
-                              setCancellationReason("");
-                              setCanceling(charge);
-                            }}
-                          >
-                            Cancelar
-                          </Button>
-                        </>
-                      ) : (
-                        <span>Sem ação disponível</span>
-                      )}
-                    </div>
+                    {renderChargeActions(charge)}
                   </td>
                 </tr>
               ))}
             </tbody>
           </AppDataTable>
+          </div>
+          </>
         )}
       </AppSectionBlock>
 
