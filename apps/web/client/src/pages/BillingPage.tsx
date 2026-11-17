@@ -93,6 +93,9 @@ export default function BillingPage() {
   const canManage = role === "ADMIN";
   const [checkoutPlan, setCheckoutPlan] = useState<BillingPlanName | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const availabilityQuery = trpc.billing.availability.useQuery(undefined, { retry: false });
+  const availability = availabilityQuery.isError ? undefined : availabilityQuery.data;
+  const canCheckout = (plan: string) => Boolean(availability?.checkoutPlans.some(available => available === plan));
   const plansQuery = trpc.billing.plans.useQuery(undefined, { retry: false });
   const statusQuery = trpc.billing.status.useQuery(undefined, { retry: false });
   const limitsQuery = trpc.billing.limits.useQuery(undefined, { retry: false });
@@ -115,6 +118,7 @@ export default function BillingPage() {
 
   const refresh = () => {
     void Promise.all([
+      availabilityQuery.refetch(),
       statusQuery.refetch(),
       plansQuery.refetch(),
       limitsQuery.refetch(),
@@ -131,6 +135,7 @@ export default function BillingPage() {
       setCheckoutPlan(null);
       toast.success("Assinatura atualizada pelo serviço de assinatura.");
       void Promise.all([
+        utils.billing.availability.invalidate(),
         utils.billing.status.invalidate(),
         utils.billing.limits.invalidate(),
       ]);
@@ -144,6 +149,7 @@ export default function BillingPage() {
       setCancelOpen(false);
       toast.success("Cancelamento confirmado pelo serviço de assinatura.");
       await Promise.all([
+        utils.billing.availability.invalidate(),
         utils.billing.status.invalidate(),
         utils.billing.limits.invalidate(),
       ]);
@@ -153,7 +159,7 @@ export default function BillingPage() {
   });
 
   const startCheckout = () => {
-    if (!checkoutPlan || checkoutPlan === "FREE") return;
+    if (!checkoutPlan || checkoutPlan === "FREE" || !canCheckout(checkoutPlan)) return;
     checkoutMutation.mutate({
       planName: checkoutPlan,
       successUrl: `${window.location.origin}/billing`,
@@ -191,6 +197,15 @@ export default function BillingPage() {
           </>
         }
       />
+
+      {!availability || availability.status !== "available" ? (
+        <AppAlert role="status">
+          <AppAlertTitle>{availability?.status === "simulation" ? "Contratação em demonstração" : "Contratação online indisponível"}</AppAlertTitle>
+          <AppAlertDescription>
+            {availabilityQuery.isLoading ? "Verificando disponibilidade..." : availability?.status === "disabled" ? "A contratação online está desativada neste ambiente. Seu plano e os limites continuam disponíveis para consulta." : availability?.status === "simulation" ? "Este ambiente simula alterações de plano e não realiza cobranças reais." : "Não foi possível confirmar a disponibilidade da contratação online. Tente atualizar esta página mais tarde."}
+          </AppAlertDescription>
+        </AppAlert>
+      ) : null}
 
       <AppSectionBlock
         title="Assinatura atual"
@@ -341,11 +356,11 @@ export default function BillingPage() {
                 <Button
                   type="button"
                   variant={plan.name === currentPlanName ? "outline" : "default"}
-                  disabled={!canManage || checkoutMutation.isPending || (plan.name === currentPlanName && (status === "ACTIVE" || status === "TRIALING"))}
+                  disabled={!canManage || !canCheckout(plan.name) || checkoutMutation.isPending || (plan.name === currentPlanName && (status === "ACTIVE" || status === "TRIALING"))}
                   onClick={() => setCheckoutPlan(plan.name)}
                 >
                   <ExternalLink className="mr-2 size-4" aria-hidden="true" />
-                  {plan.name === currentPlanName && (status === "ACTIVE" || status === "TRIALING") ? "Plano atual" : "Escolher plano"}
+                  {plan.name === currentPlanName && (status === "ACTIVE" || status === "TRIALING") ? "Plano atual" : !canCheckout(plan.name) ? "Contratação indisponível" : "Escolher plano"}
                 </Button>
               </AppSectionCard>
             ))}
@@ -359,9 +374,11 @@ export default function BillingPage() {
 
         {canManage && status && !["NO_SUBSCRIPTION", "CANCELED"].includes(status) ? (
           <div className="mt-4 border-t border-[var(--border-subtle)] pt-4">
-            <Button type="button" variant="outline" onClick={() => setCancelOpen(true)}>
+            <Button type="button" variant="outline" disabled={!availability?.cancellationAvailable}
+                  onClick={() => setCancelOpen(true)}>
               Cancelar assinatura
             </Button>
+            {!availability?.cancellationAvailable ? <p className="mt-2 text-sm text-[var(--text-muted)]">Não foi possível confirmar a disponibilidade do cancelamento online. Tente atualizar a página ou entre em contato com o atendimento.</p> : null}
           </div>
         ) : null}
       </AppSectionBlock>
@@ -382,7 +399,7 @@ export default function BillingPage() {
         title="Cancelar assinatura agora?"
         description="O contrato atual solicita cancelamento imediato. O backend confirmará a alteração antes de a página mostrar sucesso."
         confirmLabel={cancelMutation.isPending ? "Cancelando..." : "Confirmar cancelamento"}
-        onConfirm={() => cancelMutation.mutate()}
+        onConfirm={() => availability?.cancellationAvailable && cancelMutation.mutate()}
         isPending={cancelMutation.isPending}
       />
     </AppPageShell>

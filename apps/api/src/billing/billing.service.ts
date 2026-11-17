@@ -63,6 +63,17 @@ export class BillingService {
 
   }
 
+  async getAvailability(orgId: string) {
+    const subscription = await this.prisma.subscription.findUnique({ where: { orgId }, select: { billingProvider: true } })
+    const simulation = !this.stripeDisabled && !this.stripe && this.isSimulatedCheckoutEnabled()
+    const checkoutPlans = this.stripeDisabled ? [] : ['STARTER', 'PRO', 'BUSINESS'].filter(plan => simulation || (this.stripe && Boolean(this.getPlanPriceMap()[plan])))
+    return {
+      status: this.stripeDisabled ? 'disabled' : simulation ? 'simulation' : checkoutPlans.length ? 'available' : 'unavailable',
+      checkoutPlans,
+      cancellationAvailable: Boolean(subscription) && (subscription.billingProvider !== BillingProvider.STRIPE || Boolean(this.stripe)),
+    }
+  }
+
   get isStripeConfigured(): boolean {
     return this.stripe !== null
   }

@@ -72,7 +72,7 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-const APP_STORAGE_PREFIXES = ["nexo:", "nexogestao_", "pilot-onboarding:"];
+const APP_STORAGE_PREFIXES = ["nexo:", "nexo.", "nexogestao_", "pilot-onboarding:"];
 /* =========================
    HELPERS
 ========================= */

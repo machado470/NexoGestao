@@ -12,6 +12,13 @@ export const billingRouter = router({
     return unwrapNexoApiResponse(raw) ?? [];
   }),
 
+  availability: protectedProcedure
+    .output(z.object({ status: z.enum(["disabled", "simulation", "available", "unavailable"]), checkoutPlans: z.array(z.enum(["STARTER", "PRO", "BUSINESS"])), cancellationAvailable: z.boolean() }).strict())
+    .query(async ({ ctx }) => {
+      const raw = await nexoFetch<unknown>(ctx.req, "/billing/availability", { method: "GET" });
+      return unwrapNexoApiResponse(raw);
+    }),
+
   status: protectedProcedure.query(async ({ ctx }) => {
     const raw = await nexoFetch<any>(ctx.req, "/billing/status", {
       method: "GET",

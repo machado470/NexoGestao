@@ -110,6 +110,12 @@ export class BillingController {
   */
 
   @UseGuards(JwtAuthGuard)
+  @Get('availability')
+  async getAvailability(@Req() req: any) {
+    return this.billingService.getAvailability(req.user.orgId)
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get('status')
   async getBillingStatus(@Req() req: any) {
     const orgId = req.user.orgId
