@@ -3692,3 +3692,53 @@ html {
     color: var(--text-muted);
   }
 }
+
+/* Compact app chrome and customer list/detail navigation on phones. */
+@layer components {
+  @media (max-width: 767px) {
+    .app-root .nexo-topbar-content-grid {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+    .app-root .nexo-topbar-grid {
+      padding: 0.5rem 0.75rem;
+    }
+    .app-root .nexo-topbar-control {
+      min-width: 44px;
+      min-height: 44px;
+    }
+    .app-root .nexo-topbar-search-slot input {
+      font-size: 16px;
+    }
+    .app-root .nexo-app-content {
+      padding-inline: 0.75rem;
+      padding-bottom: max(1rem, env(safe-area-inset-bottom));
+    }
+    .customers-page .nexo-badge {
+      max-width: 100%;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      line-height: 1.5;
+    }
+    .customers-page input,
+    .customers-page select {
+      min-height: 44px;
+      font-size: 16px;
+    }
+    .customers-page .customer-workspace,
+    .customers-page .nexo-card-kpi {
+      min-width: 0;
+      padding: 0.875rem;
+    }
+    .customers-page button {
+      min-width: 44px;
+      min-height: 44px;
+    }
+    .customers-page .customer-mobile-detail button,
+    .customers-page article button {
+      max-width: 100%;
+      min-height: 44px;
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+  }
+}

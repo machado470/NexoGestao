@@ -504,13 +504,15 @@ export function MainLayout({ children }: MainLayoutProps) {
                       <button
                         type="button"
                         onClick={() => setMobileMenuOpen(prev => !prev)}
+                        aria-label="Abrir menu"
+                        aria-expanded={mobileMenuOpen}
                         className="nexo-topbar-control"
                       >
                         <Menu className="h-5 w-5" />
                       </button>
                     ) : null}
                     <div className="nexo-topbar-search-slot min-w-0 self-center">
-                      <GlobalSearch />
+                      <GlobalSearch compact={isMobile} />
                     </div>
                   </div>
 
@@ -532,7 +534,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent
                         align="end"
-                        className="w-[360px] nexo-floating-panel"
+                        className="w-[min(360px,calc(100vw-2rem))] nexo-floating-panel"
                       >
                         <DropdownMenuLabel className="flex items-center justify-between px-3 py-2">
                           <span>Notificações</span>
@@ -580,6 +582,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                         <button
                           type="button"
                           className="nexo-topbar-control h-9 px-2.5"
+                          aria-label="Minha conta"
                         >
                           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--surface-elevated)] text-[var(--text-primary)]">
                             <User className="h-4 w-4" />
@@ -587,7 +590,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                           <span className="hidden max-w-28 truncate md:block">
                             {user?.name ?? "Usuário"}
                           </span>
-                          <ChevronDown className="h-4 w-4 text-[var(--text-muted)]" />
+                          <ChevronDown className="hidden h-4 w-4 text-[var(--text-muted)] md:block" />
                         </button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-52 p-1">

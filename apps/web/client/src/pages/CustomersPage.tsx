@@ -1,7 +1,9 @@
+import { useIsMobile } from "@/hooks/useMobile";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
+  ArrowLeft,
   CalendarClock,
   CheckCircle2,
   CreditCard,
@@ -192,6 +194,11 @@ function toDate(value: unknown): Date | null {
   if (!value) return null;
   const parsed = new Date(String(value));
   return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function formatMobileDate(value: unknown, fallback = "Não informado") {
+  const date = toDate(value);
+  return date ? date.toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : fallback;
 }
 
 function formatDateTime(value: unknown, fallback = "Não informado") {
@@ -423,6 +430,14 @@ function buildCustomerProfiles(input: {
 export default function CustomersPage() {
   const [, navigate] = useLocation();
   const routeSearch = useSearch();
+  const isMobile = useIsMobile();
+  const [mobileDetailsOpen, setMobileDetailsOpen] = useState(() => Boolean(new URLSearchParams(routeSearch).get("customerId")));
+  const pageAnchorRef = useRef<HTMLElement | null>(null);
+  const openMobileCustomer = (id: string) => {
+    setActiveCustomerId(id);
+    setMobileDetailsOpen(true);
+    pageAnchorRef.current?.scrollIntoView({ block: "start" });
+  };
   const { isAuthenticated, role } = useAuth();
   const canCreateCustomer = Boolean(role && can(role, "customers:create"));
   const canEditCustomer = Boolean(role && can(role, "customers:update"));
@@ -907,12 +922,15 @@ export default function CustomersPage() {
     const queryCustomerId = new URLSearchParams(routeSearch).get("customerId");
     if (queryCustomerId) {
       setActiveCustomerId(queryCustomerId);
-      return;
+      setMobileDetailsOpen(true);
     }
+  }, [routeSearch, setActiveCustomerId]);
+
+  useEffect(() => {
     if (!activeCustomerId && filteredProfiles.length > 0) {
       setActiveCustomerId(filteredProfiles[0].customerId);
     }
-  }, [activeCustomerId, filteredProfiles, routeSearch, setActiveCustomerId]);
+  }, [activeCustomerId, filteredProfiles, setActiveCustomerId]);
 
   const customersOperationalStatus =
     customersOperationalSummary?.portfolio.operationalStatus ?? null;
@@ -931,7 +949,8 @@ export default function CustomersPage() {
   );
 
   const renderAuthoritativeCustomerStatus = (
-    profile: (typeof operationalProfiles)[number]
+    profile: (typeof operationalProfiles)[number],
+    compact = false
   ) => {
     const summary = profile.operationalSummary;
 
@@ -951,7 +970,7 @@ export default function CustomersPage() {
     return (
       <AppOperationalStatusBadge
         status={summary.operationalStatus}
-        label={summary.riskSignal}
+        label={compact ? undefined : summary.riskSignal}
       />
     );
   };
@@ -973,8 +992,7 @@ export default function CustomersPage() {
         {
           label: "Abrir cliente",
           tone: "primary",
-          onSelect: () =>
-            setActiveCustomerId(profile.customerId),
+          onSelect: () => openMobileCustomer(profile.customerId),
         },
         {
           label: "Agendar",
@@ -1018,6 +1036,7 @@ export default function CustomersPage() {
               ? "Editando..."
               : "Editar dados",
           onSelect: () => {
+            setActiveCustomerId(profile.customerId);
             setPendingEditCustomerId(
               profile.customerId
             );
@@ -1034,7 +1053,16 @@ export default function CustomersPage() {
   );
 
   return (
-    <AppPageShell className="gap-3">
+    <AppPageShell className="customers-page min-w-0 gap-3">
+      <header ref={pageAnchorRef} className="flex min-w-0 items-center justify-between gap-3 md:hidden">
+        {mobileDetailsOpen ? <Button variant="ghost" className="min-h-11 px-0" onClick={() => {
+          setMobileDetailsOpen(false);
+          pageAnchorRef.current?.scrollIntoView({ block: "start" });
+        }}><ArrowLeft className="h-4 w-4" />Voltar aos clientes</Button> : (
+          <><h1 className="text-xl font-semibold">Clientes</h1><Button disabled={!canCreateCustomer} onClick={() => setCreateOpen(true)}>Novo cliente</Button></>
+        )}
+      </header>
+      <div className="hidden md:block">
       <AppOperationalHeader
         title="Centro Operacional do Cliente"
         description="Memória viva do relacionamento: decisão, fluxo, execução e auditoria em uma leitura compacta."
@@ -1091,6 +1119,7 @@ export default function CustomersPage() {
           </span>
         </div>
       </AppOperationalHeader>
+      </div>
 
       {unavailableAuxiliaryData.length > 0 ? (
         <AppAlert
@@ -1137,10 +1166,10 @@ export default function CustomersPage() {
         aria-label="Filtros de apresentação"
         className={cn(
           "min-w-0 shrink-0 flex-col items-stretch gap-2 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2 md:flex-row md:items-center",
-          selectedProfile ? "order-2" : undefined
+          mobileDetailsOpen ? "hidden md:flex" : undefined
         )}
       >
-        <div className="min-w-[220px] flex-1">
+        <div className="min-w-0 flex-1">
           <label className="sr-only" htmlFor="customer-search">
             Buscar clientes
           </label>
@@ -1152,6 +1181,9 @@ export default function CustomersPage() {
             className="h-9 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)]"
           />
         </div>
+        <details className="customer-filters min-w-0 md:flex-1" open={!isMobile}>
+          <summary className="cursor-pointer py-2 text-sm font-medium md:hidden">Filtros e situação cadastral</summary>
+          <div className="grid min-w-0 gap-3 pt-2 md:flex md:flex-wrap md:items-center md:pt-0">
         <label className="sr-only" htmlFor="customer-priority-filter">
           Filtrar pela prioridade oficial
         </label>
@@ -1214,25 +1246,26 @@ export default function CustomersPage() {
         <span className="rounded-md border border-[var(--border-subtle)] px-2 py-1 text-xs text-[var(--text-muted)]">
           {filteredProfiles.length} resultado(s)
         </span>
+          </div>
+        </details>
       </AppFiltersBar>
 
       <div
         className={cn(
           "grid grid-cols-1 gap-4 2xl:grid-cols-12",
-          selectedProfile ? "order-1" : undefined
+          "min-w-0"
         )}
       >
         <AppSectionBlock
           title="Carteira operacional"
           subtitle={
-            selectedProfile
+            selectedProfile && !isMobile
               ? "Outros clientes da carteira: apoio para trocar contexto sem perder filtros e paginação."
               : "Lista priorizada por contexto, pendência e próxima ação possível."
           }
           className={cn(
-            selectedProfile
-              ? "order-2 2xl:col-span-12"
-              : "order-1 2xl:col-span-12"
+            "min-w-0 2xl:col-span-12",
+            mobileDetailsOpen ? "hidden md:block" : "order-1 md:order-2"
           )}
           compact
         >
@@ -1261,24 +1294,23 @@ export default function CustomersPage() {
                   <article
                     key={`card-${profile.customerId}`}
                     className={cn(
-                      "rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3",
+                      "min-w-0 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3",
                       profile.customerId === activeCustomerId
                         ? "bg-[var(--accent-soft)]/35"
                         : undefined
                     )}
-                    onClick={() => setActiveCustomerId(profile.customerId)}
                   >
-                    <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 flex-col gap-2">
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-[var(--text-primary)]">
+                        <button type="button" className="min-h-11 w-full break-words text-left text-base font-semibold text-[var(--text-primary)]" onClick={() => openMobileCustomer(profile.customerId)}>
                           {String(profile.customer.name ?? "Sem nome")}
-                        </p>
+                        </button>
                         <p className="mt-1 truncate text-xs text-[var(--text-secondary)]">
                           {profile.contact}
                         </p>
                       </div>
-                      <div className="flex flex-wrap justify-end gap-2">
-                        {renderAuthoritativeCustomerStatus(profile)}
+                      <div className="flex min-w-0 flex-wrap gap-2">
+                        {renderAuthoritativeCustomerStatus(profile, true)}
                         <AppStatusBadge
                           {...getCustomerActiveStatus(profile.customer.active)}
                         />
@@ -1309,7 +1341,7 @@ export default function CustomersPage() {
                       <p>
                         Último serviço:{" "}
                         {profile.lastService
-                          ? formatDateTime(
+                          ? formatMobileDate(
                               profile.lastService.updatedAt ??
                                 profile.lastService.createdAt
                             )
@@ -1320,7 +1352,7 @@ export default function CustomersPage() {
                       <p>
                         Próximo agendamento:{" "}
                         {profile.nextAppointment
-                          ? formatDateTime(profile.nextAppointment.startsAt)
+                          ? formatMobileDate(profile.nextAppointment.startsAt)
                           : isAppointmentsUnavailable
                             ? "Agenda indisponível"
                             : "Sem agenda futura"}
@@ -1336,10 +1368,10 @@ export default function CustomersPage() {
                           size="sm"
                           onClick={event => {
                             event.stopPropagation();
-                            runAuthoritativeCustomerAction(profile);
+                            openMobileCustomer(profile.customerId);
                           }}
                         >
-                          {getAuthoritativeCustomerActionLabel(profile)}
+                          Ver cliente
                         </Button>
                         {renderCustomerSecondaryActions(profile)}
                       </div>
@@ -1369,8 +1401,7 @@ export default function CustomersPage() {
                             ? "bg-[var(--accent-soft)]/35"
                             : undefined
                         )}
-                        onClick={() => setActiveCustomerId(profile.customerId)}
-                      >
+                          >
                         <td>
                           <div className="min-w-[220px] space-y-1">
                             <p className="font-semibold text-[var(--text-primary)]">
@@ -1509,9 +1540,10 @@ export default function CustomersPage() {
           title="Centro Operacional do Cliente"
           subtitle="Decisão, fluxo, execução e auditoria do cliente selecionado."
           className={cn(
-            selectedProfile
-              ? "order-1 2xl:col-span-12"
-              : "order-2 2xl:col-span-4"
+            "min-w-0 md:order-1",
+            mobileDetailsOpen ? "order-1" : "hidden md:block",
+            selectedProfile ? "2xl:col-span-12" : "2xl:col-span-4",
+            "customer-workspace [&>div:first-child]:hidden md:[&>div:first-child]:flex"
           )}
         >
           {!activeCustomerId || !selectedCustomer || !selectedProfile ? (
@@ -1529,6 +1561,55 @@ export default function CustomersPage() {
             />
           ) : (
             <div className="space-y-3">
+              <div className="customer-mobile-detail space-y-4 md:hidden">
+                <div className="min-w-0">
+                  <h1 className="break-words text-xl font-semibold leading-snug">{String(selectedCustomer.name ?? "Cliente")}</h1>
+                  <p className="mt-1 break-words text-sm text-[var(--text-secondary)]">{selectedProfile.contact}</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {selectedOperationalSummary ? <AppOperationalStatusBadge status={selectedOperationalSummary.operationalStatus} /> : <AppStatusBadge label="Estado indisponível" tone="warning" />}
+                    {renderAuthoritativeCustomerPriority(selectedProfile)}
+                  </div>
+                </div>
+                <section aria-label="Próxima ação do cliente" className="space-y-3 rounded-xl border border-[var(--border-subtle)] p-3">
+                  <p className="text-sm text-[var(--text-secondary)]">{selectedInterventionReason}</p>
+                  <Button className="h-auto min-h-11 w-full whitespace-normal py-2" disabled={!selectedOperationalSummary?.recommendedActionLabel} onClick={runSelectedRecommendedAction}>{selectedRecommendedActionLabel}</Button>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs text-[var(--text-muted)]">Outras opções do cliente</span>
+                    {renderCustomerSecondaryActions(selectedProfile)}
+                  </div>
+                </section>
+                <dl className="grid grid-cols-2 gap-x-3 gap-y-4 border-y border-[var(--border-subtle)] py-4">
+                  <div className="min-w-0"><dt className="text-xs text-[var(--text-muted)]">Saldo pendente</dt><dd className="mt-1 break-words text-lg font-semibold">{isChargesUnavailable ? "Indisponível" : formatCurrency(workspacePendingCents ?? selectedProfile.pendingCents)}</dd></div>
+                  <div className="min-w-0"><dt className="text-xs text-[var(--text-muted)]">O.S. abertas</dt><dd className="mt-1 text-lg font-semibold">{isServiceOrdersUnavailable ? "Indisponível" : workspaceOpenServiceOrders.length}</dd></div>
+                  <div className="col-span-2 min-w-0"><dt className="text-xs text-[var(--text-muted)]">Próximo agendamento</dt><dd className="mt-1 text-sm font-medium">{isAppointmentsUnavailable ? "Agenda indisponível" : formatMobileDate(workspaceNextAppointment?.startsAt ?? workspaceNextAppointment?.scheduledAt, "Sem agenda futura")}</dd></div>
+                </dl>
+                <details className="rounded-xl border border-[var(--border-subtle)] p-3">
+                  <summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold">Financeiro</summary>
+                  <div className="space-y-3 pt-2 text-sm">
+                    <p>Total pago: {isChargesUnavailable || workspaceTotalSpentCents === undefined ? "Indisponível" : formatCurrency(workspaceTotalSpentCents)}</p>
+                    <p>Cobranças vencidas: {isChargesUnavailable ? "Indisponível" : workspaceOverdueCharges.length}</p>
+                    <Button variant="outline" className="min-h-11 w-full" disabled={!canReadFinance} onClick={() => navigate(`/finances?customerId=${activeCustomerId}`)}>Ver financeiro</Button>
+                  </div>
+                </details>
+                <details className="rounded-xl border border-[var(--border-subtle)] p-3">
+                  <summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold">Serviços e agenda</summary>
+                  <div className="space-y-3 pt-2 text-sm">
+                    <p>Último serviço: {isServiceOrdersUnavailable ? "Indisponível" : workspaceLastCompletedServiceOrder ? String(workspaceLastCompletedServiceOrder.title ?? "Serviço concluído") : "Sem serviço concluído"}</p>
+                    <Button variant="outline" className="min-h-11 w-full" onClick={() => navigate(`/service-orders?customerId=${activeCustomerId}`)}>Ver ordens de serviço</Button>
+                    <Button variant="outline" className="min-h-11 w-full" disabled={!canCreateAppointment} onClick={() => setCreateAppointmentOpen(true)}>Agendar atendimento</Button>
+                    <Button variant="outline" className="min-h-11 w-full" disabled={!canCreateOrder} onClick={() => setCreateServiceOrderOpen(true)}>Criar ordem de serviço</Button>
+                  </div>
+                </details>
+                <details className="rounded-xl border border-[var(--border-subtle)] p-3">
+                  <summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold">Análise operacional</summary>
+                  <div className="space-y-2 pt-2 text-sm text-[var(--text-secondary)]">
+                    <p>{selectedInterventionReason}</p>
+                    <p>Risco: {selectedOperationalSummary ? `${selectedOperationalSummary.riskState} · score ${selectedOperationalSummary.riskScore}` : "Indisponível"}</p>
+                    <p>Avaliação: {formatMobileDate(selectedOperationalSummary?.evaluatedAt, "Indisponível")}</p>
+                  </div>
+                </details>
+              </div>
+              <div className="hidden md:block">
               <article className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-subtle)]/45 p-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
@@ -1820,6 +1901,7 @@ export default function CustomersPage() {
                 </div>
               </AppSectionCard>
 
+              </div>
               {isRefreshingWorkspace ? (
                 <p className="text-xs text-[var(--text-muted)]">
                   Atualizando dados do cliente...
@@ -1866,8 +1948,10 @@ export default function CustomersPage() {
                 </article>
               ) : null}
 
+              <details open={!isMobile} className="customer-history min-w-0 rounded-xl border border-[var(--border-subtle)] p-3">
+                <summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold md:hidden">Histórico do cliente</summary>
               <div ref={timelineAnchorRef}>
-                <p className="nexo-overline mb-2">
+                <p className="nexo-overline mb-2 hidden md:block">
                   Evidências e navegação contextual
                 </p>
                 {timelineQuery.isLoading ? (
@@ -1895,6 +1979,7 @@ export default function CustomersPage() {
                   />
                 )}
               </div>
+              </details>
             </div>
           )}
         </AppContextWorkspace>) : null}
@@ -1911,6 +1996,7 @@ export default function CustomersPage() {
           if (canReadFinance) await chargesQuery.refetch();
           if (created?.id) {
             setActiveCustomerId(created.id);
+            setMobileDetailsOpen(true);
             await refreshCustomerWorkspace(String(created.id));
           }
         }}
