@@ -8,6 +8,14 @@ export class OrganizationSettingsService {
 
   constructor(private readonly prisma: PrismaService) {}
 
+  async getDisplayPreferences(orgId: string) {
+    const preferences = await this.prisma.organization.findUnique({
+      where: { id: orgId }, select: { timezone: true, currency: true },
+    })
+    if (!preferences) throw new NotFoundException('Organização não encontrada.')
+    return preferences
+  }
+
   async getOrganizationSettings(orgId: string) {
     try {
       const organization = await this.prisma.organization.findUnique({

@@ -1,3 +1,6 @@
+import luxon3Plugin from "@fullcalendar/luxon3";
+import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
+import { formatOrganizationDate, type Instant } from "@/lib/organization-locale";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {
@@ -74,16 +77,6 @@ const STATUS_COLOR: Record<Appointment["status"], string> = {
   NO_SHOW: "var(--text-secondary)",
 };
 
-function formatDateTime(value?: string | null) {
-  if (!value) return "Não informado";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Não informado";
-  return new Intl.DateTimeFormat("pt-BR", {
-    dateStyle: "short",
-    timeStyle: "short",
-  }).format(date);
-}
-
 function durationLabel(item: Appointment) {
   if (!item.endsAt) return "Não informada";
   const start = new Date(item.startsAt).getTime();
@@ -109,6 +102,9 @@ function officialLabel(value?: string | null) {
 }
 
 export default function CalendarPage() {
+  const { timezone } = useOrganizationLocale();
+  const formatDateTime = (value: unknown, fallback = "Não informado") => formatOrganizationDate(value as Instant, timezone, fallback);
+
   const [, navigate] = useLocation();
   const { isAuthenticated, role } = useAuth();
   const canCreateAppointment = Boolean(
@@ -530,7 +526,8 @@ export default function CalendarPage() {
               <div className="hidden overflow-x-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-2 md:block">
                 <div className="min-w-[640px]"><FullCalendar
                   ref={calendarRef}
-                  plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+                  timeZone={timezone ?? "local"}
+                  plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, luxon3Plugin]}
                   initialView={viewMode}
                   headerToolbar={false}
                   events={events}

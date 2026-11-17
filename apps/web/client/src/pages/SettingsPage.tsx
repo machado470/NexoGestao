@@ -73,6 +73,7 @@ export default function SettingsPage() {
       if (!confirmed) return;
       utils.settings.get.setData(undefined, data);
       dispatch({ type: "confirmed", values: confirmed });
+      void utils.settings.displayPreferences.invalidate();
       toast.success("Configurações da organização salvas.");
     },
     onError: error => {
@@ -239,7 +240,7 @@ export default function SettingsPage() {
               <AppField
                 label="Moeda operacional"
                 htmlFor="settings-currency"
-                hint="Define a moeda usada nos valores financeiros da organização."
+                hint="Moeda de referência da organização. Cada cobrança mantém sua moeda registrada; esta alteração não converte valores existentes."
               >
                 <AppSelect
                   value={currency}
