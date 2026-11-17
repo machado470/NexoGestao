@@ -35,7 +35,7 @@ function getResultIcon(type: SearchResult["type"]) {
   }
 }
 
-export function GlobalSearch() {
+export function GlobalSearch({ compact = false }: { compact?: boolean }) {
   const { isAuthenticated, isInitializing } = useAuth();
   const canQuery = isAuthenticated && !isInitializing;
 
@@ -118,9 +118,10 @@ export function GlobalSearch() {
 
         <input
           type="text"
+          aria-label="Busca global"
           placeholder={
             canQuery
-              ? "Buscar clientes, agendamentos..."
+              ? compact ? "Buscar..." : "Buscar clientes, agendamentos..."
               : "Entre para pesquisar"
           }
           value={query}

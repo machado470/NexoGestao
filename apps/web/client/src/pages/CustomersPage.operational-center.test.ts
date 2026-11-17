@@ -61,11 +61,12 @@ describe("CustomersPage operational client center", () => {
     expect(source).not.toContain("Mini-dashboard com financeiro");
   });
 
-  it("moves the selected customer experience before the operational wallet", () => {
+  it("keeps desktop context first while mobile starts at the wallet", () => {
     expect(source).toContain('"grid grid-cols-1 gap-4 2xl:grid-cols-12"');
-    expect(source).toContain('selectedProfile ? "order-1" : undefined');
-    expect(source).toContain('"order-1 2xl:col-span-12"');
-    expect(source).toContain('"order-2 2xl:col-span-12"');
+    expect(source).toContain('"min-w-0 md:order-1"');
+    expect(source).toContain('"order-1 md:order-2"');
+    expect(source).toContain('mobileDetailsOpen ? "hidden md:block"');
+    expect(source).toContain("Voltar aos clientes");
     expect(source).toContain("Outros clientes da carteira");
   });
 
