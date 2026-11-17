@@ -22,7 +22,7 @@ describe("Timeline — golden standard audit trail", () => {
   });
 
   it("keeps the audit evidence continuous and readable instead of rendering giant cards or raw JSON", () => {
-    expect(source).toContain('<ol className="relative"');
+    expect(source).toMatch(/<ol\s[^>]*aria-label="Eventos da Timeline"/);
     expect(source).toContain("Ver metadados da evidência");
     expect(source).not.toContain("JSON.stringify");
     expect(source).not.toContain("<table");

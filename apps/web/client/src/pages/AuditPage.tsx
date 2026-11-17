@@ -1,3 +1,8 @@
+import { organizationDayRange } from "@/lib/local-date-time";
+import { MobileModuleHeader } from "@/components/MobileModuleHeader";
+import { ResponsiveDetails } from "@/components/ResponsiveDetails";
+import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
+import { formatOrganizationDate } from "@/lib/organization-locale";
 import { buildAuditActorOptions } from "@/lib/audit-actor-options";
 import { presentationLabel } from "@/lib/presentation-labels";
 import { useMemo, useState } from "react";
@@ -109,17 +114,14 @@ export function getNextAuditPage(currentPage: number, totalPages: number): numbe
   return Math.min(currentPage + 1, Math.max(totalPages, 1));
 }
 
-function toStartOfDayIso(value: string) { return value ? new Date(`${value}T00:00:00.000`).toISOString() : undefined; }
-function toEndOfDayIso(value: string) { return value ? new Date(`${value}T23:59:59.999`).toISOString() : undefined; }
-function formatDateTime(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "—" : new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "medium" }).format(date);
-}
 function fieldLabel(key: string) {
   return key.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/_/g, " ");
 }
 
 export default function AuditPage() {
+  const { timezone, ready: localeReady } = useOrganizationLocale();
+  const formatDateTime = (value: string) => formatOrganizationDate(value,timezone,"—",{dateStyle:"short",timeStyle:"medium"});
+  const [filterError, setFilterError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [draftFilters, setDraftFilters] = useState({ from: "", to: "", actorPersonId: "", action: "" });
   const [filters, setFilters] = useState<AuditFilters>({});
@@ -143,15 +145,21 @@ export default function AuditPage() {
   const hasFilters = Object.values(filters).some(Boolean);
 
   function applyFilters() {
+    if ((draftFilters.from || draftFilters.to) && !localeReady) { setFilterError("Aguarde a confirmação do fuso da empresa para filtrar por data."); return; }
+    const start = draftFilters.from ? organizationDayRange(draftFilters.from,timezone) : null;
+    const end = draftFilters.to ? organizationDayRange(draftFilters.to,timezone) : null;
+    if ((draftFilters.from && !start) || (draftFilters.to && !end) || (start && end && start.from > end.to)) { setFilterError("Informe um período válido, com início anterior ou igual ao fim."); return; }
+    setFilterError(null);
     setPage(1);
     setFilters({
-      from: toStartOfDayIso(draftFilters.from),
-      to: toEndOfDayIso(draftFilters.to),
+      from: start?.from,
+      to: end?.to,
       actorPersonId: draftFilters.actorPersonId.trim() || undefined,
       action: draftFilters.action.trim() || undefined,
     });
   }
   function clearFilters() {
+    setFilterError(null);
     setDraftFilters({ from: "", to: "", actorPersonId: "", action: "" });
     setFilters({});
     setPage(1);
@@ -159,7 +167,9 @@ export default function AuditPage() {
   function retry() { void listQuery.refetch(); void summaryQuery.refetch(); }
 
   return (
-    <AppPageShell className="gap-4 p-3 md:p-5" data-testid="audit-admin-page">
+    <AppPageShell className="operational-mobile-page mobile-module-page evidence-mobile-page gap-4" data-testid="audit-admin-page">
+      <MobileModuleHeader title="Auditoria" description="Registros administrativos e suas evidências." context={listQuery.isSuccess ? `${events.length} ${events.length === 1 ? "registro" : "registros"} nesta página${hasFilters ? " · Filtros aplicados" : ""}` : undefined} onRefresh={retry} />
+      <div className="hidden md:block">
       <AppOperationalHeader
         title="Auditoria"
         description="Rastreabilidade administrativa dos fatos e evidências registrados. Esta fonte é independente da Timeline operacional."
@@ -169,8 +179,10 @@ export default function AuditPage() {
           {hasFilters ? <AppContextChip tone="accent">Filtros aplicados</AppContextChip> : null}
         </>}
       />
+      </div>
 
-      <AppFiltersBar className="flex-col items-stretch gap-3 p-3 md:p-4">
+      <AppFiltersBar className="module-filters flex-col items-stretch gap-3 p-3 md:p-4">
+        <ResponsiveDetails title="Filtrar registros" controls>
         <form onSubmit={event => { event.preventDefault(); applyFilters(); }}>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <AppField label="Período inicial" htmlFor="audit-from"><AppInput id="audit-from" type="date" value={draftFilters.from} onChange={event => setDraftFilters(current => ({ ...current, from: event.target.value }))} /></AppField>
@@ -184,11 +196,13 @@ export default function AuditPage() {
               {Array.from(new Set([...summary.byAction.map(item => item.action), ...events.map(item => item.action), ...(draftFilters.action ? [draftFilters.action] : [])])).map(action => <option key={action} value={action}>{presentationLabel(action)}</option>)}
             </select></AppField>
           </div>
+          {filterError ? <p role="alert" className="mt-3 text-sm text-[var(--danger)]">{filterError}</p> : null}
           <AppFormActions className="mt-3 justify-start">
             <Button type="submit"><Search />Aplicar filtros</Button>
             <Button type="button" variant="neutral" onClick={clearFilters}><X />Limpar</Button>
           </AppFormActions>
         </form>
+        </ResponsiveDetails>
       </AppFiltersBar>
 
       {listQuery.isError || summaryQuery.isError ? (
@@ -201,11 +215,22 @@ export default function AuditPage() {
         </AppAlert>
       ) : null}
 
-      <AppSectionBlock title="Registros de auditoria" subtitle="Ordem oficial da API: eventos mais recentes primeiro. Selecione um registro para examinar sua evidência.">
+      <AppSectionBlock className="mobile-flat-section" title="Registros de auditoria" subtitle="Ordem oficial da API: eventos mais recentes primeiro. Selecione um registro para examinar sua evidência.">
         {listQuery.isError ? <p role="status">Registros indisponíveis. Tente novamente acima.</p> : listQuery.isLoading ? <AppLoadingState label="Carregando registros de auditoria..." /> : getAuditEmptyState(events, listQuery.isLoading) ? (
           <AppEmptyState title={hasFilters ? "Nenhum registro corresponde aos filtros" : "Nenhum registro de auditoria"} description={hasFilters ? "Revise ou limpe os filtros para ampliar o recorte." : "Ainda não há fatos registrados para esta organização."} action={hasFilters ? <Button type="button" variant="neutral" onClick={clearFilters}>Limpar filtros</Button> : undefined} />
         ) : (
           <>
+            <ol className="grid gap-3 md:hidden" aria-label="Registros de auditoria no celular">
+              {events.map(event => <li key={event.id} className="module-list-item space-y-3">
+                <time dateTime={event.createdAt} className="block text-xs text-[var(--text-muted)]">{formatDateTime(event.createdAt)}</time>
+                <h2 className="break-words font-semibold">{presentationLabel(event.action)}</h2>
+                <p className="break-words text-sm text-[var(--text-secondary)]">{event.actorName || event.actorPersonId || event.actorUserId || "Sistema"}</p>
+                <p className="text-xs text-[var(--text-muted)]">{presentationLabel(event.entityType)}</p>
+                {event.context ? <p className="break-words text-sm text-[var(--text-secondary)]">{event.context}</p> : null}
+                <Button type="button" className="min-h-11 w-full" onClick={() => setSelectedEvent(event)} aria-label={`Examinar evento ${presentationLabel(event.action)}`}><Eye />Examinar registro</Button>
+              </li>)}
+            </ol>
+            <div className="hidden md:block">
             <AppDataTable className="min-w-[860px]">
               <thead><tr><th scope="col">Data e hora</th><th scope="col">Evento</th><th scope="col">Ator</th><th scope="col">Entidade</th><th scope="col">Identificador</th><th scope="col"><span className="sr-only">Ações</span></th></tr></thead>
               <tbody>{events.map(event => (
@@ -219,6 +244,7 @@ export default function AuditPage() {
                 </tr>
               ))}</tbody>
             </AppDataTable>
+            </div>
             <AppPagination currentPage={pagination.page} totalItems={pagination.total} pageSize={pagination.limit} onPageChange={setPage} />
           </>
         )}
@@ -229,7 +255,7 @@ export default function AuditPage() {
           <dl className="grid gap-4 sm:grid-cols-2">
             {[["Evento", presentationLabel(selectedEvent.action)], ["Data e hora", formatDateTime(selectedEvent.createdAt)], ["Ator", selectedEvent.actorName || selectedEvent.actorPersonId || selectedEvent.actorUserId || "Sistema"], ["Entidade", presentationLabel(selectedEvent.entityType)], ["ID da entidade", selectedEvent.entityId || "—"], ["ID do registro", selectedEvent.id], ["Organização", selectedEvent.orgId], ["Contexto", selectedEvent.context || "—"]].map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-xs font-medium text-[var(--text-muted)]">{label}</dt><dd className="mt-1 break-words text-[var(--text-primary)]">{value}</dd></div>)}
           </dl>
-          <section aria-labelledby="audit-evidence-title"><h2 id="audit-evidence-title" className="font-semibold text-[var(--text-primary)]">Metadata legível</h2>{metadataEntries.length ? <dl className="mt-3 grid gap-3 sm:grid-cols-2">{metadataEntries.map(([key, value]) => <div key={key} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3"><dt className="text-xs capitalize text-[var(--text-muted)]">{fieldLabel(key)}</dt><dd className="mt-1 break-all text-[var(--text-primary)]">{value}</dd></div>)}</dl> : <p className="mt-2 text-[var(--text-muted)]">Nenhuma metadata primitiva e segura foi registrada.</p>}</section>
+          <section aria-labelledby="audit-evidence-title"><h2 id="audit-evidence-title" className="font-semibold text-[var(--text-primary)]">Detalhes da evidência</h2>{metadataEntries.length ? <dl className="mt-3 grid gap-3 sm:grid-cols-2">{metadataEntries.map(([key, value]) => <div key={key} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3"><dt className="text-xs capitalize text-[var(--text-muted)]">{fieldLabel(key)}</dt><dd className="mt-1 break-all text-[var(--text-primary)]">{value}</dd></div>)}</dl> : <p className="mt-2 text-[var(--text-muted)]">Nenhum detalhe adicional disponível neste registro.</p>}</section>
         </div> : null}
       </BaseModal>
     </AppPageShell>

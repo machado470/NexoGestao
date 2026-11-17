@@ -1,3 +1,9 @@
+import { AppStatusBadge as StateBadge } from "@/components/app-system";
+import { MobileModuleHeader } from "@/components/MobileModuleHeader";
+import { ResponsiveDetails } from "@/components/ResponsiveDetails";
+import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
+import { formatOrganizationDate, type Instant } from "@/lib/organization-locale";
+import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { can, type Permission } from "@/lib/rbac";
 import { presentationLabel } from "@/lib/presentation-labels";
@@ -31,13 +37,8 @@ const STATE_LABELS = {
   UNKNOWN: "Estado não informado",
 } as const;
 
-function formatDate(value: unknown) {
-  if (!value) return "Não informada";
-  const date = new Date(String(value));
-  return Number.isNaN(date.getTime())
-    ? "Data indisponível"
-    : date.toLocaleString("pt-BR");
-}
+
+const STATE_TONES = { NORMAL: "success", WARNING: "warning", RESTRICTED: "danger", SUSPENDED: "danger", UNKNOWN: "neutral" } as const;
 
 function sourceLabel(source: string | undefined) {
   if (!source) return "Não informada";
@@ -52,9 +53,12 @@ function sourceLabel(source: string | undefined) {
 }
 
 export default function GovernancePage() {
+  const { timezone } = useOrganizationLocale();
+  const formatDate = (value: unknown) => formatOrganizationDate(value as Instant, timezone, "Não informada", {dateStyle:"short",timeStyle:"medium"});
   setBootPhase("PAGE:Governança");
   useRenderWatchdog("GovernancePage");
   const [, navigate] = useLocation();
+  const [showAllSignals, setShowAllSignals] = useState(false);
 
   const stateQuery = trpc.governance.operationalState.useQuery(undefined, {
     retry: false,
@@ -97,7 +101,9 @@ export default function GovernancePage() {
   const staleEvaluation = signalsQuery.data?.signals.some(signal => signal.reason === "GOVERNANCE_RUN_STALE") ?? false;
 
   return (
-    <AppPageShell className="gap-4 p-3 md:p-5">
+    <AppPageShell className="operational-mobile-page mobile-module-page evidence-mobile-page gap-4">
+      <MobileModuleHeader title="Governança" description="Situação, alertas e próximas ações." context={stateQuery.isLoading ? "Consultando a operação…" : stateQuery.isError ? "Leitura indisponível" : undefined} onRefresh={refresh} />
+      <div className="hidden md:block">
       <AppOperationalHeader
         title="Governança e risco operacional"
         description="Estado, razões, sinais, decisões e execuções fornecidos pelas fontes oficiais — somente leitura."
@@ -127,6 +133,7 @@ export default function GovernancePage() {
           )
         }
       />
+      </div>
 
       {unavailable > 0 ? (
         <AppAlert role="status">
@@ -144,6 +151,7 @@ export default function GovernancePage() {
       ) : null}
 
       <AppSectionBlock
+        className="governance-state"
         title="Situação atual"
         subtitle="A decisão operacional vigente e a justificativa emitida pela fonte autoritativa."
       >
@@ -167,8 +175,9 @@ export default function GovernancePage() {
         ) : (
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
             <div className="min-w-0">
-              <AppStatusBadge
+              <StateBadge
                 label={STATE_LABELS[stateQuery.data.operationalState]}
+                tone={STATE_TONES[stateQuery.data.operationalState]}
               />
               <h2 className="mt-3 text-xl font-semibold text-[var(--text-primary)]">
                 {stateQuery.data.reason ?? "Justificativa não informada"}
@@ -177,6 +186,7 @@ export default function GovernancePage() {
                 Origem: {sourceLabel(stateQuery.data.source)}
               </p>
             </div>
+            <ResponsiveDetails title="Contexto da avaliação" controls>
             <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-1">
               <div>
                 <dt className="text-xs text-[var(--text-muted)]">Referência</dt>
@@ -201,15 +211,17 @@ export default function GovernancePage() {
                 </dd>
               </div>
             </dl>
+            </ResponsiveDetails>
           </div>
         )}
       </AppSectionBlock>
 
-      <AppSectionBlock title="Última avaliação" subtitle="Referência da avaliação concluída retornada pela API.">
+      <AppSectionBlock className="mobile-flat-section" title="Última avaliação" subtitle="Referência da avaliação concluída retornada pela API.">
         <p className="text-sm text-[var(--text-secondary)]" role="status">{stateQuery.isLoading ? "Carregando avaliação..." : stateQuery.isError ? "Avaliação indisponível." : stateData?.availability === "NO_DATA" ? "Nenhuma avaliação concluída com dados disponíveis." : stateData?.evidenceAt ? `Avaliação em ${formatDate(stateData.evidenceAt)}. ${staleEvaluation ? "Avaliação desatualizada conforme diagnóstico oficial." : signalsQuery.isError ? "Não foi possível verificar a atualidade da avaliação." : "Sem indicação de desatualização no recorte oficial."}` : "Data da avaliação não informada pela fonte."}</p>
       </AppSectionBlock>
       <div className="grid gap-4 xl:grid-cols-2">
         <AppSectionBlock
+          className="governance-next-action"
           title="Próxima ação"
           subtitle="Próxima ação oficial; abrir o destino não executa a ação automaticamente."
         >
@@ -230,7 +242,7 @@ export default function GovernancePage() {
           ) : (
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <AppStatusBadge label={nextAction.area} />
+                <StateBadge label={presentationLabel(nextAction.area)} tone="neutral" />
                 <span className="break-all text-xs text-[var(--text-muted)]">
                   Origem: {sourceLabel(nextAction.source)}
                 </span>
@@ -248,18 +260,19 @@ export default function GovernancePage() {
                 <strong>Recomendação:</strong> {nextAction.suggestedAction}
               </p>
               <Button
-                className="mt-4 max-w-full"
+                className="mt-4 h-auto min-h-11 max-w-full whitespace-normal break-words"
                 disabled={!canOpenNextAction}
                 onClick={() => destination === "/governance" ? refresh() : navigate(nextAction.routeHint)}
                 aria-label={`Abrir destino oficial: ${nextAction.title}`}
               >
-                {canOpenNextAction ? destination === "/governance" ? "Atualizar fontes" : "Abrir destino oficial" : "Destino restrito ao seu perfil"}
+                {canOpenNextAction ? destination === "/governance" ? "Atualizar fontes" : "Ver próximo passo" : "Destino restrito ao seu perfil"}
                 <ArrowRight className="ml-2 size-4" aria-hidden="true" />
               </Button>
             </div>
           )}
         </AppSectionBlock>
 
+        <ResponsiveDetails title="Avaliação automática" controls>
         <AppSectionBlock
           title="Avaliação automática oficial"
           subtitle="Nota e fatores já calculados pelo backend; não determina o estado operacional exibido acima."
@@ -311,6 +324,7 @@ export default function GovernancePage() {
             </div>
           )}
         </AppSectionBlock>
+        </ResponsiveDetails>
       </div>
 
       <AppSectionBlock
@@ -334,10 +348,11 @@ export default function GovernancePage() {
         ) : (
           <ol
             className="divide-y divide-[var(--border-subtle)]"
+            id="governance-signals"
             aria-label="Sinais operacionais oficiais"
           >
-            {signalsQuery.data?.signals.map(signal => (
-              <li key={signal.id} className="min-w-0 py-4 first:pt-0 last:pb-0">
+            {signalsQuery.data?.signals.map((signal, index) => (
+              <li key={signal.id} className={`min-w-0 py-4 first:pt-0 last:pb-0 ${index > 2 && !showAllSignals ? "hidden md:block" : ""}`}>
                 <div className="flex flex-wrap items-center gap-2">
                   <AppStatusBadge label={presentationLabel(signal.severity)} />
                   <span className="text-xs text-[var(--text-muted)]">
@@ -362,18 +377,22 @@ export default function GovernancePage() {
                     <strong>Impacto informado:</strong> {signal.impact}
                   </p>
                 ) : null}
+                <ResponsiveDetails title="Origem e referência" controls>
                 <p className="mt-2 break-all text-xs text-[var(--text-muted)]">
                   Origem: {sourceLabel(signal.source)} · ID: {signal.id}
                   {signal.detectedAt
                     ? ` · Detectado em ${formatDate(signal.detectedAt)}`
                     : ""}
                 </p>
+                </ResponsiveDetails>
               </li>
             ))}
           </ol>
         )}
+        {(signalsQuery.data?.signals.length ?? 0) > 3 ? <button type="button" className="mt-3 min-h-11 text-sm font-medium text-[var(--accent-primary)] md:hidden" aria-expanded={showAllSignals} aria-controls="governance-signals" onClick={() => setShowAllSignals(value => !value)}>{showAllSignals ? "Mostrar menos sinais" : "Ver todos os sinais"}</button> : null}
       </AppSectionBlock>
 
+      <ResponsiveDetails title="Histórico de avaliações" controls>
       <AppSectionBlock
         title="Histórico de execuções"
         subtitle="Execuções de governança na ordem oficial. O contrato atual não fornece ator, transição de estado ou razão por execução."
@@ -433,6 +452,7 @@ export default function GovernancePage() {
           </ol>
         )}
       </AppSectionBlock>
+      </ResponsiveDetails>
 
       <AppAlert>
         <AppAlertTitle>Limites do contrato atual</AppAlertTitle>
