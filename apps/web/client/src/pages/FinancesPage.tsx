@@ -1,3 +1,4 @@
+import { transientReadOptions } from "@/lib/read-query-retry";
 import { MobileModuleHeader } from "@/components/MobileModuleHeader";
 import { useCreateFromRoute } from "@/hooks/useCreateFromRoute";
 import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
@@ -139,7 +140,7 @@ export default function FinancesPage() {
   const openedPaymentLink = useRef<string | null>(null);
   const focusedQuery = trpc.finance.charges.getById.useQuery(
     { id: focusedChargeId ?? "" },
-    { enabled: Boolean(focusedChargeId), retry: false }
+    { enabled: Boolean(focusedChargeId), ...transientReadOptions }
   );
   const focusedCharge = normalizeObjectPayload<Charge>(focusedQuery.data);
   const paymentInputRef = useRef<HTMLInputElement>(null);
@@ -162,12 +163,12 @@ export default function FinancesPage() {
 
   const chargesQuery = trpc.finance.charges.list.useQuery(
     { page: 1, limit: 500 },
-    { retry: false }
+    { ...transientReadOptions }
   );
-  const statsQuery = trpc.finance.charges.stats.useQuery({}, { retry: false });
+  const statsQuery = trpc.finance.charges.stats.useQuery({}, { ...transientReadOptions });
   const queueQuery = trpc.finance.operationalQueue.useQuery(
     { limit: 50 },
-    { retry: false }
+    { ...transientReadOptions }
   );
   const pay = trpc.finance.charges.pay.useMutation();
   const cancel = trpc.finance.charges.cancel.useMutation();
@@ -373,13 +374,13 @@ export default function FinancesPage() {
                     </div>
   );
 
-  if (chargesQuery.isLoading && !focusedChargeId)
+  if ((chargesQuery.isLoading || (chargesQuery.isFetching && charges.length === 0)) && !focusedChargeId)
     return (
       <AppPageShell>
         <AppPageLoadingState title="Carregando carteira oficial" />
       </AppPageShell>
     );
-  if (chargesQuery.isError && charges.length === 0 && !focusedChargeId) {
+  if (chargesQuery.isError && !chargesQuery.isFetching && charges.length === 0 && !focusedChargeId) {
     return (
       <AppPageShell>
         <AppPageErrorState

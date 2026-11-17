@@ -1,3 +1,4 @@
+import { transientReadOptions } from "@/lib/read-query-retry";
 import { MobileModuleHeader } from "@/components/MobileModuleHeader";
 import { useCreateFromRoute } from "@/hooks/useCreateFromRoute";
 import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
@@ -488,28 +489,28 @@ export default function CustomersPage() {
 
   const customersQuery = trpc.customers.page.useQuery(
     { page: currentPage, focusId: currentPage === 1 && !searchTerm && activeFilter === "all" && priorityFilter === "all" && riskFilter === "all" ? new URLSearchParams(routeSearch).get("customerId") || undefined : undefined, limit: pageSize, search: debouncedSearch || undefined, active: activeFilter === "all" ? undefined : activeFilter, priority: priorityFilter === "all" ? undefined : priorityFilter, riskState: riskFilter === "all" ? undefined : riskFilter },
-    { enabled: isAuthenticated, retry: false }
+    { enabled: isAuthenticated, ...transientReadOptions }
   );
   const customersOperationalSummaryQuery =
     trpc.customers.operationalSummaryPage.useQuery({ customerIds: customersQuery.data?.items.map(customer => customer.id) ?? [] }, {
       enabled: isAuthenticated && Boolean(customersQuery.data),
-      retry: false,
+      ...transientReadOptions,
     });
   const appointmentsQuery = trpc.appointments.page.useQuery(
     { page: 1, limit: 200 },
-    { enabled: isAuthenticated, retry: false }
+    { enabled: isAuthenticated, ...transientReadOptions }
   );
   const serviceOrdersQuery = trpc.serviceOrders.page.useQuery(
     { page: 1, limit: 100 },
-    { enabled: isAuthenticated, retry: false }
+    { enabled: isAuthenticated, ...transientReadOptions }
   );
   const chargesQuery = trpc.finance.charges.list.useQuery(
     { page: 1, limit: 500 },
-    { enabled: isAuthenticated && canReadFinance, retry: false }
+    { enabled: isAuthenticated && canReadFinance, ...transientReadOptions }
   );
   const peopleQuery = trpc.people.assignees.useQuery(undefined, {
     enabled: isAuthenticated,
-    retry: false,
+    ...transientReadOptions,
   });
   const trpcUtils = trpc.useUtils();
   const [isRefreshingWorkspace, setIsRefreshingWorkspace] = useState(false);
@@ -568,11 +569,11 @@ export default function CustomersPage() {
 
   const workspaceQuery = trpc.customers.workspace.useQuery(
     { id: activeCustomerId ?? "" },
-    { enabled: isAuthenticated && Boolean(activeCustomerId), retry: false }
+    { enabled: isAuthenticated && Boolean(activeCustomerId), ...transientReadOptions }
   );
   const timelineQuery = trpc.timeline.listByCustomer.useQuery(
     { customerId: activeCustomerId ?? "", limit: 5 },
-    { enabled: isAuthenticated && Boolean(activeCustomerId), retry: false }
+    { enabled: isAuthenticated && Boolean(activeCustomerId), ...transientReadOptions }
   );
 
   const workspace = useMemo(
@@ -619,9 +620,9 @@ export default function CustomersPage() {
     searchTerm,
   ]);
 
-  const isLoading = customersQuery.isLoading && customers.length === 0;
+  const isLoading = (customersQuery.isLoading || customersQuery.isFetching) && customers.length === 0;
   const hasBlockingError =
-    Boolean(customersQuery.error) && customers.length === 0;
+    !customersQuery.isFetching && Boolean(customersQuery.error) && customers.length === 0;
   const auxiliaryDataSources = [
     { label: "cobranças", query: chargesQuery },
     { label: "ordens de serviço", query: serviceOrdersQuery },

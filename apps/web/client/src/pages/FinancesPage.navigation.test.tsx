@@ -1,3 +1,4 @@
+import { transientReadOptions } from "@/lib/read-query-retry";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Router } from "wouter";
@@ -98,7 +99,7 @@ describe("finance navigation with real Wouter query parsing", () => {
     const html = render("/finances?chargeId=old-charge");
     expect(state.getById).toHaveBeenCalledWith(
       { id: "old-charge" },
-      { enabled: true, retry: false }
+      { enabled: true, ...transientReadOptions }
     );
     expect(html).toContain("Cobrança selecionada");
     expect(html).toContain("Ana");
@@ -112,7 +113,7 @@ describe("finance navigation with real Wouter query parsing", () => {
     render("/finances");
     expect(state.getById).toHaveBeenCalledWith(
       { id: "" },
-      { enabled: false, retry: false }
+      { enabled: false, ...transientReadOptions }
     );
   });
   it("shows inaccessible records explicitly and never substitutes another charge", () => {

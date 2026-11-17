@@ -1,3 +1,4 @@
+import { transientReadOptions } from "@/lib/read-query-retry";
 import { MobileModuleHeader } from "@/components/MobileModuleHeader";
 import { useCreateFromRoute } from "@/hooks/useCreateFromRoute";
 import { useFormDiscardGuard } from "@/hooks/useFormDiscardGuard";
@@ -152,19 +153,19 @@ export default function AppointmentsPage() {
   );
   const appointmentsQuery = trpc.appointments.page.useQuery(
     appointmentListInput,
-    { enabled: isAuthenticated, retry: false }
+    { enabled: isAuthenticated, ...transientReadOptions }
   );
   const customersQuery = trpc.customers.list.useQuery(undefined, {
     enabled: isAuthenticated,
-    retry: false,
+    ...transientReadOptions,
   });
   const peopleQuery = trpc.people.assignees.useQuery(undefined, {
     enabled: isAuthenticated,
-    retry: false,
+    ...transientReadOptions,
   });
   const serviceOrdersQuery = trpc.serviceOrders.list.useQuery(
     { page: 1, limit: 100 },
-    { enabled: isAuthenticated, retry: false }
+    { enabled: isAuthenticated, ...transientReadOptions }
   );
 
   const appointments = useMemo(
@@ -280,7 +281,7 @@ export default function AppointmentsPage() {
 
   const timelineQuery = trpc.timeline.listByCustomer.useQuery(
     { customerId: selected?.customerId ?? "", limit: 25 },
-    { enabled: isAuthenticated && Boolean(selected?.customerId), retry: false }
+    { enabled: isAuthenticated && Boolean(selected?.customerId), ...transientReadOptions }
   );
   const timeline = useMemo(
     () => normalizeArrayPayload<any>(timelineQuery.data),
@@ -648,9 +649,9 @@ export default function AppointmentsPage() {
                 agendamentos permanecem visíveis.
               </p>
             ) : null}
-            {appointmentsQuery.isLoading ? (
+            {(appointmentsQuery.isLoading || (appointmentsQuery.isFetching && !appointmentsQuery.data)) ? (
               <AppPageLoadingState description="Carregando agendamentos..." />
-            ) : appointmentsQuery.isError ? (
+            ) : appointmentsQuery.isError && !appointmentsQuery.isFetching ? (
               <AppPageErrorState
                 description="Não foi possível carregar os agendamentos."
                 actionLabel="Tentar novamente"

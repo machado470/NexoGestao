@@ -27,8 +27,8 @@ describe("AppointmentsPage operational contract", () => {
   });
 
   it("separates legitimate zero from loading and unavailable context", () => {
-    expect(compact).toContain("appointmentsQuery.isLoading ? (");
-    expect(compact).toContain(") : appointmentsQuery.isError ? (");
+    expect(compact).toContain("(appointmentsQuery.isLoading || (appointmentsQuery.isFetching && !appointmentsQuery.data)) ? (");
+    expect(compact).toContain(") : appointmentsQuery.isError && !appointmentsQuery.isFetching ? (");
     expect(compact).toContain("appointmentsQuery.isSuccess ? (");
     expect(source).toContain("factualCounts.total");
     expect(source).toContain(

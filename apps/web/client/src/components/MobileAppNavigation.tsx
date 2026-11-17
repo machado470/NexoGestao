@@ -92,7 +92,7 @@ export function MobileAppNavigation({
         </button>
       </nav>
       <Dialog open={menuOpen} onOpenChange={onMenuChange}>
-        <DialogContent className="max-h-[80dvh] overflow-y-auto bg-[var(--surface-primary)] text-[var(--text-primary)]">
+        <DialogContent className="mobile-navigation-dialog max-h-[80dvh] overflow-y-auto bg-[var(--app-overlay-surface,#152036)] text-[var(--app-overlay-text,#f0f4ff)]">
           <DialogHeader>
             <DialogTitle>Mais opções</DialogTitle>
           </DialogHeader>
@@ -128,7 +128,7 @@ export function MobileAppNavigation({
         </DialogContent>
       </Dialog>
       <Dialog open={searchOpen} onOpenChange={onSearchChange}>
-        <DialogContent className="top-[15%] translate-y-0 overflow-visible bg-[var(--surface-primary)] text-[var(--text-primary)]">
+        <DialogContent className="mobile-navigation-dialog top-[15%] translate-y-0 overflow-visible bg-[var(--app-overlay-surface,#152036)] text-[var(--app-overlay-text,#f0f4ff)]">
           <DialogHeader>
             <DialogTitle>Buscar</DialogTitle>
           </DialogHeader>
