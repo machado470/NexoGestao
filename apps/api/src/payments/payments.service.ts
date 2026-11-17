@@ -12,6 +12,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { ChargeStatus } from '@prisma/client'
 import { FinanceService } from '../finance/finance.service'
 import Stripe from 'stripe'
+import { isStripeDisabled } from '../common/config/stripe-integration'
 
 interface CreateCheckoutSessionDto {
   orgId: string
@@ -27,6 +28,7 @@ interface CreateCheckoutSessionDto {
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name)
   private readonly stripe: Stripe | null
+  private readonly stripeDisabled: boolean
 
   constructor(
     private configService: ConfigService,
@@ -34,6 +36,7 @@ export class PaymentsService {
     private finance: FinanceService,
     @Optional() private readonly refunds?: PaymentRefundsService,
   ) {
+    this.stripeDisabled = isStripeDisabled(this.configService)
     const secretKey =
       this.configService.get<string>('STRIPE_SECRET_KEY') ||
       this.configService.get<string>('STRIPE_KEY') ||
@@ -43,17 +46,30 @@ export class PaymentsService {
         .toLowerCase()
         .trim() === 'production'
 
-    if (!secretKey && isProduction) {
+    if (!secretKey && isProduction && !this.stripeDisabled) {
       throw new Error('[Payments] STRIPE_SECRET_KEY/STRIPE_KEY é obrigatório em produção')
     }
 
-    if (secretKey) {
+    if (this.stripeDisabled) {
+      this.stripe = null
+      this.logger.log('[BOOT][Payments][disabled] Stripe explicitamente desativado')
+    } else if (secretKey) {
       this.stripe = new Stripe(secretKey, { apiVersion: '2024-06-20' })
       this.logger.log('[BOOT][Payments] Stripe inicializado no PaymentsService')
     } else {
       this.stripe = null
       this.logger.warn('[BOOT][Payments][disabled] Stripe não configurado no PaymentsService (checkout online desabilitado)')
     }
+  }
+
+  private assertStripeEnabled(operation: string) {
+    if (!this.stripeDisabled) return
+    throw new ServiceUnavailableException({
+      code: 'INTEGRATION_DISABLED',
+      integration: 'stripe',
+      operation,
+      message: 'Integração Stripe desativada neste ambiente.',
+    })
   }
 
   /**
@@ -63,6 +79,7 @@ export class PaymentsService {
     dto: CreateCheckoutSessionDto,
   ): Promise<{ sessionId: string; checkoutUrl: string }> {
     try {
+      this.assertStripeEnabled('create_checkout_session')
       if (!this.stripe) {
         throw new BadRequestException('Stripe não configurado')
       }
@@ -153,6 +170,7 @@ export class PaymentsService {
    * Processa webhook do Stripe usando SDK oficial
    */
   async handleWebhook(rawBody: Buffer, signature: string): Promise<{ received: true }> {
+    this.assertStripeEnabled('webhook')
     if (!this.stripe) {
       throw new ServiceUnavailableException('Stripe não configurado')
     }

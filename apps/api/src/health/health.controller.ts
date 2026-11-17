@@ -1,5 +1,6 @@
 import { Controller, Get, Optional, Request, ServiceUnavailableException, UnauthorizedException, UseGuards } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { isStripeDisabled } from '../common/config/stripe-integration'
 import { PrismaService } from '../prisma/prisma.service'
 import { QueueService } from '../queue/queue.service'
 import { isGoogleOAuthConfigured } from '../common/config/google-oauth-env'
@@ -136,7 +137,7 @@ export class HealthController {
     const whatsappIntegrationStatus = whatsappReadiness.status
 
     return {
-      stripe: stripeConfigured ? 'configured' : 'missing',
+      stripe: isStripeDisabled(this.config) ? 'disabled' : stripeConfigured ? 'configured' : 'missing',
       googleAuth: googleAuthConfigured ? 'configured' : 'missing',
       email: emailConfigured ? 'configured' : 'missing',
       whatsapp: whatsappIntegrationStatus,

@@ -28,11 +28,7 @@ DATABASE_URL=postgresql://nexo_smoke:disposable-smoke-password@postgres:5432/nex
 REDIS_PASSWORD=disposable-redis-password
 REDIS_URL=redis://:disposable-redis-password@redis:6379
 JWT_SECRET=disposable-smoke-jwt-secret-at-least-32-characters
-STRIPE_SECRET_KEY=sk_test_disposable
-STRIPE_WEBHOOK_SECRET=whsec_disposable
-STRIPE_PRICE_STARTER=price_disposable_starter
-STRIPE_PRICE_PRO=price_disposable_pro
-STRIPE_PRICE_BUSINESS=price_disposable_business
+STRIPE_ENABLED=false
 DOMAIN=nexo.test
 TLS_CERT_DIR=$smoke_dir/tls
 HTTP_PORT=0
@@ -41,7 +37,7 @@ VITE_API_URL=https://api.nexo.test
 APP_URL=https://app.nexo.test
 FRONTEND_URL=https://app.nexo.test
 CORS_ORIGINS=https://app.nexo.test
-WHATSAPP_PROVIDER=meta_cloud
+WHATSAPP_PROVIDER=disabled
 ENV
 chmod 600 "$NEXO_ENV_FILE"
 if [ "${NEXO_DOCKER_TARGET:-compose}" = 'railway' ]; then
@@ -122,7 +118,7 @@ curl --silent --show-error --dump-header "$smoke_dir/redirect" --output /dev/nul
 grep -q 'Location: https://app.nexo.test/smoke?check=1' "$smoke_dir/redirect"
 curl --fail --silent --show-error --cacert "$smoke_dir/tls/fullchain.pem" \
   -H 'Host: api.nexo.test' "https://localhost:${https_endpoint##*:}/v1/health/readiness" > "$smoke_dir/readiness.json"
-node -e 'const h=JSON.parse(require("fs").readFileSync(process.argv[1])); if(h.success!==true || h.data?.status!=="ready") process.exit(1)' "$smoke_dir/readiness.json"
+node -e 'const h=JSON.parse(require("fs").readFileSync(process.argv[1])); const d=h.data; if(h.success!==true || d?.status!=="ready" || d.integrations?.stripe!=="disabled" || d.integrations?.whatsapp!=="disabled" || !d.checks?.database?.ok || !d.checks?.prismaClient?.ok || !d.checks?.queue?.ok) process.exit(1)' "$smoke_dir/readiness.json"
 # A failed login to the pristine database proves BFF -> API connectivity.
 login_status="$(curl --silent --show-error --cacert "$smoke_dir/tls/fullchain.pem" \
   -H 'Host: app.nexo.test' -H 'Content-Type: application/json' \
