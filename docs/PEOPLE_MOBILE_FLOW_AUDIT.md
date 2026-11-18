@@ -1,0 +1,11 @@
+# Cadastro e edição de Pessoas no celular — 18/11/2026
+
+Os formulários de criação e edição agora usam a confirmação de descarte existente. Cancelar, X, Escape e clique externo seguem a mesma decisão; manter a edição preserva os campos. Descartar no editor pede confirmação e restaura a referência sem fechar o modal. Dados recebidos continuam sob personEditSessionReducer, incluindo isolamento por pessoa e versão para concorrência.
+
+Um bloqueio síncrono impede dois envios antes do próximo render. Durante a mutation, fieldsets desabilitam os controles para evitar edição de valores já enviados. Uma recusa preserva o rascunho e libera nova tentativa manual. A confirmação fecha o formulário antes do callback de atualização da lista; uma consulta lenta não mantém o cadastro confirmado aberto.
+
+A leitura inicial do editor tem Tentar novamente quando indisponível. Refetch sem dados mostra carregamento em vez do erro antigo. Leituras da tela usam a política existente de uma repetição para falhas temporárias, sem repetir automaticamente mutations ou erros de permissão. O rodapé do editor mantém Salvar/Descartar; Recarregar dados fica dentro do formulário para liberar espaço em 320 px.
+
+Validação: 47 testes de contratos da tela, sessão de edição, capacidade planejada e retry de leitura; TypeScript e build Vite passaram. scripts/audits/people-mobile-flow.cjs passou em 320/390 px com criação/edição, Escape/manter, descarte/cancelar, descarte confirmado sem fechar o editor, POST pendente, campos desabilitados, clique duplo, BAD_REQUEST com rascunho preservado, leitura inicial indisponível e recuperação, confirmação antes de liberar consultas lentas, detalhe e retorno à lista. Não houve overflow horizontal ao final.
+
+Os roteiros interceptam todas as APIs com fixtures locais. Não foi criado ou alterado colaborador real, nem concedido acesso ao sistema. Permissões e contratos de backend permanecem os existentes. A confirmação cobre fechamento dos modais e beforeunload quando suportado pelo navegador; não adiciona bloqueio de navegação interna ou garantia de rascunho após encerrar o navegador. Também não adiciona idempotência para resposta perdida. Safari/iPhone real e teclado nativo não foram executados nesta rodada.
