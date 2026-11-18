@@ -1,3 +1,5 @@
+import { NotificationCenter } from "@/components/NotificationCenter";
+import { useNotificationStore } from "@/stores/notificationStore";
 import { requestAppNavigation } from "@/lib/navigation-guard";
 import { MobileAppNavigation } from "@/components/MobileAppNavigation";
 import { useEffect, useMemo, useState } from "react";
@@ -101,6 +103,8 @@ export function MainLayout({ children }: MainLayoutProps) {
   });
   const persistentNotifications = notificationQuery.data?.items ?? [];
   const unreadCount = notificationQuery.data?.unreadCount;
+  const localNotificationCount = useNotificationStore(state => state.notifications.length);
+  const [notificationMenuOpen, setNotificationMenuOpen] = useState(false);
   const notificationStreamStatus = useNotificationStream(isAuthenticated, () => {
     void Promise.all([
       trpcUtils.dashboard.notificationCenter.list.invalidate(),
@@ -509,7 +513,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                   </div>
 
                   <div className="flex items-center justify-end gap-1.5 md:gap-2">
-                    <DropdownMenu>
+                    <DropdownMenu open={notificationMenuOpen} onOpenChange={setNotificationMenuOpen}>
                       <DropdownMenuTrigger asChild>
                         <button
                           type="button"
@@ -517,16 +521,16 @@ export function MainLayout({ children }: MainLayoutProps) {
                           aria-label="Notificações"
                         >
                           <Bell className="h-4 w-4" />
-                          {typeof unreadCount === "number" && unreadCount > 0 ? (
+                          {(unreadCount ?? 0) + (isMobile ? localNotificationCount : 0) > 0 ? (
                             <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[10px] font-semibold text-[var(--text-primary)]">
-                              {Math.min(unreadCount, 9)}
+                              {Math.min((unreadCount ?? 0) + (isMobile ? localNotificationCount : 0), 9)}
                             </span>
                           ) : null}
                         </button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent
                         align="end"
-                        className="w-[min(360px,calc(100vw-2rem))] nexo-floating-panel"
+                        className="max-h-[70dvh] w-[min(360px,calc(100vw-2rem))] overflow-y-auto nexo-floating-panel"
                       >
                         <DropdownMenuLabel className="flex items-center justify-between px-3 py-2">
                           <span>Notificações</span>
@@ -537,6 +541,9 @@ export function MainLayout({ children }: MainLayoutProps) {
                           </span>
                         </DropdownMenuLabel>
                         <DropdownMenuSeparator />
+                        {isMobile && localNotificationCount > 0 ? (
+                          <NotificationCenter inline onAction={() => setNotificationMenuOpen(false)} />
+                        ) : null}
                         {notificationQuery.isLoading ? (
                           <div className="px-3 py-8 text-center text-sm text-[var(--text-muted)]">Carregando notificações…</div>
                         ) : notificationQuery.isError ? (
@@ -547,7 +554,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                         ) : persistentNotifications.length === 0 ? (
                           <div className="px-3 py-8 text-center">
                             <Bell className="mx-auto h-5 w-5 text-[var(--text-muted)]" />
-                            <p className="mt-2 text-sm text-[var(--text-muted)]">Nenhuma notificação no momento.</p>
+                            <p className="mt-2 text-sm text-[var(--text-muted)]">{isMobile && localNotificationCount > 0 ? "Nenhuma outra notificação." : "Nenhuma notificação no momento."}</p>
                           </div>
                         ) : persistentNotifications.map(item => {
                           const safeRouteHint = isSafeNotificationRouteHint(item.routeHint) ? item.routeHint : null;
