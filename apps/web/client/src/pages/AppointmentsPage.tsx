@@ -338,6 +338,7 @@ export default function AppointmentsPage() {
 
   const discardGuard = useFormDiscardGuard({
     open: openModal,
+    guardNavigation: true,
     dirty: JSON.stringify(form) !== JSON.stringify(initialForm.current),
     blocked: savingAppointment.current || createMutation.isPending || updateMutation.isPending,
     onDiscard: () => { setOpenModal(false); setEditing(null); },
