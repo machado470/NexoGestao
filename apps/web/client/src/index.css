@@ -3959,3 +3959,21 @@ html {
   .account-page .account-form-buttons button { width: 100%; min-height: 48px; }
   .account-page p, .account-page dd { overflow-wrap: anywhere; }
 }
+
+/* Radix portals are attached to body, outside the themed app-root. */
+:root { --app-overlay-scrim: rgba(15, 23, 42, 0.38); }
+:root.dark, :root[data-theme="dark"] { --app-overlay-scrim: rgba(2, 6, 23, 0.74); }
+.mobile-navigation-dialog {
+  background: var(--app-overlay-surface, #152036);
+  overscroll-behavior: contain;
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+.mobile-navigation-dialog [data-slot="dialog-header"] { padding-right: 2rem; }
+.mobile-navigation-dialog > [data-slot="dialog-close"] {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  top: 8px;
+  right: 8px;
+}

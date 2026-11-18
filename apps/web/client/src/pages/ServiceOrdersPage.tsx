@@ -1,3 +1,4 @@
+import { transientReadOptions } from "@/lib/read-query-retry";
 import { MobileModuleHeader } from "@/components/MobileModuleHeader";
 import { useCreateFromRoute } from "@/hooks/useCreateFromRoute";
 import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
@@ -244,30 +245,30 @@ export default function ServiceOrdersPage() {
 
   const serviceOrdersQuery = trpc.serviceOrders.page.useQuery(
     { page: currentPage, limit: pageSize, id: urlServiceOrderId || undefined, appointmentId: urlAppointmentId || undefined, search: debouncedSearch || undefined, customerId: urlCustomerId || (customerFilter === 'all' ? undefined : customerFilter), assignedToPersonId: ['all', 'unassigned'].includes(responsibleFilter) ? undefined : responsibleFilter, unassigned: responsibleFilter === 'unassigned' ? 'true' : undefined, operationalFilter: activeFilter, priorityFilter, deadlineFilter },
-    { retry: false }
+    { ...transientReadOptions }
   );
   const customersQuery = trpc.customers.list.useQuery(
     { page: 1, limit: 500 },
-    { retry: false }
+    { ...transientReadOptions }
   );
   const appointmentsQuery = trpc.appointments.list.useQuery(
     { page: 1, limit: 500 },
-    { retry: false }
+    { ...transientReadOptions }
   );
   const chargesQuery = trpc.finance.charges.list.useQuery(
     { page: 1, limit: 500 },
-    { enabled: canReadFinance, retry: false }
+    { enabled: canReadFinance, ...transientReadOptions }
   );
   const peopleQuery = trpc.people.assignees.useQuery(undefined, {
-    retry: false,
+    ...transientReadOptions,
   });
   const timelineQuery = trpc.timeline.listByServiceOrder.useQuery(
     { serviceOrderId: String(selectedOrderId ?? ""), limit: 20 },
-    { enabled: Boolean(selectedOrderId), retry: false }
+    { enabled: Boolean(selectedOrderId), ...transientReadOptions }
   );
   const executionsQuery = trpc.executions.listByServiceOrder.useQuery(
     { serviceOrderId: String(selectedOrderId ?? ""), limit: 20 },
-    { enabled: Boolean(selectedOrderId), retry: false }
+    { enabled: Boolean(selectedOrderId), ...transientReadOptions }
   );
 
   const startExecutionMutation = trpc.executions.start.useMutation();
@@ -581,9 +582,9 @@ export default function ServiceOrdersPage() {
     [filteredOrders, selectedOrderId]
   );
 
-  const isLoading = serviceOrdersQuery.isLoading && enrichedOrders.length === 0;
+  const isLoading = (serviceOrdersQuery.isLoading || serviceOrdersQuery.isFetching) && enrichedOrders.length === 0;
   const hasBlockingError =
-    Boolean(serviceOrdersQuery.error) && enrichedOrders.length === 0;
+    !serviceOrdersQuery.isFetching && Boolean(serviceOrdersQuery.error) && enrichedOrders.length === 0;
 
   usePageDiagnostics({
     page: "service-orders",
