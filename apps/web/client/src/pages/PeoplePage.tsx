@@ -1,3 +1,4 @@
+import { availabilityDraftFor, availabilityDraftsReducer } from "@/lib/availability-drafts";
 import { transientReadOptions } from "@/lib/read-query-retry";
 import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
 import { formatOrganizationDate, type Instant } from "@/lib/organization-locale";
@@ -5,7 +6,7 @@ import { ResponsiveDetails } from "@/components/ResponsiveDetails";
 import { useMobileDetailNavigation } from "@/hooks/useMobileDetailNavigation";
 import { MobileDetailBack, MobileDetailState } from "@/components/MobileDetailBack";
 import { parseAvailabilityInterval } from "@/lib/availability-input";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useReducer, useRef, useState } from "react";
 import { CalendarClock, Trash2, Wrench } from "lucide-react";
 import { useLocation } from "wouter";
 import CreatePersonModal from "@/components/CreatePersonModal";
@@ -228,10 +229,14 @@ export default function PeoplePage() {
   const [roleFilter, setRoleFilter] = useState("all");
   const availabilityPending = useRef(false);
   const deletionPending = useRef(false);
-  const [availabilityError, setAvailabilityError] = useState<string | null>(null);
-  const [startsAt, setStartsAt] = useState("");
-  const [endsAt, setEndsAt] = useState("");
-  const [reason, setReason] = useState("");
+  const [availabilityDrafts, dispatchAvailability] = useReducer(availabilityDraftsReducer, {});
+  const { startsAt, endsAt, reason, error: availabilityError, removalError } = availabilityDraftFor(availabilityDrafts, selectedPersonId);
+  const setAvailabilityError = (message: string | null) => {
+    if (selectedPersonId) dispatchAvailability({ type: "error", personId: selectedPersonId, message });
+  };
+  const editAvailability = (values: Partial<{ startsAt: string; endsAt: string; reason: string }>) => {
+    if (selectedPersonId) dispatchAvailability({ type: "edit", personId: selectedPersonId, values });
+  };
 
   const summaryQuery = trpc.people.operationalSummary.useQuery(undefined, {
     enabled: isAuthenticated,
@@ -248,26 +253,25 @@ export default function PeoplePage() {
   );
   const createAvailabilityException =
     trpc.people.createAvailabilityException.useMutation({
-      onError: error => setAvailabilityError("Não foi possível registrar a indisponibilidade. " + error.message),
+      onError: (error, input) => dispatchAvailability({ type: "error", personId: input.personId, message: "Não foi possível registrar a indisponibilidade. " + error.message }),
       onSettled: () => { availabilityPending.current = false; },
-      onSuccess: async () => {
-        setAvailabilityError(null);
-        setStartsAt("");
-        setEndsAt("");
-        setReason("");
-        await Promise.all([
+      onSuccess: (_, input) => {
+        dispatchAvailability({ type: "saved", personId: input.personId });
+        void Promise.allSettled([
           utils.people.operationalSummary.invalidate(),
-          utils.people.listAvailabilityExceptions.invalidate(),
+          utils.people.listAvailabilityExceptions.invalidate({ personId: input.personId }),
         ]);
       },
     });
   const deleteAvailabilityException =
     trpc.people.deleteAvailabilityException.useMutation({
+      onError: (error, input) => dispatchAvailability({ type: "removalError", personId: input.personId, message: "Não foi possível remover a indisponibilidade. " + error.message }),
       onSettled: () => { deletionPending.current = false; },
-      onSuccess: async () => {
-        await Promise.all([
+      onSuccess: (_, input) => {
+        dispatchAvailability({ type: "removed", personId: input.personId });
+        void Promise.allSettled([
           utils.people.operationalSummary.invalidate(),
-          utils.people.listAvailabilityExceptions.invalidate(),
+          utils.people.listAvailabilityExceptions.invalidate({ personId: input.personId }),
         ]);
       },
     });
@@ -830,7 +834,7 @@ export default function PeoplePage() {
                         type="datetime-local"
                         disabled={createAvailabilityException.isPending || deleteAvailabilityException.isPending}
                         value={startsAt}
-                        onChange={event => setStartsAt(event.target.value)}
+                        onChange={event => editAvailability({ startsAt: event.target.value })}
                       />
                     </AppField>
                     <AppField
@@ -842,7 +846,7 @@ export default function PeoplePage() {
                         type="datetime-local"
                         disabled={createAvailabilityException.isPending || deleteAvailabilityException.isPending}
                         value={endsAt}
-                        onChange={event => setEndsAt(event.target.value)}
+                        onChange={event => editAvailability({ endsAt: event.target.value })}
                       />
                     </AppField>
                   </div>
@@ -855,7 +859,7 @@ export default function PeoplePage() {
                       disabled={createAvailabilityException.isPending || deleteAvailabilityException.isPending}
                       value={reason}
                       maxLength={200}
-                      onChange={event => setReason(event.target.value)}
+                      onChange={event => editAvailability({ reason: event.target.value })}
                     />
                   </AppField>
                   <Button
@@ -875,10 +879,10 @@ export default function PeoplePage() {
                 <h3 className="font-semibold">
                   Indisponibilidades registradas
                 </h3>
-                {deleteAvailabilityException.isError ? <p role="alert" className="text-sm text-destructive">Não foi possível remover a indisponibilidade. {deleteAvailabilityException.error.message}</p> : null}
-                {exceptionsQuery.isLoading ? (
+                {removalError ? <p role="alert" className="text-sm text-destructive">{removalError}</p> : null}
+                {exceptionsQuery.isLoading || (exceptionsQuery.isFetching && !exceptionsQuery.data) ? (
                   <AppPageLoadingState description="Carregando indisponibilidades..." />
-                ) : exceptionsQuery.error ? (
+                ) : exceptionsQuery.error && !exceptionsQuery.isFetching ? (
                   <AppPageErrorState
                     description="Indisponibilidades indisponíveis; o estado oficial da pessoa permanece visível."
                     actionLabel="Tentar novamente"
@@ -904,10 +908,11 @@ export default function PeoplePage() {
                         <Button
                           size="icon"
                           variant="ghost"
-                          disabled={createAvailabilityException.isPending || deleteAvailabilityException.isPending}
+                          disabled={createAvailabilityException.isPending || deleteAvailabilityException.isPending || exceptionsQuery.isFetching}
                           aria-label={`Remover indisponibilidade de ${selectedPerson.name}`}
                           onClick={() => {
                             if (deletionPending.current || availabilityPending.current) return;
+                            dispatchAvailability({ type: "removalError", personId: selectedPerson.personId, message: null });
                             deletionPending.current = true;
                             deleteAvailabilityException.mutate({ personId: selectedPerson.personId, exceptionId: exception.id });
                           }}
