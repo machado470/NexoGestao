@@ -156,6 +156,7 @@ export default function FinancesPage() {
   const [paymentFlow] = useState(() => createManualPaymentFlow());
   const [paymentSubmitting, setPaymentSubmitting] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const cancellationSubmitting = useRef(false);
   const [cancellationReason, setCancellationReason] = useState("");
   const [cancellationError, setCancellationError] = useState<string | null>(
     null
@@ -293,13 +294,14 @@ export default function FinancesPage() {
   };
 
   const submitCancellation = async () => {
-    if (!canceling) return;
+    if (!canceling || cancellationSubmitting.current) return;
     const reason = cancellationReason.trim();
     if (reason.length < 3) {
       setCancellationError("Informe um motivo com pelo menos 3 caracteres.");
       return;
     }
     setCancellationError(null);
+    cancellationSubmitting.current = true;
     try {
       await cancel.mutateAsync({
         chargeId: String(canceling.id),
@@ -316,6 +318,8 @@ export default function FinancesPage() {
       setCancellationError(
         error?.message ?? "Não foi possível cancelar a cobrança."
       );
+    } finally {
+      cancellationSubmitting.current = false;
     }
   };
 
@@ -838,7 +842,7 @@ export default function FinancesPage() {
       <FormModal
         open={Boolean(canceling)}
         onOpenChange={open => {
-          if (!open) setCanceling(null);
+          if (!open && !cancellationSubmitting.current) setCanceling(null);
         }}
         title="Cancelar cobrança"
         description="Confirme a alteração de estado informando o motivo auditável."
@@ -887,6 +891,8 @@ export default function FinancesPage() {
               ref={cancellationInputRef}
               id="cancellation-reason"
               value={cancellationReason}
+              disabled={cancel.isPending}
+              maxLength={1000}
               onChange={event => setCancellationReason(event.target.value)}
               aria-invalid={Boolean(cancellationError)}
               aria-describedby={

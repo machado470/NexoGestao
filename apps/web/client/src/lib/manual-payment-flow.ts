@@ -21,7 +21,7 @@ type PaymentOutcome<T> =
   | { status: "failed"; error: unknown }
   | { status: "confirmed"; payment: T; refreshed: boolean };
 
-/** One page session: retries of the same payload share a key, including modal reopen. */
+/** Unconfirmed retries share a key; a confirmed payment ends that attempt. */
 export function createManualPaymentFlow(
   createKey: () => string = () => crypto.randomUUID()
 ) {
@@ -68,6 +68,9 @@ export function createManualPaymentFlow(
         } catch (error) {
           return { status: "failed", error };
         }
+        // An explicitly confirmed partial payment is complete. A later payment of
+        // the same amount is a new operation, even if the read refresh fails.
+        attempts.delete(fingerprint);
         // A refresh failure must never turn a confirmed payment into a retryable write.
         actions.onConfirmed(payment);
         let refreshed = false;

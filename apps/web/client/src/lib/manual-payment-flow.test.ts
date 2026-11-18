@@ -172,6 +172,38 @@ describe("manual payment attempts", () => {
       refreshed: true,
     });
   });
+  it.each([true, false])(
+    "starts a new identical partial payment after confirmation (refresh=%s)",
+    async refreshed => {
+      let nextKey = 0;
+      const flow = createManualPaymentFlow(() => `partial-${++nextKey}`);
+      const stored = new Map<string, typeof confirmation>();
+      const send = vi.fn(async (payload: ManualPaymentInput & { idempotencyKey: string }) => {
+        const existing = stored.get(payload.idempotencyKey);
+        if (existing) return { ...existing, idempotent: true };
+        const payment = { ...confirmation, paymentId: `payment-${stored.size + 1}` };
+        stored.set(payload.idempotencyKey, payment);
+        return payment;
+      });
+      const actions = {
+        send,
+        onConfirmed: vi.fn(),
+        refresh: async () => refreshed,
+      };
+      const first = await flow.run(input, actions);
+      const second = await flow.run(input, actions);
+      expect(first).toMatchObject({
+        status: "confirmed",
+        payment: { paymentId: "payment-1", idempotent: false },
+      });
+      expect(second).toMatchObject({
+        status: "confirmed",
+        payment: { paymentId: "payment-2", idempotent: false },
+      });
+      expect(stored.size).toBe(2);
+      expect(send.mock.calls.map(([payload]) => payload.idempotencyKey)).toEqual(["partial-1", "partial-2"]);
+    }
+  );
   it("rejects unsafe values before transport or generating a request key", async () => {
     const key = vi.fn();
     const flow = createManualPaymentFlow(key);
