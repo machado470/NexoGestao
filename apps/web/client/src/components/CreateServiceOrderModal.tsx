@@ -374,7 +374,7 @@ export default function CreateServiceOrderModal({
                     Criando...
                   </span>
                 ) : (
-                  "Salvar alteração"
+                  "Criar O.S."
                 )}
               </Button>
             </>

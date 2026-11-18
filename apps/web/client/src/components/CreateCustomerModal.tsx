@@ -1,3 +1,4 @@
+import { customerContinuation, type CustomerNextStep } from "@/lib/customer-continuation";
 import { useFormDiscardGuard } from "@/hooks/useFormDiscardGuard";
 import { executeCustomerUpdate as executeCustomerCreation } from "@/lib/customer-update-flow";
 import { Button } from "@/components/ui/button";
@@ -51,6 +52,7 @@ export default function CreateCustomerModal({
   const [createdCustomer, setCreatedCustomer] = useState<{
     id: string;
     name: string;
+    nextStep: CustomerNextStep;
   } | null>(null);
 
   const utils = trpc.useUtils();
@@ -132,7 +134,7 @@ export default function CreateCustomerModal({
         }),
         confirm: created => {
           confirmedCustomerId = created.id;
-          setCreatedCustomer({ id: created.id, name: created.name });
+          setCreatedCustomer({ id: created.id, name: created.name, nextStep });
           reset();
           utils.customers.list.setData(undefined, old => [created, ...(old ?? []).filter(item => item.id !== created.id)]);
           const createdId = created.id;
@@ -151,7 +153,7 @@ export default function CreateCustomerModal({
               onClick: async () => {
                 if (nextStep === "schedule")
                   return navigate(
-                    `/appointments?customerId=${createdId}&source=customer_created`
+                    `/appointments?customerId=${createdId}&source=customer_created&action=create`
                   );
                 if (nextStep === "message")
                   return navigate(
@@ -159,7 +161,7 @@ export default function CreateCustomerModal({
                   );
                 if (nextStep === "billing")
                   return navigate(
-                    `/finances?customerId=${createdId}&source=customer_created`
+                    `/finances?customerId=${createdId}&source=customer_created&action=create`
                   );
                 await onCreated?.({ id: createdId, name: createdName });
                 close();
@@ -186,11 +188,11 @@ export default function CreateCustomerModal({
                       : "Criar O.S.",
               onClick: () => {
                 if (nextStep === "schedule")
-                  return navigate(`/appointments?customerId=${createdId}`);
+                  return navigate(`/appointments?customerId=${createdId}&action=create`);
                 if (nextStep === "message")
                   return navigate(`/whatsapp?customerId=${createdId}`);
                 if (nextStep === "billing")
-                  return navigate(`/finances?customerId=${createdId}`);
+                  return navigate(`/finances?customerId=${createdId}&action=create`);
                 navigate(`/service-orders?customerId=${createdId}`);
               },
             }
@@ -220,6 +222,8 @@ export default function CreateCustomerModal({
     }
   };
 
+  const continuation = createdCustomer ? customerContinuation(createdCustomer.id, createdCustomer.nextStep) : null;
+
   return (
     <>
     <ModalFlowShell
@@ -244,8 +248,17 @@ export default function CreateCustomerModal({
             >
               Criar outro
             </Button>
+            {continuation ? (
+              <Button type="button" onClick={() => {
+                close();
+                navigate(continuation.href);
+              }}>
+                {continuation.label}
+              </Button>
+            ) : null}
             <Button
               type="button"
+              variant="outline"
               onClick={async () => {
                 track("cta_click", {
                   screen: "customers",
@@ -275,7 +288,7 @@ export default function CreateCustomerModal({
                   name: createdCustomer.name,
                 });
                 navigate(
-                  `/service-orders?customerId=${createdCustomer.id}&source=customer_created`
+                  `/service-orders?customerId=${createdCustomer.id}&source=customer_created&action=create`
                 );
               }}
             >

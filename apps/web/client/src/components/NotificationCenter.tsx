@@ -3,12 +3,13 @@ import { useNotificationStore, getIcon, getColor } from "@/stores/notificationSt
 import { X } from "lucide-react";
 
 
-export function NotificationCenter() {
+export function NotificationCenter({ inline = false, onAction }: { inline?: boolean; onAction?: () => void }) {
   const notifications = useNotificationStore(state => state.notifications);
   const remove = useNotificationStore(state => state.remove);
 
   return (
-    <div className="fixed right-4 top-4 z-50 max-w-md space-y-2">
+    <div className={inline ? "space-y-2 p-2" : "fixed right-4 top-4 z-50 hidden max-w-md space-y-2 md:block"}>
+      {inline && notifications.length > 0 ? <p className="text-xs font-medium text-[var(--text-muted)]">Avisos desta sessão</p> : null}
       {notifications.map(notification => {
         const Icon = getIcon(notification.type);
         const colorClass = getColor(notification.type);
@@ -30,10 +31,11 @@ export function NotificationCenter() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="mt-2 h-auto p-0 text-xs text-[var(--accent)]"
+                  className={inline ? "mt-2 min-h-11 whitespace-normal px-0 text-sm text-[var(--accent)]" : "mt-2 h-auto p-0 text-xs text-[var(--accent)]"}
                   onClick={() => {
                     notification.action?.onClick();
                     remove(notification.id);
+                    onAction?.();
                   }}
                 >
                   {notification.action.label}
@@ -42,8 +44,9 @@ export function NotificationCenter() {
             </div>
 
             <button
+              aria-label={`Dispensar aviso: ${notification.title}`}
               onClick={() => remove(notification.id)}
-              className="flex-shrink-0 rounded p-1 nexo-state-transition hover:bg-[var(--accent-soft)]"
+              className={inline ? "flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded hover:bg-[var(--accent-soft)]" : "flex-shrink-0 rounded p-1 nexo-state-transition hover:bg-[var(--accent-soft)]"}
             >
               <X className="h-4 w-4" />
             </button>
