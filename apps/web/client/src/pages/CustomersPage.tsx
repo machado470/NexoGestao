@@ -1045,7 +1045,6 @@ export default function CustomersPage() {
               profile.customerId
             );
             setEditingCustomerId(profile.customerId);
-            toast.success("Editor de cliente aberto.");
           },
           disabled:
             !canEditCustomer ||
@@ -2023,7 +2022,6 @@ export default function CustomersPage() {
           setPendingEditCustomerId(null);
           await customersQuery.refetch();
           if (saved?.id) setActiveCustomerId(String(saved.id));
-          toast.success("Cliente atualizado com sucesso.");
         }}
       />
       <CreateAppointmentModal

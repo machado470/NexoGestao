@@ -1,3 +1,5 @@
+import { useFormDiscardGuard } from "@/hooks/useFormDiscardGuard";
+import { transientReadOptions } from "@/lib/read-query-retry";
 import { executeCustomerUpdate } from "@/lib/customer-update-flow";
 import { customerEditDraftReducer, initialCustomerEditDraft, isCustomerEditDirty } from "@/lib/customer-edit-draft";
 import { Button } from "@/components/ui/button";
@@ -71,7 +73,7 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
     { id: idStr! },
     {
       enabled: open && !!idStr,
-      retry: false,
+      ...transientReadOptions,
       refetchOnWindowFocus: false,
     }
   );
@@ -109,8 +111,7 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
 
   const isDirty = isCustomerEditDirty(draft);
   const reloadCustomer = async () => {
-    if (updateMutation.isPending || customerQuery.isFetching) return;
-    if (isDirty && !window.confirm("Recarregar descartará suas alterações não salvas. Deseja continuar?")) return;
+    if (!session.current.open || session.current.idStr !== idStr || submitting.current || updateMutation.isPending || customerQuery.isFetching) return;
     const result = await customerQuery.refetch();
     if (!session.current.open || session.current.idStr !== idStr) return;
     const latest = normalizeCustomerPayload(result.data);
@@ -120,6 +121,20 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
     }
     dispatch({ type: "reload", ...snapshot(latest) });
   };
+
+  const closeGuard = useFormDiscardGuard({
+    open,
+    dirty: isDirty,
+    blocked: submitting.current || updateMutation.isPending,
+    guardNavigation: true,
+    onDiscard: onClose,
+  });
+  const reloadGuard = useFormDiscardGuard({
+    open,
+    dirty: isDirty,
+    blocked: submitting.current || updateMutation.isPending || customerQuery.isFetching,
+    onDiscard: () => void reloadCustomer(),
+  });
 
   const canSubmit = useMemo(() => {
     return name.trim().length >= 2 && phone.trim().length >= 10 && isDirty;
@@ -133,7 +148,7 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
   );
 
   const submit = async () => {
-    if (!idStr || submitting.current) return;
+    if (!idStr || submitting.current || customerQuery.isFetching) return;
 
     const parsed = customerSchema.safeParse({
       name: name.trim(),
@@ -187,7 +202,7 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
       const error = outcome.error;
       if (isConcurrentConflictError(error)) {
         toast.error(getConcurrencyErrorMessage("cliente"), {
-          action: { label: "Recarregar", onClick: () => void reloadCustomer() },
+          action: { label: "Recarregar", onClick: reloadGuard.requestClose },
         });
         return;
       }
@@ -197,13 +212,12 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
     }
   };
 
-  const handleClose = () => {
-    if (updateMutation.isPending) return;
-    if (isDirty && !window.confirm("Existem alterações não salvas. Deseja descartar?")) return;
-    onClose();
-  };
+  const handleClose = closeGuard.requestClose;
 
   return (
+    <>
+    {closeGuard.confirmation}
+    {reloadGuard.confirmation}
     <FormModal
       open={open}
       onOpenChange={(nextOpen) => (!nextOpen ? handleClose() : undefined)}
@@ -213,21 +227,14 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
       contentClassName="w-full max-w-[760px] border border-[var(--app-overlay-border)] bg-[var(--app-overlay-surface)] shadow-[var(--app-overlay-shadow)]"
       footer={
         <>
-          <div className="mr-auto flex flex-wrap gap-6 text-sm text-[var(--modal-section-muted)]">
-            <span>Status: <strong className="text-[var(--modal-section-text)]">{operationalSummary.status}</strong></span>
-            <span>Contato: <strong className="text-[var(--modal-section-text)]">{operationalSummary.contact}</strong></span>
-          </div>
-          <Button type="button" variant="outline" disabled={updateMutation.isPending || customerQuery.isFetching} onClick={() => void reloadCustomer()}>
-            Recarregar dados
-          </Button>
-          <Button type="button" variant="outline" onClick={handleClose}>
+          <Button type="button" variant="outline" disabled={updateMutation.isPending} onClick={handleClose}>
             Cancelar
           </Button>
 
           <Button
             type="button"
             onClick={submit}
-            disabled={updateMutation.isPending || customerQuery.isLoading || !canSubmit}
+            disabled={updateMutation.isPending || customerQuery.isFetching || !canSubmit}
             className="bg-[var(--accent-primary)] text-[var(--primary-foreground)] hover:bg-[var(--accent-primary-hover)]"
           >
             {updateMutation.isPending ? (
@@ -242,9 +249,15 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
         </>
       }
     >
-        <div className="space-y-5">
+        <fieldset disabled={updateMutation.isPending} className="min-w-0 space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-[var(--modal-section-muted)]">
+            <span>Status: <strong>{operationalSummary.status}</strong></span>
+            <Button type="button" variant="outline" disabled={updateMutation.isPending || customerQuery.isFetching} onClick={reloadGuard.requestClose}>
+              Recarregar dados
+            </Button>
+          </div>
           {customerQuery.error && customer ? <p role="alert">Não foi possível atualizar os dados. Suas alterações foram preservadas.</p> : null}
-          {customerQuery.isLoading && !customer ? (
+          {customerQuery.isFetching && !customer ? (
             <div className="flex items-center justify-center py-8 text-sm text-[var(--modal-section-muted)]">
               <Loader2 className="mr-2 h-5 w-5 animate-spin text-orange-500" />
               Carregando...
@@ -267,7 +280,7 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
               </Button>
             </div>
           ) : (
-            <Accordion type="multiple" defaultValue={["main", "advanced"]} className="space-y-3">
+            <fieldset disabled={customerQuery.isFetching} className="min-w-0"><Accordion type="multiple" defaultValue={["main", "advanced"]} className="space-y-3">
               <AccordionItem value="main" className="rounded-xl nexo-modal-section border border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] px-4">
                 <AccordionTrigger className="py-3 text-sm font-semibold text-[var(--modal-section-text)]">
                   Dados principais
@@ -314,9 +327,10 @@ export default function EditCustomerModal({ open, customerId, onClose, onSaved }
                   </div>
                 </AccordionContent>
               </AccordionItem>
-            </Accordion>
+            </Accordion></fieldset>
           )}
-        </div>
+        </fieldset>
     </FormModal>
+    </>
   );
 }

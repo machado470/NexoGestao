@@ -91,8 +91,9 @@ export default function CreateCustomerModal({
 
   const discardGuard = useFormDiscardGuard({
     open,
+    guardNavigation: true,
     dirty: !createdCustomer && (hasDraft || nextStep !== "schedule"),
-    blocked: createCustomer.isPending || submitting.current,
+    blocked: !createdCustomer && (createCustomer.isPending || submitting.current),
     onDiscard: () => {
       setCreatedCustomer(null);
       reset();
