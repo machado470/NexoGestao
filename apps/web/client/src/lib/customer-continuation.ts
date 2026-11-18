@@ -1,3 +1,5 @@
+import { can, type Role } from "./rbac";
+
 export type CustomerNextStep =
   "schedule" | "message" | "billing" | "only_register";
 
@@ -17,4 +19,16 @@ export function customerContinuation(
   return step === "schedule"
     ? { label: "Criar agendamento", href: `/appointments?${params}` }
     : { label: "Criar cobrança", href: `/finances?${params}` };
+}
+
+/** Offer only destinations the current account can use, using the canonical permissions. */
+export function canChooseCustomerNextStep(
+  role: Role | null,
+  step: CustomerNextStep
+) {
+  if (!role || !can(role, "customers:create")) return false;
+  if (step === "billing")
+    return can(role, "finance:read") && can(role, "finance:update");
+  if (step === "schedule") return can(role, "appointments:create");
+  return true;
 }
