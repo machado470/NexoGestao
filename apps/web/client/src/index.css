@@ -3846,6 +3846,20 @@ html {
   }
 }
 
+/* Keep dismiss controls inside phone toasts, with a full touch target. */
+@media (max-width: 767px) {
+  body [data-sonner-toast][data-styled="true"] { padding-right: 3.5rem; }
+  body [data-sonner-toast][data-styled="true"] [data-close-button] {
+    left: auto;
+    right: 0.25rem;
+    top: 0.25rem;
+    transform: none;
+    width: 44px;
+    height: 44px;
+    border-radius: 0.5rem;
+  }
+}
+
 /* Consistent phone module surfaces; desktop workspaces retain their structure. */
 @media (max-width: 767px) {
   .mobile-module-header { padding: 0.5rem 0.25rem 0.75rem; }

@@ -8,6 +8,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
+      closeButton
+      toastOptions={{ closeButtonAriaLabel: "Fechar aviso" }}
       style={
         {
           "--normal-bg": "var(--app-card, var(--popover))",
