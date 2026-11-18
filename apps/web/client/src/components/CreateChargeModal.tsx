@@ -1,9 +1,10 @@
+import { createChargeCreationAttempt } from "@/lib/charge-creation-attempt";
 import { useFormDiscardGuard } from "@/hooks/useFormDiscardGuard";
 import { parseLocalDateTimeInput } from "@/lib/local-date-time";
 import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
 import { parseMoneyInputToCents as parseAmountToCents } from "@/lib/money-input";
 import { Button } from "@/components/ui/button";
-import { useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 
@@ -32,6 +33,7 @@ interface CreateChargeModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  initialCustomerId?: string | null;
 }
 
 type ChargeMode = "MANUAL" | "RECURRING" | "SERVICE";
@@ -59,6 +61,10 @@ const INITIAL_FORM: FormState = {
   serviceReference: "",
   postAction: "CREATE_ONLY",
 };
+
+function initialChargeForm(customerId?: string | null): FormState {
+  return { ...INITIAL_FORM, customerId: customerId ?? "" };
+}
 
 const chargeModeLabels: Record<ChargeMode, string> = {
   MANUAL: "Cobrança manual",
@@ -99,11 +105,22 @@ export function CreateChargeModal({
   isOpen,
   onClose,
   onSuccess,
+  initialCustomerId,
 }: CreateChargeModalProps) {
   const { timezone, ready: localeReady } = useOrganizationLocale();
   const fieldId = useId();
   const [, navigate] = useLocation();
-  const [formData, setFormData] = useState<FormState>(INITIAL_FORM);
+  const [formData, setFormData] = useState<FormState>(() => initialChargeForm(initialCustomerId));
+  const baseline = useRef<FormState>(initialChargeForm(initialCustomerId));
+  const wasOpen = useRef(false);
+  const [attempt] = useState(() => createChargeCreationAttempt(() => buildIdempotencyKey("finance.create_charge")));
+  useEffect(() => {
+    if (isOpen && !wasOpen.current) {
+      baseline.current = initialChargeForm(initialCustomerId);
+      setFormData(baseline.current);
+    }
+    wasOpen.current = isOpen;
+  }, [isOpen, initialCustomerId]);
   const customerSelectRef = useRef<HTMLButtonElement | null>(null);
   const utils = trpc.useUtils();
   const { track } = useProductAnalytics();
@@ -149,13 +166,14 @@ export function CreateChargeModal({
 
   const discardGuard = useFormDiscardGuard({
     open: isOpen,
-    dirty: JSON.stringify(formData) !== JSON.stringify(INITIAL_FORM),
-    blocked: createCharge.isPending,
+    dirty: JSON.stringify(formData) !== JSON.stringify(baseline.current),
+    blocked: createCharge.isPending || attempt.pending,
     onDiscard: () => { setFormData(INITIAL_FORM); onClose(); },
   });
   const resetAndClose = discardGuard.requestClose;
 
   const submitCharge = async () => {
+    if (attempt.pending) return;
     const customerId = formData.customerId.trim();
     const amount = formData.amount.trim();
     const dueDate = formData.dueDate;
@@ -190,40 +208,17 @@ export function CreateChargeModal({
       amountCents: parsed.data.amountCents,
       dueDate: dueInstant.toISOString(),
       notes: parsed.data.notes || undefined,
-      idempotencyKey: buildIdempotencyKey(
-        "finance.create_charge",
-        parsed.data.customerId
-      ),
     };
+    const idempotencyKey = attempt.begin(payload);
+    if (!idempotencyKey) return;
 
-    const previousCharges = utils.finance.charges.list.getData(undefined);
-    const tempId = `temp-charge-${Date.now()}`;
-    utils.finance.charges.list.setData(undefined, (old: any) => {
-      const raw = old as { data: any[]; pagination: any } | undefined;
-      const optimistic = {
-        id: tempId,
-        ...payload,
-        status: "PENDING",
-        createdAt: new Date().toISOString(),
-      };
-      if (!raw || !Array.isArray(raw.data)) return undefined;
-      return { ...raw, data: [optimistic, ...raw.data] };
-    });
-
-    createCharge.mutate(payload, {
-      onSuccess: async created => {
-        utils.finance.charges.list.setData(undefined, (old: any) => {
-          const raw = old as { data: any[]; pagination: any } | undefined;
-          const applyReplace = (items: any[]) =>
-            items.map(item => (String(item?.id) === tempId ? created : item));
-          if (!raw || !Array.isArray(raw.data)) return undefined;
-          return { ...raw, data: applyReplace(raw.data) };
-        });
-
+    createCharge.mutate({ ...payload, idempotencyKey }, {
+      onSuccess: created => {
+        attempt.confirm();
         const customerId = String(
           (created as any)?.customerId ?? payload.customerId ?? ""
         );
-        await invalidateOperationalGraph(utils, customerId || undefined);
+
         const operationStatus = String(
           (created as any)?.operation?.status ?? ""
         ).toLowerCase();
@@ -231,7 +226,7 @@ export function CreateChargeModal({
         const successMessage = resolveOperationFeedback({
           operationStatus,
           degradedStatus: degraded?.status,
-          executedMessage: "Cobrança criada com contexto sincronizado.",
+          executedMessage: "Cobrança criada.",
           duplicateMessage:
             "Requisição duplicada detectada: cobrança reaproveitada com segurança.",
           retryScheduledMessage:
@@ -282,13 +277,16 @@ export function CreateChargeModal({
         });
 
         setFormData(INITIAL_FORM);
-        onSuccess();
         onClose();
+        onSuccess();
+        void invalidateOperationalGraph(utils, customerId || undefined).catch(() => {
+          toast.warning("Cobrança criada. Atualize a consulta para conferir os dados.");
+        });
       },
       onError: error => {
-        utils.finance.charges.list.setData(undefined, previousCharges as any);
         toast.error(error.message || "Erro ao criar cobrança");
       },
+      onSettled: () => attempt.settle(),
     });
   };
 

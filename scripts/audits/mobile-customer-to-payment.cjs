@@ -562,6 +562,7 @@ let page;
     exact: true,
   });
   await billingForm.waitFor();
+  await billingForm.getByRole("combobox").first().getByText(customer.name, {exact:true}).waitFor();
   assert.equal(
     writes.filter((name) => name === "finance.charges.create").length,
     0,
