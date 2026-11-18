@@ -60,14 +60,14 @@ export function useFormDiscardGuard({
   }, [open, guardNavigation, dirty, blocked]);
 
   useEffect(() => {
-    if (!open || !dirty) return;
+    if (!open || (!dirty && !blocked)) return;
     const beforeUnload = (event: BeforeUnloadEvent) => {
       event.preventDefault();
       event.returnValue = "";
     };
     window.addEventListener("beforeunload", beforeUnload);
     return () => window.removeEventListener("beforeunload", beforeUnload);
-  }, [open, dirty]);
+  }, [open, dirty, blocked]);
 
   const requestClose = () => {
     // An underlying modal can receive the same Escape; preserve the original focus.

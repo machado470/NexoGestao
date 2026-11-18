@@ -166,6 +166,7 @@ export function CreateChargeModal({
 
   const discardGuard = useFormDiscardGuard({
     open: isOpen,
+    guardNavigation: true,
     dirty: JSON.stringify(formData) !== JSON.stringify(baseline.current),
     blocked: createCharge.isPending || attempt.pending,
     onDiscard: () => { setFormData(INITIAL_FORM); onClose(); },

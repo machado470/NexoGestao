@@ -472,7 +472,11 @@ let page;
       ),
     ]);
     await page.keyboard.press("Escape");
-    await form.getByRole("button", { name: "Cancelar", exact: true }).click();
+    assert.equal(
+      await form.getByRole("button", { name: "Cancelar", exact: true }).isDisabled(),
+      true,
+      "Pending appointments disable Cancel instead of accepting a click",
+    );
     await form.getByRole("button", { name: "Close", exact: true }).click();
     assert.equal(await form.isVisible(), true);
     assert.equal(await page.getByRole("alertdialog").count(), 0);

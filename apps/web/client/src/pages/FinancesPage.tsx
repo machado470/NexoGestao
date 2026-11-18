@@ -1,3 +1,4 @@
+import { useFormDiscardGuard } from "@/hooks/useFormDiscardGuard";
 import { transientReadOptions } from "@/lib/read-query-retry";
 import { MobileModuleHeader } from "@/components/MobileModuleHeader";
 import { useCreateFromRoute } from "@/hooks/useCreateFromRoute";
@@ -173,6 +174,24 @@ export default function FinancesPage() {
   );
   const pay = trpc.finance.charges.pay.useMutation();
   const cancel = trpc.finance.charges.cancel.useMutation();
+  const paymentDiscard = useFormDiscardGuard({
+    open: Boolean(paying),
+    dirty: Boolean(paying) && (
+      amountCents !== (typeof paying?.balanceCents === "number" ? String(paying.balanceCents) : "") ||
+      method !== "PIX"
+    ),
+    blocked: paymentSubmitting || paymentFlow.pending,
+    guardNavigation: true,
+    onDiscard: () => setPaying(null),
+  });
+  const cancellationDiscard = useFormDiscardGuard({
+    open: Boolean(canceling),
+    dirty: cancellationReason.length > 0,
+    blocked: cancel.isPending || cancellationSubmitting.current,
+    guardNavigation: true,
+    onDiscard: () => setCanceling(null),
+  });
+
   const charges = normalizeArrayPayload<Charge>(chargesQuery.data);
   const queue = normalizeArrayPayload<Charge>(queueQuery.data);
   const stats = statsQuery.data as any;
@@ -764,10 +783,12 @@ export default function FinancesPage() {
         )}
       </AppSectionBlock>
 
+      {paymentDiscard.confirmation}
+      {cancellationDiscard.confirmation}
       <FormModal
         open={Boolean(paying)}
         onOpenChange={open => {
-          if (!open && !paymentFlow.pending) setPaying(null);
+          if (!open && !paymentFlow.pending) paymentDiscard.requestClose();
         }}
         title="Registrar pagamento manual"
         description={`Cobrança de ${factualLabel(paying?.customer?.name, "cliente não informado")}. Saldo oficial: ${money(paying?.balanceCents, paying?.currency)}`}
@@ -779,7 +800,7 @@ export default function FinancesPage() {
               type="button"
               variant="outline"
               disabled={paymentSubmitting}
-              onClick={() => setPaying(null)}
+              onClick={paymentDiscard.requestClose}
             >
               Voltar
             </Button>
@@ -842,7 +863,7 @@ export default function FinancesPage() {
       <FormModal
         open={Boolean(canceling)}
         onOpenChange={open => {
-          if (!open && !cancellationSubmitting.current) setCanceling(null);
+          if (!open && !cancellationSubmitting.current) cancellationDiscard.requestClose();
         }}
         title="Cancelar cobrança"
         description="Confirme a alteração de estado informando o motivo auditável."
@@ -854,7 +875,7 @@ export default function FinancesPage() {
               type="button"
               variant="outline"
               disabled={cancel.isPending}
-              onClick={() => setCanceling(null)}
+              onClick={cancellationDiscard.requestClose}
             >
               Voltar
             </Button>
