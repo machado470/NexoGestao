@@ -3,7 +3,7 @@ import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
 import { parseMoneyInputToCents } from "@/lib/money-input";
 import { parseLocalDateTimeInput } from "@/lib/local-date-time";
 import { Button } from "@/components/ui/button";
-import { useId, useEffect, useMemo, useState } from "react";
+import { useId, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 
@@ -112,6 +112,7 @@ export default function CreateServiceOrderModal({
     customerId: initialCustomerId ? String(initialCustomerId) : "",
   });
 
+  const submitting = useRef(false);
   const createMutation = trpc.serviceOrders.create.useMutation();
   useCriticalActionGuard({
     isPending: createMutation.isPending,
@@ -138,7 +139,7 @@ export default function CreateServiceOrderModal({
   const discardGuard = useFormDiscardGuard({
     open: resolvedOpen,
     dirty: !createdServiceOrder && isDirty,
-    blocked: createMutation.isPending,
+    blocked: submitting.current || createMutation.isPending,
     onDiscard: () => {
       setCreatedServiceOrder(null);
       setFormData({ ...INITIAL_FORM, customerId: initialCustomerId ? String(initialCustomerId) : "" });
@@ -161,6 +162,7 @@ export default function CreateServiceOrderModal({
   }, [assigneeWarningTelemetry.reset, initialCustomerId, resolvedOpen]);
 
   const submit = async () => {
+    if (submitting.current || createdServiceOrder) return;
     const priority = Number(formData.priority);
     if (!Number.isFinite(priority)) {
       toast.error("Prioridade inválida.");
@@ -221,15 +223,9 @@ export default function CreateServiceOrderModal({
 
     assigneeWarningTelemetry.trackConfirmed(payload.assignedToPersonId);
 
+    submitting.current = true;
     createMutation.mutate(payload, {
-      onSuccess: async created => {
-        await invalidateOperationalGraph(
-          utils,
-          payload.customerId,
-          String((created as any)?.id ?? "")
-        );
-        await utils.dashboard.alerts.invalidate();
-
+      onSuccess: created => {
         setCreatedServiceOrder({
           id: String((created as any)?.id ?? ""),
           title: created.title,
@@ -266,20 +262,19 @@ export default function CreateServiceOrderModal({
               ),
           }
         );
+        void Promise.all([
+          invalidateOperationalGraph(utils, payload.customerId, String(created.id)),
+          utils.dashboard.alerts.invalidate(),
+        ]).catch(() => toast.warning("O.S. criada. Atualize a consulta para conferir os dados."));
       },
       onError: error => {
         toast.error(error.message || "Erro ao criar ordem de serviço");
         notify.error(
           "Falha ao criar O.S.",
-          "Você pode revisar os dados e tentar novamente sem recarregar a tela.",
-          {
-            label: "Tentar novamente",
-            onClick: () => {
-              void submit();
-            },
-          }
+          "Revise os dados preservados no formulário. Se a resposta foi interrompida, confira a lista antes de repetir."
         );
       },
+      onSettled: () => { submitting.current = false; },
     });
   };
 

@@ -287,6 +287,7 @@ export default function AppointmentsPage() {
     () => normalizeArrayPayload<any>(timelineQuery.data),
     [timelineQuery.data]
   );
+  const savingAppointment = useRef(false);
   const createMutation = trpc.appointments.create.useMutation();
   const updateMutation = trpc.appointments.update.useMutation();
   const assigneeWarningTelemetry = useAssigneeWarningTelemetry("APPOINTMENT");
@@ -338,12 +339,13 @@ export default function AppointmentsPage() {
   const discardGuard = useFormDiscardGuard({
     open: openModal,
     dirty: JSON.stringify(form) !== JSON.stringify(initialForm.current),
-    blocked: createMutation.isPending || updateMutation.isPending,
+    blocked: savingAppointment.current || createMutation.isPending || updateMutation.isPending,
     onDiscard: () => { setOpenModal(false); setEditing(null); },
   });
 
   async function saveAppointment(event: React.FormEvent) {
     event.preventDefault();
+    if (savingAppointment.current) return;
     if (!localeReady) { toast.error("Aguarde a confirmação do fuso da empresa."); return; }
     const startsAt = parseLocalDateTimeInput(
       `${form.date}T${form.time}`,
@@ -358,6 +360,7 @@ export default function AppointmentsPage() {
       startsAt.getTime() +
         Math.max(15, Number(form.durationMinutes) || 60) * 60000
     );
+    savingAppointment.current = true;
     try {
       const assignedToPersonId =
         form.assignedToPersonId === "unassigned"
@@ -387,8 +390,6 @@ export default function AppointmentsPage() {
           notes: form.notes.trim() || undefined,
         });
       }
-      await utils.appointments.list.invalidate();
-      await utils.appointments.page.invalidate();
       setSuccessMessage(
         editing
           ? "Agendamento atualizado com sucesso."
@@ -396,8 +397,14 @@ export default function AppointmentsPage() {
       );
       setOpenModal(false);
       setEditing(null);
+      void Promise.all([
+        utils.appointments.list.invalidate(),
+        utils.appointments.page.invalidate(),
+      ]).catch(() => toast.warning("Agendamento salvo. Atualize a consulta para conferir os dados."));
     } catch (error: any) {
       toast.error(error?.message ?? "Falha ao salvar agendamento.");
+    } finally {
+      savingAppointment.current = false;
     }
   }
 
@@ -970,6 +977,7 @@ export default function AppointmentsPage() {
               <Button
                 type="button"
                 variant="outline"
+                disabled={createMutation.isPending || updateMutation.isPending}
                 onClick={discardGuard.requestClose}
               >
                 Cancelar
