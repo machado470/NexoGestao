@@ -1,3 +1,5 @@
+import { useAuth } from "@/contexts/AuthContext";
+import { can } from "@/lib/rbac";
 import { useFormDiscardGuard } from "@/hooks/useFormDiscardGuard";
 import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
 import { parseMoneyInputToCents } from "@/lib/money-input";
@@ -98,6 +100,8 @@ export default function CreateServiceOrderModal({
   const { timezone, ready: localeReady } = useOrganizationLocale();
   const fieldId = useId();
   const [, navigate] = useLocation();
+  const { role } = useAuth();
+  const canReadFinance = role ? can(role, "finance:read") : false;
   const utils = trpc.useUtils();
   const { track } = useProductAnalytics();
   const assigneeWarningTelemetry = useAssigneeWarningTelemetry("SERVICE_ORDER");
@@ -253,12 +257,12 @@ export default function CreateServiceOrderModal({
         });
         notify.successPersistent(
           "O.S. criada com sucesso",
-          "Próximo passo: gerar a cobrança para transformar execução em receita.",
+          canReadFinance ? "Próximo passo: gerar a cobrança para transformar execução em receita." : "Abra a O.S. para acompanhar a execução do serviço.",
           {
-            label: "Ir para Financeiro",
+            label: canReadFinance ? "Ir para Financeiro" : "Ver O.S.",
             onClick: () =>
               navigate(
-                `/finances?serviceOrderId=${String((created as any)?.id ?? "")}`
+                canReadFinance ? `/finances?serviceOrderId=${String((created as any)?.id ?? "")}` : buildServiceOrdersDeepLink(String(created.id))
               ),
           }
         );

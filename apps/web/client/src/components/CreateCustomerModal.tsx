@@ -1,4 +1,5 @@
-import { customerContinuation, type CustomerNextStep } from "@/lib/customer-continuation";
+import { useAuth } from "@/contexts/AuthContext";
+import { customerContinuation, canChooseCustomerNextStep, type CustomerNextStep } from "@/lib/customer-continuation";
 import { useFormDiscardGuard } from "@/hooks/useFormDiscardGuard";
 import { executeCustomerUpdate as executeCustomerCreation } from "@/lib/customer-update-flow";
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,7 @@ export default function CreateCustomerModal({
   onCreated,
 }: Props) {
   const [, navigate] = useLocation();
+  const { role } = useAuth();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -101,6 +103,10 @@ export default function CreateCustomerModal({
 
   const submit = async () => {
     if (submitting.current || createdCustomer) return;
+    if (!canChooseCustomerNextStep(role, nextStep)) {
+      toast.error("Escolha uma próxima ação disponível para seu acesso.");
+      return;
+    }
     const parsed = customerSchema.safeParse({
       name: name.trim(),
       phone: phone.trim(),
@@ -222,7 +228,7 @@ export default function CreateCustomerModal({
     }
   };
 
-  const continuation = createdCustomer ? customerContinuation(createdCustomer.id, createdCustomer.nextStep) : null;
+  const continuation = createdCustomer && canChooseCustomerNextStep(role, createdCustomer.nextStep) ? customerContinuation(createdCustomer.id, createdCustomer.nextStep) : null;
 
   return (
     <>
@@ -445,7 +451,7 @@ export default function CreateCustomerModal({
                     label: "Apenas cadastrar",
                     hint: "Finaliza cadastro sem próxima ação automática.",
                   },
-                ].map(option => (
+                ].filter(option => canChooseCustomerNextStep(role, option.id)).map(option => (
                   <button
                     key={option.id}
                     type="button"

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { customerContinuation } from "./customer-continuation";
+import {
+  customerContinuation,
+  canChooseCustomerNextStep,
+} from "./customer-continuation";
 
 describe("confirmed customer continuation", () => {
   it.each([
@@ -34,4 +37,32 @@ describe("confirmed customer continuation", () => {
     expect(url.searchParams.get("customerId")).toBe("customer &action=delete");
     expect(url.searchParams.getAll("action")).toEqual(["create"]);
   });
+});
+
+describe("customer continuation permissions", () => {
+  it.each([
+    ["ADMIN", true],
+    ["MANAGER", true],
+    ["STAFF", false],
+    ["VIEWER", false],
+    [null, false],
+  ] as const)(
+    "offers billing to %s only with canonical finance access",
+    (role, allowed) => {
+      expect(canChooseCustomerNextStep(role, "billing")).toBe(allowed);
+    }
+  );
+  it.each(["schedule", "message", "only_register"] as const)(
+    "keeps %s for staff",
+    step => {
+      expect(canChooseCustomerNextStep("STAFF", step)).toBe(true);
+    }
+  );
+  it.each(["schedule", "message", "billing", "only_register"] as const)(
+    "does not offer creation continuation %s to viewers",
+    step => {
+      expect(canChooseCustomerNextStep("VIEWER", step)).toBe(false);
+      expect(canChooseCustomerNextStep(null, step)).toBe(false);
+    }
+  );
 });
