@@ -142,6 +142,7 @@ export default function CreateServiceOrderModal({
 
   const discardGuard = useFormDiscardGuard({
     open: resolvedOpen,
+    guardNavigation: true,
     dirty: !createdServiceOrder && isDirty,
     blocked: submitting.current || createMutation.isPending,
     onDiscard: () => {

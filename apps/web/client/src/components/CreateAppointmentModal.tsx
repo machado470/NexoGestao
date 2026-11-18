@@ -120,6 +120,7 @@ export function CreateAppointmentModal({
 
   const discardGuard = useFormDiscardGuard({
     open: isOpen,
+    guardNavigation: true,
     dirty: JSON.stringify(formData) !== JSON.stringify(initialForm.current),
     blocked: createAppointment.isPending,
     onDiscard: () => { setFormData(INITIAL_FORM); onClose(); },
