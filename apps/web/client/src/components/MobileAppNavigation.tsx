@@ -1,4 +1,4 @@
-import type { ComponentType } from "react";
+import { useEffect, useState, type ComponentType } from "react";
 import { House, Menu } from "lucide-react";
 import {
   Dialog,
@@ -38,6 +38,25 @@ export function MobileAppNavigation({
   theme: string;
   onThemeToggle: () => void;
 }) {
+  const [searchViewport, setSearchViewport] = useState<{ top: number; height: number } | null>(null);
+  useEffect(() => {
+    if (!searchOpen) return;
+    const viewport = window.visualViewport;
+    const update = () => setSearchViewport({
+      top: viewport?.offsetTop ?? 0,
+      height: viewport?.height ?? window.innerHeight,
+    });
+    update();
+    viewport?.addEventListener("resize", update);
+    viewport?.addEventListener("scroll", update);
+    window.addEventListener("resize", update);
+    return () => {
+      viewport?.removeEventListener("resize", update);
+      viewport?.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+    };
+  }, [searchOpen]);
+
   const ids = [
     "dashboard",
     "appointments",
@@ -128,8 +147,14 @@ export function MobileAppNavigation({
         </DialogContent>
       </Dialog>
       <Dialog open={searchOpen} onOpenChange={onSearchChange}>
-        <DialogContent className="mobile-navigation-dialog top-[15%] translate-y-0 overflow-visible bg-[var(--app-overlay-surface,#152036)] text-[var(--app-overlay-text,#f0f4ff)]">
-          <DialogHeader>
+        <DialogContent
+          className="mobile-navigation-dialog flex flex-col translate-y-0 overflow-hidden bg-[var(--app-overlay-surface,#152036)] text-[var(--app-overlay-text,#f0f4ff)]"
+          style={{
+            top: `calc(${(searchViewport?.top ?? 0) + 12}px + env(safe-area-inset-top, 0px))`,
+            maxHeight: `calc(${searchViewport ? `${Math.max(0, searchViewport.height - 24)}px` : "100dvh - 24px"} - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))`,
+          }}
+        >
+          <DialogHeader className="shrink-0">
             <DialogTitle>Buscar</DialogTitle>
           </DialogHeader>
           <GlobalSearch compact onNavigate={() => onSearchChange(false)} />

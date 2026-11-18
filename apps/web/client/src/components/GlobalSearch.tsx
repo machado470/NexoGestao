@@ -132,9 +132,9 @@ export function GlobalSearch({
   };
 
   return (
-    <div ref={searchRef} className="relative min-w-0 w-full">
+    <div ref={searchRef} className={`relative min-w-0 w-full ${compact ? "flex min-h-0 flex-col" : ""}`}>
       <div
-        className="nexo-search-input relative min-w-0 h-11"
+        className="nexo-search-input relative min-w-0 h-11 shrink-0"
         style={{
           backgroundColor: "var(--field-bg)",
           borderColor: "var(--field-border)",
@@ -180,7 +180,7 @@ export function GlobalSearch({
 
       {isOpen && canQuery && (
         <div
-          className={`nexo-floating-panel z-50 mt-2 overflow-hidden rounded-[var(--radius-surface)] p-1 ${compact ? "relative" : "absolute left-0 right-0 top-full max-h-96"}`}
+          className={`nexo-floating-panel z-50 mt-2 overflow-hidden rounded-[var(--radius-surface)] p-1 ${compact ? "relative flex min-h-0 flex-col overflow-y-auto overscroll-contain" : "absolute left-0 right-0 top-full max-h-96"}`}
           style={{
             backgroundColor: "var(--app-overlay-surface)",
             borderColor: "var(--app-overlay-border)",
@@ -207,7 +207,7 @@ export function GlobalSearch({
             </div>
           ) : results.length > 0 ? (
             <div
-              className="max-h-[min(24rem,45dvh)] overflow-y-auto"
+              className={compact ? "min-h-0 overflow-y-auto overscroll-contain" : "max-h-[min(24rem,45dvh)] overflow-y-auto"}
               data-scrollbar="nexo"
             >
               {results.map(result => (
