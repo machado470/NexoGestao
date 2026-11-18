@@ -565,7 +565,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                             onSelect={evt => {
                               evt.preventDefault();
                               if (!item.read) markNotificationRead.mutate({ id: item.id });
-                              if (safeRouteHint) navigate(safeRouteHint);
+                              if (safeRouteHint) { setNotificationMenuOpen(false); navigate(safeRouteHint); }
                             }}
                           >
                             <p className="text-sm font-medium text-[var(--text-primary)]">{item.title}</p>
