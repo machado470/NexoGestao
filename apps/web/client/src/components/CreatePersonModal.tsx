@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useFormDiscardGuard } from "@/hooks/useFormDiscardGuard";
+import { useEffect, useRef, useState } from "react";
 import { Loader2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
@@ -35,6 +36,7 @@ export default function CreatePersonModal({
   onClose,
   onSaved,
 }: Props) {
+  const saving = useRef(false);
   const [formData, setFormData] = useState<FormData>(DEFAULT_FORM);
 
   useEffect(() => {
@@ -49,12 +51,20 @@ export default function CreatePersonModal({
       });
       toast.success("Pessoa criada com sucesso.");
       setFormData(DEFAULT_FORM);
-      onSaved();
       onClose();
+      onSaved();
     },
     onError: error => {
       toast.error(error.message || "Erro ao criar pessoa.");
     },
+    onSettled: () => { saving.current = false; },
+  });
+
+  const closeGuard = useFormDiscardGuard({
+    open,
+    dirty: Object.values(formData).some(value => value.trim() !== ""),
+    blocked: saving.current || createPerson.isPending,
+    onDiscard: () => { setFormData(DEFAULT_FORM); onClose(); },
   });
 
   const handleChange = (field: keyof FormData, value: string) => {
@@ -63,6 +73,7 @@ export default function CreatePersonModal({
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
+    if (saving.current) return;
 
     const name = formData.name.trim();
     const role = formData.role.trim();
@@ -78,6 +89,7 @@ export default function CreatePersonModal({
       return;
     }
 
+    saving.current = true;
     createPerson.mutate({
       name,
       role,
@@ -86,10 +98,11 @@ export default function CreatePersonModal({
   };
 
   return (
+    <>
     <FormModal
       open={open}
       onOpenChange={nextOpen => {
-        if (!nextOpen) onClose();
+        if (!nextOpen) closeGuard.requestClose();
       }}
       size="md"
       closeBlocked={createPerson.isPending}
@@ -105,7 +118,7 @@ export default function CreatePersonModal({
           <Button
             type="button"
             variant="outline"
-            onClick={onClose}
+            onClick={closeGuard.requestClose}
             disabled={createPerson.isPending}
           >
             Cancelar
@@ -127,6 +140,7 @@ export default function CreatePersonModal({
       }
     >
       <AppForm id="create-person-form" onSubmit={handleSubmit}>
+        <fieldset disabled={createPerson.isPending} className="min-w-0 space-y-4">
         <AppField label="Nome" htmlFor="person-name">
           <AppInput
             id="person-name"
@@ -154,7 +168,10 @@ export default function CreatePersonModal({
             placeholder="Ex: pessoa@empresa.com"
           />
         </AppField>
+        </fieldset>
       </AppForm>
     </FormModal>
+    {closeGuard.confirmation}
+    </>
   );
 }

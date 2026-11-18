@@ -1,3 +1,4 @@
+import { transientReadOptions } from "@/lib/read-query-retry";
 import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
 import { formatOrganizationDate, type Instant } from "@/lib/organization-locale";
 import { ResponsiveDetails } from "@/components/ResponsiveDetails";
@@ -234,16 +235,16 @@ export default function PeoplePage() {
 
   const summaryQuery = trpc.people.operationalSummary.useQuery(undefined, {
     enabled: isAuthenticated,
-    retry: false,
+    ...transientReadOptions,
     refetchOnWindowFocus: false,
   });
   const timelineQuery = trpc.timeline.listByOrg.useQuery(
     { limit: 5 },
-    { enabled: isAuthenticated, retry: false, refetchOnWindowFocus: false }
+    { enabled: isAuthenticated, ...transientReadOptions, refetchOnWindowFocus: false }
   );
   const exceptionsQuery = trpc.people.listAvailabilityExceptions.useQuery(
     { personId: selectedPersonId ?? "" },
-    { enabled: isAuthenticated && Boolean(selectedPersonId), retry: false }
+    { enabled: isAuthenticated && Boolean(selectedPersonId), ...transientReadOptions }
   );
   const createAvailabilityException =
     trpc.people.createAvailabilityException.useMutation({
@@ -478,9 +479,9 @@ export default function PeoplePage() {
           className={`min-w-0 xl:col-span-7 ${mobile.listClass}`}
           compact
         >
-          {summaryQuery.isLoading ? (
+          {summaryQuery.isLoading || (summaryQuery.isFetching && !payload) ? (
             <AppPageLoadingState description="Carregando equipe..." />
-          ) : summaryQuery.error ? (
+          ) : summaryQuery.error && !summaryQuery.isFetching ? (
             <AppPageErrorState
               description="O resumo operacional da equipe está indisponível; nenhuma normalidade foi inferida."
               actionLabel="Tentar novamente"

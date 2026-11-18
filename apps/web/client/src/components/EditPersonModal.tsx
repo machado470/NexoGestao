@@ -1,3 +1,5 @@
+import { transientReadOptions } from "@/lib/read-query-retry";
+import { useFormDiscardGuard } from "@/hooks/useFormDiscardGuard";
 import { emptyPersonForm, initialPersonEditSession, personEditSessionReducer, type PersonEditValues } from "@/lib/person-edit-session";
 import { parsePlannedCapacityInput } from "@/lib/planned-capacity-input";
 import { useEffect, useMemo, useReducer, useRef } from "react";
@@ -108,6 +110,7 @@ export default function EditPersonModal({
   onClose,
   onSaved,
 }: Props) {
+  const saving = useRef(false);
   const utils = trpc.useUtils();
   const canLoad = open && Boolean(personId);
 
@@ -115,7 +118,7 @@ export default function EditPersonModal({
     { id: String(personId) },
     {
       enabled: canLoad,
-      retry: false,
+      ...transientReadOptions,
       refetchOnWindowFocus: false,
     }
   );
@@ -144,8 +147,8 @@ export default function EditPersonModal({
     onSuccess: saved => {
       utils.people.getById.setData({ id: String(personId) }, saved);
       toast.success("Pessoa atualizada com sucesso.");
-      onSaved();
       onClose();
+      onSaved();
     },
     onError: error => {
       if (isConcurrentConflictError(error)) {
@@ -160,6 +163,20 @@ export default function EditPersonModal({
 
       toast.error(error.message || "Erro ao atualizar pessoa.");
     },
+    onSettled: () => { saving.current = false; },
+  });
+
+  const closeGuard = useFormDiscardGuard({
+    open,
+    dirty: hasChanges,
+    blocked: saving.current || updatePerson.isPending,
+    onDiscard: onClose,
+  });
+  const resetGuard = useFormDiscardGuard({
+    open,
+    dirty: hasChanges,
+    blocked: saving.current || updatePerson.isPending,
+    onDiscard: () => dispatch({ type: "discard" }),
   });
 
   const handleChange = (field: keyof FormData, value: string | boolean) => {
@@ -179,6 +196,7 @@ export default function EditPersonModal({
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
+    if (saving.current) return;
 
     if (!personId) {
       toast.error("Pessoa inválida.");
@@ -212,6 +230,7 @@ export default function EditPersonModal({
       return;
     }
 
+    saving.current = true;
     updatePerson.mutate({
       id: String(personId),
       name,
@@ -228,10 +247,11 @@ export default function EditPersonModal({
   const unavailable = session.id !== personId || !personData;
 
   return (
+    <>
     <FormModal
       open={open}
       onOpenChange={nextOpen => {
-        if (!nextOpen) onClose();
+        if (!nextOpen) closeGuard.requestClose();
       }}
       size="md"
       closeBlocked={updatePerson.isPending}
@@ -243,8 +263,8 @@ export default function EditPersonModal({
       }
       description="Atualize cadastro e capacidade planejada da pessoa."
       footer={
-        personQuery.isLoading || unavailable ? (
-          <Button type="button" variant="outline" onClick={onClose}>
+        personQuery.isLoading || (personQuery.isFetching && !personData) || unavailable ? (
+          <Button type="button" variant="outline" onClick={closeGuard.requestClose}>
             Fechar
           </Button>
         ) : (
@@ -253,11 +273,10 @@ export default function EditPersonModal({
               {hasChanges ? "Alterações pendentes" : "Nada para salvar"}
             </span>
 
-            <Button type="button" variant="outline" disabled={updatePerson.isPending || personQuery.isFetching} onClick={() => void reloadPerson()}>Recarregar dados</Button>
             <Button
               type="button"
               variant="outline"
-              onClick={() => dispatch({ type: "discard" })}
+              onClick={resetGuard.requestClose}
               disabled={!hasChanges || updatePerson.isPending}
             >
               Descartar
@@ -280,13 +299,18 @@ export default function EditPersonModal({
         )
       }
     >
-      {personQuery.isLoading ? (
+      {personQuery.isLoading || (personQuery.isFetching && !personData) ? (
         <AppLoadingState label="Carregando dados da pessoa..." />
       ) : unavailable ? (
-        <AppErrorState message="Não foi possível carregar os dados da pessoa." />
+        <div className="space-y-3">
+          <AppErrorState message="Não foi possível carregar os dados da pessoa." />
+          <Button type="button" variant="outline" disabled={personQuery.isFetching} onClick={() => void personQuery.refetch()}>Tentar novamente</Button>
+        </div>
       ) : (
         <AppForm id="edit-person-form" onSubmit={handleSubmit}>
+          <fieldset disabled={updatePerson.isPending} className="min-w-0 space-y-4">
           {personQuery.isError ? <p role="alert" className="text-sm text-destructive">Não foi possível atualizar os dados. Suas alterações foram preservadas.</p> : null}
+          <Button type="button" variant="outline" className="min-h-11" disabled={updatePerson.isPending || personQuery.isFetching} onClick={() => void reloadPerson()}>Recarregar dados</Button>
           <AppField label="Nome" htmlFor="edit-person-name">
             <AppInput
               id="edit-person-name"
@@ -381,8 +405,12 @@ export default function EditPersonModal({
               Pessoa ativa
             </label>
           </AppField>
+          </fieldset>
         </AppForm>
       )}
     </FormModal>
+    {closeGuard.confirmation}
+    {resetGuard.confirmation}
+    </>
   );
 }
