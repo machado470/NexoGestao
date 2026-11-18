@@ -898,6 +898,7 @@ export default function FinancesPage() {
       </FormModal>
 
       <CreateChargeModal
+        initialCustomerId={customerId}
         isOpen={openCreate}
         onClose={() => setOpenCreate(false)}
         onSuccess={() => {
