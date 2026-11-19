@@ -29,4 +29,4 @@ Auditoria de navegador: Vite em 5173, harness `apps/api/test/commerce-local-api.
 
 ## Próximo incremento
 
-Aceite do cliente por fluxo próprio, garantia/retrabalho e materiais permanecem no plano consolidado. Não declarar a etapa inteira de execução comprovada concluída apenas com fotos e checklist.
+Aceite por link de acesso recebeu o incremento documentado em `docs/SERVICE_ORDER_CUSTOMER_ACCEPTANCE_AUDIT.md`. Garantia/retrabalho, identidade verificada e materiais permanecem no plano consolidado. Não declarar a etapa inteira de execução comprovada concluída apenas com estas entregas iniciais.

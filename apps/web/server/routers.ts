@@ -1,4 +1,5 @@
 import { commerceRouter } from "./routers/commerce";
+import { serviceAcceptanceRouter } from './routers/service-acceptance';
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
@@ -35,6 +36,7 @@ import { whatsappRouter } from "./routers/whatsapp";
 const SESSION_COOKIES = ["nexo_token", "token", "auth_token"] as const;
 
 export const appRouter = router({
+  serviceAcceptance: serviceAcceptanceRouter,
   system: systemRouter,
 
   nexo: nexoProxyRouter,
