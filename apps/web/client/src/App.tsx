@@ -51,6 +51,7 @@ const GovernancePage = lazy(() => import("./pages/GovernancePage"));
 const InventoryPage = lazy(() => import("./pages/CommercePages").then(m => ({ default: m.InventoryPage })));
 const FiscalPage = lazy(() => import("./pages/CommercePages").then(m => ({ default: m.FiscalPage })));
 const FinancialHealthPage = lazy(() => import("./pages/CommercePages").then(m => ({ default: m.FinancialHealthPage })));
+const ServiceAcceptancePage = lazy(() => import('./pages/ServiceAcceptancePage'));
 const FinancesPage = lazy(() => import("./pages/FinancesPage"));
 const ExecutiveDashboard = lazy(() => import("./pages/ExecutiveDashboard"));
 const WhatsAppPage = lazy(() => import("./pages/WhatsAppPage"));
@@ -641,6 +642,7 @@ function Router() {
       "/billing",
       "/cockpit",
       "/onboarding",
+      "/service-acceptance",
     ];
     const isAppRoute = appPrefixes.some(
       prefix => location === prefix || location.startsWith(`${prefix}/`)
@@ -669,6 +671,7 @@ function Router() {
       </Route>
 
       <Route path="/login" component={LoginRoute} />
+      <Route path="/service-acceptance"><Suspense fallback={<div role="status">Carregando...</div>}><ServiceAcceptancePage /></Suspense></Route>
 
       <Route path="/register" component={RegisterRoute} />
 

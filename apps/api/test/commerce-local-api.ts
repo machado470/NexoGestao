@@ -9,6 +9,8 @@ import { CommerceController } from "../src/commerce/commerce.controller";
 import { CommerceService } from "../src/commerce/commerce.service";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { JwtAuthGuard } from "../src/auth/jwt-auth.guard";
+import { ConfigService } from '@nestjs/config';
+import { ServiceOrderAcceptanceController, PublicServiceAcceptanceController, ServiceOrderAcceptanceService } from '../src/service-orders/service-order-acceptance';
 import { ServiceOrderEvidenceController, ServiceOrderEvidenceService } from '../src/service-orders/service-order-evidence';
 import { ServiceOrderChecklistController, ServiceOrderChecklistService } from '../src/service-orders/service-order-checklist';
 const url = "postgresql://nexo@127.0.0.1:55439/postgres";
@@ -45,7 +47,7 @@ async function main() {
     },
   });
   const order = await db.serviceOrder.create({
-    data: { orgId, customerId: customer.id, title: "Manutenção da validação", status: 'IN_PROGRESS' },
+    data: { orgId, customerId: customer.id, title: "Manutenção da validação", status: process.env.ACCEPTANCE_AUDIT === '1' ? 'DONE' : 'IN_PROGRESS' },
   });
   const charge = await db.charge.create({
     data: {
@@ -77,8 +79,8 @@ async function main() {
     },
   });
   const module = await Test.createTestingModule({
-    controllers: [CommerceController, ServiceOrderEvidenceController, ServiceOrderChecklistController],
-    providers: [CommerceService, ServiceOrderEvidenceService, ServiceOrderChecklistService, { provide: PrismaService, useValue: db }],
+    controllers: [CommerceController, ServiceOrderEvidenceController, ServiceOrderChecklistController, ServiceOrderAcceptanceController, PublicServiceAcceptanceController],
+    providers: [CommerceService, ServiceOrderEvidenceService, ServiceOrderChecklistService, ServiceOrderAcceptanceService, { provide: PrismaService, useValue: db }, { provide: ConfigService, useValue: new ConfigService({ JWT_SECRET: 'isolated-browser-harness-secret-not-production' }) }],
   })
     .overrideGuard(JwtAuthGuard)
     .useValue({
@@ -112,6 +114,7 @@ async function main() {
   const shutdown = async () => {
     await app.close();
     const where = { orgId };
+    await db.serviceOrderAcceptance.deleteMany({ where });
     await db.serviceOrderChecklistItem.deleteMany({ where });
     await db.serviceOrderEvidence.deleteMany({ where });
     await db.timelineEvent.deleteMany({ where });
