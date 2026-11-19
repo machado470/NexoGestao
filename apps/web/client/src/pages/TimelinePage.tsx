@@ -1,3 +1,4 @@
+import { transientReadOptions } from "@/lib/read-query-retry";
 import { MobileModuleHeader } from "@/components/MobileModuleHeader";
 import { ResponsiveDetails } from "@/components/ResponsiveDetails";
 import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
@@ -139,7 +140,7 @@ export default function TimelinePage() {
 
   const query = trpc.timeline.listByOrg.useQuery(
     { limit: PAGE_SIZE },
-    { enabled: isAuthenticated, retry: false }
+    { enabled: isAuthenticated, ...transientReadOptions }
   );
   const events = normalizeArrayPayload<OfficialTimelineEvent>(query.data);
 
@@ -294,7 +295,7 @@ export default function TimelinePage() {
         title="Trilha de auditoria"
         subtitle="A ordem relativa é exatamente a recebida da fonte oficial."
       >
-        {query.isLoading ? (
+        {query.isLoading || (query.isFetching && query.isError) ? (
           <AppPageLoadingState
             title="Carregando eventos"
             description="Consultando a trilha oficial sem interromper o restante da página."
