@@ -1,3 +1,4 @@
+import { commerceRouter } from "./routers/commerce";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
@@ -38,6 +39,7 @@ export const appRouter = router({
 
   nexo: nexoProxyRouter,
 
+  commerce: commerceRouter,
   finance: financeRouter,
   people: peopleRouter,
   governance: governanceRouter,

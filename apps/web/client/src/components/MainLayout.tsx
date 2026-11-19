@@ -14,6 +14,9 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Package,
+  ReceiptText,
+  HeartPulse,
   CreditCard,
   DollarSign,
   History,
@@ -208,6 +211,15 @@ export function MainLayout({ children }: MainLayoutProps) {
           route: "/finances",
           icon: DollarSign,
           permissions: ["finance:read"],
+        },
+        {
+          id: "inventory", label: "Estoque", route: "/inventory", icon: Package, permissions: ["inventory:manage"],
+        },
+        {
+          id: "fiscal", label: "Notas fiscais", route: "/fiscal", icon: ReceiptText, permissions: ["fiscal:manage"],
+        },
+        {
+          id: "financial-health", label: "Saúde financeira", route: "/financial-health", icon: HeartPulse, permissions: ["financial-health:read"],
         },
         {
           id: "whatsapp",

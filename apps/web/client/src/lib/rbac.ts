@@ -1,6 +1,9 @@
 export type Role = 'ADMIN' | 'MANAGER' | 'STAFF' | 'VIEWER'
 
 export type Permission =
+  | 'inventory:manage'
+  | 'fiscal:manage'
+  | 'financial-health:read'
   | 'customers:create'
   | 'customers:read'
   | 'customers:update'
@@ -25,6 +28,7 @@ export type Permission =
 
 const rolePermissions: Record<Role, Permission[]> = {
   ADMIN: [
+    'inventory:manage', 'fiscal:manage', 'financial-health:read',
     'customers:create',
     'customers:read',
     'customers:update',

@@ -1,3 +1,4 @@
+import { CommerceModule } from './commerce/commerce.module'
 import { OrganizationMembersModule } from './organization-members/organization-members.module'
 import { Module, MiddlewareConsumer, NestModule, CanActivate } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
@@ -136,6 +137,7 @@ class AllowAllThrottlerGuard implements CanActivate {
     ExecutionModule,
     FinanceModule,
     PaymentsModule,
+    CommerceModule,
     ExpensesModule,
     InvoicesModule,
     BillingModule,
