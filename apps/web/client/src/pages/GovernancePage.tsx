@@ -1,3 +1,4 @@
+import { transientReadOptions } from "@/lib/read-query-retry";
 import { AppStatusBadge as StateBadge } from "@/components/app-system";
 import { MobileModuleHeader } from "@/components/MobileModuleHeader";
 import { ResponsiveDetails } from "@/components/ResponsiveDetails";
@@ -59,24 +60,31 @@ export default function GovernancePage() {
   useRenderWatchdog("GovernancePage");
   const [, navigate] = useLocation();
   const [showAllSignals, setShowAllSignals] = useState(false);
+  const { role, isAuthenticated } = useAuth();
 
   const stateQuery = trpc.governance.operationalState.useQuery(undefined, {
-    retry: false,
+    enabled: isAuthenticated, ...transientReadOptions,
   });
   const scoreQuery = trpc.governance.autoScore.useQuery(undefined, {
-    retry: false,
+    enabled: isAuthenticated, ...transientReadOptions,
   });
   const runsQuery = trpc.governance.runs.useQuery(
     { limit: 12 },
-    { retry: false }
+    { enabled: isAuthenticated, ...transientReadOptions }
   );
   const signalsQuery = trpc.dashboard.operationalSignals.useQuery(
     { limit: 50 },
-    { retry: false }
+    { enabled: isAuthenticated, ...transientReadOptions }
   );
   const nextActionQuery = trpc.dashboard.nextBestAction.useQuery(undefined, {
-    retry: false,
+    enabled: isAuthenticated, ...transientReadOptions,
   });
+
+  const stateLoading = stateQuery.isLoading || (stateQuery.isFetching && stateQuery.isError);
+  const scoreLoading = scoreQuery.isLoading || (scoreQuery.isFetching && scoreQuery.isError);
+  const runsLoading = runsQuery.isLoading || (runsQuery.isFetching && runsQuery.isError);
+  const signalsLoading = signalsQuery.isLoading || (signalsQuery.isFetching && signalsQuery.isError);
+  const nextActionLoading = nextActionQuery.isLoading || (nextActionQuery.isFetching && nextActionQuery.isError);
 
   const queries = [
     stateQuery,
@@ -85,13 +93,12 @@ export default function GovernancePage() {
     signalsQuery,
     nextActionQuery,
   ];
-  const unavailable = queries.filter(query => query.isError).length;
-  const refresh = () => void Promise.all(queries.map(query => query.refetch()));
+  const unavailable = queries.filter(query => query.isError && !query.isFetching).length;
+  const refresh = () => void Promise.allSettled(queries.map(query => query.refetch()));
   const retryUnavailable = () =>
-    void Promise.all(
-      queries.filter(query => query.isError).map(query => query.refetch())
+    void Promise.allSettled(
+      queries.filter(query => query.isError && !query.isFetching).map(query => query.refetch())
     );
-  const { role } = useAuth();
   const routePermissions: Record<string, Permission> = { "/finances": "finance:read", "/service-orders": "orders:read", "/governance": "governance:read", "/timeline": "reports:read" };
   const stateData = stateQuery.data;
   const state = stateData?.operationalState;
@@ -102,7 +109,7 @@ export default function GovernancePage() {
 
   return (
     <AppPageShell className="operational-mobile-page mobile-module-page evidence-mobile-page gap-4">
-      <MobileModuleHeader title="Governança" description="Situação, alertas e próximas ações." context={stateQuery.isLoading ? "Consultando a operação…" : stateQuery.isError ? "Leitura indisponível" : undefined} onRefresh={refresh} />
+      <MobileModuleHeader title="Governança" description="Situação, alertas e próximas ações." context={stateLoading ? "Consultando a operação…" : stateQuery.isError ? "Leitura indisponível" : undefined} onRefresh={refresh} />
       <div className="hidden md:block">
       <AppOperationalHeader
         title="Governança e risco operacional"
@@ -119,7 +126,7 @@ export default function GovernancePage() {
           </Button>
         }
         contextChips={
-          stateQuery.isLoading ? (
+          stateLoading ? (
             <AppStatusBadge label="Carregando estado oficial" />
           ) : stateQuery.isError || !state ? (
             <AppStatusBadge label="Estado oficial indisponível" />
@@ -143,7 +150,7 @@ export default function GovernancePage() {
               {unavailable} fonte(s) não responderam. Falhas não são tratadas
               como ausência de risco nem como estado normal.
             </span>
-            <Button variant="outline" size="sm" onClick={retryUnavailable}>
+            <Button variant="outline" size="sm" className="min-h-11" onClick={retryUnavailable}>
               Tentar novamente
             </Button>
           </AppAlertDescription>
@@ -155,7 +162,7 @@ export default function GovernancePage() {
         title="Situação atual"
         subtitle="A decisão operacional vigente e a justificativa emitida pela fonte autoritativa."
       >
-        {stateQuery.isLoading ? (
+        {stateLoading ? (
           <AppPageLoadingState
             title="Carregando estado oficial"
             description="Consultando a decisão operacional vigente."
@@ -217,7 +224,7 @@ export default function GovernancePage() {
       </AppSectionBlock>
 
       <AppSectionBlock className="mobile-flat-section" title="Última avaliação" subtitle="Referência da avaliação concluída retornada pela API.">
-        <p className="text-sm text-[var(--text-secondary)]" role="status">{stateQuery.isLoading ? "Carregando avaliação..." : stateQuery.isError ? "Avaliação indisponível." : stateData?.availability === "NO_DATA" ? "Nenhuma avaliação concluída com dados disponíveis." : stateData?.evidenceAt ? `Avaliação em ${formatDate(stateData.evidenceAt)}. ${staleEvaluation ? "Avaliação desatualizada conforme diagnóstico oficial." : signalsQuery.isError ? "Não foi possível verificar a atualidade da avaliação." : "Sem indicação de desatualização no recorte oficial."}` : "Data da avaliação não informada pela fonte."}</p>
+        <p className="text-sm text-[var(--text-secondary)]" role="status">{stateLoading ? "Carregando avaliação..." : stateQuery.isError ? "Avaliação indisponível." : stateData?.availability === "NO_DATA" ? "Nenhuma avaliação concluída com dados disponíveis." : stateData?.evidenceAt ? `Avaliação em ${formatDate(stateData.evidenceAt)}. ${staleEvaluation ? "Avaliação desatualizada conforme diagnóstico oficial." : signalsLoading ? "Consultando a atualidade da avaliação…" : signalsQuery.isError ? "Não foi possível verificar a atualidade da avaliação." : "Sem indicação de desatualização no recorte oficial."}` : "Data da avaliação não informada pela fonte."}</p>
       </AppSectionBlock>
       <div className="grid gap-4 xl:grid-cols-2">
         <AppSectionBlock
@@ -225,7 +232,7 @@ export default function GovernancePage() {
           title="Próxima ação"
           subtitle="Próxima ação oficial; abrir o destino não executa a ação automaticamente."
         >
-          {nextActionQuery.isLoading ? (
+          {nextActionLoading ? (
             <AppPageLoadingState title="Carregando decisão oficial" />
           ) : nextActionQuery.isError ? (
             <AppPageErrorState
@@ -277,7 +284,7 @@ export default function GovernancePage() {
           title="Avaliação automática oficial"
           subtitle="Nota e fatores já calculados pelo backend; não determina o estado operacional exibido acima."
         >
-          {scoreQuery.isLoading ? (
+          {scoreLoading ? (
             <AppPageLoadingState title="Carregando avaliação oficial" />
           ) : scoreQuery.isError ? (
             <AppPageErrorState
@@ -331,7 +338,7 @@ export default function GovernancePage() {
         title="Sinais e evidências"
         subtitle="Sinais na ordem fornecida pelo backend, sem reclassificação, pontuação ou ordenação no navegador."
       >
-        {signalsQuery.isLoading ? (
+        {signalsLoading ? (
           <AppPageLoadingState title="Carregando sinais oficiais" />
         ) : signalsQuery.isError ? (
           <AppPageErrorState
@@ -399,7 +406,7 @@ export default function GovernancePage() {
         ctaLabel="Abrir Timeline"
         onCtaClick={() => navigate("/timeline?module=governance")}
       >
-        {runsQuery.isLoading ? (
+        {runsLoading ? (
           <AppPageLoadingState title="Carregando execuções oficiais" />
         ) : runsQuery.isError ? (
           <AppPageErrorState
