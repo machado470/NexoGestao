@@ -626,7 +626,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-52 p-1">
                         <DropdownMenuLabel className="px-2 py-1.5">
-                          <p className="truncate text-xs font-semibold text-[var(--text-primary)]">
+                          <p className="truncate text-xs font-semibold text-[var(--app-overlay-text)]">
                             {user?.name ?? "Usuário"}
                           </p>
                           <p className="truncate text-[11px] text-[var(--text-muted)]">
@@ -635,13 +635,13 @@ export function MainLayout({ children }: MainLayoutProps) {
                         </DropdownMenuLabel>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
-                          className="h-8 rounded-md px-2 text-sm text-[var(--text-secondary)] focus:text-[var(--text-primary)]"
+                          className="min-h-11 rounded-md px-2 text-sm text-[var(--app-overlay-text)] focus:text-[var(--app-overlay-text)]"
                           onClick={() => navigate("/profile")}
                         >
                           <User className="mr-2 h-4 w-4" /> Perfil
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          className="h-8 rounded-md px-2 text-sm text-[var(--text-secondary)] focus:text-[var(--text-primary)]"
+                          className="min-h-11 rounded-md px-2 text-sm text-[var(--app-overlay-text)] focus:text-[var(--app-overlay-text)]"
                           onClick={toggleTheme}
                         >
                           {theme === "dark" ? (
@@ -655,7 +655,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                         <DropdownMenuItem
                           onClick={() => void handleLogout()}
                           disabled={isLoggingOut}
-                          className="h-8 rounded-md px-2 text-sm text-[var(--danger)] focus:text-[var(--danger)]"
+                          className="min-h-11 rounded-md px-2 text-sm text-[var(--app-overlay-text)] focus:text-[var(--app-overlay-text)]"
                         >
                           <LogOut className="mr-2 h-4 w-4" /> Sair
                         </DropdownMenuItem>
