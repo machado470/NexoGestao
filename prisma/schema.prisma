@@ -51,6 +51,7 @@ model Organization {
   serviceOrderEvidence  ServiceOrderEvidence[]
   serviceOrderChecklist ServiceOrderChecklistItem[]
   serviceAcceptances    ServiceOrderAcceptance[]
+  serviceOrderReturns   ServiceOrderReturn[]
 
   subscription     Subscription?
   executionConfig  OrganizationExecutionConfig?
@@ -544,6 +545,8 @@ model ServiceOrder {
   evidence           ServiceOrderEvidence[]
   checklist          ServiceOrderChecklistItem[]
   acceptances        ServiceOrderAcceptance[]
+  returnCases        ServiceOrderReturn[]        @relation("ReturnOriginal")
+  returnOrigin       ServiceOrderReturn?         @relation("ReturnChild")
 
   @@unique([id, orgId])
   @@index([orgId, createdAt])
@@ -575,8 +578,35 @@ model ServiceOrderAcceptance {
   org             Organization @relation(fields: [orgId], references: [id])
   serviceOrder    ServiceOrder @relation(fields: [serviceOrderId, orgId], references: [id, orgId], onDelete: Cascade)
 
+  returns ServiceOrderReturn[]
+
+  @@unique([id, orgId, serviceOrderId])
   @@unique([orgId, serviceOrderId, entryKey])
   @@index([orgId, serviceOrderId, createdAt])
+}
+
+model ServiceOrderReturn {
+  id                 String                  @id @default(uuid())
+  orgId              String
+  originalOrderId    String
+  childOrderId       String                  @unique
+  entryKey           String
+  kind               String
+  title              String
+  reason             String
+  originalTitle      String
+  sourceAcceptanceId String?
+  createdByUserId    String
+  createdByName      String
+  createdAt          DateTime                @default(now())
+  org                Organization            @relation(fields: [orgId], references: [id])
+  original           ServiceOrder            @relation("ReturnOriginal", fields: [originalOrderId, orgId], references: [id, orgId], onDelete: Restrict)
+  child              ServiceOrder            @relation("ReturnChild", fields: [childOrderId, orgId], references: [id, orgId], onDelete: Restrict)
+  sourceAcceptance   ServiceOrderAcceptance? @relation(fields: [sourceAcceptanceId, orgId, originalOrderId], references: [id, orgId, serviceOrderId], onDelete: Restrict)
+
+  @@unique([childOrderId, orgId])
+  @@unique([orgId, originalOrderId, entryKey])
+  @@index([orgId, originalOrderId, createdAt])
 }
 
 model ServiceOrderChecklistItem {

@@ -10,6 +10,8 @@ import { CommerceService } from "../src/commerce/commerce.service";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { JwtAuthGuard } from "../src/auth/jwt-auth.guard";
 import { ConfigService } from '@nestjs/config';
+import { QuotasService } from '../src/quotas/quotas.service';
+import { ServiceOrderReturnsController, ServiceOrderReturnsService } from '../src/service-orders/service-order-returns';
 import { ServiceOrderAcceptanceController, PublicServiceAcceptanceController, ServiceOrderAcceptanceService } from '../src/service-orders/service-order-acceptance';
 import { ServiceOrderEvidenceController, ServiceOrderEvidenceService } from '../src/service-orders/service-order-evidence';
 import { ServiceOrderChecklistController, ServiceOrderChecklistService } from '../src/service-orders/service-order-checklist';
@@ -47,8 +49,9 @@ async function main() {
     },
   });
   const order = await db.serviceOrder.create({
-    data: { orgId, customerId: customer.id, title: "Manutenção da validação", status: process.env.ACCEPTANCE_AUDIT === '1' ? 'DONE' : 'IN_PROGRESS' },
+    data: { orgId, customerId: customer.id, title: "Manutenção da validação", status: process.env.ACCEPTANCE_AUDIT === '1' || process.env.RETURNS_AUDIT === '1' ? 'DONE' : 'IN_PROGRESS' },
   });
+  const returnIssue = process.env.RETURNS_AUDIT === '1' ? await db.serviceOrderAcceptance.create({data:{orgId,serviceOrderId:order.id,entryKey:randomUUID(),tokenHash:randomUUID(),publicTitle:'Problema relatado pelo cliente',publicSummary:'Serviço entregue para validação.',companyName:'Empresa da validação',orderVersion:order.updatedAt,createdByUserId:actor,expiresAt:new Date(Date.now()+3600000),decision:'ISSUE',responseKey:randomUUID(),respondentName:'Cliente local',responseNote:'O equipamento ainda apresenta ruído.',respondedAt:new Date()}}) : null;
   const charge = await db.charge.create({
     data: {
       orgId,
@@ -79,8 +82,8 @@ async function main() {
     },
   });
   const module = await Test.createTestingModule({
-    controllers: [CommerceController, ServiceOrderEvidenceController, ServiceOrderChecklistController, ServiceOrderAcceptanceController, PublicServiceAcceptanceController],
-    providers: [CommerceService, ServiceOrderEvidenceService, ServiceOrderChecklistService, ServiceOrderAcceptanceService, { provide: PrismaService, useValue: db }, { provide: ConfigService, useValue: new ConfigService({ JWT_SECRET: 'isolated-browser-harness-secret-not-production' }) }],
+    controllers: [CommerceController, ServiceOrderEvidenceController, ServiceOrderChecklistController, ServiceOrderAcceptanceController, PublicServiceAcceptanceController, ServiceOrderReturnsController],
+    providers: [CommerceService, ServiceOrderEvidenceService, ServiceOrderChecklistService, ServiceOrderAcceptanceService, ServiceOrderReturnsService, {provide:QuotasService,useValue:{validateQuota:async()=>{}}}, { provide: PrismaService, useValue: db }, { provide: ConfigService, useValue: new ConfigService({ JWT_SECRET: 'isolated-browser-harness-secret-not-production' }) }],
   })
     .overrideGuard(JwtAuthGuard)
     .useValue({
@@ -108,12 +111,13 @@ async function main() {
   await app.listen(55440, "127.0.0.1");
   writeFileSync(
     "/dev/shm/nexo-commerce-fixture.json",
-    JSON.stringify({ orgId, actor, customer, order }),
+    JSON.stringify({ orgId, actor, customer, order, returnIssue }),
   );
   console.log("Isolated commerce API ready on localhost:55440");
   const shutdown = async () => {
     await app.close();
     const where = { orgId };
+    await db.serviceOrderReturn.deleteMany({where});
     await db.serviceOrderAcceptance.deleteMany({ where });
     await db.serviceOrderChecklistItem.deleteMany({ where });
     await db.serviceOrderEvidence.deleteMany({ where });
