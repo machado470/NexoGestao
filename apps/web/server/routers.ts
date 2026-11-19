@@ -1,3 +1,4 @@
+import {serviceQuotesRouter} from "./routers/service-quotes";
 import {serviceCatalogRouter} from "./routers/service-catalog";
 import { commerceRouter } from "./routers/commerce";
 import { serviceAcceptanceRouter } from './routers/service-acceptance';
@@ -44,6 +45,7 @@ export const appRouter = router({
 
   commerce: commerceRouter,
   serviceCatalog: serviceCatalogRouter,
+  serviceQuotes: serviceQuotesRouter,
   finance: financeRouter,
   people: peopleRouter,
   governance: governanceRouter,

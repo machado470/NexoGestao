@@ -12,11 +12,11 @@
         window.__NEXO_AUDIT__.pathname = window.location.pathname;
         window.__NEXO_AUDIT__.renderAuditMode = new URLSearchParams(window.location.search).get("renderAuditMode") || "app";
         window.__NEXO_AUDIT__.events = (window.__NEXO_AUDIT__.events || []).concat([
-          { at: now, source: "html", message: "document-start", payload: { href: window.location.href } }
+          { at: now, source: "html", message: "document-start", payload: { href: window.location.origin + window.location.pathname } }
         ]).slice(-120);
         console.info("[HTML] document-start", {
           at: now,
-          href: window.location.href,
+          href: window.location.origin + window.location.pathname,
           readyState: document.readyState,
           renderAuditMode: window.__NEXO_AUDIT__.renderAuditMode,
         });

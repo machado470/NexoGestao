@@ -1,3 +1,4 @@
+import {ServiceQuotesController,PublicQuoteApprovalController,ServiceQuotesService} from "../src/commerce/service-quotes";
 import {ServiceCatalogController,ServiceCatalogService} from "../src/commerce/service-catalog";
 // Isolated browser-audit server. Never enabled against an application database.
 import "reflect-metadata";
@@ -83,8 +84,8 @@ async function main() {
     },
   });
   const module = await Test.createTestingModule({
-    controllers: [ServiceCatalogController,CommerceController, ServiceOrderEvidenceController, ServiceOrderChecklistController, ServiceOrderAcceptanceController, PublicServiceAcceptanceController, ServiceOrderReturnsController],
-    providers: [ServiceCatalogService,CommerceService, ServiceOrderEvidenceService, ServiceOrderChecklistService, ServiceOrderAcceptanceService, ServiceOrderReturnsService, {provide:QuotasService,useValue:{validateQuota:async()=>{}}}, { provide: PrismaService, useValue: db }, { provide: ConfigService, useValue: new ConfigService({ JWT_SECRET: 'isolated-browser-harness-secret-not-production' }) }],
+    controllers: [ServiceQuotesController,PublicQuoteApprovalController,ServiceCatalogController,CommerceController, ServiceOrderEvidenceController, ServiceOrderChecklistController, ServiceOrderAcceptanceController, PublicServiceAcceptanceController, ServiceOrderReturnsController],
+    providers: [ServiceQuotesService,ServiceCatalogService,CommerceService, ServiceOrderEvidenceService, ServiceOrderChecklistService, ServiceOrderAcceptanceService, ServiceOrderReturnsService, {provide:QuotasService,useValue:{validateQuota:async()=>{}}}, { provide: PrismaService, useValue: db }, { provide: ConfigService, useValue: new ConfigService({ JWT_SECRET: 'isolated-browser-harness-secret-not-production' }) }],
   })
     .overrideGuard(JwtAuthGuard)
     .useValue({
@@ -118,6 +119,9 @@ async function main() {
   const shutdown = async () => {
     await app.close();
     const where = { orgId };
+    await db.serviceQuoteApproval.deleteMany({where});
+    await db.serviceQuoteRevision.deleteMany({where});
+    await db.serviceQuote.deleteMany({where});
     await db.catalogServiceRevision.deleteMany({where});
     await db.catalogService.deleteMany({where});
     await db.serviceOrderReturn.deleteMany({where});
