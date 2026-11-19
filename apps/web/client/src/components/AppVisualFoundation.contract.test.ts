@@ -50,7 +50,10 @@ describe("official internal visual foundation", () => {
     expect(modal).toContain("overflow-y-auto");
     expect(modal).toContain("onEscapeKeyDown");
     expect(modal).toContain("onOpenAutoFocus");
-    expect(dialog).toContain("bg-[var(--app-overlay-scrim)]");
+    // The scrim may include a fallback for pages where theme tokens are not loaded.
+    expect(dialog).toMatch(
+      /bg-\[var\(--app-overlay-scrim(?:,[^\]]+)?\)\]/
+    );
   });
 
   it("defines one theme-aware semantic scale without decorative gradients", () => {

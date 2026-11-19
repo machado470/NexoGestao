@@ -75,7 +75,7 @@ describe("passive manual assignee warning UI contract", () => {
   });
 
   it("exibe o aviso no fluxo padronizado de agendamentos sem alterar o responsável enviado", () => {
-    expect(appointmentPage).toContain("<AppPageShell>");
+    expect(appointmentPage).toMatch(/<AppPageShell(?:\s[^>]*)?>/);
     expect(appointmentPage).toContain("AppSectionBlock");
     expect(appointmentPage).toContain("<AppRowActionsDropdown");
     expect(appointmentPageCompact).toContain(
