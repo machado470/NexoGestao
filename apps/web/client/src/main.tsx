@@ -111,19 +111,21 @@ function renderBootstrapError(errorLike: unknown, phase: string) {
   `;
 }
 
+// Query and fragment can contain private access links or authentication codes.
+const diagnosticHref = window.location.origin + window.location.pathname;
 const audit = ensureAuditState();
 setAuditField("phase", "main:start");
 setAuditField("pathname", window.location.pathname);
 setAuditField("readyState", document.readyState);
 setAuditField("title", document.title);
 pushAuditEvent("main", "start", {
-  href: window.location.href,
+  href: diagnosticHref,
   readyState: document.readyState,
   title: document.title,
 });
 console.info("[MAIN] started", {
   at: nowIso(),
-  href: window.location.href,
+  href: diagnosticHref,
   readyState: document.readyState,
 });
 

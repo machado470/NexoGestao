@@ -194,6 +194,9 @@ export function MainLayout({ children }: MainLayoutProps) {
           permissions: ["appointments:read"],
         },
         {
+          id: "quotes", label: "Orçamentos", route: "/quotes", icon: ClipboardList, permissions: ["catalog:read"],
+        },
+        {
           id: "service-catalog", label: "Catálogo de serviços", route: "/service-catalog", icon: BookOpen, permissions: ["catalog:read"],
         },
         {

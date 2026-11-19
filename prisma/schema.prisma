@@ -53,6 +53,7 @@ model Organization {
   serviceAcceptances    ServiceOrderAcceptance[]
   serviceOrderReturns   ServiceOrderReturn[]
   catalogServices       CatalogService[]
+  serviceQuotes         ServiceQuote[]
 
   subscription     Subscription?
   executionConfig  OrganizationExecutionConfig?
@@ -459,6 +460,7 @@ model GovernanceRun {
 }
 
 model Customer {
+  serviceQuotes         ServiceQuote[]
   id                    String                 @id @default(uuid())
   orgId                 String
   name                  String
@@ -1508,4 +1510,69 @@ model CatalogServiceRevision {
 
   @@unique([serviceId, version])
   @@index([orgId, serviceId, version])
+}
+
+model ServiceQuote {
+  id              String                 @id @default(uuid())
+  orgId           String
+  customerId      String
+  customerName    String
+  entryKey        String
+  createdByUserId String
+  version         Int                    @default(0)
+  status          String                 @default("DRAFT")
+  snapshot        Json
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  org             Organization           @relation(fields: [orgId], references: [id])
+  customer        Customer               @relation(fields: [customerId, orgId], references: [id, orgId], onDelete: Restrict)
+  revisions       ServiceQuoteRevision[]
+  approvals       ServiceQuoteApproval[]
+
+  @@unique([id, orgId])
+  @@unique([orgId, entryKey])
+  @@index([orgId, createdAt, id])
+}
+
+model ServiceQuoteRevision {
+  approvals   ServiceQuoteApproval[]
+  id          String                 @id @default(uuid())
+  orgId       String
+  quoteId     String
+  version     Int
+  snapshot    Json
+  reason      String
+  actorUserId String
+  actorName   String
+  createdAt   DateTime               @default(now())
+  quote       ServiceQuote           @relation(fields: [quoteId, orgId], references: [id, orgId], onDelete: Restrict)
+
+  @@unique([quoteId, version])
+  @@unique([quoteId, version, orgId])
+  @@index([orgId, quoteId, version])
+}
+
+model ServiceQuoteApproval {
+  id              String       @id @default(uuid())
+  orgId           String
+  quoteId         String
+  quoteVersion    Int
+  entryKey        String
+  tokenHash       String       @unique
+  companyName     String
+  createdByUserId String
+  createdAt       DateTime     @default(now())
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  decision        String?
+  responseKey     String?
+  respondentName  String?
+  responseNote    String?
+  respondedAt     DateTime?
+  quote           ServiceQuote @relation(fields: [quoteId, orgId], references: [id, orgId], onDelete: Restrict)
+
+  revision ServiceQuoteRevision @relation(fields: [quoteId, quoteVersion, orgId], references: [quoteId, version, orgId], onDelete: Restrict)
+
+  @@unique([orgId, quoteId, entryKey])
+  @@index([orgId, quoteId, createdAt])
 }

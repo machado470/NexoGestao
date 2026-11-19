@@ -24,7 +24,7 @@ Formulário mantém dados após falha, bloqueia envio simultâneo e pede confirm
 
 Este é o cadastro de referência que prepara a etapa de orçamento. Não gera orçamento, aprovação, O.S., agendamento, reserva de capacidade, cobrança, documento fiscal, mensagem ou movimentação de estoque. Duração não bloqueia agenda e preço não é receita. Ordens e cobranças existentes não mudam ao editar o catálogo. Nenhum limite comercial de plano específico foi criado para este cadastro.
 
-Próximo incremento: orçamento versionado com itens copiados por snapshot (nome, preço, moeda, duração e versão do serviço), condições e aprovação do cliente. Descontos/adicionais, impostos, múltiplos endereços/equipamentos e recorrência continuam futuros.
+O incremento de orçamento versionado e decisão por link está documentado em `SERVICE_QUOTES_AUDIT.md`, com itens por snapshot, condições e preços explícitos. Descontos/adicionais, impostos, múltiplos endereços/equipamentos e recorrência continuam futuros.
 
 ## Implantação
 
