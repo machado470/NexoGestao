@@ -1,3 +1,4 @@
+import {serviceCatalogRouter} from "./routers/service-catalog";
 import { commerceRouter } from "./routers/commerce";
 import { serviceAcceptanceRouter } from './routers/service-acceptance';
 import { getSessionCookieOptions } from "./_core/cookies";
@@ -42,6 +43,7 @@ export const appRouter = router({
   nexo: nexoProxyRouter,
 
   commerce: commerceRouter,
+  serviceCatalog: serviceCatalogRouter,
   finance: financeRouter,
   people: peopleRouter,
   governance: governanceRouter,

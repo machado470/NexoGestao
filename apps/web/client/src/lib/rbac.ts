@@ -1,6 +1,8 @@
 export type Role = 'ADMIN' | 'MANAGER' | 'STAFF' | 'VIEWER'
 
 export type Permission =
+  | 'catalog:read'
+  | 'catalog:manage'
   | 'inventory:manage'
   | 'fiscal:manage'
   | 'financial-health:read'
@@ -28,6 +30,7 @@ export type Permission =
 
 const rolePermissions: Record<Role, Permission[]> = {
   ADMIN: [
+    'catalog:read', 'catalog:manage',
     'inventory:manage', 'fiscal:manage', 'financial-health:read',
     'customers:create',
     'customers:read',
@@ -52,6 +55,7 @@ const rolePermissions: Record<Role, Permission[]> = {
     'settings:manage',
   ],
   MANAGER: [
+    'catalog:read', 'catalog:manage',
     'customers:create',
     'customers:read',
     'customers:update',
@@ -71,6 +75,7 @@ const rolePermissions: Record<Role, Permission[]> = {
     'reports:export',
   ],
   STAFF: [
+    'catalog:read',
     'customers:read',
     'customers:create',
     'customers:update',
@@ -83,6 +88,7 @@ const rolePermissions: Record<Role, Permission[]> = {
     'reports:read',
   ],
   VIEWER: [
+    'catalog:read',
     'customers:read',
     'appointments:read',
     'orders:read',
