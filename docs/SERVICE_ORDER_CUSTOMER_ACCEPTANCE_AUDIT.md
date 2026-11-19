@@ -36,4 +36,4 @@ Auditoria de navegador: Vite em 5173 e harness `apps/api/test/commerce-local-api
 
 ## Continuação
 
-Garantia/retrabalho após problema, modelos de checklist, materiais e margem seguem no plano consolidado. Confirmação por identidade verificada, comprovante exportável e compartilhamento explícito de fotos devem ser tratados em incrementos próprios.
+A abertura de retorno ligado ao problema recebeu o incremento documentado em `docs/SERVICE_ORDER_RETURNS_AUDIT.md`. Política de cobertura/isenção, modelos de checklist, materiais e margem seguem no plano consolidado. Confirmação por identidade verificada, comprovante exportável e compartilhamento explícito de fotos devem ser tratados em incrementos próprios.

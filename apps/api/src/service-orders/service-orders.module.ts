@@ -19,6 +19,7 @@ import { OutboxModule } from '../outbox/outbox.module'
 import { ServiceOrderEvidenceController, ServiceOrderEvidenceService } from './service-order-evidence'
 import { ServiceOrderChecklistController, ServiceOrderChecklistService } from './service-order-checklist'
 import { ServiceOrderAcceptanceController, PublicServiceAcceptanceController, ServiceOrderAcceptanceService } from './service-order-acceptance'
+import { ServiceOrderReturnsController, ServiceOrderReturnsService } from './service-order-returns'
 
 @Module({
   imports: [
@@ -35,8 +36,8 @@ import { ServiceOrderAcceptanceController, PublicServiceAcceptanceController, Se
     AnalyticsModule,
     OutboxModule,
   ],
-  controllers: [ServiceOrdersController, ServiceOrderEvidenceController, ServiceOrderChecklistController, ServiceOrderAcceptanceController, PublicServiceAcceptanceController],
-  providers: [ServiceOrdersService, ServiceOrderReadService, ServiceOrderTenantAccessGuard, ServiceOrderEvidenceService, ServiceOrderChecklistService, ServiceOrderAcceptanceService],
+  controllers: [ServiceOrdersController, ServiceOrderEvidenceController, ServiceOrderChecklistController, ServiceOrderAcceptanceController, PublicServiceAcceptanceController, ServiceOrderReturnsController],
+  providers: [ServiceOrdersService, ServiceOrderReadService, ServiceOrderTenantAccessGuard, ServiceOrderEvidenceService, ServiceOrderChecklistService, ServiceOrderAcceptanceService, ServiceOrderReturnsService],
   exports: [ServiceOrdersService],
 })
 export class ServiceOrdersModule {}

@@ -2,6 +2,7 @@ import { transientReadOptions } from "@/lib/read-query-retry";
 import { ServiceOrderEvidence } from '@/components/ServiceOrderEvidence';
 import { ServiceOrderChecklist } from '@/components/ServiceOrderChecklist';
 import { ServiceOrderAcceptance } from '@/components/ServiceOrderAcceptance';
+import { ServiceOrderReturns } from '@/components/ServiceOrderReturns';
 import { MobileModuleHeader } from "@/components/MobileModuleHeader";
 import { useCreateFromRoute } from "@/hooks/useCreateFromRoute";
 import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
@@ -1397,6 +1398,7 @@ export default function ServiceOrdersPage() {
                 <ServiceOrderEvidence key={selectedOrder.id} serviceOrderId={selectedOrder.id} status={selectedOrder.status} canWrite={canEditOrder} />
                 <ServiceOrderChecklist key={`checklist-${selectedOrder.id}`} serviceOrderId={selectedOrder.id} status={selectedOrder.status} canWrite={canEditOrder} />
                 <ServiceOrderAcceptance key={`acceptance-${selectedOrder.id}`} serviceOrderId={selectedOrder.id} title={selectedOrder.title} status={selectedOrder.status} canWrite={canEditOrder} />
+                <ServiceOrderReturns key={`returns-${selectedOrder.id}`} serviceOrderId={selectedOrder.id} title={selectedOrder.title} status={selectedOrder.status} canCreate={canCreateOrder} />
 
                 <ResponsiveDetails title="Contexto e histórico da O.S.">
                 <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
