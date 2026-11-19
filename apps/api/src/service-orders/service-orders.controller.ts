@@ -9,6 +9,7 @@ import {
   Post,
   Query,
   UseGuards,
+  UseInterceptors,
   Headers,
 } from '@nestjs/common'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
@@ -18,6 +19,7 @@ import { Org } from '../auth/decorators/org.decorator'
 import { User } from '../auth/decorators/user.decorator'
 
 import { ServiceOrdersService } from './service-orders.service'
+import { ServiceOrderPublicShapeInterceptor } from './service-order-public-shape.interceptor'
 import { ServiceOrderTenantAccessGuard } from './service-order-tenant-access.guard'
 import { CreateServiceOrderDto } from './dto/create-service-order.dto'
 import { UpdateServiceOrderDto } from './dto/update-service-order.dto'
@@ -25,6 +27,7 @@ import { QuotasService } from '../quotas/quotas.service'
 import { FinanceService } from '../finance/finance.service'
 
 @Controller('service-orders')
+@UseInterceptors(ServiceOrderPublicShapeInterceptor)
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ServiceOrdersController {
   constructor(

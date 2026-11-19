@@ -521,6 +521,7 @@ model ServiceOrder {
   appointmentId      String?                     @unique
   assignedToPersonId String?
   title              String
+  billingTreatment   String                      @default("STANDARD")
   description        String?
   status             ServiceOrderStatus          @default(OPEN)
   priority           Int                         @default(2)
@@ -586,23 +587,28 @@ model ServiceOrderAcceptance {
 }
 
 model ServiceOrderReturn {
-  id                 String                  @id @default(uuid())
-  orgId              String
-  originalOrderId    String
-  childOrderId       String                  @unique
-  entryKey           String
-  kind               String
-  title              String
-  reason             String
-  originalTitle      String
-  sourceAcceptanceId String?
-  createdByUserId    String
-  createdByName      String
-  createdAt          DateTime                @default(now())
-  org                Organization            @relation(fields: [orgId], references: [id])
-  original           ServiceOrder            @relation("ReturnOriginal", fields: [originalOrderId, orgId], references: [id, orgId], onDelete: Restrict)
-  child              ServiceOrder            @relation("ReturnChild", fields: [childOrderId, orgId], references: [id, orgId], onDelete: Restrict)
-  sourceAcceptance   ServiceOrderAcceptance? @relation(fields: [sourceAcceptanceId, orgId, originalOrderId], references: [id, orgId, serviceOrderId], onDelete: Restrict)
+  id                       String                  @id @default(uuid())
+  orgId                    String
+  originalOrderId          String
+  childOrderId             String                  @unique
+  entryKey                 String
+  kind                     String
+  title                    String
+  reason                   String
+  originalTitle            String
+  sourceAcceptanceId       String?
+  createdByUserId          String
+  createdByName            String
+  coverageReason           String?
+  coverageReviewedByUserId String?
+  coverageReviewedByName   String?
+  coverageReviewedAt       DateTime?
+  coverageVersion          Int                     @default(0)
+  createdAt                DateTime                @default(now())
+  org                      Organization            @relation(fields: [orgId], references: [id])
+  original                 ServiceOrder            @relation("ReturnOriginal", fields: [originalOrderId, orgId], references: [id, orgId], onDelete: Restrict)
+  child                    ServiceOrder            @relation("ReturnChild", fields: [childOrderId, orgId], references: [id, orgId], onDelete: Restrict)
+  sourceAcceptance         ServiceOrderAcceptance? @relation(fields: [sourceAcceptanceId, orgId, originalOrderId], references: [id, orgId, serviceOrderId], onDelete: Restrict)
 
   @@unique([childOrderId, orgId])
   @@unique([orgId, originalOrderId, entryKey])

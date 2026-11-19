@@ -1,3 +1,4 @@
+import { isBillableTreatment } from '../common/billing-treatment'
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import {
@@ -293,6 +294,7 @@ export class CustomersOperationalSummaryService {
           updatedAt: true,
           startedAt: true,
           finishedAt: true,
+          billingTreatment: true,
           charges: {
             select: { id: true },
             take: 1,
@@ -406,7 +408,7 @@ export class CustomersOperationalSummaryService {
         current.oldOpenServiceOrders += 1
       }
 
-      if (status === 'DONE' && order.charges.length === 0) {
+      if (status === 'DONE' && isBillableTreatment(order.billingTreatment) && order.charges.length === 0) {
         current.completedServiceOrdersWithoutCharge += 1
       }
 

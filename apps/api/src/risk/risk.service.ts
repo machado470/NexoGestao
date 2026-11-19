@@ -1,3 +1,4 @@
+import { BILLABLE_TREATMENTS } from '../common/billing-treatment'
 import { Injectable } from '@nestjs/common'
 import { OperationalStateValue } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
@@ -400,7 +401,7 @@ export class RiskService {
         },
       }),
       this.prisma.serviceOrder.count({
-        where: { orgId, customerId, status: 'DONE', charges: { none: {} } },
+        where: { orgId, customerId, status: 'DONE', billingTreatment: { in: [...BILLABLE_TREATMENTS] }, charges: { none: {} } },
       }),
       this.prisma.serviceOrder.count({
         where: { orgId, customerId, status: 'CANCELED', updatedAt: { gte: recentSince } },

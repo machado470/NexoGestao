@@ -1,3 +1,4 @@
+import { BILLABLE_TREATMENTS, isBillableTreatment } from '../common/billing-treatment'
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
 import { Prisma, ServiceOrderStatus } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
@@ -24,7 +25,7 @@ export type ServiceOrderOperationalDecision = {
 
 export function resolveServiceOrderOperationalDecision(input: {
   status: ServiceOrderStatus; assignedToPersonId?: string | null; dueDate?: Date | null
-  scheduledFor?: Date | null; financialSummary: FinancialSummary; now?: Date
+  scheduledFor?: Date | null; financialSummary: FinancialSummary; now?: Date; billingTreatment?: string
 }): ServiceOrderOperationalDecision {
   const now = input.now ?? new Date()
   const deadline = input.dueDate ?? input.scheduledFor ?? null
@@ -35,19 +36,21 @@ export function resolveServiceOrderOperationalDecision(input: {
   const chargeDueDate = input.financialSummary.chargeDueDate
   const chargeOverdue = input.financialSummary.chargeStatus === 'OVERDUE' || Boolean(input.financialSummary.chargeStatus === 'PENDING' && chargeDueDate && chargeDueDate.getTime() < now.getTime())
   const withoutOwner = !input.assignedToPersonId && active
-  const doneWithoutCharge = input.status === 'DONE' && !input.financialSummary.hasCharge
+  const doneWithoutCharge = input.status === 'DONE' && !input.financialSummary.hasCharge && isBillableTreatment(input.billingTreatment)
+  const pendingCoverage = input.status === 'DONE' && input.billingTreatment === 'RETURN_PENDING'
   let nextAction: ServiceOrderOperationalDecision['nextAction']
   if (isOverdue) nextAction = input.status === 'IN_PROGRESS' ? { type: 'complete', label: 'Concluir ou replanejar', reason: 'Prazo vencido' } : { type: 'start', label: 'Iniciar agora', reason: 'Atrasada sem execução' }
   else if (withoutOwner) nextAction = { type: 'edit', label: 'Definir responsável', reason: 'Sem responsável' }
+  else if (pendingCoverage) nextAction = { type: 'select', label: 'Definir cobertura do retorno', reason: 'Decisão comercial pendente' }
   else if (doneWithoutCharge) nextAction = { type: 'charge', label: 'Gerar cobrança', reason: 'Concluída sem cobrança' }
   else if (chargeOverdue) nextAction = { type: 'select', label: 'Cobrar cliente', reason: 'Cobrança vencida vinculada' }
   else if (input.status === 'OPEN' || input.status === 'ASSIGNED') nextAction = { type: 'start', label: 'Iniciar', reason: 'Pronta para execução' }
   else if (input.status === 'IN_PROGRESS') nextAction = { type: 'complete', label: 'Concluir', reason: 'Execução em andamento' }
-  else if (input.status === 'DONE') nextAction = { type: 'select', label: 'Abrir detalhe', reason: 'Execução concluída' }
+  else if (input.status === 'DONE') nextAction = { type: 'select', label: 'Abrir detalhe', reason: input.billingTreatment === 'RETURN_COVERED' ? 'Cobertura sem cobrança aprovada' : 'Execução concluída' }
   else nextAction = { type: 'select', label: 'Revisar O.S.', reason: 'Dados incompletos' }
-  const riskLabel = isOverdue ? 'Atrasada' : doneWithoutCharge ? 'Alerta: concluída sem cobrança' : chargeOverdue ? 'Cobrança vencida vinculada' : withoutOwner ? 'Sem responsável' : isStalled ? 'Em risco: sem prazo' : 'Sem bloqueio crítico'
-  const operationalStatus = isOverdue || doneWithoutCharge || chargeOverdue ? 'RISCO' as const : withoutOwner || isStalled ? 'ATENÇÃO' as const : 'NORMAL' as const
-  const priority = isOverdue || doneWithoutCharge || chargeOverdue ? 'P0' as const : withoutOwner || isStalled ? 'P1' as const : active ? 'P2' as const : 'P3' as const
+  const riskLabel = pendingCoverage ? 'Decisão de cobertura pendente' : isOverdue ? 'Atrasada' : doneWithoutCharge ? 'Alerta: concluída sem cobrança' : chargeOverdue ? 'Cobrança vencida vinculada' : withoutOwner ? 'Sem responsável' : isStalled ? 'Em risco: sem prazo' : 'Sem bloqueio crítico'
+  const operationalStatus = isOverdue || doneWithoutCharge || chargeOverdue ? 'RISCO' as const : pendingCoverage || withoutOwner || isStalled ? 'ATENÇÃO' as const : 'NORMAL' as const
+  const priority = isOverdue || doneWithoutCharge || chargeOverdue ? 'P0' as const : pendingCoverage || withoutOwner || isStalled ? 'P1' as const : active ? 'P2' as const : 'P3' as const
   return { isOverdue, overdueDays, isStalled, chargeOverdue, operationalStatus, priority, riskLabel, nextAction }
 }
 
@@ -89,8 +92,9 @@ export class ServiceOrderReadService {
     }
     return serviceOrders.map(serviceOrder => {
       const financialSummary = this.buildFinancialSummary(selected.get(serviceOrder.id) ?? null)
-      const order = serviceOrder as T & { status: ServiceOrderStatus; assignedToPersonId?: string | null; dueDate?: Date | null; scheduledFor?: Date | null }
-      return { ...serviceOrder, financialSummary, operationalDecision: resolveServiceOrderOperationalDecision({ status: order.status, assignedToPersonId: order.assignedToPersonId, dueDate: order.dueDate, scheduledFor: order.scheduledFor, financialSummary }) }
+      const order = serviceOrder as T & { status: ServiceOrderStatus; assignedToPersonId?: string | null; dueDate?: Date | null; scheduledFor?: Date | null; billingTreatment?: string }
+      const { billingTreatment: _private, ...publicOrder } = order
+      return { ...publicOrder, financialSummary, operationalDecision: resolveServiceOrderOperationalDecision({ status: order.status, assignedToPersonId: order.assignedToPersonId, dueDate: order.dueDate, scheduledFor: order.scheduledFor, billingTreatment: order.billingTreatment, financialSummary }) }
     })
   }
 
@@ -103,15 +107,15 @@ export class ServiceOrderReadService {
     const now = new Date()
     const active: Prisma.ServiceOrderWhereInput = { status: { in: ['OPEN', 'ASSIGNED', 'IN_PROGRESS'] } }
     const overdue: Prisma.ServiceOrderWhereInput = { AND: [active, { OR: [{ dueDate: { not: null, lt: now } }, { dueDate: null, scheduledFor: { not: null, lt: now } }] }] }
-    const withoutCharge: Prisma.ServiceOrderWhereInput = { status: 'DONE', charges: { none: {} } }
+    const withoutCharge: Prisma.ServiceOrderWhereInput = { status: 'DONE', billingTreatment: { in: [...BILLABLE_TREATMENTS] }, charges: { none: {} } }
     const chargeOverdue: Prisma.ServiceOrderWhereInput = { charges: { some: { OR: [{ status: 'OVERDUE' }, { status: 'PENDING', dueDate: { lt: now } }] } } }
     const withoutOwner: Prisma.ServiceOrderWhereInput = { ...active, assignedToPersonId: null }
     const stalled: Prisma.ServiceOrderWhereInput = { status: 'IN_PROGRESS', dueDate: null, scheduledFor: null }
     const p0: Prisma.ServiceOrderWhereInput = { OR: [overdue, withoutCharge, chargeOverdue] }
-    const p1: Prisma.ServiceOrderWhereInput = { OR: [withoutOwner, stalled] }
+    const p1: Prisma.ServiceOrderWhereInput = { OR: [withoutOwner, stalled, {status:'DONE', billingTreatment:'RETURN_PENDING'}] }
     const additional: Prisma.ServiceOrderWhereInput[] = []
     const operational: Record<string, Prisma.ServiceOrderWhereInput> = { open: { status: { in: ['OPEN', 'ASSIGNED'] } }, in_progress: { status: 'IN_PROGRESS' }, overdue, done: { status: 'DONE' }, without_charge: withoutCharge }
-    const priorities: Record<string, Prisma.ServiceOrderWhereInput> = { P0: p0, P1: { AND: [{ NOT: p0 }, p1] }, P2: { AND: [active, { NOT: p0 }, { NOT: p1 }] }, P3: { AND: [{ NOT: active }, { NOT: p0 }] } }
+    const priorities: Record<string, Prisma.ServiceOrderWhereInput> = { P0: p0, P1: { AND: [{ NOT: p0 }, p1] }, P2: { AND: [active, { NOT: p0 }, { NOT: p1 }] }, P3: { AND: [{ NOT: active }, { NOT: p0 }, {NOT: p1}] } }
     if (filters.operationalFilter && filters.operationalFilter !== 'all') {
       if (!operational[filters.operationalFilter]) throw new BadRequestException('Filtro operacional inválido')
       additional.push(operational[filters.operationalFilter])

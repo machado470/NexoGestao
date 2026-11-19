@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { ReturnCoverageEditor } from './ReturnCoverageEditor';
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { transientReadOptions } from "@/lib/read-query-retry";
@@ -178,6 +179,7 @@ export function ServiceOrderReturns({
               <p className="mt-2 whitespace-pre-wrap break-words text-sm">
                 {list.data.origin.reason}
               </p>
+              <ReturnCoverageEditor item={list.data.origin} />
               <Button
                 variant="outline"
                 className="mt-3 min-h-11"
@@ -214,6 +216,7 @@ export function ServiceOrderReturns({
                   <p className="mt-2 whitespace-pre-wrap break-words text-sm">
                     {item.reason}
                   </p>
+                  <ReturnCoverageEditor item={item} />
                   {item.sourceAcceptanceId && (
                     <p className="mt-2 text-xs text-[var(--text-muted)]">
                       Vinculado a um problema relatado no aceite.

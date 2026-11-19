@@ -1,3 +1,4 @@
+import { isBillableTreatment } from '../common/billing-treatment'
 import {
   BadRequestException,
   Injectable,
@@ -47,6 +48,7 @@ export class ExecutionService {
         startedAt: true,
         finishedAt: true,
         amountCents: true,
+        billingTreatment: true,
         dueDate: true,
         createdAt: true,
         updatedAt: true,
@@ -103,6 +105,7 @@ export class ExecutionService {
         description: true,
         outcomeSummary: true,
         amountCents: true,
+        billingTreatment: true,
         dueDate: true,
         createdAt: true,
         updatedAt: true,
@@ -173,6 +176,7 @@ export class ExecutionService {
         description: true,
         outcomeSummary: true,
         amountCents: true,
+        billingTreatment: true,
         dueDate: true,
         createdAt: true,
         updatedAt: true,
@@ -290,6 +294,7 @@ export class ExecutionService {
         description: true,
         outcomeSummary: true,
         amountCents: true,
+        billingTreatment: true,
         dueDate: true,
         createdAt: true,
         updatedAt: true,
@@ -340,6 +345,7 @@ export class ExecutionService {
         description: true,
         outcomeSummary: true,
         amountCents: true,
+        billingTreatment: true,
         dueDate: true,
         createdAt: true,
         updatedAt: true,
@@ -412,6 +418,7 @@ export class ExecutionService {
         },
       })
 
+      if (isBillableTreatment(updated.billingTreatment)) {
       try {
         await this.finance.ensureChargeForServiceOrderDone({
           orgId: input.orgId,
@@ -432,6 +439,7 @@ export class ExecutionService {
             error: err instanceof Error ? err.message : String(err),
           }),
         )
+      }
       }
 
       this.metrics.increment('executionsCompleted')

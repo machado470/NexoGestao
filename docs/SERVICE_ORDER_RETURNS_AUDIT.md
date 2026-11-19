@@ -21,7 +21,7 @@ A nova ordem não herda valor, vencimento, pagamento, cobrança, agendamento ou 
 
 ## Limites do incremento
 
-Esta é abertura e rastreabilidade de retorno, não um motor completo de garantia. Ainda faltam política de prazo/cobertura, aprovação comercial, materiais/custos, SLAs, encerramento do caso e isenção financeira explícita. O motor operacional/financeiro existente continua tratando a nova ordem normalmente; concluir sem cobrança pode continuar gerando seus sinais até existir uma regra de isenção aprovada. Não presumir que WARRANTY significa serviço gratuito.
+A abertura não representa aprovação automática de garantia. O incremento documentado em `RETURN_COVERAGE_AUDIT.md` acrescenta avaliação comercial explícita: novos retornos aguardam decisão e bloqueiam cobrança vinculada; o gestor pode aprovar cobertura sem cobrança ou autorizar os fluxos normais de cobrança. Ainda faltam política automática de prazo/elegibilidade, materiais/custos, SLAs e encerramento do caso. Não presumir que WARRANTY significa serviço gratuito.
 
 ## Implantação
 
