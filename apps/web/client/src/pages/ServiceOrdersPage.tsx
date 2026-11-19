@@ -1,4 +1,5 @@
 import { transientReadOptions } from "@/lib/read-query-retry";
+import { ServiceOrderEvidence } from '@/components/ServiceOrderEvidence';
 import { MobileModuleHeader } from "@/components/MobileModuleHeader";
 import { useCreateFromRoute } from "@/hooks/useCreateFromRoute";
 import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
@@ -1390,6 +1391,8 @@ export default function ServiceOrdersPage() {
                     {actionFeedback}
                   </p>
                 ) : null}
+
+                <ServiceOrderEvidence key={selectedOrder.id} serviceOrderId={selectedOrder.id} status={selectedOrder.status} canWrite={canEditOrder} />
 
                 <ResponsiveDetails title="Contexto e histórico da O.S.">
                 <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">

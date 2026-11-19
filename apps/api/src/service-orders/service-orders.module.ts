@@ -16,6 +16,7 @@ import { WhatsAppModule } from '../whatsapp/whatsapp.module'
 import { QuotasModule } from '../quotas/quotas.module'
 import { AnalyticsModule } from '../analytics/analytics.module'
 import { OutboxModule } from '../outbox/outbox.module'
+import { ServiceOrderEvidenceController, ServiceOrderEvidenceService } from './service-order-evidence'
 
 @Module({
   imports: [
@@ -32,8 +33,8 @@ import { OutboxModule } from '../outbox/outbox.module'
     AnalyticsModule,
     OutboxModule,
   ],
-  controllers: [ServiceOrdersController],
-  providers: [ServiceOrdersService, ServiceOrderReadService, ServiceOrderTenantAccessGuard],
+  controllers: [ServiceOrdersController, ServiceOrderEvidenceController],
+  providers: [ServiceOrdersService, ServiceOrderReadService, ServiceOrderTenantAccessGuard, ServiceOrderEvidenceService],
   exports: [ServiceOrdersService],
 })
 export class ServiceOrdersModule {}

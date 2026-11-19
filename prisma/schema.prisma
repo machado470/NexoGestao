@@ -45,9 +45,10 @@ model Organization {
   notifications                Notification[]
   webhookEndpoints             WebhookEndpoint[]
 
-  inventoryProducts InventoryProduct[]
-  stockMovements    StockMovement[]
-  fiscalDrafts      FiscalDraft[]
+  inventoryProducts    InventoryProduct[]
+  stockMovements       StockMovement[]
+  fiscalDrafts         FiscalDraft[]
+  serviceOrderEvidence ServiceOrderEvidence[]
 
   subscription     Subscription?
   executionConfig  OrganizationExecutionConfig?
@@ -538,6 +539,7 @@ model ServiceOrder {
   timelineEvents     TimelineEvent[]
   fiscalDrafts       FiscalDraft[]
   stockMovements     StockMovement[]
+  evidence           ServiceOrderEvidence[]
 
   @@unique([id, orgId])
   @@index([orgId, createdAt])
@@ -545,6 +547,24 @@ model ServiceOrder {
   @@index([assignedToPersonId, createdAt])
   @@index([orgId, customerId, createdAt])
   @@index([orgId, scheduledFor])
+}
+
+model ServiceOrderEvidence {
+  id               String       @id @default(uuid())
+  orgId            String
+  serviceOrderId   String
+  entryKey         String
+  description      String
+  content          Bytes
+  sha256           String
+  uploadedByUserId String
+  uploadedByName   String
+  createdAt        DateTime     @default(now())
+  org              Organization @relation(fields: [orgId], references: [id])
+  serviceOrder     ServiceOrder @relation(fields: [serviceOrderId, orgId], references: [id, orgId], onDelete: Cascade)
+
+  @@unique([orgId, serviceOrderId, entryKey])
+  @@index([orgId, serviceOrderId, createdAt])
 }
 
 model ServiceOrderAttachment {
