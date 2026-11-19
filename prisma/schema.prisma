@@ -45,6 +45,10 @@ model Organization {
   notifications                Notification[]
   webhookEndpoints             WebhookEndpoint[]
 
+  inventoryProducts InventoryProduct[]
+  stockMovements    StockMovement[]
+  fiscalDrafts      FiscalDraft[]
+
   subscription     Subscription?
   executionConfig  OrganizationExecutionConfig?
   featureOverrides TenantFeatureOverride[]
@@ -63,13 +67,13 @@ model OrganizationExecutionConfig {
 }
 
 model User {
-  id                        String        @id @default(uuid())
-  email                     String        @unique
+  id                        String                  @id @default(uuid())
+  email                     String                  @unique
   password                  String?
-  sessionVersion            Int           @default(0)
+  sessionVersion            Int                     @default(0)
   role                      UserRole
-  active                    Boolean       @default(false)
-  inviteToken               String?       @unique
+  active                    Boolean                 @default(false)
+  inviteToken               String?                 @unique
   inviteExpiresAt           DateTime?
   resetToken                String?
   resetTokenExpiresAt       DateTime?
@@ -77,12 +81,12 @@ model User {
   emailVerifyTokenHash      String?
   emailVerifyTokenExpiresAt DateTime?
   orgId                     String
-  createdAt                 DateTime      @default(now())
-  updatedAt                 DateTime      @updatedAt
+  createdAt                 DateTime                @default(now())
+  updatedAt                 DateTime                @updatedAt
   Expense                   Expense[]
   Launch                    Launch[]
   person                    Person?
-  org                       Organization  @relation(fields: [orgId], references: [id])
+  org                       Organization            @relation(fields: [orgId], references: [id])
   usageMetrics              UsageMetric[]
   notificationRecipients    NotificationRecipient[]
 
@@ -198,10 +202,10 @@ model TimelineEvent {
 /// Entrega transacional de fatos operacionais. O registro permanece para
 /// inspeção mesmo depois do processamento ou de uma falha definitiva.
 model OperationalOutboxEvent {
-  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   orgId          String
   eventType      String
-  schemaVersion  Int      @default(1)
+  schemaVersion  Int          @default(1)
   aggregateType  String
   aggregateId    String
   actorId        String?
@@ -209,16 +213,16 @@ model OperationalOutboxEvent {
   causationId    String?
   idempotencyKey String
   payload        Json
-  status         String   @default("PENDING")
-  attempts       Int      @default(0)
-  availableAt    DateTime @default(now())
+  status         String       @default("PENDING")
+  attempts       Int          @default(0)
+  availableAt    DateTime     @default(now())
   lockedAt       DateTime?
   lockedBy       String?
   lastError      String?
-  occurredAt     DateTime @default(now())
+  occurredAt     DateTime     @default(now())
   processedAt    DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @default(now()) @updatedAt
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @default(now()) @updatedAt
   org            Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   @@unique([orgId, idempotencyKey])
@@ -229,31 +233,31 @@ model OperationalOutboxEvent {
 }
 
 model WebhookEndpoint {
-  id         String   @id @default(uuid())
+  id         String            @id @default(uuid())
   orgId      String
   url        String
   secret     String
-  active     Boolean  @default(true)
+  active     Boolean           @default(true)
   events     Json
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  org        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  org        Organization      @relation(fields: [orgId], references: [id], onDelete: Cascade)
   deliveries WebhookDelivery[]
 
   @@index([orgId, active, createdAt])
 }
 
 model WebhookDelivery {
-  id             String   @id @default(uuid())
+  id             String                @id @default(uuid())
   endpointId     String
   eventType      String
   payload        Json
   status         WebhookDeliveryStatus @default(PENDING)
-  attempts       Int      @default(0)
+  attempts       Int                   @default(0)
   lastAttemptAt  DateTime?
-  createdAt      DateTime @default(now())
+  createdAt      DateTime              @default(now())
   idempotencyKey String?
-  endpoint       WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  endpoint       WebhookEndpoint       @relation(fields: [endpointId], references: [id], onDelete: Cascade)
 
   @@unique([endpointId, idempotencyKey])
   @@index([endpointId])
@@ -469,10 +473,12 @@ model Customer {
   whatsAppConversations WhatsAppConversation[]
   whatsAppMessages      WhatsAppMessage[]
   timelineEvents        TimelineEvent[]
+  fiscalDrafts          FiscalDraft[]
 
   @@unique([orgId, id])
   @@unique([orgId, phone])
   @@unique([orgId, email])
+  @@unique([id, orgId])
   @@index([orgId, createdAt])
   @@index([orgId, active, createdAt])
   @@index([orgId, email])
@@ -530,7 +536,10 @@ model ServiceOrder {
   customer           Customer                 @relation(fields: [customerId], references: [id])
   org                Organization             @relation(fields: [orgId], references: [id])
   timelineEvents     TimelineEvent[]
+  fiscalDrafts       FiscalDraft[]
+  stockMovements     StockMovement[]
 
+  @@unique([id, orgId])
   @@index([orgId, createdAt])
   @@index([orgId, status, createdAt])
   @@index([assignedToPersonId, createdAt])
@@ -679,6 +688,8 @@ model IdempotencyRecord {
 model Expense {
   id              String            @id @default(dbgenerated("gen_random_uuid()"))
   orgId           String
+  currency        String?
+  entryKey        String?
   title           String
   description     String?
   amountCents     Int
@@ -697,6 +708,7 @@ model Expense {
   User User?        @relation(fields: [createdByUserId], references: [id])
   org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
+  @@unique([orgId, entryKey])
   @@index([orgId, occurredAt])
   @@index([orgId, recurrence, isActive])
   @@index([orgId, category, occurredAt])
@@ -739,6 +751,7 @@ model Invoice {
 
   customer Customer?    @relation(fields: [orgId, customerId], references: [orgId, id], onDelete: NoAction, onUpdate: NoAction)
   org      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
   @@unique([orgId, number])
 }
 
@@ -907,6 +920,7 @@ model WhatsAppMessage {
   customer     Customer?             @relation(fields: [customerId], references: [id], onDelete: Restrict)
   org          Organization          @relation(fields: [orgId], references: [id])
 
+  @@unique([orgId, provider, providerMessageId])
   @@index([orgId, direction, createdAt])
   @@index([orgId, customerId, createdAt])
   @@index([orgId, conversationId, createdAt])
@@ -915,7 +929,6 @@ model WhatsAppMessage {
   @@index([orgId, messageType, createdAt])
   @@index([orgId, status, lockedAt, createdAt])
   @@index([status, lockedAt])
-  @@unique([orgId, provider, providerMessageId])
 }
 
 model WhatsAppProviderAccount {
@@ -1284,4 +1297,62 @@ model TenantRateLimitBucket {
 
   @@id([orgId, scope])
   @@index([startedAt])
+}
+
+model InventoryProduct {
+  id          String          @id @default(uuid())
+  orgId       String
+  sku         String
+  name        String
+  barcode     String?
+  variant     String?
+  minQuantity Int             @default(0)
+  onHand      Int             @default(0)
+  costCents   Int             @default(0)
+  saleCents   Int             @default(0)
+  currency    String
+  createdAt   DateTime        @default(now())
+  org         Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  movements   StockMovement[]
+
+  @@unique([orgId, sku])
+  @@unique([id, orgId])
+}
+
+model StockMovement {
+  id             String           @id @default(uuid())
+  orgId          String
+  productId      String
+  serviceOrderId String?
+  direction      String
+  quantity       Int
+  reason         String
+  actorUserId    String
+  entryKey       String
+  createdAt      DateTime         @default(now())
+  org            Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  product        InventoryProduct @relation(fields: [productId, orgId], references: [id, orgId], onDelete: Restrict)
+  serviceOrder   ServiceOrder?    @relation(fields: [serviceOrderId, orgId], references: [id, orgId], onDelete: Restrict)
+
+  @@unique([orgId, entryKey])
+  @@index([orgId, createdAt])
+}
+
+model FiscalDraft {
+  id             String        @id @default(uuid())
+  orgId          String
+  customerId     String
+  serviceOrderId String?
+  description    String
+  amountCents    Int
+  currency       String
+  entryKey       String
+  actorUserId    String
+  createdAt      DateTime      @default(now())
+  org            Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  customer       Customer      @relation(fields: [customerId, orgId], references: [id, orgId], onDelete: Restrict)
+  serviceOrder   ServiceOrder? @relation(fields: [serviceOrderId, orgId], references: [id, orgId], onDelete: Restrict)
+
+  @@unique([orgId, entryKey])
+  @@index([orgId, createdAt])
 }
