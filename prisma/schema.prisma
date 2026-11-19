@@ -604,6 +604,12 @@ model ServiceOrderReturn {
   coverageReviewedByName   String?
   coverageReviewedAt       DateTime?
   coverageVersion          Int                     @default(0)
+  caseState                String                  @default("ACTIVE")
+  caseVersion              Int                     @default(0)
+  caseReason               String?
+  caseReviewedByUserId     String?
+  caseReviewedByName       String?
+  caseReviewedAt           DateTime?
   createdAt                DateTime                @default(now())
   org                      Organization            @relation(fields: [orgId], references: [id])
   original                 ServiceOrder            @relation("ReturnOriginal", fields: [originalOrderId, orgId], references: [id, orgId], onDelete: Restrict)

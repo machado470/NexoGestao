@@ -62,4 +62,6 @@ O incremento de retorno abre uma nova O.S. para o mesmo cliente, ligada à origi
 
 Assinatura/identidade verificada, política completa de garantia/isenção, full-resolution e offline seguem pendentes; a etapa 1 ainda não está encerrada.
 
-O incremento de cobertura acrescenta decisão comercial manual de gestor, com motivo, versão, autor e histórico. Retornos pendentes ou cobertos bloqueiam cobranças vinculadas; serviço cobrável segue os fluxos normais. Não cancela cobranças nem estorna pagamentos. Detalhes e limites em `docs/RETURN_COVERAGE_AUDIT.md`. Política automática de garantia, materiais/custos e encerramento do caso continuam pendentes.
+O incremento de cobertura acrescenta decisão comercial manual de gestor, com motivo, versão, autor e histórico. Retornos pendentes ou cobertos bloqueiam cobranças vinculadas; serviço cobrável segue os fluxos normais. Não cancela cobranças nem estorna pagamentos. Detalhes e limites em `docs/RETURN_COVERAGE_AUDIT.md`. Política automática de garantia, materiais/custos e SLA do acompanhamento continuam pendentes.
+
+O acompanhamento de retorno agora pode ser encerrado e reaberto por gestor, com desfecho, autor/data e histórico. Exige execução concluída e cobertura definida, ou cancelamento; não confirma aceite/recebimento nem altera o financeiro. Detalhes em `docs/RETURN_CASE_RESOLUTION_AUDIT.md`. SLA, elegibilidade automática e custos continuam futuros.

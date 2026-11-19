@@ -48,6 +48,15 @@ export class ReturnCoverageDto {
   @Max(1000000)
   expectedVersion!: number;
 }
+export class ReturnCaseDto {
+  @IsIn(["ACTIVE", "CLOSED"]) state!: "ACTIVE" | "CLOSED";
+  @IsString() @MinLength(10) @MaxLength(1000) reason!: string;
+  @Transform(({ obj, key }) => obj[key])
+  @IsInt()
+  @Min(0)
+  @Max(1000000)
+  expectedVersion!: number;
+}
 const orderFields = {
   id: true,
   title: true,
@@ -55,6 +64,11 @@ const orderFields = {
   billingTreatment: true,
 } as const;
 const fields = {
+  caseState: true,
+  caseVersion: true,
+  caseReason: true,
+  caseReviewedByName: true,
+  caseReviewedAt: true,
   coverageReason: true,
   coverageReviewedByName: true,
   coverageReviewedAt: true,
@@ -76,6 +90,111 @@ export class ServiceOrderReturnsService {
     private readonly db: PrismaService,
     private readonly quotas: QuotasService,
   ) {}
+  async setCaseState(
+    orgId: string,
+    originalOrderId: string,
+    id: string,
+    actorId: string,
+    input: ReturnCaseDto,
+  ) {
+    const reason = input.reason.trim();
+    if (reason.length < 10)
+      throw new BadRequestException(
+        "Descreva o desfecho ou motivo da reabertura",
+      );
+    const actor = await this.db.user.findFirst({
+      where: { id: actorId, orgId, active: true },
+      select: { id: true, person: { select: { id: true, name: true } } },
+    });
+    if (!actor) throw new UnauthorizedException();
+    return this.db.$transaction(async (tx) => {
+      const found = await tx.serviceOrderReturn.findFirst({
+        where: { id, orgId, originalOrderId },
+      });
+      if (!found) throw new NotFoundException("Retorno não encontrado");
+      // Same lock order as coverage and linked charge writers; never infer payment or customer acceptance.
+      const rows = await tx.$queryRaw<
+        Array<{ status: string; billingTreatment: string; customerId: string }>
+      >`SELECT status, "billingTreatment", "customerId" FROM "ServiceOrder" WHERE id = ${found.childOrderId} AND "orgId" = ${orgId} FOR UPDATE`;
+      const item = await tx.serviceOrderReturn.findUnique({ where: { id } });
+      const child = rows[0];
+      if (!child || !item)
+        throw new NotFoundException("O.S. de retorno não encontrada");
+      if (
+        item.caseVersion === input.expectedVersion + 1 &&
+        item.caseState === input.state &&
+        item.caseReason === reason &&
+        item.caseReviewedByUserId === actorId
+      )
+        return tx.serviceOrderReturn.findUnique({
+          where: { id },
+          select: fields,
+        });
+      if (item.caseVersion !== input.expectedVersion)
+        throw new ConflictException(
+          "O acompanhamento mudou. Atualize o retorno antes de tentar novamente.",
+        );
+      if (item.caseState === input.state)
+        throw new ConflictException("O acompanhamento já está nesta situação.");
+      if (input.state === "CLOSED") {
+        if (child.status !== "DONE" && child.status !== "CANCELED")
+          throw new ConflictException(
+            "Conclua ou cancele a O.S. de retorno antes de encerrar o acompanhamento.",
+          );
+        if (
+          child.status === "DONE" &&
+          child.billingTreatment === "RETURN_PENDING"
+        )
+          throw new ConflictException(
+            "Defina a cobertura comercial antes de encerrar o acompanhamento.",
+          );
+      }
+      const at = new Date(),
+        name = actor.person?.name || "Responsável";
+      const updated = await tx.serviceOrderReturn.update({
+        where: { id },
+        data: {
+          caseState: input.state,
+          caseVersion: { increment: 1 },
+          caseReason: reason,
+          caseReviewedByUserId: actorId,
+          caseReviewedByName: name,
+          caseReviewedAt: at,
+        },
+        select: fields,
+      });
+      const metadata = {
+        returnCaseId: id,
+        state: input.state,
+        reason,
+        version: updated.caseVersion,
+        actorUserId: actorId,
+        originalServiceOrderId: originalOrderId,
+        childServiceOrderId: found.childOrderId,
+      };
+      await tx.timelineEvent.createMany({
+        data: [originalOrderId, found.childOrderId].map((serviceOrderId) => ({
+          orgId,
+          serviceOrderId,
+          customerId: child.customerId,
+          personId: actor.person?.id,
+          action: "SERVICE_ORDER_UPDATED",
+          description: `Acompanhamento do retorno ${input.state === "CLOSED" ? "encerrado" : "reaberto"}: ${reason}`,
+          metadata,
+        })),
+      });
+      await tx.auditEvent.create({
+        data: {
+          orgId,
+          personId: actor.person?.id,
+          action: "SERVICE_ORDER_UPDATED",
+          context: "ReturnCaseState",
+          metadata,
+        },
+      });
+      return updated;
+    });
+  }
   async coverage(
     orgId: string,
     originalOrderId: string,
@@ -115,6 +234,10 @@ export class ServiceOrderReturnsService {
       if (item.coverageVersion !== input.expectedVersion)
         throw new ConflictException(
           "A decisão mudou. Atualize o retorno antes de tentar novamente.",
+        );
+      if (item.caseState === "CLOSED")
+        throw new ConflictException(
+          "Reabra o acompanhamento antes de revisar a cobertura comercial",
         );
       if (child.status === "CANCELED")
         throw new ConflictException(
@@ -390,6 +513,19 @@ export class ServiceOrderReturnsService {
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ServiceOrderReturnsController {
   constructor(private readonly service: ServiceOrderReturnsService) {}
+  @Post(":id/state")
+  @Roles("ADMIN", "MANAGER")
+  caseState(
+    @Org() org: string,
+    @Param("serviceOrderId") original: string,
+    @Param("id") id: string,
+    @User() user: any,
+    @Body() body: ReturnCaseDto,
+  ) {
+    const actor = user?.userId ?? user?.sub;
+    if (!actor) throw new UnauthorizedException();
+    return this.service.setCaseState(org, original, id, actor, body);
+  }
   @Post(":id/coverage")
   @Roles("ADMIN", "MANAGER")
   coverage(

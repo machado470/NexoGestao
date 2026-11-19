@@ -37,4 +37,4 @@ Banco obrigatório dos testes: `COVERAGE_TEST_DATABASE_URL=postgresql://nexo@127
 
 ## Próximos incrementos
 
-Prazo/elegibilidade automática de garantia, orçamento de retorno com aprovação do cliente, materiais/custos, SLAs, encerramento de caso e ajustes financeiros com autorização própria. Esta entrega é decisão comercial manual, não motor completo de garantia nem assinatura digital.
+Prazo/elegibilidade automática de garantia, orçamento de retorno com aprovação do cliente, materiais/custos, SLAs e ajustes financeiros com autorização própria. O encerramento administrativo manual foi acrescentado no incremento documentado em `RETURN_CASE_RESOLUTION_AUDIT.md`; reabrir o acompanhamento é exigido antes de uma nova revisão comercial. Esta entrega é decisão comercial manual, não motor completo de garantia nem assinatura digital.

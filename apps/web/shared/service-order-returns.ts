@@ -1,5 +1,14 @@
 import { z } from "zod";
 const uuid = z.string().uuid();
+export const returnCaseChange = z
+  .object({
+    serviceOrderId: uuid,
+    id: uuid,
+    state: z.enum(["ACTIVE", "CLOSED"]),
+    reason: z.string().trim().min(10).max(1000),
+    expectedVersion: z.number().int().min(0).max(1000000),
+  })
+  .strict();
 export const returnCoverage = z
   .object({
     serviceOrderId: uuid,
@@ -28,6 +37,11 @@ const order = z.object({
   status: z.enum(["OPEN", "ASSIGNED", "IN_PROGRESS", "DONE", "CANCELED"]),
 });
 export const returnRecord = z.object({
+  caseState: z.enum(["ACTIVE", "CLOSED"]).optional(),
+  caseVersion: z.number().int().nonnegative().optional(),
+  caseReason: z.string().nullable().optional(),
+  caseReviewedByName: z.string().nullable().optional(),
+  caseReviewedAt: z.string().datetime().nullable().optional(),
   coverageReason: z.string().nullable().optional(),
   coverageReviewedByName: z.string().nullable().optional(),
   coverageReviewedAt: z.string().datetime().nullable().optional(),
