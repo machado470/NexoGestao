@@ -129,7 +129,7 @@ export function ReturnCoverageEditor({ item }: { item: ReturnRecord }) {
           </p>
         )}
       {(role === "ADMIN" || role === "MANAGER") &&
-        item.child.status !== "CANCELED" && (
+        item.child.status !== "CANCELED" && item.caseState !== "CLOSED" && (
           <Button
             variant="outline"
             className="mt-3 min-h-11"

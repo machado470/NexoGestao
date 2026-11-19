@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { ReturnCaseEditor } from "./ReturnCaseEditor";
 import { ReturnCoverageEditor } from './ReturnCoverageEditor';
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
@@ -180,6 +181,7 @@ export function ServiceOrderReturns({
                 {list.data.origin.reason}
               </p>
               <ReturnCoverageEditor item={list.data.origin} />
+              <ReturnCaseEditor item={list.data.origin} />
               <Button
                 variant="outline"
                 className="mt-3 min-h-11"
@@ -217,6 +219,7 @@ export function ServiceOrderReturns({
                     {item.reason}
                   </p>
                   <ReturnCoverageEditor item={item} />
+                  <ReturnCaseEditor item={item} />
                   {item.sourceAcceptanceId && (
                     <p className="mt-2 text-xs text-[var(--text-muted)]">
                       Vinculado a um problema relatado no aceite.
