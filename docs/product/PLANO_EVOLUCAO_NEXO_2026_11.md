@@ -52,4 +52,8 @@ Todas as fases devem manter isolamento por empresa, permissões na API, valores 
 
 ## Primeira entrega iniciada
 
-Fotos otimizadas e privadas na O.S. em execução/concluída, com relato e confirmação do profissional. Nesta primeira entrega as imagens são pequenas e persistidas no PostgreSQL, com limite por O.S.; não há dependência de URLs públicas ou storage externo. Antes de escalar volume, migrar conteúdo para object storage privado e definir retenção. Checklist, aceite externo, assinatura, garantia, full-resolution e offline seguem pendentes.
+Fotos otimizadas e privadas na O.S. em execução/concluída, com relato e confirmação do profissional. Nesta primeira entrega as imagens são pequenas e persistidas no PostgreSQL, com limite por O.S.; não há dependência de URLs públicas ou storage externo. Antes de escalar volume, migrar conteúdo para object storage privado e definir retenção.
+
+O incremento seguinte adiciona checklist por O.S., com tarefas preparadas antes do atendimento, marcação durante execução, autor/data, motivo para desfazer e proteção por versão. Não é obrigatório para concluir o serviço; modelos, edição/arquivamento e exigência configurável permanecem futuros. Detalhes em `docs/SERVICE_ORDER_CHECKLIST_AUDIT.md`.
+
+Aceite externo, assinatura, garantia, full-resolution e offline seguem pendentes; a etapa 1 ainda não está encerrada.

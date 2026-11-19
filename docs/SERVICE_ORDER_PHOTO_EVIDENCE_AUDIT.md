@@ -35,4 +35,4 @@ Auditoria browser: iniciar `apps/api/test/commerce-local-api.ts` com o banco loc
 
 ## Continuação
 
-O plano completo está em `docs/product/PLANO_EVOLUCAO_NEXO_2026_11.md`. Permanecem pendentes checklist, aceite seguro do cliente, assinatura, garantia/retrabalho, consumo de materiais, fotos originais e operação offline. Não considerar a etapa inteira de execução comprovada encerrada com esta entrega inicial.
+O plano completo está em `docs/product/PLANO_EVOLUCAO_NEXO_2026_11.md`. O checklist foi tratado no incremento documentado em `docs/SERVICE_ORDER_CHECKLIST_AUDIT.md`. Permanecem pendentes aceite seguro do cliente, assinatura, garantia/retrabalho, consumo de materiais, fotos originais e operação offline. Não considerar a etapa inteira de execução comprovada encerrada com estas entregas iniciais.
