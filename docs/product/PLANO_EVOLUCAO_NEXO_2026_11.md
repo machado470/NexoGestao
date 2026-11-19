@@ -61,3 +61,5 @@ O próximo incremento oferece confirmação de entrega ou relato de problema por
 O incremento de retorno abre uma nova O.S. para o mesmo cliente, ligada à original e opcionalmente ao problema do aceite. Análise de garantia/retrabalho não aprova cobertura ou gratuidade; não copia financeiro, responsável ou agendamento e não envia mensagens na abertura. Detalhes em `docs/SERVICE_ORDER_RETURNS_AUDIT.md`.
 
 Assinatura/identidade verificada, política completa de garantia/isenção, full-resolution e offline seguem pendentes; a etapa 1 ainda não está encerrada.
+
+O incremento de cobertura acrescenta decisão comercial manual de gestor, com motivo, versão, autor e histórico. Retornos pendentes ou cobertos bloqueiam cobranças vinculadas; serviço cobrável segue os fluxos normais. Não cancela cobranças nem estorna pagamentos. Detalhes e limites em `docs/RETURN_COVERAGE_AUDIT.md`. Política automática de garantia, materiais/custos e encerramento do caso continuam pendentes.

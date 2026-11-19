@@ -792,6 +792,17 @@ export default function ServiceOrdersPage() {
       return;
     }
     setSelectedOrderId(item.id);
+    if (item.nextAction.type === 'select' && item.status === 'DONE') {
+      mobile.open();
+      void utils.serviceOrders.returns.fetch({serviceOrderId:item.id,page:1}).then(data => {
+        if(data.origin?.child.billingTreatment !== 'RETURN_PENDING') return;
+        requestAnimationFrame(() => {
+          const target = document.getElementById('return-coverage-'+item.id);
+          target?.scrollIntoView({block:'start'});
+          target?.focus({preventScroll:true});
+        });
+      }).catch(() => { /* The return section presents its own read recovery. */ });
+    }
   }
 
   async function handleGenerateCharge(orderId: string) {

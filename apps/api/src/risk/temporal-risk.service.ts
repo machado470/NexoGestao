@@ -1,3 +1,4 @@
+import { BILLABLE_TREATMENTS } from '../common/billing-treatment'
 import { Injectable } from '@nestjs/common'
 import { OperationalStateValue } from '@prisma/client'
 import {
@@ -216,7 +217,7 @@ export class TemporalRiskService {
           orgId: resolvedOrgId,
           assignedToPersonId: personId,
           status: 'DONE',
-          charges: { none: {} },
+          billingTreatment: { in: [...BILLABLE_TREATMENTS] }, charges: { none: {} },
         },
       }),
       this.prisma.serviceOrder.count({

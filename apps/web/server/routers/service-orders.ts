@@ -2,7 +2,7 @@ import { z } from "zod";
 import { TRPCError } from '@trpc/server';
 import { evidenceMetadata, evidenceUpload } from '../../shared/service-order-evidence';
 import { checklistCreate, checklistChange, checklistItem } from '../../shared/service-order-checklist';
-import { returnCreate, returnRecord, returnPage } from '../../shared/service-order-returns';
+import { returnCreate, returnRecord, returnPage, returnCoverage } from '../../shared/service-order-returns';
 import { protectedProcedure, router } from "../_core/trpc";
 import { authedGetPage, authedGet, authedPatch, authedPost, type NexoContext } from "../_core/nexoTransport";
 
@@ -166,6 +166,7 @@ function parseOrder<T extends z.ZodType>(payload: unknown, schema: T): z.infer<T
 }
 
 export const serviceOrdersRouter = router({
+  setReturnCoverage: protectedProcedure.input(returnCoverage).output(returnRecord).mutation(({ctx,input})=>{const {serviceOrderId,id,...body}=input;return authedPost(ctx as NexoContext,`/service-orders/${serviceOrderId}/returns/${id}/coverage`,body);}),
   returns: protectedProcedure.input(z.object({ serviceOrderId: uuid, page: z.number().int().min(1).max(10000) }).strict()).output(returnPage).query(({ctx, input}) => privateEvidenceGet(ctx, `/service-orders/${input.serviceOrderId}/returns?page=${input.page}`)),
   createReturn: protectedProcedure.input(returnCreate).output(returnRecord).mutation(({ctx, input}) => { const { serviceOrderId, ...body } = input; return authedPost(ctx as NexoContext, `/service-orders/${serviceOrderId}/returns`, body); }),
   checklist: protectedProcedure.input(z.object({ serviceOrderId: uuid }).strict()).output(z.array(checklistItem)).query(({ctx, input}) => privateEvidenceGet(ctx, `/service-orders/${input.serviceOrderId}/checklist`)),

@@ -1,3 +1,4 @@
+import { isBillableTreatment, isReturnBillingBlock, ReturnBillingBlockedException } from '../common/billing-treatment'
 import { refundedAmount } from '../common/finance/refunded-amount'
 import {
   BadRequestException,
@@ -164,7 +165,7 @@ export class FinanceService {
   }) {
     const serviceOrder = await this.prisma.serviceOrder.findFirst({
       where: { id: params.serviceOrderId, orgId: params.orgId },
-      select: { id: true, customerId: true, status: true },
+      select: { id: true, customerId: true, status: true, billingTreatment: true },
     })
 
     if (!serviceOrder) {
@@ -174,6 +175,8 @@ export class FinanceService {
     if (params.customerId && serviceOrder.customerId !== params.customerId) {
       throw new BadRequestException('Ordem de serviço não pertence ao cliente informado')
     }
+
+    if (!isBillableTreatment(serviceOrder.billingTreatment)) throw new ReturnBillingBlockedException()
 
     if (serviceOrder.status === 'CANCELED') {
       throw new BadRequestException('Não é permitido gerar cobrança para O.S. cancelada')
@@ -670,6 +673,7 @@ export class FinanceService {
       return result
     } catch (error: any) {
       await this.idempotency.fail(idemRecordId, error?.code)
+      if (isReturnBillingBlock(error)) throw new ReturnBillingBlockedException()
       throw error
     }
   }
@@ -1184,6 +1188,7 @@ export class FinanceService {
       return result
     } catch (error: any) {
       await this.idempotency.fail(idemRecordId, error?.code)
+      if (isReturnBillingBlock(error)) throw new ReturnBillingBlockedException()
       throw error
     }
   }
@@ -1291,6 +1296,7 @@ export class FinanceService {
       return result
     } catch (error: any) {
       await this.idempotency.fail(idem.recordId, error?.code)
+      if (isReturnBillingBlock(error)) throw new ReturnBillingBlockedException()
       throw error
     }
   }

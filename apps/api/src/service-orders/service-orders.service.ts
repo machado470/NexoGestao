@@ -1,3 +1,4 @@
+import { isBillableTreatment, ReturnBillingBlockedException } from '../common/billing-treatment'
 import {
   BadRequestException,
   ConflictException,
@@ -745,7 +746,8 @@ export class ServiceOrdersService {
         },
       })
 
-      if (updated.amountCents && updated.amountCents > 0) {
+      if (isBillableTreatment(updated.billingTreatment) && updated.amountCents && updated.amountCents > 0) {
+        try {
         await this.finance.ensureChargeForServiceOrderDone({
           orgId: params.orgId,
           serviceOrderId: updated.id,
@@ -753,6 +755,10 @@ export class ServiceOrdersService {
           amountCents: updated.amountCents,
           actorUserId: params.updatedBy,
         })
+        } catch (error) {
+          // A concurrent coverage decision may block billing after completion.
+          if (!(error instanceof ReturnBillingBlockedException)) throw error
+        }
       }
 
       await this.automation.executeTrigger({

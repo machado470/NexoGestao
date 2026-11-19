@@ -1,3 +1,4 @@
+import { BILLABLE_TREATMENTS } from '../common/billing-treatment'
 import { BadRequestException, Injectable, Logger } from '@nestjs/common'
 import { randomUUID } from 'crypto'
 import { Prisma, WhatsAppMessageType } from '@prisma/client'
@@ -578,7 +579,7 @@ export class ExecutionRunner {
         orgId,
         status: 'DONE',
         amountCents: { gt: 0 },
-        charges: { none: {} },
+        billingTreatment: { in: [...BILLABLE_TREATMENTS] }, charges: { none: {} },
       },
       select: {
         id: true,

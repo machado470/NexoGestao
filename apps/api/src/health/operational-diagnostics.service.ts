@@ -1,3 +1,4 @@
+import { BILLABLE_TREATMENTS } from '../common/billing-treatment'
 import { Injectable } from '@nestjs/common'
 import { ChargeStatus, Prisma, ServiceOrderStatus, WhatsAppMessageStatus } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
@@ -38,7 +39,7 @@ export class OperationalDiagnosticsService {
       this.prisma.charge.findMany({ where: { orgId, status: ChargeStatus.PAID, payments: { none: {} } }, select: { id: true, orgId: true, updatedAt: true }, take: safeLimit }),
       this.prisma.payment.findMany({ where: { orgId, charge: { status: { not: ChargeStatus.PAID } } }, select: { id: true, orgId: true, chargeId: true, charge: { select: { status: true } } }, take: safeLimit }),
       this.prisma.charge.findMany({ where: { orgId, status: ChargeStatus.OVERDUE, timelineEvents: { none: { action: 'CHARGE_OVERDUE' } } }, select: { id: true, orgId: true, dueDate: true }, take: safeLimit }),
-      this.prisma.serviceOrder.findMany({ where: { orgId, status: { in: [ServiceOrderStatus.DONE] }, charges: { none: {} } }, select: { id: true, orgId: true, status: true }, take: safeLimit }),
+      this.prisma.serviceOrder.findMany({ where: { orgId, status: { in: [ServiceOrderStatus.DONE] }, billingTreatment: { in: [...BILLABLE_TREATMENTS] }, charges: { none: {} } }, select: { id: true, orgId: true, status: true }, take: safeLimit }),
       this.prisma.serviceOrder.findMany({ where: { orgId, status: { in: [ServiceOrderStatus.DONE] }, timelineEvents: { none: { action: 'SERVICE_ORDER_COMPLETED' } } }, select: { id: true, orgId: true, status: true }, take: safeLimit }),
       this.prisma.whatsAppMessage.findMany({ where: { orgId, status: { in: [WhatsAppMessageStatus.QUEUED, WhatsAppMessageStatus.SENDING] }, createdAt: { lt: new Date(Date.now() - 1000 * 60 * 30) } }, select: { id: true, orgId: true, status: true, createdAt: true }, take: safeLimit }),
       this.prisma.whatsAppMessage.findMany({ where: { orgId, status: WhatsAppMessageStatus.FAILED, failedAt: null }, select: { id: true, orgId: true, status: true }, take: safeLimit }),

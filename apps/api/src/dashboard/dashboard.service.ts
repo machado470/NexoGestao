@@ -1,3 +1,4 @@
+import { BILLABLE_TREATMENTS } from '../common/billing-treatment'
 import { refundedAmount } from '../common/finance/refunded-amount'
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
@@ -355,6 +356,7 @@ export class DashboardService {
         where: {
           orgId,
           status: 'DONE',
+          billingTreatment: { in: [...BILLABLE_TREATMENTS] },
           charges: {
             none: {},
           },
