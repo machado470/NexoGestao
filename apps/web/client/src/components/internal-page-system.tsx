@@ -1203,7 +1203,7 @@ export function AppPageErrorState({
       <p className="text-sm leading-6 text-[var(--text-secondary)]">
         {description}
       </p>
-      <Button variant="outline" onClick={onAction}>
+      <Button variant="outline" className="min-h-11" onClick={onAction}>
         {actionLabel}
       </Button>
     </AppSectionCard>

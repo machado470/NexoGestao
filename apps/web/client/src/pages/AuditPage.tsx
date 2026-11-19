@@ -1,3 +1,4 @@
+import { transientReadOptions } from "@/lib/read-query-retry";
 import { organizationDayRange } from "@/lib/local-date-time";
 import { MobileModuleHeader } from "@/components/MobileModuleHeader";
 import { ResponsiveDetails } from "@/components/ResponsiveDetails";
@@ -130,13 +131,16 @@ export default function AuditPage() {
   const canLoadAudit = isAuthenticated && role === "ADMIN";
   const listQuery = trpc.audit.listEvents.useQuery(
     { page, limit: AUDIT_PAGE_SIZE, ...filters },
-    { enabled: canLoadAudit, retry: false },
+    { enabled: canLoadAudit, ...transientReadOptions },
   );
   const summaryQuery = trpc.audit.getSummary.useQuery(
     { from: filters.from, to: filters.to },
-    { enabled: canLoadAudit, retry: false },
+    { enabled: canLoadAudit, ...transientReadOptions },
   );
-  const actorsQuery = trpc.people.list.useQuery(undefined, { enabled: canLoadAudit, retry: false });
+  const actorsQuery = trpc.people.list.useQuery(undefined, { enabled: canLoadAudit, ...transientReadOptions });
+  const listLoading = listQuery.isLoading || (listQuery.isFetching && listQuery.isError);
+  const listFailed = listQuery.isError && !listQuery.isFetching;
+  const summaryFailed = summaryQuery.isError && !summaryQuery.isFetching;
   const actors = Array.isArray(actorsQuery.data) ? actorsQuery.data : [];
   const { events, pagination } = useMemo(() => normalizeAuditList(listQuery.data), [listQuery.data]);
   const summary = useMemo(() => normalizeAuditSummary(summaryQuery.data), [summaryQuery.data]);
@@ -205,18 +209,18 @@ export default function AuditPage() {
         </ResponsiveDetails>
       </AppFiltersBar>
 
-      {listQuery.isError || summaryQuery.isError ? (
+      {listFailed || summaryFailed ? (
         <AppAlert variant="destructive">
           <AppAlertTitle>Não foi possível carregar toda a auditoria.</AppAlertTitle>
           <AppAlertDescription className="flex flex-wrap items-center justify-between gap-3">
             A listagem e o resumo mantêm estados independentes. Tente novamente sem perder os filtros.
-            <Button type="button" variant="neutral" size="sm" onClick={retry}><RefreshCw />Tentar novamente</Button>
+            <Button type="button" variant="neutral" size="sm" className="min-h-11" onClick={retry}><RefreshCw />Tentar novamente</Button>
           </AppAlertDescription>
         </AppAlert>
       ) : null}
 
       <AppSectionBlock className="mobile-flat-section" title="Registros de auditoria" subtitle="Ordem oficial da API: eventos mais recentes primeiro. Selecione um registro para examinar sua evidência.">
-        {listQuery.isError ? <p role="status">Registros indisponíveis. Tente novamente acima.</p> : listQuery.isLoading ? <AppLoadingState label="Carregando registros de auditoria..." /> : getAuditEmptyState(events, listQuery.isLoading) ? (
+        {listLoading ? <AppLoadingState label="Carregando registros de auditoria..." /> : listFailed ? <p role="status">Registros indisponíveis. Tente novamente acima.</p> : getAuditEmptyState(events, listLoading) ? (
           <AppEmptyState title={hasFilters ? "Nenhum registro corresponde aos filtros" : "Nenhum registro de auditoria"} description={hasFilters ? "Revise ou limpe os filtros para ampliar o recorte." : "Ainda não há fatos registrados para esta organização."} action={hasFilters ? <Button type="button" variant="neutral" onClick={clearFilters}>Limpar filtros</Button> : undefined} />
         ) : (
           <>
