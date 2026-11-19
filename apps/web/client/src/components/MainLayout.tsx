@@ -2,7 +2,7 @@ import { NotificationCenter } from "@/components/NotificationCenter";
 import { useNotificationStore } from "@/stores/notificationStore";
 import { requestAppNavigation } from "@/lib/navigation-guard";
 import { MobileAppNavigation } from "@/components/MobileAppNavigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import {
@@ -92,15 +92,35 @@ export function MainLayout({ children }: MainLayoutProps) {
     { page: 1, limit: 6, category: "all" },
     { enabled: isAuthenticated, retry: false },
   );
+  const readingNotifications = useRef(new Set<string>());
+  const [notificationReadState, setNotificationReadState] = useState<Record<string, "pending" | "error">>({});
+  const clearNotificationReadState = (id: string) => setNotificationReadState(previous => {
+    const next = { ...previous };
+    delete next[id];
+    return next;
+  });
   const markNotificationRead = trpc.dashboard.notificationCenter.markAsRead.useMutation({
-    onSuccess: async () => {
-      await Promise.all([
+    onSuccess: (_result, input) => {
+      clearNotificationReadState(input.id);
+      void Promise.allSettled([
         trpcUtils.dashboard.notificationCenter.list.invalidate(),
         trpcUtils.dashboard.notificationCenter.unreadCount.invalidate(),
         trpcUtils.dashboard.notifications.invalidate(),
       ]);
     },
+    onError: (_error, input) => {
+      setNotificationReadState(previous => ({ ...previous, [input.id]: "error" }));
+    },
+    onSettled: (_result, _error, input) => {
+      readingNotifications.current.delete(input.id);
+    },
   });
+  const markRead = (id: string) => {
+    if (readingNotifications.current.has(id)) return;
+    readingNotifications.current.add(id);
+    setNotificationReadState(previous => ({ ...previous, [id]: "pending" }));
+    markNotificationRead.mutate({ id });
+  };
   const persistentNotifications = notificationQuery.data?.items ?? [];
   const unreadCount = notificationQuery.data?.unreadCount;
   const localNotificationCount = useNotificationStore(state => state.notifications.length);
@@ -532,7 +552,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                         align="end"
                         className="max-h-[70dvh] w-[min(360px,calc(100vw-2rem))] overflow-y-auto nexo-floating-panel"
                       >
-                        <DropdownMenuLabel className="flex items-center justify-between px-3 py-2">
+                        <DropdownMenuLabel className="flex flex-col items-start gap-1 whitespace-normal px-3 py-2">
                           <span>Notificações</span>
                           <span className="text-xs font-normal text-[var(--text-muted)]">
                             {notificationStreamStatus === "connected" ? "Atualização em tempo real ativa" :
@@ -549,7 +569,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                         ) : notificationQuery.isError ? (
                           <div className="px-3 py-8 text-center">
                             <p className="text-sm text-[var(--danger)]">Não foi possível carregar as notificações.</p>
-                            <button type="button" onClick={() => notificationQuery.refetch()} className="mt-2 text-xs font-medium text-[var(--accent)]">Tentar novamente</button>
+                            <button type="button" onClick={() => notificationQuery.refetch()} className="mt-2 min-h-11 px-2 text-sm font-medium text-[var(--accent)]">Tentar novamente</button>
                           </div>
                         ) : persistentNotifications.length === 0 ? (
                           <div className="px-3 py-8 text-center">
@@ -559,18 +579,30 @@ export function MainLayout({ children }: MainLayoutProps) {
                         ) : persistentNotifications.map(item => {
                           const safeRouteHint = isSafeNotificationRouteHint(item.routeHint) ? item.routeHint : null;
                           return (
+                          <div key={item.id} className="min-w-0">
                           <DropdownMenuItem
-                            key={item.id}
-                            className={cn("flex flex-col items-start gap-1 rounded-xl px-3 py-2", safeRouteHint && "cursor-pointer", !item.read && "bg-[var(--surface-subtle)]")}
+                            className={cn("flex min-h-11 min-w-0 flex-col items-start gap-1 whitespace-normal rounded-xl px-3 py-2", safeRouteHint && "cursor-pointer", !item.read && "bg-[var(--surface-subtle)]")}
                             onSelect={evt => {
                               evt.preventDefault();
-                              if (!item.read) markNotificationRead.mutate({ id: item.id });
+                              if (!item.read) markRead(item.id);
                               if (safeRouteHint) { setNotificationMenuOpen(false); navigate(safeRouteHint); }
                             }}
                           >
-                            <p className="text-sm font-medium text-[var(--text-primary)]">{item.title}</p>
-                            <p className="line-clamp-2 text-xs text-[var(--text-muted)]">{item.message}</p>
+                            <p className="w-full break-words text-sm font-medium text-[var(--app-overlay-text)]">{item.title}</p>
+                            <p className="w-full break-words text-xs text-[var(--text-muted)]">{item.message}</p>
                           </DropdownMenuItem>
+                          {!item.read && notificationReadState[item.id] === "pending" ? (
+                            <p role="status" className="px-3 py-2 text-xs text-[var(--text-muted)]">Marcando como lida…</p>
+                          ) : null}
+                          {!item.read && notificationReadState[item.id] === "error" ? (
+                            <div className="px-3 py-2 text-sm">
+                              <p role="alert">Não foi possível marcar esta notificação como lida.</p>
+                              <DropdownMenuItem className="min-h-11 cursor-pointer text-[var(--app-overlay-text)] focus:text-[var(--app-overlay-text)] underline underline-offset-4" aria-label={`Tentar marcar como lida: ${item.title}`} onSelect={event => { event.preventDefault(); markRead(item.id); }}>
+                                Tentar novamente
+                              </DropdownMenuItem>
+                            </div>
+                          ) : null}
+                          </div>
                           );
                         })}
                       </DropdownMenuContent>
