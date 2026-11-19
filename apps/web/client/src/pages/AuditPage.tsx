@@ -191,11 +191,11 @@ export default function AuditPage() {
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <AppField label="Período inicial" htmlFor="audit-from"><AppInput id="audit-from" type="date" value={draftFilters.from} onChange={event => setDraftFilters(current => ({ ...current, from: event.target.value }))} /></AppField>
             <AppField label="Período final" htmlFor="audit-to"><AppInput id="audit-to" type="date" value={draftFilters.to} onChange={event => setDraftFilters(current => ({ ...current, to: event.target.value }))} /></AppField>
-            <AppField label="Ator" htmlFor="audit-actor"><select id="audit-actor" className="w-full rounded-md border bg-[var(--surface-base)] p-2" disabled={actorsQuery.isLoading && summaryQuery.isLoading && events.length === 0} value={draftFilters.actorPersonId} onChange={event => setDraftFilters(current => ({ ...current, actorPersonId: event.target.value }))}>
+            <AppField label="Ator" htmlFor="audit-actor"><select id="audit-actor" className="w-full min-w-0 rounded-md border border-[var(--field-border)] bg-[var(--field-bg)] p-2 text-base text-[var(--field-text)] md:text-sm" disabled={actorsQuery.isLoading && summaryQuery.isLoading && events.length === 0} value={draftFilters.actorPersonId} onChange={event => setDraftFilters(current => ({ ...current, actorPersonId: event.target.value }))}>
               <option value="">Todos os atores</option>
               {actorOptions.map(actor => <option key={actor.id} value={actor.id}>{actor.label}</option>)}
             </select>{actorsQuery.isError ? <p role="status">Cadastro de pessoas indisponível. Nomes do histórico continuam disponíveis quando retornados pela Auditoria.</p> : null}</AppField>
-            <AppField label="Tipo de evento" htmlFor="audit-action"><select id="audit-action" className="w-full rounded-md border bg-[var(--surface-base)] p-2" value={draftFilters.action} onChange={event => setDraftFilters(current => ({ ...current, action: event.target.value }))}>
+            <AppField label="Tipo de evento" htmlFor="audit-action"><select id="audit-action" className="w-full min-w-0 rounded-md border border-[var(--field-border)] bg-[var(--field-bg)] p-2 text-base text-[var(--field-text)] md:text-sm" value={draftFilters.action} onChange={event => setDraftFilters(current => ({ ...current, action: event.target.value }))}>
               <option value="">Todos os eventos</option>
               {Array.from(new Set([...summary.byAction.map(item => item.action), ...events.map(item => item.action), ...(draftFilters.action ? [draftFilters.action] : [])])).map(action => <option key={action} value={action}>{presentationLabel(action)}</option>)}
             </select></AppField>

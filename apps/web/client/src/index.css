@@ -3925,6 +3925,21 @@ html {
   }
 }
 
+/* Evidence filters keep native/select controls readable and easy to touch. */
+.evidence-mobile-page .module-filters { color-scheme: light; }
+.dark .evidence-mobile-page .module-filters { color-scheme: dark; }
+@media (max-width: 767px) {
+  .evidence-mobile-page .module-filters input,
+  .evidence-mobile-page .module-filters select,
+  .evidence-mobile-page .module-filters [role="combobox"] {
+    min-height: 44px;
+    min-width: 0;
+    max-width: 100%;
+    font-size: 16px;
+  }
+  .evidence-mobile-page .module-filters button { min-height: 44px; }
+}
+
 /* Evidence stays complete while phone views emphasize the event and action. */
 @media (max-width: 767px) {
   .evidence-mobile-page summary { min-height: 44px; }
