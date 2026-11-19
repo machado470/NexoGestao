@@ -17,6 +17,7 @@ import { QuotasModule } from '../quotas/quotas.module'
 import { AnalyticsModule } from '../analytics/analytics.module'
 import { OutboxModule } from '../outbox/outbox.module'
 import { ServiceOrderEvidenceController, ServiceOrderEvidenceService } from './service-order-evidence'
+import { ServiceOrderChecklistController, ServiceOrderChecklistService } from './service-order-checklist'
 
 @Module({
   imports: [
@@ -33,8 +34,8 @@ import { ServiceOrderEvidenceController, ServiceOrderEvidenceService } from './s
     AnalyticsModule,
     OutboxModule,
   ],
-  controllers: [ServiceOrdersController, ServiceOrderEvidenceController],
-  providers: [ServiceOrdersService, ServiceOrderReadService, ServiceOrderTenantAccessGuard, ServiceOrderEvidenceService],
+  controllers: [ServiceOrdersController, ServiceOrderEvidenceController, ServiceOrderChecklistController],
+  providers: [ServiceOrdersService, ServiceOrderReadService, ServiceOrderTenantAccessGuard, ServiceOrderEvidenceService, ServiceOrderChecklistService],
   exports: [ServiceOrdersService],
 })
 export class ServiceOrdersModule {}

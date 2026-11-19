@@ -45,10 +45,11 @@ model Organization {
   notifications                Notification[]
   webhookEndpoints             WebhookEndpoint[]
 
-  inventoryProducts    InventoryProduct[]
-  stockMovements       StockMovement[]
-  fiscalDrafts         FiscalDraft[]
-  serviceOrderEvidence ServiceOrderEvidence[]
+  inventoryProducts     InventoryProduct[]
+  stockMovements        StockMovement[]
+  fiscalDrafts          FiscalDraft[]
+  serviceOrderEvidence  ServiceOrderEvidence[]
+  serviceOrderChecklist ServiceOrderChecklistItem[]
 
   subscription     Subscription?
   executionConfig  OrganizationExecutionConfig?
@@ -511,16 +512,16 @@ model Appointment {
 }
 
 model ServiceOrder {
-  id                 String                   @id @default(uuid())
+  id                 String                      @id @default(uuid())
   orgId              String
   customerId         String
-  idempotencyKey     String?                  @unique
-  appointmentId      String?                  @unique
+  idempotencyKey     String?                     @unique
+  appointmentId      String?                     @unique
   assignedToPersonId String?
   title              String
   description        String?
-  status             ServiceOrderStatus       @default(OPEN)
-  priority           Int                      @default(2)
+  status             ServiceOrderStatus          @default(OPEN)
+  priority           Int                         @default(2)
   scheduledFor       DateTime?
   startedAt          DateTime?
   finishedAt         DateTime?
@@ -528,18 +529,19 @@ model ServiceOrder {
   dueDate            DateTime?
   cancellationReason String?
   outcomeSummary     String?
-  createdAt          DateTime                 @default(now())
-  updatedAt          DateTime                 @updatedAt
+  createdAt          DateTime                    @default(now())
+  updatedAt          DateTime                    @updatedAt
   charges            Charge[]
   attachments        ServiceOrderAttachment[]
-  appointment        Appointment?             @relation(fields: [appointmentId], references: [id])
-  assignedTo         Person?                  @relation("ServiceOrderAssignedTo", fields: [assignedToPersonId], references: [id])
-  customer           Customer                 @relation(fields: [customerId], references: [id])
-  org                Organization             @relation(fields: [orgId], references: [id])
+  appointment        Appointment?                @relation(fields: [appointmentId], references: [id])
+  assignedTo         Person?                     @relation("ServiceOrderAssignedTo", fields: [assignedToPersonId], references: [id])
+  customer           Customer                    @relation(fields: [customerId], references: [id])
+  org                Organization                @relation(fields: [orgId], references: [id])
   timelineEvents     TimelineEvent[]
   fiscalDrafts       FiscalDraft[]
   stockMovements     StockMovement[]
   evidence           ServiceOrderEvidence[]
+  checklist          ServiceOrderChecklistItem[]
 
   @@unique([id, orgId])
   @@index([orgId, createdAt])
@@ -547,6 +549,27 @@ model ServiceOrder {
   @@index([assignedToPersonId, createdAt])
   @@index([orgId, customerId, createdAt])
   @@index([orgId, scheduledFor])
+}
+
+model ServiceOrderChecklistItem {
+  id                  String       @id @default(uuid())
+  orgId               String
+  serviceOrderId      String
+  entryKey            String
+  title               String
+  completed           Boolean      @default(false)
+  completedAt         DateTime?
+  completedByName     String?
+  createdByUserId     String
+  lastChangedByUserId String?
+  lastReason          String?
+  version             Int          @default(0)
+  createdAt           DateTime     @default(now())
+  org                 Organization @relation(fields: [orgId], references: [id])
+  serviceOrder        ServiceOrder @relation(fields: [serviceOrderId, orgId], references: [id, orgId], onDelete: Cascade)
+
+  @@unique([orgId, serviceOrderId, entryKey])
+  @@index([orgId, serviceOrderId, createdAt])
 }
 
 model ServiceOrderEvidence {

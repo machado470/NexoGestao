@@ -10,6 +10,7 @@ import { CommerceService } from "../src/commerce/commerce.service";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { JwtAuthGuard } from "../src/auth/jwt-auth.guard";
 import { ServiceOrderEvidenceController, ServiceOrderEvidenceService } from '../src/service-orders/service-order-evidence';
+import { ServiceOrderChecklistController, ServiceOrderChecklistService } from '../src/service-orders/service-order-checklist';
 const url = "postgresql://nexo@127.0.0.1:55439/postgres";
 if (process.env.COMMERCE_TEST_DATABASE_URL !== url)
   throw new Error("Requires the isolated commerce test database");
@@ -76,8 +77,8 @@ async function main() {
     },
   });
   const module = await Test.createTestingModule({
-    controllers: [CommerceController, ServiceOrderEvidenceController],
-    providers: [CommerceService, ServiceOrderEvidenceService, { provide: PrismaService, useValue: db }],
+    controllers: [CommerceController, ServiceOrderEvidenceController, ServiceOrderChecklistController],
+    providers: [CommerceService, ServiceOrderEvidenceService, ServiceOrderChecklistService, { provide: PrismaService, useValue: db }],
   })
     .overrideGuard(JwtAuthGuard)
     .useValue({
@@ -111,6 +112,7 @@ async function main() {
   const shutdown = async () => {
     await app.close();
     const where = { orgId };
+    await db.serviceOrderChecklistItem.deleteMany({ where });
     await db.serviceOrderEvidence.deleteMany({ where });
     await db.timelineEvent.deleteMany({ where });
     await db.auditEvent.deleteMany({ where });

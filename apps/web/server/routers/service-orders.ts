@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { TRPCError } from '@trpc/server';
 import { evidenceMetadata, evidenceUpload } from '../../shared/service-order-evidence';
+import { checklistCreate, checklistChange, checklistItem } from '../../shared/service-order-checklist';
 import { protectedProcedure, router } from "../_core/trpc";
 import { authedGetPage, authedGet, authedPatch, authedPost, type NexoContext } from "../_core/nexoTransport";
 
@@ -164,6 +165,9 @@ function parseOrder<T extends z.ZodType>(payload: unknown, schema: T): z.infer<T
 }
 
 export const serviceOrdersRouter = router({
+  checklist: protectedProcedure.input(z.object({ serviceOrderId: uuid }).strict()).output(z.array(checklistItem)).query(({ctx, input}) => privateEvidenceGet(ctx, `/service-orders/${input.serviceOrderId}/checklist`)),
+  createChecklistItem: protectedProcedure.input(checklistCreate).output(checklistItem).mutation(({ctx, input}) => { const { serviceOrderId, ...body } = input; return authedPost(ctx as NexoContext, `/service-orders/${serviceOrderId}/checklist`, body); }),
+  changeChecklistItem: protectedProcedure.input(checklistChange).output(checklistItem).mutation(({ctx, input}) => { const { serviceOrderId, id, ...body } = input; return authedPost(ctx as NexoContext, `/service-orders/${serviceOrderId}/checklist/${id}/state`, body); }),
   evidence: protectedProcedure.input(z.object({ serviceOrderId: uuid }).strict()).output(z.array(evidenceMetadata)).query(({ctx, input}) => privateEvidenceGet(ctx, `/service-orders/${input.serviceOrderId}/evidence`)),
   evidenceImage: protectedProcedure.input(z.object({ serviceOrderId: uuid, id: uuid }).strict()).output(z.object({ imageBase64: z.string().max(87384).regex(/^[A-Za-z0-9+/]+={0,2}$/) })).query(({ctx, input}) => privateEvidenceGet(ctx, `/service-orders/${input.serviceOrderId}/evidence/${input.id}`)),
   addEvidence: protectedProcedure.input(evidenceUpload).output(evidenceMetadata).mutation(({ctx, input}) => {
