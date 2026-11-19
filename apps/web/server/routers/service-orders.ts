@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { TRPCError } from '@trpc/server';
+import { evidenceMetadata, evidenceUpload } from '../../shared/service-order-evidence';
 import { protectedProcedure, router } from "../_core/trpc";
 import { authedGetPage, authedGet, authedPatch, authedPost, type NexoContext } from "../_core/nexoTransport";
 
@@ -6,6 +8,10 @@ const uuid = z.string().uuid();
 const nullableUuid = uuid.nullable();
 const timestamp = z.string().datetime();
 const nullableTimestamp = timestamp.nullable();
+function privateEvidenceGet(ctx: any, path: string) {
+  ctx.res?.setHeader?.('Cache-Control', 'private, no-store');
+  return authedGet(ctx as NexoContext, path);
+}
 const status = z.enum(["OPEN", "ASSIGNED", "IN_PROGRESS", "DONE", "CANCELED"]);
 
 const serviceOrderListInput = z.object({
@@ -158,6 +164,13 @@ function parseOrder<T extends z.ZodType>(payload: unknown, schema: T): z.infer<T
 }
 
 export const serviceOrdersRouter = router({
+  evidence: protectedProcedure.input(z.object({ serviceOrderId: uuid }).strict()).output(z.array(evidenceMetadata)).query(({ctx, input}) => privateEvidenceGet(ctx, `/service-orders/${input.serviceOrderId}/evidence`)),
+  evidenceImage: protectedProcedure.input(z.object({ serviceOrderId: uuid, id: uuid }).strict()).output(z.object({ imageBase64: z.string().max(87384).regex(/^[A-Za-z0-9+/]+={0,2}$/) })).query(({ctx, input}) => privateEvidenceGet(ctx, `/service-orders/${input.serviceOrderId}/evidence/${input.id}`)),
+  addEvidence: protectedProcedure.input(evidenceUpload).output(evidenceMetadata).mutation(({ctx, input}) => {
+    if (!['ADMIN', 'MANAGER', 'STAFF'].includes(String(ctx.user?.role))) throw new TRPCError({ code: 'FORBIDDEN', message: 'Seu perfil não pode registrar fotos.' });
+    const { serviceOrderId, ...body } = input;
+    return authedPost(ctx as NexoContext, `/service-orders/${serviceOrderId}/evidence`, body);
+  }),
   page: protectedProcedure.input(serviceOrderListInput).query(async ({ctx, input}) => {
     const page = await authedGetPage(ctx as NexoContext, '/service-orders', input);
     return { ...page, items: parseList({ data: page.items, pagination: page.meta }).data };
