@@ -48,6 +48,7 @@ const AppointmentsPage = lazy(() => import("./pages/AppointmentsPage"));
 const ServiceOrdersPage = lazy(() => import("./pages/ServiceOrdersPage"));
 const PeoplePage = lazy(() => import("./pages/PeoplePage"));
 const GovernancePage = lazy(() => import("./pages/GovernancePage"));
+const ServiceCatalogPage = lazy(() => import("./pages/ServiceCatalogPage"));
 const InventoryPage = lazy(() => import("./pages/CommercePages").then(m => ({ default: m.InventoryPage })));
 const FiscalPage = lazy(() => import("./pages/CommercePages").then(m => ({ default: m.FiscalPage })));
 const FinancialHealthPage = lazy(() => import("./pages/CommercePages").then(m => ({ default: m.FinancialHealthPage })));
@@ -533,6 +534,7 @@ const ServiceOrdersRoute = lazyProtectedPage(ServiceOrdersPage, {
   requireCompletedOnboarding: true,
 });
 
+const ServiceCatalogRoute = lazyProtectedPage(ServiceCatalogPage, { permissions: ["catalog:read"], requireCompletedOnboarding: true });
 const InventoryRoute = lazyProtectedPage(InventoryPage, { permissions: ["inventory:manage"], requireCompletedOnboarding: true });
 const FiscalRoute = lazyProtectedPage(FiscalPage, { permissions: ["fiscal:manage"], requireCompletedOnboarding: true });
 const FinancialHealthRoute = lazyProtectedPage(FinancialHealthPage, { permissions: ["financial-health:read"], requireCompletedOnboarding: true });
@@ -630,7 +632,7 @@ function Router() {
       "/customers",
       "/appointments",
       "/service-orders",
-      "/inventory", "/fiscal", "/financial-health",
+      "/service-catalog", "/inventory", "/fiscal", "/financial-health",
       "/finances",
       "/people",
       "/governance",
@@ -708,6 +710,7 @@ function Router() {
           />
         )}
       />
+      <Route path="/service-catalog" component={ServiceCatalogRoute} />
       <Route path="/inventory" component={InventoryRoute} />
       <Route path="/fiscal" component={FiscalRoute} />
       <Route path="/financial-health" component={FinancialHealthRoute} />

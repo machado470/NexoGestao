@@ -1,3 +1,4 @@
+import {ServiceCatalogController,ServiceCatalogService} from "../src/commerce/service-catalog";
 // Isolated browser-audit server. Never enabled against an application database.
 import "reflect-metadata";
 import { Test } from "@nestjs/testing";
@@ -82,8 +83,8 @@ async function main() {
     },
   });
   const module = await Test.createTestingModule({
-    controllers: [CommerceController, ServiceOrderEvidenceController, ServiceOrderChecklistController, ServiceOrderAcceptanceController, PublicServiceAcceptanceController, ServiceOrderReturnsController],
-    providers: [CommerceService, ServiceOrderEvidenceService, ServiceOrderChecklistService, ServiceOrderAcceptanceService, ServiceOrderReturnsService, {provide:QuotasService,useValue:{validateQuota:async()=>{}}}, { provide: PrismaService, useValue: db }, { provide: ConfigService, useValue: new ConfigService({ JWT_SECRET: 'isolated-browser-harness-secret-not-production' }) }],
+    controllers: [ServiceCatalogController,CommerceController, ServiceOrderEvidenceController, ServiceOrderChecklistController, ServiceOrderAcceptanceController, PublicServiceAcceptanceController, ServiceOrderReturnsController],
+    providers: [ServiceCatalogService,CommerceService, ServiceOrderEvidenceService, ServiceOrderChecklistService, ServiceOrderAcceptanceService, ServiceOrderReturnsService, {provide:QuotasService,useValue:{validateQuota:async()=>{}}}, { provide: PrismaService, useValue: db }, { provide: ConfigService, useValue: new ConfigService({ JWT_SECRET: 'isolated-browser-harness-secret-not-production' }) }],
   })
     .overrideGuard(JwtAuthGuard)
     .useValue({
@@ -117,6 +118,8 @@ async function main() {
   const shutdown = async () => {
     await app.close();
     const where = { orgId };
+    await db.catalogServiceRevision.deleteMany({where});
+    await db.catalogService.deleteMany({where});
     await db.serviceOrderReturn.deleteMany({where});
     await db.serviceOrderAcceptance.deleteMany({ where });
     await db.serviceOrderChecklistItem.deleteMany({ where });

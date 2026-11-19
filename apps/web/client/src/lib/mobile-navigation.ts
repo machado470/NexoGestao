@@ -8,6 +8,7 @@ export function canVisitMobileRoute(role: Role | null, target: string) {
     "/appointments": "appointments:read",
     "/calendar": "appointments:read",
     "/service-orders": "orders:read",
+    "/service-catalog": "catalog:read",
     "/inventory": "inventory:manage",
     "/fiscal": "fiscal:manage",
     "/financial-health": "financial-health:read",

@@ -7,6 +7,7 @@ import { useLocation } from "wouter";
 import { toast } from "sonner";
 import {
   Bell,
+  BookOpen,
   Briefcase,
   Building2,
   Calendar,
@@ -191,6 +192,9 @@ export function MainLayout({ children }: MainLayoutProps) {
           route: "/appointments",
           icon: Calendar,
           permissions: ["appointments:read"],
+        },
+        {
+          id: "service-catalog", label: "Catálogo de serviços", route: "/service-catalog", icon: BookOpen, permissions: ["catalog:read"],
         },
         {
           id: "service-orders",
