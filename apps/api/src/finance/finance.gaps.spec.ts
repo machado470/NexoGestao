@@ -41,7 +41,8 @@ describe('Financial gap regressions', () => {
   })
   it('uses safe CSV quoting in customer and charge exports', async () => {
     const { db, service } = build()
-    db.charge.findMany.mockResolvedValue([{ id: 'charge', amountCents: 1000, customer: { name: '=1+1' }, dueDate: stamp, createdAt: stamp, status: 'PENDING' }])
+    db.charge.findMany.mockResolvedValue([{ id: 'charge', currency:'USD', amountCents: 1000, customer: { name: '=1+1' }, dueDate: stamp, createdAt: stamp, status: 'PENDING' }])
+    const currencyCsv=await service.exportChargesCsv('org');expect(currencyCsv.split('\n')[0]).toContain('Valor,Moeda,');expect(currencyCsv).toContain('USD');
     expect(await service.exportChargesCsv('org')).toContain('"\'=1+1"')
     const customers = new CustomersService({ customer: { findMany: async () => [{ id: 'c', name: 'Cliente "VIP", Sul', email: '+FORMULA', phone: '5511', active: true, createdAt: stamp }] } } as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any)
     const result = await customers.exportCsv('org')

@@ -551,8 +551,96 @@ const url = "postgresql://nexo@127.0.0.1:55439/postgres";
         data: { amountCents: 200 },
       });
       expect(
-        (await call("get", `/service-orders/${plain.id}/quote-origin`)).body.origin,
+        (await call("get", `/service-orders/${plain.id}/quote-origin`)).body
+          .origin,
       ).toBeNull();
+    });
+    it("resolves currency in one tenant-scoped batch without changing legacy BRL or disclosing foreign orders", async () => {
+      const quoteRows = await db.serviceQuoteOrder.findMany({
+        where: { orgId: org },
+        select: { serviceOrderId: true, currency: true },
+      });
+      const plain = await db.serviceOrder.create({
+        data: {
+          orgId: org,
+          customerId: customer.id,
+          title: "Valor legado",
+          amountCents: 12345,
+        },
+      });
+      const fromCharge = await db.serviceOrder.create({
+        data: {
+          orgId: org,
+          customerId: customer.id,
+          title: "Valor da cobrança",
+          amountCents: null,
+        },
+      });
+      await db.charge.create({
+        data: {
+          orgId: org,
+          customerId: customer.id,
+          serviceOrderId: fromCharge.id,
+          amountCents: 1000,
+          currency: "EUR",
+          dueDate: new Date(),
+        },
+      });
+      const foreignCustomer = await db.customer.create({
+          data: { orgId: foreign, name: "Cliente externo", phone: "" },
+        }),
+        outside = await db.serviceOrder.create({
+          data: {
+            orgId: foreign,
+            customerId: foreignCustomer.id,
+            title: "Externa",
+          },
+        });
+      const ids = [
+        ...quoteRows.map((x) => x.serviceOrderId),
+        plain.id,
+        fromCharge.id,
+        outside.id,
+      ];
+      for (const role of ["MANAGER", "STAFF", "VIEWER"]) {
+        const result = await call(
+          "post",
+          "/service-orders/currency-context",
+          { serviceOrderIds: ids },
+          role,
+        );
+        expect(result.status).toBe(201);
+        for (const row of quoteRows)
+          expect(
+            result.body.items.find(
+              (x) => x.serviceOrderId === row.serviceOrderId,
+            ),
+          ).toMatchObject({ currency: row.currency, source: "QUOTE" });
+        expect(
+          result.body.items.find((x) => x.serviceOrderId === plain.id),
+        ).toMatchObject({ currency: "BRL", source: "LEGACY_BRL" });
+        expect(
+          result.body.items.find((x) => x.serviceOrderId === fromCharge.id),
+        ).toMatchObject({ currency: "EUR", source: "CHARGE" });
+        expect(
+          result.body.items.some((x) => x.serviceOrderId === outside.id),
+        ).toBe(false);
+      }
+      expect(
+        (
+          await call("post", "/service-orders/currency-context", {
+            serviceOrderIds: ids,
+            orgId: foreign,
+          })
+        ).status,
+      ).toBe(400);
+      expect(
+        (
+          await call("post", "/service-orders/currency-context", {
+            serviceOrderIds: ["invalid"],
+          })
+        ).status,
+      ).toBe(400);
     });
   },
 );

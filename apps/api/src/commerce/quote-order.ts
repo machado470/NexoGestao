@@ -11,7 +11,14 @@ import {
   UnauthorizedException,
   UseGuards,
 } from "@nestjs/common";
-import { IsInt, Max, Min } from "class-validator";
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsUUID,
+  IsInt,
+  Max,
+  Min,
+} from "class-validator";
 import { Transform } from "class-transformer";
 import { PrismaService } from "../prisma/prisma.service";
 import { QuotasService } from "../quotas/quotas.service";
@@ -26,6 +33,12 @@ export class QuoteConvertDto {
   @Min(0)
   @Max(1000000)
   expectedVersion!: number;
+}
+export class OrderCurrencyDto {
+  @IsArray()
+  @ArrayMaxSize(500)
+  @IsUUID("all", { each: true })
+  serviceOrderIds!: string[];
 }
 export const conversionFields = {
   quoteId: true,
@@ -45,6 +58,38 @@ export class QuoteOrderService {
     private db: PrismaService,
     private quotas: QuotasService,
   ) {}
+  async currencyContext(orgId: string, ids: string[]) {
+    const orders = await this.db.serviceOrder.findMany({
+      where: { orgId, id: { in: [...new Set(ids)] } },
+      select: {
+        id: true,
+        amountCents: true,
+        quoteOrigin: { select: { currency: true } },
+        charges: {
+          where: { orgId },
+          orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+          take: 1,
+          select: { currency: true },
+        },
+      },
+    });
+    return {
+      items: orders.map((order) => ({
+        serviceOrderId: order.id,
+        currency:
+          order.quoteOrigin?.currency ??
+          (order.amountCents == null
+            ? order.charges[0]?.currency
+            : undefined) ??
+          "BRL",
+        source: order.quoteOrigin
+          ? "QUOTE"
+          : order.amountCents == null && order.charges[0]
+            ? "CHARGE"
+            : "LEGACY_BRL",
+      })),
+    };
+  }
   private async existing(orgId: string, quoteId: string, version: number) {
     const row = await this.db.serviceQuoteOrder.findFirst({
       where: { orgId, quoteId },
@@ -229,6 +274,11 @@ export class QuoteOrderService {
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class QuoteOrderController {
   constructor(private service: QuoteOrderService) {}
+  @Post("service-orders/currency-context")
+  @Roles("ADMIN", "MANAGER", "STAFF", "VIEWER")
+  currencyContext(@Org() org: string, @Body() body: OrderCurrencyDto) {
+    return this.service.currencyContext(org, body.serviceOrderIds);
+  }
   @Get("service-orders/:id/quote-origin")
   @Roles("ADMIN", "MANAGER", "STAFF", "VIEWER")
   origin(@Org() org: string, @Param("id") id: string) {

@@ -18,7 +18,7 @@ Cobrança vinculada deve corresponder ao total e à moeda aprovados. Isso não i
 
 Total zero cria tratamento QUOTE_NO_CHARGE: conclusão não gera cobrança e não é sinalizada como cobrança ausente pelos filtros/motores que usam a política comercial existente. Não é reutilizada uma isenção de retorno/garantia. Zero preserva sua natureza de serviço sem cobrança vinculada.
 
-A O.S. comum ainda não tem moeda própria no seu DTO estabelecido. O painel de origem informa a moeda aprovada; após alteração da moeda da empresa, partes antigas da interface operacional que usam a preferência global ainda precisam de evolução geral para apresentar múltiplas moedas. A proteção de dados/cobrança da ordem convertida usa a moeda do vínculo, não essa preferência visual.
+A apresentação monetária foi complementada em `ORDER_CURRENCY_DISPLAY_AUDIT.md`: lista, detalhe e resumo de edição consultam a moeda registrada no orçamento, sem alterar o DTO estrito da O.S. Ordens avulsas seguem o contrato legado de entrada em BRL; quando não há valor próprio e o valor vem de cobrança, usa a moeda dessa cobrança. Não há conversão cambial.
 
 ## Consistência e admissão
 

@@ -77,13 +77,14 @@ function toDate(value: unknown): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function formatCurrency(cents?: number | null) {
-  if (cents === null || cents === undefined || !Number.isFinite(Number(cents)))
-    return "—";
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format(Number(cents) / 100);
+function formatCurrency(cents?: number | null, currency?: string | null, loading = false) {
+  if (cents === null || cents === undefined || !Number.isFinite(Number(cents))) return "—";
+  if (!currency) return loading ? "Consultando moeda..." : "Moeda indisponível";
+  try {
+    return new Intl.NumberFormat("pt-BR", { style: "currency", currency }).format(Number(cents) / 100);
+  } catch {
+    return "Moeda indisponível";
+  }
 }
 
 function getStatusLabel(status: string) {
@@ -292,6 +293,16 @@ export default function ServiceOrdersPage() {
     () => normalizeArrayPayload<any>(serviceOrdersQuery.data?.items),
     [serviceOrdersQuery.data]
   );
+  const currencyIds = useMemo(() => serviceOrders.map(item => String(item.id)).sort(), [serviceOrders]);
+  // Refreshed order/charge data must not reuse a previous monetary classification.
+  const currenciesQuery = trpc.serviceQuotes.currencyContext.useQuery(
+    { serviceOrderIds: currencyIds, contextKey: String(serviceOrdersQuery.dataUpdatedAt) + ":" + String(chargesQuery.dataUpdatedAt) },
+    { ...transientReadOptions, enabled: currencyIds.length > 0 }
+  );
+  const currencyById = useMemo(
+    () => new Map((currenciesQuery.data?.items ?? []).map(item => [item.serviceOrderId, item.currency])),
+    [currenciesQuery.data]
+  );
   const customers = useMemo(
     () => normalizeArrayPayload<any>(customersQuery.data),
     [customersQuery.data]
@@ -413,6 +424,7 @@ export default function ServiceOrdersPage() {
                 linkedCharge?.amountCents !== undefined
               ? Number(linkedCharge.amountCents)
               : null,
+        currency:currencyById.get(id)??null,
         hasCharge,
         financialStatusLabel: financialUnavailable
           ? "Cobrança indisponível"
@@ -455,6 +467,7 @@ export default function ServiceOrdersPage() {
   }, [
     appointmentById,
     chargeByServiceOrderId,
+    currencyById,
     customerById,
     peopleById,
     serviceOrders,
@@ -890,6 +903,7 @@ export default function ServiceOrdersPage() {
 
   return (
     <AppPageShell ref={mobile.anchorRef} className="operational-mobile-page mobile-module-page gap-3">
+      {currenciesQuery.isError&&<div role="status" className="rounded-xl border border-[var(--border-subtle)] p-3 text-sm">Não foi possível confirmar a moeda dos valores. As ordens continuam disponíveis.<Button variant="outline" className="ml-2" onClick={()=>void currenciesQuery.refetch()}>Consultar moedas novamente</Button></div>}
       <MobileDetailBack visible={mobile.isOpen} onBack={mobile.back} label="Voltar às ordens de serviço" />
       <MobileDetailState visible={mobile.isOpen && !selectedOrder} loading={serviceOrdersQuery.isLoading} failed={serviceOrdersQuery.isError} onRetry={() => void serviceOrdersQuery.refetch()} />
       <div className={`${mobile.listClass} space-y-3`}>
@@ -1173,8 +1187,8 @@ export default function ServiceOrdersPage() {
                             </p>
                           </div>
                           <div className="text-xs text-[var(--text-secondary)]">
-                            <p className="font-medium text-[var(--text-primary)]">
-                              {formatCurrency(item.amountCents)}
+                            <p data-testid={"order-amount-"+item.id} className="font-medium text-[var(--text-primary)]">
+                              {formatCurrency(item.amountCents,item.currency,currenciesQuery.isLoading)}
                             </p>
                             <p>{item.financialStatusLabel}</p>
                           </div>
@@ -1437,7 +1451,7 @@ export default function ServiceOrdersPage() {
                       value: selectedOrder.hasCharge
                         ? selectedOrder.financialStatusLabel
                         : "Sem cobrança",
-                      detail: `Valor: ${formatCurrency(selectedOrder.amountCents)}`,
+                      detail: `Valor: ${formatCurrency(selectedOrder.amountCents,selectedOrder.currency,currenciesQuery.isLoading)}`,
                     },
                     {
                       label: "Agendamento",

@@ -35,6 +35,37 @@ const write = async (ctx: any, path: string, body: unknown) => {
 const page = z.number().int().min(1).max(10000),
   uuid = z.string().uuid();
 export const serviceQuotesRouter = router({
+  currencyContext: protectedProcedure
+    .input(
+      z
+        .object({
+          serviceOrderIds: z.array(uuid).max(500),
+          contextKey: z.string().max(1000).optional(),
+        })
+        .strict()
+    )
+    .query(async ({ ctx, input }) => {
+      privateHeader(ctx);
+      return z
+        .object({
+          items: z.array(
+            z.object({
+              serviceOrderId: uuid,
+              currency: z.string().regex(/^[A-Z]{3}$/),
+              source: z.enum(["QUOTE", "CHARGE", "LEGACY_BRL"]),
+            })
+          ),
+        })
+        .parse(
+          unwrapNexoApiResponse(
+            await nexoFetch(ctx, "/service-orders/currency-context", {
+              method: "POST",
+              body: JSON.stringify({ serviceOrderIds: input.serviceOrderIds }),
+            })
+          )
+        );
+    }),
+
   convert: protectedProcedure
     .input(
       z
@@ -54,7 +85,17 @@ export const serviceQuotesRouter = router({
     .output(quoteOrderOrigin.nullable())
     .query(async ({ ctx, input }) => {
       privateHeader(ctx);
-      return z.object({origin:quoteOrderOrigin.nullable()}).parse(unwrapNexoApiResponse(await nexoFetch(ctx,`/service-orders/${input.serviceOrderId}/quote-origin`,{method:'GET'}))).origin;
+      return z
+        .object({ origin: quoteOrderOrigin.nullable() })
+        .parse(
+          unwrapNexoApiResponse(
+            await nexoFetch(
+              ctx,
+              `/service-orders/${input.serviceOrderId}/quote-origin`,
+              { method: "GET" }
+            )
+          )
+        ).origin;
     }),
   list: protectedProcedure
     .input(z.object({ page }).strict())
