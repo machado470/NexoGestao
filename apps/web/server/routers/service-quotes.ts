@@ -3,6 +3,8 @@ import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { nexoFetch, nexoPublicFetch } from "../_core/nexoClient";
 import { unwrapNexoApiResponse } from "../_core/nexoEnvelope";
 import {
+  quoteConversion,
+  quoteOrderOrigin,
   quoteCreate,
   quoteRevise,
   quoteShare,
@@ -33,6 +35,27 @@ const write = async (ctx: any, path: string, body: unknown) => {
 const page = z.number().int().min(1).max(10000),
   uuid = z.string().uuid();
 export const serviceQuotesRouter = router({
+  convert: protectedProcedure
+    .input(
+      z
+        .object({
+          id: uuid,
+          expectedVersion: z.number().int().min(0).max(1000000),
+        })
+        .strict()
+    )
+    .output(quoteConversion)
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...body } = input;
+      return quoteConversion.parse(await write(ctx, `/${id}/convert`, body));
+    }),
+  orderOrigin: protectedProcedure
+    .input(z.object({ serviceOrderId: uuid }).strict())
+    .output(quoteOrderOrigin.nullable())
+    .query(async ({ ctx, input }) => {
+      privateHeader(ctx);
+      return z.object({origin:quoteOrderOrigin.nullable()}).parse(unwrapNexoApiResponse(await nexoFetch(ctx,`/service-orders/${input.serviceOrderId}/quote-origin`,{method:'GET'}))).origin;
+    }),
   list: protectedProcedure
     .input(z.object({ page }).strict())
     .query(async ({ ctx, input }) =>

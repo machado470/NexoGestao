@@ -1,3 +1,4 @@
+import { useLocation } from "wouter";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Plus } from "lucide-react";
 import { trpc } from "@/lib/trpc";
@@ -21,7 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { QuoteSummary, quoteMoney } from "@/components/QuoteSummary";
-import type { QuoteRecord } from "@shared/service-quotes";
+import type { QuoteRecord, QuoteConversion } from "@shared/service-quotes";
 const panel =
     "min-w-0 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4",
   muted = "text-sm text-[var(--text-muted)]";
@@ -432,6 +433,8 @@ function QuoteDetails({
   onRevise: (item: QuoteRecord) => void;
   manage: boolean;
 }) {
+  const [, navigate] = useLocation();
+  const [converted, setConverted] = useState<QuoteConversion | null>(null);
   const { timezone } = useOrganizationLocale(),
     utils = trpc.useUtils(),
     [page, setPage] = useState(1),
@@ -445,12 +448,47 @@ function QuoteDetails({
       { id, page },
       transientReadOptions
     ),
+    convert = trpc.serviceQuotes.convert.useMutation(),
     share = trpc.serviceQuotes.share.useMutation(),
     revoke = trpc.serviceQuotes.revoke.useMutation();
   const quote = query.data?.quote;
   useEffect(() => {
     setLink(null);
   }, [quote?.version]);
+  async function convertToOrder() {
+    if (!quote || lock.current) return;
+    lock.current = true;
+    setBusy(true);
+    setError("");
+    try {
+      const result = await convert.mutateAsync({
+        id,
+        expectedVersion: quote.version,
+      });
+      setConverted(result);
+      setNotice(
+        "O.S. disponível. Nenhuma cobrança, mensagem ou agenda foi gerada."
+      );
+      void Promise.allSettled([
+        utils.serviceQuotes.invalidate(),
+        utils.serviceOrders.invalidate(),
+        utils.customers.workspace.invalidate(),
+        utils.dashboard.invalidate(),
+        utils.people.operationalSummary.invalidate(),
+        utils.timeline.invalidate(),
+      ]);
+    } catch (e) {
+      setError(
+        e instanceof Error
+          ? e.message
+          : "Não foi possível criar ou recuperar a O.S."
+      );
+      void query.refetch();
+    } finally {
+      lock.current = false;
+      setBusy(false);
+    }
+  }
   async function generate() {
     if (!quote || lock.current) return;
     lock.current = true;
@@ -532,6 +570,43 @@ function QuoteDetails({
               Versão {quote.version + 1} · {labels[quote.status]}
             </p>
             <QuoteSummary snapshot={quote.snapshot} />
+            {(converted ?? quote.conversion) ? (
+              <div className="grid min-w-0 gap-2 rounded-xl border border-[var(--border-subtle)] p-3">
+                <p className="text-sm font-semibold">
+                  O.S. vinculada a esta versão
+                </p>
+                <p className="break-words text-sm">
+                  {(converted ?? quote.conversion)!.serviceOrder.title}
+                </p>
+                <p className="text-xs text-[var(--text-muted)]">
+                  Criada por {(converted ?? quote.conversion)!.createdByName}
+                </p>
+                <Button
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() =>
+                    navigate(
+                      "/service-orders?id=" +
+                        (converted ?? quote.conversion)!.serviceOrderId
+                    )
+                  }
+                >
+                  Abrir O.S. vinculada
+                </Button>
+              </div>
+            ) : manage && quote.status === "ACCEPTED" ? (
+              <div className="grid gap-3">
+                <p className="text-sm text-[var(--text-muted)]">
+                  Cria uma única O.S. aberta, com cliente e valor aprovados, sem
+                  responsável, agenda, cobrança ou mensagens. Usa o limite de
+                  O.S. do plano. O total zero cria uma O.S. sem cobrança.
+                </p>
+                <Button disabled={busy} onClick={() => void convertToOrder()}>
+                  {busy ? "Registrando..." : "Criar O.S. desta versão"}
+                </Button>
+              </div>
+            ) : null}
+
             <p className={muted}>
               Aprovação por link com nome informado, sem identidade verificada
               ou assinatura digital. Nenhuma O.S., cobrança ou mensagem é gerada
@@ -700,7 +775,9 @@ export default function QuotesPage() {
     { currency } = useOrganizationLocale(),
     [page, setPage] = useState(1),
     [editor, setEditor] = useState<{ item: QuoteRecord | null } | null>(null),
-    [selected, setSelected] = useState(""),
+    [selected, setSelected] = useState(
+      () => new URLSearchParams(window.location.search).get("id") ?? ""
+    ),
     [notice, setNotice] = useState("");
   const query = trpc.serviceQuotes.list.useQuery(
       { page },

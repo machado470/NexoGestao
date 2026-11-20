@@ -1,3 +1,4 @@
+import {QuoteOrderController,QuoteOrderService} from "../src/commerce/quote-order";
 import {ServiceQuotesController,PublicQuoteApprovalController,ServiceQuotesService} from "../src/commerce/service-quotes";
 import {ServiceCatalogController,ServiceCatalogService} from "../src/commerce/service-catalog";
 // Isolated browser-audit server. Never enabled against an application database.
@@ -84,8 +85,8 @@ async function main() {
     },
   });
   const module = await Test.createTestingModule({
-    controllers: [ServiceQuotesController,PublicQuoteApprovalController,ServiceCatalogController,CommerceController, ServiceOrderEvidenceController, ServiceOrderChecklistController, ServiceOrderAcceptanceController, PublicServiceAcceptanceController, ServiceOrderReturnsController],
-    providers: [ServiceQuotesService,ServiceCatalogService,CommerceService, ServiceOrderEvidenceService, ServiceOrderChecklistService, ServiceOrderAcceptanceService, ServiceOrderReturnsService, {provide:QuotasService,useValue:{validateQuota:async()=>{}}}, { provide: PrismaService, useValue: db }, { provide: ConfigService, useValue: new ConfigService({ JWT_SECRET: 'isolated-browser-harness-secret-not-production' }) }],
+    controllers: [QuoteOrderController,ServiceQuotesController,PublicQuoteApprovalController,ServiceCatalogController,CommerceController, ServiceOrderEvidenceController, ServiceOrderChecklistController, ServiceOrderAcceptanceController, PublicServiceAcceptanceController, ServiceOrderReturnsController],
+    providers: [QuoteOrderService,ServiceQuotesService,ServiceCatalogService,CommerceService, ServiceOrderEvidenceService, ServiceOrderChecklistService, ServiceOrderAcceptanceService, ServiceOrderReturnsService, {provide:QuotasService,useValue:{validateQuota:async()=>{}}}, { provide: PrismaService, useValue: db }, { provide: ConfigService, useValue: new ConfigService({ JWT_SECRET: 'isolated-browser-harness-secret-not-production' }) }],
   })
     .overrideGuard(JwtAuthGuard)
     .useValue({
@@ -119,6 +120,7 @@ async function main() {
   const shutdown = async () => {
     await app.close();
     const where = { orgId };
+    await db.serviceQuoteOrder.deleteMany({where});
     await db.serviceQuoteApproval.deleteMany({where});
     await db.serviceQuoteRevision.deleteMany({where});
     await db.serviceQuote.deleteMany({where});

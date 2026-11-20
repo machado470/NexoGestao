@@ -26,7 +26,7 @@ Locks na proposta serializam revisão, compartilhamento, revogação e resposta.
 
 Cards resumem cliente, versão, total e situação; detalhes mostram conteúdo e ações. Histórico e respostas ficam sob demanda. Lista mostra dez propostas por página, revisões cinco por página e até dez links recentes. Busca de clientes/serviços mostra até 20 resultados por pesquisa. Formulários preservam dados após erro, bloqueiam duplo envio e confirmam descarte; refetch não troca silenciosamente a versão de um rascunho. Não há rascunho offline após fechar/recarregar.
 
-Aprovar não cria O.S., agenda, cobrança, nota fiscal, reserva de estoque ou pagamento. Não envia mensagens ou notificações externas. Conversão controlada do orçamento aprovado em O.S., adicionais aprovados, cancelamento comercial, validade específica da oferta, impostos, PDF/exportação, política de assinatura/identidade e pagamento continuam futuros. O escopo atual fecha proposta e decisão, não o restante da execução.
+Aprovar não cria O.S., agenda, cobrança, nota fiscal, reserva de estoque ou pagamento. Não envia mensagens ou notificações externas. A conversão controlada está documentada em `QUOTE_ORDER_CONVERSION_AUDIT.md`. Adicionais aprovados, cancelamento comercial, validade específica da oferta, impostos, PDF/exportação, política de assinatura/identidade e pagamento continuam futuros. O escopo atual fecha proposta e decisão, não o restante da execução.
 
 ## Implantação
 

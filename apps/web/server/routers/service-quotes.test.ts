@@ -176,3 +176,56 @@ describe("service quotes BFF", () => {
       expect(canVisitMobileRoute(role, "/quotes")).toBe(true);
   });
 });
+
+describe("quote conversion BFF", () => {
+  const conversion = {
+    quoteId: id,
+    quoteVersion: 0,
+    serviceOrderId: id,
+    amountCents: 30000,
+    currency: "BRL",
+    createdByName: "Gestora",
+    createdAt: record.createdAt,
+    serviceOrder: {
+      id,
+      title: "Visita técnica",
+      status: "OPEN",
+      amountCents: 30000,
+    },
+  };
+  it("forwards only the approved version and validates the order link", async () => {
+    fetch.mockResolvedValue(conversion);
+    expect(
+      (await caller().convert({ id, expectedVersion: 0 })).serviceOrderId
+    ).toBe(id);
+    expect(fetch.mock.calls[0][1]).toBe("/service-quotes/" + id + "/convert");
+    expect(JSON.parse(fetch.mock.calls[0][2]!.body as string)).toEqual({
+      expectedVersion: 0,
+    });
+    fetch.mockClear();
+    for (const change of [
+      { amountCents: 1 },
+      { customerId: id },
+      { orgId: id },
+      { expectedVersion: "0" },
+    ])
+      await expect(
+        caller().convert({ id, expectedVersion: 0, ...change } as any)
+      ).rejects.toThrow();
+    expect(fetch).not.toHaveBeenCalled();
+    await expect(
+      caller(false).convert({ id, expectedVersion: 0 })
+    ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
+  it("reads source snapshots independently from the established strict service order DTO", async () => {
+    fetch.mockResolvedValue({ origin: { ...conversion, snapshot } });
+    expect(
+      (await caller().orderOrigin({ serviceOrderId: id }))?.snapshot.totalCents
+    ).toBe(30000);
+    expect(fetch.mock.calls[0][1]).toBe(
+      "/service-orders/" + id + "/quote-origin"
+    );
+    fetch.mockResolvedValue({ origin: null });
+    expect(await caller().orderOrigin({ serviceOrderId: id })).toBeNull();
+  });
+});

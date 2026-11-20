@@ -1,3 +1,4 @@
+import {isQuoteTermsError,quoteTermsMessage} from "../common/quote-commercial-terms";
 import { isBillableTreatment, ReturnBillingBlockedException } from '../common/billing-treatment'
 import {
   BadRequestException,
@@ -545,7 +546,9 @@ export class ServiceOrdersService {
     }
 
     if (params.data.amountCents !== undefined) {
-      data.amountCents = normalizeAmount(params.data.amountCents)
+      const quoted = await this.prisma.serviceQuoteOrder?.findFirst({where:{orgId:params.orgId,serviceOrderId:before.id},select:{amountCents:true}})
+      if(quoted && params.data.amountCents !== quoted.amountCents) throw new BadRequestException(quoteTermsMessage)
+      data.amountCents = quoted && params.data.amountCents === 0 ? 0 : normalizeAmount(params.data.amountCents)
     }
 
     if (Object.keys(data).length === 0) {
@@ -824,6 +827,7 @@ export class ServiceOrdersService {
       if (doneTransitionIdemRecordId) {
         await this.idempotency.fail(doneTransitionIdemRecordId, error?.code)
       }
+      if(isQuoteTermsError(error)) throw new BadRequestException(quoteTermsMessage)
       throw error
     }
   }
