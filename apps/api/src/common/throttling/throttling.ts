@@ -1,9 +1,10 @@
 import { createHash } from 'crypto'
-import { Injectable } from '@nestjs/common'
+import { ExecutionContext, Injectable, SetMetadata } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { ThrottlerGuard, ThrottlerOptions } from '@nestjs/throttler'
 import type { ThrottlerRequest } from '@nestjs/throttler/dist/throttler.guard.interface'
 import { resolveJwtSecret } from '../../auth/jwt-secret'
+import { SENSITIVE_KEY_PREFIX, THROTTLE_UNAVAILABLE_RETRY_AFTER_SECONDS, ThrottlerStorageUnavailableException } from './redis-throttler.storage'
 
 /**
  * Rate limiting policy.
@@ -30,6 +31,13 @@ export const AUTH_ANONYMOUS_LIMIT = 100
 
 /** Skips every configured throttler (SkipThrottle() alone only skips "default"). */
 export const SKIP_ALL_THROTTLERS = { [DEFAULT_THROTTLER]: true, [ANONYMOUS_THROTTLER]: true }
+
+/**
+ * Marks credential and payment routes. With shared (Redis) counters, these routes follow
+ * THROTTLE_REDIS_SENSITIVE_FAILURE when Redis is unavailable instead of per-process counters.
+ */
+export const SENSITIVE_THROTTLE = 'nexo:throttle:sensitive'
+export const SensitiveThrottle = () => SetMetadata(SENSITIVE_THROTTLE, true)
 
 const IDENTITY = Symbol('nexoThrottleIdentity')
 
@@ -92,13 +100,28 @@ export class NexoThrottlerGuard extends ThrottlerGuard {
   }
 
   protected async handleRequest(requestProps: ThrottlerRequest): Promise<boolean> {
-    if (requestProps.throttler.name === ANONYMOUS_THROTTLER) {
-      const req = requestProps.context.switchToHttp().getRequest()
-      if (this.sessionIdentity(req)) return true
-      // The anonymous ceiling is always per peer IP, even where a route keys "default" by account.
-      return super.handleRequest({ ...requestProps, getTracker: (r: Record<string, any>) => peerTracker(r) })
+    try {
+      if (requestProps.throttler.name === ANONYMOUS_THROTTLER) {
+        const req = requestProps.context.switchToHttp().getRequest()
+        if (this.sessionIdentity(req)) return true
+        // The anonymous ceiling is always per peer IP, even where a route keys "default" by account.
+        return await super.handleRequest({ ...requestProps, getTracker: (r: Record<string, any>) => peerTracker(r) })
+      }
+      return await super.handleRequest(requestProps)
+    } catch (error) {
+      if (error instanceof ThrottlerStorageUnavailableException) {
+        const { res } = this.getRequestResponse(requestProps.context)
+        this.setResponseHeader(res, 'Retry-After', THROTTLE_UNAVAILABLE_RETRY_AFTER_SECONDS)
+      }
+      throw error
     }
-    return super.handleRequest(requestProps)
+  }
+
+  /** Same hashed key as the library; sensitive routes are tagged so storage applies their failure policy. */
+  protected generateKey(context: ExecutionContext, suffix: string, name: string): string {
+    const key = super.generateKey(context, suffix, name)
+    const sensitive = this.reflector.getAllAndOverride<boolean>(SENSITIVE_THROTTLE, [context.getHandler(), context.getClass()])
+    return sensitive ? `${SENSITIVE_KEY_PREFIX}${key}` : key
   }
 
   private verifier(): JwtService | null {
