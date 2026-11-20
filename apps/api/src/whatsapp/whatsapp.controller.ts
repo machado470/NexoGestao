@@ -17,7 +17,8 @@ import {
   type RawBodyRequest,
 } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
-import { Throttle } from '@nestjs/throttler'
+import { SkipThrottle, Throttle } from '@nestjs/throttler'
+import { SKIP_ALL_THROTTLERS } from '../common/throttling/throttling'
 import { WhatsAppConversationStatus, WhatsAppMessageStatus } from '@prisma/client'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
@@ -237,6 +238,8 @@ export class WhatsAppController {
 
   @Post('webhooks/:provider')
   @Public()
+  // Authenticated by the provider signature (fail closed); provider retries must not be rate limited.
+  @SkipThrottle(SKIP_ALL_THROTTLERS)
   @Roles()
   @HttpCode(200)
   async webhook(@Param('provider') provider: string, @Body() payload: any, @Headers() headers: Record<string, string>, @Req() req?: RawBodyRequest<{ rawBody?: Buffer }>) {
@@ -278,6 +281,8 @@ export class WhatsAppController {
 
   @Post('webhook/:provider')
   @Public()
+  // Authenticated by the provider signature (fail closed); provider retries must not be rate limited.
+  @SkipThrottle(SKIP_ALL_THROTTLERS)
   @Roles()
   @HttpCode(200)
   async webhookLegacy(@Param('provider') provider: string, @Body() payload: any, @Headers() headers: Record<string, string>, @Req() req?: RawBodyRequest<{ rawBody?: Buffer }>) {

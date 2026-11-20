@@ -234,7 +234,7 @@ export class FinanceController {
   }
 
   @Post('charges/:chargeId/pay')
-  @Throttle({ short: { limit: 8, ttl: 60000 } })
+  @Throttle({ default: { limit: 8, ttl: 60000 } })
   @Roles('ADMIN', 'MANAGER')
   async payCharge(
     @Org() orgId: string,

@@ -1,4 +1,6 @@
 import {conversionFields} from "./quote-order";
+import { Throttle } from "@nestjs/throttler";
+import { MINUTE_MS, bodyTokenTracker } from "../common/throttling/throttling";
 import {
   BadRequestException,
   Body,
@@ -733,6 +735,7 @@ export class ServiceQuotesController {
     return this.service.revoke(org, id, link, this.actor(user));
   }
 }
+@Throttle({ default: { limit: 30, ttl: MINUTE_MS, getTracker: bodyTokenTracker } })
 @Controller("quote-approval")
 export class PublicQuoteApprovalController {
   constructor(private service: ServiceQuotesService) {}

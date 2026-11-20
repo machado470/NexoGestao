@@ -5,7 +5,8 @@ import { ConfigModule } from '@nestjs/config'
 import { ScheduleModule } from '@nestjs/schedule'
 import { ClsModule } from 'nestjs-cls'
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core'
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'
+import { ThrottlerModule } from '@nestjs/throttler'
+import { NexoThrottlerGuard, THROTTLERS } from './common/throttling/throttling'
 import { TENANT_ACCESS_INTERCEPTOR_PROVIDER } from './common/guards/tenant-access.guard'
 
 import { CoreModule } from './core/core.module'
@@ -94,7 +95,7 @@ class AllowAllThrottlerGuard implements CanActivate {
       envFilePath: getEnvFilePath(),
     }),
 
-    ThrottlerModule.forRoot([{ ttl: 60000, limit: 10 }]),
+    ThrottlerModule.forRoot(THROTTLERS),
 
     ScheduleModule.forRoot(),
 
@@ -165,7 +166,7 @@ class AllowAllThrottlerGuard implements CanActivate {
     },
     {
       provide: APP_GUARD,
-      useClass: IS_DEVELOPMENT ? AllowAllThrottlerGuard : ThrottlerGuard,
+      useClass: IS_DEVELOPMENT ? AllowAllThrottlerGuard : NexoThrottlerGuard,
     },
     // Runs after every guard (incl. controller-level JwtAuthGuard), so request.user is set.
     TENANT_ACCESS_INTERCEPTOR_PROVIDER,

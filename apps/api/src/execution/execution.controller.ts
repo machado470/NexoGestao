@@ -118,7 +118,7 @@ export class ExecutionController {
   }
 
   @Post(':id/complete')
-  @Throttle({ short: { limit: 10, ttl: 60000 } })
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Roles('ADMIN', 'MANAGER', 'STAFF')
   @ApiBody({ type: CompleteExecutionDto })
   @ApiCreatedResponse({ type: ExecutionResponseDto })
