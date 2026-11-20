@@ -13,6 +13,8 @@ import {
   Logger,
   HttpCode,
   Optional,
+  Req,
+  type RawBodyRequest,
 } from '@nestjs/common'
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { Throttle } from '@nestjs/throttler'
@@ -237,12 +239,12 @@ export class WhatsAppController {
   @Public()
   @Roles()
   @HttpCode(200)
-  async webhook(@Param('provider') provider: string, @Body() payload: any, @Headers() headers: Record<string, string>) {
+  async webhook(@Param('provider') provider: string, @Body() payload: any, @Headers() headers: Record<string, string>, @Req() req?: RawBodyRequest<{ rawBody?: Buffer }>) {
     const startedAt = Date.now()
     const traceId = String(headers?.['x-request-id'] ?? headers?.['x-trace-id'] ?? `wa-${Date.now()}`).trim()
     const serviceProvider = createWhatsAppProvider()
     if (serviceProvider.getProviderName() !== provider) throw new BadRequestException('provider inválido')
-    const signatureOk = await serviceProvider.verifyWebhookSignature(payload, headers)
+    const signatureOk = await serviceProvider.verifyWebhookSignature(payload, headers, req?.rawBody)
     if (!signatureOk) throw new BadRequestException('assinatura inválida')
     const { orgId } = await this.whatsapp.resolveWebhookTenant(provider, payload)
 
@@ -278,8 +280,8 @@ export class WhatsAppController {
   @Public()
   @Roles()
   @HttpCode(200)
-  async webhookLegacy(@Param('provider') provider: string, @Body() payload: any, @Headers() headers: Record<string, string>) {
-    return this.webhook(provider, payload, headers)
+  async webhookLegacy(@Param('provider') provider: string, @Body() payload: any, @Headers() headers: Record<string, string>, @Req() req?: RawBodyRequest<{ rawBody?: Buffer }>) {
+    return this.webhook(provider, payload, headers, req)
   }
 
   private requireExecutions() {
