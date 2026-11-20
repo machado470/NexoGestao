@@ -4,9 +4,18 @@ import superjson from "superjson";
 import cookie from "cookie";
 import type { TrpcContext } from "./context";
 import { isAdminRole } from "./roles";
+import { upstreamErrorDetails } from "./nexoClient";
 
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
+  // Only sanitized fields reach the browser: a stable upstream code and the wait in seconds.
+  // tRPC adds stack traces whenever NODE_ENV was not "production" at boot (e.g. staging):
+  // they are kept for local development only.
+  errorFormatter({ shape, error }) {
+    const { stack: _stack, ...data } = shape.data;
+    const exposeStack = (process.env.NODE_ENV ?? "").toLowerCase() === "development";
+    return { ...shape, data: { ...(exposeStack ? shape.data : data), ...upstreamErrorDetails(error) } };
+  },
 });
 
 export const router = t.router;

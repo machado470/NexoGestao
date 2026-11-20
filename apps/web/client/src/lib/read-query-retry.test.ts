@@ -35,4 +35,12 @@ describe("temporary read recovery", () => {
       })
     ).toBe(false);
   });
+  it("respects a Retry-After longer than the retry delay (429/503)", () => {
+    expect(retryTransientRead(0, { data: { httpStatus: 429, code: "TOO_MANY_REQUESTS", retryAfterSeconds: 30 } })).toBe(false);
+    expect(retryTransientRead(0, { data: { httpStatus: 503, code: "SERVICE_UNAVAILABLE", retryAfterSeconds: 5 } })).toBe(false);
+  });
+  it("still retries once when no wait was given", () => {
+    expect(retryTransientRead(0, { data: { httpStatus: 503, code: "SERVICE_UNAVAILABLE" } })).toBe(true);
+    expect(retryTransientRead(0, { data: { code: "SERVICE_UNAVAILABLE" } })).toBe(true);
+  });
 });

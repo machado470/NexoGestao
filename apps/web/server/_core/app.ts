@@ -5,6 +5,15 @@ import { registerConsentRoutes } from "./consent";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { registerNotificationStreamRoute } from "./notificationStream";
+import { upstreamErrorDetails } from "./nexoClient";
+
+/** Retry-After for the BFF response: the longest sanitized wait among the failed calls. */
+export function retryAfterHeaderFor(errors: readonly unknown[]): Record<string, string> | undefined {
+  const waits = errors
+    .map((error) => upstreamErrorDetails(error).retryAfterSeconds)
+    .filter((seconds): seconds is number => typeof seconds === "number");
+  return waits.length ? { "Retry-After": String(Math.max(...waits)) } : undefined;
+}
 
 /**
  * Builds the BFF Express app with every API route it serves, without the frontend
@@ -26,6 +35,10 @@ export function createBffApp(): Express {
     createExpressMiddleware({
       router: appRouter,
       createContext,
+      responseMeta: ({ errors }) => {
+        const headers = retryAfterHeaderFor(errors);
+        return headers ? { headers } : {};
+      },
     })
   );
 
