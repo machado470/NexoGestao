@@ -1,5 +1,5 @@
 import { SkipThrottle, Throttle } from '@nestjs/throttler'
-import { MINUTE_MS, SKIP_ALL_THROTTLERS } from '../common/throttling/throttling'
+import { MINUTE_MS, SKIP_ALL_THROTTLERS, SensitiveThrottle } from '../common/throttling/throttling'
 import {
   Controller,
   Post,
@@ -35,6 +35,7 @@ export class BillingController {
   @UseGuards(JwtAuthGuard, ActiveUserGuard, RolesGuard)
   @Roles('ADMIN')
   @Post('create-checkout-session')
+  @SensitiveThrottle()
   async createCheckoutSession(
     @Req() req: any,
     @Body() dto: CreateCheckoutSessionDto,

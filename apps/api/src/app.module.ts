@@ -7,6 +7,8 @@ import { ClsModule } from 'nestjs-cls'
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core'
 import { ThrottlerModule } from '@nestjs/throttler'
 import { NexoThrottlerGuard, THROTTLERS } from './common/throttling/throttling'
+import { NexoThrottlerStorage } from './common/throttling/redis-throttler.storage'
+import { NexoThrottlerStorageModule } from './common/throttling/throttler-storage.module'
 import { TENANT_ACCESS_INTERCEPTOR_PROVIDER } from './common/guards/tenant-access.guard'
 
 import { CoreModule } from './core/core.module'
@@ -95,7 +97,12 @@ class AllowAllThrottlerGuard implements CanActivate {
       envFilePath: getEnvFilePath(),
     }),
 
-    ThrottlerModule.forRoot(THROTTLERS),
+    // THROTTLE_STORAGE=redis shares counters across replicas; default keeps per-process counters.
+    ThrottlerModule.forRootAsync({
+      imports: [NexoThrottlerStorageModule],
+      inject: [NexoThrottlerStorage],
+      useFactory: (storage: NexoThrottlerStorage) => ({ throttlers: THROTTLERS, storage }),
+    }),
 
     ScheduleModule.forRoot(),
 

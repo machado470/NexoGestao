@@ -1,6 +1,6 @@
 import { Controller, Post, Body, UseGuards, Request, Get, Param } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler'
-import { ANONYMOUS_THROTTLER, AUTH_ANONYMOUS_LIMIT, MINUTE_MS, accountEmailTracker } from '../common/throttling/throttling'
+import { ANONYMOUS_THROTTLER, AUTH_ANONYMOUS_LIMIT, MINUTE_MS, SensitiveThrottle, accountEmailTracker } from '../common/throttling/throttling'
 import { InvitesService } from './invites.service';
 import { CreateInviteDto } from './dto/create-invite.dto';
 import { AcceptInviteDto } from './dto/accept-invite.dto';
@@ -40,6 +40,7 @@ export class InvitesController {
   @Public()
   @Post('accept-invite')
   @Throttle({ default: { limit: 5, ttl: MINUTE_MS, getTracker: accountEmailTracker }, [ANONYMOUS_THROTTLER]: { limit: AUTH_ANONYMOUS_LIMIT, ttl: MINUTE_MS } })
+  @SensitiveThrottle()
   async acceptInvite(@Body() acceptInviteDto: AcceptInviteDto) {
     return this.invitesService.acceptInvite(acceptInviteDto.email, acceptInviteDto.token, acceptInviteDto.name, acceptInviteDto.password);
   }

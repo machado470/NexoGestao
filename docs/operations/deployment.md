@@ -78,6 +78,21 @@ o domínio HTTPS do serviço web. A configuração de build não fornece variáv
 secretas nem cria os serviços de dados. Chaves reais ficam somente no Railway.
 O GitHub Pages continua sendo uma publicação estática separada.
 
+### Rate limiting da API (C7.1)
+
+Por padrão os contadores de rate limit ficam na memória de cada processo da
+API: com N réplicas o limite efetivo é multiplicado por N e zera a cada
+deploy. Com `THROTTLE_STORAGE=redis` a API usa o mesmo Redis de `REDIS_URL`
+(nenhum serviço novo), em uma conexão extra duplicada da conexão das filas,
+com timeout curto e sem fila offline. As chaves usam o prefixo
+`nexogestao:<NODE_ENV>:throttle:v1:`, contêm apenas hashes SHA-256 e sempre têm
+TTL. Se o Redis não responder, rotas comuns passam a contar por processo
+(proteção degradada, não desativada); rotas sensíveis (login, cadastro,
+recuperação de senha, convites, pagamentos e checkouts) respondem 503 com
+`Retry-After: 5` quando `THROTTLE_REDIS_SENSITIVE_FAILURE=closed` (padrão) ou
+contam por processo quando o valor é `local`. Valores desconhecidos impedem o
+boot. A API continua sem `trust proxy`: o IP de origem visto por ela é o do BFF.
+
 O CI executa `NEXO_DOCKER_TARGET=railway bash scripts/smoke-production-compose.sh`
 em banco/Redis/containers descartáveis, incluindo migrations, readiness e a
 chamada de login inválido pelo BFF à API. As credenciais de teste e a chave

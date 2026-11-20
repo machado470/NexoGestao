@@ -16,6 +16,7 @@ import {
 } from '@nestjs/common'
 import { Response } from 'express'
 import { Throttle } from '@nestjs/throttler'
+import { SensitiveThrottle } from '../common/throttling/throttling'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
 import { Roles } from '../auth/decorators/roles.decorator'
@@ -235,6 +236,7 @@ export class FinanceController {
 
   @Post('charges/:chargeId/pay')
   @Throttle({ default: { limit: 8, ttl: 60000 } })
+  @SensitiveThrottle()
   @Roles('ADMIN', 'MANAGER')
   async payCharge(
     @Org() orgId: string,

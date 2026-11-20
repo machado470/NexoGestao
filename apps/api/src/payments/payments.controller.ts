@@ -20,7 +20,7 @@ import { PaymentsService } from './payments.service'
 import { User } from '../auth/decorators/user.decorator'
 import { OperationalStateGuard } from '../people/operational-state.guard'
 import { SkipThrottle, Throttle } from '@nestjs/throttler'
-import { SKIP_ALL_THROTTLERS } from '../common/throttling/throttling'
+import { SKIP_ALL_THROTTLERS, SensitiveThrottle } from '../common/throttling/throttling'
 import { ManualPaymentsService } from '../finance/manual-payments.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { LegacyPaymentDto } from './dto/legacy-payment.dto'
@@ -39,6 +39,7 @@ export class PaymentsController {
    * Cria uma sessão de checkout no Stripe
    */
   @Post('checkout')
+  @SensitiveThrottle()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
   async createCheckout(
@@ -102,6 +103,7 @@ export class PaymentsController {
    */
   @Post('charges/:chargeId/pay')
   @Throttle({ default: { limit: 8, ttl: 60000 } })
+  @SensitiveThrottle()
   @UseGuards(JwtAuthGuard, RolesGuard, OperationalStateGuard)
   @Roles('ADMIN', 'MANAGER')
   async payCharge(
