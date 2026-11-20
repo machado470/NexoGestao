@@ -1,4 +1,6 @@
 import { Controller, Get, Optional, Request, ServiceUnavailableException, UnauthorizedException, UseGuards } from '@nestjs/common'
+import { SkipThrottle } from '@nestjs/throttler'
+import { SKIP_ALL_THROTTLERS } from '../common/throttling/throttling'
 import { ConfigService } from '@nestjs/config'
 import { isStripeDisabled } from '../common/config/stripe-integration'
 import { PrismaService } from '../prisma/prisma.service'
@@ -24,6 +26,7 @@ export class HealthController {
     return (this.config.get<string>(name) ?? '').trim().length > 0
   }
 
+  @SkipThrottle(SKIP_ALL_THROTTLERS)
   @Get()
   health(@Request() req: any) {
     if (Object.keys(req.query ?? {}).some((key) => key.toLowerCase() === 'details')) {
@@ -53,6 +56,7 @@ export class HealthController {
     }
   }
 
+  @SkipThrottle(SKIP_ALL_THROTTLERS)
   @Get('readiness')
   async readiness() {
     const startedAt = Date.now()
@@ -78,6 +82,7 @@ export class HealthController {
     return body
   }
 
+  @SkipThrottle(SKIP_ALL_THROTTLERS)
   @Get('liveness')
   liveness() {
     return {

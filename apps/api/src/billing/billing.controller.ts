@@ -1,3 +1,5 @@
+import { SkipThrottle, Throttle } from '@nestjs/throttler'
+import { MINUTE_MS, SKIP_ALL_THROTTLERS } from '../common/throttling/throttling'
 import {
   Controller,
   Post,
@@ -55,6 +57,8 @@ export class BillingController {
 
   @Public()
   @Post('webhook')
+  // Authenticated by the Stripe signature; retries must not be rate limited.
+  @SkipThrottle(SKIP_ALL_THROTTLERS)
   @HttpCode(HttpStatus.OK)
   async handleWebhook(
     @Req() req: RawBodyRequest<Request>,
@@ -99,6 +103,7 @@ export class BillingController {
 
   @Public()
   @Get('plans')
+  @Throttle({ default: { limit: 120, ttl: MINUTE_MS } })
   async getPlans() {
     return this.billingService.getPlanCatalog()
   }

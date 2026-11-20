@@ -11,6 +11,7 @@ import {
 import { ConfigService } from '@nestjs/config'
 import { AuthGuard } from '@nestjs/passport'
 import { Throttle } from '@nestjs/throttler'
+import { ANONYMOUS_THROTTLER, AUTH_ANONYMOUS_LIMIT, MINUTE_MS, accountEmailTracker, bodyIdTokenTracker, bodyTokenTracker } from '../common/throttling/throttling'
 
 import { AuthService } from './auth.service'
 import { GoogleLoginDto } from './dto/google-login.dto'
@@ -66,7 +67,7 @@ export class AuthController {
 
   @Public()
   @Post('register')
-  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Throttle({ default: { limit: 5, ttl: MINUTE_MS, getTracker: accountEmailTracker }, [ANONYMOUS_THROTTLER]: { limit: AUTH_ANONYMOUS_LIMIT, ttl: MINUTE_MS } })
   async register(
     @Body()
     body: RegisterDto,
@@ -76,7 +77,7 @@ export class AuthController {
 
   @Public()
   @Post('login')
-  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Throttle({ default: { limit: 5, ttl: MINUTE_MS, getTracker: accountEmailTracker }, [ANONYMOUS_THROTTLER]: { limit: AUTH_ANONYMOUS_LIMIT, ttl: MINUTE_MS } })
   async login(@Body() body: LoginDto) {
     return this.auth.login(body.email, body.password)
   }
@@ -91,7 +92,7 @@ export class AuthController {
 
   @Public()
   @Post('google/bff-login')
-  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Throttle({ default: { limit: 10, ttl: MINUTE_MS, getTracker: bodyIdTokenTracker }, [ANONYMOUS_THROTTLER]: { limit: AUTH_ANONYMOUS_LIMIT, ttl: MINUTE_MS } })
   async googleBffLogin(
     @Body() body: GoogleLoginDto,
   ) {
@@ -101,6 +102,7 @@ export class AuthController {
 
   @Public()
   @Get('google/status')
+  @Throttle({ default: { limit: 120, ttl: MINUTE_MS } })
   googleStatus() {
     const googleOAuthEnv = readGoogleOAuthEnv(this.config)
     const configured = Boolean(
@@ -144,28 +146,28 @@ export class AuthController {
 
   @Public()
   @Post('forgot-password')
-  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Throttle({ default: { limit: 5, ttl: MINUTE_MS, getTracker: accountEmailTracker }, [ANONYMOUS_THROTTLER]: { limit: AUTH_ANONYMOUS_LIMIT, ttl: MINUTE_MS } })
   async forgotPassword(@Body() body: AuthEmailDto) {
     return this.auth.forgotPassword(body.email)
   }
 
   @Public()
   @Post('reset-password')
-  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Throttle({ default: { limit: 5, ttl: MINUTE_MS, getTracker: bodyTokenTracker }, [ANONYMOUS_THROTTLER]: { limit: AUTH_ANONYMOUS_LIMIT, ttl: MINUTE_MS } })
   async resetPassword(@Body() body: ResetPasswordDto) {
     return this.auth.resetPassword(body.token, body.password)
   }
 
   @Public()
   @Post('verify-email')
-  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Throttle({ default: { limit: 10, ttl: MINUTE_MS, getTracker: bodyTokenTracker }, [ANONYMOUS_THROTTLER]: { limit: AUTH_ANONYMOUS_LIMIT, ttl: MINUTE_MS } })
   async verifyEmail(@Body() body: AuthTokenDto) {
     return this.auth.verifyEmail(body.token)
   }
 
   @Public()
   @Post('resend-email-verification')
-  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Throttle({ default: { limit: 5, ttl: MINUTE_MS, getTracker: accountEmailTracker }, [ANONYMOUS_THROTTLER]: { limit: AUTH_ANONYMOUS_LIMIT, ttl: MINUTE_MS } })
   async resendEmailVerification(@Body() body: AuthEmailDto) {
     return this.auth.resendEmailVerification(body.email)
   }

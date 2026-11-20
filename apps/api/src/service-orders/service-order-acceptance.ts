@@ -1,3 +1,5 @@
+import { Throttle } from "@nestjs/throttler";
+import { MINUTE_MS, bodyTokenTracker } from "../common/throttling/throttling";
 import {
   BadRequestException,
   Body,
@@ -395,6 +397,7 @@ export class ServiceOrderAcceptanceController {
     return this.service.revoke(org, order, id, this.actor(user));
   }
 }
+@Throttle({ default: { limit: 30, ttl: MINUTE_MS, getTracker: bodyTokenTracker } })
 @Controller("service-acceptance")
 export class PublicServiceAcceptanceController {
   constructor(private readonly service: ServiceOrderAcceptanceService) {}

@@ -19,7 +19,7 @@ export class OnboardingController {
 
   @Post("complete")
   @Roles("ADMIN", "MANAGER")
-  @Throttle({ short: { limit: 10, ttl: 60000 } })
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async completeOnboarding(@Req() req: any) {
     const orgId = req.user.orgId;
     return this.onboardingService.completeOnboarding(orgId);
@@ -27,14 +27,14 @@ export class OnboardingController {
 
   @Post("skip")
   @Roles("ADMIN", "MANAGER")
-  @Throttle({ short: { limit: 10, ttl: 60000 } })
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async skipOnboarding(@Req() req: any) {
     return this.onboardingService.skipOnboarding(req.user.orgId);
   }
 
   @Post("complete-step")
   @Roles("ADMIN", "MANAGER")
-  @Throttle({ short: { limit: 10, ttl: 60000 } })
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async completeOnboardingStep(
     @Req() req: any,
     @Body() body: CompleteOnboardingStepDto,

@@ -19,7 +19,8 @@ import { Org } from '../auth/decorators/org.decorator'
 import { PaymentsService } from './payments.service'
 import { User } from '../auth/decorators/user.decorator'
 import { OperationalStateGuard } from '../people/operational-state.guard'
-import { Throttle } from '@nestjs/throttler'
+import { SkipThrottle, Throttle } from '@nestjs/throttler'
+import { SKIP_ALL_THROTTLERS } from '../common/throttling/throttling'
 import { ManualPaymentsService } from '../finance/manual-payments.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { LegacyPaymentDto } from './dto/legacy-payment.dto'
@@ -69,6 +70,8 @@ export class PaymentsController {
    * Webhook do Stripe para processar pagamentos
    */
   @Post('webhook/stripe')
+  // Authenticated by the Stripe signature; retries must not be rate limited.
+  @SkipThrottle(SKIP_ALL_THROTTLERS)
   async handleStripeWebhook(
     @Req() req: RawBodyRequest<any>,
     @Headers('stripe-signature') signature: string,
@@ -98,7 +101,7 @@ export class PaymentsController {
    * Marca uma cobrança como paga
    */
   @Post('charges/:chargeId/pay')
-  @Throttle({ short: { limit: 8, ttl: 60000 } })
+  @Throttle({ default: { limit: 8, ttl: 60000 } })
   @UseGuards(JwtAuthGuard, RolesGuard, OperationalStateGuard)
   @Roles('ADMIN', 'MANAGER')
   async payCharge(
