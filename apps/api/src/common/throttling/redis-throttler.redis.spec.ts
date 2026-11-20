@@ -30,11 +30,16 @@ import { DEFAULT_THROTTLER, NexoThrottlerGuard, THROTTLERS } from './throttling'
  * every test runs (including outage/reconnect, which kill it). Without the binary, under
  * RUN_REAL_INTEGRATION=true the suite uses the disposable CI Redis (REDIS_URL) with per-test key
  * prefixes (nothing is flushed) and skips only the tests that need to kill the server.
+ * REQUIRE_REDIS_SERVER=true (CI) turns a missing binary into a failure.
  */
 // Same parsing as test/integration/infra-guards (not importable: outside the build rootDir).
 const RUN_REAL_INTEGRATION = ['1', 'true', 'yes', 'on'].includes((process.env.RUN_REAL_INTEGRATION ?? '').toLowerCase())
 const REDIS_BIN = process.env.REDIS_SERVER_BIN || 'redis-server'
 const HAS_REDIS_BIN = spawnSync(REDIS_BIN, ['--version']).status === 0
+// CI sets this so a missing binary fails the run instead of silently skipping the suite.
+if (process.env.REQUIRE_REDIS_SERVER === 'true' && !HAS_REDIS_BIN) {
+  throw new Error(`REQUIRE_REDIS_SERVER=true but "${REDIS_BIN}" is not executable`)
+}
 const EXTERNAL_REDIS_URL = !HAS_REDIS_BIN && RUN_REAL_INTEGRATION ? process.env.REDIS_URL : undefined
 if (!HAS_REDIS_BIN && !EXTERNAL_REDIS_URL) console.warn('[redis-throttler] no redis-server binary and RUN_REAL_INTEGRATION is off: shared-counter tests skipped')
 const describeRedis = HAS_REDIS_BIN || EXTERNAL_REDIS_URL ? describe : describe.skip

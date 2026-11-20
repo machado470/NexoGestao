@@ -128,6 +128,34 @@ jobs:
           pnpm --filter ./apps/api test:unit
           pnpm --filter ./apps/web test
 
+      # C7.1: the Redis throttling suite spawns its own disposable redis-server on a free local
+      # port (it kills and restarts it to test outage/reconnect), so it never touches the shared
+      # Redis service container on 6379. policy-rc.d keeps apt from starting a system Redis.
+      - name: Install redis-server for throttling tests
+        run: |
+          echo 'exit 101' | sudo tee /usr/sbin/policy-rc.d >/dev/null
+          sudo chmod +x /usr/sbin/policy-rc.d
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends redis-server
+          sudo rm -f /usr/sbin/policy-rc.d
+          redis-server --version
+
+      - name: Redis throttling integration (C7.1)
+        env:
+          REQUIRE_REDIS_SERVER: "true"
+        run: |
+          report="$RUNNER_TEMP/redis-throttler.json"
+          pnpm --filter ./apps/api exec jest --config jest.config.js --runInBand \
+            src/common/throttling/redis-throttler.redis.spec.ts --json --outputFile="$report"
+          node -e '
+            const r = require(process.argv[1]);
+            const { numTotalTests: total, numPassedTests: passed, numPendingTests: pending, numTodoTests: todo } = r;
+            console.log(`redis throttling: total=${total} passed=${passed} skipped=${pending + todo}`);
+            if (!r.success || total !== 12 || passed !== 12 || pending + todo !== 0) process.exit(1);
+          ' "$report"
+          # Disposable servers bind 127.0.0.1 only; the service container runs as "redis-server *:6379".
+          if pgrep -af 'redis-server 127\.0\.0\.1:'; then echo "leftover disposable redis-server"; exit 1; fi
+
       - name: Lint
         run: pnpm lint
 
