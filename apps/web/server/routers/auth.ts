@@ -4,6 +4,7 @@ import { getSessionCookieOptions } from "../_core/cookies";
 import { nexoPublicFetch } from "../_core/nexoClient";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { authedGet, type NexoContext } from "../_core/nexoTransport";
+import { toBrowserAuthResult, withoutSessionTokens } from "../_core/sessionTokens";
 
 const NEXO_TOKEN_COOKIE = "nexo_token";
 type AuthContext = NexoContext & { res: any };
@@ -53,7 +54,7 @@ export const authRouter = router({
       if (!token) throw new Error("Login não retornou token.");
       console.info("[auth.login] session established");
       setTokenCookie(ctx as AuthContext, token);
-      return result;
+      return toBrowserAuthResult(result, true);
     }),
   register: publicProcedure
     .input(z.object({ orgName: z.string(), adminName: z.string(), email: z.string().email(), password: z.string().min(8) }))
@@ -61,7 +62,7 @@ export const authRouter = router({
       const result = await nexoPublicFetch<any>(ctx.req, "/auth/register", { method: "POST", body: JSON.stringify(input) });
       const token = extractToken(result);
       if (token) setTokenCookie(ctx as AuthContext, token);
-      return result;
+      return toBrowserAuthResult(result, Boolean(token));
     }),
   forgotPassword: publicProcedure.input(z.object({ email: z.string().email() })).mutation(({ input, ctx }) =>
     nexoPublicFetch(ctx.req, "/auth/forgot-password", { method: "POST", body: JSON.stringify(input) })),
@@ -73,14 +74,14 @@ export const authRouter = router({
       const result = await nexoPublicFetch<any>(ctx.req, "/auth/accept-invite", { method: "POST", body: JSON.stringify(input) });
       const token = extractToken(result);
       if (token) setTokenCookie(ctx as AuthContext, token);
-      return result;
+      return toBrowserAuthResult(result, Boolean(token));
     }),
   establishSession: publicProcedure.input(z.object({ token: z.string().min(1) })).mutation(async ({ input, ctx }) => {
     const rawToken = input.token.trim();
     setTokenCookie(ctx as AuthContext, rawToken);
     try {
       const result = await nexoPublicFetch<any>(ctx.req, "/me", { headers: { Authorization: `Bearer ${rawToken}` } });
-      return { success: true, validated: true, token: rawToken, me: result };
+      return { success: true, validated: true, me: withoutSessionTokens(result) };
     } catch (error) {
       console.warn("[auth.establishSession] sessão não validada por /me", { reason: error instanceof Error ? error.message : String(error) });
       ctx.res.clearCookie(NEXO_TOKEN_COOKIE, getSessionCookieOptions(ctx.req));

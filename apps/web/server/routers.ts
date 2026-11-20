@@ -3,6 +3,7 @@ import {serviceCatalogRouter} from "./routers/service-catalog";
 import { commerceRouter } from "./routers/commerce";
 import { serviceAcceptanceRouter } from './routers/service-acceptance';
 import { getSessionCookieOptions } from "./_core/cookies";
+import { withoutSessionTokens } from "./_core/sessionTokens";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { fetchNexoMe, NexoBootstrapError } from "./_core/context";
@@ -76,7 +77,8 @@ export const appRouter = router({
   session: router({
     me: publicProcedure.query(async ({ ctx }) => {
       try {
-        return await fetchNexoMe(ctx.req);
+        // The session context carries the JWT for server-side forwarding only.
+        return withoutSessionTokens(await fetchNexoMe(ctx.req));
       } catch (error) {
         if (
           error instanceof NexoBootstrapError &&

@@ -36,7 +36,10 @@ describe("BFF↔API contract: critical frontend consumers", () => {
     const caller = appRouter.createCaller({ req: makeReq(), res: makeRes(), user: null } as any);
     const result = await caller.session.me();
 
-    expect(result).toEqual(expect.objectContaining({ id: "u1", token: "token-1", validated: true }));
+    expect(result).toEqual(expect.objectContaining({ id: "u1", validated: true }));
+    // The JWT stays in the httpOnly cookie; it must never be returned to browser JavaScript.
+    expect(result).not.toHaveProperty("token");
+    expect(JSON.stringify(result)).not.toContain("token-1");
     expect(globalThis.fetch).toHaveBeenCalledWith(expect.stringContaining("/me"), expect.any(Object));
   });
 
