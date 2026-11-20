@@ -39,10 +39,16 @@ suite('Privacy export minimization and authorization / HTTP + PostgreSQL', () =>
     expect(res.headers['content-type']).toContain('text/csv');expect(res.headers['cache-control']).toBe('no-store')
     expect(res.text).toContain('Subject Alpha');expect(res.text).toContain('Other subject Beta');expect(res.text).not.toContain('Foreign subject Gamma');expect(res.text).not.toContain('REVIEW_ONLY_PRIVATE_NOTE');expect(res.text).not.toContain('11111111111')
   })
-  it.each(paths)('%s exports only the selected customer and ignores forged tenant selection',async path=>{
-    const res=await request(app.getHttpServer()).get(path+`?customerId=${customers[0]}&orgId=${orgB}`).set(auth()).set('x-org-id',orgB).expect(200)
+  it.each(paths)('%s exports only the selected customer',async path=>{
+    const res=await request(app.getHttpServer()).get(path+`?customerId=${customers[0]}`).set(auth()).expect(200)
     expect(res.text).toContain('Subject Alpha');expect(res.text).not.toContain('Other subject Beta');expect(res.text).not.toContain('Foreign subject Gamma')
     expect(res.headers['cache-control']).toBe('no-store')
+  })
+  it.each(paths)('%s rejects forged tenant selection without disclosing records',async path=>{
+    for(const forged of [`?customerId=${customers[0]}&orgId=${orgB}`,`?customerId=${customers[0]}`]){
+      const res=await request(app.getHttpServer()).get(path+forged).set(auth()).set('x-org-id',orgB).expect(403)
+      expect(res.text).not.toContain('Subject Alpha');expect(res.text).not.toContain('Foreign subject Gamma')
+    }
   })
   it.each(paths)('%s rejects foreign and missing subject identifiers without disclosing records',async path=>{
     for(const id of [customers[2],randomUUID()]){const res=await request(app.getHttpServer()).get(path+'?customerId='+id).set(auth()).expect(404);expect(res.text).not.toContain('Foreign subject Gamma')}

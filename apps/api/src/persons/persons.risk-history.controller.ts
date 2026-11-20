@@ -20,7 +20,6 @@ export class PersonsRiskHistoryController {
     @Req() req: any,
     @Param('id') personId: string,
   ) {
-    // orgId já validado pelo guard + escopo do front
-    return this.snapshots.listByPerson(personId)
+    return this.snapshots.listByPerson(personId, req.user.orgId)
   }
 }

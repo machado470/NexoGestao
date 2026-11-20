@@ -5,6 +5,7 @@ import {
   UseGuards,
 } from '@nestjs/common'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
+import { Org } from '../auth/decorators/org.decorator'
 import { OperationalStateGuard } from '../people/operational-state.guard'
 import { AssessmentsService } from './assessments.service'
 
@@ -21,12 +22,13 @@ export class AssessmentsController {
   @Post()
   @UseGuards(OperationalStateGuard)
   async submit(
+    @Org() orgId: string,
     @Body()
     body: {
       assignmentId: string
       score: number
     },
   ) {
-    return this.service.submit(body)
+    return this.service.submit({ ...body, orgId })
   }
 }

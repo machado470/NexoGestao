@@ -190,7 +190,10 @@ describeRealIntegration('Phase 2 tenant mutation isolation (Postgres e2e)', () =
     const auditBefore = await prisma.auditEvent.count({ where: { orgId: { in: orgIds } } })
 
     await request(app.getHttpServer()).post(`/whatsapp/action-executions/${executionId}/${operation}`).set(authA())
-      .send({ reason: 'Cross-tenant action', orgId: ids.orgB, tenantId: ids.orgB, organizationId: ids.orgB }).expect(404)
+      .send({ reason: 'Cross-tenant action', orgId: ids.orgB, tenantId: ids.orgB, organizationId: ids.orgB }).expect(403)
+    // Without forged tenant fields, the Org B resource is still not found for Org A.
+    await request(app.getHttpServer()).post(`/whatsapp/action-executions/${executionId}/${operation}`).set(authA())
+      .send({ reason: 'Cross-tenant action' }).expect(404)
 
     expect(await prisma.whatsAppActionExecution.findUnique({ where: { id: executionId } })).toEqual(executionBefore)
     expect(await prisma.whatsAppConversation.findUnique({ where: { id: ids.conversationB } })).toEqual(conversationBefore)
