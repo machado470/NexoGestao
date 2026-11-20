@@ -221,11 +221,31 @@ describeRealIntegration('Canonical Operational Workflow (e2e)', () => {
     expect(foreignAudit.body.data).toHaveLength(0)
 
 
-    // forged orgId from client must not escape authenticated tenant
+    // forged orgId from client must not escape authenticated tenant: rejected (403) before any write
+    const forgedCustomerEmail = `forged.${primaryOrgId}@mail.test`
+    const forgedCustomerPayload = { name: 'Cliente Forjado', phone: '+55 (11) 98888-0000', email: forgedCustomerEmail }
+    const idempotencyBeforeForgedCustomer = await prisma.idempotencyRecord.count({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })
+    for (const forgedTenant of [{ orgId: secondaryOrgId }, { organizationId: secondaryOrgId }]) {
+      await request(app.getHttpServer())
+        .post('/customers')
+        .set(mainAuth)
+        .send({ ...forgedCustomerPayload, ...forgedTenant })
+        .expect(403)
+    }
+    await request(app.getHttpServer())
+      .post('/customers')
+      .set(mainAuth)
+      .set('x-org-id', secondaryOrgId)
+      .send(forgedCustomerPayload)
+      .expect(403)
+    expect(await prisma.customer.count({ where: { email: forgedCustomerEmail } })).toBe(0)
+    expect(await prisma.idempotencyRecord.count({ where: { orgId: { in: [primaryOrgId, secondaryOrgId] } } })).toBe(idempotencyBeforeForgedCustomer)
+
+    // the same request without forged tenant fields is created in the authenticated tenant only
     const forgedCustomer = await request(app.getHttpServer())
       .post('/customers')
       .set(mainAuth)
-      .send({ name: 'Cliente Forjado', phone: '+55 (11) 98888-0000', email: `forged.${primaryOrgId}@mail.test`, orgId: secondaryOrgId })
+      .send(forgedCustomerPayload)
       .expect(201)
 
     const forgedCustomerDb = await prisma.customer.findFirst({ where: { id: forgedCustomer.body.id, orgId: primaryOrgId } })
@@ -461,7 +481,25 @@ describeRealIntegration('Canonical Operational Workflow (e2e)', () => {
 
     // 10) exact payment and same-key retry produce one authoritative settlement
     const exactPaymentKey = `exact-pay-${chargeId}`
-    const paymentPayload = { method: 'PIX', amountCents: 15000, orgId: secondaryOrgId }
+    const paymentPayload = { method: 'PIX', amountCents: 15000 }
+
+    // forged tenant fields on an otherwise valid payment are rejected (403) before reserving
+    // idempotency, creating a payment or touching the charge, even with the exact payment key
+    const chargeBeforeForgedPayment = await prisma.charge.findFirst({ where: { id: chargeId, orgId: primaryOrgId } })
+    for (const forgedTenant of [{ orgId: secondaryOrgId }, { organizationId: secondaryOrgId }]) {
+      await request(app.getHttpServer())
+        .post(`/finance/charges/${chargeId}/pay`)
+        .set(mainAuth)
+        .set('Idempotency-Key', exactPaymentKey)
+        .send({ ...paymentPayload, ...forgedTenant })
+        .expect(403)
+    }
+    expect(await prisma.payment.count({ where: { chargeId } })).toBe(0)
+    expect(await paymentEventsFor(primaryOrgId, chargeId)).toHaveLength(0)
+    expect(await paymentEventsFor(secondaryOrgId, chargeId)).toHaveLength(0)
+    expect(await prisma.idempotencyRecord.count({ where: { scope: 'finance.pay_charge', key: exactPaymentKey } })).toBe(0)
+    expect(await prisma.charge.findFirst({ where: { id: chargeId, orgId: primaryOrgId } })).toEqual(chargeBeforeForgedPayment)
+
     const payResponse = await request(app.getHttpServer())
       .post(`/finance/charges/${chargeId}/pay`)
       .set(mainAuth)
