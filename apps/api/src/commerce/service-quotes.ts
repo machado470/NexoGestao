@@ -1,3 +1,4 @@
+import {conversionFields} from "./quote-order";
 import {
   BadRequestException,
   Body,
@@ -112,6 +113,7 @@ const publicQuote = (item: any) => ({
   snapshot: item.snapshot,
   createdAt: item.createdAt,
   updatedAt: item.updatedAt,
+  conversion: item.orderConversion,
 });
 const receiptFields = {
   id: true,
@@ -272,6 +274,7 @@ export class ServiceQuotesService {
     const [items, total] = await this.db.$transaction([
       this.db.serviceQuote.findMany({
         where,
+        include: {orderConversion:{select:conversionFields}},
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         skip: (page - 1) * 10,
         take: 10,
@@ -288,7 +291,7 @@ export class ServiceQuotesService {
   async detail(orgId: string, id: string, page = 1) {
     if (!Number.isInteger(page) || page < 1 || page > 10000)
       throw new BadRequestException("Página inválida");
-    const item = await this.db.serviceQuote.findFirst({ where: { id, orgId } });
+    const item = await this.db.serviceQuote.findFirst({ where: { id, orgId }, include:{orderConversion:{select:conversionFields}} });
     if (!item) throw new NotFoundException("Orçamento não encontrado");
     const where = { orgId, quoteId: id };
     const [revisions, total, approvals] = await Promise.all([

@@ -1,3 +1,4 @@
+import {isQuoteTermsError,quoteTermsMessage,quoteChargeTerms} from "../common/quote-commercial-terms";
 import { isBillableTreatment, isReturnBillingBlock, ReturnBillingBlockedException } from '../common/billing-treatment'
 import { refundedAmount } from '../common/finance/refunded-amount'
 import {
@@ -528,6 +529,8 @@ export class FinanceService {
       }
     }
 
+    const quoteTerms = input.serviceOrderId ? await quoteChargeTerms(this.prisma,input.orgId,input.serviceOrderId,input.amountCents) : null
+
     const idempotencyKey =
       input.idempotencyKey?.trim() ||
       this.buildChargeCreateIdempotencyKey(input)
@@ -571,6 +574,7 @@ export class FinanceService {
               status: 'PENDING',
               notes: input.notes ?? null,
               serviceOrderId: input.serviceOrderId ?? null,
+              ...(quoteTerms ? {currency:quoteTerms.currency} : {}),
             },
             include: { customer: true },
           })
@@ -673,6 +677,7 @@ export class FinanceService {
       return result
     } catch (error: any) {
       await this.idempotency.fail(idemRecordId, error?.code)
+      if (isQuoteTermsError(error)) throw new BadRequestException(quoteTermsMessage)
       if (isReturnBillingBlock(error)) throw new ReturnBillingBlockedException()
       throw error
     }
@@ -1188,6 +1193,7 @@ export class FinanceService {
       return result
     } catch (error: any) {
       await this.idempotency.fail(idemRecordId, error?.code)
+      if (isQuoteTermsError(error)) throw new BadRequestException(quoteTermsMessage)
       if (isReturnBillingBlock(error)) throw new ReturnBillingBlockedException()
       throw error
     }
@@ -1240,6 +1246,8 @@ export class FinanceService {
       customerId: input.customerId,
     })
 
+    const quoteTerms = await quoteChargeTerms(this.prisma,input.orgId,input.serviceOrderId,input.amountCents)
+
     const existing = await this.prisma.charge.findFirst({
       where: {
         orgId: input.orgId,
@@ -1261,6 +1269,7 @@ export class FinanceService {
           amountCents: input.amountCents,
           status: 'PENDING',
           dueDate: input.dueDate ?? new Date(),
+          ...(quoteTerms ? {currency:quoteTerms.currency} : {}),
         },
       })
       const timelineMetadata = {
@@ -1296,6 +1305,7 @@ export class FinanceService {
       return result
     } catch (error: any) {
       await this.idempotency.fail(idem.recordId, error?.code)
+      if (isQuoteTermsError(error)) throw new BadRequestException(quoteTermsMessage)
       if (isReturnBillingBlock(error)) throw new ReturnBillingBlockedException()
       throw error
     }

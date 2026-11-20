@@ -45,7 +45,27 @@ export const quoteSnapshot = z.object({
     })
   ),
 });
+export const quoteConversion = z.object({
+  quoteId: uuid,
+  quoteVersion: integer,
+  serviceOrderId: uuid,
+  amountCents: integer,
+  currency: z.string(),
+  createdByName: z.string(),
+  createdAt: z.string().datetime(),
+  serviceOrder: z.object({
+    id: uuid,
+    title: z.string(),
+    status: z.enum(["OPEN", "ASSIGNED", "IN_PROGRESS", "DONE", "CANCELED"]),
+    amountCents: integer.nullable(),
+  }),
+});
+export type QuoteConversion = z.infer<typeof quoteConversion>;
+export const quoteOrderOrigin = quoteConversion.extend({
+  snapshot: quoteSnapshot,
+});
 export const quoteRecord = z.object({
+  conversion: quoteConversion.nullable().optional(),
   id: uuid,
   customerId: uuid,
   customerName: z.string(),
@@ -107,23 +127,21 @@ export const quoteAnswer = quoteToken
       path: ["responseNote"],
     }
   );
-export const quotePublic = quoteSnapshot
-  .omit({ items: true })
-  .extend({
-    companyName: z.string(),
-    version: integer,
-    items: z.array(
-      z.object({
-        name: z.string(),
-        description: z.string(),
-        quantity: z.number().int(),
-        unitCents: integer,
-        lineCents: integer,
-        durationMinutes: z.number().int().nullable(),
-      })
-    ),
-    expiresAt: z.string().datetime(),
-    decision: z.enum(["ACCEPTED", "REJECTED"]).nullable(),
-    respondedAt: z.string().datetime().nullable(),
-  });
+export const quotePublic = quoteSnapshot.omit({ items: true }).extend({
+  companyName: z.string(),
+  version: integer,
+  items: z.array(
+    z.object({
+      name: z.string(),
+      description: z.string(),
+      quantity: z.number().int(),
+      unitCents: integer,
+      lineCents: integer,
+      durationMinutes: z.number().int().nullable(),
+    })
+  ),
+  expiresAt: z.string().datetime(),
+  decision: z.enum(["ACCEPTED", "REJECTED"]).nullable(),
+  respondedAt: z.string().datetime().nullable(),
+});
 export type PublicQuote = z.infer<typeof quotePublic>;

@@ -517,6 +517,7 @@ model Appointment {
 }
 
 model ServiceOrder {
+  quoteOrigin        ServiceQuoteOrder?
   id                 String                      @id @default(uuid())
   orgId              String
   customerId         String
@@ -1513,6 +1514,7 @@ model CatalogServiceRevision {
 }
 
 model ServiceQuote {
+  orderConversion ServiceQuoteOrder?
   id              String                 @id @default(uuid())
   orgId           String
   customerId      String
@@ -1553,15 +1555,16 @@ model ServiceQuoteRevision {
 }
 
 model ServiceQuoteApproval {
-  id              String       @id @default(uuid())
+  orderConversion ServiceQuoteOrder?
+  id              String             @id @default(uuid())
   orgId           String
   quoteId         String
   quoteVersion    Int
   entryKey        String
-  tokenHash       String       @unique
+  tokenHash       String             @unique
   companyName     String
   createdByUserId String
-  createdAt       DateTime     @default(now())
+  createdAt       DateTime           @default(now())
   expiresAt       DateTime
   revokedAt       DateTime?
   decision        String?
@@ -1569,10 +1572,33 @@ model ServiceQuoteApproval {
   respondentName  String?
   responseNote    String?
   respondedAt     DateTime?
-  quote           ServiceQuote @relation(fields: [quoteId, orgId], references: [id, orgId], onDelete: Restrict)
+  quote           ServiceQuote       @relation(fields: [quoteId, orgId], references: [id, orgId], onDelete: Restrict)
 
   revision ServiceQuoteRevision @relation(fields: [quoteId, quoteVersion, orgId], references: [quoteId, version, orgId], onDelete: Restrict)
 
+  @@unique([id, orgId, quoteId, quoteVersion])
   @@unique([orgId, quoteId, entryKey])
   @@index([orgId, quoteId, createdAt])
+}
+
+model ServiceQuoteOrder {
+  id              String               @id @default(uuid())
+  orgId           String
+  quoteId         String               @unique
+  quoteVersion    Int
+  approvalId      String               @unique
+  serviceOrderId  String               @unique
+  amountCents     Int
+  currency        String
+  createdByUserId String
+  createdByName   String
+  createdAt       DateTime             @default(now())
+  quote           ServiceQuote         @relation(fields: [quoteId, orgId], references: [id, orgId], onDelete: Restrict)
+  approval        ServiceQuoteApproval @relation(fields: [approvalId, orgId, quoteId, quoteVersion], references: [id, orgId, quoteId, quoteVersion], onDelete: Restrict)
+  serviceOrder    ServiceOrder         @relation(fields: [serviceOrderId, orgId], references: [id, orgId], onDelete: Restrict)
+
+  @@unique([quoteId, orgId])
+  @@unique([serviceOrderId, orgId])
+  @@unique([approvalId, orgId, quoteId, quoteVersion])
+  @@index([orgId, serviceOrderId])
 }

@@ -10,6 +10,6 @@ export function isReturnBillingBlock(error: any): boolean {
 import { BadRequestException } from "@nestjs/common";
 export class ReturnBillingBlockedException extends BadRequestException {
   constructor() {
-    super("A condição comercial deste retorno não permite cobrança.");
+    super("A condição comercial desta O.S. não permite cobrança.");
   }
 }

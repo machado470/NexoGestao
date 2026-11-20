@@ -40,11 +40,7 @@ import {
 } from "@/lib/concurrency";
 
 type ServiceOrderStatus =
-  | "OPEN"
-  | "ASSIGNED"
-  | "IN_PROGRESS"
-  | "DONE"
-  | "CANCELED";
+  "OPEN" | "ASSIGNED" | "IN_PROGRESS" | "DONE" | "CANCELED";
 
 interface EditServiceOrderModalProps {
   isOpen: boolean;
@@ -222,6 +218,12 @@ export default function EditServiceOrderModal({
   });
   const [initialSnapshot, setInitialSnapshot] = useState("");
 
+  const quoteOrigin = trpc.serviceQuotes.orderOrigin.useQuery(
+    { serviceOrderId: serviceOrderId ?? "" },
+    { enabled: isOpen && Boolean(serviceOrderId), retry: false }
+  );
+  const protectQuotedAmount =
+    quoteOrigin.isLoading || quoteOrigin.isError || Boolean(quoteOrigin.data);
   const getServiceOrder = trpc.serviceOrders.getById.useQuery(
     { id: serviceOrderId || "" },
     {
@@ -370,9 +372,15 @@ export default function EditServiceOrderModal({
       return;
     }
 
-    const amountCents = parseAmountToCents(formData.amount);
+    const amountCents = protectQuotedAmount
+      ? undefined
+      : parseAmountToCents(formData.amount);
 
-    if (formData.amount.trim() && amountCents === undefined) {
+    if (
+      !protectQuotedAmount &&
+      formData.amount.trim() &&
+      amountCents === undefined
+    ) {
       toast.error("Valor inválido.");
       return;
     }
@@ -485,8 +493,7 @@ export default function EditServiceOrderModal({
 
   const serviceOrder = normalizeServiceOrderPayload(getServiceOrder.data);
   const persistedStatus = serviceOrder?.status as
-    | ServiceOrderStatus
-    | undefined;
+    ServiceOrderStatus | undefined;
   const isPersistedDone = persistedStatus === "DONE";
   const isPersistedCanceled = persistedStatus === "CANCELED";
 
@@ -668,7 +675,10 @@ export default function EditServiceOrderModal({
 
                 <div className="space-y-4">
                   <div>
-                    <label htmlFor={`${fieldId}-field-0`} className="mb-2 block text-sm font-medium text-[var(--modal-section-text)]">
+                    <label
+                      htmlFor={`${fieldId}-field-0`}
+                      className="mb-2 block text-sm font-medium text-[var(--modal-section-text)]"
+                    >
                       Título *
                     </label>
                     <input
@@ -688,7 +698,10 @@ export default function EditServiceOrderModal({
                   </div>
 
                   <div>
-                    <label htmlFor={`${fieldId}-field-1`} className="mb-2 block text-sm font-medium text-[var(--modal-section-text)]">
+                    <label
+                      htmlFor={`${fieldId}-field-1`}
+                      className="mb-2 block text-sm font-medium text-[var(--modal-section-text)]"
+                    >
                       Descrição
                     </label>
                     <textarea
@@ -710,7 +723,10 @@ export default function EditServiceOrderModal({
 
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
-                      <label htmlFor={`${fieldId}-field-2`} className="mb-2 flex items-center gap-2 text-sm font-medium text-[var(--modal-section-text)]">
+                      <label
+                        htmlFor={`${fieldId}-field-2`}
+                        className="mb-2 flex items-center gap-2 text-sm font-medium text-[var(--modal-section-text)]"
+                      >
                         <Flag className="h-4 w-4 text-gray-500" />
                         Prioridade
                       </label>
@@ -740,7 +756,10 @@ export default function EditServiceOrderModal({
                     </div>
 
                     <div>
-                      <label htmlFor={`${fieldId}-field-3`} className="mb-2 flex items-center gap-2 text-sm font-medium text-[var(--modal-section-text)]">
+                      <label
+                        htmlFor={`${fieldId}-field-3`}
+                        className="mb-2 flex items-center gap-2 text-sm font-medium text-[var(--modal-section-text)]"
+                      >
                         <CalendarDays className="h-4 w-4 text-gray-500" />
                         Agendada para
                       </label>
@@ -763,7 +782,10 @@ export default function EditServiceOrderModal({
                   </div>
 
                   <div>
-                    <label htmlFor={`${fieldId}-field-4`} className="mb-2 flex items-center gap-2 text-sm font-medium text-[var(--modal-section-text)]">
+                    <label
+                      htmlFor={`${fieldId}-field-4`}
+                      className="mb-2 flex items-center gap-2 text-sm font-medium text-[var(--modal-section-text)]"
+                    >
                       <User className="h-4 w-4 text-gray-500" />
                       Responsável
                     </label>
@@ -820,7 +842,10 @@ export default function EditServiceOrderModal({
                   ) : null}
 
                   <div>
-                    <label htmlFor={`${fieldId}-field-5`} className="mb-2 block text-sm font-medium text-[var(--modal-section-text)]">
+                    <label
+                      htmlFor={`${fieldId}-field-5`}
+                      className="mb-2 block text-sm font-medium text-[var(--modal-section-text)]"
+                    >
                       Status
                     </label>
                     <select
@@ -935,8 +960,11 @@ export default function EditServiceOrderModal({
                 </summary>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
-                    <label htmlFor={`${fieldId}-field-6`} className="mb-2 block text-sm font-medium text-[var(--modal-section-text)]">
-                      Valor (R$)
+                    <label
+                      htmlFor={`${fieldId}-field-6`}
+                      className="mb-2 block text-sm font-medium text-[var(--modal-section-text)]"
+                    >
+                      Valor ({quoteOrigin.data?.currency ?? "BRL"})
                     </label>
                     <input
                       id={`${fieldId}-field-6`}
@@ -950,16 +978,32 @@ export default function EditServiceOrderModal({
                         }))
                       }
                       disabled={
-                        updateServiceOrder.isPending || isPersistedClosed
+                        updateServiceOrder.isPending ||
+                        isPersistedClosed ||
+                        protectQuotedAmount
                       }
                     />
                     <p className="mt-1 text-xs text-[var(--modal-section-muted)]">
-                      Valor atual: {formatCurrencyFromInput(formData.amount)}.
-                      Use 1234,56 ou 1.234,56.
+                      {quoteOrigin.data ? (
+                        "Valor preservado conforme o orçamento aprovado. Novas condições comerciais exigem outro orçamento."
+                      ) : quoteOrigin.isError ? (
+                        "Origem comercial indisponível. O valor não será alterado; consulte novamente na O.S."
+                      ) : quoteOrigin.isLoading ? (
+                        "Conferindo origem comercial..."
+                      ) : (
+                        <>
+                          Valor atual:{" "}
+                          {formatCurrencyFromInput(formData.amount)}. Use
+                          1234,56 ou 1.234,56.
+                        </>
+                      )}
                     </p>
                   </div>
                   <div>
-                    <label htmlFor={`${fieldId}-field-7`} className="mb-2 flex items-center gap-2 text-sm font-medium text-[var(--modal-section-text)]">
+                    <label
+                      htmlFor={`${fieldId}-field-7`}
+                      className="mb-2 flex items-center gap-2 text-sm font-medium text-[var(--modal-section-text)]"
+                    >
                       <CalendarDays className="h-4 w-4 text-gray-500" />
                       Vencimento
                     </label>
