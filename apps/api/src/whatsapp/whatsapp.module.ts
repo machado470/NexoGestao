@@ -19,8 +19,14 @@ import { WhatsAppExecutionService } from './whatsapp-execution.service'
 import { IdempotencyCacheService } from '../common/idempotency/idempotency-cache.service'
 import { IdempotencyInterceptor } from '../common/idempotency/idempotency.interceptor'
 import { WhatsAppMetricsModule } from '../common/metrics/whatsapp-metrics.module'
+import { areTestEndpointsEnabled } from '../common/config/test-endpoints'
 
-const testControllers = process.env.NODE_ENV === 'production' ? [] : [WhatsAppTestController]
+/** Test controllers are opt-in (ENABLE_TEST_ENDPOINTS) and never registered in production. */
+export function whatsAppTestControllers(env: NodeJS.ProcessEnv = process.env) {
+  return areTestEndpointsEnabled(env) ? [WhatsAppTestController] : []
+}
+
+const testControllers = whatsAppTestControllers()
 
 @Module({
   imports: [PrismaModule, QueueModule, TimelineModule, QuotasModule, WhatsAppMetricsModule],
