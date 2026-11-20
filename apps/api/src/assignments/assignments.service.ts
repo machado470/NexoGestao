@@ -76,10 +76,16 @@ export class AssignmentsService {
   }
 
   private ensureActorCanAccessAssignment(
-    assignment: { personId: string },
+    assignment: { personId: string; person: { orgId: string } },
     actor?: ActorContext | null,
   ) {
-    // Admin pode tudo
+    // Assignment has no orgId column (not scoped by the Prisma tenant middleware): an actor,
+    // ADMIN included, may only reach assignments of their own organization. 404 avoids leaking existence.
+    if (actor && (!actor.orgId || actor.orgId !== assignment.person.orgId)) {
+      throw new NotFoundException('Assignment não encontrado')
+    }
+
+    // Admin pode tudo dentro da própria organização
     if (actor?.isAdmin) return
 
     // Usuário normal só mexe no próprio assignment
@@ -98,7 +104,7 @@ export class AssignmentsService {
       throw new NotFoundException('Assignment não encontrado')
     }
 
-    this.ensureActorCanAccessAssignment({ personId: assignment.personId }, actor)
+    this.ensureActorCanAccessAssignment(assignment, actor)
 
     await this.timeline.log({
       orgId: assignment.person.orgId,
@@ -134,7 +140,7 @@ export class AssignmentsService {
       throw new NotFoundException('Assignment não encontrado')
     }
 
-    this.ensureActorCanAccessAssignment({ personId: assignment.personId }, actor)
+    this.ensureActorCanAccessAssignment(assignment, actor)
 
     const completedItemIds = new Set(assignment.completions.map(c => c.itemId))
 
@@ -164,7 +170,7 @@ export class AssignmentsService {
         throw new NotFoundException('Assignment não encontrado')
       }
 
-      this.ensureActorCanAccessAssignment({ personId: assignment.personId }, actor)
+      this.ensureActorCanAccessAssignment(assignment, actor)
 
       const totalItems = assignment.track.items.length
       if (totalItems === 0) {
@@ -263,7 +269,7 @@ export class AssignmentsService {
         throw new NotFoundException('Assignment não encontrado')
       }
 
-      this.ensureActorCanAccessAssignment({ personId: assignment.personId }, actor)
+      this.ensureActorCanAccessAssignment(assignment, actor)
 
       const totalItems = assignment.track.items.length
       if (totalItems === 0) {

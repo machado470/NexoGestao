@@ -100,13 +100,13 @@ describeRealIntegration('Phase 2 Execution tenant isolation (Postgres e2e)', () 
 
   it('não aceita orgId como autoridade tenant', async () => {
     await request(app.getHttpServer()).post('/executions/start').set(auth(orgA, userA, personA))
-      .send({ serviceOrderId: serviceOrderA, orgId: orgB }).expect(400)
+      .send({ serviceOrderId: serviceOrderA, orgId: orgB }).expect(403)
     expect(await prisma.serviceOrder.findUnique({ where: { id: serviceOrderA } })).toMatchObject({ status: 'OPEN', startedAt: null })
 
     await request(app.getHttpServer()).post('/executions/start').set(auth(orgA, userA, personA))
       .send({ serviceOrderId: serviceOrderA }).expect(201)
     await request(app.getHttpServer()).post(`/executions/${serviceOrderA}/complete`).set(auth(orgA, userA, personA))
-      .send({ notes: 'forged tenant', orgId: orgB }).expect(400)
+      .send({ notes: 'forged tenant', orgId: orgB }).expect(403)
     expect(await prisma.serviceOrder.findUnique({ where: { id: serviceOrderA } })).toMatchObject({ status: 'IN_PROGRESS', finishedAt: null })
   })
 

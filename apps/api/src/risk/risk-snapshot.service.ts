@@ -19,9 +19,10 @@ export class RiskSnapshotService {
     })
   }
 
-  async listByPerson(personId: string) {
+  async listByPerson(personId: string, orgId: string) {
+    // RiskSnapshot has no orgId column, so the Prisma tenant middleware cannot scope it.
     return this.prisma.riskSnapshot.findMany({
-      where: { personId },
+      where: { personId, person: { orgId } },
       orderBy: { createdAt: 'asc' },
     })
   }

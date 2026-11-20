@@ -4,6 +4,7 @@ import { Roles } from '../auth/decorators/roles.decorator'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
 import { PlatformAdminGuard } from '../auth/guards/platform-admin.guard'
+import { AllowCrossTenantParam } from '../common/guards/tenant-access.guard'
 import { CommercialPolicyService, commercialUsagePeriod } from '../common/commercial/commercial-policy.service'
 import { UpsertFeatureOverrideDto } from './dto/upsert-feature-override.dto'
 
@@ -38,6 +39,7 @@ export class CommercialController {
 
 // Cross-tenant surface: organization ADMINs are not platform operators.
 @UseGuards(JwtAuthGuard, RolesGuard, PlatformAdminGuard)
+@AllowCrossTenantParam()
 @Controller('admin/commercial')
 export class AdminCommercialController {
   constructor(private readonly commercial: CommercialPolicyService) {}

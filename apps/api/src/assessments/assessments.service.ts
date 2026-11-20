@@ -23,7 +23,7 @@ export class AssessmentsService {
     private readonly timeline: TimelineService,
   ) {}
 
-  async submit(params: { assignmentId: string; score: number }) {
+  async submit(params: { assignmentId: string; score: number; orgId: string }) {
     if (!params.assignmentId?.trim()) {
       throw new BadRequestException('assignmentId é obrigatório')
     }
@@ -36,8 +36,9 @@ export class AssessmentsService {
       throw new BadRequestException('score deve estar entre 0 e 100')
     }
 
-    const assignment = await this.prisma.assignment.findUnique({
-      where: { id: params.assignmentId },
+    // Assignment has no orgId column: scope by the authenticated organization explicitly.
+    const assignment = await this.prisma.assignment.findFirst({
+      where: { id: params.assignmentId, person: { orgId: params.orgId } },
       include: {
         person: { select: { id: true, orgId: true } },
         track: true,
