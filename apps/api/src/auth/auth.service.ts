@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   Logger,
+  OnModuleInit,
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common'
@@ -15,13 +16,41 @@ import { v4 as uuidv4 } from 'uuid'
 
 import { AnalyticsService, UsageMetricEvent } from '../analytics/analytics.service'
 import { PrismaService } from '../prisma/prisma.service'
+import { BCRYPT_ROUNDS, compareSecretOrDummy, dummyBcryptHash } from './password-hashing'
+
+/**
+ * Single answer for an unknown e-mail, an account without password (pending invite, Google-only)
+ * and a wrong password. Account state is only disclosed after the password was proven.
+ */
+export const INVALID_CREDENTIALS_MESSAGE = 'Credenciais inválidas'
+export const INVALID_CREDENTIALS_CODE = 'INVALID_CREDENTIALS'
+
+/**
+ * Minimum response time of the account-specific e-mail routes (forgot-password and
+ * resend-email-verification). The e-mail is still sent before answering; the floor only makes
+ * "no account" answer as late as "account + delivery" whenever the provider is faster than it.
+ */
+export const AUTH_EMAIL_RESPONSE_FLOOR_DEFAULT_MS = 1_000
+/** Kept well below the BFF upstream timeout (12 s) so a slow provider still fits. */
+export const AUTH_EMAIL_RESPONSE_FLOOR_MAX_MS = 5_000
+
+/** Accepts an integer number of milliseconds in [0, MAX]; anything else fails the boot. */
+export function readAuthEmailResponseFloorMs(raw: string | undefined): number {
+  if (raw === undefined || raw.trim() === '') return AUTH_EMAIL_RESPONSE_FLOOR_DEFAULT_MS
+  const value = raw.trim()
+  if (!/^\d{1,5}$/.test(value) || Number(value) > AUTH_EMAIL_RESPONSE_FLOOR_MAX_MS) {
+    throw new Error(`AUTH_EMAIL_RESPONSE_FLOOR_MS must be an integer between 0 and ${AUTH_EMAIL_RESPONSE_FLOOR_MAX_MS}`)
+  }
+  return Number(value)
+}
 
 @Injectable()
-export class AuthService {
+export class AuthService implements OnModuleInit {
   private readonly logger = new Logger(AuthService.name)
   private readonly resend: Resend | null = null
   private readonly enforceEmailVerification: boolean
   private readonly emailVerificationBypass = new Set<string>()
+  private readonly emailResponseFloorMs: number
 
   constructor(
     private readonly prisma: PrismaService,
@@ -38,6 +67,10 @@ export class AuthService {
         '[OPTIONAL][integration-missing-config] RESEND_API_KEY ausente. Recuperação por e-mail ficará desabilitada.',
       )
     }
+
+    this.emailResponseFloorMs = readAuthEmailResponseFloorMs(
+      this.config.get<string>('AUTH_EMAIL_RESPONSE_FLOOR_MS'),
+    )
 
     this.enforceEmailVerification = this.parseBooleanEnv(
       this.config.get<string>('AUTH_ENFORCE_EMAIL_VERIFICATION'),
@@ -155,7 +188,7 @@ export class AuthService {
       throw new ConflictException('Email já cadastrado')
     }
 
-    const passwordHash = await bcrypt.hash(password, 10)
+    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS)
     const baseSlug = this.slugify(orgName)
     const slug = await this.uniqueOrgSlug(baseSlug)
 
@@ -273,9 +306,24 @@ export class AuthService {
     // Availability is global: check it before looking up an account so this
     // failure cannot distinguish registered from unregistered email addresses.
     this.ensureEmailAvailable()
+    const startedAt = performance.now()
     const user = await this.prisma.user.findUnique({ where: { email: normalizedEmail } })
-    if (!user) return this.emailRequestAcknowledgement()
+    if (user) {
+      try {
+        // Sent before answering, as before C7.2b: a crash or restart never acknowledges an
+        // e-mail that was not attempted.
+        await this.sendPasswordReset(user.id, normalizedEmail)
+      } catch {
+        // A per-recipient/provider failure is observable internally, but public
+        // recovery responses must not disclose whether an account exists.
+        this.logger.error('[auth-email] password_reset_delivery_failed')
+      }
+    }
+    await this.waitForEmailResponseFloor(startedAt)
+    return this.emailRequestAcknowledgement()
+  }
 
+  private async sendPasswordReset(userId: string, normalizedEmail: string) {
     const rawToken = uuidv4()
     const tokenHash = this.hashToken(rawToken)
     const expiresAt = new Date()
@@ -285,27 +333,33 @@ export class AuthService {
       this.config.get<string>('FRONTEND_URL') || 'http://localhost:3010'
     const resetLink = `${frontendUrl}/reset-password?token=${rawToken}`
 
-    try {
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data: {
-          resetToken: tokenHash,
-          resetTokenExpiresAt: expiresAt,
-        },
-      })
-      await this.deliverAuthEmail({
-        from: this.config.get<string>('EMAIL_FROM') || 'onboarding@resend.dev',
-        to: normalizedEmail,
-        subject: 'Recuperação de Senha - NexoGestao',
-        html: `<p>Você solicitou a recuperação de senha. Clique no link abaixo para redefinir:</p><a href="${resetLink}">${resetLink}</a><p>Este link expira em 1 hora.</p>`,
-      })
-    } catch {
-      // A per-recipient/provider failure is observable internally, but public
-      // recovery responses must not disclose whether an account exists.
-      this.logger.error('[auth-email] password_reset_delivery_failed')
-    }
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        resetToken: tokenHash,
+        resetTokenExpiresAt: expiresAt,
+      },
+    })
+    await this.deliverAuthEmail({
+      from: this.config.get<string>('EMAIL_FROM') || 'onboarding@resend.dev',
+      to: normalizedEmail,
+      subject: 'Recuperação de Senha - NexoGestao',
+      html: `<p>Você solicitou a recuperação de senha. Clique no link abaixo para redefinir:</p><a href="${resetLink}">${resetLink}</a><p>Este link expira em 1 hora.</p>`,
+    })
+  }
 
-    return this.emailRequestAcknowledgement()
+  /**
+   * Pads the answer to the configured floor, measured from the account lookup. Requests that
+   * already took longer (slow provider) are not delayed further.
+   */
+  private async waitForEmailResponseFloor(startedAt: number) {
+    const remaining = this.emailResponseFloorMs - (performance.now() - startedAt)
+    if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining))
+  }
+
+  onModuleInit() {
+    // Prepare the dummy hash at boot so no request pays for creating it.
+    void dummyBcryptHash().catch(() => this.logger.warn('[auth] dummy_hash_warmup_failed'))
   }
 
   async resetPassword(token: string, password: string) {
@@ -332,7 +386,7 @@ export class AuthService {
       throw new UnauthorizedException('Token inválido ou expirado')
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10)
+    const hashedPassword = await bcrypt.hash(password, BCRYPT_ROUNDS)
 
     const updated = await this.prisma.user.updateMany({
       where: {
@@ -373,22 +427,20 @@ export class AuthService {
       include: { person: true },
     })
 
-    if (!user || !user.password) {
-      throw new UnauthorizedException('Usuário inválido')
+    // Exactly one bcrypt comparison on every path (dummy hash when there is no usable account).
+    const valid = await compareSecretOrDummy(password, user?.password)
+
+    if (!user || !valid) {
+      throw new UnauthorizedException({ message: INVALID_CREDENTIALS_MESSAGE, code: INVALID_CREDENTIALS_CODE })
     }
 
+    // From here on the caller proved the password: account state can be explained.
     if (!user.active) {
       throw new UnauthorizedException('Conta não ativada')
     }
 
     if (!user.person || !user.person.active) {
       throw new UnauthorizedException('Usuário sem identidade operacional ativa')
-    }
-
-    const valid = await bcrypt.compare(password, user.password)
-
-    if (!valid) {
-      throw new UnauthorizedException('Senha inválida')
     }
 
     const bypassEmailVerification =
@@ -476,6 +528,7 @@ export class AuthService {
     }
 
     this.ensureEmailAvailable()
+    const startedAt = performance.now()
     const user = await this.prisma.user.findUnique({
       where: { email: normalizedEmail },
       select: { id: true, email: true, emailVerifiedAt: true },
@@ -487,6 +540,7 @@ export class AuthService {
         this.logger.error('[auth-email] verification_delivery_failed')
       }
     }
+    await this.waitForEmailResponseFloor(startedAt)
     return this.emailRequestAcknowledgement()
   }
 

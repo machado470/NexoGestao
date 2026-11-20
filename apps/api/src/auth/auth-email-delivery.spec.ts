@@ -10,7 +10,7 @@ describe('Auth email delivery and public account privacy', () => {
     }
     prisma.$transaction = jest.fn(fn => fn(prisma))
     const jwt = { sign: jest.fn() }
-    const service = new AuthService(prisma, jwt as any, {} as any, { get: key => key === 'AUTH_ENFORCE_EMAIL_VERIFICATION' ? 'true' : undefined } as any)
+    const service = new AuthService(prisma, jwt as any, {} as any, { get: key => key === 'AUTH_ENFORCE_EMAIL_VERIFICATION' ? 'true' : key === 'AUTH_EMAIL_RESPONSE_FLOOR_MS' ? '0' : undefined } as any)
     const send = jest.fn().mockResolvedValue({ data: { id: 'email' }, error: null })
     if (configured) (service as any).resend = { emails: { send } }
     return { service, prisma, send, jwt }

@@ -7,6 +7,11 @@ import { ConfigService } from '@nestjs/config';
 import type { UserRole } from '@prisma/client';
 import type { InviteUserRole } from './dto/create-invite.dto';
 import { AuthService } from '../auth/auth.service';
+import { BCRYPT_ROUNDS, compareSecretOrDummy } from '../auth/password-hashing';
+
+/** Same answer for an unknown e-mail, no pending invite, an expired invite and a wrong token. */
+export const INVALID_INVITE_MESSAGE = 'Convite inválido ou expirado.';
+export const INVALID_INVITE_CODE = 'INVITE_INVALID';
 
 @Injectable()
 export class InvitesService {
@@ -34,7 +39,7 @@ export class InvitesService {
     }
 
     const token = uuidv4();
-    const hashedToken = await bcrypt.hash(token, 10);
+    const hashedToken = await bcrypt.hash(token, BCRYPT_ROUNDS);
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
 
@@ -78,7 +83,7 @@ export class InvitesService {
     const previous = await this.prisma.user.findFirst({ where });
     if (!previous) throw new NotFoundException('Convite não encontrado.');
     const token = uuidv4();
-    const hashedToken = await bcrypt.hash(token, 10);
+    const hashedToken = await bcrypt.hash(token, BCRYPT_ROUNDS);
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     await this.prisma.$transaction(async tx => {
       const result = await tx.user.updateMany({
@@ -128,13 +133,10 @@ export class InvitesService {
       where: { email: email.trim().toLowerCase(), active: false, password: null, inviteExpiresAt: { gt: new Date() } },
     });
 
-    if (!user || !user.inviteToken) {
-      throw new NotFoundException('Convite inválido ou expirado.');
-    }
-
-    const isTokenValid = await bcrypt.compare(rawToken, user.inviteToken);
-    if (!isTokenValid) {
-      throw new UnauthorizedException('Token de convite inválido.');
+    // One answer and one bcrypt comparison whether or not this e-mail has a pending invite.
+    const isTokenValid = await compareSecretOrDummy(rawToken, user?.inviteToken);
+    if (!user || !isTokenValid) {
+      throw new UnauthorizedException({ message: INVALID_INVITE_MESSAGE, code: INVALID_INVITE_CODE });
     }
 
     if (!password || password.length < 8) {
@@ -142,7 +144,7 @@ export class InvitesService {
     }
 
     const safeName = (name ?? '').trim() || email.split('@')[0] || 'Usuário';
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
     const updatedUser = await this.prisma.$transaction(async tx => {
       const claimed = await tx.user.updateMany({
