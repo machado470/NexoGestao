@@ -229,3 +229,35 @@ describe("quote conversion BFF", () => {
     expect(await caller().orderOrigin({ serviceOrderId: id })).toBeNull();
   });
 });
+
+describe("order currency context BFF", () => {
+  it("validates batch currency without extending the strict order DTO", async () => {
+    fetch.mockResolvedValue({
+      items: [{ serviceOrderId: id, currency: "USD", source: "QUOTE" }],
+    });
+    expect(
+      (
+        await caller().currencyContext({
+          serviceOrderIds: [id],
+          contextKey: "changed-orders",
+        })
+      ).items[0].currency
+    ).toBe("USD");
+    expect(fetch.mock.calls[0][1]).toBe("/service-orders/currency-context");
+    expect(fetch.mock.calls[0][2]!.method).toBe("POST");
+    expect(JSON.parse(fetch.mock.calls[0][2]!.body as string)).toEqual({
+      serviceOrderIds: [id],
+    });
+    fetch.mockClear();
+    await expect(
+      caller().currencyContext({
+        serviceOrderIds: [id],
+        currency: "BRL",
+      } as any)
+    ).rejects.toThrow();
+    expect(fetch).not.toHaveBeenCalled();
+    await expect(
+      caller(false).currencyContext({ serviceOrderIds: [id] })
+    ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
+});

@@ -1399,9 +1399,9 @@ export class FinanceService {
       orderBy: { createdAt: 'desc' },
     })
 
-    let csv = 'ID,Cliente,Valor,Vencimento,Status,Criado Em\n'
+    let csv = 'ID,Cliente,Valor,Moeda,Vencimento,Status,Criado Em\n'
     for (const c of charges) {
-      csv += csvRow([c.id, c.customer?.name ?? '', c.amountCents / 100, c.dueDate.toISOString(), c.status, c.createdAt.toISOString()]) + '\n'
+      csv += csvRow([c.id, c.customer?.name ?? '', c.amountCents / 100, c.currency ?? '', c.dueDate.toISOString(), c.status, c.createdAt.toISOString()]) + '\n'
     }
     if (actorUserId) await this.audit.log({
       orgId, actorUserId, actorPersonId, personId: actorPersonId, action: 'CHARGES_EXPORTED',
@@ -1499,10 +1499,10 @@ export class FinanceService {
   // =========================
   // WHATSAPP INTEGRATION
   // =========================
-  private formatCurrency(cents: number) {
+  private formatCurrency(cents: number, currency = 'BRL') {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL',
+      currency,
     }).format(cents / 100)
   }
 
@@ -1518,7 +1518,7 @@ export class FinanceService {
 
     if (!charge || !charge.customer?.phone) return
 
-    const amount = this.formatCurrency(charge.amountCents)
+    const amount = this.formatCurrency(charge.amountCents, charge.currency)
     const dueDate = this.formatDate(charge.dueDate, charge.org.timezone)
     const text = `Olá, ${charge.customer.name}! Segue a sua cobrança no valor de ${amount}, com vencimento em ${dueDate}.`
 
@@ -1546,8 +1546,8 @@ export class FinanceService {
 
     if (!charge || !charge.customer?.phone) return
 
-    const amount = this.formatCurrency(charge.amountCents)
-    const text = `Olá, ${charge.customer.name}! Recebemos o seu pagamento no valor de ${amount}. Obrigado!`
+    const amount = this.formatCurrency(charge.amountCents, charge.currency)
+    const text = `Olá, ${charge.customer.name}! Registramos um pagamento referente à cobrança de ${amount}. Consulte os detalhes do recebimento com a empresa.`
 
     await this.whatsapp.enqueueMessage({
       orgId: charge.orgId,
@@ -1573,7 +1573,7 @@ export class FinanceService {
     if (!['PENDING', 'OVERDUE'].includes(charge.status)) return { status: 'skipped' as const, reason: 'charge_closed' }
     if (!charge.customer?.phone) return { status: 'skipped' as const, reason: 'missing_phone' }
 
-    const amount = this.formatCurrency(charge.amountCents)
+    const amount = this.formatCurrency(charge.amountCents, charge.currency)
     const dueDate = this.formatDate(charge.dueDate, charge.org.timezone)
     const text = `Olá, ${charge.customer.name}! Lembramos que sua cobrança de ${amount} vence em ${dueDate}.`
 

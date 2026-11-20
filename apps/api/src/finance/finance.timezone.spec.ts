@@ -34,4 +34,16 @@ describe('Organization-local financial due dates', () => {
     else await service.sendPaymentReminderWhatsApp('charge')
     expect(whatsapp.enqueueMessage).toHaveBeenCalledWith(expect.objectContaining({ renderedText: expect.stringContaining('09/11/2026') }))
   })
+  it.each(['charge','reminder','receipt'])('uses the recorded currency in %s text without sending externally',async kind=>{
+    const charge={id:'charge',orgId:'org',currency:'USD',org:{timezone:'America/Sao_Paulo'},status:'PENDING',amountCents:1000,customerId:'customer',dueDate:new Date('2026-11-10T01:00Z'),customer:{name:'Customer',phone:'5511999999999'}};
+    db.charge.findUnique.mockResolvedValue(charge);
+    if(kind==='charge') await service.sendChargeWhatsApp('charge');
+    else if(kind==='reminder') await service.sendPaymentReminderWhatsApp('charge');
+    else await service.sendPaymentConfirmationWhatsApp('charge');
+    const text=whatsapp.enqueueMessage.mock.calls[0][0].renderedText;
+    expect(text).toContain(new Intl.NumberFormat('pt-BR',{style:'currency',currency:'USD'}).format(10));
+    expect(text).not.toContain('R$');
+    if(kind==='receipt'){expect(text).toContain('referente à cobrança');expect(text).not.toContain('pagamento no valor');}
+  })
+
 })

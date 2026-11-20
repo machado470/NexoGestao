@@ -93,13 +93,14 @@ function parseAmountToCents(raw: string): number | undefined {
   return parseMoneyInputToCents(raw) ?? undefined;
 }
 
-function formatCurrencyFromInput(raw: string) {
-  const cents = parseAmountToCents(raw);
-  if (!cents) return "—";
+function formatCurrencyFromInput(raw: string,currency:string|null="BRL",recorded?:number) {
+  const cents = recorded??parseAmountToCents(raw);
+  if (cents==null) return "—";
+  if(!currency)return "Moeda indisponível";
 
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
-    currency: "BRL",
+    currency,
   }).format(cents / 100);
 }
 
@@ -224,6 +225,8 @@ export default function EditServiceOrderModal({
   );
   const protectQuotedAmount =
     quoteOrigin.isLoading || quoteOrigin.isError || Boolean(quoteOrigin.data);
+  const editCurrency=quoteOrigin.isLoading||quoteOrigin.isError?null:quoteOrigin.data?.currency??"BRL";
+  const approvedAmount=quoteOrigin.data?.amountCents;
   const getServiceOrder = trpc.serviceOrders.getById.useQuery(
     { id: serviceOrderId || "" },
     {
@@ -537,7 +540,7 @@ export default function EditServiceOrderModal({
             <DialogDescription className="text-sm text-[var(--modal-section-muted)]">
               {getServiceOrderCustomerName(serviceOrder)} ·{" "}
               {formData.amount.trim()
-                ? formatCurrencyFromInput(formData.amount)
+                ? formatCurrencyFromInput(formData.amount,editCurrency,approvedAmount)
                 : "Sem valor"}
             </DialogDescription>
           </div>
@@ -993,7 +996,7 @@ export default function EditServiceOrderModal({
                       ) : (
                         <>
                           Valor atual:{" "}
-                          {formatCurrencyFromInput(formData.amount)}. Use
+                          {formatCurrencyFromInput(formData.amount,editCurrency,approvedAmount)}. Use
                           1234,56 ou 1.234,56.
                         </>
                       )}
@@ -1077,7 +1080,7 @@ export default function EditServiceOrderModal({
                     </p>
                     <p className="mt-1 text-sm font-medium text-[var(--modal-section-text)]">
                       {formData.amount.trim()
-                        ? formatCurrencyFromInput(formData.amount)
+                        ? formatCurrencyFromInput(formData.amount,editCurrency,approvedAmount)
                         : "Ainda sem valor"}
                     </p>
                   </div>
@@ -1112,7 +1115,7 @@ export default function EditServiceOrderModal({
               Valor:{" "}
               <strong className="text-[var(--modal-section-text)]">
                 {formData.amount.trim()
-                  ? formatCurrencyFromInput(formData.amount)
+                  ? formatCurrencyFromInput(formData.amount,editCurrency,approvedAmount)
                   : "—"}
               </strong>
             </span>
