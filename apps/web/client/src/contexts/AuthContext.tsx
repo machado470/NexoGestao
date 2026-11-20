@@ -17,7 +17,6 @@ import {
 import { pushAuditEvent, setAuditField } from "@/lib/renderAudit";
 
 type AuthUser = {
-  token?: string;
   id?: string;
   organizationId?: string;
   role?: string;
@@ -111,7 +110,6 @@ function getUser(payload: unknown) {
   };
 
   return {
-    token: raw.token as string | undefined,
     id: normalizeIdentifier(raw.id),
     organizationId: normalizeIdentifier(raw.organizationId ?? raw.orgId),
     role: raw.role as string | undefined,
@@ -466,14 +464,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           password: payload.password,
         });
 
-        const token =
-          result?.data?.data?.token ??
-          result?.data?.token ??
-          result?.token ??
-          result?.accessToken ??
-          null;
-
-        if (typeof token === "string" && token.trim().length > 0) {
+        // The BFF keeps the JWT in an httpOnly cookie and only reports whether a session exists.
+        if (result?.sessionEstablished === true) {
           setForcedLoggedOut(false);
           queryClient.removeQueries();
           await meQuery.refetch();
