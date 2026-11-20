@@ -51,7 +51,11 @@ export interface WhatsAppProvider {
   sendText(input: WhatsAppSendTextInput): Promise<WhatsAppSendResult>
   sendTemplate(input: WhatsAppSendTemplateInput): Promise<WhatsAppSendResult>
   parseWebhook(payload: unknown): ParsedWebhookMessage[]
-  verifyWebhookSignature(payload: unknown, headers?: Record<string, string | string[] | undefined>): Promise<boolean> | boolean
+  /**
+   * Authenticates an inbound webhook. Must fail closed: missing config, credentials or body => false.
+   * `rawBody` holds the exact HTTP request bytes; signatures must never be computed over re-serialized JSON.
+   */
+  verifyWebhookSignature(payload: unknown, headers?: Record<string, string | string[] | undefined>, rawBody?: Buffer): Promise<boolean> | boolean
   mapProviderStatus(status: string): ParsedWebhookMessage['eventType']
   getProviderName(): string
   checkHealth(): WhatsAppProviderHealth

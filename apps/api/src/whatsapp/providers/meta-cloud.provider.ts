@@ -64,16 +64,20 @@ export class MetaCloudWhatsAppProvider implements WhatsAppProvider {
     return out
   }
 
-  async verifyWebhookSignature(payload: unknown, headers?: Record<string, string | string[] | undefined>): Promise<boolean> {
-    if (!this.appSecret) return true
-    const provided = String(headers?.['x-hub-signature-256'] ?? headers?.['X-Hub-Signature-256'] ?? '').trim()
-    if (!provided.startsWith('sha256=')) return false
-    const digest = createHmac('sha256', this.appSecret).update(JSON.stringify(payload)).digest('hex')
-    const expected = `sha256=${digest}`
-    const providedBuffer = Buffer.from(provided)
-    const expectedBuffer = Buffer.from(expected)
-    if (providedBuffer.length !== expectedBuffer.length) return false
-    return timingSafeEqual(providedBuffer, expectedBuffer)
+  /**
+   * Meta signs the exact request bytes: X-Hub-Signature-256: sha256=<hex HMAC-SHA256(rawBody, app secret)>.
+   * Fail closed when the app secret, the raw body or a single well-formed signature header is missing.
+   */
+  async verifyWebhookSignature(_payload: unknown, headers?: Record<string, string | string[] | undefined>, rawBody?: Buffer): Promise<boolean> {
+    if (!this.appSecret) return false
+    if (!Buffer.isBuffer(rawBody) || rawBody.length === 0) return false
+    const header = headers?.['x-hub-signature-256']
+    if (typeof header !== 'string') return false
+    const match = /^sha256=([0-9a-f]{64})$/i.exec(header.trim())
+    if (!match) return false
+    const provided = Buffer.from(match[1], 'hex')
+    const expected = createHmac('sha256', this.appSecret).update(rawBody).digest()
+    return provided.length === expected.length && timingSafeEqual(provided, expected)
   }
   mapProviderStatus(status: string): ParsedWebhookMessage['eventType'] {
     const s = status.toLowerCase()

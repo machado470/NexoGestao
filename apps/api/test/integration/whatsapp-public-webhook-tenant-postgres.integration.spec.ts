@@ -75,7 +75,7 @@ describeRealIntegration('Phase 2.2 WhatsApp public webhook tenant isolation (Pos
     if (!RUN_REAL_INTEGRATION) return
     if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET must be explicitly configured for integration tests')
     const module = await Test.createTestingModule({ imports: [AppModule] }).compile()
-    app = module.createNestApplication()
+    app = module.createNestApplication({ rawBody: true })
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }))
     await app.init()
     prisma = app.get(PrismaService)

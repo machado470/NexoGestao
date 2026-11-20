@@ -134,8 +134,13 @@ export class ZApiWhatsAppProvider implements WhatsAppProvider {
   getProviderName(): string {
     return this.providerName
   }
+  /**
+   * Fail closed. No documented Z-API mechanism to authenticate callbacks it sends us has been verified
+   * (Client-Token authenticates requests we send to Z-API, not the reverse), so inbound Z-API webhooks
+   * are rejected until a verified contract is implemented.
+   */
   verifyWebhookSignature(): boolean {
-    return true
+    return false
   }
   mapProviderStatus(status: string): ParsedWebhookMessage['eventType'] {
     const normalized = status.toLowerCase()
