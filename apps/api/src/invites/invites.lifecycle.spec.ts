@@ -1,4 +1,4 @@
-import { ConflictException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { ConflictException, NotFoundException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { InvitesService } from './invites.service';
 
 jest.mock('bcrypt', () => ({ hash: jest.fn(), compare: jest.fn() }));
@@ -111,7 +111,8 @@ describe('invitation lifecycle', () => {
 
   it('does not accept a revoked or expired link', async () => {
     user.findFirst.mockResolvedValue(null);
-    await expect(service.acceptInvite(previous.email, 'old-token', 'Ana', 'Password123!')).rejects.toBeInstanceOf(NotFoundException);
+    // C7.2b: same 401 as a wrong token, so the link state does not reveal pending invites.
+    await expect(service.acceptInvite(previous.email, 'old-token', 'Ana', 'Password123!')).rejects.toBeInstanceOf(UnauthorizedException);
     expect(user.updateMany).not.toHaveBeenCalled();
   });
 
