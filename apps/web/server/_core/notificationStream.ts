@@ -1,6 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { fetchNexoMe, getNexoTokenFromReq } from "./context";
 import { resolveNexoApiUrl } from "./nexoApiUrl";
+import { internalApiHeaders } from "./internalAuth";
 
 const SAFE_EVENT_ID = /^[a-zA-Z0-9_-]{1,128}$/;
 const MAX_UPSTREAM_CHUNK_BYTES = 1024 * 1024;
@@ -39,8 +40,12 @@ export function registerNotificationStreamRoute(app: Express) {
     // being read. The lifetime of SSE is owned by the response instead.
     req.once("aborted", onDisconnect); res.once("close", onDisconnect); res.once("error", onDisconnect);
     try {
-      const upstream = await fetch(`${resolveNexoApiUrl()}/notifications/stream`, {
-        headers: { Authorization: `Bearer ${token}`, ...(lastEventId ? { "Last-Event-ID": lastEventId } : {}) },
+      const streamUrl = `${resolveNexoApiUrl()}/notifications/stream`;
+      const upstream = await fetch(streamUrl, {
+        headers: internalApiHeaders(
+          { Authorization: `Bearer ${token}`, ...(lastEventId ? { "Last-Event-ID": lastEventId } : {}) },
+          { method: "GET", url: streamUrl },
+        ),
         signal: abort.signal,
       });
       if (!upstream.ok || !upstream.body) {

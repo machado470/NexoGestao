@@ -1,6 +1,7 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
 import cookie from "cookie";
 import { resolveNexoApiUrl } from "./nexoApiUrl";
+import { internalApiHeaders } from "./internalAuth";
 
 const NEXO_TOKEN_COOKIE = "nexo_token";
 
@@ -249,12 +250,11 @@ export async function fetchNexoMe(req: any) {
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      const response = await fetch(`${NEXO_API_URL}/me`, {
+      const meUrl = `${NEXO_API_URL}/me`;
+      const response = await fetch(meUrl, {
         method: "GET",
         signal: controller.signal,
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: internalApiHeaders({ Authorization: `Bearer ${token}` }, { method: "GET", url: meUrl }),
       });
 
       const text = await response.text();

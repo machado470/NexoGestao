@@ -14,6 +14,8 @@ import { TENANT_ACCESS_INTERCEPTOR_PROVIDER } from './common/guards/tenant-acces
 import { CoreModule } from './core/core.module'
 import { OrgContextInterceptor } from './auth/org-context.interceptor'
 import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware'
+import { InternalAuthModule } from './common/internal-auth/internal-auth.module'
+import { InternalAuthMiddleware } from './common/internal-auth/internal-auth.middleware'
 import { PrismaModule } from './prisma/prisma.module'
 import { HealthModule } from './health/health.module'
 import { MetricsService } from './common/metrics/metrics.service'
@@ -114,6 +116,8 @@ class AllowAllThrottlerGuard implements CanActivate {
     PrismaModule,
     HealthModule,
     QueueModule,
+    // C7.2d: BFF → API HMAC, observe-only (off by default).
+    InternalAuthModule,
     ...(ENABLE_BULL_BOARD ? [QueueBoardModule] : []),
     SentryModule,
     AnalyticsModule,
@@ -181,6 +185,6 @@ class AllowAllThrottlerGuard implements CanActivate {
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(RequestLoggerMiddleware).forRoutes('*')
+    consumer.apply(RequestLoggerMiddleware, InternalAuthMiddleware).forRoutes('*')
   }
 }

@@ -7,6 +7,7 @@ import { createContext } from "./context";
 import { registerNotificationStreamRoute } from "./notificationStream";
 import { upstreamErrorDetails } from "./nexoClient";
 import { clientIpObservationMiddleware } from "./clientIp";
+import { internalAuthSigner, stripClientInternalHeaders } from "./internalAuth";
 
 /** Retry-After for the BFF response: the longest sanitized wait among the failed calls. */
 export function retryAfterHeaderFor(errors: readonly unknown[]): Record<string, string> | undefined {
@@ -23,9 +24,13 @@ export function retryAfterHeaderFor(errors: readonly unknown[]): Record<string, 
  */
 export function createBffApp(): Express {
   const app = express();
+  // C7.2d: validate the signing configuration at boot (invalid values fail loudly, never silently).
+  internalAuthSigner();
 
   // C7.2c: count the shape of the forwarding chain (observation only, nothing is trusted).
   app.use(clientIpObservationMiddleware());
+  // C7.2d: client-supplied x-nexo-* headers never enter the BFF (outgoing calls drop them too).
+  app.use(stripClientInternalHeaders);
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 

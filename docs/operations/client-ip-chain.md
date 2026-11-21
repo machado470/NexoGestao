@@ -51,6 +51,10 @@ Só com essa evidência se define a política `trustPolicyFrom(<faixas da borda>
 
 ## C7.2d — assinatura BFF → API (planejamento)
 
+> Implementada em modo observação; protocolo, variáveis, ativação e rollback em
+> [`internal-auth.md`](internal-auth.md). O cabeçalho final é `X-Nexo-Internal-Auth` e
+> **não** transporta IP: a assinatura autentica o BFF; o IP continua `NO_TRUST`.
+
 - Cabeçalho `X-Nexo-Client-Context: v1.<kid>.<ts>.<nonce>.<ipB64>.<mac>`; `mac` =
   HMAC-SHA256(`v1|kid|ts|nonce|ip|MÉTODO|rota|requestId`) com segredo **próprio** (nunca o
   `JWT_SECRET`), ≥ 32 bytes, gerado pelo operador no Railway.
