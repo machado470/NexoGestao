@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { z } from "zod";
 import { randomUUID } from "crypto";
 import { logger } from "./logger";
+import { observeClientIpChain } from "./clientIp";
 
 const consentPayloadSchema = z.object({
   marketing: z.boolean(),
@@ -12,18 +13,6 @@ const consentPayloadSchema = z.object({
 const CONSENT_COOKIE_NAME = "nexo_lgpd_consent";
 const CONSENT_SCHEMA_VERSION = 1;
 const CONSENT_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
-
-function getClientIp(forwardedForHeader: unknown, socketAddress?: string) {
-  if (typeof forwardedForHeader === "string" && forwardedForHeader.trim()) {
-    return forwardedForHeader.split(",")[0]?.trim() ?? socketAddress ?? "unknown";
-  }
-
-  if (Array.isArray(forwardedForHeader) && forwardedForHeader.length > 0) {
-    return forwardedForHeader[0] ?? socketAddress ?? "unknown";
-  }
-
-  return socketAddress ?? "unknown";
-}
 
 export function registerConsentRoutes(app?: Express) {
   if (!app) return;
@@ -44,15 +33,20 @@ export function registerConsentRoutes(app?: Express) {
 
     const consentEventId = randomUUID();
     const consentAt = new Date().toISOString();
+    // C7.2c: no IP is recorded unless its origin was verified through a trusted proxy chain.
+    // With the production policy (NO_TRUST) nothing is verified, so the record keeps `ip: null`
+    // and states why. The first X-Forwarded-For value (chosen by the client) is never used.
+    const origin = observeClientIpChain(req);
+    const ipVerified = origin.classification === "verified";
     const auditPayload = {
       id: consentEventId,
       version: CONSENT_SCHEMA_VERSION,
       consentAt,
       preferences: parsedPayload.data,
       userAgent: req.get("user-agent") ?? "unknown",
-      ip: getClientIp(req.headers["x-forwarded-for"], req.socket.remoteAddress),
     };
 
+    // The browser-side copy carries no IP address.
     res.cookie(CONSENT_COOKIE_NAME, encodeURIComponent(JSON.stringify(auditPayload)), {
       httpOnly: true,
       sameSite: "lax",
@@ -65,7 +59,9 @@ export function registerConsentRoutes(app?: Express) {
       consentEventId,
       consentAt,
       preferences: parsedPayload.data,
-      ip: auditPayload.ip,
+      ip: ipVerified ? origin.candidate : null,
+      ipVerified,
+      ipVerification: origin.classification,
     });
 
     return res.status(200).json({

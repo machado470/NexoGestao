@@ -7,6 +7,7 @@ import { OperationalStateModule } from '../people/operational-state.module'
 import { AdminOverviewService } from './admin-overview.service'
 import { AdminOverviewController } from './admin-overview.controller'
 import { OperationalStateAdminController } from './operational-state.admin.controller'
+import { PlatformAccessController } from './platform-access.controller'
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { OperationalStateAdminController } from './operational-state.admin.contr
   controllers: [
     AdminOverviewController,
     OperationalStateAdminController,
+    PlatformAccessController,
   ],
   providers: [AdminOverviewService],
 })

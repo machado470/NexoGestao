@@ -6,6 +6,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { registerNotificationStreamRoute } from "./notificationStream";
 import { upstreamErrorDetails } from "./nexoClient";
+import { clientIpObservationMiddleware } from "./clientIp";
 
 /** Retry-After for the BFF response: the longest sanitized wait among the failed calls. */
 export function retryAfterHeaderFor(errors: readonly unknown[]): Record<string, string> | undefined {
@@ -23,6 +24,8 @@ export function retryAfterHeaderFor(errors: readonly unknown[]): Record<string, 
 export function createBffApp(): Express {
   const app = express();
 
+  // C7.2c: count the shape of the forwarding chain (observation only, nothing is trusted).
+  app.use(clientIpObservationMiddleware());
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
