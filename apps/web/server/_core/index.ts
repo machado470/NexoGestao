@@ -4,6 +4,7 @@ import type { AddressInfo } from "net";
 import { getNexoApiResolutionMetadata } from "./nexoApiUrl";
 import { serveStatic } from "./static";
 import { createBffApp } from "./app";
+import { internalAuthSigner } from "./internalAuth";
 
 async function startServer() {
   const app = createBffApp();
@@ -35,6 +36,9 @@ async function startServer() {
     const finalPort = address?.port ?? port;
     console.log(`[web] Server running on http://localhost:${finalPort}/`);
     console.log(`[web] WEB_PORT=${finalPort}`);
+    const signer = internalAuthSigner();
+    // C7.2d: key id only (never key material).
+    console.log(`[web] internal auth signing=${signer ? `enabled kid=${signer.kid}` : "disabled"}`);
     const nexoApi = getNexoApiResolutionMetadata();
     console.log(
       `[web] NEXO_API_URL resolved=${nexoApi.resolved} configured=${nexoApi.configured ?? "default"} ` +

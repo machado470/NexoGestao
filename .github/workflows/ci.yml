@@ -140,7 +140,7 @@ jobs:
           sudo rm -f /usr/sbin/policy-rc.d
           redis-server --version
 
-      - name: Redis throttling integration (C7.1)
+      - name: Redis throttling and internal auth integration (C7.1, C7.2d)
         env:
           REQUIRE_REDIS_SERVER: "true"
         run: |
@@ -152,6 +152,16 @@ jobs:
             const { numTotalTests: total, numPassedTests: passed, numPendingTests: pending, numTodoTests: todo } = r;
             console.log(`redis throttling: total=${total} passed=${passed} skipped=${pending + todo}`);
             if (!r.success || total !== 12 || passed !== 12 || pending + todo !== 0) process.exit(1);
+          ' "$report"
+          # C7.2d: nonce replay protection on real Redis (replicas, concurrency, outage).
+          report="$RUNNER_TEMP/internal-auth-redis.json"
+          pnpm --filter ./apps/api exec jest --config jest.config.js --runInBand \
+            src/common/internal-auth/internal-auth.redis.spec.ts --json --outputFile="$report"
+          node -e '
+            const r = require(process.argv[1]);
+            const { numTotalTests: total, numPassedTests: passed, numPendingTests: pending, numTodoTests: todo } = r;
+            console.log(`internal auth redis: total=${total} passed=${passed} skipped=${pending + todo}`);
+            if (!r.success || total !== 4 || passed !== 4 || pending + todo !== 0) process.exit(1);
           ' "$report"
           # Disposable servers bind 127.0.0.1 only; the service container runs as "redis-server *:6379".
           if pgrep -af 'redis-server 127\.0\.0\.1:'; then echo "leftover disposable redis-server"; exit 1; fi

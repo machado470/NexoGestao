@@ -3,6 +3,7 @@ import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import cookie from "cookie";
 import { getSessionCookieOptions } from "./cookies";
 import { resolveNexoApiUrl } from "./nexoApiUrl";
+import { internalApiHeaders } from "./internalAuth";
 
 const NEXO_API_URL = resolveNexoApiUrl();
 const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -212,12 +213,12 @@ async function exchangeCodeForTokens(code: string) {
 }
 
 async function establishSessionInApi(idToken: string) {
-  const upstream = await fetch(`${NEXO_API_URL}/auth/google/bff-login`, {
+  const url = `${NEXO_API_URL}/auth/google/bff-login`;
+  const body = JSON.stringify({ idToken });
+  const upstream = await fetch(url, {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({ idToken }),
+    headers: internalApiHeaders({ "content-type": "application/json" }, { method: "POST", url, body }),
+    body,
   });
 
   const payload = await upstream.json().catch(() => null);

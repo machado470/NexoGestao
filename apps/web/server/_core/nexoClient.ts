@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import cookie from "cookie";
 import { resolveNexoApiUrl } from "./nexoApiUrl";
+import { internalApiHeaders } from "./internalAuth";
 
 const NEXO_API_URL = resolveNexoApiUrl();
 const NEXO_TOKEN_COOKIE = "nexo_token";
@@ -229,17 +230,22 @@ async function requestNexo<T>(
       source?.headers?.["x-correlation-id"] ??
       requestId ??
       undefined;
-    res = await fetch(`${NEXO_API_URL}${path}`, {
+    const url = `${NEXO_API_URL}${path}`;
+    res = await fetch(url, {
       ...init,
       credentials: "include",
       signal: controller.signal,
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        "content-type": "application/json",
-        ...(requestId ? { "x-request-id": String(requestId) } : {}),
-        ...(correlationId ? { "x-correlation-id": String(correlationId) } : {}),
-        ...(init?.headers || {}),
-      },
+      // C7.2d: caller x-nexo-* headers are dropped; the BFF signature (if enabled) is added last.
+      headers: internalApiHeaders(
+        {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          "content-type": "application/json",
+          ...(requestId ? { "x-request-id": String(requestId) } : {}),
+          ...(correlationId ? { "x-correlation-id": String(correlationId) } : {}),
+          ...((init?.headers as Record<string, string> | undefined) || {}),
+        },
+        { method: init?.method ?? "GET", url, body: init?.body },
+      ),
     });
   } catch (error: any) {
     if (error?.name === "AbortError") {
