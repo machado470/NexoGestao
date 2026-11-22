@@ -97,17 +97,16 @@ export class TracksController {
   }
 
   /**
-   * ✅ Lista itens da trilha (debug/inspeção)
+   * Lista os itens da trilha, ordenados por `order`.
    * GET /tracks/:id/items
    *
-   * Nota: aqui você estava retornando a trilha, não os itens.
-   * Se quiser lista de itens, use /track-items/track/:trackId
-   * (mantive esse endpoint chamando getById pra não quebrar nada).
+   * Retorna somente os itens (mesmo formato de GET /track-items/track/:trackId), sem atribuições
+   * nem dados de pessoas. Trilha inexistente ou de outra organização: 404.
    */
   @Get(':id/items')
   @Roles('ADMIN')
   listItems(@Req() req: any, @Param('id') trackId: string) {
-    return this.service.getById(trackId, req.user.orgId)
+    return this.service.listItems(trackId, req.user.orgId)
   }
 
   @Post(':id/publish')

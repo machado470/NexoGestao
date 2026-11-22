@@ -73,6 +73,20 @@ export class TracksService {
     return track
   }
 
+  /**
+   * Items of a track of the session organization, ordered by `order` (same shape as
+   * GET /track-items/track/:trackId). TrackItem has no orgId: items are read only through the
+   * organization-filtered track, never by trackId alone. No assignments or people are loaded.
+   */
+  async listItems(trackId: string, orgId: string) {
+    const track = await this.prisma.track.findFirst({
+      where: { id: trackId, orgId },
+      select: { items: { orderBy: { order: 'asc' } } },
+    })
+    if (!track) throw new NotFoundException('Trilha não encontrada')
+    return track.items
+  }
+
   async create(params: {
     title: string
     description?: string
