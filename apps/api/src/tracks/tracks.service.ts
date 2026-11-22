@@ -63,12 +63,14 @@ export class TracksService {
   }
 
   async getById(id: string, orgId: string) {
-    return this.prisma.track.findFirstOrThrow({
+    const track = await this.prisma.track.findFirst({
       where: { id, orgId },
       include: {
         assignments: { include: { person: true } },
       },
     })
+    if (!track) throw new NotFoundException('Trilha não encontrada')
+    return track
   }
 
   async create(params: {
@@ -295,9 +297,12 @@ export class TracksService {
     personIds: string[],
     orgId: string,
   ) {
-    await this.prisma.track.findFirstOrThrow({
+    // Must stay before deleteMany: assignments have no orgId, this check is the tenant barrier.
+    const track = await this.prisma.track.findFirst({
       where: { id: trackId, orgId },
+      select: { id: true },
     })
+    if (!track) throw new NotFoundException('Trilha não encontrada')
 
     const result = await this.prisma.assignment.deleteMany({
       where: { trackId, personId: { in: personIds } },
