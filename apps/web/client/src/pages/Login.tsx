@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Loader2, LockKeyhole, Mail } from "lucide-react";
 
@@ -10,6 +10,7 @@ import { trpc } from "@/lib/trpc";
 import { GoogleOAuthButton } from "@/components/GoogleOAuthButton";
 import { AuthMarketingShell } from "@/components/AuthMarketingShell";
 import { usePageMeta } from "@/hooks/usePageMeta";
+import { normalizeLoginEmail, validateLoginInput, type LoginField } from "./Login.validation";
 
 function normalizeErrorMessage(error: unknown): string {
   const message =
@@ -128,6 +129,10 @@ export default function Login() {
   const [email, setEmail] = useState(queryEmail);
   const [password, setPassword] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
+  const [invalidField, setInvalidField] = useState<LoginField | null>(null);
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  const passwordInputRef = useRef<HTMLInputElement>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
   const [resendSuccessMessage, setResendSuccessMessage] = useState<
     string | null
@@ -143,11 +148,18 @@ export default function Login() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError(null);
+    setInvalidField(null);
 
-    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedEmail = normalizeLoginEmail(email);
 
-    if (!normalizedEmail || !password) {
-      setLocalError("Preencha email e senha.");
+    // The form is noValidate: this is the only pre-submit validation, always with a visible message.
+    const validationError = validateLoginInput(email, password);
+    if (validationError) {
+      setInvalidField(validationError.field);
+      setLocalError(validationError.message);
+      (validationError.field === "email" ? emailInputRef : passwordInputRef).current?.focus();
+      // Keep the message on screen next to the focused field (small viewports, open keyboard).
+      requestAnimationFrame(() => errorRef.current?.scrollIntoView({ block: "nearest" }));
       return;
     }
 
@@ -232,7 +244,7 @@ export default function Login() {
       backTo="/"
       backLabel="Voltar para a página inicial"
     >
-      <form onSubmit={submit} className="space-y-5">
+      <form onSubmit={submit} noValidate className="space-y-5">
         <GoogleOAuthButton />
 
         <div className="relative">
@@ -257,10 +269,17 @@ export default function Login() {
           <div className="relative">
             <Mail className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <Input
+              ref={emailInputRef}
               id="email"
               type="email"
+              inputMode="email"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               value={email}
               onChange={e => setEmail(e.target.value)}
+              aria-invalid={invalidField === "email" || undefined}
+              aria-describedby={invalidField === "email" ? "login-error" : undefined}
               autoComplete="email"
               placeholder="voce@empresa.com"
               className="pl-9"
@@ -273,10 +292,13 @@ export default function Login() {
           <div className="relative">
             <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <Input
+              ref={passwordInputRef}
               id="password"
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
+              aria-invalid={invalidField === "password" || undefined}
+              aria-describedby={invalidField === "password" ? "login-error" : undefined}
               autoComplete="current-password"
               placeholder="Sua senha"
               className="pl-9"
@@ -289,7 +311,12 @@ export default function Login() {
         </div>
 
         {errorText ? (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div
+            ref={errorRef}
+            id="login-error"
+            role="alert"
+            className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          >
             {errorText}
           </div>
         ) : null}
