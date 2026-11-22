@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
@@ -10,6 +11,9 @@ import { CorrectiveActionsService } from '../corrective-actions/corrective-actio
 import { TimelineService } from '../timeline/timeline.service'
 
 type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+
+/** Author of an assessment, derived only from the authenticated session. */
+export type AssessmentActor = { userId: string | null; personId: string | null }
 
 const ASSESSMENT_CRITICAL_REASON = 'Risco crítico identificado em avaliação'
 
@@ -23,7 +27,12 @@ export class AssessmentsService {
     private readonly timeline: TimelineService,
   ) {}
 
-  async submit(params: { assignmentId: string; score: number; orgId: string }) {
+  async submit(params: { assignmentId: string; score: number; orgId: string; actor: AssessmentActor }) {
+    // Without a verifiable session person the self-assessment rule cannot be enforced: deny.
+    if (!params.actor?.personId || !params.actor?.userId) {
+      throw new ForbiddenException('Não foi possível identificar o avaliador.')
+    }
+
     if (!params.assignmentId?.trim()) {
       throw new BadRequestException('assignmentId é obrigatório')
     }
@@ -47,6 +56,17 @@ export class AssessmentsService {
 
     if (!assignment) {
       throw new NotFoundException('Assignment não encontrado')
+    }
+
+    // No one evaluates their own assignment, ADMIN included. Checked before any write or event.
+    if (assignment.personId === params.actor.personId) {
+      throw new ForbiddenException('Não é permitido avaliar a própria atribuição.')
+    }
+
+    const author = {
+      orgId: params.orgId,
+      actorUserId: params.actor.userId,
+      actorPersonId: params.actor.personId,
     }
 
     if (assignment.progress < 100) {
@@ -103,9 +123,13 @@ export class AssessmentsService {
         })
 
         await this.audit.log({
+          ...author,
           action: 'CORRECTIVE_ACTION_CREATED',
           personId: assignment.personId,
+          entityType: 'CORRECTIVE_ACTION',
+          entityId: created.id,
           context: 'Ação corretiva criada automaticamente após avaliação crítica',
+          metadata: { assessmentId: assessment.id },
         })
 
         await this.timeline.log({
@@ -124,9 +148,13 @@ export class AssessmentsService {
         })
       } else {
         await this.audit.log({
+          ...author,
           action: 'CORRECTIVE_ACTION_SKIPPED_DUPLICATE',
           personId: assignment.personId,
+          entityType: 'CORRECTIVE_ACTION',
+          entityId: existingOpen.id,
           context: `Corretiva OPEN já existe (id=${existingOpen.id}) para avaliação crítica recente`,
+          metadata: { assessmentId: assessment.id },
         })
       }
     }
@@ -137,8 +165,11 @@ export class AssessmentsService {
     )
 
     await this.audit.log({
+      ...author,
       action: 'ASSESSMENT_SUBMITTED',
       personId: assignment.personId,
+      entityType: 'ASSESSMENT',
+      entityId: assessment.id,
       context: `Avaliação da trilha "${assignment.track.title}" concluída com score ${params.score}`,
     })
 

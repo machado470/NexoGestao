@@ -199,8 +199,9 @@ describe('C6: organization isolation over HTTP', () => {
   })
 
   describe('POST /assessments', () => {
-    it.each(['adminA', 'staffA'] as const)('%s cannot submit an assessment for an assignment of org-b', async (user) => {
-      await http().post('/assessments').set(as(user)).send({ assignmentId: 'asg-b', score: 95 }).expect(404)
+    // C8 PR3-3A: only ADMINs submit assessments, so a STAFF is refused (403) before the lookup.
+    it.each([['adminA', 404], ['staffA', 403]] as const)('%s cannot submit an assessment for an assignment of org-b (%s)', async (user, status) => {
+      await http().post('/assessments').set(as(user)).send({ assignmentId: 'asg-b', score: 95 }).expect(status)
       for (const fn of [sideEffects.risk.recalculate, sideEffects.audit.log, sideEffects.corrective.create, timeline.log]) {
         expect(fn).not.toHaveBeenCalled()
       }
@@ -211,7 +212,7 @@ describe('C6: organization isolation over HTTP', () => {
     })
 
     it('finds assignments of the same organization (business validation still applies)', async () => {
-      const res = await http().post('/assessments').set(as('staffA')).send({ assignmentId: 'asg-a', score: 95 }).expect(400)
+      const res = await http().post('/assessments').set(as('adminA')).send({ assignmentId: 'asg-a', score: 95 }).expect(400)
       expect(res.body.message).toContain('trilha ainda não concluída')
     })
   })
