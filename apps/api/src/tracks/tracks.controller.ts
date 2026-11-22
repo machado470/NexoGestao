@@ -10,8 +10,7 @@ import {
 } from '@nestjs/common'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { TracksService } from './tracks.service'
-
-type TrackItemTypeInput = 'READING' | 'ACTION' | 'CHECKPOINT' | 'CONTENT'
+import { AddTrackItemDto, CreateTrackDto, TrackPeopleDto, UpdateTrackDto } from './dto/track.dto'
 
 @Controller('tracks')
 @UseGuards(JwtAuthGuard)
@@ -31,11 +30,7 @@ export class TracksController {
   @Post()
   create(
     @Req() req: any,
-    @Body()
-    body: {
-      title: string
-      description?: string
-    },
+    @Body() body: CreateTrackDto,
   ) {
     return this.service.create({
       title: body.title,
@@ -48,9 +43,12 @@ export class TracksController {
   update(
     @Req() req: any,
     @Param('id') id: string,
-    @Body() body: { title?: string; description?: string },
+    @Body() body: UpdateTrackDto,
   ) {
-    return this.service.update(id, req.user.orgId, body)
+    return this.service.update(id, req.user.orgId, {
+      title: body.title,
+      description: body.description,
+    })
   }
 
   /**
@@ -64,12 +62,7 @@ export class TracksController {
   addItem(
     @Req() req: any,
     @Param('id') trackId: string,
-    @Body()
-    body: {
-      type: TrackItemTypeInput
-      title: string
-      content: string
-    },
+    @Body() body: AddTrackItemDto,
   ) {
     const normalizedType =
       body.type === 'CONTENT' ? 'READING' : body.type
@@ -110,7 +103,7 @@ export class TracksController {
   assignPeople(
     @Req() req: any,
     @Param('id') trackId: string,
-    @Body() body: { personIds: string[] },
+    @Body() body: TrackPeopleDto,
   ) {
     return this.service.assignPeople({
       trackId,
@@ -123,7 +116,7 @@ export class TracksController {
   unassignPeople(
     @Req() req: any,
     @Param('id') trackId: string,
-    @Body() body: { personIds: string[] },
+    @Body() body: TrackPeopleDto,
   ) {
     return this.service.unassignPeople(
       trackId,

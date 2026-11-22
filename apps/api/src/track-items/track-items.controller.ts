@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { TrackItemsService } from './track-items.service'
+import { CreateTrackItemDto, UpdateTrackItemDto } from './dto/track-item.dto'
 
 @Controller('track-items')
 @UseGuards(JwtAuthGuard)
@@ -40,17 +41,12 @@ export class TrackItemsController {
   create(
     @Req() req: any,
     @Param('trackId') trackId: string,
-    @Body()
-    body: {
-      title: string
-      content?: string
-      type: 'READING' | 'ACTION' | 'CHECKPOINT'
-    },
+    @Body() body: CreateTrackItemDto,
   ) {
     return this.service.create(
       trackId,
       req.user.orgId,
-      body,
+      { title: body.title, content: body.content, type: body.type },
     )
   }
 
@@ -61,16 +57,12 @@ export class TrackItemsController {
   update(
     @Req() req: any,
     @Param('itemId') itemId: string,
-    @Body()
-    body: {
-      title?: string
-      content?: string
-    },
+    @Body() body: UpdateTrackItemDto,
   ) {
     return this.service.update(
       itemId,
       req.user.orgId,
-      body,
+      { title: body.title, content: body.content },
     )
   }
 

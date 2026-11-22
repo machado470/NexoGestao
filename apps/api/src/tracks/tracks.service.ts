@@ -112,9 +112,15 @@ export class TracksService {
       throw new BadRequestException('Somente DRAFT pode ser editada')
     }
 
+    // Explicit field mapping: status, slug, version, orgId… can never come from the caller.
+    const data: { title?: string; description?: string } = {}
+    if (params.title !== undefined) data.title = params.title
+    if (params.description !== undefined) data.description = params.description
+    if (Object.keys(data).length === 0) return track
+
     return this.prisma.track.update({
       where: { id },
-      data: params,
+      data,
     })
   }
 
