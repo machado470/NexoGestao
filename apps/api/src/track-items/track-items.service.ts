@@ -97,9 +97,19 @@ export class TrackItemsService {
       )
     }
 
+    // Explicit field mapping: trackId, order and type can never come from the caller, so an item
+    // cannot be moved to another track (TrackItem has no orgId column for the tenant middleware).
+    const data: { title?: string; content?: string } = {}
+    if (params.title !== undefined) data.title = params.title
+    if (params.content !== undefined) data.content = params.content
+    if (Object.keys(data).length === 0) {
+      const { track: _track, ...current } = item
+      return current
+    }
+
     return this.prisma.trackItem.update({
       where: { id: itemId },
-      data: params,
+      data,
     })
   }
 
