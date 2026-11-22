@@ -1,0 +1,169 @@
+import { useState } from "react";
+import { Eye, EyeOff, Network, RefreshCw, ShieldCheck, ShieldQuestion } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import {
+  AppOperationalHeader,
+  AppPageErrorState,
+  AppPageLoadingState,
+  AppPageShell,
+  AppSectionBlock,
+} from "@/components/internal-page-system";
+import { AppSectionCard, AppStatCard, AppStatusBadge } from "@/components/app-system";
+import { trpc } from "@/lib/trpc";
+import {
+  DIAGNOSTIC_ERROR_TEXT,
+  buildIpDiagnosticView,
+  diagnosticErrorKind,
+  yesNoLabel,
+  type DiagnosticErrorKind,
+  type IpDiagnosticPayload,
+  type IpDiagnosticView as View,
+  type YesNo,
+} from "./IpDiagnostic.logic";
+
+export const HEADER_COINCIDENCE_DISCLAIMER =
+  "Coincidência entre headers NÃO comprova que o IP de origem seja autêntico. Ela só mostra como esta requisição chegou ao BFF. Nenhum resultado desta tela é usado para autenticação, autorização ou rate limiting (política NO_TRUST).";
+
+function yesNoTone(value: YesNo, expected: "yes" | "no" = "yes") {
+  if (value === "na") return "neutral" as const;
+  return value === expected ? ("success" as const) : ("warning" as const);
+}
+
+export function IpDiagnosticDisclaimer() {
+  return (
+    <AppSectionCard className="space-y-1" role="note" aria-label="Limites do diagnóstico">
+      <p className="text-sm font-semibold text-[var(--text-primary)]">Somente diagnóstico</p>
+      <p className="text-sm text-[var(--text-secondary)]">{HEADER_COINCIDENCE_DISCLAIMER}</p>
+    </AppSectionCard>
+  );
+}
+
+export function IpDiagnosticAccessState({ kind, onRetry }: { kind: DiagnosticErrorKind; onRetry: () => void }) {
+  const text = DIAGNOSTIC_ERROR_TEXT[kind];
+  return <AppPageErrorState title={text.title} description={text.description} actionLabel="Verificar novamente" onAction={onRetry} />;
+}
+
+export function IpDiagnosticResult({ view }: { view: View }) {
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <AppStatusBadge label="Diagnóstico autorizado" tone="success" />
+        <AppStatusBadge label={`Classificação: ${view.classification.label}`} tone={view.classification.tone} />
+        <AppStatusBadge label={view.addressesMode === "full" ? "Endereços completos visíveis" : "Endereços parciais"} tone={view.addressesMode === "full" ? "warning" : "neutral"} />
+      </div>
+      <p className="text-sm text-[var(--text-secondary)]">{view.classification.description}</p>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <AppStatCard icon={<ShieldQuestion className="h-4 w-4" />} label="X-Real-IP presente" value={yesNoLabel(view.realIpPresent)} helper={<AppStatusBadge label={yesNoLabel(view.realIpPresent)} tone={yesNoTone(view.realIpPresent)} />} />
+        <AppStatCard icon={<ShieldCheck className="h-4 w-4" />} label="X-Real-IP válido" value={yesNoLabel(view.realIpValid)} helper={<AppStatusBadge label={yesNoLabel(view.realIpValid)} tone={yesNoTone(view.realIpValid)} />} />
+        <AppStatCard icon={<Network className="h-4 w-4" />} label="Saltos no X-Forwarded-For" value={String(view.hops)} helper={`Linhas de header: ${view.headerLines}. Conexão com o BFF: ${view.peer}.`} />
+        <AppStatCard label="X-Real-IP = primeiro X-Forwarded-For" value={yesNoLabel(view.matchesFirstHop)} helper={<AppStatusBadge label={yesNoLabel(view.matchesFirstHop)} tone={yesNoTone(view.matchesFirstHop)} />} />
+        <AppStatCard label="X-Real-IP = último X-Forwarded-For" value={yesNoLabel(view.matchesLastHop)} helper="Diferença aqui é comum quando há uma camada pública (CDN/borda) no caminho." />
+      </div>
+
+      <AppSectionBlock title="Alertas de topologia" subtitle="Derivados apenas desta requisição.">
+        {view.alerts.length ? (
+          <ul className="space-y-2" aria-label="Alertas de topologia">
+            {view.alerts.map((alert, index) => (
+              <li key={index} className="flex items-start gap-2 text-sm text-[var(--text-primary)]">
+                <AppStatusBadge label={alert.tone === "info" ? "Info" : "Atenção"} tone={alert.tone} />
+                <span>{alert.text}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-[var(--text-secondary)]">Nenhum alerta para esta requisição.</p>
+        )}
+      </AppSectionBlock>
+
+      <AppSectionBlock title="Cadeia observada" subtitle="Da esquerda (informada antes) para a direita (adicionada pelo proxy mais próximo). Endereços internos nunca são exibidos.">
+        {view.chain.length ? (
+          <ol className="space-y-1 text-sm" aria-label="Cadeia X-Forwarded-For">
+            {view.chain.map((hop) => (
+              <li key={hop.position} className="flex flex-wrap gap-2">
+                <span className="font-medium text-[var(--text-primary)]">#{hop.position + 1}</span>
+                <span className="font-mono text-[var(--text-primary)]">{hop.label}</span>
+                <span className="text-[var(--text-secondary)]">{hop.detail}</span>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="text-sm text-[var(--text-secondary)]">Sem X-Forwarded-For nesta requisição.</p>
+        )}
+        <p className="mt-2 text-sm text-[var(--text-secondary)]">
+          X-Real-IP: <span className="font-mono text-[var(--text-primary)]">{view.realIpLabel}</span>
+        </p>
+      </AppSectionBlock>
+
+      <AppSectionBlock title="Formatos agregados recentes" subtitle="Contagens da janela atual de observação, sem endereços.">
+        {view.aggregate.buckets.length ? (
+          <ul className="space-y-1 text-sm" aria-label="Formatos agregados">
+            {view.aggregate.buckets.map((bucket) => (
+              <li key={bucket.shape} className="flex flex-wrap gap-2">
+                <span className="font-mono text-[var(--text-primary)]">{bucket.shape}</span>
+                <span className="text-[var(--text-secondary)]">{bucket.count} requisição(ões)</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-[var(--text-secondary)]">Ainda não há contagens nesta janela.</p>
+        )}
+      </AppSectionBlock>
+    </div>
+  );
+}
+
+export default function IpDiagnosticPage() {
+  const [revealAddresses, setRevealAddresses] = useState(false);
+  const query = trpc.system.clientIpDiagnostic.useQuery(
+    { addresses: revealAddresses ? "full" : "masked" },
+    {
+      retry: false,
+      refetchOnWindowFocus: false,
+      // Kept only in memory, and full addresses are dropped as soon as they are no longer shown.
+      gcTime: revealAddresses ? 0 : undefined,
+    }
+  );
+  const recheck = () => void query.refetch();
+
+  return (
+    <AppPageShell className="space-y-4">
+      <AppOperationalHeader
+        title="Diagnóstico da cadeia de IP"
+        description="Mostra como a sua própria requisição chegou ao BFF, para validar a topologia de proxies sem abrir JSON nem compartilhar endereços."
+        primaryAction={
+          <Button type="button" onClick={recheck} disabled={query.isFetching}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Verificar novamente
+          </Button>
+        }
+        secondaryActions={
+          <Button type="button" variant="ghost" onClick={() => setRevealAddresses((value) => !value)} aria-pressed={revealAddresses}>
+            {revealAddresses ? <EyeOff className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
+            {revealAddresses ? "Ocultar endereços" : "Mostrar endereços completos"}
+          </Button>
+        }
+        contextChips={
+          <>
+            <AppStatusBadge label="Somente plataforma" tone="info" />
+            <AppStatusBadge label="NO_TRUST ativo" tone="neutral" />
+          </>
+        }
+      />
+
+      <IpDiagnosticDisclaimer />
+      {revealAddresses ? (
+        <AppSectionCard role="note" aria-label="Aviso de privacidade">
+          <p className="text-sm text-[var(--text-secondary)]">
+            Endereços completos aparecem apenas nesta tela, ficam só na memória do navegador e não são registrados. Não compartilhe capturas de tela com endereços.
+          </p>
+        </AppSectionCard>
+      ) : null}
+
+      {query.isLoading ? <AppPageLoadingState title="Consultando diagnóstico" description="Verificando a sua requisição e a autorização na API." /> : null}
+      {query.isError ? <IpDiagnosticAccessState kind={diagnosticErrorKind(query.error)} onRetry={recheck} /> : null}
+      {query.data && !query.isError ? <IpDiagnosticResult view={buildIpDiagnosticView(query.data as IpDiagnosticPayload)} /> : null}
+    </AppPageShell>
+  );
+}

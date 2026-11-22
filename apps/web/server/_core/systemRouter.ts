@@ -20,10 +20,13 @@ export const systemRouter = router({
    * active ADMIN, id in PLATFORM_ADMIN_USER_IDS; deny by default). An organization ADMIN gets
    * FORBIDDEN. Returns the shape of the caller's own request and aggregated counters only.
    */
-  clientIpDiagnostic: protectedProcedure.query(async ({ ctx }) => {
-    await authedGet(ctx, "/admin/platform-access");
-    return { self: selfDiagnostic(ctx.req), aggregate: clientIpChainMetrics.snapshot() };
-  }),
+  clientIpDiagnostic: protectedProcedure
+    // Optional: the admin panel asks for masked addresses; without input the response is unchanged.
+    .input(z.object({ addresses: z.enum(["masked", "full"]).optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      await authedGet(ctx, "/admin/platform-access");
+      return { self: selfDiagnostic(ctx.req, { addresses: input?.addresses }), aggregate: clientIpChainMetrics.snapshot() };
+    }),
 
   notifyOwner: adminProcedure
     .input(

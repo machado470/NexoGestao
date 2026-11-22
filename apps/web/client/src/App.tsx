@@ -61,6 +61,7 @@ const WhatsAppPage = lazy(() => import("./pages/WhatsAppPage"));
 const WhatsAppWebhookRecoveryPage = lazy(() => import("./pages/WhatsAppWebhookRecoveryPage"));
 const CalendarPage = lazy(() => import("./pages/CalendarPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
+const IpDiagnosticPage = lazy(() => import("./pages/IpDiagnosticPage"));
 const ProfilePage = lazy(() => import("./pages/ProfilePage"));
 const TimelinePage = lazy(() => import("./pages/TimelinePage"));
 const AuditPage = lazy(() => import("./pages/AuditPage"));
@@ -568,6 +569,11 @@ const WhatsAppWebhookRecoveryRoute = lazyProtectedPage(WhatsAppWebhookRecoveryPa
   requireCompletedOnboarding: true,
 });
 
+// C7.2e: the ADMIN role only filters the screen; the API (PlatformAdminGuard) decides access.
+const IpDiagnosticRoute = lazyProtectedPage(IpDiagnosticPage, {
+  requiredRoles: ["ADMIN"],
+});
+
 const CalendarRoute = lazyProtectedPage(CalendarPage, {
   permissions: ["appointments:read"],
   requireCompletedOnboarding: true,
@@ -773,6 +779,7 @@ function Router() {
       />
       <Route path="/calendar" component={CalendarRoute} />
       <Route path="/settings" component={SettingsRoute} />
+      <Route path="/admin/ip-diagnostic" component={IpDiagnosticRoute} />
       <Route path="/profile" component={ProfileRoute} />
       <Route path="/timeline" component={TimelineRoute} />
       <Route path="/audit" component={AuditRoute} />

@@ -274,23 +274,40 @@ export function clientIpObservationMiddleware(
   return Object.assign(middleware, { stop: () => clearInterval(timer) });
 }
 
+/** Partial form of an address: first two IPv4 octets or first two IPv6 groups. Never the full address. */
+export function maskAddress(address: string, family: 4 | 6): string {
+  if (family === 4) return `${address.split(".").slice(0, 2).join(".")}.•.•`;
+  const groups = address.split(":").filter(Boolean);
+  return `${groups.slice(0, 2).join(":")}:…`;
+}
+
+export type DiagnosticAddressMode = "masked" | "full";
+
 /**
  * What a platform operator may see about *their own* request: shapes and scopes, plus the
  * public addresses in the chain (their own address and the proxies'), never private/internal
- * addresses, header values other than addresses, cookies or tokens.
+ * addresses, header values other than addresses, cookies or tokens. With `addresses: "masked"`
+ * public addresses are reduced to a partial form, so the response carries no full address.
+ * The comparisons (X-Real-IP vs first/last hop) are computed on the full values server-side.
  */
-export function selfDiagnostic(req: IncomingMessage) {
+export function selfDiagnostic(req: IncomingMessage, options: { addresses?: DiagnosticAddressMode } = {}) {
+  const mode: DiagnosticAddressMode = options.addresses === "masked" ? "masked" : "full";
   const observation = observeClientIpChain(req);
   const xffLines = headerLines(req, "x-forwarded-for");
   const rawHops = xffLines.join(",").length <= MAX_FORWARDED_HEADER_LENGTH ? xffLines.join(",").split(",").map((e) => e.trim()).filter(Boolean) : [];
   const publicOrMasked = (raw: string) => {
     const normalized = normalizeIp(raw);
     if (!normalized) return "invalid";
-    return scopeOf(normalized.address, normalized.family) === "public" ? normalized.address : `<${scopeOf(normalized.address, normalized.family)}>`;
+    if (scopeOf(normalized.address, normalized.family) !== "public") return `<${scopeOf(normalized.address, normalized.family)}>`;
+    return mode === "masked" ? maskAddress(normalized.address, normalized.family) : normalized.address;
   };
   const xri = headerLines(req, "x-real-ip");
+  const realIp = xri.length === 1 && !xri[0].includes(",") ? normalizeIp(xri[0]) : null;
+  const firstHop = rawHops.length ? normalizeIp(rawHops[0]) : null;
+  const matchesFirstHop = realIp && firstHop ? realIp.address === firstHop.address : null;
   return {
     policy: "observation-only (no proxy is trusted; nothing is used for security decisions)",
+    addresses: mode,
     classification: observation.classification,
     source: observation.source,
     issues: observation.issues,
@@ -304,6 +321,7 @@ export function selfDiagnostic(req: IncomingMessage) {
     },
     realIp: {
       ...observation.realIp,
+      matchesFirstHop,
       address: xri.length === 1 ? publicOrMasked(xri[0]) : xri.length ? "repeated" : null,
     },
   };
