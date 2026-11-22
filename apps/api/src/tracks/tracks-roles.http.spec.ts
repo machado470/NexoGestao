@@ -11,6 +11,7 @@ import { ROLES_KEY } from '../auth/decorators/roles.decorator'
 import { RolesGuard } from '../auth/guards/roles.guard'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { TENANT_ACCESS_INTERCEPTOR_PROVIDER } from '../common/guards/tenant-access.guard'
+import { ApiExceptionFilter } from '../common/http/api-exception.filter'
 import { OperationalStateGuard } from '../people/operational-state.guard'
 import { PrismaService } from '../prisma/prisma.service'
 import { RiskService } from '../risk/risk.service'
@@ -89,12 +90,10 @@ const prisma: any = {
     findFirst: jest.fn(async ({ where, include }: any) => {
       const t = findTrack(where)
       if (!t) return null
-      return { ...t, ...(include?.items ? { items: items.filter((i) => i.trackId === t.id) } : {}), ...(include?.assignments ? { assignments: [] } : {}) }
-    }),
-    findFirstOrThrow: jest.fn(async ({ where }: any) => {
-      const t = findTrack(where)
-      if (!t) throw Object.assign(new Error('No Track found'), { code: 'P2025' })
-      return { ...t }
+      const withAssignments = include?.assignments
+        ? { assignments: assignments.filter((a) => a.trackId === t.id).map((a) => ({ ...a, person: { id: a.personId, name: `Pessoa ${a.personId}`, orgId: PERSON_ORG[a.personId] } })) }
+        : {}
+      return { ...t, ...(include?.items ? { items: items.filter((i) => i.trackId === t.id) } : {}), ...withAssignments }
     }),
     create: jest.fn(async ({ data }: any) => ({ id: 'track-new', createdAt: new Date(), ...data })),
     update: jest.fn(async ({ where, data }: any) => {
@@ -154,25 +153,21 @@ const assignmentFactory = { assignPeopleToTrack: jest.fn(async ({ personIds }: a
 const timeline = { log: jest.fn().mockResolvedValue(undefined) }
 const risk = { recalculatePersonRisk: jest.fn().mockResolvedValue(undefined) }
 
-/**
- * `crossOrg`: 404 where the service throws NotFoundException. `blocked` where it uses
- * findFirstOrThrow: the API's ApiExceptionFilter does not map Prisma P2025, so these answer 500
- * (pre-existing, out of scope here); the request is still refused with no data and no write.
- */
-type Route = { name: string; method: 'get' | 'post' | 'patch' | 'delete'; path: string; body?: object; adminStatus: number; crossOrgPath?: string; crossOrg?: 404 | 'blocked' }
+/** `crossOrgPath`: the same request by an ADMIN of org-b must answer 404 (C8 PR3-2B: no route is exempt). */
+type Route = { name: string; method: 'get' | 'post' | 'patch' | 'delete'; path: string; body?: object; adminStatus: number; crossOrgPath?: string }
 
 /** The 14 track and item routes, each with a valid request and its expected result for an ADMIN of org-a. */
 const ADMIN_ROUTES: Route[] = [
   { name: 'GET /tracks', method: 'get', path: '/tracks', adminStatus: 200 },
-  { name: 'GET /tracks/:id', method: 'get', path: '/tracks/track-a', adminStatus: 200, crossOrgPath: '/tracks/track-a', crossOrg: 'blocked' },
-  { name: 'GET /tracks/:id/items', method: 'get', path: '/tracks/track-a/items', adminStatus: 200, crossOrgPath: '/tracks/track-a/items', crossOrg: 'blocked' },
+  { name: 'GET /tracks/:id', method: 'get', path: '/tracks/track-a', adminStatus: 200, crossOrgPath: '/tracks/track-a' },
+  { name: 'GET /tracks/:id/items', method: 'get', path: '/tracks/track-a/items', adminStatus: 200, crossOrgPath: '/tracks/track-a/items' },
   { name: 'POST /tracks', method: 'post', path: '/tracks', body: { title: 'Nova trilha' }, adminStatus: 201 },
   { name: 'PATCH /tracks/:id', method: 'patch', path: '/tracks/track-a', body: { title: 'Renomeada' }, adminStatus: 200, crossOrgPath: '/tracks/track-a' },
   { name: 'POST /tracks/:id/items', method: 'post', path: '/tracks/track-a/items', body: { type: 'READING', title: 'Novo' }, adminStatus: 201, crossOrgPath: '/tracks/track-a/items' },
   { name: 'POST /tracks/:id/publish', method: 'post', path: '/tracks/track-a/publish', adminStatus: 201, crossOrgPath: '/tracks/track-a/publish' },
   { name: 'POST /tracks/:id/archive', method: 'post', path: '/tracks/track-a/archive', adminStatus: 201, crossOrgPath: '/tracks/track-a/archive' },
   { name: 'POST /tracks/:id/assign', method: 'post', path: '/tracks/track-a/assign', body: { personIds: ['person-staff-a'] }, adminStatus: 201 },
-  { name: 'POST /tracks/:id/unassign', method: 'post', path: '/tracks/track-a/unassign', body: { personIds: ['person-staff-a'] }, adminStatus: 201, crossOrgPath: '/tracks/track-a/unassign', crossOrg: 'blocked' },
+  { name: 'POST /tracks/:id/unassign', method: 'post', path: '/tracks/track-a/unassign', body: { personIds: ['person-staff-a'] }, adminStatus: 201, crossOrgPath: '/tracks/track-a/unassign' },
   { name: 'GET /track-items/track/:trackId', method: 'get', path: '/track-items/track/track-a', adminStatus: 200, crossOrgPath: '/track-items/track/track-a' },
   { name: 'POST /track-items/track/:trackId', method: 'post', path: '/track-items/track/track-a', body: { type: 'ACTION', title: 'Novo' }, adminStatus: 201, crossOrgPath: '/track-items/track/track-a' },
   { name: 'PATCH /track-items/:itemId', method: 'patch', path: '/track-items/item-a1', body: { title: 'Novo' }, adminStatus: 200, crossOrgPath: '/track-items/item-a1' },
@@ -219,6 +214,7 @@ describe('C8 PR3-2: only organization ADMINs reach track and item routes', () =>
       .useValue({ canActivate: () => true })
       .compile()
     app = module.createNestApplication()
+    app.useGlobalFilters(new ApiExceptionFilter()) // the production filter: unmapped errors become 500
     app.useGlobalPipes(
       new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true, transformOptions: { enableImplicitConversion: true } }),
     )
@@ -253,15 +249,11 @@ describe('C8 PR3-2: only organization ADMINs reach track and item routes', () =>
     })
   })
 
-  it('an ADMIN of another organization is refused (404, or blocked where pre-existing) and writes nothing', async () => {
+  it('an ADMIN of another organization gets 404 on every id-scoped route and writes nothing', async () => {
     for (const route of ADMIN_ROUTES.filter((r) => r.crossOrgPath)) {
       const res = await call(route, 'adminB', route.crossOrgPath)
-      if (route.crossOrg === 'blocked') {
-        expect([route.name, res.status >= 400]).toEqual([route.name, true])
-        expect(JSON.stringify(res.body)).not.toContain('Trilha A')
-      } else {
-        expect([route.name, res.status]).toEqual([route.name, 404])
-      }
+      expect([route.name, res.status]).toEqual([route.name, 404])
+      expect(JSON.stringify(res.body)).not.toContain('Trilha A')
     }
     expect(prisma.track.create).not.toHaveBeenCalled()
     expect(prisma.track.update).not.toHaveBeenCalled()
@@ -272,6 +264,55 @@ describe('C8 PR3-2: only organization ADMINs reach track and item routes', () =>
     expect(prisma.assignment.deleteMany).not.toHaveBeenCalled()
     expect(prisma.auditEvent.create).not.toHaveBeenCalled()
     expect(tracks.find((t) => t.id === 'track-a')).toMatchObject({ status: 'DRAFT', title: 'Trilha A' })
+  })
+
+  // C8 PR3-2B: these three routes answered 500 (Prisma P2025 from findFirstOrThrow) instead of 404.
+  describe('missing or other-organization track on GET /tracks/:id, GET /tracks/:id/items, POST /tracks/:id/unassign', () => {
+    const NOT_FOUND_ROUTES = [
+      { name: 'GET /tracks/:id', send: (id: string) => http().get(`/tracks/${id}`) },
+      { name: 'GET /tracks/:id/items', send: (id: string) => http().get(`/tracks/${id}/items`) },
+      { name: 'POST /tracks/:id/unassign', send: (id: string) => http().post(`/tracks/${id}/unassign`).send({ personIds: ['person-staff-a', 'person-admin-b'] }) },
+    ]
+    /** The body without the echoed request path, which naturally differs between the two ids. */
+    const comparable = ({ path: _path, ...rest }: any) => rest
+    const FOREIGN_DATA = ['Trilha B', 'trilha-b', 'Item B1', 'org-b', 'person-admin-b', 'Pessoa']
+
+    beforeEach(() => {
+      // org-b has a real assignment on its track: it must be neither leaked nor deleted.
+      assignments.push({ id: 'asg-b', personId: 'person-admin-b', trackId: 'track-b', progress: 30 })
+      PERSON_ORG['person-admin-b'] = 'org-b'
+    })
+    afterEach(() => delete PERSON_ORG['person-admin-b'])
+
+    it.each(NOT_FOUND_ROUTES.map((r) => [r.name, r] as const))('%s: missing id and other-organization id are the same 404, with no data', async (_name, route) => {
+      const missing = await route.send('track-does-not-exist').set('x-test-user', 'adminA')
+      const foreign = await route.send('track-b').set('x-test-user', 'adminA')
+      for (const res of [missing, foreign]) {
+        expect(res.status).toBe(404)
+        expect(res.body).toMatchObject({ success: false, error: 'Trilha não encontrada', data: null })
+        expect(res.body.code).not.toBe('INTERNAL_ERROR')
+        for (const fragment of FOREIGN_DATA) expect(JSON.stringify(res.body)).not.toContain(fragment)
+      }
+      expect(comparable(foreign.body)).toEqual(comparable(missing.body))
+      // Rejected attempts write nothing and audit nothing.
+      expect(prisma.assignment.deleteMany).not.toHaveBeenCalled()
+      expect(prisma.auditEvent.create).not.toHaveBeenCalled()
+      expect(assignments.find((a) => a.id === 'asg-b')).toEqual({ id: 'asg-b', personId: 'person-admin-b', trackId: 'track-b', progress: 30 })
+    })
+
+    it('the lookup stays scoped to the session organization before any deletion', async () => {
+      await http().post('/tracks/track-b/unassign').set('x-test-user', 'adminA').send({ personIds: ['person-admin-b'] }).expect(404)
+      expect(prisma.track.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'track-b', orgId: 'org-a' } }))
+      expect(prisma.assignment.deleteMany).not.toHaveBeenCalled()
+    })
+
+    it('the ADMIN of the owning organization still reads and unassigns', async () => {
+      const own = await http().get('/tracks/track-b').set('x-test-user', 'adminB').expect(200)
+      expect(own.body).toMatchObject({ id: 'track-b', title: 'Trilha B', assignments: [expect.objectContaining({ id: 'asg-b' })] })
+      await http().get('/tracks/track-b/items').set('x-test-user', 'adminB').expect(200)
+      await http().post('/tracks/track-b/unassign').set('x-test-user', 'adminB').send({ personIds: ['person-admin-b'] }).expect(201)
+      expect(prisma.assignment.deleteMany).toHaveBeenCalledWith({ where: { trackId: 'track-b', personId: { in: ['person-admin-b'] } } })
+    })
   })
 
   it('unauthenticated requests are 401 on every route', async () => {

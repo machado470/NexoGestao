@@ -21,7 +21,7 @@ import { TracksService } from '../../src/tracks/tracks.service'
 import { describeRealIntegration } from './infra-guards'
 
 /**
- * C8 PR3-2 — track roles with the real session validation (JwtStrategy + persisted session) and
+ * C8 PR3-2 / PR3-2B — track roles with the real session validation (JwtStrategy + persisted session) and
  * PostgreSQL: active ADMIN is authorized, other roles get 403, inactive users/people, a revoked
  * session and missing credentials get 401 — always before any write.
  */
@@ -134,6 +134,81 @@ describeRealIntegration('Track routes: roles and real session validation with Po
     await prisma.user.update({ where: { id: other.id }, data: { role: 'STAFF' } })
     await http().post('/tracks').set('Authorization', adminToken).send({ title: 'x' }).expect(401)
     expect(await tracksOf()).toBe(0)
+  })
+
+  // C8 PR3-2B: a track that does not exist or belongs to another organization is 404 (was 500).
+  describe('missing or other-organization track on GET /tracks/:id, GET /tracks/:id/items, POST /tracks/:id/unassign', () => {
+    async function foreignTrack() {
+      const ownerOrg = randomUUID()
+      orgIds.push(ownerOrg)
+      await prisma.organization.create({ data: { id: ownerOrg, name: 'Tracks owner org', slug: `tracks-owner-${ownerOrg}` } })
+      const person = await prisma.person.create({ data: { orgId: ownerOrg, name: 'Pessoa Estrangeira', role: 'TECH', active: true } })
+      const track = await prisma.track.create({
+        data: { orgId: ownerOrg, slug: `foreign-${ownerOrg}`, title: 'Trilha Estrangeira', status: 'DRAFT', version: 1, items: { create: { title: 'Item Estrangeiro', content: 'conteudo', type: 'READING', order: 1 } } },
+      })
+      await prisma.assignment.create({ data: { personId: person.id, trackId: track.id, progress: 30 } })
+      return { ownerOrg, person, track }
+    }
+    const routes = (personId: string) => [
+      { name: 'GET /tracks/:id', send: (id: string, auth: string) => http().get(`/tracks/${id}`).set('Authorization', auth) },
+      { name: 'GET /tracks/:id/items', send: (id: string, auth: string) => http().get(`/tracks/${id}/items`).set('Authorization', auth) },
+      { name: 'POST /tracks/:id/unassign', send: (id: string, auth: string) => http().post(`/tracks/${id}/unassign`).set('Authorization', auth).send({ personIds: [personId] }) },
+    ]
+    const comparable = ({ path: _path, ...rest }: any) => rest
+
+    afterAll(async () => {
+      await prisma.assignment.deleteMany({ where: { track: { orgId: { in: orgIds } } } })
+      await prisma.trackItem.deleteMany({ where: { track: { orgId: { in: orgIds } } } })
+    })
+
+    it('an ADMIN gets the same 404 for a missing id and for another organization’s track, with no data, no deletion and no audit', async () => {
+      const admin = await member('ADMIN')
+      const { ownerOrg, person, track } = await foreignTrack()
+      const auth = token(admin)
+      for (const route of routes(person.id)) {
+        const missing = await route.send(randomUUID(), auth)
+        const foreign = await route.send(track.id, auth)
+        for (const res of [missing, foreign]) {
+          expect([route.name, res.status, res.body.code]).toEqual([route.name, 404, null])
+          expect(res.body).toMatchObject({ success: false, error: 'Trilha não encontrada', data: null })
+          const text = JSON.stringify(res.body)
+          for (const fragment of ['Trilha Estrangeira', 'Item Estrangeiro', 'Pessoa Estrangeira', ownerOrg, person.id]) expect(text).not.toContain(fragment)
+        }
+        expect(comparable(foreign.body)).toEqual(comparable(missing.body))
+      }
+      expect(await prisma.assignment.count({ where: { trackId: track.id, personId: person.id, progress: 30 } })).toBe(1)
+      expect(await prisma.auditEvent.count({ where: { orgId: { in: [orgId, ownerOrg] } } })).toBe(0)
+    })
+
+    it('the ADMIN of the owning organization still reads the track and its items and unassigns', async () => {
+      const { ownerOrg, person, track } = await foreignTrack()
+      orgId = ownerOrg
+      const owner = await member('ADMIN')
+      const auth = token(owner)
+      const read = await http().get(`/tracks/${track.id}`).set('Authorization', auth).expect(200)
+      expect(read.body).toMatchObject({ id: track.id, title: 'Trilha Estrangeira', assignments: [expect.objectContaining({ personId: person.id })] })
+      // Pre-existing: this route returns the same payload as GET /tracks/:id (not changed here).
+      const items = await http().get(`/tracks/${track.id}/items`).set('Authorization', auth).expect(200)
+      expect(items.body).toMatchObject({ id: track.id })
+      const unassigned = await http().post(`/tracks/${track.id}/unassign`).set('Authorization', auth).send({ personIds: [person.id] }).expect(201)
+      expect(unassigned.body).toEqual({ unassigned: 1 })
+      expect(await prisma.assignment.count({ where: { trackId: track.id } })).toBe(0)
+    })
+
+    it.each(['MANAGER', 'STAFF', 'VIEWER'] as UserRole[])('%s still gets 403 on these routes, before any lookup or deletion', async (role) => {
+      const user = await member(role)
+      const { person, track } = await foreignTrack()
+      for (const route of routes(person.id)) await route.send(track.id, token(user)).expect(403)
+      expect(await prisma.assignment.count({ where: { trackId: track.id } })).toBe(1)
+    })
+
+    it('no credentials still get 401 on these routes', async () => {
+      const { person, track } = await foreignTrack()
+      await http().get(`/tracks/${track.id}`).expect(401)
+      await http().get(`/tracks/${track.id}/items`).expect(401)
+      await http().post(`/tracks/${track.id}/unassign`).send({ personIds: [person.id] }).expect(401)
+      expect(await prisma.assignment.count({ where: { trackId: track.id } })).toBe(1)
+    })
   })
 
   it('missing or invalid credentials get 401', async () => {
