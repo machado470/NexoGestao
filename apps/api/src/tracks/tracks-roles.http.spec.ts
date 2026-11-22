@@ -75,6 +75,15 @@ function reset() {
   completions = []
 }
 
+const FICTITIOUS_PERSON_DATA = {
+  email: 'pessoa.ficticia@example.test',
+  riskScore: 87,
+  operationalRiskScore: 64,
+  operationalState: 'RESTRICTED',
+  offboardReason: 'Motivo de desligamento fictício',
+  workloadNotes: 'Notas de carga fictícias',
+}
+
 const findTrack = (where: any) =>
   tracks.find((t) => (where.id === undefined || t.id === where.id) && (where.orgId === undefined || t.orgId === where.orgId) && (where.slug === undefined || t.slug === where.slug))
 const withAssignmentRelations = (a: Assignment) => ({
@@ -87,13 +96,27 @@ const withAssignmentRelations = (a: Assignment) => ({
 const prisma: any = {
   track: {
     findMany: jest.fn(async ({ where }: any) => tracks.filter((t) => t.orgId === where.orgId).map((t) => ({ ...t, assignments: [] }))),
-    findFirst: jest.fn(async ({ where, include }: any) => {
+    findFirst: jest.fn(async ({ where, include, select }: any) => {
       const t = findTrack(where)
       if (!t) return null
-      const withAssignments = include?.assignments
-        ? { assignments: assignments.filter((a) => a.trackId === t.id).map((a) => ({ ...a, person: { id: a.personId, name: `Pessoa ${a.personId}`, orgId: PERSON_ORG[a.personId] } })) }
-        : {}
-      return { ...t, ...(include?.items ? { items: items.filter((i) => i.trackId === t.id) } : {}), ...withAssignments }
+      const itemsOf = (spec: any) => {
+        const own = items.filter((i) => i.trackId === t.id).map((i) => ({ ...i }))
+        return spec?.orderBy?.order === 'asc' ? own.sort((x, y) => x.order - y.order) : own
+      }
+      // Assigned people carry fictitious personal data: a route that loads them would expose it.
+      const assignmentsOf = () =>
+        assignments.filter((a) => a.trackId === t.id).map((a) => ({ ...a, person: { id: a.personId, name: `Pessoa ${a.personId}`, orgId: PERSON_ORG[a.personId], ...FICTITIOUS_PERSON_DATA } }))
+      // Prisma semantics: `select` returns only the selected fields; `include` adds relations.
+      if (select) {
+        const picked: any = {}
+        for (const key of Object.keys(select)) {
+          if (key === 'items') picked.items = itemsOf(select.items)
+          else if (key === 'assignments') picked.assignments = assignmentsOf()
+          else picked[key] = (t as any)[key]
+        }
+        return picked
+      }
+      return { ...t, ...(include?.items ? { items: itemsOf(include.items) } : {}), ...(include?.assignments ? { assignments: assignmentsOf() } : {}) }
     }),
     create: jest.fn(async ({ data }: any) => ({ id: 'track-new', createdAt: new Date(), ...data })),
     update: jest.fn(async ({ where, data }: any) => {
@@ -309,9 +332,66 @@ describe('C8 PR3-2: only organization ADMINs reach track and item routes', () =>
     it('the ADMIN of the owning organization still reads and unassigns', async () => {
       const own = await http().get('/tracks/track-b').set('x-test-user', 'adminB').expect(200)
       expect(own.body).toMatchObject({ id: 'track-b', title: 'Trilha B', assignments: [expect.objectContaining({ id: 'asg-b' })] })
-      await http().get('/tracks/track-b/items').set('x-test-user', 'adminB').expect(200)
+      await http().get('/tracks/track-b/items').set('x-test-user', 'adminB').expect(200, [{ id: 'item-b1', trackId: 'track-b', title: 'Item B1', content: '', type: 'READING', order: 1 }])
       await http().post('/tracks/track-b/unassign').set('x-test-user', 'adminB').send({ personIds: ['person-admin-b'] }).expect(201)
       expect(prisma.assignment.deleteMany).toHaveBeenCalledWith({ where: { trackId: 'track-b', personId: { in: ['person-admin-b'] } } })
+    })
+  })
+
+  // C8 PR3-2C: GET /tracks/:id/items returns only the track's items, never assignments or people.
+  describe('GET /tracks/:id/items contract', () => {
+    const SENSITIVE = ['assignments', 'person', FICTITIOUS_PERSON_DATA.email, 'riskScore', 'operationalRiskScore', FICTITIOUS_PERSON_DATA.offboardReason, 'offboardReason', 'workloadNotes', 'orgId', 'org-a', 'org-b']
+
+    beforeEach(() => {
+      // Stored out of order; the track also has an assigned person with personal data.
+      items.push(
+        { id: 'item-a3', trackId: 'track-a', title: 'Item A3', content: 'c3', type: 'CHECKPOINT', order: 3 },
+        { id: 'item-a2', trackId: 'track-a', title: 'Item A2', content: 'c2', type: 'ACTION', order: 2 },
+      )
+      assignments.push({ id: 'asg-a', personId: 'person-staff-a', trackId: 'track-a', progress: 40 })
+      tracks.push({ id: 'track-empty', orgId: 'org-a', status: 'DRAFT', title: 'Trilha vazia', slug: 'trilha-vazia', version: 1, description: null, createdAt: new Date('2026-11-01T00:00:00.000Z') })
+    })
+
+    it('an ADMIN gets 200 with only the items, ordered, equal to GET /track-items/track/:trackId', async () => {
+      const res = await http().get('/tracks/track-a/items').set('x-test-user', 'adminA').expect(200)
+      expect(Array.isArray(res.body)).toBe(true)
+      expect(res.body.map((i: any) => [i.id, i.order])).toEqual([['item-a1', 1], ['item-a2', 2], ['item-a3', 3]])
+      for (const item of res.body) expect(Object.keys(item).sort()).toEqual(['content', 'id', 'order', 'title', 'trackId', 'type'])
+      const sibling = await http().get('/track-items/track/track-a').set('x-test-user', 'adminA').expect(200)
+      expect(res.body).toEqual(sibling.body)
+    })
+
+    it('the response carries no assignment, person, personal data, risk score, offboarding reason or orgId', async () => {
+      const res = await http().get('/tracks/track-a/items').set('x-test-user', 'adminA').expect(200)
+      const text = JSON.stringify(res.body)
+      for (const fragment of SENSITIVE) expect([fragment, text.includes(fragment)]).toEqual([fragment, false])
+      // The query itself never loads assignments or people and stays scoped to the session org.
+      expect(prisma.track.findFirst).toHaveBeenCalledWith({ where: { id: 'track-a', orgId: 'org-a' }, select: { items: { orderBy: { order: 'asc' } } } })
+    })
+
+    it('a track without items returns []', async () => {
+      await http().get('/tracks/track-empty/items').set('x-test-user', 'adminA').expect(200, [])
+    })
+
+    it('a missing or other-organization track is the same 404, without the foreign items', async () => {
+      const missing = await http().get('/tracks/track-missing/items').set('x-test-user', 'adminA').expect(404)
+      const foreign = await http().get('/tracks/track-a/items').set('x-test-user', 'adminB').expect(404)
+      const { path: _m, ...missingBody } = missing.body
+      const { path: _f, ...foreignBody } = foreign.body
+      expect(foreignBody).toEqual(missingBody)
+      expect(JSON.stringify(foreign.body)).not.toMatch(/Item A|Trilha A/)
+    })
+
+    it.each(NON_ADMIN_ROLES)('%s gets 403 before any database access', async (user) => {
+      await http().get('/tracks/track-a/items').set('x-test-user', user).expect(403)
+      for (const mock of allPrismaMocks()) expect(mock).not.toHaveBeenCalled()
+    })
+
+    it('reads write nothing and audit nothing', async () => {
+      await http().get('/tracks/track-a/items').set('x-test-user', 'adminA').expect(200)
+      await http().get('/tracks/track-a/items').expect(401)
+      const writes = [prisma.track.create, prisma.track.update, prisma.trackItem.create, prisma.trackItem.update, prisma.trackItem.delete, prisma.assignment.update, prisma.assignment.updateMany, prisma.assignment.deleteMany, prisma.auditEvent.create]
+      for (const write of writes) expect(write).not.toHaveBeenCalled()
     })
   })
 
