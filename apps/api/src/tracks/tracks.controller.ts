@@ -9,8 +9,17 @@ import {
   UseGuards,
 } from '@nestjs/common'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
-import { TracksService } from './tracks.service'
+import { TracksService, type TrackActor } from './tracks.service'
 import { AddTrackItemDto, CreateTrackDto, TrackPeopleDto, UpdateTrackDto } from './dto/track.dto'
+
+/** Author of an operation, taken only from the authenticated session (never from the body). */
+function actorOf(req: any): TrackActor {
+  const user = req?.user ?? {}
+  return {
+    userId: typeof (user.userId ?? user.sub) === 'string' ? (user.userId ?? user.sub) : null,
+    personId: typeof user.personId === 'string' ? user.personId : null,
+  }
+}
 
 @Controller('tracks')
 @UseGuards(JwtAuthGuard)
@@ -36,6 +45,7 @@ export class TracksController {
       title: body.title,
       description: body.description,
       orgId: req.user.orgId,
+      actor: actorOf(req),
     })
   }
 
@@ -73,6 +83,7 @@ export class TracksController {
       type: normalizedType,
       title: body.title,
       content: body.content,
+      actor: actorOf(req),
     })
   }
 
@@ -91,12 +102,12 @@ export class TracksController {
 
   @Post(':id/publish')
   publish(@Req() req: any, @Param('id') id: string) {
-    return this.service.publish(id, req.user.orgId)
+    return this.service.publish(id, req.user.orgId, actorOf(req))
   }
 
   @Post(':id/archive')
   archive(@Req() req: any, @Param('id') id: string) {
-    return this.service.archive(id, req.user.orgId)
+    return this.service.archive(id, req.user.orgId, actorOf(req))
   }
 
   @Post(':id/assign')
