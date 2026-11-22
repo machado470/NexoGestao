@@ -139,16 +139,20 @@ export function buildIpDiagnosticView(payload: IpDiagnosticPayload | null | unde
   };
 }
 
-export type DiagnosticErrorKind = "forbidden" | "unauthorized" | "rate_limited" | "unavailable" | "error";
+export type DiagnosticErrorKind = "forbidden" | "unauthorized" | "rate_limited" | "unavailable" | "no_response" | "error";
 
 export function diagnosticErrorKind(error: unknown): DiagnosticErrorKind {
-  const data = (error as { data?: { code?: string; httpStatus?: number } } | null)?.data;
+  const typed = error as { name?: string; data?: { code?: string; httpStatus?: number } | null } | null;
+  const data = typed?.data;
   const code = data?.code;
   const status = data?.httpStatus;
   if (code === "FORBIDDEN" || status === 403) return "forbidden";
   if (code === "UNAUTHORIZED" || status === 401) return "unauthorized";
   if (code === "TOO_MANY_REQUESTS" || status === 429) return "rate_limited";
   if (code === "SERVICE_UNAVAILABLE" || status === 503) return "unavailable";
+  // A tRPC client error without server data means no valid tRPC response arrived (request
+  // failed in transit, or a proxy answered with something else). It is NOT proof of being offline.
+  if (typed?.name === "TRPCClientError" && !data) return "no_response";
   return "error";
 }
 
@@ -157,5 +161,69 @@ export const DIAGNOSTIC_ERROR_TEXT: Record<DiagnosticErrorKind, { title: string;
   unauthorized: { title: "Sessão expirada", description: "Entre novamente para consultar o diagnóstico." },
   rate_limited: { title: "Muitas consultas seguidas", description: "Aguarde alguns instantes antes de verificar novamente." },
   unavailable: { title: "Serviço temporariamente indisponível", description: "Tente novamente em alguns instantes." },
+  no_response: { title: "Sem resposta do servidor", description: "A verificação não recebeu uma resposta válida. Pode ser a conexão deste aparelho ou o servidor. Tente verificar novamente." },
   error: { title: "Não foi possível consultar o diagnóstico", description: "Tente verificar novamente." },
 };
+
+/**
+ * Snapshot of the React Query state of the diagnostic query (only the fields the screen needs).
+ * `fetchStatus: "paused"` happens when React Query believes the browser is offline.
+ */
+export type DiagnosticQuerySnapshot = {
+  status: "pending" | "error" | "success";
+  fetchStatus: "fetching" | "paused" | "idle";
+  dataUpdatedAt: number;
+  errorUpdatedAt: number;
+  error?: unknown;
+};
+
+/** What the result area shows. Every combination maps to a visible, explained state. */
+export type DiagnosticPhase = "loading" | "paused" | "idle" | "error" | "success";
+
+export type DiagnosticQueryState = {
+  phase: DiagnosticPhase;
+  /** A request is in flight (first load or a new check over previous results). */
+  checking: boolean;
+  /** Last completed check (success or error), or null before the first one. */
+  lastCheck: { at: number; outcome: "success" | "error" } | null;
+  /** Short text for the aria-live status line. Never empty. */
+  statusText: string;
+};
+
+export const DIAGNOSTIC_STATUS_TEXT = {
+  checking: "Verificando...",
+  paused:
+    "Verificação em espera: o navegador indicou que está sem conexão. Ela continua quando a conexão voltar, ou toque em Verificar novamente.",
+  idle: "Nenhuma verificação em andamento. Toque em Verificar novamente.",
+  success: "Diagnóstico autorizado",
+} as const;
+
+export function formatCheckTime(at: number, timeZone?: string): string {
+  return new Date(at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false, timeZone });
+}
+
+export function resolveDiagnosticQueryState(snapshot: DiagnosticQuerySnapshot, timeZone?: string): DiagnosticQueryState {
+  const { status, fetchStatus } = snapshot;
+  const dataAt = snapshot.dataUpdatedAt > 0 ? snapshot.dataUpdatedAt : 0;
+  const errorAt = snapshot.errorUpdatedAt > 0 ? snapshot.errorUpdatedAt : 0;
+  const lastCheck =
+    dataAt === 0 && errorAt === 0 ? null : { at: Math.max(dataAt, errorAt), outcome: errorAt > dataAt ? ("error" as const) : ("success" as const) };
+
+  let phase: DiagnosticPhase;
+  if (status === "pending") phase = fetchStatus === "fetching" ? "loading" : fetchStatus === "paused" ? "paused" : "idle";
+  else phase = status === "error" ? "error" : "success";
+
+  const checking = fetchStatus === "fetching";
+  let statusText: string;
+  if (checking) statusText = DIAGNOSTIC_STATUS_TEXT.checking;
+  else if (fetchStatus === "paused") statusText = DIAGNOSTIC_STATUS_TEXT.paused;
+  else if (lastCheck) {
+    const outcome =
+      lastCheck.outcome === "success"
+        ? DIAGNOSTIC_STATUS_TEXT.success
+        : DIAGNOSTIC_ERROR_TEXT[diagnosticErrorKind(snapshot.error)].title;
+    statusText = `Última verificação concluída às ${formatCheckTime(lastCheck.at, timeZone)}: ${outcome}.`;
+  } else statusText = DIAGNOSTIC_STATUS_TEXT.idle;
+
+  return { phase, checking, lastCheck, statusText };
+}

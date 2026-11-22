@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Eye, EyeOff, Network, RefreshCw, ShieldCheck, ShieldQuestion } from "lucide-react";
+import { useRef, useState, type Ref } from "react";
+import { Eye, EyeOff, Loader2, Network, RefreshCw, ShieldCheck, ShieldQuestion } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -11,12 +11,16 @@ import {
 } from "@/components/internal-page-system";
 import { AppSectionCard, AppStatCard, AppStatusBadge } from "@/components/app-system";
 import { trpc } from "@/lib/trpc";
+import { cn } from "@/lib/utils";
 import {
   DIAGNOSTIC_ERROR_TEXT,
+  DIAGNOSTIC_STATUS_TEXT,
   buildIpDiagnosticView,
   diagnosticErrorKind,
+  resolveDiagnosticQueryState,
   yesNoLabel,
   type DiagnosticErrorKind,
+  type DiagnosticQueryState,
   type IpDiagnosticPayload,
   type IpDiagnosticView as View,
   type YesNo,
@@ -42,6 +46,52 @@ export function IpDiagnosticDisclaimer() {
 export function IpDiagnosticAccessState({ kind, onRetry }: { kind: DiagnosticErrorKind; onRetry: () => void }) {
   const text = DIAGNOSTIC_ERROR_TEXT[kind];
   return <AppPageErrorState title={text.title} description={text.description} actionLabel="Verificar novamente" onAction={onRetry} />;
+}
+
+/**
+ * Status line right below the header (a manual check scrolls it into view on short screens).
+ * It is the live region: "Verificando..." on every request and the time of the last completed check.
+ */
+export function IpDiagnosticStatus({ state, ref }: { state: DiagnosticQueryState; ref?: Ref<HTMLDivElement> }) {
+  return (
+    <div
+      ref={ref}
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      data-diagnostic-phase={state.phase}
+      className="flex items-start gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2 text-sm text-[var(--text-primary)]"
+    >
+      {state.checking ? <Loader2 aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 motion-safe:animate-spin" /> : null}
+      <span>{state.statusText}</span>
+    </div>
+  );
+}
+
+/**
+ * Result area for every query phase. It is never empty: loading, paused (browser reports offline),
+ * idle, error (specific 401/403/429/503/no-response texts) or the diagnostic itself.
+ */
+export function IpDiagnosticStateView({
+  state,
+  error,
+  data,
+  onRetry,
+}: {
+  state: DiagnosticQueryState;
+  error: unknown;
+  data: unknown;
+  onRetry: () => void;
+}) {
+  if (state.phase === "loading") {
+    return <AppPageLoadingState title="Consultando diagnóstico" description="Verificando a sua requisição e a autorização na API." />;
+  }
+  if (state.phase === "paused") {
+    return <AppPageErrorState title="Verificação em espera" description={DIAGNOSTIC_STATUS_TEXT.paused} actionLabel="Verificar novamente" onAction={onRetry} />;
+  }
+  if (state.phase === "error") return <IpDiagnosticAccessState kind={diagnosticErrorKind(error)} onRetry={onRetry} />;
+  if (state.phase === "success" && data) return <IpDiagnosticResult view={buildIpDiagnosticView(data as IpDiagnosticPayload)} />;
+  return <AppPageErrorState title="Nenhum resultado ainda" description={DIAGNOSTIC_STATUS_TEXT.idle} actionLabel="Verificar novamente" onAction={onRetry} />;
 }
 
 export function IpDiagnosticResult({ view }: { view: View }) {
@@ -121,11 +171,29 @@ export default function IpDiagnosticPage() {
     {
       retry: false,
       refetchOnWindowFocus: false,
+      // Always send the request, even if the browser reported "offline" (iOS can do that during a
+      // network handover). A real network failure then surfaces as a visible error instead of a
+      // silently paused query.
+      networkMode: "always",
       // Kept only in memory, and full addresses are dropped as soon as they are no longer shown.
       gcTime: revealAddresses ? 0 : undefined,
     }
   );
-  const recheck = () => void query.refetch();
+  const statusRef = useRef<HTMLDivElement>(null);
+  // Keep the status line on screen for a check the user asked for (short phones), at the start
+  // ("Verificando...") and when it completes. "nearest" does not move the page if it is visible.
+  const showStatus = () => requestAnimationFrame(() => statusRef.current?.scrollIntoView({ block: "nearest" }));
+  const recheck = () => {
+    showStatus();
+    void query.refetch().finally(showStatus);
+  };
+  const state = resolveDiagnosticQueryState({
+    status: query.status,
+    fetchStatus: query.fetchStatus,
+    dataUpdatedAt: query.dataUpdatedAt,
+    errorUpdatedAt: query.errorUpdatedAt,
+    error: query.error,
+  });
 
   return (
     <AppPageShell className="space-y-4">
@@ -133,9 +201,9 @@ export default function IpDiagnosticPage() {
         title="Diagnóstico da cadeia de IP"
         description="Mostra como a sua própria requisição chegou ao BFF, para validar a topologia de proxies sem abrir JSON nem compartilhar endereços."
         primaryAction={
-          <Button type="button" onClick={recheck} disabled={query.isFetching}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Verificar novamente
+          <Button type="button" onClick={recheck} disabled={state.checking} aria-busy={state.checking}>
+            <RefreshCw aria-hidden="true" className={cn("mr-2 h-4 w-4", state.checking && "motion-safe:animate-spin")} />
+            {state.checking ? DIAGNOSTIC_STATUS_TEXT.checking : "Verificar novamente"}
           </Button>
         }
         secondaryActions={
@@ -152,6 +220,10 @@ export default function IpDiagnosticPage() {
         }
       />
 
+      {/* State first: on phones the header already fills most of the screen. */}
+      <IpDiagnosticStatus ref={statusRef} state={state} />
+      <IpDiagnosticStateView state={state} error={query.error} data={query.data} onRetry={recheck} />
+
       <IpDiagnosticDisclaimer />
       {revealAddresses ? (
         <AppSectionCard role="note" aria-label="Aviso de privacidade">
@@ -161,9 +233,6 @@ export default function IpDiagnosticPage() {
         </AppSectionCard>
       ) : null}
 
-      {query.isLoading ? <AppPageLoadingState title="Consultando diagnóstico" description="Verificando a sua requisição e a autorização na API." /> : null}
-      {query.isError ? <IpDiagnosticAccessState kind={diagnosticErrorKind(query.error)} onRetry={recheck} /> : null}
-      {query.data && !query.isError ? <IpDiagnosticResult view={buildIpDiagnosticView(query.data as IpDiagnosticPayload)} /> : null}
     </AppPageShell>
   );
 }
