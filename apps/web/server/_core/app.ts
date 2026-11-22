@@ -9,6 +9,19 @@ import { upstreamErrorDetails } from "./nexoClient";
 import { clientIpObservationMiddleware } from "./clientIp";
 import { internalAuthSigner, stripClientInternalHeaders } from "./internalAuth";
 
+/** Procedures whose responses (data or errors) must never be stored by any cache. */
+export const NO_STORE_PROCEDURES: ReadonlySet<string> = new Set(["system.clientIpDiagnostic"]);
+
+/**
+ * Cache-Control for a tRPC response: "private, no-store" when the call (or any call of a batch)
+ * targets a no-store procedure, or when the paths could not be parsed. Other endpoints keep
+ * their current behaviour.
+ */
+export function cacheControlHeaderFor(paths: readonly string[] | undefined): Record<string, string> | undefined {
+  if (paths === undefined || paths.some((path) => NO_STORE_PROCEDURES.has(path))) return { "Cache-Control": "private, no-store" };
+  return undefined;
+}
+
 /** Retry-After for the BFF response: the longest sanitized wait among the failed calls. */
 export function retryAfterHeaderFor(errors: readonly unknown[]): Record<string, string> | undefined {
   const waits = errors
@@ -43,9 +56,9 @@ export function createBffApp(): Express {
     createExpressMiddleware({
       router: appRouter,
       createContext,
-      responseMeta: ({ errors }) => {
-        const headers = retryAfterHeaderFor(errors);
-        return headers ? { headers } : {};
+      responseMeta: ({ errors, paths }) => {
+        const headers = { ...retryAfterHeaderFor(errors), ...cacheControlHeaderFor(paths) };
+        return Object.keys(headers).length ? { headers } : {};
       },
     })
   );
