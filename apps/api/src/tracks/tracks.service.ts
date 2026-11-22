@@ -7,6 +7,15 @@ import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { AssignmentFactoryService } from '../assignments/assignment-factory.service'
 
+/**
+ * Authenticated user performing a track operation. Built by the controller exclusively from
+ * `req.user` (never from the request body) and recorded as the author of the audit event.
+ */
+export type TrackActor = {
+  userId: string | null
+  personId: string | null
+}
+
 function slugify(text: string) {
   return text
     .toLowerCase()
@@ -66,6 +75,7 @@ export class TracksService {
     title: string
     description?: string
     orgId: string
+    actor: TrackActor
   }) {
     const baseSlug = slugify(params.title)
 
@@ -88,8 +98,14 @@ export class TracksService {
     })
 
     await this.audit.log({
+      orgId: params.orgId,
       action: 'TRACK_CREATED',
+      actorUserId: params.actor.userId,
+      actorPersonId: params.actor.personId,
+      entityType: 'TRACK',
+      entityId: track.id,
       context: `Track "${track.title}" v${track.version}`,
+      metadata: { trackId: track.id, slug: track.slug, version: track.version },
     })
 
     return track
@@ -134,6 +150,7 @@ export class TracksService {
     type: any // (ideal: TrackItemType do Prisma, mas deixo flexível aqui)
     title: string
     content: string
+    actor: TrackActor
   }) {
     const track = await this.prisma.track.findFirst({
       where: { id: params.trackId, orgId: params.orgId },
@@ -171,14 +188,20 @@ export class TracksService {
     })
 
     await this.audit.log({
+      orgId: params.orgId,
       action: 'TRACK_ITEM_CREATED',
+      actorUserId: params.actor.userId,
+      actorPersonId: params.actor.personId,
+      entityType: 'TRACK_ITEM',
+      entityId: created.id,
+      metadata: { trackId: track.id, itemId: created.id, order: created.order, type: created.type, trackVersion: track.version },
       context: `Track "${track.title}" v${track.version} -> item #${created.order} "${created.title}"`,
     })
 
     return created
   }
 
-  async publish(id: string, orgId: string) {
+  async publish(id: string, orgId: string, actor: TrackActor) {
     const track = await this.prisma.track.findFirst({
       where: { id, orgId },
     })
@@ -207,14 +230,20 @@ export class TracksService {
     })
 
     await this.audit.log({
+      orgId,
       action: 'TRACK_PUBLISHED',
+      actorUserId: actor.userId,
+      actorPersonId: actor.personId,
+      entityType: 'TRACK',
+      entityId: updated.id,
+      metadata: { trackId: updated.id, version: updated.version, previousStatus: track.status, status: updated.status, itemsCount },
       context: `Track "${updated.title}" v${updated.version}`,
     })
 
     return updated
   }
 
-  async archive(id: string, orgId: string) {
+  async archive(id: string, orgId: string, actor: TrackActor) {
     const track = await this.prisma.track.findFirst({
       where: { id, orgId },
     })
@@ -223,18 +252,30 @@ export class TracksService {
       throw new NotFoundException('Trilha não encontrada')
     }
 
-    await this.prisma.assignment.updateMany({
-      where: { trackId: id, progress: { lt: 100 } },
-      data: { progress: 100 },
-    })
-
-    const updated = await this.prisma.track.update({
-      where: { id },
-      data: { status: 'ARCHIVED' },
+    // Both domain writes are atomic: assignments are never closed without the track being archived.
+    // Semantics unchanged (open assignments still go to progress 100); the audit stays outside.
+    const { updated, closedAssignments } = await this.prisma.$transaction(async (tx) => {
+      // Explicit organization filters (independent of the earlier lookup and of the tenant
+      // middleware): Assignment has no orgId column, so it is scoped through its track.
+      const closed = await tx.assignment.updateMany({
+        where: { trackId: id, track: { orgId }, progress: { lt: 100 } },
+        data: { progress: 100 },
+      })
+      const archived = await tx.track.update({
+        where: { id, orgId },
+        data: { status: 'ARCHIVED' },
+      })
+      return { updated: archived, closedAssignments: closed.count }
     })
 
     await this.audit.log({
+      orgId,
       action: 'TRACK_ARCHIVED',
+      actorUserId: actor.userId,
+      actorPersonId: actor.personId,
+      entityType: 'TRACK',
+      entityId: updated.id,
+      metadata: { trackId: updated.id, version: updated.version, previousStatus: track.status, status: updated.status, closedAssignments },
       context: `Track "${updated.title}" v${updated.version}`,
     })
 
