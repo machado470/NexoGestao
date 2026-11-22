@@ -215,7 +215,7 @@ describe('C8 PR3-1: tracks and track items accept only explicit fields', () => {
     })
 
     it('updates only title and description', async () => {
-      await http().patch('/tracks/track-a').set(as('staffA')).send({ title: 'Renomeada' }).expect(200)
+      await http().patch('/tracks/track-a').set(as('adminA')).send({ title: 'Renomeada' }).expect(200)
       expect(prisma.track.update).toHaveBeenLastCalledWith({ where: { id: 'track-a' }, data: { title: 'Renomeada' } })
       await http().patch('/tracks/track-a').set(as('adminA')).send({ description: '' }).expect(200)
       expect(prisma.track.update).toHaveBeenLastCalledWith({ where: { id: 'track-a' }, data: { description: '' } })
@@ -256,7 +256,7 @@ describe('C8 PR3-1: tracks and track items accept only explicit fields', () => {
     it('a track of another organization is not found (read and write)', async () => {
       await http().patch('/tracks/track-b').set(as('adminA')).send({ title: 'x' }).expect(404)
       await http().post('/tracks/track-b/items').set(as('adminA')).send({ type: 'READING', title: 'x' }).expect(404)
-      await http().post('/track-items/track/track-b').set(as('staffA')).send({ type: 'READING', title: 'x' }).expect(404)
+      await http().post('/track-items/track/track-b').set(as('adminA')).send({ type: 'READING', title: 'x' }).expect(404)
       expect(prisma.track.update).not.toHaveBeenCalled()
       expect(prisma.trackItem.create).not.toHaveBeenCalled()
       expect(tracks.find((t) => t.id === 'track-b')).toMatchObject({ orgId: 'org-b', title: 'Trilha B' })
