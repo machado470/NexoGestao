@@ -1138,20 +1138,21 @@ function App() {
       <BootProbeProvider stage={bootProbeStage}>
         <TooltipProvider>
           <Toaster />
+          <ConsentBanner />
           <AppLayout>
             <div className="p-4 text-sm text-[var(--text-secondary)]">
               NEXO LAYOUT OK
             </div>
           </AppLayout>
-          <ConsentBanner />
         </TooltipProvider>
       </BootProbeProvider>
     ) : (
       <BootProbeProvider stage={bootProbeStage}>
         <TooltipProvider>
           <Toaster />
-          <Router />
+          {/* Before the routes: in its inline placement the banner is the top of the page flow. */}
           <ConsentBanner />
+          <Router />
         </TooltipProvider>
       </BootProbeProvider>
     );
