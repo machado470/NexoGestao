@@ -9,6 +9,8 @@ import {
   UseGuards,
 } from '@nestjs/common'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
+import { RolesGuard } from '../auth/guards/roles.guard'
+import { Roles } from '../auth/decorators/roles.decorator'
 import { TracksService, type TrackActor } from './tracks.service'
 import { AddTrackItemDto, CreateTrackDto, TrackPeopleDto, UpdateTrackDto } from './dto/track.dto'
 
@@ -21,22 +23,27 @@ function actorOf(req: any): TrackActor {
   }
 }
 
+// C8 PR3-2: tracks are administered and read only by organization ADMINs (D1/D2). JwtAuthGuard
+// must run first so RolesGuard sees req.user; every route declares its roles explicitly.
 @Controller('tracks')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class TracksController {
   constructor(private readonly service: TracksService) {}
 
   @Get()
+  @Roles('ADMIN')
   list(@Req() req: any) {
     return this.service.listForDashboard(req.user.orgId)
   }
 
   @Get(':id')
+  @Roles('ADMIN')
   getById(@Req() req: any, @Param('id') id: string) {
     return this.service.getById(id, req.user.orgId)
   }
 
   @Post()
+  @Roles('ADMIN')
   create(
     @Req() req: any,
     @Body() body: CreateTrackDto,
@@ -50,6 +57,7 @@ export class TracksController {
   }
 
   @Patch(':id')
+  @Roles('ADMIN')
   update(
     @Req() req: any,
     @Param('id') id: string,
@@ -69,6 +77,7 @@ export class TracksController {
    * Mantemos compatibilidade: CONTENT -> READING.
    */
   @Post(':id/items')
+  @Roles('ADMIN')
   addItem(
     @Req() req: any,
     @Param('id') trackId: string,
@@ -96,21 +105,25 @@ export class TracksController {
    * (mantive esse endpoint chamando getById pra não quebrar nada).
    */
   @Get(':id/items')
+  @Roles('ADMIN')
   listItems(@Req() req: any, @Param('id') trackId: string) {
     return this.service.getById(trackId, req.user.orgId)
   }
 
   @Post(':id/publish')
+  @Roles('ADMIN')
   publish(@Req() req: any, @Param('id') id: string) {
     return this.service.publish(id, req.user.orgId, actorOf(req))
   }
 
   @Post(':id/archive')
+  @Roles('ADMIN')
   archive(@Req() req: any, @Param('id') id: string) {
     return this.service.archive(id, req.user.orgId, actorOf(req))
   }
 
   @Post(':id/assign')
+  @Roles('ADMIN')
   assignPeople(
     @Req() req: any,
     @Param('id') trackId: string,
@@ -124,6 +137,7 @@ export class TracksController {
   }
 
   @Post(':id/unassign')
+  @Roles('ADMIN')
   unassignPeople(
     @Req() req: any,
     @Param('id') trackId: string,

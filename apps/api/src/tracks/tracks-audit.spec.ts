@@ -23,6 +23,9 @@ const USERS: Record<string, { userId: string; orgId: string; role: string; perso
   adminA: { userId: 'u-admin-a', orgId: 'org-a', role: 'ADMIN', personId: 'person-admin-a' },
   staffA: { userId: 'u-staff-a', orgId: 'org-a', role: 'STAFF', personId: 'person-staff-a' },
   adminB: { userId: 'u-admin-b', orgId: 'org-b', role: 'ADMIN', personId: 'person-admin-b' },
+  // Second ADMIN of org-a, so the actor test proves the author is the session user (C8 PR3-2:
+  // only ADMIN may run track operations, so the previous STAFF actor is no longer authorized).
+  adminA2: { userId: 'u-admin-a2', orgId: 'org-a', role: 'ADMIN', personId: 'person-admin-a2' },
 }
 
 type State = {
@@ -246,9 +249,9 @@ describe('C8 PR3-4: track operations write one complete audit event', () => {
   })
 
   it('the actor is the authenticated user, never a value from the body', async () => {
-    await http().post('/tracks/track-a/publish').set(as('staffA')).send({ actorUserId: 'forged', actorPersonId: 'forged' }).expect(201)
-    expect(state.auditEvents).toEqual([expect.objectContaining({ orgId: 'org-a', actorUserId: 'u-staff-a', actorPersonId: 'person-staff-a' })])
-    await http().post('/tracks').set(as('staffA')).send({ title: 'x', actorUserId: 'forged' }).expect(400)
+    await http().post('/tracks/track-a/publish').set(as('adminA2')).send({ actorUserId: 'forged', actorPersonId: 'forged' }).expect(201)
+    expect(state.auditEvents).toEqual([expect.objectContaining({ orgId: 'org-a', actorUserId: 'u-admin-a2', actorPersonId: 'person-admin-a2' })])
+    await http().post('/tracks').set(as('adminA2')).send({ title: 'x', actorUserId: 'forged' }).expect(400)
     expect(state.auditEvents).toHaveLength(1)
   })
 

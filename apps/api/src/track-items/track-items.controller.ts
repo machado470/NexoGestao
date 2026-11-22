@@ -10,11 +10,14 @@ import {
   UseGuards,
 } from '@nestjs/common'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
+import { RolesGuard } from '../auth/guards/roles.guard'
+import { Roles } from '../auth/decorators/roles.decorator'
 import { TrackItemsService } from './track-items.service'
 import { CreateTrackItemDto, UpdateTrackItemDto } from './dto/track-item.dto'
 
+// C8 PR3-2: track items are administered and read only by organization ADMINs (D1/D2).
 @Controller('track-items')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class TrackItemsController {
   constructor(
     private readonly service: TrackItemsService,
@@ -24,6 +27,7 @@ export class TrackItemsController {
    * 📋 LISTAR ITENS DA TRILHA
    */
   @Get('track/:trackId')
+  @Roles('ADMIN')
   list(
     @Req() req: any,
     @Param('trackId') trackId: string,
@@ -38,6 +42,7 @@ export class TrackItemsController {
    * ➕ CRIAR ITEM
    */
   @Post('track/:trackId')
+  @Roles('ADMIN')
   create(
     @Req() req: any,
     @Param('trackId') trackId: string,
@@ -54,6 +59,7 @@ export class TrackItemsController {
    * ✏️ EDITAR ITEM
    */
   @Patch(':itemId')
+  @Roles('ADMIN')
   update(
     @Req() req: any,
     @Param('itemId') itemId: string,
@@ -70,6 +76,7 @@ export class TrackItemsController {
    * ❌ REMOVER ITEM
    */
   @Delete(':itemId')
+  @Roles('ADMIN')
   remove(
     @Req() req: any,
     @Param('itemId') itemId: string,

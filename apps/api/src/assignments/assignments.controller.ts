@@ -113,6 +113,7 @@ export class AssignmentsController {
    * 🛠️ REBUILD PROGRESS
    */
   @Post(':id/rebuild-progress')
+  @Roles('ADMIN') // C8 PR3-2 (D3): maintenance operation, not part of executing an assignment
   @UseGuards(OperationalStateGuard)
   async rebuildProgress(
     @Param('id') assignmentId: string,
