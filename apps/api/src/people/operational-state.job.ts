@@ -16,6 +16,10 @@ import {
   deriveOperationalStateFromRiskScore,
 } from '../common/domain/operational-state-policy'
 
+/** Explicit organization scope of a manual run; its orgId comes only from the authenticated session. */
+export type OperationalStateRunScope = { orgId: string }
+export type OperationalStateRunResult = { evaluated: number; changed: number }
+
 @Injectable()
 export class OperationalStateJob {
   constructor(
@@ -36,11 +40,22 @@ export class OperationalStateJob {
       OperationalStateRepository,
   ) {}
 
-  async run() {
+  /**
+   * Without `scope` (internal OperationalStateScheduler): every active person of every organization,
+   * unchanged. With `scope` (C8 PR3-3B-7, manual HTTP run): only the active people of that
+   * organization, filtered explicitly in every query instead of relying on the tenant middleware.
+   */
+  async run(scope?: OperationalStateRunScope): Promise<OperationalStateRunResult> {
+    const scopedOrgId = scope ? scope.orgId : null
+    if (scope && (typeof scopedOrgId !== 'string' || scopedOrgId.trim().length === 0)) {
+      throw new Error('Escopo de organização inválido para o recálculo manual do estado operacional')
+    }
+
     const persons =
       await this.prisma.person.findMany({
         where: {
           active: true,
+          ...(scopedOrgId !== null ? { orgId: scopedOrgId } : {}),
         },
         select: {
           id: true,
@@ -57,6 +72,9 @@ export class OperationalStateJob {
     const now = new Date()
 
     for (const p of persons) {
+      // Defense in depth: a scoped run never touches a person of another organization.
+      if (scopedOrgId !== null && p.orgId !== scopedOrgId) continue
+
       evaluated++
 
       /*
@@ -65,7 +83,7 @@ export class OperationalStateJob {
        */
       const riskScore =
         await this.risk
-          .calculatePersonRisk(p.id)
+          .calculatePersonRisk(p.id, scopedOrgId ?? undefined)
 
       const nextState =
         deriveOperationalStateFromRiskScore(
@@ -108,7 +126,9 @@ export class OperationalStateJob {
     }
 
     console.log(
-      `[OperationalStateJob] evaluated=${evaluated} changed=${changed} at=${new Date().toISOString()}`,
+      `[OperationalStateJob] scope=${scopedOrgId !== null ? 'organization' : 'global'} evaluated=${evaluated} changed=${changed} at=${new Date().toISOString()}`,
     )
+
+    return { evaluated, changed }
   }
 }

@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common'
+import { BadRequestException, Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
 import { Roles } from '../auth/decorators/roles.decorator'
@@ -13,6 +13,10 @@ import type { ExecutionMode, ExecutionPolicyConfig } from './execution.types'
 import { ApiBody, ApiCreatedResponse } from '@nestjs/swagger'
 import { ExecutionResponseDto, StartExecutionDto } from './dto/start-execution.dto'
 import { CompleteExecutionDto } from './dto/complete-execution.dto'
+import { AuditService } from '../audit/audit.service'
+import { AUDIT_ACTIONS } from '../audit/audit.actions'
+import { auditedManualRun, manualRunActor } from '../audit/manual-run-audit'
+import { RequestContextService } from '../common/context/request-context.service'
 
 const VALID_MODES = new Set<ExecutionMode>(['manual', 'semi_automatic', 'automatic'])
 
@@ -101,6 +105,8 @@ export class ExecutionController {
     private readonly runner: ExecutionRunner,
     private readonly executionEvents: ExecutionEventsService,
     private readonly config: ExecutionConfigService,
+    private readonly audit: AuditService,
+    private readonly requestContext: RequestContextService,
   ) {}
 
   @Get('service-order/:serviceOrderId')
@@ -237,15 +243,43 @@ export class ExecutionController {
     return this.executionEvents.listRecentExecutions(orgId, Number.isFinite(normalizedLimit) ? normalizedLimit : 100)
   }
 
+  // C8 PR3-3B-7: ADMIN-only manual run of the session organization only. The organization comes
+  // exclusively from the validated session (a client orgId is refused by TenantAccessInterceptor),
+  // `overrideCooldown` is not accepted over HTTP (ignored, only recorded as requested in the audit)
+  // and every attempt reaching this handler is audited. The global run stays with ExecutionScheduler.
   @Post('runner/run-once')
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN')
   runOnce(
+    @Req() req: any,
     @Query('debug') debug?: string,
     @Query('overrideCooldown') overrideCooldown?: string,
   ) {
-    return this.runner.runOnce({
-      debugExecution: debug === 'execution',
-      overrideCooldown: overrideCooldown === '1' || overrideCooldown === 'true',
+    const actor = manualRunActor(req)
+    const debugExecution = debug === 'execution'
+    return auditedManualRun({
+      audit: this.audit,
+      action: AUDIT_ACTIONS.MANUAL_EXECUTION_RUNNER_RUN,
+      operation: 'executions.runner.run-once',
+      actor,
+      correlationId: this.requestContext.correlationId,
+      requested: { debugExecution, overrideCooldownIgnored: overrideCooldown !== undefined },
+      run: () => this.runner.runOnce({ debugExecution, scope: { orgId: actor.orgId } }),
+      summarize: (result) => {
+        if ('delayed' in result && result.delayed) return { outcome: 'SKIPPED_CYCLE_DELAY', counters: { totalCandidates: 0, executed: 0 } }
+        const full = result as Exclude<typeof result, { delayed: boolean }>
+        return {
+          outcome: full.failed > 0 ? 'COMPLETED_WITH_FAILURES' : 'SUCCEEDED',
+          counters: {
+            totalCandidates: full.totalCandidates,
+            executed: full.executed,
+            blocked: full.blocked,
+            blockedRecent: full.blockedRecent,
+            failed: full.failed,
+            skipped: full.skipped,
+            runnerCorrelationId: full.correlationId,
+          },
+        }
+      },
     })
   }
 }
