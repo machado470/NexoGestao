@@ -95,7 +95,7 @@ const customerSchema = z
   })
   .strict();
 
-const serviceOrderSchema = z
+const serviceOrderRecordSchema = z
   .object({
     id: z.string(),
     orgId: z.string(),
@@ -118,8 +118,9 @@ const serviceOrderSchema = z
     createdAt: isoDateSchema,
     updatedAt: isoDateSchema,
   })
-  .strict()
-  .transform(withoutBillingTreatment);
+  .strict();
+
+const serviceOrderSchema = serviceOrderRecordSchema.transform(withoutBillingTreatment);
 
 const chargePaymentSchema = z
   .object({
@@ -179,6 +180,164 @@ const chargesListOutputSchema = z
   })
   .strict();
 
+/**
+ * Browser-facing contracts for a single charge and for the collection queue.
+ *
+ * Upstream schemas validate the API payload strictly, including the
+ * requester's own `orgId` and the private `ServiceOrder.billingTreatment`.
+ * The mappers drop both (the tenant id is already known from the session and
+ * unused by the UI; billingTreatment is private to the API, see
+ * ServiceOrderPublicShapeInterceptor), and the public schemas validate the
+ * result strictly again as the procedure output.
+ */
+function withoutTenantId<T extends { orgId?: unknown }>({
+  orgId: _tenant,
+  ...publicValue
+}: T): Omit<T, "orgId"> {
+  return publicValue;
+}
+
+const paymentMethodSchema = z.enum(["PIX", "CASH", "CARD", "TRANSFER", "OTHER"]);
+
+const paymentRecordSchema = z
+  .object({
+    id: z.string(),
+    orgId: z.string(),
+    chargeId: z.string(),
+    amountCents: moneyCentsSchema,
+    method: paymentMethodSchema,
+    paidAt: isoDateSchema,
+    notes: z.string().nullable(),
+    externalRef: z.string().nullable(),
+    createdAt: isoDateSchema,
+    refunds: z
+      .array(
+        z
+          .object({
+            amountCents: moneyCentsSchema,
+            reversedAt: isoDateSchema.nullable().optional(),
+          })
+          .strict()
+      )
+      .optional(),
+  })
+  .strict();
+
+/** Values come from the CollectionPriority/Action/RiskLevel types in apps/api finance.service.ts. */
+const collectionActionSchema = z.enum([
+  "SEND_PAYMENT_LINK",
+  "SEND_REMINDER",
+  "CALL_CUSTOMER",
+  "REVIEW_CHARGE",
+  "WAIT_FOR_DUE_DATE",
+]);
+
+const financialOperationalSummarySchema = z
+  .object({
+    priority: z.enum(["HIGH", "MEDIUM", "LOW"]),
+    priorityReason: z.string(),
+    daysOverdue: z.number().int().nonnegative(),
+    lastPaymentDate: isoDateSchema.nullable(),
+    lastContactDate: isoDateSchema.nullable(),
+    lastChargeReminderDate: isoDateSchema.nullable(),
+    riskLevel: z.enum(["NORMAL", "WARNING", "RESTRICTED", "SUSPENDED"]).nullable(),
+    recommendedAction: collectionActionSchema,
+    recommendedActionTarget: z.enum(["CUSTOMER", "CHARGE"]),
+    evaluatedAt: isoDateSchema,
+  })
+  .strict();
+
+const chargeRecordShape = chargeSchema.omit({
+  customer: true,
+  serviceOrder: true,
+  payments: true,
+});
+
+const upstreamChargeDetailSchema = chargeRecordShape
+  .extend({
+    customer: customerSchema,
+    serviceOrder: serviceOrderRecordSchema.nullable(),
+    payments: z.array(paymentRecordSchema),
+  })
+  .strict();
+
+const upstreamQueueItemSchema = chargeRecordShape
+  .omit({
+    refundedAmountCents: true,
+    netReceivedAmountCents: true,
+    daysOverdue: true,
+    evaluatedAt: true,
+  })
+  .extend({
+    customer: customerSchema,
+    serviceOrder: serviceOrderRecordSchema.nullable(),
+    payments: z.array(paymentRecordSchema),
+    financialOperationalSummary: financialOperationalSummarySchema,
+    nextBestCollectionAction: collectionActionSchema,
+  })
+  .strict();
+
+const upstreamOperationalQueueSchema = z
+  .object({
+    items: z.array(upstreamQueueItemSchema),
+    meta: z
+      .object({
+        limit: z.number().int().positive(),
+        total: z.number().int().nonnegative(),
+      })
+      .strict(),
+  })
+  .strict();
+
+const publicCustomerSchema = customerSchema.omit({ orgId: true }).strict();
+const publicServiceOrderSchema = serviceOrderRecordSchema
+  .omit({ orgId: true, billingTreatment: true })
+  .strict();
+const publicPaymentSchema = paymentRecordSchema.omit({ orgId: true }).strict();
+
+const chargeDetailOutputSchema = upstreamChargeDetailSchema
+  .omit({ orgId: true })
+  .extend({
+    customer: publicCustomerSchema,
+    serviceOrder: publicServiceOrderSchema.nullable(),
+    payments: z.array(publicPaymentSchema),
+  })
+  .strict();
+
+const operationalQueueOutputSchema = upstreamOperationalQueueSchema
+  .extend({
+    items: z.array(
+      upstreamQueueItemSchema
+        .omit({ orgId: true })
+        .extend({
+          customer: publicCustomerSchema,
+          serviceOrder: publicServiceOrderSchema.nullable(),
+          payments: z.array(publicPaymentSchema),
+        })
+        .strict()
+    ),
+  })
+  .strict();
+
+type UpstreamChargeRelations = {
+  orgId: string;
+  customer: z.infer<typeof customerSchema>;
+  serviceOrder: z.infer<typeof serviceOrderRecordSchema> | null;
+  payments: z.infer<typeof paymentRecordSchema>[];
+};
+
+function toPublicCharge<T extends UpstreamChargeRelations>(charge: T) {
+  const { orgId: _tenant, customer, serviceOrder, payments, ...rest } = charge;
+  return {
+    ...rest,
+    customer: withoutTenantId(customer),
+    serviceOrder: serviceOrder
+      ? withoutTenantId(withoutBillingTreatment(serviceOrder))
+      : null,
+    payments: payments.map(withoutTenantId),
+  };
+}
+
 export const financeRouter = router({
   payments: router({
     getById: protectedProcedure
@@ -198,11 +357,13 @@ export const financeRouter = router({
 
   operationalQueue: protectedProcedure
     .input(z.object({ limit: z.number().int().positive().max(50).default(50) }).optional())
+    .output(operationalQueueOutputSchema)
     .query(async ({ input, ctx }) => {
       const params = new URLSearchParams();
       params.set("limit", String(input?.limit ?? 50));
       const raw = await nexoFetch<unknown>(ctx, `/finance/operational-queue?${params.toString()}`, { method: "GET" });
-      return unwrapNexoApiResponse(raw);
+      const queue = upstreamOperationalQueueSchema.parse(unwrapNexoApiResponse(raw));
+      return { ...queue, items: queue.items.map(toPublicCharge) };
     }),
 
   charges: router({
@@ -288,12 +449,13 @@ export const financeRouter = router({
           id: z.union([z.string(), z.number()]).transform((v) => String(v)),
         })
       )
+      .output(chargeDetailOutputSchema)
       .query(async ({ input, ctx }) => {
         const raw = await nexoFetch<unknown>(ctx, `/finance/charges/${input.id}`, {
           method: "GET",
         });
 
-        return unwrapNexoApiResponse(raw);
+        return toPublicCharge(upstreamChargeDetailSchema.parse(unwrapNexoApiResponse(raw)));
       }),
 
     update: protectedProcedure
