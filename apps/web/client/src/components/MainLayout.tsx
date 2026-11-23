@@ -417,7 +417,7 @@ export function MainLayout({ children }: MainLayoutProps) {
               <div
                 className={`flex items-center gap-2 ${
                   isDesktopCollapsedSidebar
-                    ? "relative min-h-10 justify-start pl-1 pr-11"
+                    ? "relative min-h-10 w-full justify-start"
                     : "justify-between"
                 }`}
               >
@@ -445,10 +445,10 @@ export function MainLayout({ children }: MainLayoutProps) {
                         ? "Expandir menu lateral"
                         : "Recolher menu lateral"
                     }
-                    className={`rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-muted)] transition hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/35 ${
+                    className={`rounded-lg border border-[var(--border)] text-[var(--text-muted)] transition hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/35 ${
                       isDesktopCollapsedSidebar
-                        ? "absolute right-1.5 top-1/2 -translate-y-1/2"
-                        : ""
+                        ? "absolute right-0 top-1/2 -translate-y-1/2 p-1"
+                        : "p-1.5"
                     }`}
                   >
                     {sidebarCollapsed ? (
