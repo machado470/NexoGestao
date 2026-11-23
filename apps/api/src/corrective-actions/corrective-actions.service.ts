@@ -68,25 +68,60 @@ export class CorrectiveActionsService {
 
     const resolvedAt = new Date()
 
-    const result = await this.prisma.correctiveAction.updateMany({
-      where: {
-        id,
-        person: { orgId },
-      },
-      data: {
-        status: 'DONE',
-        resolvedAt,
-      },
-    })
+    // C8 PR3-3B-3: the closing and its audit are one transaction.
+    // - CA-4: only an OPEN action is closed. The status condition is part of the single conditional
+    //   UPDATE, so of concurrent or repeated requests exactly one changes the row; the others get
+    //   count 0 and stop here with no audit, recalculation or timeline.
+    // - CA-5 (minimal): if the audit write fails, the update is rolled back, the action stays OPEN
+    //   and a retry closes and audits it once. AuditService.log has no transaction client, so the
+    //   row is written with the same fields and defaults it uses (orgId from the session, author
+    //   from the session actor, never from the request body).
+    const resolved = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.correctiveAction.updateMany({
+        where: {
+          id,
+          person: { orgId },
+          status: 'OPEN',
+        },
+        data: {
+          status: 'DONE',
+          resolvedAt,
+        },
+      })
 
-    if (result.count === 0) return null
+      if (result.count === 0) return null
 
-    const resolved = await this.prisma.correctiveAction.findFirst({
-      where: { id, person: { orgId } },
+      const closed = await tx.correctiveAction.findFirst({
+        where: { id, person: { orgId } },
+      })
+
+      // The row was just updated in this transaction: not finding it is an inconsistency. Throw so
+      // the transaction rolls back, instead of leaving an action DONE without its audit.
+      if (!closed) {
+        throw new Error('CorrectiveActionsService.resolve(): ação atualizada não encontrada na transação')
+      }
+
+      await tx.auditEvent.create({
+        data: {
+          orgId,
+          action: AUDIT_ACTIONS.CORRECTIVE_ACTION_RESOLVED,
+          actorUserId: actor.userId,
+          actorPersonId: actor.personId,
+          personId: null,
+          entityType: 'CORRECTIVE_ACTION',
+          entityId: closed.id,
+          context: 'Ação corretiva resolvida',
+          metadata: { requestId: this.requestContext.requestId, personId: closed.personId },
+        },
+      })
+
+      return closed
     })
 
     if (!resolved) return null
 
+    // After the commit, outside the transaction: the risk recalculation opens its own transaction
+    // (operational state CAS), so it cannot be nested here. Unchanged order and content.
     const recalculatedScore = await this.risk.recalculatePersonRisk(
       action.personId,
       `Corretiva resolvida (${action.reason})`,
@@ -106,17 +141,6 @@ export class CorrectiveActionsService {
         recalculatedScore,
         requestId: this.requestContext.requestId,
       },
-    })
-
-    await this.audit.log({
-      orgId,
-      action: AUDIT_ACTIONS.CORRECTIVE_ACTION_RESOLVED,
-      actorUserId: actor.userId,
-      actorPersonId: actor.personId,
-      entityType: 'CORRECTIVE_ACTION',
-      entityId: resolved.id,
-      context: 'Ação corretiva resolvida',
-      metadata: { requestId: this.requestContext.requestId, personId: resolved.personId },
     })
 
     return resolved
