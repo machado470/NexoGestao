@@ -23,6 +23,9 @@ import {
   isCommercialBlocked,
 } from '../common/commercial/commercial-policy.service'
 
+/** Explicit organization scope of a manual run; its orgId comes only from the authenticated session. */
+export type ExecutionRunScope = { orgId: string }
+
 @Injectable()
 export class ExecutionRunner {
   private readonly logger = new Logger(ExecutionRunner.name)
@@ -448,7 +451,18 @@ export class ExecutionRunner {
     }
   }
 
-  async runOnce(options?: { debugExecution?: boolean; overrideCooldown?: boolean }) {
+  /**
+   * Without `scope` (internal ExecutionScheduler): one cycle over every organization, unchanged.
+   * With `scope` (C8 PR3-3B-7, manual HTTP run): only that organization is processed — the global
+   * organization list is never read, candidates of any other organization are dropped, the
+   * cooldown bypass is ignored and the response counters cover that organization only.
+   */
+  async runOnce(options?: { debugExecution?: boolean; overrideCooldown?: boolean; scope?: ExecutionRunScope }) {
+    const scopedOrgId = options?.scope ? options.scope.orgId : null
+    if (options?.scope && (typeof scopedOrgId !== 'string' || scopedOrgId.trim().length === 0)) {
+      throw new BadRequestException('Escopo de organização inválido para a execução manual')
+    }
+    const overrideCooldown = scopedOrgId === null && options?.overrideCooldown === true
     const debugExecution = this.isDebugExecutionEnabled(options)
     const correlationId = randomUUID()
     this.blockedReasonCounters.clear()
@@ -462,10 +476,13 @@ export class ExecutionRunner {
       }
     }
 
-    const orgs = await this.prisma.organization.findMany({
-      select: { id: true },
-      take: 200,
-    })
+    const orgs: Array<{ id: string }> =
+      scopedOrgId !== null
+        ? [{ id: scopedOrgId }]
+        : await this.prisma.organization.findMany({
+            select: { id: true },
+            take: 200,
+          })
 
     let totalCandidates = 0
     let executed = 0
@@ -475,14 +492,23 @@ export class ExecutionRunner {
     let skipped = 0
 
     for (const org of orgs) {
-      const candidates = this.sortCandidatesByPriority(await this.loadActionCandidates(org.id))
+      const loaded = await this.loadActionCandidates(org.id)
+      // Defense in depth for the scoped run: never act on a candidate of another organization.
+      const candidates = this.sortCandidatesByPriority(
+        scopedOrgId !== null ? loaded.filter((candidate) => candidate.orgId === scopedOrgId) : loaded,
+      )
+      if (candidates.length !== loaded.length) {
+        this.logger.warn(
+          JSON.stringify({ event: 'execution_runner_out_of_scope_candidates_dropped', dropped: loaded.length - candidates.length, correlationId }),
+        )
+      }
       totalCandidates += candidates.length
 
       for (const candidate of candidates) {
         if (executed >= this.config.getMaxExecutionsPerCycle()) break
         const result = await this.processCandidate(candidate, {
           debugExecution,
-          overrideCooldown: options?.overrideCooldown === true,
+          overrideCooldown,
           correlationId,
         })
         if (result === 'executed') executed += 1
@@ -517,7 +543,8 @@ export class ExecutionRunner {
               .reduce((total, [, count]) => total + count, 0),
         },
         debugExecution,
-        overrideCooldown: options?.overrideCooldown === true,
+        overrideCooldown,
+        scope: scopedOrgId !== null ? 'organization' : 'global',
         correlationId,
         orgsProcessed: orgs.length,
         maxExecutionsPerCycle: this.config.getMaxExecutionsPerCycle(),

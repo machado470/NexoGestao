@@ -3,6 +3,7 @@ import { ReportsModule } from '../reports/reports.module'
 import { PendingModule } from '../pending/pending.module'
 import { RiskModule } from '../risk/risk.module'
 import { OperationalStateModule } from '../people/operational-state.module'
+import { AuditModule } from '../audit/audit.module'
 
 import { AdminOverviewService } from './admin-overview.service'
 import { AdminOverviewController } from './admin-overview.controller'
@@ -15,6 +16,7 @@ import { PlatformAccessController } from './platform-access.controller'
     PendingModule,
     RiskModule,
     OperationalStateModule,
+    AuditModule,
   ],
   controllers: [
     AdminOverviewController,
