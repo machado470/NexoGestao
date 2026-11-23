@@ -94,9 +94,17 @@ const prisma: any = {
       return { id: `audit-${audits.length}`, ...data }
     }),
   },
-  person: { findUnique: jest.fn(async ({ where }: any) => (PERSON_ORG[where.id] ? { orgId: PERSON_ORG[where.id] } : null)) },
+  person: {
+    findUnique: jest.fn(async ({ where }: any) => (PERSON_ORG[where.id] ? { orgId: PERSON_ORG[where.id] } : null)),
+    // Person check inside the atomic corrective-action creation (C8 PR3-3B-5).
+    findFirst: jest.fn(async ({ where }: any) => (PERSON_ORG[where.id] === where.orgId ? { id: where.id } : null)),
+  },
+  // Transactional advisory lock + interactive transaction over the same in-memory delegates.
+  $queryRaw: jest.fn(async () => [{ locked: 1 }]),
+  $transaction: jest.fn(async (fn: any) => fn(prisma)),
 }
-const allPrismaMocks = () => Object.values(prisma).flatMap((delegate: any) => Object.values(delegate)) as jest.Mock[]
+const allPrismaMocks = () =>
+  Object.values(prisma).flatMap((delegate: any) => (typeof delegate === 'function' ? [delegate] : Object.values(delegate))) as jest.Mock[]
 
 const risk = { recalculatePersonRisk: jest.fn().mockResolvedValue(10) }
 const timeline = { log: jest.fn().mockResolvedValue(undefined) }

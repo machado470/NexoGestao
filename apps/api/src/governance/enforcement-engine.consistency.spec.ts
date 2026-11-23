@@ -19,6 +19,7 @@ function build(params: { state: string; persistedScore: number; liveScore: numbe
         { id: 'person-a', orgId, operationalState: params.state, operationalRiskScore: params.persistedScore, operationalStateUpdatedAt: UPDATED_AT },
       ]),
       updateMany: jest.fn().mockResolvedValue({ count: params.claimCount ?? 1 }),
+      findFirst: jest.fn().mockResolvedValue({ id: 'person-a' }),
     },
     correctiveAction: {
       findFirst: jest.fn().mockResolvedValue(params.activeCorrective ? { id: 'ca-existing' } : null),
@@ -26,7 +27,7 @@ function build(params: { state: string; persistedScore: number; liveScore: numbe
     },
     $queryRaw: jest.fn().mockResolvedValue([{ active: false }]),
   }
-  prisma.$transaction = jest.fn(async (callback: any) => callback({ person: prisma.person }))
+  prisma.$transaction = jest.fn(async (callback: any) => callback({ person: prisma.person, correctiveAction: prisma.correctiveAction, $queryRaw: prisma.$queryRaw }))
   const timeline = {
     log: jest.fn().mockResolvedValue(undefined),
     logInTransaction: jest.fn().mockResolvedValue({ id: 'state-event' }),
@@ -68,7 +69,7 @@ describe('C8 PR3-3B-4 (A): no corrective action from a stale persisted score', (
   it('the live decision is used when it differs (persisted RESTRICTED, live SUSPENDED) and the live score is persisted', async () => {
     const t = build({ state: 'RESTRICTED', persistedScore: 75, liveScore: 95 })
     await t.service.runForOrg('org-a')
-    expect(t.prisma.correctiveAction.create).toHaveBeenCalledWith({ data: expect.objectContaining({ reason: expect.stringContaining('SUSPENDED') }) })
+    expect(t.prisma.correctiveAction.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ reason: expect.stringContaining('SUSPENDED') }) }))
     // CAS on the persisted snapshot (75), writing the live score (95).
     expect(t.prisma.person.updateMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({ id: 'person-a', orgId: 'org-a', operationalState: 'RESTRICTED', operationalRiskScore: 75 }),
@@ -120,7 +121,7 @@ describe('C8 PR3-3B-4 (B): enforcement events only on real changes', () => {
     const t = build({ state: 'RESTRICTED', persistedScore: 80, liveScore: 80, activeCorrective: true })
     for (let i = 0; i < 3; i++) await t.service.runForOrg('org-a')
     expect(t.prisma.correctiveAction.create).not.toHaveBeenCalled()
-    expect(t.prisma.$transaction).not.toHaveBeenCalled()
+    expect(t.prisma.person.updateMany).not.toHaveBeenCalled() // no state transition (CAS never ran)
     expect(t.enforcementEvents()).toEqual([])
   })
 

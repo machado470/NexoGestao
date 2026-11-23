@@ -6,6 +6,7 @@ import { OperationalStateValue } from '@prisma/client'
 import { OperationalStateRepository } from '../people/operational-state.repository'
 import { persistOperationalStateTransition } from '../people/operational-state.transition'
 import { TemporalRiskService } from '../risk/temporal-risk.service'
+import { createCorrectiveActionAtomically } from '../corrective-actions/corrective-action-creation'
 
 export type EnforcementRunResult = {
   evaluated: number
@@ -150,6 +151,7 @@ export class EnforcementEngineService {
 
       if (decision.action === 'CREATE_CORRECTIVE_ACTION') {
         const created = await this.ensureCorrectiveAction({
+          orgId: p.orgId,
           personId: p.id,
           reason: decision.reason,
           riskScore,
@@ -250,30 +252,26 @@ export class EnforcementEngineService {
     return Boolean(rows?.[0]?.active)
   }
 
+  /**
+   * Engine rule (unchanged): no new action while the person has any active one (OPEN or
+   * AWAITING_REASSESSMENT), whatever its reason. C8 PR3-3B-5: the check and the creation run
+   * atomically under the per-person transactional lock shared with the assessments module.
+   * Returns true only when an action was actually created.
+   */
   private async ensureCorrectiveAction(params: {
+    orgId: string
     personId: string
     reason: string
     riskScore: number
     nextState: OperationalStateValue
   }): Promise<boolean> {
-    const active = await this.prisma.correctiveAction.findFirst({
-      where: {
-        personId: params.personId,
-        status: { in: ['OPEN', 'AWAITING_REASSESSMENT'] },
-      },
-      select: { id: true },
+    const result = await createCorrectiveActionAtomically(this.prisma, {
+      orgId: params.orgId,
+      personId: params.personId,
+      reason: params.reason,
+      duplicateWhere: { status: { in: ['OPEN', 'AWAITING_REASSESSMENT'] } },
     })
 
-    if (active) return false
-
-    await this.prisma.correctiveAction.create({
-      data: {
-        personId: params.personId,
-        status: 'OPEN',
-        reason: params.reason,
-      },
-    })
-
-    return true
+    return result.created
   }
 }
