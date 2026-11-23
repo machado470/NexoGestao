@@ -36,6 +36,7 @@ const USERS = {
   staffNormal: { userId: 'u-staff-n', orgId: 'org-a', role: 'STAFF', personId: 'p-normal' },
   managerWarning: { userId: 'u-mgr-w', orgId: 'org-a', role: 'MANAGER', personId: 'p-warning' },
   adminSuspended: { userId: 'u-admin-s', orgId: 'org-a', role: 'ADMIN', personId: 'p-suspended' },
+  adminNormal: { userId: 'u-admin-n', orgId: 'org-a', role: 'ADMIN', personId: 'p-admin' },
 } as const
 type UserKey = keyof typeof USERS
 
@@ -137,30 +138,61 @@ describe('C8 PR3-3B-1: OperationalStateGuard decides by the declared route, not 
     })
   })
 
-  describe('legitimate RESTRICTED regularization routes still work (unchanged rule)', () => {
-    it('POST /v1/corrective-actions/:id/resolve', async () => {
-      await post('staffRestricted', '/v1/corrective-actions/ca-1/resolve').expect(201)
-      expect(corrective.resolve).toHaveBeenCalledWith('org-a', 'ca-1')
+  describe('regularization routes: the guard exception is unchanged, access is now ADMIN-only (PR3-3B-2)', () => {
+    /** Runs the real guard against the real route metadata of a corrective-actions handler. */
+    const runGuard = (handler: keyof CorrectiveActionsController, state: string, url: string) => {
+      operationalState.getStatus.mockResolvedValueOnce({ state, riskScore: 75 })
+      const guard = new OperationalStateGuard(operationalState as any, timeline as any)
+      const req = { method: 'POST', originalUrl: url, user: { role: 'STAFF', personId: 'p-guard', orgId: 'org-a' } }
+      return guard.canActivate({
+        switchToHttp: () => ({ getRequest: () => req }),
+        getHandler: () => CorrectiveActionsController.prototype[handler],
+        getClass: () => CorrectiveActionsController,
+      } as any)
+    }
+
+    it('the guard still lets RESTRICTED through on the two declared regularization routes', async () => {
+      await expect(runGuard('resolve', 'RESTRICTED', '/v1/corrective-actions/ca-1/resolve')).resolves.toBe(true)
+      await expect(runGuard('processReassessment', 'RESTRICTED', '/v1/corrective-actions/person/p-guard/reassess')).resolves.toBe(true)
       expect(timeline.log).not.toHaveBeenCalled()
     })
 
-    it('POST /v1/corrective-actions/person/:personId/reassess', async () => {
-      await post('staffRestricted', '/v1/corrective-actions/person/p-restricted/reassess').expect(201)
-      expect(corrective.processReassessment).toHaveBeenCalledWith('org-a', 'p-restricted')
+    it('the guard still blocks SUSPENDED on those routes and the GET list is not an exception', async () => {
+      await expect(runGuard('resolve', 'SUSPENDED', '/v1/corrective-actions/ca-1/resolve')).rejects.toMatchObject({ status: 403 })
+      await expect(runGuard('processReassessment', 'SUSPENDED', '/v1/corrective-actions/person/p-guard/reassess')).rejects.toMatchObject({ status: 403 })
+      await expect(runGuard('listByPerson', 'RESTRICTED', '/v1/corrective-actions/person/p-guard')).rejects.toMatchObject({ status: 403 })
     })
 
-    it('with a query string, a parameter that looks like a path, or a trailing slash', async () => {
-      await post('staffRestricted', '/v1/corrective-actions/ca-2/resolve?source=ui').expect(201)
-      await post('staffRestricted', '/v1/corrective-actions/reassess/resolve').expect(201)
-      await post('staffRestricted', '/v1/corrective-actions/ca-3/resolve/').expect(201)
-      expect(corrective.resolve.mock.calls.map((c) => c[1])).toEqual(['ca-2', 'reassess', 'ca-3'])
+    it.each([
+      ['staffRestricted', '/v1/corrective-actions/ca-1/resolve'],
+      ['staffRestricted', '/v1/corrective-actions/person/p-restricted/reassess'],
+      ['staffSuspended', '/v1/corrective-actions/ca-1/resolve'],
+      ['staffSuspended', '/v1/corrective-actions/person/p-suspended/reassess'],
+      ['managerNormal', '/v1/corrective-actions/ca-1/resolve'],
+    ] as Array<[UserKey, string]>)('%s POST %s → 403 by role, before the operational check and with no effects', async (user, path) => {
+      const res = await post(user, path).expect(403)
+      expect(res.body.error).toBe('Sem permissão (role).')
+      expect(operationalState.getStatus).not.toHaveBeenCalled()
+      expect(timeline.log).not.toHaveBeenCalled()
+      for (const write of domainWrites()) expect(write).not.toHaveBeenCalled()
+    })
+
+    it('an ADMIN reaches both routes, with a query string, a parameter that looks like a path, or a trailing slash', async () => {
+      await post('adminNormal', '/v1/corrective-actions/ca-1/resolve').expect(201)
+      await post('adminNormal', '/v1/corrective-actions/person/p-restricted/reassess').expect(201)
+      await post('adminNormal', '/v1/corrective-actions/ca-2/resolve?source=ui').expect(201)
+      await post('adminNormal', '/v1/corrective-actions/reassess/resolve').expect(201)
+      await post('adminNormal', '/v1/corrective-actions/ca-3/resolve/').expect(201)
+      expect(corrective.resolve.mock.calls.map((c) => c[1])).toEqual(['ca-1', 'ca-2', 'reassess', 'ca-3'])
+      expect(corrective.processReassessment).toHaveBeenCalledWith('org-a', 'p-restricted', { userId: 'u-admin-n', personId: 'p-admin' })
+      expect(timeline.log).not.toHaveBeenCalled()
     })
 
     it('the allowlist holds exactly the two regularization routes', () => {
       expect([...RESTRICTED_REGULARIZATION_ROUTES].sort()).toEqual(['corrective-actions/:id/resolve', 'corrective-actions/person/:personId/reassess'])
     })
 
-    it('GET stays allowed for RESTRICTED (next-item, corrective-action list)', async () => {
+    it('GET stays allowed for RESTRICTED (next-item)', async () => {
       await http().get('/v1/assignments/asg-1/next-item').set('x-test-user', 'staffRestricted').expect(200)
       expect(timeline.log).not.toHaveBeenCalled()
     })
@@ -171,8 +203,7 @@ describe('C8 PR3-3B-1: OperationalStateGuard decides by the declared route, not 
       ['managerSuspended', '/v1/finance/charges/automation/overdue'],
       ['managerSuspended', '/v1/finance/charges/automation/overdue?x=/reassess'],
       ['staffSuspended', '/v1/assignments/asg-1/start'],
-      ['staffSuspended', '/v1/corrective-actions/ca-1/resolve'],
-      ['staffSuspended', '/v1/corrective-actions/person/p-suspended/reassess'],
+      ['staffSuspended', '/v1/assignments/asg-1/complete-item?x=/reassess'],
     ] as Array<[UserKey, string]>)('%s POST %s → 403', async (user, path) => {
       await expectBlocked(await post(user, path), 'SUSPENDED', path)
     })
