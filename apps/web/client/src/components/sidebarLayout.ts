@@ -78,3 +78,24 @@ export function resolveInitialSidebarCollapsed(
 ): boolean {
   return !(mode === "push" && rememberedPushExpanded);
 }
+
+export const MAIN_CONTENT_ID = "conteudo-principal";
+export const SIDEBAR_NAV_ID = "nexo-sidebar-nav";
+
+export type SidebarToggleA11y = {
+  "aria-label": string;
+  "aria-expanded": boolean;
+  "aria-controls": string;
+  title: string;
+};
+
+/** Accessible attributes of the desktop expand/collapse sidebar button. */
+export function resolveSidebarToggleA11y(collapsed: boolean): SidebarToggleA11y {
+  const label = collapsed ? "Expandir menu lateral" : "Recolher menu lateral";
+  return {
+    "aria-label": label,
+    "aria-expanded": !collapsed,
+    "aria-controls": SIDEBAR_NAV_ID,
+    title: label,
+  };
+}

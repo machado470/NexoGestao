@@ -41,11 +41,14 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { canAny, type Permission, type Role } from "@/lib/rbac";
 import { useIsMobile } from "@/hooks/useMobile";
 import {
+  MAIN_CONTENT_ID,
   SIDEBAR_MOBILE_BREAKPOINT,
+  SIDEBAR_NAV_ID,
   SIDEBAR_PUSH_BREAKPOINT,
   resolveInitialSidebarCollapsed,
   resolveSidebarLayout,
   resolveSidebarMode,
+  resolveSidebarToggleA11y,
   type SidebarMode,
 } from "@/components/sidebarLayout";
 import { trpc } from "@/lib/trpc";
@@ -430,10 +433,26 @@ export function MainLayout({ children }: MainLayoutProps) {
         className={`nexo-app-shell nexo-app app-root ${theme === "dark" ? "dark" : ""} min-h-screen text-[var(--text-primary)]`}
         data-theme={theme}
       >
+        <a
+          href={`#${MAIN_CONTENT_ID}`}
+          className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[60] focus:rounded-lg focus:bg-[var(--accent-primary)] focus:px-4 focus:py-2.5 focus:text-sm focus:font-semibold focus:text-white focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-white"
+          onClick={event => {
+            event.preventDefault();
+            const target = document.getElementById(MAIN_CONTENT_ID);
+            target?.focus();
+            target?.scrollIntoView({ block: "start" });
+          }}
+        >
+          Pular para o conteúdo
+        </a>
+
         {sidebarLayout.showBackdrop ? (
+          // Pointer-only affordance: keyboard users close with Esc or the
+          // sidebar toggle, so the backdrop stays out of the Tab order.
           <button
             type="button"
-            aria-label="Recolher menu lateral"
+            tabIndex={-1}
+            aria-hidden="true"
             className="fixed inset-0 z-30 bg-slate-950/20 nexo-state-transition"
             onClick={() => setSidebarCollapsed(true)}
           />
@@ -441,6 +460,7 @@ export function MainLayout({ children }: MainLayoutProps) {
 
         <div className="flex min-h-screen w-full">
           {!isMobile ? <aside
+            aria-label="Menu lateral"
             className={`nexo-sidebar z-40 flex shrink-0 flex-col overflow-hidden shadow-lg transition-[width,transform] duration-200 ease-out ${
               isMobile
                 ? `fixed inset-y-0 left-0 w-[304px] ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`
@@ -465,6 +485,7 @@ export function MainLayout({ children }: MainLayoutProps) {
               >
                 <button
                   type="button"
+                  aria-label="NexoGestão, ir para o Dashboard"
                   onClick={() => handleNavigate("/executive-dashboard")}
                   className={`flex min-w-0 items-center ${
                     isDesktopCollapsedSidebar ? "justify-start" : ""
@@ -477,16 +498,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                   <button
                     type="button"
                     onClick={() => setSidebarCollapsed(prev => !prev)}
-                    aria-label={
-                      sidebarCollapsed
-                        ? "Expandir menu lateral"
-                        : "Recolher menu lateral"
-                    }
-                    title={
-                      sidebarCollapsed
-                        ? "Expandir menu lateral"
-                        : "Recolher menu lateral"
-                    }
+                    {...resolveSidebarToggleA11y(sidebarCollapsed)}
                     className={`rounded-lg border border-[var(--border)] text-[var(--text-muted)] transition hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/35 ${
                       isDesktopCollapsedSidebar
                         ? "absolute right-0 top-1/2 -translate-y-1/2 p-1"
@@ -511,7 +523,11 @@ export function MainLayout({ children }: MainLayoutProps) {
               </div>
             </div>
 
-            <nav className="min-h-0 flex-1 overflow-y-auto px-2.5 py-3">
+            <nav
+              id={SIDEBAR_NAV_ID}
+              aria-label="Navegação principal"
+              className="min-h-0 flex-1 overflow-y-auto px-2.5 py-3"
+            >
               <div className="space-y-5">
                 {visibleSections.map(section => (
                   <section key={section.id} className="space-y-2">
@@ -747,10 +763,12 @@ export function MainLayout({ children }: MainLayoutProps) {
             </header>
 
             <main
+              id={MAIN_CONTENT_ID}
+              tabIndex={-1}
               data-scrollbar="nexo"
               style={isMobile ? { paddingBottom: "calc(88px + env(safe-area-inset-bottom, 0px))" } : undefined}
               className={cn(
-                "nexo-app-content nexo-section-reveal mt-0 min-h-0 flex-1 overflow-auto px-3 pb-4 md:mt-0 md:px-4 md:pb-5",
+                "nexo-app-content nexo-section-reveal focus:outline-none mt-0 min-h-0 flex-1 overflow-auto px-3 pb-4 md:mt-0 md:px-4 md:pb-5",
                 isWhatsAppRoute
                   ? "mt-0 overflow-hidden px-3 pb-0 pt-0 md:mt-0 md:px-4 md:pb-0"
                   : undefined

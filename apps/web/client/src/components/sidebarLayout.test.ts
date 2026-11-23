@@ -5,6 +5,8 @@ import {
   resolveInitialSidebarCollapsed,
   resolveSidebarLayout,
   resolveSidebarMode,
+  resolveSidebarToggleA11y,
+  SIDEBAR_NAV_ID,
 } from "./sidebarLayout";
 
 describe("resolveSidebarMode", () => {
@@ -95,5 +97,24 @@ describe("resolveInitialSidebarCollapsed", () => {
       expect(resolveInitialSidebarCollapsed("overlay", remembered)).toBe(true);
       expect(resolveInitialSidebarCollapsed("mobile", remembered)).toBe(true);
     }
+  });
+});
+
+describe("resolveSidebarToggleA11y", () => {
+  it("announces the collapsed sidebar as expandable and controls the nav", () => {
+    expect(resolveSidebarToggleA11y(true)).toEqual({
+      "aria-label": "Expandir menu lateral",
+      "aria-expanded": false,
+      "aria-controls": SIDEBAR_NAV_ID,
+      title: "Expandir menu lateral",
+    });
+  });
+
+  it("announces the expanded sidebar as collapsible", () => {
+    expect(resolveSidebarToggleA11y(false)).toMatchObject({
+      "aria-label": "Recolher menu lateral",
+      "aria-expanded": true,
+      "aria-controls": SIDEBAR_NAV_ID,
+    });
   });
 });
