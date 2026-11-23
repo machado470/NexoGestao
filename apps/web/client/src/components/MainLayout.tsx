@@ -40,6 +40,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { canAny, type Permission, type Role } from "@/lib/rbac";
 import { useIsMobile } from "@/hooks/useMobile";
+import {
+  SIDEBAR_MOBILE_BREAKPOINT,
+  SIDEBAR_PUSH_BREAKPOINT,
+  resolveInitialSidebarCollapsed,
+  resolveSidebarLayout,
+  resolveSidebarMode,
+  type SidebarMode,
+} from "@/components/sidebarLayout";
 import { trpc } from "@/lib/trpc";
 import { useNotificationStream } from "@/hooks/useNotificationStream";
 import { GlobalSearch } from "@/components/GlobalSearch";
@@ -79,8 +87,27 @@ interface MainLayoutProps {
   children: React.ReactNode;
 }
 
-const SIDEBAR_EXPANDED_WIDTH = 292;
-const SIDEBAR_COLLAPSED_WIDTH = 88;
+// In-memory only (not persisted): survives the per-route MainLayout remount,
+// resets on reload.
+let rememberedPushSidebarExpanded = false;
+
+function useViewportSidebarMode(): SidebarMode {
+  const [mode, setMode] = useState<SidebarMode>(() =>
+    typeof window === "undefined" ? "overlay" : resolveSidebarMode(window.innerWidth)
+  );
+
+  useEffect(() => {
+    const queries = [SIDEBAR_MOBILE_BREAKPOINT, SIDEBAR_PUSH_BREAKPOINT].map(width =>
+      window.matchMedia(`(min-width: ${width}px)`)
+    );
+    const update = () => setMode(resolveSidebarMode(window.innerWidth));
+    update();
+    queries.forEach(query => query.addEventListener("change", update));
+    return () => queries.forEach(query => query.removeEventListener("change", update));
+  }, []);
+
+  return mode;
+}
 
 export function MainLayout({ children }: MainLayoutProps) {
   // KPI/top-metrics são definidos por página (dashboard forte, módulos contextuais).
@@ -136,9 +163,15 @@ export function MainLayout({ children }: MainLayoutProps) {
   });
 
   const isMobile = useIsMobile();
-  // Desktop sidebar always starts collapsed; the expanded state is an overlay
-  // and must not be restored across reloads.
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const viewportSidebarMode = useViewportSidebarMode();
+  // Starts collapsed on load; only in push mode (>=1280px) an expanded sidebar
+  // is kept across navigation. Nothing is restored across reloads.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() =>
+    resolveInitialSidebarCollapsed(
+      typeof window === "undefined" ? "overlay" : resolveSidebarMode(window.innerWidth),
+      rememberedPushSidebarExpanded
+    )
+  );
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 
@@ -324,9 +357,15 @@ export function MainLayout({ children }: MainLayoutProps) {
   );
 
   const isWhatsAppRoute = isRouteActive(location, "/whatsapp");
-  const desktopSidebarWidth = sidebarCollapsed
-    ? SIDEBAR_COLLAPSED_WIDTH
-    : SIDEBAR_EXPANDED_WIDTH;
+  // Mobile keeps being decided by useIsMobile so its behaviour is unchanged;
+  // desktop widths pick between overlay (768-1279px) and push (>=1280px).
+  const sidebarMode: SidebarMode = isMobile
+    ? "mobile"
+    : viewportSidebarMode === "push"
+      ? "push"
+      : "overlay";
+  const sidebarLayout = resolveSidebarLayout(sidebarMode, sidebarCollapsed);
+  const desktopSidebarWidth = sidebarLayout.sidebarWidth;
   const isDesktopCollapsedSidebar = sidebarCollapsed && !isMobile;
 
   useEffect(() => {
@@ -336,24 +375,28 @@ export function MainLayout({ children }: MainLayoutProps) {
   }, [isMobile, location]);
 
   useEffect(() => {
-    if (isMobile) return;
-    setSidebarCollapsed(true);
-  }, [isMobile, location]);
+    rememberedPushSidebarExpanded = sidebarMode === "push" && !sidebarCollapsed;
+  }, [sidebarMode, sidebarCollapsed]);
 
   useEffect(() => {
-    if (isMobile || sidebarCollapsed) return;
+    if (!sidebarLayout.collapseOnNavigate) return;
+    setSidebarCollapsed(true);
+  }, [sidebarLayout.collapseOnNavigate, location]);
+
+  useEffect(() => {
+    if (!sidebarLayout.collapseOnEscape || sidebarCollapsed) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.defaultPrevented) return;
       setSidebarCollapsed(true);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isMobile, sidebarCollapsed]);
+  }, [sidebarLayout.collapseOnEscape, sidebarCollapsed]);
 
   const handleNavigate = (route: string) => {
     navigate(route);
     if (isMobile) setMobileMenuOpen(false);
-    else setSidebarCollapsed(true);
+    else if (sidebarLayout.collapseOnNavigate) setSidebarCollapsed(true);
   };
 
   const performLogout = async () => {
@@ -387,7 +430,7 @@ export function MainLayout({ children }: MainLayoutProps) {
         className={`nexo-app-shell nexo-app app-root ${theme === "dark" ? "dark" : ""} min-h-screen text-[var(--text-primary)]`}
         data-theme={theme}
       >
-        {!isMobile && !sidebarCollapsed ? (
+        {sidebarLayout.showBackdrop ? (
           <button
             type="button"
             aria-label="Recolher menu lateral"
@@ -548,10 +591,14 @@ export function MainLayout({ children }: MainLayoutProps) {
             data-sidebar-expanded={
               !isMobile && !sidebarCollapsed ? "true" : "false"
             }
-            className="flex min-w-0 flex-1 flex-col"
+            className={cn(
+              "flex min-w-0 flex-1 flex-col",
+              !isMobile &&
+                "transition-[margin-left] duration-200 ease-out motion-reduce:transition-none"
+            )}
             style={
               !isMobile
-                ? { marginLeft: "var(--sidebar-collapsed-width, 88px)" }
+                ? { marginLeft: `${sidebarLayout.contentOffset}px` }
                 : undefined
             }
           >
