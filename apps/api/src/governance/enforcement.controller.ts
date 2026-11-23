@@ -7,6 +7,8 @@ import {
   Inject,
 } from '@nestjs/common'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
+import { RolesGuard } from '../auth/guards/roles.guard'
+import { Roles } from '../auth/decorators/roles.decorator'
 import { PrismaService } from '../prisma/prisma.service'
 import { EnforcementEngineService } from './enforcement-engine.service'
 import { GovernanceRunService } from './governance-run.service'
@@ -19,8 +21,11 @@ function envBool(name: string, fallback = false): boolean {
   return fallback
 }
 
+// C8 PR3-3B-6: the manual run executes the enforcement engine (state transitions, corrective
+// actions, timeline) for the caller's organization, so it is ADMIN-only. JwtAuthGuard runs first
+// so RolesGuard sees the validated session; the organization comes only from that session.
 @Controller('admin/enforcement')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class EnforcementController {
   constructor(
     @Inject(PrismaService)
@@ -31,6 +36,7 @@ export class EnforcementController {
   ) {}
 
   @Post('run-once')
+  @Roles('ADMIN')
   async runOnce(@Req() req: any) {
     const enabled = envBool('ALLOW_MANUAL_ENFORCEMENT', false)
     if (!enabled) {
