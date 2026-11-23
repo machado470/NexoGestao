@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appRouter } from "./routers";
+import { SERVICE_ORDER_BILLING_TREATMENTS } from "../shared/service-order-billing-treatment";
 
 const orgId = "20000000-0000-4000-8000-000000000001";
 const customerId = "10000000-0000-4000-8000-000000000001";
@@ -137,6 +138,92 @@ describe("customers output contracts", () => {
       ...workspace,
       customer,
     });
+  });
+
+  it.each(SERVICE_ORDER_BILLING_TREATMENTS)(
+    "aceita O.S. do workspace com billingTreatment %s sem expô-lo",
+    async (treatment) => {
+      const serviceOrder = {
+        id: "30000000-0000-4000-8000-000000000001",
+        customerId,
+        idempotencyKey: null,
+        appointmentId: null,
+        assignedToPersonId: null,
+        title: "Manutenção",
+        description: null,
+        status: "DONE",
+        priority: 2,
+        scheduledFor: null,
+        startedAt: "2026-09-08T10:00:00.000Z",
+        finishedAt: "2026-09-08T11:00:00.000Z",
+        amountCents: 15000,
+        dueDate: null,
+        cancellationReason: null,
+        outcomeSummary: null,
+        createdAt: "2026-09-08T10:00:00.000Z",
+        updatedAt: "2026-09-08T11:00:00.000Z",
+      };
+      const workspace = {
+        customer: { ...customer, orgId },
+        appointments: [],
+        serviceOrders: [{ ...serviceOrder, orgId, billingTreatment: treatment }],
+        charges: [],
+        timeline: [],
+        totalSpentCents: 0,
+      };
+      respond({ success: true, data: workspace });
+
+      const result = await appRouter
+        .createCaller(context)
+        .customers.workspace({ id: customerId });
+
+      expect(result).toEqual({
+        ...workspace,
+        customer,
+        serviceOrders: [serviceOrder],
+      });
+      expect(result.serviceOrders[0]).not.toHaveProperty("billingTreatment");
+      expect(result.serviceOrders[0]).not.toHaveProperty("orgId");
+    }
+  );
+
+  it("rejeita billingTreatment fora do contrato no workspace", async () => {
+    respond({
+      success: true,
+      data: {
+        customer,
+        appointments: [],
+        serviceOrders: [
+          {
+            id: "30000000-0000-4000-8000-000000000001",
+            customerId,
+            idempotencyKey: null,
+            appointmentId: null,
+            assignedToPersonId: null,
+            title: "Manutenção",
+            description: null,
+            status: "DONE",
+            priority: 2,
+            scheduledFor: null,
+            startedAt: null,
+            finishedAt: null,
+            amountCents: null,
+            dueDate: null,
+            cancellationReason: null,
+            outcomeSummary: null,
+            billingTreatment: "FREE",
+            createdAt: "2026-09-08T10:00:00.000Z",
+            updatedAt: "2026-09-08T11:00:00.000Z",
+          },
+        ],
+        charges: [],
+        timeline: [],
+        totalSpentCents: 0,
+      },
+    });
+    await expect(
+      appRouter.createCaller(context).customers.workspace({ id: customerId })
+    ).rejects.toBeTruthy();
   });
 
   it("rejeita workspace incompatível em HTTP 200", async () => {

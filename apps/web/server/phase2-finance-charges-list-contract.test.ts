@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appRouter } from "./routers";
+import { SERVICE_ORDER_BILLING_TREATMENTS } from "../shared/service-order-billing-treatment";
 
 const context = {
   req: { headers: { cookie: "nexo_token=trusted" }, cookies: { nexo_token: "trusted" } },
@@ -131,6 +132,38 @@ describe("Phase 2 finance.charges.list output contract", () => {
     mutate(charge);
     mockList([charge]);
     await expect(caller().finance.charges.list()).rejects.toBeTruthy();
+  });
+
+  it.each(SERVICE_ORDER_BILLING_TREATMENTS)(
+    "aceita billingTreatment %s da API sem expô-lo na O.S. pública",
+    async (treatment) => {
+      const expected = historicalCharge();
+      const upstream = historicalCharge();
+      (upstream.serviceOrder as any).billingTreatment = treatment;
+      mockList([upstream]);
+
+      const result = await caller().finance.charges.list();
+
+      expect(result).toEqual({ data: [expected], pagination: meta });
+      expect(result.data[0].serviceOrder).not.toHaveProperty("billingTreatment");
+    },
+  );
+
+  it.each([
+    ["billingTreatment fora do contrato", (charge: any) => { charge.serviceOrder.billingTreatment = "FREE"; }],
+    ["billingTreatment com tipo inválido", (charge: any) => { charge.serviceOrder.billingTreatment = 1; }],
+    ["chave desconhecida na serviceOrder", (charge: any) => { charge.serviceOrder.internalNote = "x"; }],
+  ])("mantém a validação estrita: rejeita %s", async (_label, mutate) => {
+    const charge = historicalCharge();
+    mutate(charge);
+    mockList([charge]);
+    await expect(caller().finance.charges.list()).rejects.toBeTruthy();
+  });
+
+  it("aceita cobrança sem O.S. vinculada", async () => {
+    const charge = { ...historicalCharge(), serviceOrderId: null, serviceOrder: null };
+    mockList([charge]);
+    await expect(caller().finance.charges.list()).resolves.toEqual({ data: [charge], pagination: meta });
   });
 
   it("preserva o envelope duplo existente", async () => {

@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import {
+  serviceOrderBillingTreatmentSchema,
+  withoutBillingTreatment,
+} from "../../shared/service-order-billing-treatment";
+import {
   authedGet,
   authedGetPage,
   authedPatch,
@@ -100,10 +104,12 @@ const workspaceServiceOrderSchema = z
     dueDate: optionalTimestamp,
     cancellationReason: z.string().nullable(),
     outcomeSummary: z.string().nullable(),
+    billingTreatment: serviceOrderBillingTreatmentSchema.optional(),
     createdAt: z.string().datetime(),
     updatedAt: z.string().datetime(),
   })
-  .strict();
+  .strict()
+  .transform(withoutBillingTreatment);
 
 const workspaceChargeSchema = z
   .object({
