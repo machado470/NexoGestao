@@ -2,6 +2,10 @@ import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import { nexoFetch } from "../_core/nexoClient";
 import { unwrapNexoApiResponse } from "../_core/nexoEnvelope";
+import {
+  serviceOrderBillingTreatmentSchema,
+  withoutBillingTreatment,
+} from "../../shared/service-order-billing-treatment";
 
 const paginationInput = z.object({
   page: z.number().int().positive().default(1),
@@ -110,10 +114,12 @@ const serviceOrderSchema = z
     dueDate: isoDateSchema.nullable(),
     cancellationReason: z.string().nullable(),
     outcomeSummary: z.string().nullable(),
+    billingTreatment: serviceOrderBillingTreatmentSchema.optional(),
     createdAt: isoDateSchema,
     updatedAt: isoDateSchema,
   })
-  .strict();
+  .strict()
+  .transform(withoutBillingTreatment);
 
 const chargePaymentSchema = z
   .object({
