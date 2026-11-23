@@ -45,7 +45,6 @@ import { useNotificationStream } from "@/hooks/useNotificationStream";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import { BrandSignature } from "@/components/BrandSignature";
 import { AppShell } from "@/components/AppShell";
-import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
 import { cn } from "@/lib/utils";
 import { isSafeNotificationRouteHint } from "../../../../../packages/common/src/notification-route";
 import {
@@ -80,7 +79,6 @@ interface MainLayoutProps {
   children: React.ReactNode;
 }
 
-const SIDEBAR_COLLAPSED_STORAGE_KEY = "nexo:app-shell:sidebar-collapsed";
 const SIDEBAR_EXPANDED_WIDTH = 292;
 const SIDEBAR_COLLAPSED_WIDTH = 88;
 
@@ -138,8 +136,9 @@ export function MainLayout({ children }: MainLayoutProps) {
   });
 
   const isMobile = useIsMobile();
-  const [sidebarCollapsed, setSidebarCollapsed] =
-    useOperationalMemoryState<boolean>(SIDEBAR_COLLAPSED_STORAGE_KEY, true);
+  // Desktop sidebar always starts collapsed; the expanded state is an overlay
+  // and must not be restored across reloads.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 
@@ -336,9 +335,25 @@ export function MainLayout({ children }: MainLayoutProps) {
     setMobileSearchOpen(false);
   }, [isMobile, location]);
 
+  useEffect(() => {
+    if (isMobile) return;
+    setSidebarCollapsed(true);
+  }, [isMobile, location]);
+
+  useEffect(() => {
+    if (isMobile || sidebarCollapsed) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      setSidebarCollapsed(true);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isMobile, sidebarCollapsed]);
+
   const handleNavigate = (route: string) => {
     navigate(route);
     if (isMobile) setMobileMenuOpen(false);
+    else setSidebarCollapsed(true);
   };
 
   const performLogout = async () => {
@@ -383,7 +398,6 @@ export function MainLayout({ children }: MainLayoutProps) {
 
         <div className="flex min-h-screen w-full">
           {!isMobile ? <aside
-            data-scrollbar="nexo"
             className={`nexo-sidebar z-40 flex shrink-0 flex-col overflow-hidden shadow-lg transition-[width,transform] duration-200 ease-out ${
               isMobile
                 ? `fixed inset-y-0 left-0 w-[304px] ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`
@@ -402,7 +416,7 @@ export function MainLayout({ children }: MainLayoutProps) {
               <div
                 className={`flex items-center gap-2 ${
                   isDesktopCollapsedSidebar
-                    ? "relative min-h-10 justify-start pl-1 pr-11"
+                    ? "relative min-h-10 w-full justify-start"
                     : "justify-between"
                 }`}
               >
@@ -430,10 +444,10 @@ export function MainLayout({ children }: MainLayoutProps) {
                         ? "Expandir menu lateral"
                         : "Recolher menu lateral"
                     }
-                    className={`rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-muted)] transition hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/35 ${
+                    className={`rounded-lg border border-[var(--border)] text-[var(--text-muted)] transition hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/35 ${
                       isDesktopCollapsedSidebar
-                        ? "absolute right-1.5 top-1/2 -translate-y-1/2"
-                        : ""
+                        ? "absolute right-0 top-1/2 -translate-y-1/2 p-1"
+                        : "p-1.5"
                     }`}
                   >
                     {sidebarCollapsed ? (
