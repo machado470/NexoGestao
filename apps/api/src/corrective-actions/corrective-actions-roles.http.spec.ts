@@ -77,8 +77,11 @@ const prisma: any = {
   },
   person: { findFirst: jest.fn(async ({ where }: any) => (PERSON_ORG[where.id] === where.orgId ? { orgId: where.orgId } : null)) },
   auditEvent: { create: jest.fn(async ({ data }: any) => { audits.push(data); return { id: `audit-${audits.length}`, ...data } }) },
+  // Interactive transaction: the callback runs against the same in-memory delegates.
+  $transaction: jest.fn(async (fn: any) => fn(prisma)),
 }
-const allPrismaMocks = () => Object.values(prisma).flatMap((delegate: any) => Object.values(delegate)) as jest.Mock[]
+const allPrismaMocks = () =>
+  Object.values(prisma).flatMap((delegate: any) => (typeof delegate === 'function' ? [delegate] : Object.values(delegate))) as jest.Mock[]
 
 const risk = { recalculatePersonRisk: jest.fn().mockResolvedValue({ score: 10, state: 'NORMAL' }) }
 const timeline = { log: jest.fn().mockResolvedValue(undefined) }
@@ -269,6 +272,70 @@ describe('C8 PR3-3B-2: closing corrective actions (ADMIN only, never one’s own
       await post('adminA', `${ROUTES.resolve('ca-staff')}?orgId=org-b`).expect(403)
       await post('adminA', ROUTES.reassess('p-staff-a'), { orgId: 'org-b' }).expect(403)
       expectNoEffects()
+    })
+  })
+
+  // C8 PR3-3B-3 (CA-4): only an OPEN action is closed, once.
+  describe('idempotent closing (CA-4)', () => {
+    it('the conditional update requires status OPEN within the organization', async () => {
+      await post('adminA', ROUTES.resolve('ca-staff')).expect(201)
+      expect(prisma.correctiveAction.updateMany).toHaveBeenCalledWith({
+        where: { id: 'ca-staff', person: { orgId: 'org-a' }, status: 'OPEN' },
+        data: { status: 'DONE', resolvedAt: expect.any(Date) },
+      })
+    })
+
+    it('a second resolve keeps resolvedAt and has no recalculation, timeline or audit', async () => {
+      await post('adminA', ROUTES.resolve('ca-staff')).expect(201)
+      const firstResolvedAt = actions.find((a) => a.id === 'ca-staff')!.resolvedAt
+      jest.clearAllMocks()
+      audits.length = 0
+      const again = await post('adminA', ROUTES.resolve('ca-staff')).expect(201)
+      expect(again.text).toBe('')
+      expect(actions.find((a) => a.id === 'ca-staff')!.resolvedAt).toBe(firstResolvedAt)
+      expect(risk.recalculatePersonRisk).not.toHaveBeenCalled()
+      expect(timeline.log).not.toHaveBeenCalled()
+      expect(prisma.auditEvent.create).not.toHaveBeenCalled()
+    })
+
+    it.each(['DONE', 'AWAITING_REASSESSMENT'])('an action in %s is not closed and produces no effect', async (status) => {
+      const target = actions.find((a) => a.id === 'ca-staff')!
+      target.status = status
+      await post('adminA', ROUTES.resolve('ca-staff')).expect(201, '')
+      expect(target).toMatchObject({ status, resolvedAt: null })
+      expect(risk.recalculatePersonRisk).not.toHaveBeenCalled()
+      expect(timeline.log).not.toHaveBeenCalled()
+      expect(prisma.auditEvent.create).not.toHaveBeenCalled()
+    })
+
+    it('the update and its audit run in one transaction; an audit failure propagates (500) with no recalculation or timeline', async () => {
+      prisma.auditEvent.create.mockRejectedValueOnce(new Error('simulated audit storage failure'))
+      const res = await post('adminA', ROUTES.resolve('ca-staff')).expect(500)
+      expect(res.body).toMatchObject({ code: 'INTERNAL_ERROR' })
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1)
+      expect(risk.recalculatePersonRisk).not.toHaveBeenCalled()
+      expect(timeline.log).not.toHaveBeenCalled()
+      // The real rollback (action stays OPEN) is proven against PostgreSQL in the idempotency spec.
+    })
+
+    it('if the updated action cannot be re-read inside the transaction, the transaction fails (no silent null, no audit)', async () => {
+      prisma.correctiveAction.findFirst
+        .mockImplementationOnce(async ({ where }: any) => ({ ...actions.find((a) => matches(a, where))! })) // pre-check
+        .mockResolvedValueOnce(null) // re-read inside the transaction, after updateMany.count = 1
+      const res = await post('adminA', ROUTES.resolve('ca-staff')).expect(500)
+      expect(res.body).toMatchObject({ code: 'INTERNAL_ERROR' })
+      expect(prisma.correctiveAction.updateMany).toHaveReturnedTimes(1)
+      expect(await prisma.correctiveAction.updateMany.mock.results[0].value).toEqual({ count: 1 })
+      expect(prisma.auditEvent.create).not.toHaveBeenCalled()
+      expect(risk.recalculatePersonRisk).not.toHaveBeenCalled()
+      expect(timeline.log).not.toHaveBeenCalled()
+      // The real rollback (action stays OPEN) is proven against PostgreSQL in the idempotency spec.
+    })
+
+    it('a repeated reassess closes the next OPEN action and then reports resolved: false', async () => {
+      await post('adminA', ROUTES.reassess('p-staff-a')).expect(201, { reassessed: true, resolved: true, correctiveActionId: 'ca-staff' })
+      await post('adminA', ROUTES.reassess('p-staff-a')).expect(201, { reassessed: true, resolved: false })
+      expect(audits).toHaveLength(1)
     })
   })
 
