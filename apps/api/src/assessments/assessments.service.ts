@@ -9,6 +9,7 @@ import { RiskService } from '../risk/risk.service'
 import { AuditService } from '../audit/audit.service'
 import { CorrectiveActionsService } from '../corrective-actions/corrective-actions.service'
 import { TimelineService } from '../timeline/timeline.service'
+import { createCorrectiveActionAtomically } from '../corrective-actions/corrective-action-creation'
 
 type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
 
@@ -103,24 +104,23 @@ export class AssessmentsService {
       const windowMs = 1000 * 60 * 60 * 24
       const since = new Date(Date.now() - windowMs)
 
-      const existingOpen = await this.prisma.correctiveAction.findFirst({
-        where: {
-          personId: assignment.personId,
+      // Assessment rule (unchanged): no new action while the person has an OPEN one with the same
+      // reason created in the last 24h. C8 PR3-3B-5: the check and the creation run atomically under
+      // the per-person transactional lock shared with the enforcement engine. The audit, timeline
+      // and risk recalculation below stay outside that transaction, as before.
+      const creation = await createCorrectiveActionAtomically(this.prisma, {
+        orgId: assignment.person.orgId,
+        personId: assignment.personId,
+        reason: ASSESSMENT_CRITICAL_REASON,
+        duplicateWhere: {
           status: 'OPEN',
           reason: ASSESSMENT_CRITICAL_REASON,
           createdAt: { gte: since },
         },
-        select: { id: true },
       })
 
-      if (!existingOpen) {
-        const created = await this.prisma.correctiveAction.create({
-          data: {
-            personId: assignment.personId,
-            reason: ASSESSMENT_CRITICAL_REASON,
-            status: 'OPEN',
-          },
-        })
+      if (creation.outcome === 'CREATED') {
+        const created = creation.action
 
         await this.audit.log({
           ...author,
@@ -146,16 +146,20 @@ export class AssessmentsService {
             risk: assessmentRisk,
           },
         })
-      } else {
+      } else if (creation.outcome === 'DUPLICATE') {
         await this.audit.log({
           ...author,
           action: 'CORRECTIVE_ACTION_SKIPPED_DUPLICATE',
           personId: assignment.personId,
           entityType: 'CORRECTIVE_ACTION',
-          entityId: existingOpen.id,
-          context: `Corretiva OPEN já existe (id=${existingOpen.id}) para avaliação crítica recente`,
+          entityId: creation.existingId,
+          context: `Corretiva OPEN já existe (id=${creation.existingId}) para avaliação crítica recente`,
           metadata: { assessmentId: assessment.id },
         })
+      } else {
+        // The assignment was read within the session organization, so this cannot happen; refuse
+        // loudly rather than skip silently (no action is created for a person of another org).
+        throw new Error('AssessmentsService.submit(): pessoa da atribuição fora da organização')
       }
     }
 

@@ -50,6 +50,9 @@ function buildService(params: {
       updateMany: jest.fn().mockResolvedValue({
         count: params.claimCount ?? 1,
       }),
+
+      // Person check inside the atomic corrective-action creation (C8 PR3-3B-5).
+      findFirst: jest.fn().mockResolvedValue({ id: 'person-a' }),
     },
 
     correctiveAction: {
@@ -70,6 +73,8 @@ function buildService(params: {
     async (callback: any) =>
       callback({
         person: prisma.person,
+        correctiveAction: prisma.correctiveAction,
+        $queryRaw: prisma.$queryRaw,
       }),
   )
 
@@ -443,7 +448,10 @@ describe(
 
         await service.runForOrg('org-a')
 
-        expect(prisma.$transaction).not.toHaveBeenCalled()
+        // No state transition (the CAS write never ran). The only transaction is the atomic
+        // corrective-action creation (C8 PR3-3B-5).
+        expect(prisma.person.updateMany).not.toHaveBeenCalled()
+        expect(prisma.correctiveAction.create).toHaveBeenCalledTimes(1)
         expect(stateChangedCalls(timeline)).toHaveLength(0)
 
         expect(timeline.log).toHaveBeenCalledWith(
