@@ -89,6 +89,8 @@ function buildService(params: {
     new EnforcementPolicyService(),
     timeline as any,
     { getLastState: jest.fn().mockResolvedValue(null) } as any,
+    // Live risk equal to the persisted score: these scenarios test the state CAS, not staleness.
+    { calculate: jest.fn(async () => params.initialScore) } as any,
   )
 
   return {
@@ -315,6 +317,7 @@ describe(
           new EnforcementPolicyService(),
           timeline as any,
           { getLastState: jest.fn().mockResolvedValue(null) } as any,
+          { calculate: jest.fn(async () => 60) } as any,
         )
 
         const second = new EnforcementEngineService(
@@ -322,6 +325,7 @@ describe(
           new EnforcementPolicyService(),
           timeline as any,
           { getLastState: jest.fn().mockResolvedValue(null) } as any,
+          { calculate: jest.fn(async () => 60) } as any,
         )
 
         await Promise.all([
@@ -413,6 +417,7 @@ describe(
           new EnforcementPolicyService(),
           timeline as any,
           { getLastState: jest.fn().mockResolvedValue(null) } as any,
+          { calculate: jest.fn(async () => 60) } as any,
         )
 
         await service.runForOrg('org-a')
@@ -541,6 +546,7 @@ describe(
           new EnforcementPolicyService(),
           timeline as any,
           { getLastState: jest.fn().mockResolvedValue(null) } as any,
+          { calculate: jest.fn(async () => 60) } as any,
         )
 
         await expect(

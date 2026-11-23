@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client'
+import { TemporalRiskService } from '../../src/risk/temporal-risk.service'
 import { EnforcementEngineService } from '../../src/governance/enforcement-engine.service'
 import { EnforcementPolicyService } from '../../src/governance/enforcement-policy.service'
 import { OperationalStateRepository } from '../../src/people/operational-state.repository'
@@ -213,6 +214,7 @@ describeReal(
             new OperationalStateRepository(
               prismaA as any,
             ),
+            new TemporalRiskService(prismaA as any),
           )
 
         const serviceB =
@@ -226,6 +228,7 @@ describeReal(
             new OperationalStateRepository(
               prismaB as any,
             ),
+            new TemporalRiskService(prismaB as any),
           )
 
         await Promise.all([
@@ -310,6 +313,7 @@ describeReal(
             new OperationalStateRepository(
               prismaA as any,
             ),
+            new TemporalRiskService(prismaA as any),
           )
 
         await expect(
