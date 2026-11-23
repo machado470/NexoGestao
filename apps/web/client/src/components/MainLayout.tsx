@@ -45,7 +45,6 @@ import { useNotificationStream } from "@/hooks/useNotificationStream";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import { BrandSignature } from "@/components/BrandSignature";
 import { AppShell } from "@/components/AppShell";
-import { useOperationalMemoryState } from "@/hooks/useOperationalMemory";
 import { cn } from "@/lib/utils";
 import { isSafeNotificationRouteHint } from "../../../../../packages/common/src/notification-route";
 import {
@@ -80,7 +79,6 @@ interface MainLayoutProps {
   children: React.ReactNode;
 }
 
-const SIDEBAR_COLLAPSED_STORAGE_KEY = "nexo:app-shell:sidebar-collapsed";
 const SIDEBAR_EXPANDED_WIDTH = 292;
 const SIDEBAR_COLLAPSED_WIDTH = 88;
 
@@ -138,8 +136,9 @@ export function MainLayout({ children }: MainLayoutProps) {
   });
 
   const isMobile = useIsMobile();
-  const [sidebarCollapsed, setSidebarCollapsed] =
-    useOperationalMemoryState<boolean>(SIDEBAR_COLLAPSED_STORAGE_KEY, true);
+  // Desktop sidebar always starts collapsed; the expanded state is an overlay
+  // and must not be restored across reloads.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 
@@ -336,9 +335,25 @@ export function MainLayout({ children }: MainLayoutProps) {
     setMobileSearchOpen(false);
   }, [isMobile, location]);
 
+  useEffect(() => {
+    if (isMobile) return;
+    setSidebarCollapsed(true);
+  }, [isMobile, location]);
+
+  useEffect(() => {
+    if (isMobile || sidebarCollapsed) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      setSidebarCollapsed(true);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isMobile, sidebarCollapsed]);
+
   const handleNavigate = (route: string) => {
     navigate(route);
     if (isMobile) setMobileMenuOpen(false);
+    else setSidebarCollapsed(true);
   };
 
   const performLogout = async () => {
