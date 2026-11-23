@@ -5,6 +5,7 @@ import { EnforcementPolicyService } from './enforcement-policy.service'
 import { OperationalStateValue } from '@prisma/client'
 import { OperationalStateRepository } from '../people/operational-state.repository'
 import { persistOperationalStateTransition } from '../people/operational-state.transition'
+import { TemporalRiskService } from '../risk/temporal-risk.service'
 
 export type EnforcementRunResult = {
   evaluated: number
@@ -28,6 +29,10 @@ export class EnforcementEngineService {
 
     @Inject(OperationalStateRepository)
     private readonly operationalStateRepository: OperationalStateRepository,
+
+    // Canonical live risk (same calculation the OperationalStateGuard uses through getStatus).
+    @Inject(TemporalRiskService)
+    private readonly temporalRisk: TemporalRiskService,
   ) {}
 
   /**
@@ -58,19 +63,41 @@ export class EnforcementEngineService {
       result.evaluated++
 
       // Fonte canônica (por enquanto): score já persistido no Person
-      const riskScore = Number(p.operationalRiskScore ?? 0)
+      const persistedRiskScore = Number(p.operationalRiskScore ?? 0)
+      const currentState = (p.operationalState ?? OperationalStateValue.NORMAL) as any
 
       // exceções (por enquanto via tabela PersonException)
       const hasActiveException = await this.hasActiveException(p.id)
 
-      const decision = this.policy.decide({
+      let riskScore = persistedRiskScore
+      let decision = this.policy.decide({
         riskScore,
-        status: (p.operationalState ?? OperationalStateValue.NORMAL) as any,
+        status: currentState,
         hasActiveException,
         orgId: p.orgId,
         personId: p.id,
         source: 'ENFORCEMENT_ENGINE',
       })
+
+      // C8 PR3-3B-4 (A): a corrective action is never created from the persisted score alone. The
+      // persisted score can be stale (e.g. a corrective action was closed and the recalculation
+      // failed after the commit). Re-evaluate with the live risk, same calculation and thresholds
+      // as the OperationalStateGuard, right before acting; if it no longer justifies RESTRICTED or
+      // SUSPENDED, do nothing here (the operational-state reconciliation job repairs the score).
+      if (decision.action === 'CREATE_CORRECTIVE_ACTION') {
+        const liveRiskScore = await this.temporalRisk.calculate(p.id, p.orgId)
+        const liveDecision = this.policy.decide({
+          riskScore: liveRiskScore,
+          status: currentState,
+          hasActiveException,
+          orgId: p.orgId,
+          personId: p.id,
+          source: 'ENFORCEMENT_ENGINE',
+        })
+        if (liveDecision.action !== 'CREATE_CORRECTIVE_ACTION') continue
+        riskScore = liveRiskScore
+        decision = liveDecision
+      }
 
       // contagem do “estado alvo” (pós decisão)
       if (decision.nextState === 'RESTRICTED') result.restrictedCount++
@@ -93,24 +120,30 @@ export class EnforcementEngineService {
           hasActiveException,
         }
 
-        await this.timeline.log({
-          orgId: p.orgId,
-          action: 'OPERATIONAL_WARNING_RAISED',
-          personId: p.id,
-          description: decision.reason,
-          metadata: warningMetadata,
-        })
-
-        await this.persistPersonStateTransition({
+        const transitioned = await this.persistPersonStateTransition({
           orgId: p.orgId,
           personId: p.id,
           expectedState: p.operationalState ?? null,
-          expectedRiskScore: riskScore,
+          expectedRiskScore: persistedRiskScore,
+          nextRiskScore: riskScore,
           expectedUpdatedAt: p.operationalStateUpdatedAt,
           nextState: decision.nextState as any,
           description: decision.reason,
           metadata: warningMetadata,
         })
+
+        // C8 PR3-3B-4 (B): emitted only for a transition confirmed by the CAS, never on every
+        // periodic run. These events count as OPERATIONAL_STATE_CHANGED in the risk calculation, so
+        // repeating them fed the score back (up to +20) and kept people in WARNING or above.
+        if (transitioned) {
+          await this.timeline.log({
+            orgId: p.orgId,
+            action: 'OPERATIONAL_WARNING_RAISED',
+            personId: p.id,
+            description: decision.reason,
+            metadata: warningMetadata,
+          })
+        }
 
         continue
       }
@@ -138,24 +171,29 @@ export class EnforcementEngineService {
           correctiveCreated: created,
         }
 
-        await this.persistPersonStateTransition({
+        const transitioned = await this.persistPersonStateTransition({
           orgId: p.orgId,
           personId: p.id,
           expectedState: p.operationalState ?? null,
-          expectedRiskScore: riskScore,
+          expectedRiskScore: persistedRiskScore,
+          nextRiskScore: riskScore,
           expectedUpdatedAt: p.operationalStateUpdatedAt,
           nextState: decision.nextState as any,
           description: decision.reason,
           metadata: enforcedMetadata,
         })
 
-        await this.timeline.log({
-          orgId: p.orgId,
-          action: 'OPERATIONAL_STATE_ENFORCED',
-          personId: p.id,
-          description: decision.reason,
-          metadata: enforcedMetadata,
-        })
+        // C8 PR3-3B-4 (B): only when something actually happened in this run: a new corrective
+        // action was created, or the state transition was confirmed by the CAS.
+        if (created || transitioned) {
+          await this.timeline.log({
+            orgId: p.orgId,
+            action: 'OPERATIONAL_STATE_ENFORCED',
+            personId: p.id,
+            description: decision.reason,
+            metadata: enforcedMetadata,
+          })
+        }
       }
     }
 
@@ -167,6 +205,8 @@ export class EnforcementEngineService {
     personId: string
     expectedState: OperationalStateValue | null
     expectedRiskScore: number
+    /** Score written with the transition (the live score when it was re-evaluated). */
+    nextRiskScore?: number
     expectedUpdatedAt: Date | null
     nextState: OperationalStateValue
     description: string
@@ -189,7 +229,7 @@ export class EnforcementEngineService {
         operationalStateUpdatedAt: params.expectedUpdatedAt,
       },
       nextState: params.nextState,
-      riskScore: params.expectedRiskScore,
+      riskScore: params.nextRiskScore ?? params.expectedRiskScore,
       source: 'ENFORCEMENT_ENGINE',
       reason: params.description,
       metadata: params.metadata,

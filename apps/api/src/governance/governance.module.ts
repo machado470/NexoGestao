@@ -3,6 +3,7 @@ import { PrismaModule } from '../prisma/prisma.module'
 import { TimelineModule } from '../timeline/timeline.module'
 import { FinanceModule } from '../finance/finance.module'
 import { ServiceOrdersModule } from '../service-orders/service-orders.module'
+import { RiskModule } from '../risk/risk.module'
 
 import { GovernanceRunService } from './governance-run.service'
 import { GovernanceRunJob } from './governance-run.job'
@@ -27,6 +28,8 @@ import { RolesGuard } from '../auth/guards/roles.guard'
     TimelineModule,
     FinanceModule,
     ServiceOrdersModule,
+    // Live risk for the enforcement engine (C8 PR3-3B-4).
+    RiskModule,
   ],
   controllers: [
     EnforcementController,
