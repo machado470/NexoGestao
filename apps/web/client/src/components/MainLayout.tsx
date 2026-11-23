@@ -398,7 +398,6 @@ export function MainLayout({ children }: MainLayoutProps) {
 
         <div className="flex min-h-screen w-full">
           {!isMobile ? <aside
-            data-scrollbar="nexo"
             className={`nexo-sidebar z-40 flex shrink-0 flex-col overflow-hidden shadow-lg transition-[width,transform] duration-200 ease-out ${
               isMobile
                 ? `fixed inset-y-0 left-0 w-[304px] ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`
