@@ -1,0 +1,136 @@
+/*
+ * NexoGestão Premium skin — GENERATED from theme/premium/tokens.ts. Do not edit by hand.
+ * Inert unless data-skin="premium" is set (flag off by default, see flag.ts).
+ * Unlayered on purpose: it must win over the @layer base theme blocks in index.css.
+ * Rollback: remove the import in main.tsx (or revert the PR).
+ */
+
+:root[data-skin="premium"],
+.app-root[data-skin="premium"] {
+  --nx-bg: #f7f7f8;
+  --nx-surface: #ffffff;
+  --nx-raised: #f1f1f3;
+  --nx-line: #e4e4e7;
+  --nx-line-strong: #7a7a82;
+  --nx-text: #18181b;
+  --nx-text-2: #52525b;
+  --nx-muted: #6b6b74;
+  --nx-brand: #ff6a01;
+  --nx-brand-hover: #e85f00;
+  --nx-on-brand: #0a0a0a;
+  --nx-brand-text: #b4460f;
+  --nx-brand-soft: #fff1e6;
+  --nx-chart-1: #c2410c;
+  --nx-ok: #166534;
+  --nx-ok-soft: #e6f4ea;
+  --nx-info: #1d4ed8;
+  --nx-info-soft: #e8efff;
+  --nx-warn: #854d0e;
+  --nx-warn-soft: #fdf3dc;
+  --nx-bad: #b91c1c;
+  --nx-bad-soft: #fdecec;
+  --nx-on-bad: #ffffff;
+  --nx-focus: #b4460f;
+  --nx-scrim: rgba(24, 24, 27, 0.45);
+  --nx-shadow: 0 1px 2px rgba(24, 24, 27, 0.06), 0 8px 24px -12px rgba(24, 24, 27, 0.12);
+
+  /* Existing aliases → Premium tokens */
+  --bg-app: var(--nx-bg);
+  --bg-page: var(--nx-bg);
+  --nexo-app-bg: var(--nx-bg);
+  --background: var(--nx-bg);
+  --surface-base: var(--nx-surface);
+  --surface-primary: var(--nx-surface);
+  --bg-surface: var(--nx-surface);
+  --app-surface: var(--nx-surface);
+  --app-surface-1: var(--nx-surface);
+  --app-card: var(--nx-surface);
+  --nexo-card-surface: var(--nx-surface);
+  --card: var(--nx-surface);
+  --field-bg: var(--nx-surface);
+  --surface-elevated: var(--nx-raised);
+  --surface-subtle: var(--nx-raised);
+  --modal-section-bg: var(--nx-raised);
+  --app-overlay-surface: var(--nx-raised);
+  --popover: var(--nx-raised);
+  --secondary: var(--nx-raised);
+  --muted: var(--nx-raised);
+  --text-primary: var(--nx-text);
+  --app-text: var(--nx-text);
+  --field-text: var(--nx-text);
+  --modal-section-text: var(--nx-text);
+  --app-overlay-text: var(--nx-text);
+  --foreground: var(--nx-text);
+  --card-foreground: var(--nx-text);
+  --popover-foreground: var(--nx-text);
+  --secondary-foreground: var(--nx-text);
+  --accent-foreground: var(--nx-text);
+  --text-secondary: var(--nx-text-2);
+  --text-muted: var(--nx-muted);
+  --nexo-text-muted: var(--nx-muted);
+  --modal-section-muted: var(--nx-muted);
+  --muted-foreground: var(--nx-muted);
+  --border: var(--nx-line);
+  --border-subtle: var(--nx-line);
+  --border-soft: var(--nx-line);
+  --app-border: var(--nx-line);
+  --nexo-border-soft: var(--nx-line);
+  --modal-section-border: var(--nx-line);
+  --app-overlay-border: var(--nx-line);
+  --field-border: var(--nx-line-strong);
+  --input: var(--nx-line-strong);
+  --accent-primary: var(--nx-brand);
+  --primary: var(--nx-brand);
+  --accent-primary-hover: var(--nx-brand-hover);
+  --primary-foreground: var(--nx-on-brand);
+  --accent-text: var(--nx-brand-text);
+  --accent: var(--nx-brand-text);
+  --accent-soft: var(--nx-brand-soft);
+  --ring: var(--nx-focus);
+  --success: var(--nx-ok);
+  --warning: var(--nx-warn);
+  --danger: var(--nx-bad);
+  --destructive: var(--nx-bad);
+  --destructive-foreground: var(--nx-on-bad);
+  --app-overlay-shadow: var(--nx-shadow);
+  --app-overlay-scrim: var(--nx-scrim);
+
+  /* Typography */
+  --nx-font: "DM Sans", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --nexo-body-font: var(--nx-font);
+  --nexo-title-font: var(--nx-font);
+  --nexo-font-body: var(--nx-font);
+  --nexo-font-title: var(--nx-font);
+  color-scheme: light;
+}
+
+:root[data-skin="premium"][data-theme="dark"],
+.app-root[data-skin="premium"][data-theme="dark"] {
+  --nx-bg: #08080a;
+  --nx-surface: #111113;
+  --nx-raised: #18181b;
+  --nx-line: #26262a;
+  --nx-line-strong: #71717a;
+  --nx-text: #f4f4f5;
+  --nx-text-2: #a1a1aa;
+  --nx-muted: #8b8b93;
+  --nx-brand: #ff6a01;
+  --nx-brand-hover: #ff7d1f;
+  --nx-on-brand: #0a0a0a;
+  --nx-brand-text: #ff8a3d;
+  --nx-brand-soft: #2a1506;
+  --nx-chart-1: #ff6a01;
+  --nx-ok: #4ade80;
+  --nx-ok-soft: #0f2417;
+  --nx-info: #7cb4ff;
+  --nx-info-soft: #0f1d33;
+  --nx-warn: #fbbf24;
+  --nx-warn-soft: #2a1f06;
+  --nx-bad: #fb8a8a;
+  --nx-bad-soft: #2d1212;
+  --nx-on-bad: #0a0a0a;
+  --nx-focus: #ff8a3d;
+  --nx-scrim: rgba(0, 0, 0, 0.66);
+  --nx-shadow: none;
+  color-scheme: dark;
+}

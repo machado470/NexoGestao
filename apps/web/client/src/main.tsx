@@ -9,6 +9,8 @@ import { Router as BrowserRouter } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import App from "./App";
 import "./index.css";
+// Premium skin tokens: inert until the Premium flag is on (off by default).
+import "./theme/premium/premium-skin.css";
 import {
   ensureAuditState,
   markAuditError,
