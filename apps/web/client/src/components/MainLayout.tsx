@@ -6,6 +6,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import {
+  isPremiumSkinEnabled,
+  premiumSkinAttribute,
+  useDocumentPremiumSkin,
+} from "@/theme/premium/flag";
+import {
   Bell,
   BookOpen,
   Briefcase,
@@ -119,6 +124,8 @@ export function MainLayout({ children }: MainLayoutProps) {
   const { role, user, logout, isLoggingOut, loading, isAuthenticated } =
     useAuth();
   const { theme, toggleTheme } = useTheme();
+  const premiumSkin = isPremiumSkinEnabled();
+  useDocumentPremiumSkin(premiumSkin);
   const trpcUtils = trpc.useUtils();
   const notificationQuery = trpc.dashboard.notificationCenter.list.useQuery(
     { page: 1, limit: 6, category: "all" },
@@ -432,6 +439,7 @@ export function MainLayout({ children }: MainLayoutProps) {
       <div
         className={`nexo-app-shell nexo-app app-root ${theme === "dark" ? "dark" : ""} min-h-screen text-[var(--text-primary)]`}
         data-theme={theme}
+        data-skin={premiumSkinAttribute(premiumSkin)}
       >
         <a
           href={`#${MAIN_CONTENT_ID}`}
