@@ -388,6 +388,29 @@
 /* ---------- Mobile bottom navigation ---------- */
 .nx-bottom-nav { display: none; }
 
+/* ---------- Topbar on small screens ----------
+ * index.css (@media max-width: 768px) sets overflow-x: hidden on html, body
+ * and #root, which turns them into scroll containers that never scroll, so a
+ * sticky topbar scrolls away. Up to 768px the preview topbar is fixed instead,
+ * and the main column reserves its height.
+ */
+@media (max-width: 768px) {
+  .nx-topbar {
+    position: fixed; top: 0; right: 0; left: var(--nx-sidebar-collapsed-w);
+    height: calc(var(--nx-topbar-h) + env(safe-area-inset-top, 0px));
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .nx-main { padding-top: calc(var(--nx-topbar-h) + env(safe-area-inset-top, 0px)); }
+}
+@media (max-width: 767px) {
+  .nx-topbar { left: 0; }
+}
+/* At exactly 768px the same global rule applies while the sidebar is still visible. */
+@media (min-width: 768px) and (max-width: 768px) {
+  .nx-sidebar { position: fixed; top: 0; left: 0; width: var(--nx-sidebar-collapsed-w); z-index: 25; }
+  .nx-main { grid-column: 2; }
+}
+
 /* ---------- Responsive ---------- */
 @media (max-width: 1279px) {
   .nx-span-3 { grid-column: span 6; }

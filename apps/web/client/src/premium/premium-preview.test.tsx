@@ -41,6 +41,18 @@ describe("Premium preview isolation", () => {
     }
   });
 
+  it("keeps the topbar and sidebar fixed where the global overflow rule breaks sticky", () => {
+    // index.css sets overflow-x: hidden on html, body and #root up to 768px.
+    expect(readFileSync("client/src/index.css", "utf8")).toMatch(
+      /@media \(max-width: 768px\) \{\s*html,\s*body,\s*#root \{[^}]*overflow-x: hidden/
+    );
+    expect(css).toMatch(/@media \(max-width: 768px\) \{\s*\.nx-topbar \{\s*position: fixed;/);
+    expect(css).toMatch(/\.nx-main \{ padding-top: calc\(var\(--nx-topbar-h\)/);
+    expect(css).toMatch(
+      /@media \(min-width: 768px\) and \(max-width: 768px\) \{\s*\.nx-sidebar \{ position: fixed;[^}]*\}\s*\.nx-main \{ grid-column: 2; \}/
+    );
+  });
+
   it("registers /premium-preview only in development", () => {
     const app = readFileSync("client/src/App.tsx", "utf8");
     expect(app).toMatch(
