@@ -589,7 +589,7 @@ function AttentionRow({
   navigate: (path: string) => void;
 }) {
   return (
-    <OperationalInnerCard className="grid w-full min-w-0 gap-3 border-[var(--border-subtle)]/70 bg-[var(--surface-primary)]/35 p-3 sm:p-4 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center">
+    <OperationalInnerCard className="grid w-full min-w-0 gap-3 border-[var(--border-subtle)]/70 bg-[var(--surface-primary)]/35 p-3 sm:p-4 md:grid-cols-[auto_minmax(0,1fr)_minmax(8rem,14rem)] md:items-center">
       <span className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--danger)]/25 bg-[var(--danger)]/8">
         <ShieldAlert className="h-4 w-4 text-[var(--danger)]" />
       </span>
@@ -623,7 +623,7 @@ function AttentionRow({
           </strong>
         ) : null}
         <Button
-          className="h-9 w-full shrink-0 px-3 text-xs sm:w-auto"
+          className="h-auto min-h-9 w-full whitespace-normal px-3 py-2 text-left text-xs leading-4 sm:w-auto md:w-full"
           size="sm"
           onClick={() => navigate(item.path)}
         >
