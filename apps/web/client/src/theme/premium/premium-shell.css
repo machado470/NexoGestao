@@ -143,6 +143,57 @@
     );
   }
 
+  /* ---------- Mobile bottom navigation (PR 3) ---------- */
+  .app-root[data-skin="premium"] .mobile-app-nav {
+    background: var(--nx-surface);
+    border-top-color: var(--nx-line);
+  }
+
+  .app-root[data-skin="premium"] .mobile-app-nav button {
+    color: var(--nx-text-2);
+  }
+
+  .app-root[data-skin="premium"] .mobile-app-nav button[aria-current="page"] {
+    background: var(--nx-brand-soft);
+    color: var(--nx-brand-text);
+  }
+
+  .app-root[data-skin="premium"] .mobile-app-nav button:focus-visible {
+    outline: 2px solid var(--nx-focus);
+    outline-offset: -2px;
+  }
+
+  /* ---------- Status badges (PR 3) ---------- */
+  .app-root[data-skin="premium"] .nexo-badge-success {
+    color: var(--nx-ok);
+    background: var(--nx-ok-soft);
+    border-color: color-mix(in srgb, var(--nx-ok) 32%, transparent);
+  }
+
+  .app-root[data-skin="premium"] .nexo-badge-warning {
+    color: var(--nx-warn);
+    background: var(--nx-warn-soft);
+    border-color: color-mix(in srgb, var(--nx-warn) 32%, transparent);
+  }
+
+  .app-root[data-skin="premium"] .nexo-badge-danger {
+    color: var(--nx-bad);
+    background: var(--nx-bad-soft);
+    border-color: color-mix(in srgb, var(--nx-bad) 32%, transparent);
+  }
+
+  .app-root[data-skin="premium"] .nexo-badge-info {
+    color: var(--nx-info);
+    background: var(--nx-info-soft);
+    border-color: color-mix(in srgb, var(--nx-info) 32%, transparent);
+  }
+
+  .app-root[data-skin="premium"] .nexo-badge-accent {
+    color: var(--nx-brand-text);
+    background: var(--nx-brand-soft);
+    border-color: color-mix(in srgb, var(--nx-brand) 34%, transparent);
+  }
+
   .app-root[data-skin="premium"] .nexo-badge-neutral {
     color: var(--nx-text-2);
     background: var(--nx-raised);
@@ -173,4 +224,11 @@
 /* Mobile menu backdrop (bg-slate-950/20). */
 .app-root[data-skin="premium"] .nexo-sidebar-backdrop {
   background: var(--nx-scrim);
+}
+
+/* Keyboard focus for the shared Button (PR 3). `outline-none` is a utility,
+   so this must be unlayered; :root also covers dialogs rendered in portals. */
+:root[data-skin="premium"] [data-slot="button"]:focus-visible {
+  outline: 2px solid var(--nx-focus);
+  outline-offset: 2px;
 }

@@ -112,7 +112,7 @@ export function MobileHome({
               <strong className="mt-1 block break-words text-xl font-semibold tabular-nums">
                 {item.value}
               </strong>
-              <span className="mt-1 inline-flex items-center gap-1 text-xs text-[var(--accent-primary)]">
+              <span className="mt-1 inline-flex items-center gap-1 text-xs text-[var(--nx-brand-text,var(--accent-primary))]">
                 Consultar <ArrowRight className="h-3 w-3" />
               </span>
             </button>
@@ -128,7 +128,7 @@ export function MobileHome({
               onClick={() => navigate(path)}
               className="flex min-h-20 min-w-0 flex-col items-center justify-start gap-2 text-center text-xs font-medium"
             >
-              <span className="grid h-12 w-12 place-items-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-primary)]">
+              <span className="grid h-12 w-12 place-items-center rounded-2xl bg-[var(--accent-soft)] text-[var(--nx-brand-text,var(--accent-primary))]">
                 <Icon className="h-5 w-5" />
               </span>
               {label}
@@ -245,7 +245,7 @@ export function MobileHome({
                       <button
                         type="button"
                         onClick={() => navigate(item.path)}
-                        className="mt-1 flex min-h-11 items-center gap-2 text-sm font-medium text-[var(--accent-primary)]"
+                        className="mt-1 flex min-h-11 items-center gap-2 text-sm font-medium text-[var(--nx-brand-text,var(--accent-primary))]"
                       >
                         {item.ctaLabel}
                         <ArrowRight className="h-4 w-4" />

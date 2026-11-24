@@ -148,6 +148,7 @@ export const premiumAliasMap: Record<string, PremiumTokenName> = {
   "--success": "--nx-ok",
   "--warning": "--nx-warn",
   "--danger": "--nx-bad",
+  "--info": "--nx-info",
   "--destructive": "--nx-bad",
   "--destructive-foreground": "--nx-on-bad",
   // Overlays

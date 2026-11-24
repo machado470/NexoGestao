@@ -11,9 +11,9 @@ const buttonVariants = cva(
     variants: {
       variant: {
         primary:
-          "border border-[color-mix(in_srgb,var(--accent-primary)_72%,black)] bg-[var(--accent-primary)] text-white shadow-[0_10px_24px_-18px_var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] hover:border-[color-mix(in_srgb,var(--accent-primary)_85%,black)]",
+          "border border-[color-mix(in_srgb,var(--accent-primary)_72%,black)] bg-[var(--accent-primary)] text-[var(--nx-on-brand,#fff)] shadow-[0_10px_24px_-18px_var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] hover:border-[color-mix(in_srgb,var(--accent-primary)_85%,black)]",
         default:
-          "border border-[color-mix(in_srgb,var(--accent-primary)_72%,black)] bg-[var(--accent-primary)] text-white shadow-[0_10px_24px_-18px_var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] hover:border-[color-mix(in_srgb,var(--accent-primary)_85%,black)]",
+          "border border-[color-mix(in_srgb,var(--accent-primary)_72%,black)] bg-[var(--accent-primary)] text-[var(--nx-on-brand,#fff)] shadow-[0_10px_24px_-18px_var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] hover:border-[color-mix(in_srgb,var(--accent-primary)_85%,black)]",
         danger:
           "bg-destructive text-destructive-foreground hover:bg-[color-mix(in_srgb,var(--destructive)_86%,black)]",
         destructive:
@@ -26,7 +26,7 @@ const buttonVariants = cva(
           "border border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--text-primary)] hover:border-[var(--accent-primary)]/35 hover:bg-[var(--accent-soft)]",
         ghost:
           "text-[var(--text-secondary)] hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)]",
-        link: "text-primary underline-offset-4 hover:underline",
+        link: "text-[var(--nx-brand-text,var(--primary))] underline-offset-4 hover:underline",
       },
       size: {
         default: "h-10 px-4 py-2 has-[>svg]:px-3",

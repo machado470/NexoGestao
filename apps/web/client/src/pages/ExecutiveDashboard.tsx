@@ -1465,7 +1465,7 @@ export default function ExecutiveDashboard() {
                   </p>
                 ) : null}
                 <Button
-                  className="mt-2 h-auto px-0 py-0 text-[var(--accent-primary)]"
+                  className="mt-2 h-auto px-0 py-0 text-[var(--nx-brand-text,var(--accent-primary))]"
                   variant="link"
                   size="sm"
                   onClick={() => navigate("/timeline")}
@@ -1625,7 +1625,7 @@ export default function ExecutiveDashboard() {
                 </p>
                 {pendingWhatsAppApprovals.length > 0 ? (
                   <Button
-                    className="h-auto px-0 py-0 text-[var(--accent-primary)]"
+                    className="h-auto px-0 py-0 text-[var(--nx-brand-text,var(--accent-primary))]"
                     variant="link"
                     size="sm"
                     onClick={() => navigate("/whatsapp")}

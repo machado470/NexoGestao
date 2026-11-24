@@ -82,7 +82,7 @@ const flowStageTone: Record<
   active: {
     badge: "Ativo",
     container: "border-[var(--accent-primary)]/35 bg-[var(--accent-soft)]/55",
-    icon: <Circle className="h-4 w-4 text-[var(--accent-primary)]" />,
+    icon: <Circle className="h-4 w-4 text-[var(--nx-brand-text,var(--accent-primary))]" />,
     rail: "bg-[var(--accent-primary)]/70",
   },
   warning: {
@@ -236,7 +236,7 @@ export function NexoPriorityPanel({
     >
       <div className="flex items-start gap-3">
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[var(--accent-primary)]/25 bg-[var(--surface-primary)]/60">
-          <Zap className="h-4 w-4 text-[var(--accent-primary)]" />
+          <Zap className="h-4 w-4 text-[var(--nx-brand-text,var(--accent-primary))]" />
         </span>
         <div className="min-w-0 flex-1">
           <p className="nexo-overline">Próxima ação</p>
@@ -371,7 +371,7 @@ export function NexoOperationalPipeline({
               </p>
               {stage.onClick ? (
                 <Button
-                  className="mt-2 h-auto px-0 py-0 text-[var(--accent-primary)]"
+                  className="mt-2 h-auto px-0 py-0 text-[var(--nx-brand-text,var(--accent-primary))]"
                   variant="link"
                   size="sm"
                   onClick={stage.onClick}
@@ -414,7 +414,7 @@ function getEvidenceTimelineIcon(type: string) {
   const normalized = type.toLowerCase();
   if (normalized.includes("mensagem"))
     return (
-      <MessageCircle className="h-3.5 w-3.5 text-[var(--accent-primary)]" />
+      <MessageCircle className="h-3.5 w-3.5 text-[var(--nx-brand-text,var(--accent-primary))]" />
     );
   if (normalized.includes("agendamento"))
     return (
