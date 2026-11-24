@@ -389,7 +389,7 @@ export default function PeoplePage() {
       />
 
       <AppFiltersBar className="min-w-0 flex-col items-stretch gap-2 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2 md:flex-row md:items-center">
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 md:min-w-[16rem]">
           <label htmlFor="people-search" className="sr-only">
             Buscar pessoas
           </label>
