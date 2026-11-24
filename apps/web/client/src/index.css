@@ -84,6 +84,8 @@
     --shadow-medium: 0 20px 44px rgba(17, 35, 64, 0.12);
     --accent-primary: #e8772e;
     --accent-primary-hover: #d96d28;
+    /* Accent text on accent-tinted surfaces: 5.1:1 on --accent-soft (light). */
+    --accent-text: #9a4a16;
     --info: #0ea5e9;
 
     --background-base: var(--bg-page);
@@ -234,6 +236,8 @@
     --shadow-medium: 0 22px 56px rgba(2, 6, 23, 0.55);
     --accent-primary: #e8772e;
     --accent-primary-hover: #f0893f;
+    /* Accent text on accent-tinted surfaces: 6.5:1 on --accent-soft (dark). */
+    --accent-text: #f4a46c;
     --info: #38bdf8;
 
     --background-base: #11151d;
@@ -2246,6 +2250,11 @@ html {
     color: #ffd6bd;
     background: rgba(232, 119, 46, 0.18);
     border-color: rgba(232, 119, 46, 0.34);
+  }
+
+  /* #ffd6bd is tuned for dark surfaces (1.1:1 on light ones). */
+  .app-root[data-theme="light"] .nexo-badge-accent {
+    color: var(--accent-text);
   }
 
   .nexo-table thead {

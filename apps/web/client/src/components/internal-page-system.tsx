@@ -189,7 +189,7 @@ export function AppContextChip({
         tone === "neutral" &&
           "border-[var(--border-subtle)] bg-[var(--surface-primary)]/45 text-[var(--text-secondary)]",
         tone === "accent" &&
-          "border-[var(--accent-primary)]/30 bg-[var(--accent-soft)] text-[var(--accent-primary)]",
+          "border-[var(--accent-primary)]/30 bg-[var(--accent-soft)] text-[var(--accent-text)]",
         tone === "danger" &&
           "border-[var(--danger)]/30 bg-[var(--danger)]/10 text-[var(--danger)]",
         tone === "success" &&
