@@ -94,6 +94,31 @@
   --destructive-foreground: var(--nx-on-bad);
   --app-overlay-shadow: var(--nx-shadow);
   --app-overlay-scrim: var(--nx-scrim);
+  --app-bg: var(--nx-bg);
+  --app-shell: var(--nx-bg);
+  --nexo-surface-0: var(--nx-bg);
+  --app-sidebar: var(--nx-surface);
+  --app-sidebar-surface: var(--nx-surface);
+  --bg-sidebar: var(--nx-surface);
+  --app-topbar: var(--nx-surface);
+  --bg-header: var(--nx-surface);
+  --card-bg: var(--nx-surface);
+  --bg-card: var(--nx-surface);
+  --surface-card-light: var(--nx-surface);
+  --surface-elevated-light: var(--nx-surface);
+  --surface-contrast: var(--nx-surface);
+  --nexo-card-muted: var(--nx-raised);
+  --bg-surface-hover: var(--nx-raised);
+  --app-border-subtle: var(--nx-line);
+  --nexo-border-strong: var(--nx-line-strong);
+  --neutral: var(--nx-text-2);
+  --nexo-focus-ring: var(--nx-focus);
+  --app-shadow-soft: var(--nx-shadow);
+  --shadow-soft: var(--nx-shadow);
+  --nexo-depth-subtle: var(--nx-shadow);
+  --nexo-depth-hover: var(--nx-shadow);
+  --nexo-shadow-elev-1: var(--nx-shadow);
+  --modal-card-shadow-light: var(--nx-shadow);
 
   /* Typography */
   --nx-font: "DM Sans", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
