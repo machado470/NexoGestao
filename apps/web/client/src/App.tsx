@@ -69,6 +69,12 @@ const BillingPage = lazy(() => import("./pages/BillingPage"));
 const OperationalCockpitPage = lazy(() => import("./pages/OperationalCockpitPage"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+// NexoGestão Premium visual lab (PR 0): development only. import.meta.env.DEV
+// is statically false in production builds, so this dynamic import is removed
+// and the experimental module is not bundled or reachable there.
+const PremiumPreviewPage = import.meta.env.DEV
+  ? lazy(() => import("./premium/PremiumPreviewPage"))
+  : null;
 const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
 const AcceptInvitePage = lazy(() => import("./pages/AcceptInvitePage"));
@@ -817,6 +823,12 @@ function Router() {
       <Route path="/privacidade" component={publicPage(PrivacyPolicy)} />
       <Route path="/terms" component={publicPage(TermsOfService)} />
       <Route path="/termos" component={publicPage(TermsOfService)} />
+      {PremiumPreviewPage ? (
+        <Route
+          path="/premium-preview"
+          component={() => <LazyPage component={PremiumPreviewPage} />}
+        />
+      ) : null}
       <Route path="/404" component={() => <LazyPage component={NotFound} />} />
       <Route component={() => <LazyPage component={NotFound} />} />
     </Switch>
