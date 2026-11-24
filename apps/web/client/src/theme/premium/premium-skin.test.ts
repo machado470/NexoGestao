@@ -202,6 +202,20 @@ describe("Premium skin flag (default OFF)", () => {
     }
   });
 
+  it("cannot be injected into deploy builds (Dockerfiles and workflows never pass it)", () => {
+    // Docker only forwards platform variables (e.g. Railway) that are declared as ARG/ENV.
+    const deployFiles = [
+      ...readdirSync(".").filter(entry => /^Dockerfile/.test(entry)),
+      ...readdirSync("../../.github/workflows").map(
+        entry => `../../.github/workflows/${entry}`
+      ),
+    ];
+    expect(deployFiles).toContain("Dockerfile.railway");
+    for (const file of deployFiles) {
+      expect(read(file), file).not.toMatch(/PREMIUM_SKIN/);
+    }
+  });
+
   it("is applied by MainLayout only, through the flag", () => {
     const layout = read("client/src/components/MainLayout.tsx");
     expect(layout).toMatch(/const premiumSkin = isPremiumSkinEnabled\(\);/);
