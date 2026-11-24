@@ -12,9 +12,7 @@ RUN apt-get update && apt-get install -y \
   g++ \
   && rm -rf /var/lib/apt/lists/*
 
-RUN --mount=type=secret,id=proxy_ca \
-  if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
-  npm install -g pnpm@10.30.3
+RUN npm install -g pnpm@10.30.3
 
 # manifests do workspace
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
@@ -22,9 +20,7 @@ COPY patches ./patches
 COPY apps/api/package.json apps/api/package.json
 COPY packages/common/package.json packages/common/package.json
 
-RUN --mount=type=secret,id=proxy_ca \
-  if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
-  pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile
 
 # resto do repo
 COPY . .

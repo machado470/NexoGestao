@@ -3,9 +3,7 @@ FROM node:24-bookworm-slim AS base
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl \
     && rm -rf /var/lib/apt/lists/*
-RUN --mount=type=secret,id=proxy_ca \
-    if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
-    npm install -g pnpm@10.30.3
+RUN npm install -g pnpm@10.30.3
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY patches ./patches
 COPY apps/web/package.json apps/web/package.json
@@ -13,9 +11,7 @@ COPY apps/web/package.json apps/web/package.json
 FROM base AS builder
 RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ \
     && rm -rf /var/lib/apt/lists/*
-RUN --mount=type=secret,id=proxy_ca \
-    if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
-    pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile
 COPY . .
 ARG VITE_API_URL
 ARG VITE_SENTRY_DSN
@@ -24,9 +20,7 @@ RUN pnpm --filter ./apps/web build
 
 FROM base AS production-deps
 ENV PRISMA_SKIP_POSTINSTALL_GENERATE=true
-RUN --mount=type=secret,id=proxy_ca \
-    if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
-    pnpm install --prod --frozen-lockfile
+RUN pnpm install --prod --frozen-lockfile
 
 FROM production-deps AS runtime
 ENV NODE_ENV=production WEB_PORT=3010
