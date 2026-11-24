@@ -179,11 +179,11 @@ export function NexoGovernanceDecisionCard({
         </div>
       ) : null}
       <div className="grid gap-1.5 text-xs leading-4 text-[var(--text-secondary)] sm:grid-cols-2">
-        <p>
+        <p className="min-w-0 [overflow-wrap:anywhere]">
           <strong className="text-[var(--text-primary)]">Problema:</strong>{" "}
           {reason}
         </p>
-        <p>
+        <p className="min-w-0 [overflow-wrap:anywhere]">
           <strong className="text-[var(--text-primary)]">Consequência:</strong>{" "}
           {impact}
         </p>
@@ -259,11 +259,11 @@ export function NexoPriorityPanel({
         </div>
       </div>
       <div className="grid gap-2 text-xs leading-4 text-[var(--text-secondary)] md:grid-cols-2">
-        <p>
+        <p className="min-w-0 [overflow-wrap:anywhere]">
           <strong className="text-[var(--text-primary)]">Problema:</strong>{" "}
           {reason}
         </p>
-        <p>
+        <p className="min-w-0 [overflow-wrap:anywhere]">
           <strong className="text-[var(--text-primary)]">Consequência:</strong>{" "}
           {impact}
         </p>
@@ -276,7 +276,7 @@ export function NexoPriorityPanel({
       ) : null}
       <div className="mt-auto flex flex-col gap-2 sm:flex-row">
         <Button
-          className="h-9 flex-[1.35] justify-between px-3 text-sm font-semibold"
+          className="h-auto min-h-9 min-w-0 flex-[1.35] justify-between whitespace-normal px-3 py-2 text-left text-sm font-semibold leading-5"
           onClick={onPrimaryAction}
         >
           {primaryActionLabel}
