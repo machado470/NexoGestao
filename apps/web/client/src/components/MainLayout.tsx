@@ -443,7 +443,7 @@ export function MainLayout({ children }: MainLayoutProps) {
       >
         <a
           href={`#${MAIN_CONTENT_ID}`}
-          className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[60] focus:rounded-lg focus:bg-[var(--accent-primary)] focus:px-4 focus:py-2.5 focus:text-sm focus:font-semibold focus:text-white focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-white"
+          className="nexo-skip-link sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[60] focus:rounded-lg focus:bg-[var(--accent-primary)] focus:px-4 focus:py-2.5 focus:text-sm focus:font-semibold focus:text-white focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-white"
           onClick={event => {
             event.preventDefault();
             const target = document.getElementById(MAIN_CONTENT_ID);
@@ -461,7 +461,7 @@ export function MainLayout({ children }: MainLayoutProps) {
             type="button"
             tabIndex={-1}
             aria-hidden="true"
-            className="fixed inset-0 z-30 bg-slate-950/20 nexo-state-transition"
+            className="fixed inset-0 z-30 bg-slate-950/20 nexo-state-transition nexo-sidebar-backdrop"
             onClick={() => setSidebarCollapsed(true)}
           />
         ) : null}
@@ -646,7 +646,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                         >
                           <Bell className="h-4 w-4" />
                           {(unreadCount ?? 0) + (isMobile ? localNotificationCount : 0) > 0 ? (
-                            <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[10px] font-semibold text-[var(--text-primary)]">
+                            <span className="nexo-notification-count absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[10px] font-semibold text-[var(--text-primary)]">
                               {Math.min((unreadCount ?? 0) + (isMobile ? localNotificationCount : 0), 9)}
                             </span>
                           ) : null}

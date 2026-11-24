@@ -1,0 +1,176 @@
+/*
+ * NexoGestão Premium — Shell and Dashboard surfaces (PR 2).
+ *
+ * Every selector starts with .app-root[data-skin="premium"], so nothing here
+ * applies while the Premium flag is off (default). Values come only from the
+ * --nx-* tokens in premium-skin.css.
+ *
+ * Layering: surfaces live in @layer components, after index.css, so the
+ * Tailwind utilities on each element (bg-[...], border-[...]) still win, as
+ * they do today. Only the small block at the end is unlayered, for cases where
+ * a utility class hard-codes an off-palette colour.
+ *
+ * Rollback: remove the import in main.tsx.
+ */
+
+@layer components {
+  /* ---------- Shell ---------- */
+  .app-root[data-skin="premium"] .nexo-sidebar {
+    background: var(--nx-surface);
+    border-right: 1px solid var(--nx-line);
+    box-shadow: none;
+    color: var(--nx-text);
+  }
+
+  .app-root[data-skin="premium"] .nexo-sidebar-header {
+    border-color: var(--nx-line);
+  }
+
+  .app-root[data-skin="premium"] .nexo-sidebar-item {
+    color: var(--nx-text-2);
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+  }
+
+  .app-root[data-skin="premium"] .nexo-sidebar-item:hover {
+    color: var(--nx-text);
+    background: var(--nx-raised);
+    border-color: transparent;
+    box-shadow: none;
+  }
+
+  .app-root[data-skin="premium"] .nexo-sidebar-item.nexo-sidebar-item-active,
+  .app-root[data-skin="premium"] .nexo-sidebar-item.nexo-sidebar-item-active:hover {
+    color: var(--nx-brand-text);
+    font-weight: 600;
+    background: var(--nx-brand-soft);
+    border-color: transparent;
+    box-shadow: inset 3px 0 0 var(--nx-brand);
+  }
+
+  .app-root[data-skin="premium"] .nexo-sidebar-item:focus-visible {
+    outline: 2px solid var(--nx-focus);
+    outline-offset: 2px;
+    box-shadow: none;
+  }
+
+  .app-root[data-skin="premium"] .nexo-sidebar-item:disabled,
+  .app-root[data-skin="premium"] .nexo-sidebar-item[aria-disabled="true"] {
+    color: var(--nx-muted);
+    background: transparent;
+    cursor: not-allowed;
+  }
+
+  .app-root[data-skin="premium"] .nexo-topbar {
+    background: color-mix(in srgb, var(--nx-surface) 92%, transparent);
+    border-bottom: 1px solid var(--nx-line);
+    box-shadow: none;
+    color: var(--nx-text);
+  }
+
+  .app-root[data-skin="premium"] .nexo-topbar-control,
+  .app-root[data-skin="premium"] .nexo-search-input {
+    background: var(--nx-surface);
+    border: 1px solid var(--nx-line);
+    color: var(--nx-text-2);
+    box-shadow: none;
+  }
+
+  .app-root[data-skin="premium"] .nexo-topbar-control:hover {
+    background: var(--nx-raised);
+    color: var(--nx-text);
+  }
+
+  .app-root[data-skin="premium"] .nexo-topbar-control:focus-visible,
+  .app-root[data-skin="premium"] .nexo-search-input:focus-visible {
+    outline: 2px solid var(--nx-focus);
+    outline-offset: 2px;
+    box-shadow: none;
+  }
+
+  .app-root[data-skin="premium"] .nexo-topbar-control:disabled {
+    color: var(--nx-muted);
+    background: var(--nx-surface);
+    cursor: not-allowed;
+  }
+
+  .app-root[data-skin="premium"].nexo-app-shell,
+  .app-root[data-skin="premium"] .nexo-app-shell,
+  .app-root[data-skin="premium"] .nexo-app-content,
+  .app-root[data-skin="premium"] .nexo-page-shell {
+    background: var(--nx-bg);
+  }
+
+  /* ---------- Shared Dashboard surfaces ---------- */
+  .app-root[data-skin="premium"] .nexo-page-header,
+  .app-root[data-skin="premium"] .nexo-card-kpi,
+  .app-root[data-skin="premium"] .nexo-card-informative,
+  .app-root[data-skin="premium"] .nexo-kpi-card,
+  .app-root[data-skin="premium"] .nexo-card-panel,
+  .app-root[data-skin="premium"] .nexo-card-priority,
+  .app-root[data-skin="premium"] .nexo-card-timeline,
+  .app-root[data-skin="premium"] .nexo-surface,
+  .app-root[data-skin="premium"] .nexo-surface-operational {
+    background-color: var(--nx-surface);
+    background-image: none;
+    border-color: var(--nx-line);
+    box-shadow: var(--nx-shadow);
+  }
+
+  .app-root[data-skin="premium"] .nexo-card-kpi::before {
+    background: none;
+  }
+
+  .app-root[data-skin="premium"] .nexo-page-header:hover,
+  .app-root[data-skin="premium"] .nexo-card-kpi:hover,
+  .app-root[data-skin="premium"] .nexo-card-informative:hover,
+  .app-root[data-skin="premium"] .nexo-kpi-card:hover,
+  .app-root[data-skin="premium"] .nexo-card-panel:hover,
+  .app-root[data-skin="premium"] .nexo-card-priority:hover,
+  .app-root[data-skin="premium"] .nexo-card-timeline:hover,
+  .app-root[data-skin="premium"] .nexo-surface:hover,
+  .app-root[data-skin="premium"] .nexo-surface-operational:hover {
+    border-color: color-mix(in srgb, var(--nx-brand) 28%, var(--nx-line));
+    box-shadow: var(--nx-shadow);
+  }
+
+  .app-root[data-skin="premium"] .nexo-card-kpi--critical {
+    background-image: linear-gradient(
+      138deg,
+      color-mix(in srgb, var(--nx-bad) 10%, var(--nx-surface)),
+      var(--nx-surface)
+    );
+  }
+
+  .app-root[data-skin="premium"] .nexo-badge-neutral {
+    color: var(--nx-text-2);
+    background: var(--nx-raised);
+    border-color: var(--nx-line);
+  }
+}
+
+/* ---------- Unlayered: utilities that hard-code off-palette colours ---------- */
+
+/* Skip link: white on orange is 2.87:1. */
+.app-root[data-skin="premium"] .nexo-skip-link:focus {
+  color: var(--nx-on-brand);
+  background: var(--nx-brand);
+  box-shadow: 0 0 0 2px var(--nx-focus);
+}
+
+/* Notification counter: --accent is a text colour in Premium. */
+.app-root[data-skin="premium"] .nexo-notification-count {
+  color: var(--nx-on-brand);
+  background: var(--nx-brand);
+}
+
+/* Active nav icon follows the active label. */
+.app-root[data-skin="premium"] .nexo-sidebar-item-active svg {
+  color: var(--nx-brand-text);
+}
+
+/* Mobile menu backdrop (bg-slate-950/20). */
+.app-root[data-skin="premium"] .nexo-sidebar-backdrop {
+  background: var(--nx-scrim);
+}

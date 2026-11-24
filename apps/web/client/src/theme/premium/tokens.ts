@@ -153,6 +153,32 @@ export const premiumAliasMap: Record<string, PremiumTokenName> = {
   // Overlays
   "--app-overlay-shadow": "--nx-shadow",
   "--app-overlay-scrim": "--nx-scrim",
+  // Shell (PR 2): app background, sidebar, topbar, shared cards and depth
+  "--app-bg": "--nx-bg",
+  "--app-shell": "--nx-bg",
+  "--nexo-surface-0": "--nx-bg",
+  "--app-sidebar": "--nx-surface",
+  "--app-sidebar-surface": "--nx-surface",
+  "--bg-sidebar": "--nx-surface",
+  "--app-topbar": "--nx-surface",
+  "--bg-header": "--nx-surface",
+  "--card-bg": "--nx-surface",
+  "--bg-card": "--nx-surface",
+  "--surface-card-light": "--nx-surface",
+  "--surface-elevated-light": "--nx-surface",
+  "--surface-contrast": "--nx-surface",
+  "--nexo-card-muted": "--nx-raised",
+  "--bg-surface-hover": "--nx-raised",
+  "--app-border-subtle": "--nx-line",
+  "--nexo-border-strong": "--nx-line-strong",
+  "--neutral": "--nx-text-2",
+  "--nexo-focus-ring": "--nx-focus",
+  "--app-shadow-soft": "--nx-shadow",
+  "--shadow-soft": "--nx-shadow",
+  "--nexo-depth-subtle": "--nx-shadow",
+  "--nexo-depth-hover": "--nx-shadow",
+  "--nexo-shadow-elev-1": "--nx-shadow",
+  "--modal-card-shadow-light": "--nx-shadow",
 };
 
 export const premiumFontAliases = [
