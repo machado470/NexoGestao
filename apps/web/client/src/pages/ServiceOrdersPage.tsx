@@ -1050,7 +1050,7 @@ export default function ServiceOrdersPage() {
               className={cn(
                 "h-8 rounded-md border px-3 text-xs font-medium transition-colors",
                 activeFilter === filter.key
-                  ? "border-[var(--accent-primary)] bg-[var(--accent-soft)] text-[var(--accent-primary)]"
+                  ? "border-[var(--accent-primary)] bg-[var(--accent-soft)] text-[var(--nx-brand-text,var(--accent-primary))]"
                   : "border-[var(--border-subtle)] bg-[var(--surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
               )}
               onClick={() => setActiveFilter(filter.key as ServiceOrdersFilter)}
@@ -1074,7 +1074,7 @@ export default function ServiceOrdersPage() {
                 onSelect={() => setActiveFilter("without_charge")}
                 className={cn(
                   activeFilter === "without_charge" &&
-                    "font-semibold text-[var(--accent-primary)]"
+                    "font-semibold text-[var(--nx-brand-text,var(--accent-primary))]"
                 )}
               >
                 Concluídas sem cobrança

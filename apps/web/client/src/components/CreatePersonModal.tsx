@@ -108,7 +108,7 @@ export default function CreatePersonModal({
       closeBlocked={createPerson.isPending}
       title={
         <span className="flex items-center gap-2">
-          <UserPlus className="h-5 w-5 text-[var(--accent-primary)]" />
+          <UserPlus className="h-5 w-5 text-[var(--nx-brand-text,var(--accent-primary))]" />
           Nova pessoa
         </span>
       }

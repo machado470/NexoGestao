@@ -1199,7 +1199,7 @@ function ExecutionChatColumn({
           >
             <ArrowLeft className="size-4" />
           </Button>
-          <div className="flex size-12 items-center justify-center rounded-2xl border border-[var(--accent-primary)]/20 bg-[var(--accent-soft)]/45 text-base font-semibold text-[var(--accent-primary)]">
+          <div className="flex size-12 items-center justify-center rounded-2xl border border-[var(--accent-primary)]/20 bg-[var(--accent-soft)]/45 text-base font-semibold text-[var(--nx-brand-text,var(--accent-primary))]">
             {conversation?.name?.slice(0, 1) ?? "-"}
           </div>
           <div className="min-w-0">

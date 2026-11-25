@@ -322,7 +322,7 @@ function OnboardingJourney() {
   if (isInitializing) {
     return (
       <div className="flex h-[80vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-[var(--accent-primary)]" />
+        <Loader2 className="h-8 w-8 animate-spin text-[var(--nx-brand-text,var(--accent-primary))]" />
       </div>
     );
   }
@@ -360,7 +360,7 @@ function OnboardingJourney() {
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-2xl">
             <div className="mb-4 flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-[var(--accent-primary)]" />
+              <Sparkles className="h-4 w-4 text-[var(--nx-brand-text,var(--accent-primary))]" />
               <AppStatusBadge label="Demo guiada" tone="accent" className="text-[var(--text-primary)]" />
             </div>
 
@@ -422,7 +422,7 @@ function OnboardingJourney() {
       ) : null}
 
       <AppSectionCard variant="action" className="p-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--accent-primary)]">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--nx-brand-text,var(--accent-primary))]">
           Quer impressionar em 30 segundos?
         </p>
         <p className="mt-2 text-sm text-[var(--text-secondary)]">

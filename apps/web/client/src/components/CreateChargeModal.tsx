@@ -303,7 +303,7 @@ export function CreateChargeModal({
       initialFocusRef={customerSelectRef}
       title={
         <span className="inline-flex items-center gap-2">
-          <Wallet className="h-5 w-5 text-[var(--accent-primary)]" />
+          <Wallet className="h-5 w-5 text-[var(--nx-brand-text,var(--accent-primary))]" />
           Nova cobrança
         </span>
       }

@@ -188,22 +188,21 @@ describe("Premium controls (PR 3): shared status badges", () => {
   });
 });
 
-describe("Premium controls (PR 3): remaining work is tracked, not hidden", () => {
-  it("raw orange text outside the central components stays at or below today's count", () => {
+describe("Premium controls across modules", () => {
+  it("uses the contrast-aware token for accent text", () => {
     const remaining = sourceFiles("client/src").filter(file =>
       readFileSync(file, "utf8").includes("text-[var(--accent-primary)]")
     );
-    // Module pages and modals, to be handled by each module's migration.
-    const count = remaining
-      .map(
-        file =>
-          readFileSync(file, "utf8").split("text-[var(--accent-primary)]")
-            .length - 1
-      )
-      .reduce((a, b) => a + b, 0);
-    expect(count).toBeLessThanOrEqual(16);
-    for (const file of central) {
-      expect(remaining).not.toContain(path.join("client", "src", file));
+    expect(remaining).toEqual([]);
+  });
+
+  it("uses the contrast-aware color for the selected radio indicator", () => {
+    const radio = read("components/ui/radio-group.tsx");
+    expect(radio).toContain("text-[var(--nx-brand-text,var(--primary))]");
+    expect(radio).toContain("fill-current");
+    for (const theme of ["light", "dark"] as const) {
+      const tokens = premiumTokens[theme];
+      expect(contrastRatio(tokens["--nx-brand-text"], tokens["--nx-surface"])).toBeGreaterThanOrEqual(3);
     }
   });
 });

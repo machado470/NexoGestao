@@ -396,7 +396,7 @@ export default function GovernancePage() {
             ))}
           </ol>
         )}
-        {(signalsQuery.data?.signals.length ?? 0) > 3 ? <button type="button" className="mt-3 min-h-11 text-sm font-medium text-[var(--accent-primary)] md:hidden" aria-expanded={showAllSignals} aria-controls="governance-signals" onClick={() => setShowAllSignals(value => !value)}>{showAllSignals ? "Mostrar menos sinais" : "Ver todos os sinais"}</button> : null}
+        {(signalsQuery.data?.signals.length ?? 0) > 3 ? <button type="button" className="mt-3 min-h-11 text-sm font-medium text-[var(--nx-brand-text,var(--accent-primary))] md:hidden" aria-expanded={showAllSignals} aria-controls="governance-signals" onClick={() => setShowAllSignals(value => !value)}>{showAllSignals ? "Mostrar menos sinais" : "Ver todos os sinais"}</button> : null}
       </AppSectionBlock>
 
       <ResponsiveDetails title="Histórico de avaliações" controls>
@@ -431,7 +431,7 @@ export default function GovernancePage() {
                 className="grid min-w-0 gap-3 py-4 first:pt-0 last:pb-0 sm:grid-cols-[auto_minmax(0,1fr)_auto]"
               >
                 <FileCheck2
-                  className="size-5 text-[var(--accent-primary)]"
+                  className="size-5 text-[var(--nx-brand-text,var(--accent-primary))]"
                   aria-hidden="true"
                 />
                 <div className="min-w-0">

@@ -337,7 +337,7 @@ export default function TimelinePage() {
 
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-md bg-[var(--accent-soft)] px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--accent-primary)]">
+                      <span className="rounded-md bg-[var(--accent-soft)] px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--nx-brand-text,var(--accent-primary))]">
                         {EVENT_LABELS[event.eventType] ?? PRESENTATION_LABELS[event.eventType] ?? presentationLabel(event.eventType)}
                       </span>
                       {event.severity ? (
