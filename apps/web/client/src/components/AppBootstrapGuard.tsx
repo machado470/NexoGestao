@@ -1,6 +1,7 @@
 import { useEffect, useMemo, type ReactNode } from "react";
 import { useLocation } from "wouter";
-import { AppPageErrorState, AppPageShell } from "@/components/internal-page-system";
+import { AppPageErrorState } from "@/components/internal-page-system";
+import { AppStartupFrame } from "@/components/AppStartupFrame";
 import { useAuth, type AuthBootstrapState } from "@/contexts/AuthContext";
 import { extractPathname, isPublicOrAuthPath } from "@/lib/routeAccess";
 import { pushAuditEvent, setAuditField } from "@/lib/renderAudit";
@@ -76,44 +77,31 @@ export function AppBootstrapGuard({
     };
   }, []);
 
-  if (state === "validating" && !isPublicBootstrapPath) {
-    return (
-      <>
-        {children}
-        <div className="pointer-events-none fixed inset-x-0 top-4 z-40 flex justify-center px-4">
-          <div className="inline-flex items-center gap-2 rounded-full border border-orange-200/70 bg-white/95 px-3 py-1.5 text-xs text-[var(--text-secondary)] shadow-sm backdrop-blur dark:border-orange-500/20 dark:bg-[var(--surface-base)]">
-            Inicializando autenticação em segundo plano...
-          </div>
-        </div>
-      </>
-    );
-  }
-
   if (guardBranch === "blocking_degraded") {
     setAuditField("errorType", "bootstrap_degraded");
     return (
-      <AppPageShell>
+      <AppStartupFrame>
         <AppPageErrorState
           title="Sessão temporariamente indisponível"
           description="Não foi possível validar sua sessão agora. Tente novamente em alguns instantes."
           actionLabel="Tentar novamente"
           onAction={onReload}
         />
-      </AppPageShell>
+      </AppStartupFrame>
     );
   }
 
   if (guardBranch === "blocking_error") {
     setAuditField("errorType", "bootstrap");
     return (
-      <AppPageShell>
+      <AppStartupFrame>
         <AppPageErrorState
           title="Falha ao iniciar a aplicação"
           description={reason ?? "Não foi possível concluir o bootstrap inicial."}
           actionLabel="Recarregar aplicação"
           onAction={onReload}
         />
-      </AppPageShell>
+      </AppStartupFrame>
     );
   }
 

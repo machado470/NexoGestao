@@ -19,6 +19,7 @@ import { ConsentBanner } from "@/components/ConsentBanner";
 import { AppBootstrapGuard, type AppBootstrapState } from "./components/AppBootstrapGuard";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { AppLayout } from "./components/AppLayout";
+import { AppStartupFrame } from "./components/AppStartupFrame";
 import { PublicLayout } from "./components/PublicLayout";
 import { AuthLayout } from "./components/AuthLayout";
 import { AuthServiceGate } from "./components/AuthServiceGate";
@@ -341,7 +342,20 @@ function ProtectedRoute({
   ]);
 
   if (authBranch === "pending_bootstrap") {
-    return <FullScreenLoader />;
+    return (
+      <AppStartupFrame>
+        <div
+          role="status"
+          className="flex items-center gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-5 text-sm text-[var(--text-secondary)]"
+        >
+          <Loader
+            aria-hidden="true"
+            className="size-5 shrink-0 text-[var(--accent-text)] motion-safe:animate-spin"
+          />
+          <span>Carregando ambiente...</span>
+        </div>
+      </AppStartupFrame>
+    );
   }
 
   if (authBranch === "login_redirect") {

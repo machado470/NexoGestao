@@ -214,16 +214,20 @@ describe("Premium skin flag (default ON)", () => {
     }
   });
 
-  it("is applied by MainLayout only, through the flag", () => {
+  it("is applied by the app shell and startup frame through the flag", () => {
     const layout = read("client/src/components/MainLayout.tsx");
     expect(layout).toMatch(/const premiumSkin = isPremiumSkinEnabled\(\);/);
     expect(layout).toMatch(/useDocumentPremiumSkin\(premiumSkin\);/);
     expect(layout).toMatch(/data-skin=\{premiumSkinAttribute\(premiumSkin\)\}/);
+    const startup = read("client/src/components/AppStartupFrame.tsx");
+    expect(startup).toContain("data-skin={premiumSkinAttribute(isPremiumSkinEnabled())}");
+    expect(startup).not.toContain("useDocumentPremiumSkin");
     const writers = sourceFiles("client/src").filter(file =>
       /data-skin|dataset\.skin/.test(read(file))
     );
     expect(writers.sort()).toEqual(
       [
+        path.join("client", "src", "components", "AppStartupFrame.tsx"),
         path.join("client", "src", "components", "MainLayout.tsx"),
         path.join("client", "src", "theme", "premium", "flag.ts"),
         path.join("client", "src", "theme", "premium", "premium-overlays.css"),
