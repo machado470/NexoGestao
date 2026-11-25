@@ -1,12 +1,9 @@
 import { useEffect } from "react";
 
 /**
- * Premium skin feature flag — OFF by default.
- *
- * On only when:
- *  - the build sets VITE_PREMIUM_SKIN=true (not set in any environment today), or
- *  - in development (`vite dev`), localStorage "nexo:premium-skin" is "on".
- * Production builds ignore localStorage, so users cannot turn it on.
+ * Premium is the default theme for the signed-in app.
+ * Builds can explicitly set VITE_PREMIUM_SKIN=false to use the legacy theme.
+ * In Vite development, localStorage can also set "nexo:premium-skin" to "off".
  */
 export const PREMIUM_SKIN_STORAGE_KEY = "nexo:premium-skin";
 export const PREMIUM_SKIN_ATTRIBUTE = "premium";
@@ -26,12 +23,12 @@ export function isPremiumSkinEnabled(
   env: FlagEnv = import.meta.env as FlagEnv,
   storage: FlagStorage = defaultStorage()
 ): boolean {
-  if (env.VITE_PREMIUM_SKIN === "true") return true;
-  if (!env.DEV) return false;
+  if (env.VITE_PREMIUM_SKIN === "false") return false;
+  if (env.VITE_PREMIUM_SKIN === "true" || !env.DEV) return true;
   try {
-    return storage?.getItem(PREMIUM_SKIN_STORAGE_KEY) === "on";
+    return storage?.getItem(PREMIUM_SKIN_STORAGE_KEY) !== "off";
   } catch {
-    return false;
+    return true;
   }
 }
 

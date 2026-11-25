@@ -153,22 +153,17 @@ describe("Premium skin CSS", () => {
   });
 });
 
-describe("Premium skin flag (default OFF)", () => {
+describe("Premium skin flag (default ON)", () => {
   const storage = (value: string | null) => ({ getItem: () => value });
 
-  it("is off in production builds, even with the localStorage override", () => {
-    expect(isPremiumSkinEnabled({ DEV: false }, storage("on"))).toBe(false);
-    expect(
-      isPremiumSkinEnabled(
-        { DEV: false, VITE_PREMIUM_SKIN: "false" },
-        storage("on")
-      )
-    ).toBe(false);
+  it("defaults to Premium in production regardless of browser storage", () => {
+    expect(isPremiumSkinEnabled({ DEV: false }, storage("off"))).toBe(true);
+    expect(isPremiumSkinEnabled({ DEV: false }, null)).toBe(true);
   });
 
-  it("is off in development without an explicit opt-in", () => {
-    expect(isPremiumSkinEnabled({ DEV: true }, storage(null))).toBe(false);
-    expect(isPremiumSkinEnabled({ DEV: true }, null)).toBe(false);
+  it("defaults to Premium in development, including when storage is blocked", () => {
+    expect(isPremiumSkinEnabled({ DEV: true }, storage(null))).toBe(true);
+    expect(isPremiumSkinEnabled({ DEV: true }, null)).toBe(true);
     expect(
       isPremiumSkinEnabled(
         { DEV: true },
@@ -178,14 +173,17 @@ describe("Premium skin flag (default OFF)", () => {
           },
         }
       )
-    ).toBe(false);
+    ).toBe(true);
   });
 
-  it("turns on only by explicit opt-in", () => {
-    expect(isPremiumSkinEnabled({ DEV: true }, storage("on"))).toBe(true);
+  it("supports an explicit build override and a development-only opt-out", () => {
+    expect(isPremiumSkinEnabled({ DEV: true }, storage("off"))).toBe(false);
     expect(
-      isPremiumSkinEnabled({ DEV: false, VITE_PREMIUM_SKIN: "true" }, null)
+      isPremiumSkinEnabled({ DEV: true, VITE_PREMIUM_SKIN: "true" }, storage("off"))
     ).toBe(true);
+    expect(
+      isPremiumSkinEnabled({ DEV: false, VITE_PREMIUM_SKIN: "false" }, storage("on"))
+    ).toBe(false);
     expect(PREMIUM_SKIN_STORAGE_KEY).toBe("nexo:premium-skin");
   });
 
