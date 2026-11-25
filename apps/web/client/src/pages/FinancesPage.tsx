@@ -574,7 +574,7 @@ export default function FinancesPage() {
             })}
           </div>
           <div className="hidden md:block">
-          <AppDataTable className="min-w-[900px]">
+          <AppDataTable label="Pendências financeiras" className="min-w-[900px]">
             <thead>
               <tr>
                 <th scope="col">Cliente</th>
@@ -699,7 +699,7 @@ export default function FinancesPage() {
             </article>)}
           </div>
           <div className="hidden md:block">
-          <AppDataTable className="min-w-[980px]">
+          <AppDataTable label="Carteira de cobranças" className="min-w-[980px]">
             <thead>
               <tr>
                 <th scope="col">Cliente / origem</th>

@@ -219,14 +219,38 @@ export function AppEmptyState({
   );
 }
 
+export function AppTableViewport({
+  children,
+  label,
+  className,
+}: {
+  children: ReactNode;
+  label?: string;
+  className?: string;
+}) {
+  return (
+    <div
+      role={label ? "region" : undefined}
+      aria-label={label}
+      tabIndex={label ? 0 : undefined}
+      className={cn(
+        "min-w-0 overflow-x-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]",
+        className
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
 export function AppDataTable({ className, ...props }: ComponentProps<"table">) {
   return (
-    <div className="overflow-x-auto rounded-xl border border-[var(--border-subtle)]/85 bg-[var(--surface-primary)] shadow-[0_8px_20px_-18px_rgba(15,23,42,0.45)]">
+    <AppTableViewport>
       <table
-        className={cn("w-full min-w-full nexo-data-table text-sm", className)}
+        className={cn("nexo-data-table w-full min-w-full text-sm", className)}
         {...props}
       />
-    </div>
+    </AppTableViewport>
   );
 }
 export type AppStatusTone =
