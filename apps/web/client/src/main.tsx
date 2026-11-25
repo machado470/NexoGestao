@@ -12,6 +12,7 @@ import "./index.css";
 // Premium skin tokens: inert until the Premium flag is on (off by default).
 import "./theme/premium/premium-skin.css";
 import "./theme/premium/premium-shell.css";
+import "./theme/premium/premium-overlays.css";
 import {
   ensureAuditState,
   markAuditError,

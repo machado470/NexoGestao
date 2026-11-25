@@ -120,6 +120,28 @@
   --nexo-depth-hover: var(--nx-shadow);
   --nexo-shadow-elev-1: var(--nx-shadow);
   --modal-card-shadow-light: var(--nx-shadow);
+  --modal-bg: var(--nx-raised);
+  --modal-header-bg: var(--nx-raised);
+  --modal-body-bg: var(--nx-raised);
+  --modal-footer-bg: var(--nx-raised);
+  --app-overlay-bg: var(--nx-raised);
+  --app-overlay-header: var(--nx-raised);
+  --app-overlay-body: var(--nx-raised);
+  --app-overlay-footer: var(--nx-raised);
+  --app-surface-2: var(--nx-raised);
+  --app-text-primary: var(--nx-text);
+  --app-text-secondary: var(--nx-text-2);
+  --app-text-muted: var(--nx-muted);
+  --app-border-strong: var(--nx-line-strong);
+  --app-accent: var(--nx-brand-text);
+  --app-success: var(--nx-ok);
+  --app-warning: var(--nx-warn);
+  --app-danger: var(--nx-bad);
+  --app-surface-success: var(--nx-ok-soft);
+  --app-surface-warning: var(--nx-warn-soft);
+  --app-surface-critical: var(--nx-bad-soft);
+  --app-border-warning: var(--nx-warn);
+  --app-border-critical: var(--nx-bad);
 
   /* Typography */
   --nx-font: "DM Sans", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;

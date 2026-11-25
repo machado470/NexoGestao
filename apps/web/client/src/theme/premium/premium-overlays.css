@@ -1,0 +1,39 @@
+/*
+ * NexoGestão Premium — overlays and feedback (PR 4a).
+ *
+ * Colours for dialogs, alert dialogs, dropdowns, popovers, selects and toasts
+ * come from the aliases in tokens.ts (premium-skin.css), which also apply on
+ * :root so Radix portals in <body> inherit them. This file only covers what a
+ * variable cannot: hard-coded colours in index.css.
+ *
+ * Every selector starts with :root[data-skin="premium"], so nothing here
+ * applies while the Premium flag is off (default). Rules live in
+ * @layer components: they win over the @layer base rules they replace and
+ * still lose to element utilities, as today.
+ *
+ * Rollback: remove the import in main.tsx.
+ */
+
+@layer components {
+  /* index.css (@layer base) paints html/body #f8f9fb in every theme, which
+     shows as a pale band on overscroll in the dark theme. */
+  :root[data-skin="premium"],
+  :root[data-skin="premium"] body {
+    background-color: var(--nx-bg);
+    color: var(--nx-text);
+  }
+
+  /* Skeleton: index.css shimmers with a fixed white highlight. */
+  :root[data-skin="premium"] .nexo-skeleton {
+    background-color: var(--nx-raised);
+  }
+
+  :root[data-skin="premium"] .nexo-skeleton::after {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      color-mix(in srgb, var(--nx-text) 8%, transparent) 50%,
+      transparent 100%
+    );
+  }
+}
