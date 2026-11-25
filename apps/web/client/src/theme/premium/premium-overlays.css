@@ -7,7 +7,7 @@
  * variable cannot: hard-coded colours in index.css.
  *
  * Every selector starts with :root[data-skin="premium"], so nothing here
- * applies while the Premium flag is off (default). Rules live in
+ * applies while the Premium flag is off. Rules live in
  * @layer components: they win over the @layer base rules they replace and
  * still lose to element utilities, as today.
  *

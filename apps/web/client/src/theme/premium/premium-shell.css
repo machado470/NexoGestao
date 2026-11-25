@@ -2,7 +2,7 @@
  * NexoGestão Premium — Shell and Dashboard surfaces (PR 2).
  *
  * Every selector starts with .app-root[data-skin="premium"], so nothing here
- * applies while the Premium flag is off (default). Values come only from the
+ * applies while the Premium flag is off. Values come only from the
  * --nx-* tokens in premium-skin.css.
  *
  * Layering: surfaces live in @layer components, after index.css, so the

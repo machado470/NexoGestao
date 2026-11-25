@@ -1,6 +1,6 @@
 /*
  * NexoGestão Premium skin — GENERATED from theme/premium/tokens.ts. Do not edit by hand.
- * Inert unless data-skin="premium" is set (flag off by default, see flag.ts).
+ * Inert unless data-skin="premium" is set (see flag.ts).
  * Unlayered on purpose: it must win over the @layer base theme blocks in index.css.
  * Rollback: remove the import in main.tsx (or revert the PR).
  */
