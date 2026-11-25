@@ -272,7 +272,7 @@ export default function ServiceCatalogPage() {
     <AppPageShell className="operational-mobile-page mobile-module-page min-w-0 gap-4">
       <header className="flex min-w-0 flex-col items-start justify-between gap-3 sm:flex-row">
         <div className="min-w-0">
-          <BookOpen className="mb-2 h-6 w-6 text-[var(--accent-primary)]" />
+          <BookOpen className="mb-2 h-6 w-6 text-[var(--nx-brand-text,var(--accent-primary))]" />
           <h1 className="text-2xl font-semibold">Catálogo de serviços</h1>
           <p className={`${muted} mt-2`}>
             Padronize serviços, preços de referência e duração.

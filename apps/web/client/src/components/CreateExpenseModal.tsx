@@ -197,7 +197,7 @@ export default function CreateExpenseModal({ open, onClose, onCreated }: Props) 
       initialFocusRef={quickEntryRef}
       title={
         <span className="inline-flex items-center gap-2">
-          <Receipt className="h-5 w-5 text-[var(--accent-primary)]" />
+          <Receipt className="h-5 w-5 text-[var(--nx-brand-text,var(--accent-primary))]" />
           Nova despesa
         </span>
       }

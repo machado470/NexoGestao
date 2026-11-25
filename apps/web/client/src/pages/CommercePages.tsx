@@ -86,7 +86,7 @@ function Workspace({
     <AppPageShell className="operational-mobile-page mobile-module-page commerce-workspace min-w-0 gap-4">
       <header className="flex min-w-0 flex-col items-start justify-between gap-4 sm:flex-row">
         <div className="min-w-0 flex-1">
-          <div className="mb-2 inline-flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent-primary)]">
+          <div className="mb-2 inline-flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--nx-brand-text,var(--accent-primary))]">
             {icon}
           </div>
           <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">

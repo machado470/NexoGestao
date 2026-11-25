@@ -257,7 +257,7 @@ export default function EditPersonModal({
       closeBlocked={updatePerson.isPending}
       title={
         <span className="flex items-center gap-2">
-          <Pencil className="h-5 w-5 text-[var(--accent-primary)]" />
+          <Pencil className="h-5 w-5 text-[var(--nx-brand-text,var(--accent-primary))]" />
           Editar pessoa
         </span>
       }
