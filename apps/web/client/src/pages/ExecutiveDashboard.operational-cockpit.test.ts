@@ -219,13 +219,17 @@ describe("ExecutiveDashboard decision center", () => {
     expect(source).not.toMatch(/attention\.length[\s\S]{0,100}"NORMAL"/);
   });
 
-  it("renders an empty dashboard with a link to Customers", () => {
+  it("renders permission-aware shortcuts in the empty dashboard", () => {
     expect(source).toContain("resolveExecutiveDashboardState");
     expect(source).toContain('dashboardState !== "EMPTY"');
-    expect(source).toContain("Ainda não há dados operacionais");
-    expect(source).toContain(">Ver clientes</Button>");
+    expect(source).toContain('title="Primeiros passos"');
+    expect(source).toContain('canCreateCustomer ? "/customers?action=create" : "/customers"');
+    expect(source).toContain('canCreateCustomer ? "Cadastrar cliente" : "Ver clientes"');
+    expect(source).toContain('can(role, "appointments:create")');
+    expect(source).toContain('can(role, "orders:create")');
+    expect(source).toContain('href="/appointments?action=create"');
+    expect(source).toContain('href="/service-orders?action=create"');
     expect(source).toContain("contextChips={hasOperationalData ? (");
-    expect(source).toContain('navigate("/customers")');
   });
 
   it("diferencia erro de ação, vazio e ação real sem CTA fictício", () => {

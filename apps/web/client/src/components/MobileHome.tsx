@@ -94,7 +94,7 @@ export function MobileHome({
           Sua operação hoje
         </h1>
       </header>
-      {summary.length > 0 ? (
+      {!empty && summary.length > 0 ? (
         <section
           aria-label="Resumo da operação"
           className={`mobile-home-summary grid ${summary.length === 1 ? "grid-cols-1" : "grid-cols-2"} gap-4 rounded-2xl bg-[var(--surface-elevated)] p-4`}
@@ -119,7 +119,7 @@ export function MobileHome({
           ))}
         </section>
       ) : null}
-      {allowed.length ? (
+      {!empty && allowed.length > 0 ? (
         <nav aria-label="Ações rápidas" className="grid grid-cols-4 gap-2">
           {allowed.map(({ label, path, Icon }) => (
             <button
@@ -155,21 +155,6 @@ export function MobileHome({
             Tentar novamente
           </Button>
         </div>
-      ) : null}
-      {empty && !loading && !failed ? (
-        <section className="rounded-2xl bg-[var(--surface-elevated)] p-4">
-          <h2 className="font-semibold">Organize sua operação</h2>
-          <p className="mt-2 text-sm text-[var(--text-muted)]">
-            Abra os clientes para consultar cadastros ou iniciar um novo atendimento.
-          </p>
-          <Button
-            variant="outline"
-            className="mt-3 min-h-11"
-            onClick={() => navigate("/customers")}
-          >
-            Ver clientes
-          </Button>
-        </section>
       ) : null}
       {!empty && !failed ? (
         <>

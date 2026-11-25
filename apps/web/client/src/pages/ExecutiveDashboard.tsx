@@ -15,7 +15,7 @@ import {
   TrendingDown,
   WalletCards,
 } from "lucide-react";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { OperationalInnerCard } from "@/components/operational";
@@ -848,6 +848,9 @@ export default function ExecutiveDashboard() {
   const missingComparisonCount =
     pulseComparisons.length - availableComparisons.length;
   const hasOperationalData = dashboardState !== "EMPTY";
+  const canCreateCustomer = role !== null && can(role, "customers:create");
+  const canCreateAppointment = role !== null && can(role, "appointments:create");
+  const canCreateOrder = role !== null && can(role, "orders:create");
   const officialReference = operationalStateQuery.data?.evidenceAt
     ? `Referência oficial: ${formatEventDateTime(operationalStateQuery.data.evidenceAt)}`
     : "Referência temporal oficial indisponível";
@@ -1109,7 +1112,10 @@ export default function ExecutiveDashboard() {
           ]);
         }}
       />
-      <details open={!isMobile} className="min-w-0 md:contents">
+      <details
+        open={!isMobile}
+        className={hasOperationalData ? "min-w-0 md:contents" : "hidden md:contents"}
+      >
         <summary className="min-h-11 py-3 text-sm font-medium md:hidden">Indicadores e detalhes da operação</summary>
         <div className="min-w-0 md:contents">
       <AppOperationalHeader
@@ -1220,16 +1226,6 @@ export default function ExecutiveDashboard() {
           </Button>
         </div>
       ) : null}
-      {!pageLoading && !pageError && !hasOperationalData ? (
-        <AppPageEmptyState
-          title="Ainda não há dados operacionais"
-          description="Acesse Clientes para consultar cadastros ou cadastrar o primeiro cliente."
-          action={
-            <Button onClick={() => navigate("/customers")}>Ver clientes</Button>
-          }
-        />
-      ) : null}
-
       {hasOperationalData ? (
         <div className="w-full min-w-0 space-y-3 sm:space-y-4">
           <div className="grid w-full min-w-0 items-start gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(20rem,0.65fr)] sm:gap-4">
@@ -1676,6 +1672,34 @@ export default function ExecutiveDashboard() {
       ) : null}
         </div>
       </details>
+      {!pageLoading && !pageError && !hasOperationalData ? (
+        <AppSectionBlock
+          title="Primeiros passos"
+          subtitle={
+            canCreateCustomer
+              ? "Cadastre um cliente para agendar um atendimento ou abrir uma ordem de serviço."
+              : "Ainda não há dados operacionais. Consulte os cadastros em Clientes."
+          }
+        >
+          <div className="flex flex-wrap gap-2">
+            <Button asChild className="min-h-11">
+              <Link href={canCreateCustomer ? "/customers?action=create" : "/customers"}>
+                {canCreateCustomer ? "Cadastrar cliente" : "Ver clientes"}
+              </Link>
+            </Button>
+            {canCreateAppointment ? (
+              <Button asChild variant="outline" className="min-h-11">
+                <Link href="/appointments?action=create">Novo agendamento</Link>
+              </Button>
+            ) : null}
+            {canCreateOrder ? (
+              <Button asChild variant="outline" className="min-h-11">
+                <Link href="/service-orders?action=create">Nova ordem de serviço</Link>
+              </Button>
+            ) : null}
+          </div>
+        </AppSectionBlock>
+      ) : null}
     </AppPageShell>
   );
 }
