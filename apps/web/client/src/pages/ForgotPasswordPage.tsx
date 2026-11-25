@@ -99,7 +99,7 @@ export default function ForgotPasswordPage() {
             Solicitação recebida. Verifique seu e-mail e a pasta de spam. Se o link não chegar, tente novamente mais tarde.
           </div>
           <Button
-            className="w-full bg-orange-500 hover:bg-orange-600"
+            className="w-full bg-orange-700 text-white hover:bg-orange-800"
             onClick={() => navigate("/login")}
           >
             Voltar para login
@@ -137,7 +137,7 @@ export default function ForgotPasswordPage() {
             type="submit"
             disabled={forgotPasswordMutation.isPending}
             aria-busy={forgotPasswordMutation.isPending}
-            className="w-full gap-2 bg-orange-500 hover:bg-orange-600"
+            className="w-full gap-2 bg-orange-700 text-white hover:bg-orange-800"
             size="lg"
           >
             {forgotPasswordMutation.isPending ? (

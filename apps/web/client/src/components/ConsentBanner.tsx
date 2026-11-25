@@ -165,7 +165,7 @@ export function ConsentBanner() {
               pode aceitar categorias opcionais ou personalizar. Leia a nossa{" "}
               <Link
                 href="/privacidade"
-                className="font-medium text-orange-600 hover:text-orange-700"
+                className="font-medium text-orange-700 hover:text-orange-800"
               >
                 Política de Privacidade
               </Link>
@@ -244,7 +244,7 @@ export function ConsentBanner() {
           <Button
             onClick={handleAcceptAll}
             disabled={isSubmitting}
-            className="bg-orange-500 hover:bg-orange-600"
+            className="bg-orange-700 text-white hover:bg-orange-800"
           >
             {isSubmitting ? "Salvando..." : "Aceitar tudo"}
           </Button>
