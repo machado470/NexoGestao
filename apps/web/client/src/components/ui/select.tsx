@@ -60,7 +60,7 @@ function SelectContent({
       <SelectPrimitive.Content
         data-slot="select-content"
         className={cn(
-          "nexo-floating-panel bg-[var(--modal-section-bg)] text-[var(--modal-section-text)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 relative z-50 max-h-(--radix-select-content-available-height) max-w-(--radix-select-content-available-width) min-w-[8rem] origin-(--radix-select-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-[0.85rem] border border-[var(--modal-section-border)] shadow-[var(--app-overlay-shadow)] dark:border-[var(--modal-section-border)]",
+          "nexo-floating-panel bg-[var(--modal-section-bg)] text-[var(--modal-section-text)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 relative z-50 max-h-(--radix-select-content-available-height) max-w-(--radix-select-content-available-width) min-w-[min(8rem,var(--radix-select-content-available-width,100vw))] origin-(--radix-select-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-[0.85rem] border border-[var(--modal-section-border)] shadow-[var(--app-overlay-shadow)] dark:border-[var(--modal-section-border)]",
           position === "popper" &&
             "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
           className
@@ -74,7 +74,7 @@ function SelectContent({
           className={cn(
             "p-1",
             position === "popper" &&
-              "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)] scroll-my-1"
+              "h-[var(--radix-select-trigger-height)] w-full min-w-[min(var(--radix-select-trigger-width),var(--radix-select-content-available-width))] scroll-my-1"
           )}
         >
           {children}
@@ -107,7 +107,7 @@ function SelectItem({
     <SelectPrimitive.Item
       data-slot="select-item"
       className={cn(
-        "focus:bg-[var(--accent-soft)] focus:text-[var(--app-overlay-text)] [&_svg:not([class*='text-'])]:text-[var(--field-placeholder)] relative flex w-full cursor-default items-center gap-2 rounded-md min-h-11 md:min-h-0 py-1.5 pr-8 pl-2.5 text-base md:text-sm whitespace-normal text-[var(--app-overlay-text)] outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&>span:last-child]:block [&>span:last-child]:min-w-0 [&>span:last-child]:break-words",
+        "focus:bg-[var(--accent-soft)] focus:text-[var(--app-overlay-text)] [&_svg:not([class*='text-'])]:text-[var(--field-placeholder)] relative flex w-full cursor-default items-center gap-2 rounded-md min-h-11 md:min-h-0 py-1.5 pr-8 pl-2.5 text-base md:text-sm whitespace-normal text-[var(--app-overlay-text)] outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&>span:last-child]:block [&>span:last-child]:min-w-0 [&>span:last-child]:[overflow-wrap:anywhere]",
         className
       )}
       {...props}
