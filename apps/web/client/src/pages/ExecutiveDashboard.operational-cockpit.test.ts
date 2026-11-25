@@ -147,9 +147,7 @@ describe("ExecutiveDashboard decision center", () => {
   it("does not disguise errors as a healthy empty operation", () => {
     expect(source).toContain("Não foi possível ler a operação");
     expect(source).toContain("não assume que está tudo bem");
-    expect(source).toContain(
-      "A operação não cria alertas ou recomendações fictícias"
-    );
+    expect(source).toContain("!pageLoading && !pageError && !hasOperationalData");
   });
 
   it("keeps valid sections visible when an auxiliary source is unavailable", () => {
@@ -221,11 +219,12 @@ describe("ExecutiveDashboard decision center", () => {
     expect(source).not.toMatch(/attention\.length[\s\S]{0,100}"NORMAL"/);
   });
 
-  it("renders explicit dashboard states and a real onboarding CTA", () => {
+  it("renders an empty dashboard with a link to Customers", () => {
     expect(source).toContain("resolveExecutiveDashboardState");
     expect(source).toContain('dashboardState !== "EMPTY"');
     expect(source).toContain("Ainda não há dados operacionais");
-    expect(source).toContain("Cadastrar ou importar primeiro cliente");
+    expect(source).toContain(">Ver clientes</Button>");
+    expect(source).toContain("contextChips={hasOperationalData ? (");
     expect(source).toContain('navigate("/customers")');
   });
 

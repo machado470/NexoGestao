@@ -1116,8 +1116,12 @@ export default function ExecutiveDashboard() {
         className="px-4 sm:px-6"
         density="compact"
         title="Operação hoje"
-        description="Decida primeiro o que destrava execução e caixa."
-        contextChips={
+        description={
+          hasOperationalData
+            ? "Decida primeiro o que destrava execução e caixa."
+            : undefined
+        }
+        contextChips={hasOperationalData ? (
           <>
             <AppContextChip>{officialReference}</AppContextChip>
             <AppContextChip
@@ -1142,22 +1146,24 @@ export default function ExecutiveDashboard() {
                 : `${overdueOrders} O.S. atrasadas`}
             </AppContextChip>
           </>
-        }
+        ) : undefined}
       >
-        <div className="grid gap-2 text-xs text-[var(--text-secondary)] sm:grid-cols-3">
-          <p>
-            <strong className="text-[var(--text-primary)]">Agora</strong> ·{" "}
-            {statusLabel}
-          </p>
-          <p>
-            <strong className="text-[var(--text-primary)]">Atenção</strong> ·
-            sinais oficiais logo abaixo
-          </p>
-          <p>
-            <strong className="text-[var(--text-primary)]">Primeiro</strong> ·
-            execute a recomendação oficial
-          </p>
-        </div>
+        {hasOperationalData ? (
+          <div className="grid gap-2 text-xs text-[var(--text-secondary)] sm:grid-cols-3">
+            <p>
+              <strong className="text-[var(--text-primary)]">Agora</strong> ·{" "}
+              {statusLabel}
+            </p>
+            <p>
+              <strong className="text-[var(--text-primary)]">Atenção</strong> ·
+              sinais oficiais logo abaixo
+            </p>
+            <p>
+              <strong className="text-[var(--text-primary)]">Primeiro</strong> ·
+              execute a recomendação oficial
+            </p>
+          </div>
+        ) : null}
       </AppOperationalHeader>
 
       {pageLoading ? (
@@ -1215,17 +1221,13 @@ export default function ExecutiveDashboard() {
         </div>
       ) : null}
       {!pageLoading && !pageError && !hasOperationalData ? (
-        <div className="space-y-3">
-          <AppPageEmptyState
-            title="Ainda não há dados operacionais"
-            description="Nenhuma avaliação operacional foi concluída com dados avaliáveis. Cadastre ou importe o primeiro cliente para iniciar. A operação não cria alertas ou recomendações fictícias, nem inventa riscos, valores, cobranças ou ações."
-          />
-          <div className="flex justify-center">
-            <Button onClick={() => navigate("/customers")}>
-              Cadastrar ou importar primeiro cliente
-            </Button>
-          </div>
-        </div>
+        <AppPageEmptyState
+          title="Ainda não há dados operacionais"
+          description="Acesse Clientes para consultar cadastros ou cadastrar o primeiro cliente."
+          action={
+            <Button onClick={() => navigate("/customers")}>Ver clientes</Button>
+          }
+        />
       ) : null}
 
       {hasOperationalData ? (
