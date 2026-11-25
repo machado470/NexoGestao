@@ -1076,7 +1076,12 @@
       rgba(255, 255, 255, 0.42) 50%,
       transparent 100%
     );
-    animation: nexo-shimmer 1.4s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .nexo-skeleton::after {
+      animation: nexo-shimmer 1.4s ease-in-out infinite;
+    }
   }
 
   .nexo-fade-in {

@@ -42,6 +42,8 @@ import {
 import {
   AlertTriangle,
   CheckCircle2,
+  Inbox,
+  Loader2,
   Lock,
   MoreHorizontal,
   ShieldAlert,
@@ -198,14 +200,21 @@ export function AppEmptyState({
   action?: ReactNode;
 }) {
   return (
-    <section className="nexo-card-informative flex flex-col items-center justify-center gap-2.5 p-8 text-center">
-      <p className="text-base font-semibold leading-tight text-[var(--text-primary)]">
-        {title}
-      </p>
-      <p className="max-w-xl text-sm leading-6 text-[var(--text-muted)]">
-        {description}
-      </p>
-      {action ? <div className="pt-1">{action}</div> : null}
+    <section className="nexo-card-informative flex min-w-0 items-start gap-3 p-4 sm:gap-4 sm:p-5">
+      <div aria-hidden="true" className="grid size-9 shrink-0 place-items-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)]">
+        <Inbox className="size-4 text-[var(--text-secondary)]" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div role="status">
+          <p className="text-sm font-semibold text-[var(--text-primary)]">
+            {title}
+          </p>
+          <p className="mt-1 max-w-xl text-sm leading-5 text-[var(--text-secondary)]">
+            {description}
+          </p>
+        </div>
+        {action ? <div className="mt-3">{action}</div> : null}
+      </div>
     </section>
   );
 }
@@ -568,8 +577,9 @@ export function AppLoadingState({
   label?: string;
 }) {
   return (
-    <div className="nexo-card-informative p-4 text-sm text-[var(--text-muted)]">
-      {label}
+    <div role="status" className="nexo-card-informative flex min-w-0 items-center gap-3 p-4 text-sm text-[var(--text-secondary)]">
+      <Loader2 aria-hidden="true" className="size-4 shrink-0 motion-safe:animate-spin" />
+      <span>{label}</span>
     </div>
   );
 }

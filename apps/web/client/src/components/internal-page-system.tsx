@@ -12,7 +12,6 @@ import {
   ChevronRight,
   ChevronDown,
   CircleCheck,
-  Inbox,
   Loader2,
   Search,
   SlidersHorizontal,
@@ -28,6 +27,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
+  AppEmptyState as BaseEmptyState,
   AppPageShell,
   AppPageHeader as BasePageHeader,
   AppFiltersBar as BaseFiltersBar,
@@ -1154,17 +1154,17 @@ export function AppPageLoadingState({
   description?: string;
 }) {
   return (
-    <AppSectionCard className="space-y-3">
-      <div className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)]/65">
-        <Loader2 className="h-4 w-4 animate-spin text-[var(--text-secondary)]" />
+    <AppSectionCard className="space-y-3 p-4 sm:p-5">
+      <div role="status" className="flex min-w-0 items-start gap-3">
+        <div aria-hidden="true" className="grid size-9 shrink-0 place-items-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)]">
+          <Loader2 className="size-4 text-[var(--text-secondary)] motion-safe:animate-spin" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-[var(--text-primary)]">{title}</p>
+          <p className="mt-1 text-sm leading-5 text-[var(--text-secondary)]">{description}</p>
+        </div>
       </div>
-      <p className="text-sm font-semibold text-[var(--text-primary)]">
-        {title}
-      </p>
-      <p className="text-sm leading-6 text-[var(--text-secondary)]">
-        {description}
-      </p>
-      <BaseLoadingState rows={4} />
+      <BaseLoadingState rows={2} decorative />
     </AppSectionCard>
   );
 }
@@ -1181,46 +1181,25 @@ export function AppPageErrorState({
   onAction: () => void;
 }) {
   return (
-    <AppSectionCard className="space-y-3">
-      <div className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--danger)]/30 bg-[var(--danger)]/10">
-        <TriangleAlert className="h-4 w-4 text-[var(--danger)]" />
+    <AppSectionCard className="flex min-w-0 flex-wrap items-start gap-3 border-[var(--danger)]/30 p-4 sm:p-5">
+      <div aria-hidden="true" className="grid size-9 shrink-0 place-items-center rounded-lg border border-[var(--danger)]/30 bg-[var(--danger)]/10">
+        <TriangleAlert className="size-4 text-[var(--danger)]" />
       </div>
-      <p className="text-sm font-semibold text-[var(--text-primary)]">
-        {title}
-      </p>
-      <p className="text-sm leading-6 text-[var(--text-secondary)]">
-        {description}
-      </p>
-      <Button variant="outline" className="min-h-11" onClick={onAction}>
-        {actionLabel}
-      </Button>
+      <div className="min-w-0 flex-1">
+        <div role="alert">
+          <p className="text-sm font-semibold text-[var(--text-primary)]">{title}</p>
+          <p className="mt-1 text-sm leading-5 text-[var(--text-secondary)]">{description}</p>
+        </div>
+        <Button type="button" variant="outline" className="mt-3 min-h-11" onClick={onAction}>
+          {actionLabel}
+        </Button>
+      </div>
     </AppSectionCard>
   );
 }
 
-export function AppPageEmptyState({
-  title,
-  description,
-  action,
-}: {
-  title: string;
-  description: string;
-  action?: ReactNode;
-}) {
-  return (
-    <AppSectionCard className="flex flex-col items-center justify-center gap-2.5 p-8 text-center">
-      <div className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)]/65">
-        <Inbox className="h-4 w-4 text-[var(--text-secondary)]" />
-      </div>
-      <p className="text-sm font-semibold text-[var(--text-primary)]">
-        {title}
-      </p>
-      <p className="max-w-xl text-sm leading-6 text-[var(--text-secondary)]">
-        {description}
-      </p>
-      {action ? <div className="mt-2">{action}</div> : null}
-    </AppSectionCard>
-  );
+export function AppPageEmptyState(props: ComponentProps<typeof BaseEmptyState>) {
+  return <BaseEmptyState {...props} />;
 }
 
 export const AppAttentionBlock = AppSectionBlock;
