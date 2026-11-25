@@ -329,8 +329,8 @@ export function NexoOperationalPipeline({
           {subtitle}
         </p>
       </div>
-      <div className="grid gap-2 lg:grid-cols-5 xl:gap-3">
-        {primaryStages.map((stage, index) => {
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,11rem),1fr))] gap-3">
+        {primaryStages.map(stage => {
           const tone = flowStageTone[stage.state];
           const isBottleneck =
             stage.state === "blocked" || stage.state === "warning";
@@ -338,40 +338,35 @@ export function NexoOperationalPipeline({
             <article
               key={stage.id}
               className={cn(
-                "relative min-w-[9.5rem] rounded-xl border p-2.5 shadow-sm",
+                "min-w-0 rounded-xl border p-3 shadow-sm",
                 tone.container,
                 isBottleneck
                   ? "ring-1 ring-[var(--accent-primary)]/25"
                   : undefined
               )}
             >
-              {index < primaryStages.length - 1 ? (
-                <span className="absolute -right-2 top-1/2 z-10 hidden -translate-y-1/2 items-center text-[var(--text-muted)] lg:flex">
-                  <ArrowRight className="h-4 w-4" />
-                </span>
-              ) : null}
-              <div className="flex items-center justify-between gap-2">
-                <span className="flex min-w-0 items-center gap-2">
-                  {tone.icon}
-                  <span className="whitespace-normal text-[10px] font-semibold uppercase leading-4 tracking-[0.06em] text-[var(--text-secondary)] xl:text-[11px]">
+              <div className="space-y-1">
+                <div className="flex items-start gap-2">
+                  <span aria-hidden="true" className="shrink-0">{tone.icon}</span>
+                  <span className="min-w-0 text-xs font-semibold leading-4 text-[var(--text-primary)] [overflow-wrap:anywhere]">
                     {stage.label}
                   </span>
-                </span>
-                <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                </div>
+                <span className="block text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)] [overflow-wrap:anywhere]">
                   {tone.badge}
                 </span>
               </div>
               {stage.countOrValue ? (
-                <p className="mt-1.5 text-lg font-semibold leading-tight text-[var(--text-primary)]">
+                <p className="mt-1.5 text-lg font-semibold leading-tight text-[var(--text-primary)] [overflow-wrap:anywhere]">
                   {stage.countOrValue}
                 </p>
               ) : null}
-              <p className="mt-1 min-h-[32px] text-xs leading-4 text-[var(--text-secondary)]">
+              <p className="mt-1 min-h-[32px] text-xs leading-4 text-[var(--text-secondary)] [overflow-wrap:anywhere]">
                 {stage.summary}
               </p>
               {stage.onClick ? (
                 <Button
-                  className="mt-2 h-auto px-0 py-0 text-[var(--nx-brand-text,var(--accent-primary))]"
+                  className="mt-2 h-auto max-w-full whitespace-normal px-0 py-0 text-left text-[var(--nx-brand-text,var(--accent-primary))] [overflow-wrap:anywhere]"
                   variant="link"
                   size="sm"
                   onClick={stage.onClick}
