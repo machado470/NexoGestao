@@ -144,7 +144,7 @@ export default function ConfirmEmailPage() {
             )}
           </Button>
           <Button
-            className="w-full bg-orange-500 hover:bg-orange-600"
+            className="w-full bg-orange-700 text-white hover:bg-orange-800"
             onClick={() => navigate("/login")}
           >
             Ir para login
@@ -156,7 +156,7 @@ export default function ConfirmEmailPage() {
             E-mail confirmado com sucesso. Você já pode entrar na plataforma.
           </div>
           <Button
-            className="w-full bg-orange-500 hover:bg-orange-600"
+            className="w-full bg-orange-700 text-white hover:bg-orange-800"
             onClick={() => navigate("/login")}
           >
             Entrar

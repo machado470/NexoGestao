@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { Instagram, Linkedin, Menu, Twitter, X } from "lucide-react";
 import { BrandSignature } from "@/components/BrandSignature";
@@ -51,6 +51,7 @@ const institutionalNotes = [
 export function MarketingLayout({ children }: MarketingLayoutProps) {
   const [location, navigate] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const mobileMenuButton = useRef<HTMLButtonElement>(null);
   const year = useMemo(() => new Date().getFullYear(), []);
 
   if (import.meta.env.DEV) {
@@ -66,8 +67,21 @@ export function MarketingLayout({ children }: MarketingLayoutProps) {
 
   return (
     <div className="nexo-public landing-root min-h-screen">
-      <header className="sticky top-0 z-50 border-b border-[var(--border-subtle)] bg-[#f8f9fb]/90 backdrop-blur-sm">
-        <div className="container flex h-20 items-center justify-between gap-4">
+      <a
+        href="#public-main"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[60] focus:rounded-lg focus:bg-white focus:px-4 focus:py-3 focus:text-slate-900 focus:outline-2 focus:outline-orange-700"
+      >
+        Pular para o conteúdo
+      </a>
+      <header
+        className="sticky top-0 z-50 border-b border-[var(--border-subtle)] bg-[#f8f9fb]/95 backdrop-blur-sm"
+        onKeyDown={event => {
+          if (event.key !== "Escape" || !mobileMenuOpen) return;
+          closeMobileMenu();
+          mobileMenuButton.current?.focus();
+        }}
+      >
+        <div className="container flex h-16 items-center justify-between gap-4 lg:h-20">
           <button
             type="button"
             onClick={() => {
@@ -83,71 +97,79 @@ export function MarketingLayout({ children }: MarketingLayoutProps) {
             />
           </button>
 
-          <nav className="hidden items-center gap-8 md:flex" aria-label="Menu principal">
+          <nav className="hidden items-center gap-6 lg:flex" aria-label="Menu principal">
             {headerLinks.map(item => (
               <Link
                 key={item.label}
                 href={item.href}
-                className={`text-sm font-medium transition hover:text-slate-900 ${location === item.href ? "text-slate-900" : "text-slate-600"}`}
+                aria-current={location === item.href ? "page" : undefined}
+                className={`rounded-md px-2 py-2 text-sm font-medium transition-colors hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700 ${location === item.href ? "bg-slate-200/65 text-slate-900" : "text-slate-600"}`}
               >
                 {item.label}
               </Link>
             ))}
           </nav>
 
-          <div className="hidden items-center gap-3 md:flex">
+          <div className="hidden items-center gap-3 lg:flex">
             <Link href="/login" className="rounded-xl px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100">
               Entrar
             </Link>
-            <Link href="/register" className="rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(249,115,22,0.35)] transition hover:bg-orange-600">
+            <Link href="/register" className="rounded-xl bg-orange-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-orange-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">
               Começar agora
             </Link>
           </div>
 
           <button
             type="button"
-            className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white p-2 text-slate-700 md:hidden"
+            ref={mobileMenuButton}
+            className="inline-flex size-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700 lg:hidden"
             onClick={() => setMobileMenuOpen(prev => !prev)}
             aria-label={mobileMenuOpen ? "Fechar menu" : "Abrir menu"}
             aria-expanded={mobileMenuOpen}
+            aria-controls="public-mobile-menu"
           >
             {mobileMenuOpen ? <X className="size-5" /> : <Menu className="size-5" />}
           </button>
         </div>
 
-        {mobileMenuOpen ? (
-          <div className="border-t border-slate-200 bg-white md:hidden">
-            <nav className="container flex flex-col gap-1 py-3" aria-label="Menu mobile">
-              {headerLinks.map(item => (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  onClick={closeMobileMenu}
-                  className="rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
-                >
-                  {item.label}
-                </Link>
-              ))}
+        <div
+          id="public-mobile-menu"
+          hidden={!mobileMenuOpen}
+          className="max-h-[calc(100dvh-4rem)] overflow-y-auto border-t border-slate-200 bg-white lg:hidden"
+        >
+          <nav className="container flex flex-col gap-1 py-3" aria-label="Menu mobile">
+            {headerLinks.map(item => (
               <Link
-                href="/login"
+                key={item.label}
+                href={item.href}
                 onClick={closeMobileMenu}
-                className="mt-2 rounded-lg border border-slate-200 px-3 py-2 text-center text-sm font-medium text-slate-700"
+                aria-current={location === item.href ? "page" : undefined}
+                className="flex min-h-11 items-center rounded-lg px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 aria-[current=page]:bg-slate-100 aria-[current=page]:text-slate-900"
               >
-                Entrar
+                {item.label}
               </Link>
-              <Link
-                href="/register"
-                onClick={closeMobileMenu}
-                className="rounded-lg bg-orange-500 px-3 py-2 text-center text-sm font-semibold text-white"
-              >
-                Começar agora
-              </Link>
-            </nav>
-          </div>
-        ) : null}
+            ))}
+            <Link
+              href="/login"
+              onClick={closeMobileMenu}
+              className="mt-2 flex min-h-11 items-center justify-center rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-700"
+            >
+              Entrar
+            </Link>
+            <Link
+              href="/register"
+              onClick={closeMobileMenu}
+              className="flex min-h-11 items-center justify-center rounded-lg bg-orange-700 px-3 text-sm font-semibold text-white hover:bg-orange-800"
+            >
+              Começar agora
+            </Link>
+          </nav>
+        </div>
       </header>
 
-      <main>{children}</main>
+      <main id="public-main" tabIndex={-1} className="scroll-mt-20 lg:scroll-mt-24">
+        {children}
+      </main>
 
       <footer className="bg-white py-12">
         <div className="container">

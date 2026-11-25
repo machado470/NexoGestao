@@ -37,8 +37,8 @@ export function AuthMarketingShell({
 
   return (
     <div className="nexo-auth landing-root min-h-screen text-slate-900">
-      <main className="container py-6 sm:py-10">
-        <div className="grid min-h-[calc(100vh-5rem)] overflow-hidden rounded-[2rem] border border-[var(--border-subtle)] bg-white/80 shadow-[0_25px_60px_rgba(15,23,42,0.08)] backdrop-blur-sm lg:grid-cols-[1.05fr_0.95fr]">
+      <main className="container py-4 sm:py-8 lg:py-10">
+        <div className="grid lg:min-h-[calc(100svh-5rem)] overflow-hidden rounded-[2rem] border border-[var(--border-subtle)] bg-white/80 shadow-[0_25px_60px_rgba(15,23,42,0.08)] backdrop-blur-sm lg:grid-cols-[1.05fr_0.95fr]">
           <section className="relative hidden border-r border-[var(--border-subtle)] bg-white/70 lg:block">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.16),transparent_35%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.12),transparent_30%)]" />
             <div className="relative flex h-full flex-col justify-between p-10 xl:p-14">
@@ -54,7 +54,7 @@ export function AuthMarketingShell({
                   <span className="inline-flex items-center rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-semibold tracking-[0.12em] text-orange-700">
                     {badge}
                   </span>
-                  <h1 className="mt-5 text-4xl font-semibold leading-tight text-slate-900 xl:text-5xl">{asideTitle}</h1>
+                  <h2 className="mt-5 text-4xl font-semibold leading-tight text-slate-900 xl:text-5xl">{asideTitle}</h2>
                   <p className="mt-6 text-base leading-7 text-slate-600 xl:text-lg">{asideDescription}</p>
 
                   <div className="mt-8 space-y-3">
@@ -72,9 +72,9 @@ export function AuthMarketingShell({
                 <div className="mt-3 grid gap-3 sm:grid-cols-3">
                   {bottomPanelSteps.map((step) => (
                     <div key={step.label} className="rounded-xl border border-slate-200 bg-[var(--surface-base)] p-3">
-                      <p className="text-xs text-slate-500">{step.label}</p>
+                      <p className="text-xs text-slate-600">{step.label}</p>
                       <p className="mt-1 text-sm font-semibold text-slate-900">{step.value}</p>
-                      <p className="mt-1 text-xs text-slate-500">{step.description}</p>
+                      <p className="mt-1 text-xs text-slate-600">{step.description}</p>
                     </div>
                   ))}
                 </div>
@@ -82,22 +82,22 @@ export function AuthMarketingShell({
             </div>
           </section>
 
-          <section className="flex min-h-screen items-center justify-center p-6 sm:p-8 lg:min-h-0 lg:p-10">
+          <section className="flex min-w-0 items-center justify-center px-4 py-6 sm:p-8 lg:p-10">
             <div className="w-full max-w-md">
               <button
                 type="button"
                 onClick={() => navigate(backTo)}
-                className="mb-6 inline-flex items-center gap-2 text-sm text-slate-500 transition-colors hover:text-slate-900"
+                className="mb-4 inline-flex min-h-11 items-center gap-2 rounded-md text-sm text-slate-600 transition-colors hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700"
               >
                 <ArrowLeft className="size-4" />
                 {backLabel}
               </button>
 
-              <AuthCard className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_20px_45px_rgba(15,23,42,0.08)] sm:p-7">
+              <AuthCard className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_20px_45px_rgba(15,23,42,0.08)] sm:p-7">
                 <span className="inline-flex rounded-full border border-slate-200 bg-[var(--surface-base)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-700">
                   {badge}
                 </span>
-                <h2 className="mt-4 text-2xl font-semibold text-slate-900">{title}</h2>
+                <h1 className="mt-4 text-2xl font-semibold text-slate-900">{title}</h1>
                 <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
 
                 <div className="mt-6">{children}</div>

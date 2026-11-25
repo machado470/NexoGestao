@@ -235,7 +235,7 @@ export default function Register() {
           type="submit"
           disabled={isSubmitting}
           aria-busy={isSubmitting}
-          className="w-full gap-2 bg-orange-500 hover:bg-orange-600"
+          className="w-full gap-2 bg-orange-700 text-white hover:bg-orange-800"
           size="lg"
         >
           {isSubmitting ? (

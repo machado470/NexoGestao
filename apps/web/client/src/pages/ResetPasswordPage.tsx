@@ -116,7 +116,7 @@ export default function ResetPasswordPage() {
             Senha redefinida com sucesso.
           </div>
           <Button
-            className="w-full bg-orange-500 hover:bg-orange-600"
+            className="w-full bg-orange-700 text-white hover:bg-orange-800"
             onClick={() => navigate("/login")}
           >
             Ir para login
@@ -163,7 +163,7 @@ export default function ResetPasswordPage() {
             type="submit"
             disabled={resetPasswordMutation.isPending}
             aria-busy={resetPasswordMutation.isPending}
-            className="w-full gap-2 bg-orange-500 hover:bg-orange-600"
+            className="w-full gap-2 bg-orange-700 text-white hover:bg-orange-800"
             size="lg"
           >
             {resetPasswordMutation.isPending ? (
