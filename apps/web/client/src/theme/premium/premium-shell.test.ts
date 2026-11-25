@@ -71,11 +71,11 @@ describe("Premium shell CSS (PR 2)", () => {
     expect(parsed.length).toBeGreaterThan(15);
   });
 
-  it('only applies while data-skin="premium" is on the app shell', () => {
+  it('only applies while data-skin="premium" is set (app shell, or :root for portals)', () => {
     for (const rule of parsed) {
       for (const selector of rule.selectors) {
         expect(selector, selector).toMatch(
-          /^\.app-root\[data-skin="premium"\]/
+          /^(\.app-root|:root)\[data-skin="premium"\]/
         );
       }
     }
@@ -107,7 +107,7 @@ describe("Premium shell CSS (PR 2)", () => {
       expect(rule.layered, rule.selectors[0]).toBe(true);
   });
 
-  it("keeps the unlayered overrides to the four utility hooks", () => {
+  it("keeps the unlayered overrides to the utility hooks and Button focus", () => {
     const unlayered = parsed
       .filter(rule => !rule.layered)
       .flatMap(rule => rule.selectors);
@@ -116,12 +116,13 @@ describe("Premium shell CSS (PR 2)", () => {
       '.app-root[data-skin="premium"] .nexo-notification-count',
       '.app-root[data-skin="premium"] .nexo-sidebar-item-active svg',
       '.app-root[data-skin="premium"] .nexo-sidebar-backdrop',
+      ':root[data-skin="premium"] [data-slot="button"]:focus-visible',
     ]);
   });
 
   it("does not change layout or responsive behaviour (colours, borders and shadows only)", () => {
     const allowed =
-      /^(background(-color|-image)?|border(-right|-bottom)?(-color)?|box-shadow|color|outline(-offset)?|cursor|font-weight)$/;
+      /^(background(-color|-image)?|border(-top|-right|-bottom)?(-color)?|box-shadow|color|outline(-offset)?|cursor|font-weight)$/;
     for (const rule of parsed) {
       for (const declaration of rule.body
         .split(";")

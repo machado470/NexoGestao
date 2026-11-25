@@ -84,7 +84,7 @@ export function MobileUpcomingAppointment({
             )
           }
         >
-          <span className="block text-sm font-semibold text-[var(--accent-primary)]">
+          <span className="block text-sm font-semibold text-[var(--nx-brand-text,var(--accent-primary))]">
             {formatOrganizationDate(item.startsAt, timezone)}
           </span>
           <span className="mt-1 block break-words font-medium">

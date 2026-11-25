@@ -344,7 +344,7 @@ export function AppPagination({
               className={cn(
                 baseButtonClass,
                 safePage === item
-                  ? "border-[var(--accent-primary)] bg-[var(--accent-soft)] text-[var(--accent-primary)]"
+                  ? "border-[var(--accent-primary)] bg-[var(--accent-soft)] text-[var(--nx-brand-text,var(--accent-primary))]"
                   : undefined
               )}
               aria-current={safePage === item ? "page" : undefined}

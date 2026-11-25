@@ -90,6 +90,7 @@
   --success: var(--nx-ok);
   --warning: var(--nx-warn);
   --danger: var(--nx-bad);
+  --info: var(--nx-info);
   --destructive: var(--nx-bad);
   --destructive-foreground: var(--nx-on-bad);
   --app-overlay-shadow: var(--nx-shadow);

@@ -631,7 +631,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                 <div className="nexo-topbar-content-grid">
                   <div className="flex min-w-0 items-center gap-2 md:gap-2.5">
                     {isMobile ? <>
-                      <button type="button" onClick={() => handleNavigate("/executive-dashboard")} className="min-h-11 min-w-0 flex-1 truncate text-left text-base font-semibold tracking-tight" aria-label="NexoGestão, início">NexoGestão<span className="text-[var(--accent-primary)]">.</span></button>
+                      <button type="button" onClick={() => handleNavigate("/executive-dashboard")} className="min-h-11 min-w-0 flex-1 truncate text-left text-base font-semibold tracking-tight" aria-label="NexoGestão, início">NexoGestão<span className="text-[var(--nx-brand-text,var(--accent-primary))]">.</span></button>
                       <button type="button" className="nexo-topbar-control" aria-label="Buscar" onClick={() => setMobileSearchOpen(true)}><Search className="h-5 w-5" /></button>
                     </> : <div className="nexo-topbar-search-slot min-w-0 self-center"><GlobalSearch /></div>}
                   </div>

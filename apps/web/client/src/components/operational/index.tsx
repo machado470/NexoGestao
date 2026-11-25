@@ -92,7 +92,7 @@ export function OperationalPanel({
         >
           <div className="flex min-w-0 gap-3">
             {icon ? (
-              <div className="mt-0.5 text-[var(--accent-primary)]">{icon}</div>
+              <div className="mt-0.5 text-[var(--nx-brand-text,var(--accent-primary))]">{icon}</div>
             ) : null}
             <div className="min-w-0">
               {title ? (
@@ -161,7 +161,7 @@ export function OperationalKpiCard({
           {value}
         </p>
         {trend ? (
-          <span className="text-xs font-medium text-[var(--accent-primary)]">
+          <span className="text-xs font-medium text-[var(--nx-brand-text,var(--accent-primary))]">
             {trend}
           </span>
         ) : null}
@@ -243,7 +243,7 @@ export function OperationalTimelineItem({
       <div className="flex flex-col items-center">
         <span
           className={cn(
-            "timeline-dot flex h-8 w-8 items-center justify-center rounded-full border text-[var(--accent-primary)]",
+            "timeline-dot flex h-8 w-8 items-center justify-center rounded-full border text-[var(--nx-brand-text,var(--accent-primary))]",
             toneClasses[tone]
           )}
         >

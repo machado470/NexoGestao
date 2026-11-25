@@ -373,7 +373,7 @@ export function AppRowActionsDropdown({
               className={cn(
                 "px-3 py-2.5",
                 item.tone === "primary"
-                  ? "font-semibold text-[var(--accent-primary)] focus:text-[var(--accent-primary)]"
+                  ? "font-semibold text-[var(--nx-brand-text,var(--accent-primary))] focus:text-[var(--nx-brand-text,var(--accent-primary))]"
                   : undefined
               )}
             >
