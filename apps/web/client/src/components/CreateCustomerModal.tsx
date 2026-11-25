@@ -3,7 +3,7 @@ import { customerContinuation, canChooseCustomerNextStep, type CustomerNextStep 
 import { useFormDiscardGuard } from "@/hooks/useFormDiscardGuard";
 import { executeCustomerUpdate as executeCustomerCreation } from "@/lib/customer-update-flow";
 import { Button } from "@/components/ui/button";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type RefObject } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/accordion";
 
 type Props = {
+  returnFocusRef?: RefObject<HTMLButtonElement | null>;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated?: (createdCustomer?: {
@@ -39,6 +40,7 @@ export default function CreateCustomerModal({
   open,
   onOpenChange,
   onCreated,
+  returnFocusRef,
 }: Props) {
   const [, navigate] = useLocation();
   const { role } = useAuth();
@@ -237,6 +239,7 @@ export default function CreateCustomerModal({
       open={open}
       onOpenChange={nextOpen => (nextOpen ? onOpenChange(nextOpen) : close())}
       title="Novo Cliente"
+      returnFocusRef={returnFocusRef}
       description={`${name.trim() || "Cliente em cadastro"} · ${phone.trim() || "Sem telefone"}`}
       isSubmitting={createCustomer.isPending}
       closeBlocked={createCustomer.isPending}
@@ -466,7 +469,7 @@ export default function CreateCustomerModal({
                     <p className="text-sm font-medium text-[var(--modal-section-text)]">
                       {option.label}
                     </p>
-                    <p className="mt-1 text-xs text-[var(--modal-section-muted)]">
+                    <p className="mt-1 text-xs text-[var(--nx-text-2,var(--modal-section-muted))]">
                       {option.hint}
                     </p>
                   </button>

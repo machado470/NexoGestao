@@ -5,7 +5,7 @@ import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
 import { formatOrganizationDate, type Instant } from "@/lib/organization-locale";
 import { useIsMobile } from "@/hooks/useMobile";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import {
   ArrowRight,
   ArrowLeft,
@@ -473,6 +473,12 @@ export default function CustomersPage() {
   >("nexo.customers.active-id.v2", null);
   const [createOpen, setCreateOpen] = useState(false);
   useCreateFromRoute("customers:create", setCreateOpen);
+  const createTriggerRef = useRef<HTMLButtonElement | null>(null);
+
+  function openCreateCustomer(event: MouseEvent<HTMLButtonElement>) {
+    createTriggerRef.current = event.currentTarget;
+    setCreateOpen(true);
+  }
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(
     null
   );
@@ -1064,7 +1070,7 @@ export default function CustomersPage() {
         }}><ArrowLeft className="h-4 w-4" />Voltar aos clientes</Button> : <MobileModuleHeader
           title="Clientes" description="Relacionamentos e próximos atendimentos."
           context={customersQuery.isSuccess ? `${customersQuery.data?.meta.total ?? 0} ${(customersQuery.data?.meta.total ?? 0) === 1 ? "cliente encontrado" : "clientes encontrados"}` : undefined}
-          primaryAction={canCreateCustomer ? <Button className="min-h-11" onClick={() => setCreateOpen(true)}>Novo cliente</Button> : undefined}
+          primaryAction={canCreateCustomer ? <Button className="min-h-11" onClick={openCreateCustomer}>Novo cliente</Button> : undefined}
         />}
       </div>
       <div className="hidden md:block">
@@ -1075,7 +1081,7 @@ export default function CustomersPage() {
         primaryAction={
           <Button
             disabled={!canCreateCustomer}
-            onClick={() => setCreateOpen(true)}
+            onClick={openCreateCustomer}
           >
             Novo cliente
           </Button>
@@ -1134,7 +1140,7 @@ export default function CustomersPage() {
           <ShieldAlert className="h-4 w-4 text-[var(--warning)]" />
           <AppAlertTitle>Leitura operacional parcial</AppAlertTitle>
           <AppAlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <span>
+            <span className="text-[var(--nx-text-2,var(--muted-foreground))]">
               Clientes carregados, mas{" "}
               {unavailableAuxiliaryData.map(source => source.label).join(", ")}{" "}
               não puderam ser consultados. Estado operacional e risco continuam
@@ -1239,7 +1245,7 @@ export default function CustomersPage() {
               className={cn(
                 "h-8 rounded-md border px-3 text-xs font-medium transition-colors",
                 activeFilter === item.key
-                  ? "border-[var(--accent-primary)] bg-[var(--accent-soft)] text-[var(--accent-primary)]"
+                  ? "border-[var(--accent-primary)] bg-[var(--accent-soft)] text-[var(--nx-brand-text,var(--accent-primary))]"
                   : "border-[var(--border-subtle)] bg-[var(--surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
               )}
               onClick={() => setActiveFilter(item.key as CustomerFilter)}
@@ -1287,7 +1293,7 @@ export default function CustomersPage() {
           ) : customers.length === 0 && !searchTerm && activeFilter === "all" && priorityFilter === "all" && riskFilter === "all" ? (
             <AppPageEmptyState title="Nenhum cliente cadastrado"
               description="Cadastre o primeiro cliente para começar."
-              action={canCreateCustomer ? <Button onClick={() => setCreateOpen(true)}>Criar primeiro cliente</Button> : undefined} />
+              action={canCreateCustomer ? <Button onClick={openCreateCustomer}>Criar primeiro cliente</Button> : undefined} />
           ) : filteredProfiles.length === 0 ? (
             <AppPageEmptyState title="Nenhum resultado para os filtros"
               description="Limpe os filtros para ver a carteira."
@@ -1996,6 +2002,7 @@ export default function CustomersPage() {
       <CreateCustomerModal
         open={createOpen && canCreateCustomer}
         onOpenChange={setCreateOpen}
+        returnFocusRef={createTriggerRef}
         onCreated={async created => {
           setCreateOpen(false);
           await customersQuery.refetch();

@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, type ReactNode, type RefObject } from "react";
 import { AlertTriangle, Loader2 } from "lucide-react";
 
 import { FormModal } from "@/components/app-modal-system";
@@ -20,6 +20,7 @@ type Props = {
   loadingTimeoutMs?: number;
   hasDirtyState?: boolean;
   contentClassName?: string;
+  returnFocusRef?: RefObject<HTMLButtonElement | null>;
 };
 
 export default function ModalFlowShell({
@@ -38,6 +39,7 @@ export default function ModalFlowShell({
   loadingTimeoutMs = 9000,
   hasDirtyState = false,
   contentClassName,
+  returnFocusRef,
 }: Props) {
   useEffect(() => {
     if (!open || !isSubmitting) return;
@@ -53,6 +55,7 @@ export default function ModalFlowShell({
 
   return (
     <FormModal
+      returnFocusRef={returnFocusRef}
       open={open}
       onOpenChange={nextOpen => {
         if (!nextOpen && (closeBlocked || isSubmitting)) return;

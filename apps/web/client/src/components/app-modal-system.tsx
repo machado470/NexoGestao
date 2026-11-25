@@ -33,6 +33,7 @@ export function BaseModal({
   fixedHeader = true,
   fixedFooter = true,
   initialFocusRef,
+  returnFocusRef,
   intent = "edit",
   contentClassName,
 }: {
@@ -47,6 +48,7 @@ export function BaseModal({
   fixedHeader?: boolean;
   fixedFooter?: boolean;
   initialFocusRef?: RefObject<HTMLElement | null>;
+  returnFocusRef?: RefObject<HTMLButtonElement | null>;
   intent?: ModalIntent;
   contentClassName?: string;
 }) {
@@ -71,6 +73,14 @@ export function BaseModal({
         }}
         onInteractOutside={(event) => {
           if (closeBlocked) event.preventDefault();
+        }}
+        onCloseAutoFocus={(event) => {
+          if (!returnFocusRef) return;
+          const trigger = returnFocusRef.current;
+          returnFocusRef.current = null;
+          if (!trigger?.isConnected || trigger.disabled) return;
+          trigger.focus({ preventScroll: true });
+          if (trigger === document.activeElement) event.preventDefault();
         }}
         onOpenAutoFocus={(event) => {
           if (!initialFocusRef?.current) return;
@@ -273,6 +283,7 @@ export function FormModal({
   size = "lg",
   closeBlocked = false,
   initialFocusRef,
+  returnFocusRef,
   contentClassName,
 }: {
   open: boolean;
@@ -284,6 +295,7 @@ export function FormModal({
   size?: keyof typeof modalSizeMap;
   closeBlocked?: boolean;
   initialFocusRef?: RefObject<HTMLElement | null>;
+  returnFocusRef?: RefObject<HTMLButtonElement | null>;
   contentClassName?: string;
 }) {
   return (
@@ -297,6 +309,7 @@ export function FormModal({
       closeBlocked={closeBlocked}
       footer={footer}
       initialFocusRef={initialFocusRef}
+      returnFocusRef={returnFocusRef}
       contentClassName={contentClassName}
     >
       {children}
