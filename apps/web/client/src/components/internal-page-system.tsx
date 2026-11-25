@@ -305,20 +305,21 @@ export function AppPagination({
   const pages = buildPagination(safePage, totalPages);
 
   const baseButtonClass =
-    "inline-flex h-8 min-w-8 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-40";
+    "inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-8 sm:min-w-8";
 
   return (
-    <div
+    <nav
+      aria-label="Paginação"
       className={cn(
-        "mt-2 flex flex-col gap-2 border-t border-[var(--border-subtle)] pt-3 sm:flex-row sm:items-center sm:justify-between",
+        "mt-2 flex flex-col gap-2 border-t border-[var(--border-subtle)] pt-3 md:flex-row md:flex-wrap md:items-center md:justify-between",
         className
       )}
     >
-      <p className="text-xs text-[var(--text-muted)]">
+      <p role="status" className="text-xs text-[var(--text-muted)]">
         Mostrando {startItem}–{endItem} de {totalItems} registros
       </p>
 
-      <div className="hidden items-center gap-1 sm:flex">
+      <div className="flex min-w-0 flex-wrap items-center justify-center gap-2 sm:justify-end sm:gap-1">
         <button
           type="button"
           className={baseButtonClass}
@@ -326,33 +327,41 @@ export function AppPagination({
           onClick={() => onPageChange(safePage - 1)}
           aria-label="Página anterior"
         >
-          <ChevronLeft className="h-4 w-4" />
+          <ChevronLeft aria-hidden="true" className="size-4 shrink-0" />
+          <span className="sm:hidden">Anterior</span>
         </button>
-        {pages.map((item, index) =>
-          item === "..." ? (
-            <span
-              key={`ellipsis-${index}`}
-              className="px-1 text-xs text-[var(--text-muted)]"
-            >
-              ...
-            </span>
-          ) : (
-            <button
-              key={`page-${item}`}
-              type="button"
-              onClick={() => onPageChange(item)}
-              className={cn(
-                baseButtonClass,
-                safePage === item
-                  ? "border-[var(--accent-primary)] bg-[var(--accent-soft)] text-[var(--nx-brand-text,var(--accent-primary))]"
-                  : undefined
-              )}
-              aria-current={safePage === item ? "page" : undefined}
-            >
-              {item}
-            </button>
-          )
-        )}
+        <span aria-current="page" className="text-xs font-medium text-[var(--text-secondary)] sm:hidden">
+          Página {safePage} de {totalPages}
+        </span>
+        <div className="hidden flex-wrap items-center gap-1 sm:flex">
+          {pages.map((item, index) =>
+            item === "..." ? (
+              <span
+                key={`ellipsis-${index}`}
+                aria-hidden="true"
+                className="px-1 text-xs text-[var(--text-muted)]"
+              >
+                ...
+              </span>
+            ) : (
+              <button
+                key={`page-${item}`}
+                type="button"
+                onClick={() => onPageChange(item)}
+                className={cn(
+                  baseButtonClass,
+                  safePage === item
+                    ? "border-[var(--accent-primary)] bg-[var(--accent-soft)] text-[var(--nx-brand-text,var(--accent-primary))]"
+                    : undefined
+                )}
+                aria-label={`Página ${item}`}
+                aria-current={safePage === item ? "page" : undefined}
+              >
+                {item}
+              </button>
+            )
+          )}
+        </div>
         <button
           type="button"
           className={baseButtonClass}
@@ -360,32 +369,11 @@ export function AppPagination({
           onClick={() => onPageChange(safePage + 1)}
           aria-label="Próxima página"
         >
-          <ChevronRight className="h-4 w-4" />
+          <span className="sm:hidden">Próxima</span>
+          <ChevronRight aria-hidden="true" className="size-4 shrink-0" />
         </button>
       </div>
-
-      <div className="flex items-center justify-end gap-2 sm:hidden">
-        <button
-          type="button"
-          className={baseButtonClass}
-          disabled={safePage === 1}
-          onClick={() => onPageChange(safePage - 1)}
-        >
-          Anterior
-        </button>
-        <span className="text-xs font-medium text-[var(--text-secondary)]">
-          {safePage}/{totalPages}
-        </span>
-        <button
-          type="button"
-          className={baseButtonClass}
-          disabled={safePage === totalPages}
-          onClick={() => onPageChange(safePage + 1)}
-        >
-          Próxima
-        </button>
-      </div>
-    </div>
+    </nav>
   );
 }
 
