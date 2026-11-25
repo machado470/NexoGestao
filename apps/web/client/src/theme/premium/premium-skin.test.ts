@@ -228,6 +228,7 @@ describe("Premium skin flag (default OFF)", () => {
       [
         path.join("client", "src", "components", "MainLayout.tsx"),
         path.join("client", "src", "theme", "premium", "flag.ts"),
+        path.join("client", "src", "theme", "premium", "premium-overlays.css"),
         path.join("client", "src", "theme", "premium", "premium-shell.css"),
         path.join("client", "src", "theme", "premium", "premium-skin.css"),
         path.join("client", "src", "theme", "premium", "tokens.ts"),

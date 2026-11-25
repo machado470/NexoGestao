@@ -180,6 +180,30 @@ export const premiumAliasMap: Record<string, PremiumTokenName> = {
   "--nexo-depth-hover": "--nx-shadow",
   "--nexo-shadow-elev-1": "--nx-shadow",
   "--modal-card-shadow-light": "--nx-shadow",
+  // Overlays and feedback (PR 4a). Modals use one elevated surface, like
+  // menus and popovers (--app-overlay-surface), so header/body/footer match.
+  "--modal-bg": "--nx-raised",
+  "--modal-header-bg": "--nx-raised",
+  "--modal-body-bg": "--nx-raised",
+  "--modal-footer-bg": "--nx-raised",
+  "--app-overlay-bg": "--nx-raised",
+  "--app-overlay-header": "--nx-raised",
+  "--app-overlay-body": "--nx-raised",
+  "--app-overlay-footer": "--nx-raised",
+  "--app-surface-2": "--nx-raised",
+  "--app-text-primary": "--nx-text",
+  "--app-text-secondary": "--nx-text-2",
+  "--app-text-muted": "--nx-muted",
+  "--app-border-strong": "--nx-line-strong",
+  "--app-accent": "--nx-brand-text",
+  "--app-success": "--nx-ok",
+  "--app-warning": "--nx-warn",
+  "--app-danger": "--nx-bad",
+  "--app-surface-success": "--nx-ok-soft",
+  "--app-surface-warning": "--nx-warn-soft",
+  "--app-surface-critical": "--nx-bad-soft",
+  "--app-border-warning": "--nx-warn",
+  "--app-border-critical": "--nx-bad",
 };
 
 export const premiumFontAliases = [
