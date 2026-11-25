@@ -976,7 +976,7 @@ export default function ServiceOrdersPage() {
             value={searchTerm}
             onChange={event => setSearchTerm(event.target.value)}
             placeholder="Buscar por código, cliente ou descrição"
-            className="h-9 w-full"
+            className="h-11 w-full md:h-9"
           />
         </div>
 <ResponsiveDetails title="Mais filtros" controls>
@@ -1047,8 +1047,9 @@ export default function ServiceOrdersPage() {
             <button
               key={filter.key}
               type="button"
+              aria-pressed={activeFilter === filter.key}
               className={cn(
-                "h-8 rounded-md border px-3 text-xs font-medium transition-colors",
+                "min-h-11 rounded-md border px-3 text-sm font-medium transition-colors md:h-8 md:min-h-0 md:text-xs",
                 activeFilter === filter.key
                   ? "border-[var(--accent-primary)] bg-[var(--accent-soft)] text-[var(--nx-brand-text,var(--accent-primary))]"
                   : "border-[var(--border-subtle)] bg-[var(--surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"

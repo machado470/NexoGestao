@@ -35,18 +35,18 @@ describe("ResponsiveDetails", () => {
   it("on mobile keeps a collapsed disclosure with a visible summary", () => {
     mobile.value = true;
     const html = render({ controls: true });
-    expect(html).toMatch(/^<details class="min-w-0 w-full" data-responsive-details="Mais filtros">/);
+    expect(html).toMatch(/^<details class="group min-w-0 w-full" data-responsive-details="Mais filtros">/);
     expect(html).not.toMatch(/<details[^>]*\sopen/);
-    expect(html).toContain(
-      '<summary class="min-h-11 cursor-pointer py-2 text-sm font-semibold">Mais filtros</summary>'
-    );
-    expect(html).toContain('<div class="grid min-w-0 gap-3"><select aria-label="Responsável">');
+    expect(html).toMatch(/<summary[^>]*min-h-11[^>]*>/);
+    expect(html).toContain("<span>Mais filtros</span>");
+    expect(html).toContain('aria-hidden="true"');
+    expect(html).toContain('<div class="mt-2 grid min-w-0 gap-3"><select aria-label="Responsável">');
   });
 
   it("keeps the bordered card variant on mobile", () => {
     mobile.value = true;
     expect(render()).toMatch(
-      /^<details class="min-w-0 rounded-xl border border-\[var\(--border-subtle\)\] p-3"/
+      /^<details class="group min-w-0 rounded-xl border border-\[var\(--border-subtle\)\] p-3"/
     );
   });
 

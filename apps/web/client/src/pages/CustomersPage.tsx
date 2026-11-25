@@ -1,3 +1,4 @@
+import { ResponsiveDetails } from "@/components/ResponsiveDetails";
 import { transientReadOptions } from "@/lib/read-query-retry";
 import { MobileModuleHeader } from "@/components/MobileModuleHeader";
 import { useCreateFromRoute } from "@/hooks/useCreateFromRoute";
@@ -1189,12 +1190,12 @@ export default function CustomersPage() {
             value={searchTerm}
             onChange={event => setSearchTerm(event.target.value)}
             placeholder="Buscar por nome, telefone ou e-mail"
-            className="h-9 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)]"
+            className="h-11 w-full md:h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-base text-[var(--text-primary)] outline-none md:text-sm transition-colors placeholder:text-[var(--text-muted)] focus:border-[var(--accent-primary)]"
           />
         </div>
-        <details className="customer-filters min-w-0 md:flex-1" open={!isMobile}>
-          <summary className="cursor-pointer py-2 text-sm font-medium md:hidden">Filtros e situação cadastral</summary>
-          <div className="grid min-w-0 gap-3 pt-2 md:flex md:flex-wrap md:items-center md:pt-0">
+        <div className="min-w-0 md:flex-1">
+          <ResponsiveDetails title="Filtros e situação cadastral" controls>
+            <div className="grid min-w-0 gap-3 md:flex md:flex-wrap md:items-center">
         <label className="sr-only" htmlFor="customer-priority-filter">
           Filtrar pela prioridade oficial
         </label>
@@ -1204,7 +1205,7 @@ export default function CustomersPage() {
           onChange={event =>
             setPriorityFilter(event.target.value as OfficialPriorityFilter)
           }
-          className="h-9 min-w-0 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2 text-sm text-[var(--text-primary)]"
+          className="h-11 min-w-0 md:h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2 text-base text-[var(--text-primary)] md:text-sm"
         >
           <option value="all">Todas as prioridades</option>
           {(["P0", "P1", "P2", "P3"] as const).map(priority => (
@@ -1222,7 +1223,7 @@ export default function CustomersPage() {
           onChange={event =>
             setRiskFilter(event.target.value as OfficialRiskFilter)
           }
-          className="h-9 min-w-0 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2 text-sm text-[var(--text-primary)]"
+          className="h-11 min-w-0 md:h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2 text-base text-[var(--text-primary)] md:text-sm"
         >
           <option value="all">Todos os riscos oficiais</option>
           <option value="NORMAL">Normal</option>
@@ -1242,8 +1243,9 @@ export default function CustomersPage() {
             <button
               key={item.key}
               type="button"
+              aria-pressed={activeFilter === item.key}
               className={cn(
-                "h-8 rounded-md border px-3 text-xs font-medium transition-colors",
+                "min-h-11 rounded-md border px-3 text-sm font-medium transition-colors md:h-8 md:min-h-0 md:text-xs",
                 activeFilter === item.key
                   ? "border-[var(--accent-primary)] bg-[var(--accent-soft)] text-[var(--nx-brand-text,var(--accent-primary))]"
                   : "border-[var(--border-subtle)] bg-[var(--surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
@@ -1257,8 +1259,9 @@ export default function CustomersPage() {
         <span className="rounded-md border border-[var(--border-subtle)] px-2 py-1 text-xs text-[var(--text-muted)]">
           {filteredProfiles.length} resultado(s)
         </span>
-          </div>
-        </details>
+            </div>
+          </ResponsiveDetails>
+        </div>
       </AppFiltersBar>
 
       <div

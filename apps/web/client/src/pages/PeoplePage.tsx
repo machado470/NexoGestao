@@ -398,7 +398,7 @@ export default function PeoplePage() {
             value={queryText}
             onChange={event => setQueryText(event.target.value)}
             placeholder="Buscar por nome, função ou contato"
-            className="h-9 w-full"
+            className="h-11 w-full md:h-9"
           />
         </div>
 <ResponsiveDetails title="Mais filtros" controls>

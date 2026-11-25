@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ChevronDown } from "lucide-react";
 import { useIsMobile } from "@/hooks/useMobile";
 
 /**
@@ -33,15 +34,19 @@ export function ResponsiveDetails({
     <details
       className={
         controls
-          ? "min-w-0 w-full"
-          : "min-w-0 rounded-xl border border-[var(--border-subtle)] p-3"
+          ? "group min-w-0 w-full"
+          : "group min-w-0 rounded-xl border border-[var(--border-subtle)] p-3"
       }
       data-responsive-details={title}
     >
-      <summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold">
-        {title}
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] [&::-webkit-details-marker]:hidden">
+        <span>{title}</span>
+        <ChevronDown
+          aria-hidden="true"
+          className="size-4 shrink-0 text-[var(--text-secondary)] motion-safe:transition-transform group-open:rotate-180"
+        />
       </summary>
-      <div className="grid min-w-0 gap-3">{children}</div>
+      <div className="mt-2 grid min-w-0 gap-3">{children}</div>
     </details>
   );
 }
