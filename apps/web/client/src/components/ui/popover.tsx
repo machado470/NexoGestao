@@ -28,7 +28,7 @@ function PopoverContent({
         align={align}
         sideOffset={sideOffset}
         className={cn(
-          "nexo-floating-panel border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] text-[var(--modal-section-text)] shadow-[var(--app-overlay-shadow)] nexo-motion-panel z-50 w-72 origin-(--radix-popover-content-transform-origin) rounded-[var(--radius-surface)] border p-4 outline-hidden",
+          "nexo-floating-panel border-[var(--modal-section-border)] bg-[var(--modal-section-bg)] text-[var(--modal-section-text)] shadow-[var(--app-overlay-shadow)] nexo-motion-panel z-50 w-72 max-h-(--radix-popover-content-available-height) max-w-(--radix-popover-content-available-width) overflow-y-auto origin-(--radix-popover-content-transform-origin) rounded-[var(--radius-surface)] border p-4 outline-hidden",
           className
         )}
         {...props}
