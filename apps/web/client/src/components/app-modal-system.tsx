@@ -88,7 +88,7 @@ export function BaseModal({
           initialFocusRef.current.focus();
         }}
         className={cn(
-          "flex max-h-[90vh] min-h-[220px] flex-col overflow-hidden rounded-2xl border-[var(--modal-section-border)] bg-[var(--modal-bg)] p-0 text-[var(--modal-section-text)] shadow-[var(--app-overlay-shadow)]",
+          "flex max-h-[90vh] min-h-[220px] flex-col gap-0 overflow-hidden rounded-2xl border-[var(--modal-section-border)] bg-[var(--modal-bg)] p-0 sm:p-0 text-[var(--modal-section-text)] shadow-[var(--app-overlay-shadow)]",
           modalSizeMap[size],
           contentClassName
         )}
@@ -124,7 +124,7 @@ export function ModalHeader({
   return (
     <DialogHeader
       className={cn(
-        "border-b border-[var(--modal-section-border)] bg-[var(--modal-header-bg)] px-6 py-5",
+        "border-b border-[var(--modal-section-border)] bg-[var(--modal-header-bg)] px-4 py-4 pr-10 sm:px-6 sm:py-5 sm:pr-12",
         fixed ? "shrink-0" : ""
       )}
     >
@@ -144,7 +144,7 @@ export function ModalBody({
     <div
       data-scrollbar="nexo"
       className={cn(
-        "nexo-modal-body min-h-0 flex-1 overflow-y-auto bg-[var(--modal-body-bg)] px-6 py-5",
+        "nexo-modal-body min-h-0 flex-1 overflow-y-auto bg-[var(--modal-body-bg)] px-4 py-4 sm:px-6 sm:py-5",
         className
       )}
     >
@@ -163,7 +163,7 @@ export function ModalFooter({
   return (
     <DialogFooter
       className={cn(
-        "border-t border-[var(--modal-section-border)] bg-[var(--modal-footer-bg)] px-6 py-4",
+        "border-t border-[var(--modal-section-border)] bg-[var(--modal-footer-bg)] px-4 py-3 sm:px-6 sm:py-4",
         fixed ? "shrink-0" : ""
       )}
     >
