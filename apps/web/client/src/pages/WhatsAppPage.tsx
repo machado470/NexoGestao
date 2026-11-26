@@ -1,3 +1,4 @@
+import { ResponsiveDetails } from "@/components/ResponsiveDetails";
 import { requiresWhatsAppChannel, whatsappAvailability } from "@/lib/integration-availability";
 import {
   memo,
@@ -815,16 +816,11 @@ function InboxQueueColumn({
     <aside className="flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden bg-transparent xl:border-r xl:border-[var(--app-border)]/40 p-2.5 text-app-primary">
       <div className="shrink-0 space-y-2 pb-2">
         <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
-              Inbox
-            </p>
-            <p className="truncate text-[10px] text-[var(--text-muted)]">
-              Conversas por prioridade
-            </p>
-          </div>
+          <h3 className="min-w-0 text-sm font-semibold text-[var(--text-primary)]">
+            Caixa de entrada
+          </h3>
           <span className="shrink-0 rounded-lg bg-app-surface px-2 py-1 text-[10px] text-app-muted">
-            {rows.length} itens
+            {rows.length} {rows.length === 1 ? "conversa" : "conversas"}
           </span>
         </div>
       </div>
@@ -2676,13 +2672,9 @@ export default function WhatsAppPage() {
       <AppPageShell className="min-w-0 gap-3 overflow-x-hidden">
         <AppOperationalHeader
           title="WhatsApp"
-          description="Inbox, conversa e contexto oficial em um único workspace operacional."
           density="compact"
           contextChips={
             <>
-              <AppContextChip tone="neutral">
-                {conversations.length} conversa(s) no inbox
-              </AppContextChip>
               <AppContextChip tone={channelAvailability.canSend && healthQuery.data?.status === "configured" ? "success" : "warning"}>
                 {healthQuery.isLoading ? "Verificando disponibilidade do canal" : channelAvailability.label}
               </AppContextChip>
@@ -2691,13 +2683,13 @@ export default function WhatsAppPage() {
         >
           {channelAvailability.reason ? (
             <div className="flex flex-col gap-2 text-xs text-[var(--text-secondary)] sm:flex-row sm:items-center sm:justify-between">
-              <span>
-                {channelAvailability.reason}
-              </span>
+              <span role="status">{channelAvailability.reason}</span>
               <Button
                 type="button"
                 size="sm"
                 variant="outline"
+                className="min-h-11 shrink-0 md:min-h-9"
+                disabled={healthQuery.isFetching}
                 onClick={() => void healthQuery.refetch()}
               >
                 Verificar novamente
@@ -2707,7 +2699,7 @@ export default function WhatsAppPage() {
         </AppOperationalHeader>
 
         <AppFiltersBar className="min-w-0 flex-col items-stretch gap-2 border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2 md:flex-row md:items-center">
-          <div className="relative min-w-0 flex-1">
+          <div className="relative min-w-0 flex-1 md:basis-64">
             <label htmlFor="whatsapp-search" className="sr-only">
               Buscar conversas
             </label>
@@ -2717,68 +2709,69 @@ export default function WhatsAppPage() {
               value={searchTerm}
               onChange={event => setSearchTerm(event.target.value)}
               placeholder="Buscar por cliente, contato ou mensagem"
-              className="h-9 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] pl-9 pr-3 text-sm"
+              className="h-11 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] pl-9 pr-3 text-base md:h-9 md:text-sm"
             />
           </div>
-          <label htmlFor="whatsapp-status-filter" className="sr-only">
-            Filtrar por status da conversa
-          </label>
-          <select
-            id="whatsapp-status-filter"
-            value={activeFilter}
-            onChange={event =>
-              setActiveFilter(event.target.value as ConversationFilter)
-            }
-            className="h-9 min-w-0 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2 text-sm"
-          >
-            {FILTERS.map(item => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
-          <label htmlFor="whatsapp-priority-filter" className="sr-only">
-            Filtrar por prioridade oficial
-          </label>
-          <select
-            id="whatsapp-priority-filter"
-            value={priorityFilter}
-            onChange={event =>
-              setPriorityFilter(event.target.value as "ALL" | WhatsAppPriority)
-            }
-            className="h-9 min-w-0 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2 text-sm"
-          >
-            <option value="ALL">Todas as prioridades</option>
-            <option value="CRITICAL">Crítica</option>
-            <option value="HIGH">Alta</option>
-            <option value="MEDIUM">Média</option>
-            <option value="NORMAL">Normal</option>
-            <option value="LOW">Baixa</option>
-          </select>
-          <label htmlFor="whatsapp-responsible-filter" className="sr-only">
-            Filtrar por responsável oficial
-          </label>
-          <select
-            id="whatsapp-responsible-filter"
-            value={responsibleFilter}
-            onChange={event => setResponsibleFilter(event.target.value)}
-            className="h-9 min-w-0 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2 text-sm"
-          >
-            <option value="ALL">Todos os responsáveis</option>
-            <option value="UNASSIGNED">Sem responsável</option>
-            {responsibles.map(name => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
+          <ResponsiveDetails title="Filtros de conversa" controls>
+            <label htmlFor="whatsapp-status-filter" className="sr-only">
+              Filtrar por status da conversa
+            </label>
+            <select
+              id="whatsapp-status-filter"
+              value={activeFilter}
+              onChange={event =>
+                setActiveFilter(event.target.value as ConversationFilter)
+              }
+              className="h-11 min-w-0 max-w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2 text-base md:h-9 md:text-sm"
+            >
+              {FILTERS.map(item => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+            <label htmlFor="whatsapp-priority-filter" className="sr-only">
+              Filtrar por prioridade oficial
+            </label>
+            <select
+              id="whatsapp-priority-filter"
+              value={priorityFilter}
+              onChange={event =>
+                setPriorityFilter(event.target.value as "ALL" | WhatsAppPriority)
+              }
+              className="h-11 min-w-0 max-w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2 text-base md:h-9 md:text-sm"
+            >
+              <option value="ALL">Todas as prioridades</option>
+              <option value="CRITICAL">Crítica</option>
+              <option value="HIGH">Alta</option>
+              <option value="MEDIUM">Média</option>
+              <option value="NORMAL">Normal</option>
+              <option value="LOW">Baixa</option>
+            </select>
+            <label htmlFor="whatsapp-responsible-filter" className="sr-only">
+              Filtrar por responsável oficial
+            </label>
+            <select
+              id="whatsapp-responsible-filter"
+              value={responsibleFilter}
+              onChange={event => setResponsibleFilter(event.target.value)}
+              className="h-11 min-w-0 max-w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2 text-base md:h-9 md:text-sm"
+            >
+              <option value="ALL">Todos os responsáveis</option>
+              <option value="UNASSIGNED">Sem responsável</option>
+              {responsibles.map(name => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </ResponsiveDetails>
         </AppFiltersBar>
 
         <AppSectionBlock
           title="Workspace de comunicação"
-          subtitle="A ordem relativa do inbox é exatamente a ordem recebida da API."
           compact
-          className="min-h-0 overflow-hidden"
+          className="min-h-0 overflow-hidden [&>div:first-child]:sr-only"
         >
           <div className={cn("grid min-h-[24rem] min-w-0 grid-cols-1 overflow-hidden md:h-[calc(100dvh-19rem)] md:max-h-[52rem]", selectedConversation ? "md:grid-cols-[minmax(17rem,20rem)_minmax(0,1fr)] xl:grid-cols-[minmax(18rem,21rem)_minmax(0,1fr)_minmax(18rem,20rem)]" : "grid-cols-1")}>
             <div
