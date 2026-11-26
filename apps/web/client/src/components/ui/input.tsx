@@ -55,7 +55,7 @@ function Input({
       data-slot="input"
       className={cn(
         "file:text-foreground placeholder:text-[var(--field-placeholder)] selection:bg-primary selection:text-primary-foreground h-10 w-full min-w-0 rounded-[0.76rem] border border-[var(--field-border)] bg-[var(--field-bg)] px-3 py-2 text-base text-[var(--field-text)] shadow-xs transition-[color,box-shadow,border-color,background-color] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-[var(--field-disabled-bg)] disabled:text-[var(--field-disabled-text)] disabled:opacity-100 md:text-sm",
-        "focus-visible:border-[var(--accent-primary)] focus-visible:ring-[3px] focus-visible:ring-[color-mix(in_srgb,var(--accent-primary)_24%,transparent)]",
+        "focus-visible:border-[var(--nx-focus,var(--accent-primary))] focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--nx-focus,var(--accent-primary))]",
         "aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
         className
       )}
