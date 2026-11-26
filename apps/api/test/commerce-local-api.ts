@@ -7,9 +7,12 @@ import { Test } from "@nestjs/testing";
 import { ValidationPipe, UnauthorizedException } from "@nestjs/common";
 import { PrismaClient } from "@prisma/client";
 import { randomUUID } from "crypto";
+import { json } from "express";
 import { writeFileSync } from "fs";
 import { CommerceController } from "../src/commerce/commerce.controller";
 import { CommerceService } from "../src/commerce/commerce.service";
+import { FinanceService } from "../src/finance/finance.service";
+import { IdempotencyService } from "../src/common/idempotency/idempotency.service";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { JwtAuthGuard } from "../src/auth/jwt-auth.guard";
 import { ConfigService } from '@nestjs/config';
@@ -111,6 +114,33 @@ async function main() {
       forbidNonWhitelisted: true,
     }),
   );
+  const requestContext = { requestId: "browser-audit", correlationId: "browser-audit" };
+  const metrics = { increment: () => undefined };
+  const finance = new FinanceService(
+    db as any,
+    { send: async () => undefined } as any,
+    { log: async () => undefined, logInTransaction: async () => ({ id: randomUUID() }) } as any,
+    { track: () => undefined } as any,
+    requestContext as any,
+    new IdempotencyService(db as any, requestContext as any, metrics as any),
+    metrics as any,
+    { log: () => undefined } as any,
+    { enqueue: async () => undefined } as any,
+  );
+  app.getHttpAdapter().getInstance().post("/audit/payment", json(), async (req, res) => {
+    if (req.headers["x-audit-org"] !== orgId || req.headers["x-audit-role"] !== "MANAGER") {
+      return res.status(403).json({ message: "Acesso inválido" });
+    }
+    try {
+      const { chargeId, amountCents, method, idempotencyKey } = req.body;
+      const result = await finance.payCharge({
+        orgId, actorUserId: actor, chargeId, amountCents, method, idempotencyKey,
+      });
+      return res.json(result);
+    } catch (error) {
+      return res.status(400).json({ message: error instanceof Error ? error.message : "Falha no pagamento" });
+    }
+  });
   await app.listen(55440, "127.0.0.1");
   writeFileSync(
     "/dev/shm/nexo-commerce-fixture.json",
