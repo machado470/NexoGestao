@@ -497,7 +497,7 @@ export default function FinancesPage() {
       <AppSectionBlock
         className="mobile-flat-section [&>div:first-child]:hidden md:[&>div:first-child]:flex"
         title="Indicadores oficiais"
-        subtitle="Zero é exibido como valor legítimo; ausência e erro permanecem explícitos."
+        compact
       >
         {statsQuery.isLoading ? (
           <AppPageLoadingState title="Carregando indicadores" />
@@ -514,7 +514,7 @@ export default function FinancesPage() {
             </AppAlertDescription>
           </AppAlert>
         ) : (
-          <div className="finance-summary-grid grid grid-cols-3 gap-2">
+          <div className="finance-summary-grid grid grid-cols-1 gap-2 min-[380px]:grid-cols-3">
             {[
               ["Recebido", stats?.paid],
               ["A receber", stats?.pending],
@@ -522,7 +522,7 @@ export default function FinancesPage() {
             ].map(([title, metric]) => (
               <AppInfoCard key={String(title)}>
                 <p className="text-sm text-muted-foreground">{String(title)}</p>
-                <strong>{formatRecordedTotal((metric as any)?.amountCents, stats?.currencies, currency)}</strong>
+                <strong className="break-words tabular-nums">{formatRecordedTotal((metric as any)?.amountCents, stats?.currencies, currency)}</strong>
                 <p>
                   {typeof (metric as any)?.count === "number"
                     ? `${(metric as any).count} ${(metric as any).count === 1 ? "item" : "itens"}`
@@ -538,7 +538,7 @@ export default function FinancesPage() {
       <ResponsiveDetails title="Pendências prioritárias" controls>
       <AppSectionBlock
         title="Fila operacional oficial"
-        subtitle="Pendências na ordem de prioridade da sua operação."
+        compact
       >
         {queueQuery.isError ? (
           <AppAlert>
