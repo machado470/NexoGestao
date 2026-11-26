@@ -15,6 +15,15 @@ let auditPage;
     width = Number(process.env.MOBILE_WIDTH || 390),
     writes = [],
     errors = [];
+  const appointment = await db.appointment.create({
+    data: {
+      orgId: fixture.orgId,
+      customerId: fixture.customer.id,
+      startsAt: new Date("2026-11-27T13:00:00Z"),
+      endsAt: new Date("2026-11-27T14:00:00Z"),
+      status: "CONFIRMED",
+    },
+  });
   const browser = await chromium.launch({
     executablePath: "/usr/bin/chromium",
     args: ["--no-sandbox"],
@@ -251,12 +260,32 @@ let auditPage;
           out.push({ result: { data: { json: await response.json() } } });
           continue;
         }
+        if (name === "serviceOrders.update") {
+          assert.equal(input.id, convertedOrder.serviceOrderId);
+          assert.equal(input.appointmentId, appointment.id);
+          assert.equal(input.amountCents ?? undefined, undefined);
+          const response = await page.request.patch(
+            `http://127.0.0.1:55440/audit/service-orders/${input.id}/appointment`,
+            { headers, data: input },
+          );
+          assert(response.ok(), await response.text());
+          const persisted = await response.json();
+          Object.assign(orders.get(input.id), persisted, { appointment });
+          writes.push({ op: "linkAppointment", input });
+          out.push({ result: { data: { json: persisted } } });
+          continue;
+        }
         assert(req.method() !== "POST", "Unexpected write " + name);
         const selectedId = new URL(page.url()).searchParams.get("id");
-        const current = orders.get(input.id || selectedId) || fixture.order;
+        const current = orders.get(input.id || selectedId) ?? orders.get(convertedOrder?.serviceOrderId) ?? fixture.order;
         const data =
           {
             "serviceOrders.getById": current,
+            "appointments.list": [appointment],
+            "appointments.page": {
+              items: input.customerId === fixture.customer.id ? [appointment] : [],
+              meta: { page: 1, pages: 1, total: 1, limit: 50 },
+            },
             "serviceOrders.page": {
               items: [current],
               meta: { page: 1, pages: 1, total: 1, limit: 8 },
@@ -631,7 +660,24 @@ let auditPage;
     await detail.getByRole("button", { name: "Fechar", exact: true }).click();
   }
   role.role = "MANAGER";
-  await page.goto(`http://localhost:5173/service-orders?id=${convertedOrder.serviceOrderId}`);
+  const orderUrl = `http://localhost:5173/service-orders?id=${convertedOrder.serviceOrderId}`;
+  await page.goto(width < 768 ? "http://localhost:5173/service-orders" : orderUrl);
+  await page.getByRole("button", { name: "Definir responsável", exact: true }).first().click();
+  const orderEditor = page.getByRole("dialog");
+  await orderEditor.getByLabel("Vincular agendamento da Agenda").selectOption(appointment.id);
+  await orderEditor.getByRole("button", { name: "Salvar alterações", exact: true }).click();
+  await orderEditor.waitFor({ state: "hidden" });
+  const linked = await db.serviceOrder.findUniqueOrThrow({
+    where: { id: convertedOrder.serviceOrderId },
+  });
+  assert.equal(linked.appointmentId, appointment.id);
+  assert.equal(linked.amountCents, 40000);
+  assert.equal(writes.filter(write => write.op === "linkAppointment").length, 1);
+  await page.goto(orderUrl);
+  if (width < 768) {
+    await page.locator('summary').filter({ hasText: "Contexto e histórico da O.S." }).click();
+  }
+  await page.getByText("Agendamento vinculado", { exact: true }).waitFor();
   await page.getByRole("button", { name: "Iniciar execução", exact: true }).click();
   await page.getByRole("button", { name: "Concluir execução", exact: true }).click();
   await page.getByText("O.S. concluída.", { exact: true }).first().waitFor();
@@ -676,7 +722,7 @@ let auditPage;
   await db.$disconnect();
   await browser.close();
   console.log(
-    `PASS ${width}: approved quote to one order, execution, automatic charge, persisted manual payment, lost response/recovery, preserved terms, roles, viewport`,
+    `PASS ${width}: approved quote to one order, linked appointment, execution, automatic charge, persisted manual payment, lost response/recovery, preserved terms, roles, viewport`,
   );
 })().catch(async (e) => {
   console.error(e);

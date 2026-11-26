@@ -11,6 +11,7 @@ import { json } from "express";
 import { writeFileSync } from "fs";
 import { CommerceController } from "../src/commerce/commerce.controller";
 import { CommerceService } from "../src/commerce/commerce.service";
+import { ServiceOrdersService } from "../src/service-orders/service-orders.service";
 import { ExecutionService } from "../src/execution/execution.service";
 import { FinanceService } from "../src/finance/finance.service";
 import { IdempotencyService } from "../src/common/idempotency/idempotency.service";
@@ -165,6 +166,31 @@ async function main() {
       return res.status(400).json({ message: error instanceof Error ? error.message : "Falha na execução" });
     }
   });
+  const serviceOrders = new ServiceOrdersService(
+    db as any,
+    { log: async () => undefined } as any,
+    { log: async () => undefined } as any,
+    { syncAndLogStateChange: async () => undefined } as any,
+    finance,
+    {} as any, {} as any, {} as any, {} as any, {} as any,
+    new IdempotencyService(db as any, requestContext as any, metrics as any),
+    {} as any, {} as any,
+  );
+  app.getHttpAdapter().getInstance().patch("/audit/service-orders/:id/appointment", json(), async (req, res) => {
+    if (req.headers["x-audit-org"] !== orgId || req.headers["x-audit-role"] !== "MANAGER") {
+      return res.status(403).json({ message: "Acesso inválido" });
+    }
+    try {
+      const { appointmentId, expectedUpdatedAt } = req.body;
+      const result = await serviceOrders.update({
+        orgId, id: req.params.id, updatedBy: actor, personId: null,
+        data: { appointmentId, expectedUpdatedAt },
+      });
+      return res.json(result);
+    } catch (error) {
+      return res.status(400).json({ message: error instanceof Error ? error.message : "Falha no vínculo" });
+    }
+  });
   await app.listen(55440, "127.0.0.1");
   writeFileSync(
     "/dev/shm/nexo-commerce-fixture.json",
@@ -194,6 +220,7 @@ async function main() {
     await db.charge.deleteMany({ where });
     await db.expense.deleteMany({ where });
     await db.serviceOrder.deleteMany({ where });
+    await db.appointment.deleteMany({ where });
     await db.customer.deleteMany({ where });
     await db.user.deleteMany({ where });
     await db.organization.delete({ where: { id: orgId } });
