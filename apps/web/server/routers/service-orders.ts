@@ -47,6 +47,7 @@ const serviceOrderCreateInput = z.object({
 
 const serviceOrderUpdateInput = z.object({
   id: uuid,
+  appointmentId: uuid.optional(),
   title: z.string().min(1).optional(),
   description: z.string().optional(),
   priority: z.number().int().min(1).max(5).optional(),

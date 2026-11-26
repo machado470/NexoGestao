@@ -1,3 +1,6 @@
+import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
+import { formatOrganizationDate } from "@/lib/organization-locale";
+import { normalizeArrayPayload } from "@/lib/query-helpers";
 import { parseMoneyInputToCents } from "@/lib/money-input";
 import {
   toLocalDateTimeInput,
@@ -55,6 +58,8 @@ type ServiceOrderDetails = {
   description?: string | null;
   priority?: number | null;
   scheduledFor?: string | null;
+  customerId?: string | null;
+  appointmentId?: string | null;
   assignedToPersonId?: string | null;
   amountCents?: number | null;
   dueDate?: string | null;
@@ -202,6 +207,7 @@ export default function EditServiceOrderModal({
   people,
 }: EditServiceOrderModalProps) {
   const fieldId = useId();
+  const { timezone } = useOrganizationLocale();
   const [, navigate] = useLocation();
   const utils = trpc.useUtils();
   const assigneeWarningTelemetry = useAssigneeWarningTelemetry("SERVICE_ORDER");
@@ -210,6 +216,7 @@ export default function EditServiceOrderModal({
     description: "",
     priority: "2",
     scheduledFor: "",
+    appointmentId: "",
     assignedToPersonId: "",
     amount: "",
     dueDate: "",
@@ -236,12 +243,36 @@ export default function EditServiceOrderModal({
     }
   );
 
+  const serviceOrder = normalizeServiceOrderPayload(getServiceOrder.data);
+  const [appointmentPage, setAppointmentPage] = useState(1);
+  const appointmentChoices = trpc.appointments.page.useQuery(
+    { customerId: serviceOrder?.customerId ?? undefined, page: appointmentPage, limit: 50 },
+    {
+      enabled: isOpen && Boolean(serviceOrder?.customerId && !serviceOrder.appointmentId &&
+        serviceOrder.status && !["DONE", "CANCELED"].includes(serviceOrder.status)),
+      retry: false,
+    }
+  );
+  const appointmentPages = appointmentChoices.data?.meta.pages ?? 1;
+  const eligibleAppointments = normalizeArrayPayload<{
+    id: string;
+    customerId: string;
+    title?: string | null;
+    startsAt: string;
+    status: string;
+  }>(appointmentChoices.data).filter(appointment =>
+    appointment.customerId === serviceOrder?.customerId &&
+    ["SCHEDULED", "CONFIRMED", "DONE"].includes(appointment.status)
+  );
+
   const updateServiceOrder = trpc.serviceOrders.update.useMutation();
   useCriticalActionGuard({
     isPending: updateServiceOrder.isPending,
     reason: "Atualizando O.S. com sincronização global.",
   });
   const [loadingTimedOut, setLoadingTimedOut] = useState(false);
+
+  useEffect(() => setAppointmentPage(1), [serviceOrderId]);
 
   useEffect(() => {
     if (!isOpen) assigneeWarningTelemetry.reset();
@@ -258,6 +289,7 @@ export default function EditServiceOrderModal({
       description: serviceOrder?.description || "",
       priority: String(serviceOrder?.priority ?? 2),
       scheduledFor: toLocalDateTimeInput(serviceOrder?.scheduledFor),
+      appointmentId: "",
       assignedToPersonId: serviceOrder?.assignedToPersonId || "",
       amount:
         typeof serviceOrder?.amountCents === "number" &&
@@ -437,6 +469,7 @@ export default function EditServiceOrderModal({
         description: parsed.data.description || undefined,
         priority: parsed.data.priority,
         scheduledFor: scheduledFor?.toISOString(),
+        appointmentId: formData.appointmentId || undefined,
         status: parsed.data.status,
         assignedToPersonId: parsed.data.assignedToPersonId
           ? parsed.data.assignedToPersonId
@@ -468,6 +501,7 @@ export default function EditServiceOrderModal({
         serviceOrderId
       );
       await utils.dashboard.alerts.invalidate();
+      if (formData.appointmentId) await utils.appointments.page.invalidate();
       toast.success(`O.S. atualizada: ${parsed.data.title}`, {
         action: {
           label: "Ver O.S.",
@@ -494,7 +528,6 @@ export default function EditServiceOrderModal({
     }
   };
 
-  const serviceOrder = normalizeServiceOrderPayload(getServiceOrder.data);
   const persistedStatus = serviceOrder?.status as
     ServiceOrderStatus | undefined;
   const isPersistedDone = persistedStatus === "DONE";
@@ -783,6 +816,53 @@ export default function EditServiceOrderModal({
                       />
                     </div>
                   </div>
+
+                  {serviceOrder?.appointmentId ? (
+                    <p className="text-sm text-[var(--modal-section-muted)]">
+                      Esta O.S. já tem um agendamento vinculado.
+                    </p>
+                  ) : serviceOrder?.customerId && !isPersistedClosed ? (
+                    <div>
+                      <label htmlFor={`${fieldId}-appointment`} className="mb-2 block text-sm font-medium">
+                        Vincular agendamento da Agenda
+                      </label>
+                      <select
+                        id={`${fieldId}-appointment`}
+                        className="nexo-field min-h-11 w-full rounded-lg border border-[var(--field-border)] bg-[var(--field-bg)] px-3"
+                        value={formData.appointmentId}
+                        onChange={event => setFormData(state => ({
+                          ...state,
+                          appointmentId: event.target.value,
+                        }))}
+                        disabled={appointmentChoices.isLoading || appointmentChoices.isError || updateServiceOrder.isPending}
+                      >
+                        <option value="">Sem vínculo</option>
+                        {eligibleAppointments.map(appointment => (
+                          <option key={appointment.id} value={appointment.id}>
+                            {formatOrganizationDate(appointment.startsAt, timezone, "Data indisponível")}
+                            {" · "}
+                            {appointment.title || "Agendamento"}
+                          </option>
+                        ))}
+                      </select>
+                      {appointmentPages > 1 && (
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                          <Button type="button" size="sm" variant="outline"
+                            disabled={appointmentPage <= 1 || appointmentChoices.isFetching || Boolean(formData.appointmentId)}
+                            onClick={() => setAppointmentPage(page => page - 1)}
+                          >Anteriores</Button>
+                          <span>Página {appointmentPage} de {appointmentPages}</span>
+                          <Button type="button" size="sm" variant="outline"
+                            disabled={appointmentPage >= appointmentPages || appointmentChoices.isFetching || Boolean(formData.appointmentId)}
+                            onClick={() => setAppointmentPage(page => page + 1)}
+                          >Próximos</Button>
+                        </div>
+                      )}
+                      {appointmentChoices.isError && (
+                        <p role="status" className="mt-1 text-sm">Não foi possível consultar a Agenda.</p>
+                      )}
+                    </div>
+                  ) : null}
 
                   <div>
                     <label

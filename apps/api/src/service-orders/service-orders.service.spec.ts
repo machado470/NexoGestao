@@ -131,3 +131,79 @@ describe('ServiceOrdersService timeline hardening', () => {
     )
   })
 })
+
+describe('ServiceOrdersService appointment linking', () => {
+  const input = {
+    orgId: 'org-1',
+    updatedBy: 'user-1',
+    personId: null,
+    id: 'order-1',
+    data: { appointmentId: 'appointment-1', expectedUpdatedAt: '2026-11-26T12:00:00Z' },
+  }
+
+  function setup(appointmentStatus: string | null, appointmentId: string | null = null) {
+    const order = {
+      id: input.id,
+      orgId: input.orgId,
+      customerId: 'customer-1',
+      title: 'O.S. de orçamento',
+      status: 'OPEN',
+      amountCents: 40000,
+      appointmentId,
+    }
+    const prisma = {
+      appointment: {
+        findFirst: jest.fn().mockResolvedValue(appointmentStatus ? { status: appointmentStatus } : null),
+      },
+      serviceOrder: {
+        findFirst: jest.fn().mockResolvedValueOnce(order).mockResolvedValue({
+          ...order, appointmentId: input.data.appointmentId,
+        }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+    }
+    const service = new ServiceOrdersService(
+      prisma as any, { log: jest.fn() } as any, { log: jest.fn() } as any,
+      { syncAndLogStateChange: jest.fn() } as any, {} as any, {} as any,
+      {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any,
+    )
+    return { service, prisma }
+  }
+
+  it('scopes the appointment to the organization and customer and writes only the link', async () => {
+    const { service, prisma } = setup('CONFIRMED')
+    await expect(service.update(input)).resolves.toMatchObject({
+      appointmentId: input.data.appointmentId,
+      amountCents: 40000,
+    })
+    expect(prisma.appointment.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: input.data.appointmentId, orgId: input.orgId, customerId: 'customer-1' },
+    }))
+    expect(prisma.serviceOrder.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ appointmentId: null, status: 'OPEN' }),
+      data: { appointmentId: input.data.appointmentId },
+    }))
+  })
+
+  it.each([null, 'CANCELED', 'NO_SHOW'])('rejects an unavailable appointment (%s)', async (status) => {
+    const { service, prisma } = setup(status)
+    await expect(service.update(input)).rejects.toMatchObject({ status: 400 })
+    expect(prisma.serviceOrder.updateMany).not.toHaveBeenCalled()
+  })
+
+  it('preserves a different existing link and returns the matching link on replay', async () => {
+    const linked = setup('CONFIRMED', 'existing-appointment')
+    await expect(linked.service.update(input)).rejects.toMatchObject({ status: 409 })
+    const replay = setup('CONFIRMED', input.data.appointmentId)
+    await expect(replay.service.update(input)).resolves.toMatchObject({ appointmentId: input.data.appointmentId })
+    expect(replay.prisma.serviceOrder.updateMany).not.toHaveBeenCalled()
+  })
+
+  it('reports a conflict when another order links the same appointment', async () => {
+    const { service, prisma } = setup('CONFIRMED')
+    prisma.serviceOrder.updateMany.mockRejectedValue({
+      code: 'P2002', meta: { target: ['appointmentId'] },
+    })
+    await expect(service.update(input)).rejects.toMatchObject({ status: 409 })
+  })
+})
