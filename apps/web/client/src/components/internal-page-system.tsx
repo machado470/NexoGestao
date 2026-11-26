@@ -1040,7 +1040,7 @@ export function AppStatusBadge({ label }: { label: string }) {
     <BaseAppStatusBadge
       label={safeLabel}
       tone={operationalSeverityTone(label)}
-      className="h-6 px-2.5 py-0 text-[10px] font-semibold uppercase tracking-[0.08em]"
+      className="min-h-6 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide"
     />
   );
 }

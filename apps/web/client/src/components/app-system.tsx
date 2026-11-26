@@ -271,7 +271,13 @@ export function AppStatusBadge({
   className?: string;
 }) {
   return (
-    <span className={cn("nexo-badge", `nexo-badge-${tone}`, className)}>
+    <span
+      className={cn(
+        "nexo-badge min-w-0 max-w-full whitespace-normal text-center leading-tight [overflow-wrap:anywhere]",
+        `nexo-badge-${tone}`,
+        className
+      )}
+    >
       {label}
     </span>
   );

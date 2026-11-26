@@ -153,6 +153,13 @@ describe("Premium controls (PR 3): WCAG AA with the flag ON", () => {
 });
 
 describe("Premium controls (PR 3): shared status badges", () => {
+  it("applies every status tone to overlays outside the app shell", () => {
+    const shell = read("theme/premium/premium-shell.css");
+    for (const tone of ["success", "warning", "danger", "info", "accent", "neutral"]) {
+      expect(shell).toContain(`:root[data-skin="premium"] .nexo-badge-${tone} {`);
+    }
+  });
+
   const shell = read("theme/premium/premium-shell.css");
   const tones = {
     success: "ok",
