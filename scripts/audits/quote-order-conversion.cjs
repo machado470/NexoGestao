@@ -207,6 +207,28 @@ let auditPage;
           );
           continue;
         }
+        if (name === "finance.charges.pay") {
+          const response = await page.request.post("http://127.0.0.1:55440/audit/payment", {
+            headers,
+            data: input,
+          });
+          assert(response.ok(), await response.text());
+          writes.push({ op: "pay", input });
+          out.push({ result: { data: { json: await response.json() } } });
+          continue;
+        }
+        if (name === "finance.charges.getById" || name === "finance.charges.list") {
+          const rows = await db.charge.findMany({
+            where: { orgId: fixture.orgId, serviceOrderId: convertedOrder?.serviceOrderId ?? "" },
+            include: { customer: true },
+          });
+          const charges = rows.map(charge => ({
+            ...charge,
+            balanceCents: charge.status === "PAID" ? 0 : charge.amountCents,
+          }));
+          out.push({ result: { data: { json: name.endsWith(".list") ? charges : charges.find(charge => charge.id === input.id) ?? null } } });
+          continue;
+        }
         assert(req.method() !== "POST", "Unexpected write " + name);
         const selectedId = new URL(page.url()).searchParams.get("id");
         const current = orders.get(input.id || selectedId) || fixture.order;
@@ -586,6 +608,34 @@ let auditPage;
     );
     await detail.getByRole("button", { name: "Fechar", exact: true }).click();
   }
+  role.role = "MANAGER";
+  // Prepare completion and billing in the isolated fixture, then pay in the UI.
+  await db.serviceOrder.update({
+    where: { id: convertedOrder.serviceOrderId },
+    data: { status: "DONE" },
+  });
+  const charge = await db.charge.create({
+    data: {
+      orgId: fixture.orgId,
+      customerId: fixture.customer.id,
+      serviceOrderId: convertedOrder.serviceOrderId,
+      amountCents: 40000,
+      currency: "BRL",
+      status: "PENDING",
+      dueDate: new Date("2027-01-01T12:00:00Z"),
+    },
+  });
+  await page.goto(`http://localhost:5173/finances?chargeId=${charge.id}&action=pay`);
+  const paymentDialog = page.getByRole("dialog", { name: "Registrar pagamento manual" });
+  await paymentDialog.getByLabel("Valor exato em centavos").waitFor();
+  assert.equal(await paymentDialog.getByLabel("Valor exato em centavos").inputValue(), "40000");
+  await paymentDialog.getByRole("button", { name: "Confirmar pagamento", exact: true }).click();
+  await page.getByText("Pagamento confirmado pelo serviço financeiro.", { exact: true }).first().waitFor();
+  assert.equal(writes.filter(write => write.op === "pay").length, 1);
+  assert.equal((await db.charge.findUniqueOrThrow({ where: { id: charge.id } })).status, "PAID");
+  const payments = await db.payment.findMany({ where: { orgId: fixture.orgId, chargeId: charge.id } });
+  assert.equal(payments.length, 1);
+  assert.equal(payments[0].amountCents, 40000);
   const tokens = [firstUrl.split("#")[1], secondUrl.split("#")[1]];
   const diagnostics = JSON.stringify(
     await client.evaluate(() => window.__NEXO_AUDIT__),
@@ -604,7 +654,7 @@ let auditPage;
   await db.$disconnect();
   await browser.close();
   console.log(
-    `PASS ${width}: approved quote to one order, lost response/recovery, source navigation, preserved terms, roles, viewport`,
+    `PASS ${width}: approved quote to one order, persisted manual payment, lost response/recovery, preserved terms, roles, viewport`,
   );
 })().catch(async (e) => {
   console.error(e);
