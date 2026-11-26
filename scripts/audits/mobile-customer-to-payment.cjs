@@ -192,6 +192,12 @@ let page;
         case "executions.listByServiceOrder":
           data = execution ? [execution] : [];
           break;
+        case "serviceQuotes.orderOrigin":
+          data = null;
+          break;
+        case "serviceOrders.returns":
+          data = { items: [], origin: null };
+          break;
         case "serviceOrders.getById":
           data = order;
           break;
