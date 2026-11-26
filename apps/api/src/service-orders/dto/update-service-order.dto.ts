@@ -3,6 +3,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  IsUUID,
   Max,
   MaxLength,
   Min,
@@ -27,6 +28,10 @@ export class UpdateServiceOrderDto {
   @IsString()
   @MaxLength(4000)
   description?: string
+
+  @ValidateIf((_, value) => value !== undefined)
+  @IsUUID()
+  appointmentId?: string
 
   @IsOptional()
   @IsInt()

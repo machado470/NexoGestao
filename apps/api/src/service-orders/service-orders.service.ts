@@ -491,6 +491,7 @@ export class ServiceOrdersService {
       assignedToPersonId?: string
       status?: ServiceOrderStatus
       scheduledFor?: string
+      appointmentId?: string
       amountCents?: number
       expectedUpdatedAt?: string
     }
@@ -500,6 +501,10 @@ export class ServiceOrdersService {
 
     const before = await this.prisma.serviceOrder.findFirst({
       where: { id: params.id, orgId: params.orgId },
+      include: {
+        customer: { select: { id: true, name: true, phone: true } },
+        assignedTo: { select: { id: true, name: true } },
+      },
     })
     if (!before) throw new NotFoundException('Ordem de serviço não encontrada')
     if (isTerminalStatus(before.status)) {
@@ -545,6 +550,23 @@ export class ServiceOrdersService {
       data.scheduledFor = parseOptionalDate('scheduledFor', params.data.scheduledFor)
     }
 
+    if (params.data.appointmentId !== undefined) {
+      if (before.appointmentId && before.appointmentId !== params.data.appointmentId) {
+        throw new ConflictException('A ordem já tem um agendamento vinculado')
+      }
+      if (!before.appointmentId) {
+        const appointment = await this.prisma.appointment.findFirst({
+          where: { id: params.data.appointmentId, orgId: params.orgId, customerId: before.customerId },
+          select: { status: true },
+        })
+        if (!appointment) throw new BadRequestException('Agendamento inválido para o cliente da ordem')
+        if (appointment.status === 'CANCELED' || appointment.status === 'NO_SHOW') {
+          throw new BadRequestException('Agendamento cancelado ou com não comparecimento não pode ser vinculado')
+        }
+        data.appointmentId = params.data.appointmentId
+      }
+    }
+
     if (params.data.amountCents !== undefined) {
       const quoted = await this.prisma.serviceQuoteOrder?.findFirst({where:{orgId:params.orgId,serviceOrderId:before.id},select:{amountCents:true}})
       if(quoted && params.data.amountCents !== quoted.amountCents) throw new BadRequestException(quoteTermsMessage)
@@ -552,6 +574,7 @@ export class ServiceOrdersService {
     }
 
     if (Object.keys(data).length === 0) {
+      if (params.data.appointmentId && params.data.appointmentId === before.appointmentId) return before
       throw new BadRequestException('Nenhum campo para atualizar')
     }
 
@@ -574,6 +597,7 @@ export class ServiceOrdersService {
           from: before.status,
           to: data.status,
           amountCents: data.amountCents ?? before.amountCents ?? null,
+          ...(data.appointmentId ? { appointmentId: data.appointmentId } : {}),
         },
       })
       if (idem.mode === 'replay') {
@@ -594,6 +618,7 @@ export class ServiceOrdersService {
             orgId: params.orgId,
             status: before.status,
             updatedAt: expectedUpdatedAt,
+            ...(data.appointmentId ? { appointmentId: null } : {}),
           },
           data,
         })
@@ -611,7 +636,7 @@ export class ServiceOrdersService {
             throw new NotFoundException('Ordem de serviço não encontrada')
           }
 
-          if (latest.status === 'DONE') {
+          if (latest.status === 'DONE' && (!data.appointmentId || latest.appointmentId === data.appointmentId)) {
             return { updated: latest, transitioned: false }
           }
 
@@ -682,6 +707,7 @@ export class ServiceOrdersService {
             id: params.id,
             orgId: params.orgId,
             updatedAt: expectedUpdatedAt,
+            ...(data.appointmentId ? { appointmentId: null, status: before.status } : {}),
           },
           data,
         })
@@ -826,6 +852,9 @@ export class ServiceOrdersService {
     } catch (error: any) {
       if (doneTransitionIdemRecordId) {
         await this.idempotency.fail(doneTransitionIdemRecordId, error?.code)
+      }
+      if (data.appointmentId && isUniqueConflict(error) && error.meta?.target?.includes('appointmentId')) {
+        throw new ConflictException('O agendamento já está vinculado a uma ordem de serviço')
       }
       if(isQuoteTermsError(error)) throw new BadRequestException(quoteTermsMessage)
       throw error
