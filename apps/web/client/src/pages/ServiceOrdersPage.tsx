@@ -995,7 +995,7 @@ export default function ServiceOrdersPage() {
             ]}
           />
         </div>
-        <div className="w-full md:max-w-[190px]">
+        <div className="w-full md:max-w-[220px]">
           <AppSelect
             value={responsibleFilter}
             onValueChange={setResponsibleFilter}
@@ -1114,7 +1114,7 @@ export default function ServiceOrdersPage() {
               <AppPageEmptyState
                 title={enrichedOrders.length === 0 && !hasListFilters ? "Nenhuma ordem de serviço" : "Nenhum resultado para os filtros"}
                 description={enrichedOrders.length === 0 && !hasListFilters ? "Crie a primeira O.S. para iniciar o atendimento." : "Limpe os filtros para ver as ordens."}
-                action={enrichedOrders.length === 0 && !hasListFilters ? (canCreateOrder && !customersQuery.isError ? <Button onClick={() => setOpenCreate(true)}>Nova O.S.</Button> : undefined) : <Button variant="outline" onClick={() => { setSearchTerm(""); setActiveFilter("all"); setCustomerFilter("all"); setResponsibleFilter("all"); setDeadlineFilter("all"); setPriorityFilter("all"); setCurrentPage(1); }}>Limpar filtros</Button>}
+                action={hasListFilters ? <Button variant="outline" onClick={() => { setSearchTerm(""); setActiveFilter("all"); setCustomerFilter("all"); setResponsibleFilter("all"); setDeadlineFilter("all"); setPriorityFilter("all"); setCurrentPage(1); }}>Limpar filtros</Button> : undefined}
               />
             ) : (
               <div className="space-y-3">
