@@ -336,86 +336,9 @@ export default function CalendarPage() {
 
       <div className="mt-4 space-y-4">
         <AppSectionBlock
-          title="Disponibilidade e capacidade oficiais"
-          subtitle="Dados do resumo operacional da equipe."
-          compact
-        >
-          {!canReadTeamSummary ? (
-            <p role="status" className="text-sm text-[var(--text-secondary)]">
-              O resumo de capacidade da equipe está disponível para
-              administradores.
-            </p>
-          ) : officialCapacityQuery.isLoading ? (
-            <AppPageLoadingState description="Carregando capacidade e disponibilidade oficiais..." />
-          ) : officialCapacityQuery.isError || officialScope.length === 0 ? (
-            <div
-              role="status"
-              className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-4 text-sm text-[var(--text-secondary)]"
-            >
-              Capacidade e disponibilidade indisponíveis na fonte oficial para
-              este recorte.
-            </div>
-          ) : (
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {officialScope.map(person => (
-                <article
-                  key={person.personId}
-                  className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-4"
-                >
-                  <h3 className="break-all font-semibold text-[var(--text-primary)]">
-                    {person.name}
-                  </h3>
-                  <dl className="mt-2 grid gap-x-3 gap-y-2 text-sm sm:grid-cols-2">
-                    <div>
-                      <dt className="text-[var(--text-muted)]">
-                        Disponibilidade oficial
-                      </dt>
-                      <dd className="font-medium text-[var(--text-primary)]">
-                        {officialLabel(person.availabilityStatus)}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-[var(--text-muted)]">
-                        Capacidade oficial
-                      </dt>
-                      <dd className="font-medium text-[var(--text-primary)]">
-                        {officialLabel(person.capacityStatus)}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-[var(--text-muted)]">Uso oficial</dt>
-                      <dd className="font-medium text-[var(--text-primary)]">
-                        {person.appointmentCapacityUsagePct == null
-                          ? "Indisponível na fonte oficial"
-                          : `${person.appointmentCapacityUsagePct}%`}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-[var(--text-muted)]">
-                        Agendamentos hoje / limite diário
-                      </dt>
-                      <dd className="font-medium text-[var(--text-primary)]">
-                        {person.todayAppointmentsCount == null ||
-                        person.dailyAppointmentCapacity == null
-                          ? "Indisponível na fonte oficial"
-                          : `${person.todayAppointmentsCount} / ${person.dailyAppointmentCapacity}`}
-                      </dd>
-                    </div>
-                  </dl>
-                  {person.capacitySummaryText ? (
-                    <p className="mt-3 text-xs text-[var(--text-secondary)]">
-                      {person.capacitySummaryText}
-                    </p>
-                  ) : null}
-                </article>
-              ))}
-            </div>
-          )}
-        </AppSectionBlock>
-
-        <AppSectionBlock
           title="Controles de visualização"
-          subtitle="Escolha a escala temporal sem alterar os fatos persistidos."
+          compact
+          className="[&>div:first-child]:sr-only"
         >
           <div
             className="flex flex-wrap gap-2"
@@ -432,6 +355,7 @@ export default function CalendarPage() {
                 key={value}
                 size="sm"
                 variant={viewMode === value ? "default" : "outline"}
+                aria-pressed={viewMode === value}
                 onClick={() => changeView(value)}
               >
                 {label}
@@ -439,6 +363,323 @@ export default function CalendarPage() {
             ))}
           </div>
         </AppSectionBlock>
+
+        <AppFiltersBar>
+          <input
+            aria-label="Filtrar por texto"
+            value={textFilter}
+            onChange={event => setTextFilter(event.target.value)}
+            placeholder="Cliente, serviço ou observação"
+            className="h-9 min-w-0 flex-1 basis-48 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm text-[var(--text-primary)]"
+          />
+          <select
+            aria-label="Filtrar por responsável"
+            value={teamFilter}
+            onChange={event => setTeamFilter(event.target.value)}
+            disabled={peopleQuery.isError}
+            className="h-9 min-w-0 max-w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm text-[var(--text-primary)]"
+          >
+            <option value="all">Todos os responsáveis</option>
+            {people.map(person => (
+              <option key={person.id} value={person.id}>
+                {person.name ?? person.fullName ?? "Responsável"}
+              </option>
+            ))}
+          </select>
+          <select
+            aria-label="Filtrar por status"
+            value={statusFilter}
+            onChange={event => setStatusFilter(event.target.value)}
+            className="h-9 min-w-0 max-w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm text-[var(--text-primary)]"
+          >
+            <option value="all">Todos os status</option>
+            {Object.entries(STATUS_LABEL).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </AppFiltersBar>
+
+        <div className="grid min-w-0 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(17rem,22rem)]">
+          <div className="min-w-0">
+            {appointmentsQuery.isLoading ? (
+              <AppPageLoadingState description="Carregando agendamentos do calendário..." />
+            ) : null}
+            {appointmentsQuery.isError ? (
+              <AppPageErrorState
+                description="Não foi possível carregar os agendamentos do calendário."
+                onAction={refetchAll}
+              />
+            ) : null}
+            {!appointmentsQuery.isLoading && !appointmentsQuery.isError ? (
+              <AppSectionBlock
+                title="Grade do calendário"
+                subtitle="Sobreposições são organizadas apenas pelo layout visual da grade."
+                className="min-w-0"
+              >
+                {filteredAppointments.length === 0 ? (
+                  <AppPageEmptyState
+                    title="Nenhum evento encontrado"
+                    description="Ajuste os filtros factuais ou crie um agendamento."
+                  />
+                ) : null}
+                {(appointmentsQuery.data?.meta.pages ?? 0) > 1 ? <div className="flex flex-wrap items-center gap-3 pb-3"><Button variant="outline" disabled={calendarPage <= 1 || appointmentsQuery.isFetching} onClick={() => setCalendarPage(page => page - 1)}>Anterior</Button><span>Página {calendarPage} de {appointmentsQuery.data?.meta.pages} dos agendamentos deste período</span><Button variant="outline" disabled={calendarPage >= (appointmentsQuery.data?.meta.pages ?? 0) || appointmentsQuery.isFetching} onClick={() => setCalendarPage(page => page + 1)}>Próxima</Button></div> : null}
+                <div className="hidden overflow-x-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-2 md:block">
+                  <div className="min-w-[640px]"><FullCalendar
+                    ref={calendarRef}
+                    timeZone={timezone ?? "local"}
+                    plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, luxon3Plugin]}
+                    initialView={viewMode}
+                    headerToolbar={false}
+                    events={events}
+                    datesSet={onDatesSet}
+                    eventClick={(arg: EventClickArg) =>
+                      setSelectedId(arg.event.id)
+                    }
+                    locale="pt-br"
+                    allDaySlot={false}
+                    slotMinTime="07:00:00"
+                    slotMaxTime="19:00:00"
+                    nowIndicator
+                    height="min(70vh, 720px)"
+                    stickyHeaderDates={true}
+                    eventContent={info => (
+                      <div className="p-1 text-xs">
+                        <strong>{info.timeText}</strong>
+                        <span className="block truncate">
+                          {info.event.extendedProps.customerName}
+                        </span>
+                        <span className="block truncate">
+                          {info.event.extendedProps.statusLabel}
+                        </span>
+                      </div>
+                    )}
+                  /></div>
+                </div>
+                <div
+                  className="space-y-2 md:hidden"
+                  aria-label="Agenda em lista para telas pequenas"
+                >
+                  {filteredAppointments.map(item => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setSelectedId(item.id)}
+                      className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-3 text-left"
+                    >
+                      <span className="block text-sm font-semibold text-[var(--text-primary)]">
+                        {formatDateTime(item.startsAt)}
+                      </span>
+                      <span className="block text-sm text-[var(--text-secondary)]">
+                        {item.customer?.name ?? "Cliente não informado"} ·{" "}
+                        {item.title ?? "Serviço não informado"}
+                      </span>
+                      <span className="block text-xs text-[var(--text-muted)]">
+                        {STATUS_LABEL[item.status]}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </AppSectionBlock>
+
+            ) : null}
+          </div>
+          <div className="grid min-w-0 gap-4">
+            {!appointmentsQuery.isLoading && !appointmentsQuery.isError ? (
+              <AppSectionBlock
+                title="Detalhe do evento selecionado"
+                subtitle="Fatos persistidos e navegação para ações legítimas."
+                className="min-w-0"
+              >
+                {selected ? (
+                  <div className="space-y-4">
+                    <dl className="divide-y divide-[var(--border-subtle)] rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-4">
+                      {[
+                        ["Cliente", selected.customer?.name ?? "Não informado"],
+                        ["Serviço", selected.title ?? "Não informado"],
+                        ["Início", formatDateTime(selected.startsAt)],
+                        ["Fim", formatDateTime(selected.endsAt)],
+                        ["Duração", durationLabel(selected)],
+                        [
+                          "Responsável",
+                          selectedPerson?.name ??
+                            selectedPerson?.fullName ??
+                            "Não atribuído",
+                        ],
+                        ["Status", STATUS_LABEL[selected.status]],
+                        [
+                          "O.S.",
+                          selected.serviceOrderId ||
+                          selected.serviceOrder?.id ||
+                          selected.serviceOrders?.some(order => order.id)
+                            ? "Vínculo retornado"
+                            : "Sem vínculo retornado",
+                        ],
+                      ].map(([label, value]) => (
+                        <div key={label} className="py-2">
+                          <dt className="text-xs text-[var(--text-muted)]">
+                            {label}
+                          </dt>
+                          <dd className="text-sm font-medium text-[var(--text-primary)]">
+                            {value}
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() =>
+                          navigate(
+                            `/appointments?id=${selected.id}&source=calendar`
+                          )
+                        }
+                      >
+                        Abrir agendamento
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          navigate(
+                            `/appointments?id=${selected.id}&action=reschedule&source=calendar`
+                          )
+                        }
+                      >
+                        Editar / remarcar
+                      </Button>
+                      {selected.status === "SCHEDULED" ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            navigate(
+                              `/appointments?id=${selected.id}&source=calendar`
+                            )
+                          }
+                        >
+                          Confirmar no agendamento
+                        </Button>
+                      ) : null}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          navigate(
+                            `/appointments?id=${selected.id}&source=calendar`
+                          )
+                        }
+                      >
+                        Cancelar no agendamento
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => navigate(serviceOrderLink(selected))}
+                      >
+                        Abrir O.S.
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          navigate(
+                            `/customers?id=${selected.customerId}&source=calendar`
+                          )
+                        }
+                      >
+                        Abrir cliente
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <AppPageEmptyState
+                    title="Nenhum evento selecionado"
+                    description="Selecione um evento na grade ou na lista para ver seus fatos e ações."
+                  />
+                )}
+              </AppSectionBlock>
+            ) : null}
+            <AppSectionBlock
+              title="Disponibilidade e capacidade oficiais"
+              subtitle="Dados do resumo operacional da equipe."
+              compact
+            >
+              {!canReadTeamSummary ? (
+                <p role="status" className="text-sm text-[var(--text-secondary)]">
+                  O resumo de capacidade da equipe está disponível para
+                  administradores.
+                </p>
+              ) : officialCapacityQuery.isLoading ? (
+                <AppPageLoadingState description="Carregando capacidade e disponibilidade oficiais..." />
+              ) : officialCapacityQuery.isError || officialScope.length === 0 ? (
+                <div
+                  role="status"
+                  className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-4 text-sm text-[var(--text-secondary)]"
+                >
+                  Capacidade e disponibilidade indisponíveis na fonte oficial para
+                  este recorte.
+                </div>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                  {officialScope.map(person => (
+                    <article
+                      key={person.personId}
+                      className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-4"
+                    >
+                      <h3 className="break-all font-semibold text-[var(--text-primary)]">
+                        {person.name}
+                      </h3>
+                      <dl className="mt-2 grid gap-x-3 gap-y-2 text-sm sm:grid-cols-2">
+                        <div>
+                          <dt className="text-[var(--text-muted)]">
+                            Disponibilidade oficial
+                          </dt>
+                          <dd className="font-medium text-[var(--text-primary)]">
+                            {officialLabel(person.availabilityStatus)}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-[var(--text-muted)]">
+                            Capacidade oficial
+                          </dt>
+                          <dd className="font-medium text-[var(--text-primary)]">
+                            {officialLabel(person.capacityStatus)}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-[var(--text-muted)]">Uso oficial</dt>
+                          <dd className="font-medium text-[var(--text-primary)]">
+                            {person.appointmentCapacityUsagePct == null
+                              ? "Indisponível na fonte oficial"
+                              : `${person.appointmentCapacityUsagePct}%`}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-[var(--text-muted)]">
+                            Agendamentos hoje / limite diário
+                          </dt>
+                          <dd className="font-medium text-[var(--text-primary)]">
+                            {person.todayAppointmentsCount == null ||
+                            person.dailyAppointmentCapacity == null
+                              ? "Indisponível na fonte oficial"
+                              : `${person.todayAppointmentsCount} / ${person.dailyAppointmentCapacity}`}
+                          </dd>
+                        </div>
+                      </dl>
+                      {person.capacitySummaryText ? (
+                        <p className="mt-3 text-xs text-[var(--text-secondary)]">
+                          {person.capacitySummaryText}
+                        </p>
+                      ) : null}
+                    </article>
+                  ))}
+                </div>
+              )}
+            </AppSectionBlock>
+          </div>
+        </div>
 
         <AppSectionBlock
           title="Indicadores factuais"
@@ -464,240 +705,6 @@ export default function CalendarPage() {
           </div>
         </AppSectionBlock>
 
-        <AppFiltersBar>
-          <input
-            aria-label="Filtrar por texto"
-            value={textFilter}
-            onChange={event => setTextFilter(event.target.value)}
-            placeholder="Cliente, serviço ou observação"
-            className="h-9 min-w-56 flex-1 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm text-[var(--text-primary)]"
-          />
-          <select
-            aria-label="Filtrar por responsável"
-            value={teamFilter}
-            onChange={event => setTeamFilter(event.target.value)}
-            disabled={peopleQuery.isError}
-            className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm text-[var(--text-primary)]"
-          >
-            <option value="all">Todos os responsáveis</option>
-            {people.map(person => (
-              <option key={person.id} value={person.id}>
-                {person.name ?? person.fullName ?? "Responsável"}
-              </option>
-            ))}
-          </select>
-          <select
-            aria-label="Filtrar por status"
-            value={statusFilter}
-            onChange={event => setStatusFilter(event.target.value)}
-            className="h-9 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm text-[var(--text-primary)]"
-          >
-            <option value="all">Todos os status</option>
-            {Object.entries(STATUS_LABEL).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </AppFiltersBar>
-
-        {appointmentsQuery.isLoading ? (
-          <AppPageLoadingState description="Carregando agendamentos do calendário..." />
-        ) : null}
-        {appointmentsQuery.isError ? (
-          <AppPageErrorState
-            description="Não foi possível carregar os agendamentos do calendário."
-            onAction={refetchAll}
-          />
-        ) : null}
-        {!appointmentsQuery.isLoading && !appointmentsQuery.isError ? (
-          <div className="grid gap-4 xl:grid-cols-12">
-            <AppSectionBlock
-              title="Grade do calendário"
-              subtitle="Sobreposições são organizadas apenas pelo layout visual da grade."
-              className="xl:col-span-8"
-            >
-              {filteredAppointments.length === 0 ? (
-                <AppPageEmptyState
-                  title="Nenhum evento encontrado"
-                  description="Ajuste os filtros factuais ou crie um agendamento."
-                />
-              ) : null}
-              {(appointmentsQuery.data?.meta.pages ?? 0) > 1 ? <div className="flex items-center gap-3 pb-3"><Button variant="outline" disabled={calendarPage <= 1 || appointmentsQuery.isFetching} onClick={() => setCalendarPage(page => page - 1)}>Anterior</Button><span>Página {calendarPage} de {appointmentsQuery.data?.meta.pages} dos agendamentos deste período</span><Button variant="outline" disabled={calendarPage >= (appointmentsQuery.data?.meta.pages ?? 0) || appointmentsQuery.isFetching} onClick={() => setCalendarPage(page => page + 1)}>Próxima</Button></div> : null}
-              <div className="hidden overflow-x-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-2 md:block">
-                <div className="min-w-[640px]"><FullCalendar
-                  ref={calendarRef}
-                  timeZone={timezone ?? "local"}
-                  plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, luxon3Plugin]}
-                  initialView={viewMode}
-                  headerToolbar={false}
-                  events={events}
-                  datesSet={onDatesSet}
-                  eventClick={(arg: EventClickArg) =>
-                    setSelectedId(arg.event.id)
-                  }
-                  locale="pt-br"
-                  allDaySlot={false}
-                  slotMinTime="07:00:00"
-                  slotMaxTime="19:00:00"
-                  nowIndicator
-                  height="min(70vh, 720px)"
-                  stickyHeaderDates={true}
-                  eventContent={info => (
-                    <div className="p-1 text-xs">
-                      <strong>{info.timeText}</strong>
-                      <span className="block truncate">
-                        {info.event.extendedProps.customerName}
-                      </span>
-                      <span className="block truncate">
-                        {info.event.extendedProps.statusLabel}
-                      </span>
-                    </div>
-                  )}
-                /></div>
-              </div>
-              <div
-                className="space-y-2 md:hidden"
-                aria-label="Agenda em lista para telas pequenas"
-              >
-                {filteredAppointments.map(item => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => setSelectedId(item.id)}
-                    className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-3 text-left"
-                  >
-                    <span className="block text-sm font-semibold text-[var(--text-primary)]">
-                      {formatDateTime(item.startsAt)}
-                    </span>
-                    <span className="block text-sm text-[var(--text-secondary)]">
-                      {item.customer?.name ?? "Cliente não informado"} ·{" "}
-                      {item.title ?? "Serviço não informado"}
-                    </span>
-                    <span className="block text-xs text-[var(--text-muted)]">
-                      {STATUS_LABEL[item.status]}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </AppSectionBlock>
-
-            <AppSectionBlock
-              title="Detalhe do evento selecionado"
-              subtitle="Fatos persistidos e navegação para ações legítimas."
-              className="xl:col-span-4"
-            >
-              {selected ? (
-                <div className="space-y-4">
-                  <dl className="divide-y divide-[var(--border-subtle)] rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-4">
-                    {[
-                      ["Cliente", selected.customer?.name ?? "Não informado"],
-                      ["Serviço", selected.title ?? "Não informado"],
-                      ["Início", formatDateTime(selected.startsAt)],
-                      ["Fim", formatDateTime(selected.endsAt)],
-                      ["Duração", durationLabel(selected)],
-                      [
-                        "Responsável",
-                        selectedPerson?.name ??
-                          selectedPerson?.fullName ??
-                          "Não atribuído",
-                      ],
-                      ["Status", STATUS_LABEL[selected.status]],
-                      [
-                        "O.S.",
-                        selected.serviceOrderId ||
-                        selected.serviceOrder?.id ||
-                        selected.serviceOrders?.some(order => order.id)
-                          ? "Vínculo retornado"
-                          : "Sem vínculo retornado",
-                      ],
-                    ].map(([label, value]) => (
-                      <div key={label} className="py-2">
-                        <dt className="text-xs text-[var(--text-muted)]">
-                          {label}
-                        </dt>
-                        <dd className="text-sm font-medium text-[var(--text-primary)]">
-                          {value}
-                        </dd>
-                      </div>
-                    ))}
-                  </dl>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      size="sm"
-                      onClick={() =>
-                        navigate(
-                          `/appointments?id=${selected.id}&source=calendar`
-                        )
-                      }
-                    >
-                      Abrir agendamento
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() =>
-                        navigate(
-                          `/appointments?id=${selected.id}&action=reschedule&source=calendar`
-                        )
-                      }
-                    >
-                      Editar / remarcar
-                    </Button>
-                    {selected.status === "SCHEDULED" ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() =>
-                          navigate(
-                            `/appointments?id=${selected.id}&source=calendar`
-                          )
-                        }
-                      >
-                        Confirmar no agendamento
-                      </Button>
-                    ) : null}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() =>
-                        navigate(
-                          `/appointments?id=${selected.id}&source=calendar`
-                        )
-                      }
-                    >
-                      Cancelar no agendamento
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => navigate(serviceOrderLink(selected))}
-                    >
-                      Abrir O.S.
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() =>
-                        navigate(
-                          `/customers?id=${selected.customerId}&source=calendar`
-                        )
-                      }
-                    >
-                      Abrir cliente
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <AppPageEmptyState
-                  title="Nenhum evento selecionado"
-                  description="Selecione um evento na grade ou na lista para ver seus fatos e ações."
-                />
-              )}
-            </AppSectionBlock>
-          </div>
-        ) : null}
-
         <AppSectionBlock
           title="Evidências e navegação contextual"
           subtitle="A agenda é uma leitura temporal; a Timeline continua sendo a fonte de evidências operacionais."
@@ -707,7 +714,7 @@ export default function CalendarPage() {
               Eventos exibidos derivam dos agendamentos persistidos. Fontes
               auxiliares ausentes são declaradas como leitura parcial.
             </p>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 size="sm"
                 variant="outline"

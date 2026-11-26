@@ -8,12 +8,12 @@ describe("CalendarPage official temporal-exploration contract", () => {
   it("follows the official information hierarchy", () => {
     const labels = [
       "Navegação temporal",
-      "Disponibilidade e capacidade oficiais",
       "Controles de visualização",
-      "Indicadores factuais",
       "Filtrar por texto",
       "Grade do calendário",
       "Detalhe do evento selecionado",
+      "Disponibilidade e capacidade oficiais",
+      "Indicadores factuais",
       "Evidências e navegação contextual",
     ];
     labels.forEach(label => expect(source).toContain(label));
