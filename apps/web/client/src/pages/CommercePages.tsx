@@ -374,123 +374,125 @@ export function InventoryPage() {
           }}
         />
       </AppFiltersBar>
-      <ReadState query={products}>
-        {products.data?.items.length === 0 ? (
-          <AppEmptyState
-            title="Nenhum produto encontrado"
-            description="Cadastre cada variação com um SKU próprio. Registre a primeira entrada para formar o saldo."
-          />
-        ) : (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {products.data?.items.map(p => (
-              <article key={p.id} className={`${panel} space-y-3`}>
-                <div>
-                  <p className="break-words text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-                    {p.sku}
-                  </p>
-                  <h2 className="break-words text-lg font-semibold">
-                    {p.name}
-                  </h2>
-                  <p className={muted}>
-                    {p.variant || "Sem variação"}
-                    {p.barcode ? ` · ${p.barcode}` : ""}
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-end justify-between gap-2">
-                  <p>
-                    <strong className="text-3xl tabular-nums">
-                      {p.onHand}
-                    </strong>{" "}
-                    <span className={muted}>unidades</span>
-                  </p>
-                  <span className="rounded-lg border border-[var(--border-subtle)] px-2 py-1 text-xs">
-                    {p.onHand <= p.minQuantity ? "Repor estoque" : "Disponível"}
-                  </span>
-                </div>
-                <dl className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <dt className={muted}>Custo unitário</dt>
-                    <dd>{money(p.costCents, p.currency)}</dd>
-                  </div>
-                  <div>
-                    <dt className={muted}>Preço de venda</dt>
-                    <dd>{money(p.saleCents, p.currency)}</dd>
-                  </div>
-                </dl>
-                <p className={muted}>Estoque mínimo: {p.minQuantity}</p>
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" onClick={() => beginMove(p, "IN")}>
-                    <ArrowDownToLine className="mr-2 h-4 w-4" />
-                    Entrada
+      <div className="grid min-w-0 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(17rem,23rem)]">
+        <section aria-label="Produtos em estoque" className="@container min-w-0">
+          <ReadState query={products}>
+            {products.data?.items.length === 0 ? (
+              <AppEmptyState
+                title="Nenhum produto encontrado"
+                description="Cadastre cada variação com um SKU próprio. Registre a primeira entrada para formar o saldo."
+              />
+            ) : (
+              <div className="grid gap-3 @min-[34rem]:grid-cols-2 @min-[52rem]:grid-cols-3">
+                {products.data?.items.map(p => (
+                  <article key={p.id} className={`${panel} space-y-3`}>
+                    <div>
+                      <p className="break-words text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                        {p.sku}
+                      </p>
+                      <h2 className="break-words text-lg font-semibold">
+                        {p.name}
+                      </h2>
+                      <p className={muted}>
+                        {p.variant || "Sem variação"}
+                        {p.barcode ? ` · ${p.barcode}` : ""}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-end justify-between gap-2">
+                      <p>
+                        <strong className="text-3xl tabular-nums">
+                          {p.onHand}
+                        </strong>{" "}
+                        <span className={muted}>unidades</span>
+                      </p>
+                      <span className="rounded-lg border border-[var(--border-subtle)] px-2 py-1 text-xs">
+                        {p.onHand <= p.minQuantity ? "Repor estoque" : "Disponível"}
+                      </span>
+                    </div>
+                    <dl className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <dt className={muted}>Custo unitário</dt>
+                        <dd>{money(p.costCents, p.currency)}</dd>
+                      </div>
+                      <div>
+                        <dt className={muted}>Preço de venda</dt>
+                        <dd>{money(p.saleCents, p.currency)}</dd>
+                      </div>
+                    </dl>
+                    <p className={muted}>Estoque mínimo: {p.minQuantity}</p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button variant="outline" onClick={() => beginMove(p, "IN")}>
+                        <ArrowDownToLine className="mr-2 h-4 w-4" />
+                        Entrada
+                      </Button>
+                      <Button variant="outline" onClick={() => beginMove(p, "OUT")}>
+                        <ArrowUpFromLine className="mr-2 h-4 w-4" />
+                        Saída
+                      </Button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+            {products.data && (page > 1 || products.data.pages > 1) ? (
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm">
+                <span>
+                  {products.data.total} produtos · Página {page} de{" "}
+                  {products.data.pages}
+                </span>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    disabled={page <= 1 || products.isFetching}
+                    onClick={() => setPage(p => p - 1)}
+                  >
+                    Anterior
                   </Button>
-                  <Button variant="outline" onClick={() => beginMove(p, "OUT")}>
-                    <ArrowUpFromLine className="mr-2 h-4 w-4" />
-                    Saída
+                  <Button
+                    variant="outline"
+                    disabled={page >= products.data!.pages || products.isFetching}
+                    onClick={() => setPage(p => p + 1)}
+                  >
+                    Próxima
                   </Button>
                 </div>
-              </article>
-            ))}
-          </div>
-        )}
-        {products.data && (page > 1 || products.data.pages > 1) ? (
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm">
-            <span>
-              {products.data.total} produtos · Página {page} de{" "}
-              {products.data.pages}
-            </span>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                disabled={page <= 1 || products.isFetching}
-                onClick={() => setPage(p => p - 1)}
-              >
-                Anterior
-              </Button>
-              <Button
-                variant="outline"
-                disabled={page >= products.data!.pages || products.isFetching}
-                onClick={() => setPage(p => p + 1)}
-              >
-                Próxima
-              </Button>
-            </div>
-          </div>
-        ) : null}
-      </ReadState>
-      <section className={`${panel} space-y-3`}>
-        <h2 className="text-lg font-semibold">Últimas movimentações</h2>
-        <ReadState query={movements}>
-          {movements.data?.length === 0 ? (
-            <p className={muted}>Nenhuma entrada ou saída registrada.</p>
-          ) : (
-            <ol className="divide-y divide-[var(--border-subtle)]">
-              {movements.data?.map(m => (
-                <li key={m.id} className="space-y-1 py-3">
-                  <strong>
-                    {m.direction === "IN" ? "+" : "−"}
-                    {m.quantity} · {m.product?.name ?? "Produto"}
-                  </strong>
-                  <p className={muted}>{m.reason}</p>
-                  <p className={muted}>
-                    {formatOrganizationDate(
-                      m.createdAt,
-                      timezone,
-                      "Data indisponível",
-                      { dateStyle: "short", timeStyle: "short" }
-                    )}
-                    {m.serviceOrderId ? ` · O.S. ${m.serviceOrderId}` : ""}
-                  </p>
-                </li>
-              ))}
-            </ol>
-          )}
-        </ReadState>
-        <p className={muted}>
-          Exibindo as 50 movimentações mais recentes. Saldo em unidades
-          inteiras; reservas, compras e sincronização com lojas serão etapas
-          seguintes.
-        </p>
-      </section>
+              </div>
+            ) : null}
+          </ReadState>
+        </section>
+        <section className={`${panel} space-y-3`}>
+          <h2 className="text-lg font-semibold">Últimas movimentações</h2>
+          <ReadState query={movements}>
+            {movements.data?.length === 0 ? (
+              <p className={muted}>Nenhuma entrada ou saída registrada.</p>
+            ) : (
+              <ol className="divide-y divide-[var(--border-subtle)]">
+                {movements.data?.map(m => (
+                  <li key={m.id} className="space-y-1 py-3">
+                    <strong className="break-words">
+                      {m.direction === "IN" ? "+" : "−"}
+                      {m.quantity} · {m.product?.name ?? "Produto"}
+                    </strong>
+                    <p className={`${muted} break-words`}>{m.reason}</p>
+                    <p className={muted}>
+                      {formatOrganizationDate(
+                        m.createdAt,
+                        timezone,
+                        "Data indisponível",
+                        { dateStyle: "short", timeStyle: "short" }
+                      )}
+                      {m.serviceOrderId ? ` · O.S. ${m.serviceOrderId}` : ""}
+                    </p>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </ReadState>
+          <p className={muted}>
+            Até 50 movimentações recentes. Os saldos são exibidos em unidades inteiras.
+          </p>
+        </section>
+      </div>
       <Editor
         form={productForm}
         title="Novo produto"
