@@ -1315,74 +1315,6 @@ export default function ExecutiveDashboard() {
           </div>
 
           <AppSectionBlock
-            title="KPIs operacionais"
-            compact
-            className={dashboardSectionClass}
-            subtitle="Indicadores de apoio para decidir rápido."
-          >
-            {kpisQuery.isLoading ? (
-              <AppPageLoadingState title="Carregando KPIs operacionais" />
-            ) : kpisQuery.isError ? (
-              <AppPageErrorState
-                title="KPIs indisponíveis"
-                description="O contrato oficial de indicadores não pôde ser consultado. Nenhum valor zero foi fabricado."
-                onAction={() => void kpisQuery.refetch()}
-              />
-            ) : (
-              <div className="grid w-full min-w-0 grid-cols-1 overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--border-subtle)] md:grid-cols-2 xl:grid-cols-4">
-                {kpiCards.map(({ label, value, context, cta, path, Icon }) => (
-                  <NexoExecutiveMetric
-                    key={label}
-                    title={label}
-                    value={value}
-                    context={context}
-                    icon={<Icon className="h-4 w-4" />}
-                    ctaLabel={cta}
-                    onClick={() => navigate(path)}
-                    className="rounded-none border-0 bg-[var(--surface-base)]"
-                  />
-                ))}
-              </div>
-            )}
-          </AppSectionBlock>
-
-          <AppSectionBlock
-            title="Fluxo operacional"
-            compact
-            className={dashboardSectionClass}
-            subtitle="Gargalos do fluxo Cliente → Agendamento → O.S. → Cobrança → Pagamento."
-          >
-            {executivePipelineQuery.isError ? (
-              <AppPageErrorState
-                title="Fluxo operacional indisponível"
-                description="O pipeline oficial não pôde ser consultado. Nenhum estado ou gargalo foi inferido a partir dos KPIs."
-                onAction={() => void executivePipelineQuery.refetch()}
-              />
-            ) : executivePipelineQuery.isLoading ? (
-              <AppPageLoadingState title="Carregando fluxo operacional" />
-            ) : flow.length > 0 ? (
-              <NexoOperationalPipeline
-                title="Etapas operacionais"
-                subtitle="Volumes, estados e justificativas recebidos do contrato autoritativo do backend."
-                stages={flow.map(stage => ({
-                  id: stage.id,
-                  label: stage.label,
-                  summary: stage.context,
-                  state: stage.state,
-                  countOrValue: stage.value,
-                  hrefLabel: stage.action,
-                  onClick: () => navigate(stage.path),
-                }))}
-              />
-            ) : (
-              <AppPageEmptyState
-                title="Fluxo operacional sem etapas retornadas"
-                description="O contrato oficial respondeu sem etapas para esta leitura; nenhuma etapa ou sequência foi fabricada no navegador."
-              />
-            )}
-          </AppSectionBlock>
-
-          <AppSectionBlock
             title="Fila operacional"
             compact
             className={dashboardSectionClass}
@@ -1398,7 +1330,12 @@ export default function ExecutiveDashboard() {
               />
             ) : queue.length > 0 ? (
               <div className="w-full min-w-0">
-                <div className="max-h-[340px] w-full min-w-0 overflow-auto rounded-xl border border-[var(--border-subtle)]/70 p-2">
+                <div
+                  role="region"
+                  aria-label="Itens da fila operacional"
+                  tabIndex={0}
+                  className="max-h-[340px] w-full min-w-0 overflow-auto rounded-xl border border-[var(--border-subtle)]/70 p-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"
+                >
                   <div className="grid min-w-0 gap-2 text-xs">
                     {queue.slice(0, 10).map(item => (
                       <OperationalInnerCard
@@ -1477,6 +1414,74 @@ export default function ExecutiveDashboard() {
               <AppPageEmptyState
                 title="Fila operacional sem itens retornados"
                 description="Não há itens acionáveis na leitura atual. A operação não preenche a fila com exemplos."
+              />
+            )}
+          </AppSectionBlock>
+
+          <AppSectionBlock
+            title="KPIs operacionais"
+            compact
+            className={dashboardSectionClass}
+            subtitle="Indicadores de apoio para decidir rápido."
+          >
+            {kpisQuery.isLoading ? (
+              <AppPageLoadingState title="Carregando KPIs operacionais" />
+            ) : kpisQuery.isError ? (
+              <AppPageErrorState
+                title="KPIs indisponíveis"
+                description="O contrato oficial de indicadores não pôde ser consultado. Nenhum valor zero foi fabricado."
+                onAction={() => void kpisQuery.refetch()}
+              />
+            ) : (
+              <div className="grid w-full min-w-0 grid-cols-1 overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--border-subtle)] md:grid-cols-2 xl:grid-cols-4">
+                {kpiCards.map(({ label, value, context, cta, path, Icon }) => (
+                  <NexoExecutiveMetric
+                    key={label}
+                    title={label}
+                    value={value}
+                    context={context}
+                    icon={<Icon className="h-4 w-4" />}
+                    ctaLabel={cta}
+                    onClick={() => navigate(path)}
+                    className="rounded-none border-0 bg-[var(--surface-base)]"
+                  />
+                ))}
+              </div>
+            )}
+          </AppSectionBlock>
+
+          <AppSectionBlock
+            title="Fluxo operacional"
+            compact
+            className={dashboardSectionClass}
+            subtitle="Gargalos do fluxo Cliente → Agendamento → O.S. → Cobrança → Pagamento."
+          >
+            {executivePipelineQuery.isError ? (
+              <AppPageErrorState
+                title="Fluxo operacional indisponível"
+                description="O pipeline oficial não pôde ser consultado. Nenhum estado ou gargalo foi inferido a partir dos KPIs."
+                onAction={() => void executivePipelineQuery.refetch()}
+              />
+            ) : executivePipelineQuery.isLoading ? (
+              <AppPageLoadingState title="Carregando fluxo operacional" />
+            ) : flow.length > 0 ? (
+              <NexoOperationalPipeline
+                title="Etapas operacionais"
+                subtitle="Volumes, estados e justificativas recebidos do contrato autoritativo do backend."
+                stages={flow.map(stage => ({
+                  id: stage.id,
+                  label: stage.label,
+                  summary: stage.context,
+                  state: stage.state,
+                  countOrValue: stage.value,
+                  hrefLabel: stage.action,
+                  onClick: () => navigate(stage.path),
+                }))}
+              />
+            ) : (
+              <AppPageEmptyState
+                title="Fluxo operacional sem etapas retornadas"
+                description="O contrato oficial respondeu sem etapas para esta leitura; nenhuma etapa ou sequência foi fabricada no navegador."
               />
             )}
           </AppSectionBlock>
