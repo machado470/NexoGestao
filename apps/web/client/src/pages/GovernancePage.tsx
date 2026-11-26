@@ -130,6 +130,8 @@ export default function GovernancePage() {
             <AppStatusBadge label="Carregando estado oficial" />
           ) : stateQuery.isError || !state ? (
             <AppStatusBadge label="Estado oficial indisponível" />
+          ) : stateData?.availability === "NO_DATA" ? (
+            <AppStatusBadge label="Sem avaliação" />
           ) : (
             <>
               <AppStatusBadge label={STATE_LABELS[state]} />
@@ -160,7 +162,7 @@ export default function GovernancePage() {
       <AppSectionBlock
         className="governance-state"
         title="Situação atual"
-        subtitle="A decisão operacional vigente e a justificativa emitida pela fonte autoritativa."
+        compact
       >
         {stateLoading ? (
           <AppPageLoadingState

@@ -10,6 +10,7 @@ export const PRESENTATION_LABELS: Record<string, string> = {
   BRL: "Real (BRL)", USD: "Dólar (USD)", EUR: "Euro (EUR)",
   UNKNOWN: "Não informado", NORMAL: "Operação normal", WARNING: "Em atenção", RESTRICTED: "Operação restrita", SUSPENDED: "Operação suspensa",
   AVAILABLE: "Disponível", NO_DATA: "Sem avaliação", UNAVAILABLE: "Indisponível",
+  UNAVAILABLE_NOW: "Indisponível agora", UNAVAILABLE_SOON: "Indisponível em breve",
   UNDER_CAPACITY: "Abaixo da capacidade", AT_CAPACITY: "Na capacidade", OVER_CAPACITY: "Acima da capacidade",
   CUSTOMERS_EXPORTED: "Clientes exportados", CHARGES_EXPORTED: "Cobranças exportadas",
   CUSTOMER_CREATED: "Cliente cadastrado", CUSTOMER_UPDATED: "Cliente atualizado", CUSTOMER_DELETED: "Cliente removido",

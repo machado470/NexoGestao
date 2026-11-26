@@ -322,7 +322,7 @@ export default function TimelinePage() {
               return (
                 <li
                   key={event.id}
-                  className="timeline-event module-list-item relative flex min-w-0 flex-col gap-2 pb-5 pl-6 last:pb-0"
+                  className="timeline-event module-list-item relative min-w-0 pb-3 pl-6 last:pb-0"
                 >
                   {index < filteredEvents.length - 1 ? (
                     <span
@@ -335,7 +335,7 @@ export default function TimelinePage() {
                     className="absolute left-0 top-1.5 size-[15px] rounded-full border-[3px] border-[var(--surface-base)] bg-[var(--accent-primary)] outline outline-1 outline-[var(--border-emphasis)]"
                   />
 
-                  <div className="min-w-0">
+                  <div className="min-w-0 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="rounded-md bg-[var(--accent-soft)] px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--nx-brand-text,var(--accent-primary))]">
                         {EVENT_LABELS[event.eventType] ?? PRESENTATION_LABELS[event.eventType] ?? presentationLabel(event.eventType)}
@@ -348,17 +348,17 @@ export default function TimelinePage() {
                           {presentationLabel(event.module)}
                         </span>
                       ) : null}
+                      <time
+                        dateTime={event.occurredAt}
+                        className="flex items-center gap-1.5 sm:ml-auto text-xs font-medium text-[var(--text-secondary)]"
+                      >
+                        <CalendarClock aria-hidden="true" className="size-3.5 shrink-0" />
+                        {formatDateTime(event.occurredAt, timezone)}
+                      </time>
                     </div>
                     <h3 className="mt-2 break-words text-sm font-semibold text-[var(--text-primary)] md:text-[15px]">
                       {officialEventLabel(event)}
                     </h3>
-                  <time
-                    dateTime={event.occurredAt}
-                    className="flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-[var(--text-secondary)]"
-                  >
-                    <CalendarClock className="size-3.5" />
-                    {formatDateTime(event.occurredAt, timezone)}
-                  </time>
                     {event.description ? (
                       <p className="mt-1 break-words text-sm leading-6 text-[var(--text-secondary)]">
                         {event.description}

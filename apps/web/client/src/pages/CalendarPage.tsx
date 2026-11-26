@@ -1,3 +1,4 @@
+import { presentationLabel } from "@/lib/presentation-labels";
 import luxon3Plugin from "@fullcalendar/luxon3";
 import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
 import { formatOrganizationDate, type Instant } from "@/lib/organization-locale";
@@ -98,7 +99,7 @@ function serviceOrderLink(item: Appointment) {
 
 function officialLabel(value?: string | null) {
   if (!value) return "Indisponível na fonte oficial";
-  return value.replace(/_/g, " ").toLocaleLowerCase("pt-BR");
+  return presentationLabel(value);
 }
 
 export default function CalendarPage() {
@@ -281,7 +282,6 @@ export default function CalendarPage() {
         }
         contextChips={
           <>
-            <AppStatusBadge label={periodTitle} />
             <AppStatusBadge
               label={`${factualCounts.total} evento(s) exibido(s)`}
             />
@@ -337,7 +337,8 @@ export default function CalendarPage() {
       <div className="mt-4 space-y-4">
         <AppSectionBlock
           title="Disponibilidade e capacidade oficiais"
-          subtitle="Valores exibidos diretamente pelo resumo operacional; o calendário não calcula vagas, margem ou horário livre."
+          subtitle="Dados do resumo operacional da equipe."
+          compact
         >
           {!canReadTeamSummary ? (
             <p role="status" className="text-sm text-[var(--text-secondary)]">
@@ -361,10 +362,10 @@ export default function CalendarPage() {
                   key={person.personId}
                   className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-4"
                 >
-                  <h3 className="font-semibold text-[var(--text-primary)]">
+                  <h3 className="break-all font-semibold text-[var(--text-primary)]">
                     {person.name}
                   </h3>
-                  <dl className="mt-3 grid gap-2 text-sm">
+                  <dl className="mt-2 grid gap-x-3 gap-y-2 text-sm sm:grid-cols-2">
                     <div>
                       <dt className="text-[var(--text-muted)]">
                         Disponibilidade oficial
