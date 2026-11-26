@@ -127,6 +127,7 @@ export default function AppointmentsPage() {
   const [page, setPage] = useState(1);
   const [openModal, setOpenModal] = useState(false);
   useCreateFromRoute("appointments:create", setOpenModal);
+  const createTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [editing, setEditing] = useState<AppointmentRow | null>(null);
   const [openServiceOrderModal, setOpenServiceOrderModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -451,7 +452,7 @@ export default function AppointmentsPage() {
         <div className={`${mobile.listClass} space-y-3`}>
         <MobileModuleHeader title="Agenda" description="Atendimentos, horários e responsáveis."
           context={appointmentsQuery.isSuccess ? `${appointments.length} ${appointments.length === 1 ? "agendamento" : "agendamentos"} nesta página` : undefined}
-          primaryAction={canCreateAppointment ? <Button className="min-h-11" onClick={() => {setEditing(null);setOpenModal(true);}}>Novo agendamento</Button> : undefined}
+          primaryAction={canCreateAppointment ? <Button className="min-h-11" data-create-focus="appointment" onClick={event => {createTriggerRef.current = event.currentTarget;setEditing(null);setOpenModal(true);}}>Novo agendamento</Button> : undefined}
         />
         <div className="hidden md:block">
         <AppOperationalHeader
@@ -474,7 +475,9 @@ export default function AppointmentsPage() {
           primaryAction={
             <Button
               disabled={!canCreateAppointment}
-              onClick={() => {
+              data-create-focus="appointment"
+              onClick={event => {
+                createTriggerRef.current = event.currentTarget;
                 setEditing(null);
                 setOpenModal(true);
               }}
@@ -667,7 +670,7 @@ export default function AppointmentsPage() {
               <AppPageEmptyState
                 title="Sem agendamentos"
                 description="Crie o primeiro agendamento para organizar os atendimentos."
-                action={canCreateAppointment ? <Button onClick={() => { setEditing(null); setOpenModal(true); }}>Novo agendamento</Button> : undefined}
+                action={canCreateAppointment ? <Button onClick={event => { createTriggerRef.current = event.currentTarget; setEditing(null); setOpenModal(true); }}>Novo agendamento</Button> : undefined}
               />
             ) : filteredRows.length === 0 ? (
               <AppPageEmptyState
@@ -964,6 +967,8 @@ export default function AppointmentsPage() {
         </div>
 
         <FormModal
+          returnFocusRef={editing ? undefined : createTriggerRef}
+          returnFocusFallback={editing ? undefined : '[data-create-focus="appointment"]'}
           open={
             openModal && (editing ? canEditAppointment : canCreateAppointment)
           }

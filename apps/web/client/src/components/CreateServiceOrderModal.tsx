@@ -5,7 +5,7 @@ import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
 import { parseMoneyInputToCents } from "@/lib/money-input";
 import { parseLocalDateTimeInput } from "@/lib/local-date-time";
 import { Button } from "@/components/ui/button";
-import { useId, useEffect, useMemo, useRef, useState } from "react";
+import { useId, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 
@@ -42,6 +42,8 @@ type Props = {
   open?: boolean;
   isOpen?: boolean;
   onClose: () => void;
+  returnFocusRef?: RefObject<HTMLButtonElement | null>;
+  returnFocusFallback?: string;
   onCreated?: (created?: { id: string; customerId: string }) => void;
   onSuccess?: () => void;
   customers: Array<{ id: string; name: string }>;
@@ -90,6 +92,8 @@ export default function CreateServiceOrderModal({
   open,
   isOpen,
   onClose,
+  returnFocusRef,
+  returnFocusFallback,
   onCreated,
   onSuccess,
   customers,
@@ -286,6 +290,8 @@ export default function CreateServiceOrderModal({
   return (
     <>
     <FormModal
+      returnFocusRef={returnFocusRef}
+      returnFocusFallback={returnFocusFallback}
       open={resolvedOpen}
       onOpenChange={open => (!open ? handleClose() : undefined)}
       title="Nova O.S."

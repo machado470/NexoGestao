@@ -34,6 +34,7 @@ export function BaseModal({
   fixedFooter = true,
   initialFocusRef,
   returnFocusRef,
+  returnFocusFallback,
   intent = "edit",
   contentClassName,
 }: {
@@ -49,6 +50,7 @@ export function BaseModal({
   fixedFooter?: boolean;
   initialFocusRef?: RefObject<HTMLElement | null>;
   returnFocusRef?: RefObject<HTMLButtonElement | null>;
+  returnFocusFallback?: string;
   intent?: ModalIntent;
   contentClassName?: string;
 }) {
@@ -75,12 +77,21 @@ export function BaseModal({
           if (closeBlocked) event.preventDefault();
         }}
         onCloseAutoFocus={(event) => {
-          if (!returnFocusRef) return;
-          const trigger = returnFocusRef.current;
-          returnFocusRef.current = null;
-          if (!trigger?.isConnected || trigger.disabled) return;
-          trigger.focus({ preventScroll: true });
-          if (trigger === document.activeElement) event.preventDefault();
+          const trigger = returnFocusRef?.current;
+          if (returnFocusRef) returnFocusRef.current = null;
+          if (trigger?.isConnected && !trigger.disabled) {
+            trigger.focus({ preventScroll: true });
+            if (trigger === document.activeElement) {
+              event.preventDefault();
+              return;
+            }
+          }
+          if (!returnFocusFallback) return;
+          const fallback = Array.from(
+            document.querySelectorAll<HTMLButtonElement>(returnFocusFallback)
+          ).find(button => !button.disabled && button.getClientRects().length > 0);
+          fallback?.focus({ preventScroll: true });
+          if (fallback && fallback === document.activeElement) event.preventDefault();
         }}
         onOpenAutoFocus={(event) => {
           if (!initialFocusRef?.current) return;
@@ -284,6 +295,7 @@ export function FormModal({
   closeBlocked = false,
   initialFocusRef,
   returnFocusRef,
+  returnFocusFallback,
   contentClassName,
 }: {
   open: boolean;
@@ -296,6 +308,7 @@ export function FormModal({
   closeBlocked?: boolean;
   initialFocusRef?: RefObject<HTMLElement | null>;
   returnFocusRef?: RefObject<HTMLButtonElement | null>;
+  returnFocusFallback?: string;
   contentClassName?: string;
 }) {
   return (
@@ -310,6 +323,7 @@ export function FormModal({
       footer={footer}
       initialFocusRef={initialFocusRef}
       returnFocusRef={returnFocusRef}
+      returnFocusFallback={returnFocusFallback}
       contentClassName={contentClassName}
     >
       {children}

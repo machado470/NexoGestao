@@ -148,6 +148,7 @@ export default function FinancesPage() {
   const cancellationInputRef = useRef<HTMLInputElement>(null);
   const [openCreate, setOpenCreate] = useState(false);
   useCreateFromRoute("finance:update", setOpenCreate);
+  const createTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [status, setStatus] = useState("all");
   const [search, setSearch] = useState("");
   const [paying, setPaying] = useState<Charge | null>(null);
@@ -419,7 +420,7 @@ export default function FinancesPage() {
     <AppPageShell className="operational-mobile-page mobile-module-page min-w-0 gap-4" data-testid="finances-authoritative-page">
       <MobileModuleHeader title="Financeiro" description="Cobranças, recebimentos e pendências."
         context={chargesQuery.isSuccess ? `${charges.length} ${charges.length === 1 ? "cobrança carregada" : "cobranças carregadas"}` : undefined}
-        primaryAction={<Button className="min-h-11" onClick={() => setOpenCreate(true)}>Nova cobrança</Button>}
+        primaryAction={<Button className="min-h-11" data-create-focus="charge" onClick={event => { createTriggerRef.current = event.currentTarget; setOpenCreate(true); }}>Nova cobrança</Button>}
         onRefresh={() => void refresh()}
       />
       <div className="hidden md:block">
@@ -427,7 +428,7 @@ export default function FinancesPage() {
         title="Financeiro operacional"
         description="Acompanhe cobranças, recebimentos e pendências."
         primaryAction={
-          <Button onClick={() => setOpenCreate(true)}>Nova cobrança</Button>
+          <Button data-create-focus="charge" onClick={event => { createTriggerRef.current = event.currentTarget; setOpenCreate(true); }}>Nova cobrança</Button>
         }
         secondaryActions={
           <Button variant="outline" onClick={() => void refresh()}>
@@ -925,6 +926,8 @@ export default function FinancesPage() {
       </FormModal>
 
       <CreateChargeModal
+          returnFocusRef={createTriggerRef}
+          returnFocusFallback='[data-create-focus="charge"]'
         initialCustomerId={customerId}
         isOpen={openCreate}
         onClose={() => setOpenCreate(false)}

@@ -28,6 +28,7 @@ import {
 
 type Props = {
   returnFocusRef?: RefObject<HTMLButtonElement | null>;
+  returnFocusFallback?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated?: (createdCustomer?: {
@@ -41,6 +42,7 @@ export default function CreateCustomerModal({
   onOpenChange,
   onCreated,
   returnFocusRef,
+  returnFocusFallback,
 }: Props) {
   const [, navigate] = useLocation();
   const { role } = useAuth();
@@ -240,6 +242,7 @@ export default function CreateCustomerModal({
       onOpenChange={nextOpen => (nextOpen ? onOpenChange(nextOpen) : close())}
       title="Novo Cliente"
       returnFocusRef={returnFocusRef}
+      returnFocusFallback={returnFocusFallback}
       description={`${name.trim() || "Cliente em cadastro"} · ${phone.trim() || "Sem telefone"}`}
       isSubmitting={createCustomer.isPending}
       closeBlocked={createCustomer.isPending}

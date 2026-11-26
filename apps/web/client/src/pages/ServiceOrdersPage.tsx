@@ -14,7 +14,7 @@ import { MobileDetailBack, MobileDetailState } from "@/components/MobileDetailBa
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useAuth } from "@/contexts/AuthContext";
 import { can } from "@/lib/rbac";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useSearch } from "wouter";
 import { toast } from "sonner";
 
@@ -221,6 +221,7 @@ export default function ServiceOrdersPage() {
 
   const [openCreate, setOpenCreate] = useState(false);
   useCreateFromRoute("orders:create", setOpenCreate);
+  const createTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] =
     useOperationalMemoryState<ServiceOrdersFilter>(
@@ -909,7 +910,7 @@ export default function ServiceOrdersPage() {
       <div className={`${mobile.listClass} space-y-3`}>
       <MobileModuleHeader title="Serviços" description="Acompanhe suas ordens de serviço."
         context={serviceOrdersQuery.isSuccess ? `${serviceOrders.length} ${serviceOrders.length === 1 ? "ordem" : "ordens"} nesta página` : undefined}
-        primaryAction={canCreateOrder ? <Button className="min-h-11" disabled={customersQuery.isError} onClick={() => setOpenCreate(true)}>Nova O.S.</Button> : undefined}
+        primaryAction={canCreateOrder ? <Button className="min-h-11" disabled={customersQuery.isError} data-create-focus="order" onClick={event => { createTriggerRef.current = event.currentTarget; setOpenCreate(true); }}>Nova O.S.</Button> : undefined}
       />
       <div className="hidden md:block">
       <AppOperationalHeader
@@ -919,7 +920,7 @@ export default function ServiceOrdersPage() {
         primaryAction={
           <Button
             type="button"
-            onClick={() => setOpenCreate(true)}
+            data-create-focus="order" onClick={event => { createTriggerRef.current = event.currentTarget; setOpenCreate(true); }}
             disabled={!canCreateOrder || customersQuery.isError}
             title={
               customersQuery.isError
@@ -1607,6 +1608,8 @@ export default function ServiceOrdersPage() {
       </div>
 
       <CreateServiceOrderModal
+          returnFocusRef={createTriggerRef}
+          returnFocusFallback='[data-create-focus="order"]'
         open={openCreate && canCreateOrder}
         onClose={() => setOpenCreate(false)}
         onSuccess={() => void refreshEverything()}

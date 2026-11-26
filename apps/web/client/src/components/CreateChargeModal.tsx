@@ -4,7 +4,7 @@ import { parseLocalDateTimeInput } from "@/lib/local-date-time";
 import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
 import { parseMoneyInputToCents as parseAmountToCents } from "@/lib/money-input";
 import { Button } from "@/components/ui/button";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type RefObject } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 
@@ -32,6 +32,8 @@ import { FormModal } from "@/components/app-modal-system";
 interface CreateChargeModalProps {
   isOpen: boolean;
   onClose: () => void;
+  returnFocusRef?: RefObject<HTMLButtonElement | null>;
+  returnFocusFallback?: string;
   onSuccess: () => void;
   initialCustomerId?: string | null;
 }
@@ -104,6 +106,8 @@ function formatDueDatePreview(value: string) {
 export function CreateChargeModal({
   isOpen,
   onClose,
+  returnFocusRef,
+  returnFocusFallback,
   onSuccess,
   initialCustomerId,
 }: CreateChargeModalProps) {
@@ -294,6 +298,8 @@ export function CreateChargeModal({
   return (
     <>
     <FormModal
+      returnFocusRef={returnFocusRef}
+      returnFocusFallback={returnFocusFallback}
       open={isOpen}
       onOpenChange={open => {
         if (!open) resetAndClose();

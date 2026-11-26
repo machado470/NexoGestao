@@ -1069,7 +1069,7 @@ export default function CustomersPage() {
         }}><ArrowLeft className="h-4 w-4" />Voltar aos clientes</Button> : <MobileModuleHeader
           title="Clientes" description="Relacionamentos e próximos atendimentos."
           context={customersQuery.isSuccess ? `${customersQuery.data?.meta.total ?? 0} ${(customersQuery.data?.meta.total ?? 0) === 1 ? "cliente encontrado" : "clientes encontrados"}` : undefined}
-          primaryAction={canCreateCustomer ? <Button className="min-h-11" onClick={openCreateCustomer}>Novo cliente</Button> : undefined}
+          primaryAction={canCreateCustomer ? <Button className="min-h-11" data-create-focus="customer" onClick={openCreateCustomer}>Novo cliente</Button> : undefined}
         />}
       </div>
       <div className="hidden md:block">
@@ -1080,7 +1080,7 @@ export default function CustomersPage() {
         primaryAction={
           <Button
             disabled={!canCreateCustomer}
-            onClick={openCreateCustomer}
+            data-create-focus="customer" onClick={openCreateCustomer}
           >
             Novo cliente
           </Button>
@@ -1992,6 +1992,7 @@ export default function CustomersPage() {
         open={createOpen && canCreateCustomer}
         onOpenChange={setCreateOpen}
         returnFocusRef={createTriggerRef}
+        returnFocusFallback='[data-create-focus="customer"]'
         onCreated={async created => {
           setCreateOpen(false);
           await customersQuery.refetch();
