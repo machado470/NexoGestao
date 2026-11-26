@@ -1,5 +1,5 @@
 import { useRef, useState, type FormEvent } from "react";
-import { BookOpen, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { transientReadOptions } from "@/lib/read-query-retry";
 import { useAuth } from "@/contexts/AuthContext";
@@ -18,6 +18,7 @@ import {
   AppEmptyState,
 } from "@/components/app-system";
 import {
+  AppPageHeader,
   AppPageLoadingState,
   AppPageErrorState,
 } from "@/components/internal-page-system";
@@ -270,25 +271,22 @@ export default function ServiceCatalogPage() {
     setForm(prev => ({ ...prev, [key]: value }));
   return (
     <AppPageShell className="operational-mobile-page mobile-module-page min-w-0 gap-4">
-      <header className="flex min-w-0 flex-col items-start justify-between gap-3 sm:flex-row">
-        <div className="min-w-0">
-          <BookOpen className="mb-2 h-6 w-6 text-[var(--nx-brand-text,var(--accent-primary))]" />
-          <h1 className="text-2xl font-semibold">Catálogo de serviços</h1>
-          <p className={`${muted} mt-2`}>
-            Padronize serviços, preços de referência e duração.
-          </p>
-        </div>
-        {manage && (
-          <Button
-            className="min-h-11"
-            disabled={!currency}
-            onClick={() => begin(null)}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Novo serviço
-          </Button>
-        )}
-      </header>
+      <AppPageHeader
+        title="Catálogo de serviços"
+        description="Padronize serviços, preços de referência e duração."
+        actions={
+          manage && (
+            <Button
+              className="min-h-11"
+              disabled={!currency}
+              onClick={() => begin(null)}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Novo serviço
+            </Button>
+          )
+        }
+      />
       <p className={muted}>
         Preços são referências. Este cadastro não altera O.S., estoque ou
         cobranças.
@@ -300,7 +298,7 @@ export default function ServiceCatalogPage() {
       )}
       <form
         aria-label="Buscar serviços"
-        className={`${panel} grid gap-3 sm:grid-cols-[1fr_auto_auto]`}
+        className={`${panel} grid gap-2 !p-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]`}
         onSubmit={e => {
           e.preventDefault();
           setSearch(q.trim());
@@ -404,12 +402,14 @@ export default function ServiceCatalogPage() {
               ))}
             </div>
           )}
-          <Pager
-            page={page}
-            pages={list.data?.pages ?? 1}
-            busy={list.isFetching}
-            setPage={setPage}
-          />
+          {(page > 1 || (list.data?.pages ?? 1) > 1) && (
+            <Pager
+              page={page}
+              pages={list.data?.pages ?? 1}
+              busy={list.isFetching}
+              setPage={setPage}
+            />
+          )}
         </>
       )}
       {guard.confirmation}
