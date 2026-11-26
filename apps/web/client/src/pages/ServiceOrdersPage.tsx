@@ -1142,12 +1142,12 @@ export default function ServiceOrdersPage() {
                           }
                         }}
                       >
-                        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-[1.1fr_0.75fr_0.9fr_0.8fr_auto] lg:items-center">
+                        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.75fr)_minmax(0,0.9fr)_minmax(0,0.8fr)_auto] lg:items-center">
                           <div className="min-w-0">
-                            <p className="break-words text-sm font-semibold text-[var(--text-primary)] md:truncate">
+                            <p className="break-words text-sm font-semibold text-[var(--text-primary)]">
                               {item.customerName}
                             </p>
-                            <p className="mt-1 break-words text-xs text-[var(--text-secondary)] md:truncate">
+                            <p className="mt-1 break-words text-xs text-[var(--text-secondary)]">
                               Serviço: {item.title}
                             </p>
                           </div>
@@ -1312,10 +1312,10 @@ export default function ServiceOrdersPage() {
                   <p className="text-xs uppercase tracking-wide text-[var(--text-muted)]">
                     Resumo
                   </p>
-                  <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                  <h2 className="break-words text-lg font-semibold text-[var(--text-primary)]">
                     {selectedOrder.code} · {selectedOrder.title}
                   </h2>
-                  <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                  <p className="mt-1 break-words text-sm text-[var(--text-secondary)]">
                     {selectedOrder.description}
                   </p>
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">

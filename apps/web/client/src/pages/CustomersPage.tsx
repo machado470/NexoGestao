@@ -1406,8 +1406,8 @@ export default function CustomersPage() {
                         )}
                           >
                         <td>
-                          <div className="min-w-[220px] space-y-1">
-                            <p className="font-semibold text-[var(--text-primary)]">
+                          <div className="w-[220px] space-y-1">
+                            <p className="break-words font-semibold text-[var(--text-primary)]">
                               {String(profile.customer.name ?? "Sem nome")}
                             </p>
                             <p className="max-w-[280px] truncate text-xs text-[var(--text-secondary)]">
