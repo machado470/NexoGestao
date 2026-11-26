@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   TrendingDown,
   WalletCards,
+  UsersRound,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
@@ -1681,20 +1682,38 @@ export default function ExecutiveDashboard() {
               : "Ainda não há dados operacionais. Consulte os cadastros em Clientes."
           }
         >
-          <div className="flex flex-wrap gap-2">
-            <Button asChild className="min-h-11">
+          <div className="grid gap-2 lg:grid-cols-3">
+            <Button asChild className="h-auto min-h-16 w-full justify-start whitespace-normal px-4 py-3 text-left">
               <Link href={canCreateCustomer ? "/customers?action=create" : "/customers"}>
-                {canCreateCustomer ? "Cadastrar cliente" : "Ver clientes"}
+                <UsersRound aria-hidden="true" className="size-5 shrink-0" />
+                <span className="min-w-0">
+                  <span className="block">{canCreateCustomer ? "Cadastrar cliente" : "Ver clientes"}</span>
+                  <span className="block text-xs font-normal">
+                    {canCreateCustomer ? "Inclua um cliente na carteira." : "Consulte os cadastros da carteira."}
+                  </span>
+                </span>
               </Link>
             </Button>
             {canCreateAppointment ? (
-              <Button asChild variant="outline" className="min-h-11">
-                <Link href="/appointments?action=create">Novo agendamento</Link>
+              <Button asChild variant="outline" className="h-auto min-h-16 w-full justify-start whitespace-normal px-4 py-3 text-left">
+                <Link href="/appointments?action=create">
+                  <CalendarClock aria-hidden="true" className="size-5 shrink-0" />
+                  <span className="min-w-0">
+                    <span className="block">Novo agendamento</span>
+                    <span className="block text-xs font-normal">Reserve um horário para o atendimento.</span>
+                  </span>
+                </Link>
               </Button>
             ) : null}
             {canCreateOrder ? (
-              <Button asChild variant="outline" className="min-h-11">
-                <Link href="/service-orders?action=create">Nova ordem de serviço</Link>
+              <Button asChild variant="outline" className="h-auto min-h-16 w-full justify-start whitespace-normal px-4 py-3 text-left">
+                <Link href="/service-orders?action=create">
+                  <ClipboardList aria-hidden="true" className="size-5 shrink-0" />
+                  <span className="min-w-0">
+                    <span className="block">Nova ordem de serviço</span>
+                    <span className="block text-xs font-normal">Registre um serviço para execução.</span>
+                  </span>
+                </Link>
               </Button>
             ) : null}
           </div>
