@@ -235,7 +235,7 @@ export default function AuditPage() {
               </li>)}
             </ol>
             <div className="hidden md:block">
-            <AppDataTable className="min-w-[860px]">
+            <AppDataTable label="Registros de auditoria" className="min-w-[860px]">
               <thead><tr><th scope="col">Data e hora</th><th scope="col">Evento</th><th scope="col">Ator</th><th scope="col">Entidade</th><th scope="col">Identificador</th><th scope="col"><span className="sr-only">Ações</span></th></tr></thead>
               <tbody>{events.map(event => (
                 <tr key={event.id}>

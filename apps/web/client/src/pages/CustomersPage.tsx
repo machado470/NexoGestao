@@ -36,7 +36,6 @@ import { presentationStatusLabel } from "@/lib/presentation-status";
 import { Button } from "@/components/ui/button";
 import { NexoEvidenceTimeline, NexoExecutiveMetric } from "@/components/app";
 import {
-  AppDataTable,
   AppAlert,
   AppAlertDescription,
   AppAlertTitle,
@@ -48,6 +47,7 @@ import {
   AppStatusBadge,
 } from "@/components/app-system";
 import {
+  AppDataTable,
   AppFiltersBar,
   AppContextWorkspace,
   AppOperationalHeader,
@@ -1396,16 +1396,20 @@ export default function CustomersPage() {
                   </article>
                 ))}
               </div>
-              <div className="hidden max-h-[560px] overflow-y-auto md:block">
-                <AppDataTable className="min-w-[940px]">
-                  <thead>
+              <div className="hidden min-w-0 md:block">
+                <AppDataTable
+                  label="Carteira de clientes"
+                  className="nexo-data-table min-w-[940px] overflow-visible"
+                  viewportClassName="max-h-[560px]"
+                >
+                  <thead className="sticky top-0 z-10">
                     <tr>
-                      <th>Cliente</th>
-                      <th>Contexto / status</th>
-                      <th>Responsável / atraso</th>
-                      <th>Próxima ação</th>
-                      <th>Financeiro</th>
-                      <th className="text-right">Ações</th>
+                      <th scope="col">Cliente</th>
+                      <th scope="col">Contexto / status</th>
+                      <th scope="col">Responsável / atraso</th>
+                      <th scope="col">Próxima ação</th>
+                      <th scope="col">Financeiro</th>
+                      <th scope="col" className="text-right">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
