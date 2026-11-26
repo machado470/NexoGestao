@@ -5,11 +5,8 @@ import {
   type ReactNode,
   type FormEvent,
 } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import {
-  Package,
-  ReceiptText,
-  HeartPulse,
   Plus,
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -35,6 +32,8 @@ import {
   AppEmptyState,
 } from "@/components/app-system";
 import {
+  AppPageHeader,
+  AppFiltersBar,
   AppPageLoadingState,
   AppPageErrorState,
 } from "@/components/internal-page-system";
@@ -72,30 +71,19 @@ function amount(value: string, allowZero = false) {
 function Workspace({
   title,
   description,
-  icon,
   action,
   children,
 }: {
   title: string;
   description: string;
-  icon: ReactNode;
   action?: ReactNode;
   children: ReactNode;
 }) {
+  const [location] = useLocation();
+
   return (
     <AppPageShell className="operational-mobile-page mobile-module-page commerce-workspace min-w-0 gap-4">
-      <header className="flex min-w-0 flex-col items-start justify-between gap-4 sm:flex-row">
-        <div className="min-w-0 flex-1">
-          <div className="mb-2 inline-flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--nx-brand-text,var(--accent-primary))]">
-            {icon}
-          </div>
-          <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">
-            {title}
-          </h1>
-          <p className={`${muted} mt-2 max-w-2xl`}>{description}</p>
-        </div>
-        {action}
-      </header>
+      <AppPageHeader title={title} description={description} actions={action} />
       <nav
         aria-label="Estoque, fiscal e saúde financeira"
         className="flex flex-wrap gap-2"
@@ -108,7 +96,8 @@ function Workspace({
           <Link
             key={href}
             href={href}
-            className="inline-flex min-h-11 items-center rounded-xl border border-[var(--border-subtle)] px-3 text-sm hover:bg-[var(--accent-soft)]"
+            aria-current={location === href ? "page" : undefined}
+            className="inline-flex min-h-11 items-center rounded-xl border border-[var(--border-subtle)] px-3 text-sm hover:bg-[var(--accent-soft)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] aria-[current=page]:border-[var(--accent-primary)] aria-[current=page]:bg-[var(--accent-soft)] aria-[current=page]:text-[var(--nx-brand-text,var(--accent-primary))]"
           >
             {label}
           </Link>
@@ -361,7 +350,6 @@ export function InventoryPage() {
     <Workspace
       title="Estoque"
       description="Peças e produtos por SKU, variação e código de barras. Entradas e saídas ficam registradas por profissional."
-      icon={<Package />}
       action={
         <Button onClick={() => productForm.start()}>
           <Plus className="mr-2 h-4 w-4" />
@@ -374,8 +362,9 @@ export function InventoryPage() {
           {notice}
         </p>
       ) : null}
-      <div className={panel}>
+      <AppFiltersBar className="[&>label]:w-full">
         <Field
+          type="search"
           label="Buscar por nome, SKU ou código de barras"
           value={search}
           maxLength={120}
@@ -384,7 +373,7 @@ export function InventoryPage() {
             setPage(1);
           }}
         />
-      </div>
+      </AppFiltersBar>
       <ReadState query={products}>
         {products.data?.items.length === 0 ? (
           <AppEmptyState
@@ -443,7 +432,7 @@ export function InventoryPage() {
             ))}
           </div>
         )}
-        {products.data ? (
+        {products.data && (page > 1 || products.data.pages > 1) ? (
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm">
             <span>
               {products.data.total} produtos · Página {page} de{" "}
@@ -657,7 +646,6 @@ export function FiscalPage() {
     <Workspace
       title="Notas fiscais"
       description="Organize os dados do serviço e prepare a emissão para o cliente correto."
-      icon={<ReceiptText />}
       action={
         <Button onClick={() => form.start()}>
           <Plus className="mr-2 h-4 w-4" />
@@ -665,12 +653,11 @@ export function FiscalPage() {
         </Button>
       }
     >
-      <section className={`${panel} space-y-2`}>
-        <h2 className="font-semibold">Conectar emissão fiscal</h2>
+      <section className="space-y-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-4 py-3">
+        <h2 className="text-sm font-semibold">Emissão fiscal indisponível</h2>
         <p className={muted}>
-          A emissão autorizada de NFS-e depende de um provedor fiscal e da
-          configuração tributária da empresa. Esta seção salva preparações; não
-          emite documentos fiscais nem gera número, XML ou autorização.
+          Você pode salvar preparações aqui. Para emitir NFS-e, conecte um
+          provedor fiscal e configure a tributação da empresa.
         </p>
         <p className={muted}>
           As faturas comerciais do Financeiro não substituem uma nota fiscal.
@@ -831,7 +818,6 @@ export function FinancialHealthPage() {
     <Workspace
       title="Saúde financeira"
       description="Recebimentos, despesas registradas e valores em aberto, separados por moeda."
-      icon={<HeartPulse />}
       action={
         <Button onClick={() => form.start()}>
           <Plus className="mr-2 h-4 w-4" />
@@ -839,7 +825,9 @@ export function FinancialHealthPage() {
         </Button>
       }
     >
-      <section className={panel}>
+      <section
+        className={`${panel} grid items-end gap-3 sm:grid-cols-[minmax(0,14rem)_1fr]`}
+      >
         <Field
           label="Mês de análise"
           type="month"
@@ -848,7 +836,7 @@ export function FinancialHealthPage() {
           value={month || report.data?.month || ""}
           onChange={e => setMonth(e.target.value)}
         />
-        <p className={`${muted} mt-2`}>
+        <p className={`${muted} sm:pb-1`}>
           O período usa o fuso da empresa. Valores em aberto mostram a carteira
           atual, independentemente do mês selecionado.
         </p>
@@ -866,11 +854,11 @@ export function FinancialHealthPage() {
             misturar valores.
           </p>
         ) : null}
-        <div className="grid gap-4 xl:grid-cols-2">
+        <div className="grid gap-4">
           {report.data?.currencies.map(r => (
             <section key={r.currency} className={`${panel} space-y-4`}>
               <h2 className="text-lg font-semibold">Resumo · {r.currency}</h2>
-              <dl className="grid grid-cols-2 gap-4">
+              <dl className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2 xl:grid-cols-3">
                 {[
                   ["Recebido no mês", r.receivedCents],
                   ["Reembolsado no mês", r.refundedCents],
@@ -879,7 +867,10 @@ export function FinancialHealthPage() {
                   ["A receber · carteira atual", r.openCents],
                   ["Em atraso · carteira atual", r.overdueCents],
                 ].map(([label, value]) => (
-                  <div key={String(label)} className="min-w-0">
+                  <div
+                    key={String(label)}
+                    className="min-w-0 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3"
+                  >
                     <dt className={muted}>{label}</dt>
                     <dd className="mt-1 break-words text-lg font-semibold tabular-nums">
                       {money(value as number | null, r.currency)}

@@ -16,6 +16,7 @@ import {
   AppEmptyState,
 } from "@/components/app-system";
 import {
+  AppPageHeader,
   AppPageLoadingState,
   AppPageErrorState,
 } from "@/components/internal-page-system";
@@ -786,24 +787,22 @@ export default function QuotesPage() {
     manage = role ? can(role, "catalog:manage") : false;
   return (
     <AppPageShell className="operational-mobile-page mobile-module-page min-w-0 gap-4">
-      <header className="flex flex-col items-start justify-between gap-3 sm:flex-row">
-        <div>
-          <h1 className="text-2xl font-semibold">Orçamentos</h1>
-          <p className={`${muted} mt-2`}>
-            Combine escopo, valores e condições antes do serviço.
-          </p>
-        </div>
-        {manage && (
-          <Button
-            className="min-h-11"
-            disabled={!currency}
-            onClick={() => setEditor({ item: null })}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Novo orçamento
-          </Button>
-        )}
-      </header>
+      <AppPageHeader
+        title="Orçamentos"
+        description="Combine escopo, valores e condições antes do serviço."
+        actions={
+          manage && (
+            <Button
+              className="min-h-11"
+              disabled={!currency}
+              onClick={() => setEditor({ item: null })}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Novo orçamento
+            </Button>
+          )
+        }
+      />
       {notice && (
         <p role="status" className="text-sm">
           {notice}
@@ -854,25 +853,30 @@ export default function QuotesPage() {
           ))}
         </div>
       )}
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          variant="outline"
-          disabled={page <= 1 || query.isFetching}
-          onClick={() => setPage(x => x - 1)}
+      {(page > 1 || (query.data?.pages ?? 1) > 1) && (
+        <nav
+          aria-label="Paginação de orçamentos"
+          className="flex flex-wrap items-center gap-2"
         >
-          Anterior
-        </Button>
-        <span>
-          {page}/{query.data?.pages ?? 1}
-        </span>
-        <Button
-          variant="outline"
-          disabled={page >= (query.data?.pages ?? 1) || query.isFetching}
-          onClick={() => setPage(x => x + 1)}
-        >
-          Próxima
-        </Button>
-      </div>
+          <Button
+            variant="outline"
+            disabled={page <= 1 || query.isFetching}
+            onClick={() => setPage(x => x - 1)}
+          >
+            Anterior
+          </Button>
+          <span>
+            {page}/{query.data?.pages ?? 1}
+          </span>
+          <Button
+            variant="outline"
+            disabled={page >= (query.data?.pages ?? 1) || query.isFetching}
+            onClick={() => setPage(x => x + 1)}
+          >
+            Próxima
+          </Button>
+        </nav>
+      )}
       {selected && (
         <QuoteDetails
           key={selected}
