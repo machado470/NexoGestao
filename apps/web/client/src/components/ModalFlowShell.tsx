@@ -21,6 +21,7 @@ type Props = {
   hasDirtyState?: boolean;
   contentClassName?: string;
   returnFocusRef?: RefObject<HTMLButtonElement | null>;
+  returnFocusFallback?: string;
 };
 
 export default function ModalFlowShell({
@@ -40,6 +41,7 @@ export default function ModalFlowShell({
   hasDirtyState = false,
   contentClassName,
   returnFocusRef,
+  returnFocusFallback,
 }: Props) {
   useEffect(() => {
     if (!open || !isSubmitting) return;
@@ -56,6 +58,7 @@ export default function ModalFlowShell({
   return (
     <FormModal
       returnFocusRef={returnFocusRef}
+      returnFocusFallback={returnFocusFallback}
       open={open}
       onOpenChange={nextOpen => {
         if (!nextOpen && (closeBlocked || isSubmitting)) return;
