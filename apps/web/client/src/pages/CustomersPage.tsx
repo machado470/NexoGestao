@@ -8,10 +8,8 @@ import { useIsMobile } from "@/hooks/useMobile";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import {
-  ArrowRight,
   ArrowLeft,
   CalendarClock,
-  CheckCircle2,
   CreditCard,
   MessageCircle,
   ShieldAlert,
@@ -1077,7 +1075,7 @@ export default function CustomersPage() {
       <div className="hidden md:block">
       <AppOperationalHeader
         title="Centro Operacional do Cliente"
-        description="Memória viva do relacionamento: decisão, fluxo, execução e auditoria em uma leitura compacta."
+        description="Consulte a carteira, o risco operacional e a próxima ação de cada cliente."
         density="compact"
         primaryAction={
           <Button
@@ -1115,22 +1113,7 @@ export default function CustomersPage() {
             />
           </>
         }
-      >
-        <div className="grid gap-2 text-xs text-[var(--text-secondary)] md:grid-cols-3">
-          <span className="flex items-center gap-2">
-            <CheckCircle2 className="h-3.5 w-3.5 text-[var(--dashboard-success)]" />
-            Cada cliente mostra contexto e próxima ação.
-          </span>
-          <span className="flex items-center gap-2">
-            <ShieldAlert className="h-3.5 w-3.5 text-[var(--dashboard-warning)]" />
-            Prioridade e risco vêm do resumo operacional oficial.
-          </span>
-          <span className="flex items-center gap-2">
-            <ArrowRight className="h-3.5 w-3.5 text-[var(--dashboard-info)]" />
-            Ações reais vêm antes da navegação.
-          </span>
-        </div>
-      </AppOperationalHeader>
+      />
       </div>
 
       {unavailableAuxiliaryData.length > 0 ? (
@@ -1295,8 +1278,7 @@ export default function CustomersPage() {
             />
           ) : customers.length === 0 && !searchTerm && activeFilter === "all" && priorityFilter === "all" && riskFilter === "all" ? (
             <AppPageEmptyState title="Nenhum cliente cadastrado"
-              description="Cadastre o primeiro cliente para começar."
-              action={canCreateCustomer ? <Button onClick={openCreateCustomer}>Criar primeiro cliente</Button> : undefined} />
+              description={canCreateCustomer ? "Cadastre o primeiro cliente para começar." : "Os clientes cadastrados aparecerão aqui."} />
           ) : filteredProfiles.length === 0 ? (
             <AppPageEmptyState title="Nenhum resultado para os filtros"
               description="Limpe os filtros para ver a carteira."

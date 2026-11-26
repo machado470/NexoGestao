@@ -491,10 +491,9 @@ export default function AppointmentsPage() {
             <AppSectionBlock
               className={`${mobile.listClass} mobile-flat-section mobile-summary [&>div:first-child]:hidden md:[&>div:first-child]:flex`}
               title="Contexto da agenda"
-              subtitle="Leitura factual do escopo retornado; nenhuma decisão é reconstruída no navegador."
               compact
             >
-              <div className="grid min-w-0 divide-y divide-[var(--border-subtle)] sm:grid-cols-2 sm:divide-x sm:divide-y-0 lg:grid-cols-4">
+              <div className="grid min-w-0 grid-cols-2 gap-x-3 gap-y-2 lg:grid-cols-4">
                 {[
                   ["Total no escopo", factualCounts.total],
                   ["Agendados", factualCounts.scheduled],
@@ -503,10 +502,10 @@ export default function AppointmentsPage() {
                 ].map(([label, value]) => (
                   <div
                     key={String(label)}
-                    className="min-w-0 px-3 py-2 first:pl-0 last:pr-0"
+                    className="min-w-0 border-l border-[var(--border-subtle)] pl-3"
                   >
                     <p className="text-xs text-[var(--text-muted)]">{label}</p>
-                    <p className="mt-1 break-words text-xl font-semibold text-[var(--text-primary)]">
+                    <p className="break-words text-lg font-semibold tabular-nums text-[var(--text-primary)]">
                       {value}
                     </p>
                   </div>
@@ -516,13 +515,12 @@ export default function AppointmentsPage() {
           ) : null}
 
           <AppSectionBlock
-            className={`${mobile.listClass} mobile-flat-section`}
+            className={`${mobile.listClass} mobile-flat-section [&>div:first-child]:sr-only`}
             title="Filtros"
-            subtitle="Refine apenas por fatos persistidos, sem alterar a ordem recebida."
             compact
           >
             <div role="group" aria-label="Filtros de apresentação">
-              <AppFiltersBar className="gap-3">
+              <AppFiltersBar className="gap-3 border-0 bg-transparent !p-0">
                 <div className="min-w-0 flex-1 basis-full sm:basis-64">
                   <label
                     className="mb-1 block text-xs font-medium text-[var(--text-secondary)]"
