@@ -12,9 +12,9 @@ describe("ExecutiveDashboard decision center", () => {
       "Operação hoje",
       "Atenção imediata",
       "Próxima melhor ação",
+      "Fila operacional",
       "KPIs operacionais",
       "Fluxo operacional",
-      "Fila operacional",
       "Pulso da operação",
       "Acessos rápidos contextuais",
     ];
