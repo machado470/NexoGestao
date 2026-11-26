@@ -261,6 +261,7 @@ export default function SettingsPage() {
                 hint="Moeda de referência da organização. Cada cobrança mantém sua moeda registrada; esta alteração não converte valores existentes."
               >
                 <AppSelect
+                  id="settings-currency"
                   value={currency}
                   onValueChange={value => {
                     if (updateMutation.isPending) return;

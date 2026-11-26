@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import type { ComponentProps, ReactNode } from "react";
+import { Children, cloneElement, isValidElement, type ComponentProps, type ReactNode } from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
@@ -482,11 +482,24 @@ export function AppField({
   htmlFor?: string;
   children: ReactNode;
 }) {
+  const hintId = hint && htmlFor ? `${htmlFor}-hint` : undefined;
+  const controls = hintId
+    ? Children.map(children, child => {
+        if (!isValidElement<Pick<ComponentProps<"input">, "id" | "aria-describedby">>(child) || child.props.id !== htmlFor) {
+          return child;
+        }
+        const description = child.props["aria-describedby"];
+        return cloneElement(child, {
+          "aria-describedby": description ? `${description} ${hintId}` : hintId,
+        });
+      })
+    : children;
+
   return (
-    <div className="space-y-1.5">
+    <div className="min-w-0 space-y-1.5">
       <Label htmlFor={htmlFor}>{label}</Label>
-      {children}
-      {hint ? <AppInlineHint>{hint}</AppInlineHint> : null}
+      {controls}
+      {hint ? <AppInlineHint id={hintId}>{hint}</AppInlineHint> : null}
     </div>
   );
 }
@@ -508,6 +521,7 @@ export function AppSelect({
   placeholder,
   options,
   ariaLabel,
+  "aria-describedby": describedBy,
 }: {
   id?: string;
   value?: string;
@@ -515,10 +529,11 @@ export function AppSelect({
   placeholder?: string;
   options: Array<{ label: string; value: string }>;
   ariaLabel?: string;
+  "aria-describedby"?: string;
 }) {
   return (
     <Select value={value} onValueChange={onValueChange}>
-      <SelectTrigger id={id} aria-label={ariaLabel}>
+      <SelectTrigger id={id} aria-label={ariaLabel} aria-describedby={describedBy}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
