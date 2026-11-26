@@ -439,7 +439,7 @@ const url = "postgresql://nexo@127.0.0.1:55439/postgres";
         }),
       ).rejects.toThrow();
     });
-    it("preserves approved amount/currency through both financial writers even after organization currency changes", async () => {
+    it("preserves approved amount/currency through billing and payment even after organization currency changes", async () => {
       await db.organization.update({
         where: { id: org },
         data: { currency: "USD" },
@@ -515,6 +515,34 @@ const url = "postgresql://nexo@127.0.0.1:55439/postgres";
           data: { amountCents: 9999 },
         }),
       ).rejects.toThrow();
+
+      const paymentInput = {
+        orgId: org,
+        chargeId: charge.id,
+        amountCents: 10000,
+        method: "PIX" as const,
+        currency: "USD",
+        actorUserId: actor,
+        idempotencyKey: uuid(),
+      };
+      const settled = await finance.payCharge(paymentInput);
+      expect(settled.ok).toBe(true);
+      expect(await db.charge.findUnique({ where: { id: charge.id } })).toMatchObject({
+        id: charge.id,
+        serviceOrderId: second.serviceOrderId,
+        currency: "USD",
+        status: "PAID",
+      });
+      expect(await db.payment.findUnique({ where: { id: settled.paymentId } })).toMatchObject({
+        chargeId: charge.id,
+        amountCents: 10000,
+      });
+
+      const replay = await finance.payCharge(paymentInput);
+      expect(replay.paymentId).toBe(settled.paymentId);
+      expect(
+        await db.payment.count({ where: { orgId: org, chargeId: charge.id } }),
+      ).toBe(1);
     });
     it("protects the commercial link and order fields against alternate SQL paths; preserves ordinary orders", async () => {
       await expect(
