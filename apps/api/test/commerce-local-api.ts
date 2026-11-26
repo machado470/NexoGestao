@@ -11,6 +11,7 @@ import { json } from "express";
 import { writeFileSync } from "fs";
 import { CommerceController } from "../src/commerce/commerce.controller";
 import { CommerceService } from "../src/commerce/commerce.service";
+import { ExecutionService } from "../src/execution/execution.service";
 import { FinanceService } from "../src/finance/finance.service";
 import { IdempotencyService } from "../src/common/idempotency/idempotency.service";
 import { PrismaService } from "../src/prisma/prisma.service";
@@ -139,6 +140,29 @@ async function main() {
       return res.json(result);
     } catch (error) {
       return res.status(400).json({ message: error instanceof Error ? error.message : "Falha no pagamento" });
+    }
+  });
+  const execution = new ExecutionService(
+    db as any,
+    { log: async () => undefined } as any,
+    { log: async () => undefined } as any,
+    requestContext as any,
+    metrics as any,
+    finance,
+  );
+  app.getHttpAdapter().getInstance().post("/audit/execution/:operation", json(), async (req, res) => {
+    if (req.headers["x-audit-org"] !== orgId || req.headers["x-audit-role"] !== "MANAGER") {
+      return res.status(403).json({ message: "Acesso inválido" });
+    }
+    const { operation } = req.params;
+    const { serviceOrderId, executionId } = req.body;
+    try {
+      if (operation === "start") return res.json(await execution.start({ orgId, serviceOrderId }));
+      if (operation === "listByServiceOrder") return res.json(await execution.listByServiceOrder(orgId, serviceOrderId));
+      if (operation === "complete") return res.json(await execution.complete({ orgId, executionId }));
+      return res.sendStatus(404);
+    } catch (error) {
+      return res.status(400).json({ message: error instanceof Error ? error.message : "Falha na execução" });
     }
   });
   await app.listen(55440, "127.0.0.1");
