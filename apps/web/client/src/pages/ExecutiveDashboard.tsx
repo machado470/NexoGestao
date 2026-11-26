@@ -1067,6 +1067,7 @@ export default function ExecutiveDashboard() {
         attention={attention}
         attentionError={operationalSignalsQuery.isError}
         attentionLoading={operationalSignalsQuery.isLoading}
+        operationalQueue={isMobile && hasOperationalData ? renderOperationalQueue() : null}
         summary={[
           ...(role && can(role, "finance:read")
             ? [
@@ -1314,109 +1315,7 @@ export default function ExecutiveDashboard() {
             </AppSectionBlock>
           </div>
 
-          <AppSectionBlock
-            title="Fila operacional"
-            compact
-            className={dashboardSectionClass}
-            subtitle="Itens que exigem execução, ordenados por urgência."
-          >
-            {alertsQuery.isLoading ? (
-              <AppPageLoadingState title="Carregando fila operacional" />
-            ) : alertsQuery.isError ? (
-              <AppPageErrorState
-                title="Fila operacional indisponível"
-                description="A fonte oficial da fila não pôde ser consultada. A ausência de itens não representa uma fila vazia."
-                onAction={() => void alertsQuery.refetch()}
-              />
-            ) : queue.length > 0 ? (
-              <div className="w-full min-w-0">
-                <div
-                  role="region"
-                  aria-label="Itens da fila operacional"
-                  tabIndex={0}
-                  className="max-h-[340px] w-full min-w-0 overflow-auto rounded-xl border border-[var(--border-subtle)]/70 p-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"
-                >
-                  <div className="grid min-w-0 gap-2 text-xs">
-                    {queue.slice(0, 10).map(item => (
-                      <OperationalInnerCard
-                        key={`${item.type}-${item.id}`}
-                        className="grid min-w-0 gap-2 border-[var(--border-subtle)]/60 bg-[var(--surface-primary)]/35 p-2.5 text-[var(--text-secondary)] md:grid-cols-[minmax(0,1fr)_auto] md:items-center"
-                      >
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-semibold text-[var(--text-primary)]">
-                              {item.type}
-                            </span>
-                            <AppStatusBadge
-                              label={presentationStatusLabel(item.status)}
-                            />
-                          </div>
-                          <strong className="mt-1 block break-words text-sm text-[var(--text-primary)]">
-                            {item.entity}
-                          </strong>
-                          <p className="mt-0.5 line-clamp-3 break-words text-xs">
-                            {item.context}
-                          </p>
-                          <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-[var(--text-muted)]">
-                            <span>{item.dueLabel}</span>
-                            <span>
-                              Responsável:{" "}
-                              <span
-                                className={
-                                  item.responsibleMissing
-                                    ? "text-[var(--text-muted)]"
-                                    : "text-[var(--text-secondary)]"
-                                }
-                                title={
-                                  item.responsibleMissing
-                                    ? "Responsável não informado"
-                                    : item.responsible
-                                }
-                                aria-label={
-                                  item.responsibleMissing
-                                    ? "Responsável não informado"
-                                    : undefined
-                                }
-                              >
-                                {item.responsible}
-                              </span>
-                            </span>
-                          </div>
-                        </div>
-                        <Button
-                          className="h-8 justify-self-start px-3 text-xs md:justify-self-end"
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => navigate(item.path)}
-                        >
-                          {item.ctaLabel}
-                        </Button>
-                      </OperationalInnerCard>
-                    ))}
-                  </div>
-                </div>
-                {hasMissingResponsible ? (
-                  <p className="mt-2 text-xs text-[var(--text-muted)]">
-                    Alguns itens não retornaram responsável pela fonte atual.
-                  </p>
-                ) : null}
-                <Button
-                  className="mt-2 h-auto px-0 py-0 text-[var(--nx-brand-text,var(--accent-primary))]"
-                  variant="link"
-                  size="sm"
-                  onClick={() => navigate("/timeline")}
-                >
-                  Abrir Timeline
-                  <ArrowRight className="ml-1 h-3.5 w-3.5" />
-                </Button>
-              </div>
-            ) : (
-              <AppPageEmptyState
-                title="Fila operacional sem itens retornados"
-                description="Não há itens acionáveis na leitura atual. A operação não preenche a fila com exemplos."
-              />
-            )}
-          </AppSectionBlock>
+          {!isMobile ? renderOperationalQueue() : null}
 
           <AppSectionBlock
             title="KPIs operacionais"
@@ -1726,4 +1625,112 @@ export default function ExecutiveDashboard() {
       ) : null}
     </AppPageShell>
   );
+
+  function renderOperationalQueue() {
+    return (
+    <AppSectionBlock
+      title="Fila operacional"
+      compact
+      className={dashboardSectionClass}
+      subtitle="Itens que exigem execução, ordenados por urgência."
+    >
+      {alertsQuery.isLoading ? (
+        <AppPageLoadingState title="Carregando fila operacional" />
+      ) : alertsQuery.isError ? (
+        <AppPageErrorState
+          title="Fila operacional indisponível"
+          description="A fonte oficial da fila não pôde ser consultada. A ausência de itens não representa uma fila vazia."
+          onAction={() => void alertsQuery.refetch()}
+        />
+      ) : queue.length > 0 ? (
+        <div className="w-full min-w-0">
+          <div
+            role="region"
+            aria-label="Itens da fila operacional"
+            tabIndex={0}
+            className="max-h-[340px] w-full min-w-0 overflow-auto rounded-xl border border-[var(--border-subtle)]/70 p-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"
+          >
+            <div className="grid min-w-0 gap-2 text-xs">
+              {queue.slice(0, 10).map(item => (
+                <OperationalInnerCard
+                  key={`${item.type}-${item.id}`}
+                  className="grid min-w-0 gap-2 border-[var(--border-subtle)]/60 bg-[var(--surface-primary)]/35 p-2.5 text-[var(--text-secondary)] md:grid-cols-[minmax(0,1fr)_auto] md:items-center"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-[var(--text-primary)]">
+                        {item.type}
+                      </span>
+                      <AppStatusBadge
+                        label={presentationStatusLabel(item.status)}
+                      />
+                    </div>
+                    <strong className="mt-1 block break-words text-sm text-[var(--text-primary)]">
+                      {item.entity}
+                    </strong>
+                    <p className="mt-0.5 line-clamp-3 break-words text-xs">
+                      {item.context}
+                    </p>
+                    <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-[var(--text-muted)]">
+                      <span>{item.dueLabel}</span>
+                      <span>
+                        Responsável:{" "}
+                        <span
+                          className={
+                            item.responsibleMissing
+                              ? "text-[var(--text-muted)]"
+                              : "text-[var(--text-secondary)]"
+                          }
+                          title={
+                            item.responsibleMissing
+                              ? "Responsável não informado"
+                              : item.responsible
+                          }
+                          aria-label={
+                            item.responsibleMissing
+                              ? "Responsável não informado"
+                              : undefined
+                          }
+                        >
+                          {item.responsible}
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+                  <Button
+                    className="min-h-11 justify-self-start px-3 text-xs md:min-h-8 md:justify-self-end"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => navigate(item.path)}
+                  >
+                    {item.ctaLabel}
+                  </Button>
+                </OperationalInnerCard>
+              ))}
+            </div>
+          </div>
+          {hasMissingResponsible ? (
+            <p className="mt-2 text-xs text-[var(--text-muted)]">
+              Alguns itens não retornaram responsável pela fonte atual.
+            </p>
+          ) : null}
+          <Button
+            className="mt-2 min-h-11 px-0 py-0 md:min-h-8 text-[var(--nx-brand-text,var(--accent-primary))]"
+            variant="link"
+            size="sm"
+            onClick={() => navigate("/timeline")}
+          >
+            Abrir Timeline
+            <ArrowRight className="ml-1 h-3.5 w-3.5" />
+          </Button>
+        </div>
+      ) : (
+        <AppPageEmptyState
+          title="Fila operacional sem itens retornados"
+          description="Não há itens acionáveis na leitura atual. A operação não preenche a fila com exemplos."
+        />
+      )}
+    </AppSectionBlock>
+    );
+  }
 }
