@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { MobileUpcomingAppointment } from "@/components/MobileUpcomingAppointment";
 import { useIsMobile } from "@/hooks/useMobile";
 import {
@@ -28,6 +29,7 @@ export function MobileHome({
   attention,
   attentionError,
   attentionLoading,
+  operationalQueue,
   empty,
   loading,
   failed,
@@ -44,6 +46,7 @@ export function MobileHome({
   attention: Action[];
   attentionError: boolean;
   attentionLoading: boolean;
+  operationalQueue?: ReactNode;
   empty: boolean;
   loading: boolean;
   failed: boolean;
@@ -245,6 +248,7 @@ export function MobileHome({
               </p>
             )}
           </section>
+          {operationalQueue}
         </>
       ) : null}
       {isMobile ? <MobileUpcomingAppointment navigate={navigate} /> : null}

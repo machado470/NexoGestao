@@ -22,7 +22,9 @@ describe("ExecutiveDashboard decision center", () => {
     const renderedSections = sections
       .slice(1)
       .map(section =>
-        source.search(new RegExp(`<AppSectionBlock\\s+title="${section}"`))
+        section === "Fila operacional"
+          ? source.indexOf("{!isMobile ? renderOperationalQueue() : null}")
+          : source.search(new RegExp(`<AppSectionBlock\\s+title="${section}"`))
       );
     renderedSections.forEach((position, index) => {
       expect(position).toBeGreaterThan(-1);
