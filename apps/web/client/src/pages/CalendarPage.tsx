@@ -364,20 +364,20 @@ export default function CalendarPage() {
           </div>
         </AppSectionBlock>
 
-        <AppFiltersBar>
+        <AppFiltersBar className="gap-2">
           <input
             aria-label="Filtrar por texto"
             value={textFilter}
             onChange={event => setTextFilter(event.target.value)}
             placeholder="Cliente, serviço ou observação"
-            className="h-9 min-w-0 flex-1 basis-48 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm text-[var(--text-primary)]"
+            className="min-h-11 min-w-0 flex-1 basis-48 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-base text-[var(--text-primary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] md:min-h-9 md:text-sm"
           />
           <select
             aria-label="Filtrar por responsável"
             value={teamFilter}
             onChange={event => setTeamFilter(event.target.value)}
             disabled={peopleQuery.isError}
-            className="h-9 min-w-0 max-w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm text-[var(--text-primary)]"
+            className="min-h-11 min-w-0 max-w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-base text-[var(--text-primary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] md:min-h-9 md:text-sm"
           >
             <option value="all">Todos os responsáveis</option>
             {people.map(person => (
@@ -390,7 +390,7 @@ export default function CalendarPage() {
             aria-label="Filtrar por status"
             value={statusFilter}
             onChange={event => setStatusFilter(event.target.value)}
-            className="h-9 min-w-0 max-w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-sm text-[var(--text-primary)]"
+            className="min-h-11 min-w-0 max-w-full rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 text-base text-[var(--text-primary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] md:min-h-9 md:text-sm"
           >
             <option value="all">Todos os status</option>
             {Object.entries(STATUS_LABEL).map(([value, label]) => (
@@ -670,7 +670,10 @@ export default function CalendarPage() {
                       </dl>
                       {person.capacitySummaryText ? (
                         <p className="mt-3 text-xs text-[var(--text-secondary)]">
-                          {person.capacitySummaryText}
+                          {person.capacitySummaryText.replace(
+                            /\b(?:UNDER_CAPACITY|AT_CAPACITY|OVER_CAPACITY)\b/g,
+                            code => officialLabel(code).toLocaleLowerCase("pt-BR")
+                          )}
                         </p>
                       ) : null}
                     </article>
