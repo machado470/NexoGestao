@@ -288,7 +288,9 @@ export function InventoryPage() {
   );
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const create = trpc.commerce.createProduct.useMutation(),
-    move = trpc.commerce.move.useMutation();
+    move = trpc.commerce.move.useMutation(),
+    createKit = trpc.commerce.createKit.useMutation(),
+    withdrawKit = trpc.commerce.withdrawKit.useMutation();
   const saved = () => {
     setNotice("Registro confirmado.");
     void products.refetch();
@@ -304,13 +306,27 @@ export function InventoryPage() {
     min: "0",
     cost: "0,00",
     sale: "0,00",
+    components: JSON.stringify([{ sku: "", quantity: "1" }]),
   };
   const productForm = useCommerceForm(
     productDefaults,
     v => {
-      const kind: Product["kind"] = v.kind === "PARENT" || v.kind === "VARIANT" ? v.kind : "SIMPLE";
+      if (v.kind === "KIT") {
+        const rows: { sku: string; quantity: string }[] = JSON.parse(v.components);
+        return {
+          expectedCurrency: requiredCurrency(currency),
+          sku: v.sku.trim().toUpperCase(),
+          name: text(v.name, 2, "Nome do kit"),
+          saleCents: amount(v.sale, true),
+          components: rows.map(row => ({
+            sku: text(row.sku, 1, "SKU do componente").toUpperCase(),
+            quantity: integer(row.quantity, 1),
+          })),
+        };
+      }
+      const kind = v.kind === "PARENT" || v.kind === "VARIANT" ? v.kind : "SIMPLE";
       return {
-        kind,
+        kind: kind as Exclude<Product["kind"], "KIT">,
         expectedCurrency: requiredCurrency(currency),
         sku: v.sku.trim().toUpperCase(),
         name: text(v.name, 2, "Nome do produto"),
@@ -322,7 +338,7 @@ export function InventoryPage() {
         saleCents: kind === "PARENT" ? 0 : amount(v.sale, true),
       };
     },
-    payload => create.mutateAsync(payload),
+    payload => "components" in payload && payload.components ? createKit.mutateAsync(payload) : create.mutateAsync(payload),
     saved
   );
   const moveForm = useCommerceForm(
@@ -340,6 +356,13 @@ export function InventoryPage() {
     (payload, entryKey) => move.mutateAsync({ ...payload, entryKey }),
     saved
   );
+  const kitWithdrawalForm = useCommerceForm(
+    { kitId: "", quantity: "1", reason: "" },
+    v => ({ kitId: v.kitId, quantity: integer(v.quantity, 1), reason: text(v.reason, 3, "Motivo") }),
+    (payload, entryKey) => withdrawKit.mutateAsync({ ...payload, entryKey }),
+    saved
+  );
+  const kitComponents: { sku: string; quantity: string }[] = JSON.parse(productForm.values.components);
   const beginMove = (product: Product, direction: string) => {
     setSelectedProduct(product);
     moveForm.start({
@@ -352,7 +375,7 @@ export function InventoryPage() {
   };
   const movementOptions = [
     ...(selectedProduct ? [selectedProduct] : []),
-    ...(products.data?.items ?? []).filter(p => p.kind !== "PARENT" && p.id !== selectedProduct?.id),
+    ...(products.data?.items ?? []).filter(p => (p.kind === "SIMPLE" || p.kind === "VARIANT") && p.id !== selectedProduct?.id),
   ];
   return (
     <Workspace
@@ -402,7 +425,7 @@ export function InventoryPage() {
                         {p.name}
                       </h2>
                       <p className={muted}>
-                        {p.kind === "PARENT" ? "Produto pai" : p.variant || "Produto simples"}
+                        {p.kind === "KIT" ? "Kit" : p.kind === "PARENT" ? "Produto pai" : p.variant || "Produto simples"}
                         {p.barcode ? ` · ${p.barcode}` : ""}
                       </p>
                     </div>
@@ -421,6 +444,24 @@ export function InventoryPage() {
                         </Button>
                         <Button variant="outline" onClick={() => { setSearch(p.sku); setPage(1); }}>
                           Buscar variações
+                        </Button>
+                      </div>
+                    ) : p.kind === "KIT" ? (
+                      <div className="grid gap-2">
+                        <p><strong>{p.availableKits ?? 0}</strong> kits disponíveis</p>
+                        <p className={muted}>Preço de venda: {money(p.saleCents, p.currency)}</p>
+                        <ul aria-label="Composição do kit" className="grid gap-1 text-sm">
+                          {(p.components ?? []).map(component => (
+                            <li key={component.sku} className="break-words">
+                              {component.quantity} × {component.sku} · {component.name}
+                            </li>
+                          ))}
+                        </ul>
+                        <Button variant="outline" className="justify-self-start"
+                          disabled={!p.availableKits}
+                          onClick={() => kitWithdrawalForm.start({ kitId: p.id, quantity: "1", reason: "" })}
+                        >
+                          Registrar saída do kit
                         </Button>
                       </div>
                     ) : (
@@ -538,6 +579,7 @@ export function InventoryPage() {
             { value: "SIMPLE", label: "Produto simples" },
             { value: "PARENT", label: "Produto pai com variações" },
             { value: "VARIANT", label: "Variação de um produto pai" },
+            { value: "KIT", label: "Kit de produtos simples" },
           ]}
         />
         {productForm.values.kind === "VARIANT" && (
@@ -566,7 +608,47 @@ export function InventoryPage() {
           value={productForm.values.name}
           onChange={e => productForm.edit("name", e.target.value)}
         />
-        {productForm.values.kind === "PARENT" ? (
+        {productForm.values.kind === "KIT" ? (
+          <>
+            <Field label={`Preço de venda (${currency ?? "moeda da empresa"})`}
+              required inputMode="decimal" value={productForm.values.sale}
+              onChange={e => productForm.edit("sale", e.target.value)}
+            />
+            <fieldset className="grid gap-3">
+              <legend className="text-sm font-medium">Composição do kit</legend>
+              {kitComponents.map((row, index) => (
+                <div key={index} className="grid gap-2 sm:grid-cols-2">
+                  <Field label={`SKU do componente ${index + 1}`} required maxLength={64}
+                    value={row.sku} onChange={e => productForm.edit("components", JSON.stringify(
+                      kitComponents.map((component, position) => position === index
+                        ? { ...component, sku: e.target.value } : component)
+                    ))}
+                  />
+                  <Field label={`Quantidade do componente ${index + 1}`} required inputMode="numeric"
+                    value={row.quantity} onChange={e => productForm.edit("components", JSON.stringify(
+                      kitComponents.map((component, position) => position === index
+                        ? { ...component, quantity: e.target.value } : component)
+                    ))}
+                  />
+                  {kitComponents.length > 1 && (
+                    <Button type="button" variant="outline" className="justify-self-start"
+                      onClick={() => productForm.edit("components", JSON.stringify(
+                        kitComponents.filter((_, position) => position !== index)
+                      ))}
+                    >
+                      Remover componente {index + 1}
+                    </Button>
+                  )}
+                </div>
+              ))}
+              <Button type="button" variant="outline" className="justify-self-start" disabled={kitComponents.length >= 30}
+                onClick={() => productForm.edit("components", JSON.stringify([...kitComponents, { sku: "", quantity: "1" }]))}
+              >
+                Adicionar componente
+              </Button>
+            </fieldset>
+          </>
+        ) : productForm.values.kind === "PARENT" ? (
           <p className={muted}>Cada variação terá seu próprio SKU e saldo.</p>
         ) : (
           <>
@@ -612,6 +694,15 @@ export function InventoryPage() {
             </p>
           </>
         )}
+      </Editor>
+      <Editor form={kitWithdrawalForm} title="Saída do kit" submitLabel="Confirmar saída">
+        <Field label="Quantidade de kits" inputMode="numeric" required
+          value={kitWithdrawalForm.values.quantity} onChange={e => kitWithdrawalForm.edit("quantity", e.target.value)}
+        />
+        <Field label="Motivo da saída" required minLength={3} maxLength={500}
+          value={kitWithdrawalForm.values.reason} onChange={e => kitWithdrawalForm.edit("reason", e.target.value)}
+        />
+        <p className={muted}>A saída baixa os componentes conforme a composição.</p>
       </Editor>
       <Editor
         form={moveForm}

@@ -16,6 +16,8 @@ import { User } from "../auth/decorators/user.decorator";
 import { CommerceService } from "./commerce.service";
 import {
   ProductDto,
+  KitDto,
+  WithdrawKitDto,
   MovementDto,
   ReserveStockDto,
   FiscalDraftDto,
@@ -45,6 +47,18 @@ export class CommerceController {
   ) {
     return this.service.createProduct(org, body);
   }
+  @Post("kits") createKit(@Org() org: string, @Body() body: KitDto) {
+    return this.service.createKit(org, body);
+  }
+  @Post("kits/:id/withdrawals") withdrawKit(
+    @Org() org: string,
+    @User() user: any,
+    @Param("id") id: string,
+    @Body() body: WithdrawKitDto,
+  ) {
+    return this.service.withdrawKit(org, this.actor(user), id, body);
+  }
+
   @Get("reservations/:serviceOrderId") reservations(
     @Org() org: string,
     @Param("serviceOrderId") serviceOrderId: string,

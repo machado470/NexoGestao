@@ -1,4 +1,9 @@
+import { Type } from "class-transformer";
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
+  ValidateNested,
   IsIn,
   IsInt,
   IsOptional,
@@ -24,8 +29,24 @@ export class ProductDto {
   @IsInt() @Min(0) @Max(2147483647) costCents!: number;
   @IsInt() @Min(0) @Max(2147483647) saleCents!: number;
 }
+export class KitComponentDto {
+  @IsString() @Matches(/^[a-z0-9][a-z0-9._-]{0,63}$/i) sku!: string;
+  @IsInt() @Min(1) @Max(1000000000) quantity!: number;
+}
+export class KitDto {
+  @IsString() @Matches(/^[A-Z]{3}$/) expectedCurrency!: string;
+  @IsString() @Matches(/^[a-z0-9][a-z0-9._-]{0,63}$/i) sku!: string;
+  @IsString() @MinLength(2) @MaxLength(180) name!: string;
+  @IsInt() @Min(0) @Max(2147483647) saleCents!: number;
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(30) @ValidateNested({ each: true })
+  @Type(() => KitComponentDto) components!: KitComponentDto[];
+}
 export class EntryDto {
   @IsString() @MinLength(8) @MaxLength(100) entryKey!: string;
+}
+export class WithdrawKitDto extends EntryDto {
+  @IsInt() @Min(1) @Max(1000000000) quantity!: number;
+  @IsString() @MinLength(3) @MaxLength(500) reason!: string;
 }
 export class ReserveStockDto extends EntryDto {
   @IsString() @MinLength(1) @MaxLength(100) productId!: string;

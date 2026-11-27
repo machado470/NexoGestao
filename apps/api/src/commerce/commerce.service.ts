@@ -9,6 +9,8 @@ import { PrismaService } from "../prisma/prisma.service";
 import { zonedMonthBounds } from "../common/zoned-month";
 import {
   ProductDto,
+  KitDto,
+  WithdrawKitDto,
   MovementDto,
   ReserveStockDto,
   FiscalDraftDto,
@@ -40,6 +42,20 @@ export class CommerceService {
     }
     return existing;
   }
+  private kitAvailability(components: Array<{
+    quantity: number;
+    component: { sku: string; name: string; onHand: number; reservedQuantity: number };
+  }>) {
+    return {
+      availableKits: components.length ? Math.min(...components.map(({ quantity, component }) =>
+        Math.floor((component.onHand - component.reservedQuantity) / quantity)
+      )) : 0,
+      components: components.map(({ quantity, component }) => ({
+        sku: component.sku, name: component.name, quantity,
+      })),
+    };
+  }
+
   async products(orgId: string, page = 1, q = "") {
     if (!Number.isInteger(page) || page < 1)
       throw new BadRequestException("Página inválida");
@@ -63,10 +79,23 @@ export class CommerceService {
         orderBy: [{ name: "asc" }, { id: "asc" }],
         skip: (page - 1) * 30,
         take: 30,
+        include: {
+          kitComponents: {
+            orderBy: { componentId: "asc" },
+            select: { quantity: true, component: {
+              select: { sku: true, name: true, onHand: true, reservedQuantity: true },
+            } },
+          },
+        },
       }),
       this.db.inventoryProduct.count({ where }),
     ]);
-    return { items, total, page, pages: Math.max(1, Math.ceil(total / 30)) };
+    return {
+      items: items.map(({ kitComponents, ...item }) => item.kind === "KIT"
+        ? { ...item, ...this.kitAvailability(kitComponents) }
+        : item),
+      total, page, pages: Math.max(1, Math.ceil(total / 30)),
+    };
   }
   async createProduct(orgId: string, input: ProductDto) {
     const { currency } = await this.organization(orgId);
@@ -116,6 +145,98 @@ export class CommerceService {
       return this.same(existing, data);
     }
   }
+  async createKit(orgId: string, input: KitDto) {
+    const { currency } = await this.organization(orgId);
+    if (currency !== input.expectedCurrency) {
+      throw new ConflictException("A moeda da empresa mudou. Atualize a página antes de salvar.");
+    }
+    const sku = input.sku.trim().toUpperCase();
+    const name = input.name.trim();
+    const quantities = new Map(input.components.map(item => [item.sku.trim().toUpperCase(), item.quantity]));
+    if (name.length < 2 || quantities.size !== input.components.length || quantities.has(sku)) {
+      throw new BadRequestException("Informe o nome e componentes distintos do kit.");
+    }
+    const products = await this.db.inventoryProduct.findMany({
+      where: { orgId, sku: { in: [...quantities.keys()] }, kind: "SIMPLE" },
+      orderBy: { id: "asc" },
+    });
+    if (products.length !== quantities.size) {
+      throw new BadRequestException("Use apenas SKUs de produtos simples desta empresa.");
+    }
+    const components = products.map(product => ({ componentId: product.id, quantity: quantities.get(product.sku)! }));
+    const values = { orgId, sku, name, currency, saleCents: input.saleCents, kind: "KIT" as const };
+    try {
+      const kit = await this.db.$transaction(async tx => {
+        const item = await tx.inventoryProduct.create({ data: values });
+        await tx.inventoryKitComponent.createMany({
+          data: components.map(component => ({ ...component, orgId, kitId: item.id })),
+        });
+        return item;
+      });
+      return { ...kit, ...this.kitAvailability(products.map(product => ({
+        component: product, quantity: quantities.get(product.sku)!,
+      }))) };
+    } catch (error) {
+      if ((error as { code?: string }).code !== "P2002") throw error;
+      const existing = await this.db.inventoryProduct.findUnique({
+        where: { orgId_sku: { orgId, sku } },
+        include: { kitComponents: { orderBy: { componentId: "asc" }, include: { component: true } } },
+      });
+      if (!existing) throw error;
+      this.same(existing, values);
+      const { kitComponents, ...kit } = existing;
+      const current = kitComponents.map(({ componentId, quantity }) => ({ componentId, quantity }));
+      if (JSON.stringify(current) !== JSON.stringify(components)) {
+        throw new ConflictException("O SKU já identifica um kit com outra composição.");
+      }
+      return { ...kit, ...this.kitAvailability(kitComponents) };
+    }
+  }
+
+  async withdrawKit(orgId: string, actorUserId: string, kitId: string, input: WithdrawKitDto) {
+    const reason = input.reason.trim();
+    if (reason.length < 3) throw new BadRequestException("Informe o motivo da saída.");
+    const values = { kitId, quantity: input.quantity, reason };
+    const key = { orgId_entryKey: { orgId, entryKey: input.entryKey } };
+    try {
+      return await this.db.$transaction(async tx => {
+        const existing = await tx.inventoryKitWithdrawal.findUnique({ where: key });
+        if (existing) return this.same(existing, values);
+        const kit = await tx.inventoryProduct.findFirst({
+          where: { orgId, id: kitId, kind: "KIT" },
+          select: { sku: true, kitComponents: { orderBy: { componentId: "asc" } } },
+        });
+        if (!kit?.kitComponents.length) throw new NotFoundException("Kit não encontrado nesta empresa.");
+        const withdrawal = await tx.inventoryKitWithdrawal.create({
+          data: { ...values, orgId, actorUserId, entryKey: input.entryKey },
+        });
+        for (const { componentId, quantity } of kit.kitComponents) {
+          if (input.quantity > Math.floor(2147483647 / quantity)) {
+            throw new BadRequestException("Quantidade excede o limite da movimentação.");
+          }
+          const units = quantity * input.quantity;
+          const changed = await tx.$executeRaw`
+            UPDATE "InventoryProduct" SET "onHand" = "onHand" - ${units}::integer
+            WHERE id = ${componentId} AND "orgId" = ${orgId} AND kind = 'SIMPLE'
+              AND "onHand" - "reservedQuantity" >= ${units}::integer
+          `;
+          if (!changed) throw new ConflictException("Um componente não tem saldo disponível para esta saída.");
+          await tx.stockMovement.create({
+            data: {
+              orgId, actorUserId, productId: componentId, direction: "OUT", quantity: units,
+              reason: `Kit ${kit.sku} · ${reason}`, entryKey: randomUUID(), kitWithdrawalId: withdrawal.id,
+            },
+          });
+        }
+        return withdrawal;
+      });
+    } catch (error) {
+      const saved = await this.db.inventoryKitWithdrawal.findUnique({ where: key });
+      if (saved) return this.same(saved, values);
+      throw error;
+    }
+  }
+
   async movements(orgId: string) {
     return this.db.stockMovement.findMany({
       where: { orgId },
@@ -155,7 +276,7 @@ export class CommerceService {
         const changed = await tx.$executeRaw`
           UPDATE "InventoryProduct"
           SET "reservedQuantity" = "reservedQuantity" + ${quantity}::integer
-          WHERE id = ${productId} AND "orgId" = ${orgId} AND kind <> 'PARENT'
+          WHERE id = ${productId} AND "orgId" = ${orgId} AND kind IN ('SIMPLE', 'VARIANT')
             AND "onHand" - "reservedQuantity" >= ${quantity}::integer
         `;
         if (!changed) throw new ConflictException("Estoque disponível insuficiente para reservar.");
@@ -251,7 +372,7 @@ export class CommerceService {
         }
         const [product] = await tx.$queryRaw<Array<{ reservedQuantity: number }>>`
           SELECT "reservedQuantity" FROM "InventoryProduct"
-          WHERE id = ${values.productId} AND "orgId" = ${orgId} AND kind <> 'PARENT'
+          WHERE id = ${values.productId} AND "orgId" = ${orgId} AND kind IN ('SIMPLE', 'VARIANT')
           FOR UPDATE
         `;
         if (!product) throw new NotFoundException("Produto não encontrado nesta empresa");
@@ -259,7 +380,7 @@ export class CommerceService {
           where: {
             id: values.productId,
             orgId,
-            kind: { not: "PARENT" },
+            kind: { in: ["SIMPLE", "VARIANT"] },
             onHand:
               input.direction === "OUT"
                 ? { gte: input.quantity + product.reservedQuantity }
