@@ -41,6 +41,7 @@ export function ServiceOrderEvidence({
     { serviceOrderId, id: viewId || serviceOrderId },
     { ...transientReadOptions, enabled: Boolean(viewId), gcTime: 0 }
   );
+  const cameraInput = useRef<HTMLInputElement>(null);
   const lock = useRef(false),
     keys = useRef(new Map<string, string>());
   const discard = () => {
@@ -233,7 +234,7 @@ export function ServiceOrderEvidence({
         >
           <fieldset disabled={busy} className="grid min-w-0 gap-4">
             <label className="grid min-w-0 gap-2 text-sm">
-              Foto
+              Escolher foto da galeria ou dos arquivos
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
@@ -245,6 +246,31 @@ export function ServiceOrderEvidence({
                 }}
               />
             </label>
+            <input
+              ref={cameraInput}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              hidden
+              onChange={e => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                void choose(file);
+              }}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-11 justify-self-start"
+              onClick={() => cameraInput.current?.click()}
+            >
+              <Camera aria-hidden="true" className="mr-2 size-4" />
+              Tirar foto
+            </Button>
+            <p className="text-sm text-muted-foreground">
+              A foto fica na O.S. e só pode ser vista pela equipe com acesso à
+              ordem.
+            </p>
             {image && (
               <img
                 src={`data:image/jpeg;base64,${image}`}
