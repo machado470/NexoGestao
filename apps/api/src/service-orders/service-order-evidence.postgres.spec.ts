@@ -10,6 +10,8 @@ import {
   ServiceOrderEvidenceService,
 } from "./service-order-evidence";
 
+import { ServiceOrderReadService } from "./service-order-read.service";
+
 const url = "postgresql://nexo@127.0.0.1:55439/postgres";
 // Opt-in, isolated database only. Never consumes DATABASE_URL.
 (process.env.EVIDENCE_TEST_DATABASE_URL === url ? describe : describe.skip)(
@@ -34,10 +36,13 @@ const url = "postgresql://nexo@127.0.0.1:55439/postgres";
       role = "STAFF",
       tenant = org,
       orderId = order.id,
+      actorId: string = actor,
+      personId?: string,
     ) =>
       request(app.getHttpServer())
         [method](`/service-orders/${orderId}/evidence${path}`)
-        .set("x-actor", actor)
+        .set("x-actor", actorId)
+        .set("x-person", personId ?? "")
         .set("x-org", tenant)
         .set("x-role", role);
     beforeAll(async () => {
@@ -99,6 +104,7 @@ const url = "postgresql://nexo@127.0.0.1:55439/postgres";
               sub: req.headers["x-actor"],
               orgId: req.headers["x-org"],
               role: req.headers["x-role"],
+              personId: req.headers["x-person"],
             };
             return true;
           },
@@ -145,10 +151,10 @@ const url = "postgresql://nexo@127.0.0.1:55439/postgres";
       ).toBe(1);
       expect(await db.timelineEvent.count({ where: { orgId: org } })).toBe(1);
       expect(await db.auditEvent.count({ where: { orgId: org } })).toBe(1);
-      expect((await api("get", "/" + photo.id)).body.imageBase64).toBe(
-        imageBase64,
-      );
-      expect((await api("get")).body).toHaveLength(1);
+      const image = await api("get", "/" + photo.id).expect("Cache-Control", "private, no-store");
+      expect(image.body.imageBase64).toBe(imageBase64);
+      const list = await api("get").expect("Cache-Control", "private, no-store");
+      expect(list.body).toHaveLength(1);
       expect(
         (
           await api("post").send({
@@ -157,6 +163,50 @@ const url = "postgresql://nexo@127.0.0.1:55439/postgres";
           })
         ).status,
       ).toBe(409);
+    });
+    it("limits contractor evidence to the current assignee after reassignment", async () => {
+      const [a, b] = await Promise.all(["A", "B"].map(async name => {
+        const id = uuid();
+        return db.user.create({
+          data: {
+            id, orgId: org, email: id + "@example.test", role: "CONTRACTOR", active: true,
+            person: { create: { orgId: org, name, role: "CONTRACTOR" } },
+          },
+          include: { person: true },
+        });
+      }));
+      const contractor = (user: typeof a, method: "get" | "post", path = "") =>
+        api(method, path, "CONTRACTOR", org, order.id, user.id, user.person!.id);
+      await db.serviceOrder.update({ where: { id: order.id }, data: { assignedToPersonId: a.person!.id } });
+      const orders = new ServiceOrderReadService(db as PrismaService);
+      const aId = a.person!.id;
+      const bId = b.person!.id;
+      try {
+        expect(await orders.listAssigned(org, aId, 1)).toEqual({
+          items: [{ id: order.id, title: order.title, status: order.status,
+            priority: order.priority, scheduledFor: order.scheduledFor }],
+          nextPage: null,
+        });
+        expect((await orders.listAssigned(org, bId, 1)).items).toEqual([]);
+        expect((await orders.listAssigned(foreign, aId, 1)).items).toEqual([]);
+        await expect(orders.getAssigned(org, bId, order.id)).rejects.toMatchObject({ status: 404 });
+        const detail = await orders.getAssigned(org, aId, order.id);
+        expect(detail).not.toHaveProperty("amountCents");
+        expect(detail).not.toHaveProperty("customerId");
+        await contractor(a, "get").expect(200);
+        await contractor(a, "get", "/" + photo.id).expect(200);
+        await contractor(b, "get").expect(404);
+        await contractor(b, "get", "/" + photo.id).expect(404);
+        await contractor(b, "post").send(body()).expect(404);
+        await db.serviceOrder.update({ where: { id: order.id }, data: { assignedToPersonId: b.person!.id } });
+        await expect(orders.getAssigned(org, aId, order.id)).rejects.toMatchObject({ status: 404 });
+        expect((await orders.getAssigned(org, bId, order.id)).id).toBe(order.id);
+        await contractor(a, "get", "/" + photo.id).expect(404);
+        await contractor(a, "post").send(body()).expect(404);
+        await contractor(b, "get", "/" + photo.id).expect(200);
+      } finally {
+        await db.serviceOrder.update({ where: { id: order.id }, data: { assignedToPersonId: null } });
+      }
     });
     it("enforces auth, role and tenant boundaries on metadata, image and writes", async () => {
       expect(

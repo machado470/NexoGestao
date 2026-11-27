@@ -17,10 +17,12 @@ export function ServiceOrderChecklist({
   serviceOrderId,
   status,
   canWrite,
+  allowTaskCreation = true,
 }: {
   serviceOrderId: string;
   status: string;
   canWrite: boolean;
+  allowTaskCreation?: boolean;
 }) {
   const list = trpc.serviceOrders.checklist.useQuery(
     { serviceOrderId },
@@ -52,7 +54,7 @@ export function ServiceOrderChecklist({
     onDiscard: close,
     guardNavigation: true,
   });
-  const canAdd = canWrite && !["DONE", "CANCELED"].includes(status),
+  const canAdd = allowTaskCreation && canWrite && !["DONE", "CANCELED"].includes(status),
     canMark = canWrite && status === "IN_PROGRESS";
   const refresh = () =>
     Promise.allSettled([

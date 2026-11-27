@@ -2,12 +2,17 @@ import { Throttle } from '@nestjs/throttler'
 import {
   Body,
   Controller,
+  DefaultValuePipe,
+  Header,
   Get,
   HttpCode,
   Param,
+  ParseIntPipe,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
+  UnauthorizedException,
   UseGuards,
   UseInterceptors,
   Headers,
@@ -41,6 +46,30 @@ export class ServiceOrdersController {
   @Roles('ADMIN', 'MANAGER', 'STAFF', 'VIEWER')
   list(@Org() orgId: string, @Query() query: any) {
     return this.serviceOrders.list(orgId, query)
+  }
+
+  @Get('assigned')
+  @Roles('CONTRACTOR')
+  @Header('Cache-Control', 'private, no-store')
+  listAssigned(
+    @Org() orgId: string,
+    @User() user: { personId?: string },
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+  ) {
+    if (!user.personId) throw new UnauthorizedException()
+    return this.serviceOrders.listAssigned(orgId, user.personId, page)
+  }
+
+  @Get('assigned/:id')
+  @Roles('CONTRACTOR')
+  @Header('Cache-Control', 'private, no-store')
+  getAssigned(
+    @Org() orgId: string,
+    @User() user: { personId?: string },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    if (!user.personId) throw new UnauthorizedException()
+    return this.serviceOrders.getAssigned(orgId, user.personId, id)
   }
 
   @Get(':id')

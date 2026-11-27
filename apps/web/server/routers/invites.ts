@@ -12,7 +12,7 @@ export const invitesRouter = router({
     .input(
       z.object({
         email: z.string().email(),
-        role: z.enum(["ADMIN", "MANAGER", "STAFF", "VIEWER"]),
+        role: z.enum(["ADMIN", "MANAGER", "STAFF", "VIEWER", "CONTRACTOR"]),
       })
     )
     .mutation(async ({ ctx, input }) => {

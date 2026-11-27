@@ -24,12 +24,14 @@ const url = "postgresql://nexo@127.0.0.1:55439/postgres";
       role = "STAFF",
       orderId = order.id,
       tenant = org,
+      personId = "",
     ) =>
       request(app.getHttpServer())
         [method](`/service-orders/${orderId}/checklist${path}`)
         .set("x-actor", actor)
         .set("x-org", tenant)
-        .set("x-role", role);
+        .set("x-role", role)
+        .set("x-person", personId);
     const change = (
       completed: boolean,
       expectedVersion: number,
@@ -94,6 +96,7 @@ const url = "postgresql://nexo@127.0.0.1:55439/postgres";
               sub: req.headers["x-actor"],
               orgId: req.headers["x-org"],
               role: req.headers["x-role"],
+              personId: req.headers["x-person"],
             };
             return true;
           },
@@ -294,6 +297,36 @@ const url = "postgresql://nexo@127.0.0.1:55439/postgres";
           },
         }),
       ).rejects.toMatchObject({ code: "P2003" });
+    });
+    it("allows the assigned contractor to execute existing tasks until reassignment", async () => {
+      const person = await db.person.findUniqueOrThrow({ where: { userId: actor } });
+      const scopedOrder = await db.serviceOrder.create({
+        data: {
+          orgId: org, customerId: order.customerId, title: "Checklist atribuído",
+          status: "IN_PROGRESS", assignedToPersonId: person.id,
+        },
+      });
+      const task = await db.serviceOrderChecklistItem.create({
+        data: {
+          orgId: org, serviceOrderId: scopedOrder.id, entryKey: uuid(),
+          title: "Conferir execução", createdByUserId: actor,
+        },
+      });
+      const contractor = (method: "get" | "post", path = "") =>
+        api(method, path, "CONTRACTOR", scopedOrder.id, org, person.id);
+      await db.user.update({ where: { id: actor }, data: { role: "CONTRACTOR" } });
+      try {
+        await contractor("get").expect(200);
+        await contractor("post").send({ title: "Nova tarefa", entryKey: uuid() }).expect(403);
+        await contractor("post", `/${task.id}/state`)
+          .send({ completed: true, expectedVersion: task.version }).expect(201);
+        await db.serviceOrder.update({ where: { id: scopedOrder.id }, data: { assignedToPersonId: null } });
+        await contractor("get").expect(404);
+        await contractor("post", `/${task.id}/state`)
+          .send({ completed: true, expectedVersion: task.version }).expect(404);
+      } finally {
+        await db.user.update({ where: { id: actor }, data: { role: "STAFF" } });
+      }
     });
   },
 );

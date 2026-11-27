@@ -1,5 +1,6 @@
 import { Controller, Get, Req, UnauthorizedException, UseGuards } from '@nestjs/common'
 
+import { Roles } from '../auth/decorators/roles.decorator'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { Throttle } from '@nestjs/throttler'
 import { PrismaService } from '../prisma/prisma.service'
@@ -10,6 +11,7 @@ export class MeController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Get()
+  @Roles('ADMIN', 'MANAGER', 'STAFF', 'VIEWER', 'CONTRACTOR')
   // O BFF revalida a sessão em cada consulta; uma tela pode emitir várias consultas.
   @Throttle({ default: { limit: 120, ttl: 60_000 } })
   async me(@Req() req: any) {
@@ -48,6 +50,7 @@ export class MeController {
         })
       : null
 
+    const contractor = authUser?.role === 'CONTRACTOR'
     return {
       success: true,
       data: {
@@ -98,7 +101,7 @@ export class MeController {
         },
         assignments: [],
         requiresOnboarding: org?.requiresOnboarding ?? false,
-        redirect: org?.requiresOnboarding ? '/onboarding' : '/dashboard',
+        redirect: contractor ? '/service-orders/assigned' : org?.requiresOnboarding ? '/onboarding' : '/dashboard',
       },
     }
   }

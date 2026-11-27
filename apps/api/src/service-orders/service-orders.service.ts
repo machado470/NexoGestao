@@ -248,6 +248,14 @@ export class ServiceOrdersService {
     return this.readService.get(orgId, id)
   }
 
+  listAssigned(orgId: string, personId: string, page: number) {
+    return this.readService.listAssigned(orgId, personId, page)
+  }
+
+  getAssigned(orgId: string, personId: string, id: string) {
+    return this.readService.getAssigned(orgId, personId, id)
+  }
+
   async create(params: {
     orgId: string
     createdBy: string | null

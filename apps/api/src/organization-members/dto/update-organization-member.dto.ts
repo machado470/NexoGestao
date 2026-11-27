@@ -1,11 +1,11 @@
 import { Transform } from 'class-transformer'
 import { IsBoolean, IsDateString, IsEnum, IsOptional } from 'class-validator'
-import { InviteUserRole } from '../../invites/dto/create-invite.dto'
+import { InternalUserRole } from '../../invites/dto/create-invite.dto'
 
 export class UpdateOrganizationMemberDto {
   @IsOptional()
-  @IsEnum(InviteUserRole)
-  role?: InviteUserRole
+  @IsEnum(InternalUserRole)
+  role?: InternalUserRole
 
   @IsOptional()
   // Preserva o tipo recebido mesmo com enableImplicitConversion no bootstrap.

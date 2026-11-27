@@ -166,7 +166,23 @@ function parseOrder<T extends z.ZodType>(payload: unknown, schema: T): z.infer<T
   return schema.parse(withoutInternalFields(payload));
 }
 
+const assignedOrder = z.object({
+  id: uuid,
+  title: z.string(),
+  status,
+  priority: z.number().int(),
+  scheduledFor: nullableTimestamp,
+});
+
 export const serviceOrdersRouter = router({
+  assigned: protectedProcedure
+    .input(z.object({ page: z.number().int().min(1).max(10000) }).strict())
+    .output(z.object({ items: z.array(assignedOrder), nextPage: z.number().int().nullable() }))
+    .query(({ ctx, input }) => privateEvidenceGet(ctx, `/service-orders/assigned?page=${input.page}`)),
+  assignedDetail: protectedProcedure
+    .input(z.object({ id: uuid }).strict())
+    .output(assignedOrder.extend({ description: z.string().nullable() }))
+    .query(({ ctx, input }) => privateEvidenceGet(ctx, `/service-orders/assigned/${input.id}`)),
   setReturnCaseState: protectedProcedure.input(returnCaseChange).output(returnRecord).mutation(({ctx,input})=>{const {serviceOrderId,id,...body}=input;return authedPost(ctx as NexoContext,`/service-orders/${serviceOrderId}/returns/${id}/state`,body);}),
   setReturnCoverage: protectedProcedure.input(returnCoverage).output(returnRecord).mutation(({ctx,input})=>{const {serviceOrderId,id,...body}=input;return authedPost(ctx as NexoContext,`/service-orders/${serviceOrderId}/returns/${id}/coverage`,body);}),
   returns: protectedProcedure.input(z.object({ serviceOrderId: uuid, page: z.number().int().min(1).max(10000) }).strict()).output(returnPage).query(({ctx, input}) => privateEvidenceGet(ctx, `/service-orders/${input.serviceOrderId}/returns?page=${input.page}`)),

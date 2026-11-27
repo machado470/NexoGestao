@@ -1198,6 +1198,7 @@ enum UsageMetricEvent {
 }
 
 enum UserRole {
+  CONTRACTOR
   ADMIN
   MANAGER
   STAFF

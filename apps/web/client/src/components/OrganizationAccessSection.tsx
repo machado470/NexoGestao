@@ -48,6 +48,7 @@ const roles = [
   { value: "MANAGER", label: "Gestor" },
   { value: "STAFF", label: "Operador" },
   { value: "VIEWER", label: "Leitura" },
+  { value: "CONTRACTOR", label: "Prestador terceirizado" },
 ];
 
 export function OrganizationAccessSection() {
