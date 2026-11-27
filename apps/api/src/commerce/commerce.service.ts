@@ -46,9 +46,12 @@ export class CommerceService {
       orgId,
       ...(q.trim()
         ? {
-            OR: ["name", "sku", "barcode"].map((field) => ({
-              [field]: { contains: q.trim(), mode: "insensitive" as const },
-            })),
+            OR: [
+              ...["name", "sku", "barcode"].map(field => ({
+                [field]: { contains: q.trim(), mode: "insensitive" as const },
+              })),
+              { parent: { sku: { equals: q.trim().toUpperCase() } } },
+            ],
           }
         : {}),
     };
@@ -69,12 +72,30 @@ export class CommerceService {
       throw new ConflictException(
         "A moeda da empresa mudou. Atualize a página antes de salvar.",
       );
+    const kind = input.kind ?? "SIMPLE";
+    const variant = input.variant?.trim() || null;
+    if (kind === "VARIANT" ? !input.parentSku || !variant : Boolean(input.parentSku)) {
+      throw new BadRequestException("Informe o SKU do produto pai e o nome da variação.");
+    }
+    if (kind === "PARENT" &&
+        (variant || input.barcode?.trim() || input.minQuantity || input.costCents || input.saleCents)) {
+      throw new BadRequestException("Cadastre código de barras, estoque e valores nas variações.");
+    }
+    const parent = kind === "VARIANT"
+      ? await this.db.inventoryProduct.findFirst({
+          where: { orgId, sku: input.parentSku!.toUpperCase(), kind: "PARENT" },
+          select: { id: true },
+        })
+      : null;
+    if (kind === "VARIANT" && !parent) throw new NotFoundException("Produto pai não encontrado nesta empresa");
     const data = {
       orgId,
       sku: input.sku.trim().toUpperCase(),
       name: input.name.trim(),
       barcode: input.barcode?.trim() || null,
-      variant: input.variant?.trim() || null,
+      variant,
+      kind,
+      parentId: parent?.id ?? null,
       minQuantity: input.minQuantity,
       costCents: input.costCents,
       saleCents: input.saleCents,
@@ -127,7 +148,7 @@ export class CommerceService {
           throw new NotFoundException("O.S. não encontrada nesta empresa");
         if (
           !(await tx.inventoryProduct.findFirst({
-            where: { id: values.productId, orgId },
+            where: { id: values.productId, orgId, kind: { not: "PARENT" } },
             select: { id: true },
           }))
         )
@@ -136,6 +157,7 @@ export class CommerceService {
           where: {
             id: values.productId,
             orgId,
+            kind: { not: "PARENT" },
             onHand:
               input.direction === "OUT"
                 ? { gte: input.quantity }

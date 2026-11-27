@@ -4,7 +4,10 @@ const cents = z.number().int().min(0).max(2147483647);
 const money = z.number().int().safe();
 const currency = z.string().regex(/^[A-Z]{3}$/);
 const key = z.string().min(8).max(100);
+export const productKind = z.enum(["SIMPLE", "PARENT", "VARIANT"]);
 export const productInput = z.object({
+  kind: productKind.optional(),
+  parentSku: z.string().trim().regex(/^[a-z0-9][a-z0-9._-]{0,63}$/i).optional(),
   expectedCurrency: currency,
   sku: z
     .string()
@@ -18,9 +21,11 @@ export const productInput = z.object({
   saleCents: cents,
 });
 export const productSchema = productInput
-  .omit({ expectedCurrency: true })
+  .omit({ expectedCurrency: true, parentSku: true })
   .extend({
     id,
+    kind: productKind.default("SIMPLE"),
+    parentId: id.nullable().optional(),
     currency,
     barcode: z.string().nullable(),
     variant: z.string().nullable(),

@@ -11,6 +11,10 @@ import {
   IsDateString,
 } from "class-validator";
 export class ProductDto {
+  @IsOptional() @IsIn(["SIMPLE", "PARENT", "VARIANT"])
+  kind?: "SIMPLE" | "PARENT" | "VARIANT";
+  @IsOptional() @IsString() @Matches(/^[a-z0-9][a-z0-9._-]{0,63}$/i)
+  parentSku?: string;
   @IsString() @Matches(/^[A-Z]{3}$/) expectedCurrency!: string;
   @IsString() @Matches(/^[a-z0-9][a-z0-9._-]{0,63}$/i) sku!: string;
   @IsString() @MinLength(2) @MaxLength(180) name!: string;
