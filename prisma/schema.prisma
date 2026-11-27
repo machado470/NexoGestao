@@ -8,6 +8,7 @@ datasource db {
 }
 
 model Organization {
+  stockReservations StockReservation[]
   id                           String                        @id @default(uuid())
   name                         String
   slug                         String                        @unique
@@ -517,6 +518,7 @@ model Appointment {
 }
 
 model ServiceOrder {
+  stockReservations StockReservation[]
   quoteOrigin        ServiceQuoteOrder?
   id                 String                      @id @default(uuid())
   orgId              String
@@ -1424,6 +1426,8 @@ enum InventoryProductKind {
 }
 
 model InventoryProduct {
+  reservations StockReservation[]
+  reservedQuantity Int @default(0)
   id          String          @id @default(uuid())
   orgId       String
   sku         String
@@ -1448,7 +1452,30 @@ model InventoryProduct {
   @@index([orgId, parentId])
 }
 
+model StockReservation {
+  id String @id @default(uuid())
+  orgId String
+  productId String
+  serviceOrderId String
+  quantity Int
+  entryKey String
+  actorUserId String
+  createdAt DateTime @default(now())
+  releasedAt DateTime?
+  releasedByUserId String?
+  consumedAt DateTime?
+  movement StockMovement?
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  product InventoryProduct @relation(fields: [productId, orgId], references: [id, orgId], onDelete: Restrict)
+  serviceOrder ServiceOrder @relation(fields: [serviceOrderId, orgId], references: [id, orgId], onDelete: Restrict)
+
+  @@unique([orgId, entryKey])
+  @@index([orgId, serviceOrderId, releasedAt])
+}
+
 model StockMovement {
+  reservationId  String? @unique
+  reservation    StockReservation? @relation(fields: [reservationId], references: [id], onDelete: Restrict)
   id             String           @id @default(uuid())
   orgId          String
   productId      String

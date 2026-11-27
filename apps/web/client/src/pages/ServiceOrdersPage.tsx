@@ -1,3 +1,4 @@
+import { ServiceOrderMaterials } from "@/components/ServiceOrderMaterials";
 import {ServiceOrderQuoteOrigin} from "@/components/ServiceOrderQuoteOrigin";
 import { transientReadOptions } from "@/lib/read-query-retry";
 import { ServiceOrderEvidence } from '@/components/ServiceOrderEvidence';
@@ -1424,6 +1425,9 @@ export default function ServiceOrdersPage() {
                 ) : null}
 
                 <ServiceOrderQuoteOrigin key={"quote-origin-"+selectedOrder.id} serviceOrderId={selectedOrder.id} />
+                {role === "ADMIN" && (
+                  <ServiceOrderMaterials key={`materials-${selectedOrder.id}`} serviceOrderId={selectedOrder.id} status={selectedOrder.status} />
+                )}
                 <ServiceOrderEvidence key={selectedOrder.id} serviceOrderId={selectedOrder.id} status={selectedOrder.status} canWrite={canEditOrder} />
                 <ServiceOrderChecklist key={`checklist-${selectedOrder.id}`} serviceOrderId={selectedOrder.id} status={selectedOrder.status} canWrite={canEditOrder} />
                 <ServiceOrderAcceptance key={`acceptance-${selectedOrder.id}`} serviceOrderId={selectedOrder.id} title={selectedOrder.title} status={selectedOrder.status} canWrite={canEditOrder} />

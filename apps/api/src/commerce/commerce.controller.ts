@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Param,
   Post,
   Query,
   UseGuards,
@@ -16,6 +17,7 @@ import { CommerceService } from "./commerce.service";
 import {
   ProductDto,
   MovementDto,
+  ReserveStockDto,
   FiscalDraftDto,
   RecordedExpenseDto,
   ExpenseCurrencyDto,
@@ -43,6 +45,37 @@ export class CommerceController {
   ) {
     return this.service.createProduct(org, body);
   }
+  @Get("reservations/:serviceOrderId") reservations(
+    @Org() org: string,
+    @Param("serviceOrderId") serviceOrderId: string,
+  ) {
+    return this.service.reservations(org, serviceOrderId);
+  }
+
+  @Post("reservations") reserve(
+    @Org() org: string,
+    @User() user: any,
+    @Body() body: ReserveStockDto,
+  ) {
+    return this.service.reserve(org, this.actor(user), body);
+  }
+
+  @Post("reservations/:id/release") releaseReservation(
+    @Org() org: string,
+    @User() user: any,
+    @Param("id") id: string,
+  ) {
+    return this.service.releaseReservation(org, this.actor(user), id);
+  }
+
+  @Post("reservations/:id/consume") consumeReservation(
+    @Org() org: string,
+    @User() user: any,
+    @Param("id") id: string,
+  ) {
+    return this.service.consumeReservation(org, this.actor(user), id);
+  }
+
   @Get("movements") movements(@Org() org: string) {
     return this.service.movements(org);
   }

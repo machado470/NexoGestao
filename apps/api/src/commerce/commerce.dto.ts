@@ -27,6 +27,11 @@ export class ProductDto {
 export class EntryDto {
   @IsString() @MinLength(8) @MaxLength(100) entryKey!: string;
 }
+export class ReserveStockDto extends EntryDto {
+  @IsString() @MinLength(1) @MaxLength(100) productId!: string;
+  @IsString() @MinLength(1) @MaxLength(100) serviceOrderId!: string;
+  @IsInt() @Min(1) @Max(1000000000) quantity!: number;
+}
 export class MovementDto extends EntryDto {
   @IsString() @MinLength(1) @MaxLength(100) productId!: string;
   @IsIn(["IN", "OUT"]) direction!: "IN" | "OUT";

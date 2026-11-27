@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   BadRequestException,
   ConflictException,
@@ -9,6 +10,7 @@ import { zonedMonthBounds } from "../common/zoned-month";
 import {
   ProductDto,
   MovementDto,
+  ReserveStockDto,
   FiscalDraftDto,
   RecordedExpenseDto,
 } from "./commerce.dto";
@@ -122,6 +124,107 @@ export class CommerceService {
       take: 50,
     });
   }
+  async reservations(orgId: string, serviceOrderId: string) {
+    const order = await this.db.serviceOrder.findFirst({
+      where: { id: serviceOrderId, orgId }, select: { id: true },
+    });
+    if (!order) throw new NotFoundException("O.S. não encontrada nesta empresa");
+    return this.db.stockReservation.findMany({
+      where: { orgId, serviceOrderId },
+      include: { product: { select: { name: true, sku: true } } },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    });
+  }
+
+  async reserve(orgId: string, actorUserId: string, input: ReserveStockDto) {
+    const { productId, serviceOrderId, quantity, entryKey } = input;
+    const values = { productId, serviceOrderId, quantity };
+    const key = { orgId_entryKey: { orgId, entryKey } };
+    try {
+      return await this.db.$transaction(async tx => {
+        const [order] = await tx.$queryRaw<Array<{ status: string }>>`
+          SELECT status FROM "ServiceOrder"
+          WHERE id = ${serviceOrderId} AND "orgId" = ${orgId} FOR UPDATE
+        `;
+        if (!order) throw new NotFoundException("O.S. não encontrada nesta empresa");
+        const existing = await tx.stockReservation.findUnique({ where: key });
+        if (existing) return this.same(existing, values);
+        if (order.status === "DONE" || order.status === "CANCELED") {
+          throw new ConflictException("A O.S. já foi encerrada.");
+        }
+        const changed = await tx.$executeRaw`
+          UPDATE "InventoryProduct"
+          SET "reservedQuantity" = "reservedQuantity" + ${quantity}::integer
+          WHERE id = ${productId} AND "orgId" = ${orgId} AND kind <> 'PARENT'
+            AND "onHand" - "reservedQuantity" >= ${quantity}::integer
+        `;
+        if (!changed) throw new ConflictException("Estoque disponível insuficiente para reservar.");
+        return tx.stockReservation.create({ data: { orgId, actorUserId, entryKey, ...values } });
+      });
+    } catch (error) {
+      const saved = await this.db.stockReservation.findUnique({ where: key });
+      if (saved) return this.same(saved, values);
+      throw error;
+    }
+  }
+
+  async releaseReservation(orgId: string, actorUserId: string, id: string) {
+    return this.db.$transaction(async tx => {
+      const changed = await tx.stockReservation.updateMany({
+        where: { orgId, id, releasedAt: null, consumedAt: null },
+        data: { releasedAt: new Date(), releasedByUserId: actorUserId },
+      });
+      const reservation = await tx.stockReservation.findFirst({ where: { orgId, id } });
+      if (!reservation) throw new NotFoundException("Reserva não encontrada nesta empresa.");
+      if (reservation.consumedAt) throw new ConflictException("A reserva já foi consumida.");
+      if (changed.count) {
+        await tx.inventoryProduct.update({
+          where: { id_orgId: { id: reservation.productId, orgId } },
+          data: { reservedQuantity: { decrement: reservation.quantity } },
+        });
+      }
+      return reservation;
+    });
+  }
+
+  async consumeReservation(orgId: string, actorUserId: string, id: string) {
+    return this.db.$transaction(async tx => {
+      const reservation = await tx.stockReservation.findFirst({ where: { orgId, id } });
+      if (!reservation) throw new NotFoundException("Reserva não encontrada nesta empresa.");
+
+      const [order] = await tx.$queryRaw<Array<{ status: string }>>`
+        SELECT status FROM "ServiceOrder"
+        WHERE id = ${reservation.serviceOrderId} AND "orgId" = ${orgId} FOR UPDATE
+      `;
+      const existing = await tx.stockMovement.findUnique({ where: { reservationId: id } });
+      if (existing) return existing;
+      if (order?.status !== "IN_PROGRESS") {
+        throw new ConflictException("A peça só pode ser consumida durante a execução da O.S.");
+      }
+      const changed = await tx.stockReservation.updateMany({
+        where: { id, orgId, releasedAt: null, consumedAt: null },
+        data: { consumedAt: new Date() },
+      });
+      if (!changed.count) throw new ConflictException("A reserva já foi liberada.");
+
+      const { productId, serviceOrderId, quantity } = reservation;
+      await tx.inventoryProduct.update({
+        where: { id_orgId: { id: productId, orgId } },
+        data: {
+          onHand: { decrement: quantity },
+          reservedQuantity: { decrement: quantity },
+        },
+      });
+      return tx.stockMovement.create({
+        data: {
+          orgId, productId, serviceOrderId, quantity, actorUserId,
+          reservationId: id, entryKey: randomUUID(), direction: "OUT",
+          reason: "Consumo de peça reservada para O.S.",
+        },
+      });
+    });
+  }
+
   async move(orgId: string, actorUserId: string, input: MovementDto) {
     const values = {
       productId: input.productId,
@@ -146,13 +249,12 @@ export class CommerceService {
           }))
         )
           throw new NotFoundException("O.S. não encontrada nesta empresa");
-        if (
-          !(await tx.inventoryProduct.findFirst({
-            where: { id: values.productId, orgId, kind: { not: "PARENT" } },
-            select: { id: true },
-          }))
-        )
-          throw new NotFoundException("Produto não encontrado nesta empresa");
+        const [product] = await tx.$queryRaw<Array<{ reservedQuantity: number }>>`
+          SELECT "reservedQuantity" FROM "InventoryProduct"
+          WHERE id = ${values.productId} AND "orgId" = ${orgId} AND kind <> 'PARENT'
+          FOR UPDATE
+        `;
+        if (!product) throw new NotFoundException("Produto não encontrado nesta empresa");
         const changed = await tx.inventoryProduct.updateMany({
           where: {
             id: values.productId,
@@ -160,7 +262,7 @@ export class CommerceService {
             kind: { not: "PARENT" },
             onHand:
               input.direction === "OUT"
-                ? { gte: input.quantity }
+                ? { gte: input.quantity + product.reservedQuantity }
                 : { lte: 2147483647 - input.quantity },
           },
           data: {
