@@ -518,5 +518,24 @@ const url = "postgresql://nexo@127.0.0.1:55439/postgres";
           .toMatchObject({ releasedAt: null, consumedAt: expect.any(Date) });
       },
     );
+    it("serializes a linked movement and reservations on the same order and product", async () => {
+      const item = await db.inventoryProduct.create({ data: {
+        orgId: org, sku: "PECA-CONCORRENTE", name: "Peça concorrente", currency: "BRL", onHand: 12,
+      }});
+      const service = await db.serviceOrder.create({ data: {
+        orgId: org, customerId: customer.id, title: "O.S. concorrente", status: "IN_PROGRESS",
+      }});
+      const base = { productId: item.id, serviceOrderId: service.id, quantity: 1 };
+      const [reservations] = await Promise.all([
+        Promise.all(Array.from({ length: 4 }, () =>
+          api("post", "reservations").send({ ...base, entryKey: uuid() }).expect(201))),
+        Promise.all(Array.from({ length: 4 }, () =>
+          api("post", "movements").send({ ...base, direction: "OUT", reason: "Saída vinculada", entryKey: uuid() }).expect(201))),
+      ]);
+      await Promise.all(reservations.map(row =>
+        api("post", `reservations/${row.body.id}/consume`).expect(201)));
+      expect(await db.inventoryProduct.findUnique({ where: { id: item.id } }))
+        .toMatchObject({ onHand: 4, reservedQuantity: 0 });
+    });
   },
 );
