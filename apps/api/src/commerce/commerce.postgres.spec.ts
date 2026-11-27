@@ -104,6 +104,7 @@ const url = "postgresql://nexo@127.0.0.1:55439/postgres";
         const where = { orgId: { in: [org, foreign] } };
         await db.fiscalDraft.deleteMany({ where });
         await db.stockMovement.deleteMany({ where });
+        await db.inventoryProduct.deleteMany({ where: { ...where, kind: "VARIANT" } });
         await db.inventoryProduct.deleteMany({ where });
         await db.paymentRefund.deleteMany({ where });
         await db.payment.deleteMany({ where });
@@ -406,6 +407,31 @@ const url = "postgresql://nexo@127.0.0.1:55439/postgres";
         openCents: 7000,
       });
       await api("get", "health?month=2026-13").expect(400);
+    });
+    it("keeps legacy items and moves stock only on a variant within its company", async () => {
+      const input = {
+        expectedCurrency: "BRL", minQuantity: 0, costCents: 0, saleCents: 0,
+      };
+      expect(product).toMatchObject({ kind: "SIMPLE", variant: "220V", parentId: null });
+      const parent = (await api("post", "products").send({
+        ...input, kind: "PARENT", sku: "FAMILIA", name: "Família",
+      }).expect(201)).body;
+      const child = {
+        ...input, kind: "VARIANT", sku: "FILTRO-FILHO-220", name: "Família",
+        variant: "220V", parentSku: "familia",
+      };
+      await api("post", "products", "ADMIN", foreign).send({ ...child, expectedCurrency: "USD" }).expect(404);
+      await api("post", "products").send({ ...child, parentSku: product.sku }).expect(404);
+      const variant = (await api("post", "products").send(child).expect(201)).body;
+      expect(variant).toMatchObject({ parentId: parent.id, kind: "VARIANT", onHand: 0 });
+      const family = (await api("get", "products?q=FAMILIA").expect(200)).body;
+      expect(family.items.map((item: { id: string }) => item.id)).toEqual(expect.arrayContaining([parent.id, variant.id]));
+      expect((await api("post", "products").send(child).expect(201)).body.id).toBe(variant.id);
+      const movement = { direction: "IN", quantity: 1, reason: "Entrada de teste" };
+      await api("post", "movements").send({ ...movement, productId: parent.id, entryKey: uuid() }).expect(404);
+      await api("post", "movements").send({ ...movement, productId: variant.id, entryKey: uuid() }).expect(201);
+      expect(await db.inventoryProduct.findUnique({ where: { id: variant.id } })).toMatchObject({ onHand: 1 });
+      expect(await db.inventoryProduct.findUnique({ where: { id: parent.id } })).toMatchObject({ onHand: 0 });
     });
   },
 );

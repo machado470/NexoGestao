@@ -294,26 +294,34 @@ export function InventoryPage() {
     void products.refetch();
     void movements.refetch();
   };
+  const productDefaults = {
+    kind: "SIMPLE",
+    parentSku: "",
+    sku: "",
+    name: "",
+    barcode: "",
+    variant: "",
+    min: "0",
+    cost: "0,00",
+    sale: "0,00",
+  };
   const productForm = useCommerceForm(
-    {
-      sku: "",
-      name: "",
-      barcode: "",
-      variant: "",
-      min: "0",
-      cost: "0,00",
-      sale: "0,00",
+    productDefaults,
+    v => {
+      const kind: Product["kind"] = v.kind === "PARENT" || v.kind === "VARIANT" ? v.kind : "SIMPLE";
+      return {
+        kind,
+        expectedCurrency: requiredCurrency(currency),
+        sku: v.sku.trim().toUpperCase(),
+        name: text(v.name, 2, "Nome do produto"),
+        parentSku: kind === "VARIANT" ? v.parentSku.trim().toUpperCase() : undefined,
+        barcode: kind === "PARENT" ? undefined : v.barcode.trim() || undefined,
+        variant: kind === "VARIANT" ? text(v.variant, 1, "Variação") : undefined,
+        minQuantity: kind === "PARENT" ? 0 : integer(v.min),
+        costCents: kind === "PARENT" ? 0 : amount(v.cost, true),
+        saleCents: kind === "PARENT" ? 0 : amount(v.sale, true),
+      };
     },
-    v => ({
-      expectedCurrency: requiredCurrency(currency),
-      sku: v.sku.trim().toUpperCase(),
-      name: text(v.name, 2, "Nome do produto"),
-      barcode: v.barcode.trim() || undefined,
-      variant: v.variant.trim() || undefined,
-      minQuantity: integer(v.min),
-      costCents: amount(v.cost, true),
-      saleCents: amount(v.sale, true),
-    }),
     payload => create.mutateAsync(payload),
     saved
   );
@@ -344,7 +352,7 @@ export function InventoryPage() {
   };
   const movementOptions = [
     ...(selectedProduct ? [selectedProduct] : []),
-    ...(products.data?.items ?? []).filter(p => p.id !== selectedProduct?.id),
+    ...(products.data?.items ?? []).filter(p => p.kind !== "PARENT" && p.id !== selectedProduct?.id),
   ];
   return (
     <Workspace
@@ -394,42 +402,63 @@ export function InventoryPage() {
                         {p.name}
                       </h2>
                       <p className={muted}>
-                        {p.variant || "Sem variação"}
+                        {p.kind === "PARENT" ? "Produto pai" : p.variant || "Produto simples"}
                         {p.barcode ? ` · ${p.barcode}` : ""}
                       </p>
                     </div>
-                    <div className="flex flex-wrap items-end justify-between gap-2">
-                      <p>
-                        <strong className="text-3xl tabular-nums">
-                          {p.onHand}
-                        </strong>{" "}
-                        <span className={muted}>unidades</span>
-                      </p>
-                      <span className="rounded-lg border border-[var(--border-subtle)] px-2 py-1 text-xs">
-                        {p.onHand <= p.minQuantity ? "Repor estoque" : "Disponível"}
-                      </span>
-                    </div>
-                    <dl className="grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <dt className={muted}>Custo unitário</dt>
-                        <dd>{money(p.costCents, p.currency)}</dd>
+                    {p.kind === "PARENT" ? (
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => productForm.start({
+                            ...productDefaults,
+                            kind: "VARIANT",
+                            parentSku: p.sku,
+                            name: p.name,
+                          })}
+                        >
+                          Adicionar variação
+                        </Button>
+                        <Button variant="outline" onClick={() => { setSearch(p.sku); setPage(1); }}>
+                          Buscar variações
+                        </Button>
                       </div>
-                      <div>
-                        <dt className={muted}>Preço de venda</dt>
-                        <dd>{money(p.saleCents, p.currency)}</dd>
-                      </div>
-                    </dl>
-                    <p className={muted}>Estoque mínimo: {p.minQuantity}</p>
-                    <div className="flex flex-wrap gap-2">
-                      <Button variant="outline" onClick={() => beginMove(p, "IN")}>
-                        <ArrowDownToLine className="mr-2 h-4 w-4" />
-                        Entrada
-                      </Button>
-                      <Button variant="outline" onClick={() => beginMove(p, "OUT")}>
-                        <ArrowUpFromLine className="mr-2 h-4 w-4" />
-                        Saída
-                      </Button>
-                    </div>
+                    ) : (
+                      <>
+                        <div className="flex flex-wrap items-end justify-between gap-2">
+                          <p>
+                            <strong className="text-3xl tabular-nums">
+                              {p.onHand}
+                            </strong>{" "}
+                            <span className={muted}>unidades</span>
+                          </p>
+                          <span className="rounded-lg border border-[var(--border-subtle)] px-2 py-1 text-xs">
+                            {p.onHand <= p.minQuantity ? "Repor estoque" : "Disponível"}
+                          </span>
+                        </div>
+                        <dl className="grid grid-cols-2 gap-2 text-sm">
+                          <div>
+                            <dt className={muted}>Custo unitário</dt>
+                            <dd>{money(p.costCents, p.currency)}</dd>
+                          </div>
+                          <div>
+                            <dt className={muted}>Preço de venda</dt>
+                            <dd>{money(p.saleCents, p.currency)}</dd>
+                          </div>
+                        </dl>
+                        <p className={muted}>Estoque mínimo: {p.minQuantity}</p>
+                        <div className="flex flex-wrap gap-2">
+                          <Button variant="outline" onClick={() => beginMove(p, "IN")}>
+                            <ArrowDownToLine className="mr-2 h-4 w-4" />
+                            Entrada
+                          </Button>
+                          <Button variant="outline" onClick={() => beginMove(p, "OUT")}>
+                            <ArrowUpFromLine className="mr-2 h-4 w-4" />
+                            Saída
+                          </Button>
+                        </div>
+                      </>
+                    )}
                   </article>
                 ))}
               </div>
@@ -498,8 +527,28 @@ export function InventoryPage() {
         title="Novo produto"
         submitLabel="Cadastrar produto"
       >
+        <AppSelect
+          ariaLabel="Tipo de produto"
+          value={productForm.values.kind}
+          onValueChange={value => productForm.edit("kind", value)}
+          options={[
+            { value: "SIMPLE", label: "Produto simples" },
+            { value: "PARENT", label: "Produto pai com variações" },
+            { value: "VARIANT", label: "Variação de um produto pai" },
+          ]}
+        />
+        {productForm.values.kind === "VARIANT" && (
+          <Field
+            label="SKU do produto pai"
+            required
+            pattern="[A-Za-z0-9][A-Za-z0-9._-]{0,63}"
+            maxLength={64}
+            value={productForm.values.parentSku}
+            onChange={e => productForm.edit("parentSku", e.target.value)}
+          />
+        )}
         <Field
-          label="SKU"
+          label={productForm.values.kind === "PARENT" ? "SKU de referência" : "SKU"}
           required
           pattern="[A-Za-z0-9][A-Za-z0-9._-]{0,63}"
           maxLength={64}
@@ -514,43 +563,52 @@ export function InventoryPage() {
           value={productForm.values.name}
           onChange={e => productForm.edit("name", e.target.value)}
         />
-        <Field
-          label="Código de barras (opcional)"
-          maxLength={64}
-          value={productForm.values.barcode}
-          onChange={e => productForm.edit("barcode", e.target.value)}
-        />
-        <Field
-          label="Variação, como modelo, cor ou voltagem"
-          maxLength={100}
-          value={productForm.values.variant}
-          onChange={e => productForm.edit("variant", e.target.value)}
-        />
-        <Field
-          label="Estoque mínimo (unidades inteiras)"
-          required
-          inputMode="numeric"
-          value={productForm.values.min}
-          onChange={e => productForm.edit("min", e.target.value)}
-        />
-        <Field
-          label={`Custo unitário (${currency ?? "moeda da empresa"})`}
-          required
-          inputMode="decimal"
-          value={productForm.values.cost}
-          onChange={e => productForm.edit("cost", e.target.value)}
-        />
-        <Field
-          label={`Preço de venda (${currency ?? "moeda da empresa"})`}
-          required
-          inputMode="decimal"
-          value={productForm.values.sale}
-          onChange={e => productForm.edit("sale", e.target.value)}
-        />
-        <p className={muted}>
-          O produto inicia sem saldo. Use Entrada para registrar a quantidade
-          recebida.
-        </p>
+        {productForm.values.kind === "PARENT" ? (
+          <p className={muted}>Cada variação terá seu próprio SKU e saldo.</p>
+        ) : (
+          <>
+            <Field
+              label="Código de barras (opcional)"
+              maxLength={64}
+              value={productForm.values.barcode}
+              onChange={e => productForm.edit("barcode", e.target.value)}
+            />
+            {productForm.values.kind === "VARIANT" && (
+              <Field
+                label="Variação, como modelo, cor ou voltagem"
+                required
+                maxLength={100}
+                value={productForm.values.variant}
+                onChange={e => productForm.edit("variant", e.target.value)}
+              />
+            )}
+            <Field
+              label="Estoque mínimo (unidades inteiras)"
+              required
+              inputMode="numeric"
+              value={productForm.values.min}
+              onChange={e => productForm.edit("min", e.target.value)}
+            />
+            <Field
+              label={`Custo unitário (${currency ?? "moeda da empresa"})`}
+              required
+              inputMode="decimal"
+              value={productForm.values.cost}
+              onChange={e => productForm.edit("cost", e.target.value)}
+            />
+            <Field
+              label={`Preço de venda (${currency ?? "moeda da empresa"})`}
+              required
+              inputMode="decimal"
+              value={productForm.values.sale}
+              onChange={e => productForm.edit("sale", e.target.value)}
+            />
+            <p className={muted}>
+              O produto inicia sem saldo. Use Entrada para registrar a quantidade
+              recebida.
+            </p>
+          </>
+        )}
       </Editor>
       <Editor
         form={moveForm}

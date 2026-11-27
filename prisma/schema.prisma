@@ -1417,6 +1417,12 @@ model TenantRateLimitBucket {
   @@index([startedAt])
 }
 
+enum InventoryProductKind {
+  SIMPLE
+  PARENT
+  VARIANT
+}
+
 model InventoryProduct {
   id          String          @id @default(uuid())
   orgId       String
@@ -1424,6 +1430,10 @@ model InventoryProduct {
   name        String
   barcode     String?
   variant     String?
+  kind        InventoryProductKind @default(SIMPLE)
+  parentId    String?
+  parent      InventoryProduct? @relation("InventoryProductFamily", fields: [parentId, orgId], references: [id, orgId], onDelete: Restrict)
+  variants    InventoryProduct[] @relation("InventoryProductFamily")
   minQuantity Int             @default(0)
   onHand      Int             @default(0)
   costCents   Int             @default(0)
@@ -1435,6 +1445,7 @@ model InventoryProduct {
 
   @@unique([orgId, sku])
   @@unique([id, orgId])
+  @@index([orgId, parentId])
 }
 
 model StockMovement {
