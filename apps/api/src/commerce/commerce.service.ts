@@ -241,14 +241,14 @@ export class CommerceService {
     if (existing) return this.same(existing, values);
     try {
       return await this.db.$transaction(async (tx) => {
-        if (
-          values.serviceOrderId &&
-          !(await tx.serviceOrder.findFirst({
-            where: { id: values.serviceOrderId, orgId },
-            select: { id: true },
-          }))
-        )
-          throw new NotFoundException("O.S. não encontrada nesta empresa");
+        if (values.serviceOrderId) {
+          // Reserve, consume and linked movements lock the order before inventory.
+          const [order] = await tx.$queryRaw<Array<{ id: string }>>`
+            SELECT id FROM "ServiceOrder"
+            WHERE id = ${values.serviceOrderId} AND "orgId" = ${orgId} FOR UPDATE
+          `;
+          if (!order) throw new NotFoundException("O.S. não encontrada nesta empresa");
+        }
         const [product] = await tx.$queryRaw<Array<{ reservedQuantity: number }>>`
           SELECT "reservedQuantity" FROM "InventoryProduct"
           WHERE id = ${values.productId} AND "orgId" = ${orgId} AND kind <> 'PARENT'
