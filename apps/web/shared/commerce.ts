@@ -30,6 +30,7 @@ export const productSchema = productInput
     barcode: z.string().nullable(),
     variant: z.string().nullable(),
     onHand: z.number().int().min(0),
+    reservedQuantity: z.number().int().min(0).default(0),
     createdAt: z.string(),
   });
 export const productsSchema = z.object({
@@ -37,6 +38,23 @@ export const productsSchema = z.object({
   total: z.number().int().min(0),
   page: z.number().int().positive(),
   pages: z.number().int().positive(),
+});
+export const reservationInput = z.object({
+  productId: id,
+  serviceOrderId: id,
+  quantity: z.number().int().min(1).max(1000000000),
+  entryKey: key,
+});
+export const reservationSchema = z.object({
+  id,
+  productId: id,
+  serviceOrderId: id,
+  quantity: z.number().int().positive(),
+  releasedAt: z.string().nullable(),
+  consumedAt: z.string().nullable(),
+});
+export const reservationListItem = reservationSchema.extend({
+  product: z.object({ name: z.string(), sku: z.string() }),
 });
 export const movementInput = z.object({
   productId: id,

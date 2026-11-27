@@ -7,6 +7,9 @@ import {
   productSchema,
   productsSchema,
   movementInput,
+  reservationInput,
+  reservationSchema,
+  reservationListItem,
   movementSchema,
   fiscalInput,
   fiscalSchema,
@@ -48,6 +51,22 @@ export const commerceRouter = router({
     .input(productInput)
     .mutation(async ({ ctx, input }) =>
       productSchema.parse(await write(ctx, "products", input))
+    ),
+  reservations: adminProcedure
+    .input(z.object({ serviceOrderId: z.string().uuid() }))
+    .query(async ({ ctx, input }) =>
+      z.array(reservationListItem).parse(await read(ctx, `reservations/${input.serviceOrderId}`))
+    ),
+  reserve: adminProcedure.input(reservationInput).mutation(async ({ ctx, input }) =>
+    reservationSchema.parse(await write(ctx, "reservations", input))
+  ),
+  releaseReservation: adminProcedure.input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) =>
+      reservationSchema.parse(await write(ctx, `reservations/${input.id}/release`, {}))
+    ),
+  consumeReservation: adminProcedure.input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) =>
+      movementSchema.parse(await write(ctx, `reservations/${input.id}/consume`, {}))
     ),
   movements: adminProcedure.query(async ({ ctx }) =>
     z.array(movementSchema).parse(await read(ctx, "movements"))

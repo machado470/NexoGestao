@@ -104,6 +104,7 @@ const url = "postgresql://nexo@127.0.0.1:55439/postgres";
         const where = { orgId: { in: [org, foreign] } };
         await db.fiscalDraft.deleteMany({ where });
         await db.stockMovement.deleteMany({ where });
+        await db.stockReservation.deleteMany({ where });
         await db.inventoryProduct.deleteMany({ where: { ...where, kind: "VARIANT" } });
         await db.inventoryProduct.deleteMany({ where });
         await db.paymentRefund.deleteMany({ where });
@@ -433,5 +434,89 @@ const url = "postgresql://nexo@127.0.0.1:55439/postgres";
       expect(await db.inventoryProduct.findUnique({ where: { id: variant.id } })).toMatchObject({ onHand: 1 });
       expect(await db.inventoryProduct.findUnique({ where: { id: parent.id } })).toMatchObject({ onHand: 0 });
     });
+    it("reserves the last unit once, protects it from stock withdrawals, and releases it once", async () => {
+      const item = await db.inventoryProduct.create({ data: {
+        orgId: org, sku: "ULTIMA-UNIDADE", name: "Peça de teste", currency: "BRL", onHand: 1,
+      }});
+      const orders = await Promise.all(["Reserva A", "Reserva B"].map(title =>
+        db.serviceOrder.create({ data: { orgId: org, customerId: customer.id, title } })
+      ));
+      const inputs = orders.map(service => ({
+        productId: item.id, serviceOrderId: service.id, quantity: 1, entryKey: uuid(),
+      }));
+      const attempts = await Promise.all(inputs.map(input => api("post", "reservations").send(input)));
+      expect(attempts.map(result => result.status).sort()).toEqual([201, 409]);
+      const winner = attempts.findIndex(result => result.status === 201);
+      const reservation = attempts[winner].body;
+      await api("post", "reservations").send(inputs[winner]).expect(201);
+      const withdrawal = {
+        productId: item.id, direction: "OUT", quantity: 1, reason: "Saída avulsa", entryKey: uuid(),
+      };
+      await api("post", "movements").send(withdrawal).expect(400);
+      await api("post", `reservations/${reservation.id}/release`, "ADMIN", foreign).expect(404);
+      await Promise.all(Array.from({ length: 2 }, () =>
+        api("post", `reservations/${reservation.id}/release`).expect(201)
+      ));
+      await api("post", "movements").send(withdrawal).expect(201);
+      expect(await db.inventoryProduct.findUnique({ where: { id: item.id } }))
+        .toMatchObject({ onHand: 0, reservedQuantity: 0 });
+    });
+    it("consumes a reservation only during execution and writes one stock movement on retries", async () => {
+      const item = await db.inventoryProduct.create({ data: {
+        orgId: org, sku: "PECA-CONSUMIDA", name: "Peça a consumir", currency: "BRL", onHand: 3,
+      }});
+      const service = await db.serviceOrder.create({
+        data: { orgId: org, customerId: customer.id, title: "O.S. de consumo" },
+      });
+      const reservation = (await api("post", "reservations").send({
+        productId: item.id, serviceOrderId: service.id, quantity: 2, entryKey: uuid(),
+      }).expect(201)).body;
+      const path = `reservations/${reservation.id}/consume`;
+      await api("get", `reservations/${service.id}`, "STAFF").expect(403);
+      await api("get", `reservations/${service.id}`, "ADMIN", foreign).expect(404);
+      const list = await api("get", `reservations/${service.id}`).expect(200);
+      expect(list.body).toMatchObject([{ id: reservation.id, product: { sku: item.sku } }]);
+      await api("post", path, "ADMIN", foreign).expect(404);
+      await api("post", path).expect(409);
+      await db.serviceOrder.update({ where: { id: service.id }, data: { status: "IN_PROGRESS" } });
+      const attempts = await Promise.all(Array.from({ length: 3 }, () => api("post", path).expect(201)));
+      expect(new Set(attempts.map(attempt => attempt.body.id)).size).toBe(1);
+      expect(attempts[0].body).toMatchObject({ direction: "OUT", quantity: 2, serviceOrderId: service.id });
+      await api("post", `reservations/${reservation.id}/release`).expect(409);
+      expect(await db.stockMovement.count({ where: { orgId: org, reservationId: reservation.id } })).toBe(1);
+      expect(await db.inventoryProduct.findUnique({ where: { id: item.id } }))
+        .toMatchObject({ onHand: 1, reservedQuantity: 0 });
+    });
+    it.each(["CANCELED", "DONE"] as const)(
+      "releases only unused reservations when the order becomes %s",
+      async status => {
+        const item = await db.inventoryProduct.create({ data: {
+          orgId: org, sku: `PECA-${status}`, name: "Peça de encerramento", currency: "BRL", onHand: 5,
+        }});
+        const service = await db.serviceOrder.create({ data: {
+          orgId: org, customerId: customer.id, title: "O.S. de encerramento", status: "IN_PROGRESS",
+        }});
+        const reserve = async (quantity: number) => (await api("post", "reservations").send({
+          productId: item.id, serviceOrderId: service.id, quantity, entryKey: uuid(),
+        }).expect(201)).body;
+        const consumed = await reserve(1);
+        const pending = await reserve(2);
+        await api("post", `reservations/${consumed.id}/consume`).expect(201);
+        await expect(db.$transaction(async tx => {
+          await tx.serviceOrder.update({ where: { id: service.id }, data: { status } });
+          throw new Error("Rollback de teste");
+        })).rejects.toThrow("Rollback de teste");
+        expect(await db.inventoryProduct.findUnique({ where: { id: item.id } }))
+          .toMatchObject({ onHand: 4, reservedQuantity: 2 });
+        await db.serviceOrder.update({ where: { id: service.id }, data: { status } });
+        await db.serviceOrder.update({ where: { id: service.id }, data: { status } });
+        expect(await db.inventoryProduct.findUnique({ where: { id: item.id } }))
+          .toMatchObject({ onHand: 4, reservedQuantity: 0 });
+        expect(await db.stockReservation.findUnique({ where: { id: pending.id } }))
+          .toMatchObject({ releasedAt: expect.any(Date), consumedAt: null });
+        expect(await db.stockReservation.findUnique({ where: { id: consumed.id } }))
+          .toMatchObject({ releasedAt: null, consumedAt: expect.any(Date) });
+      },
+    );
   },
 );

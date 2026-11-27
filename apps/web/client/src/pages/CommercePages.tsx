@@ -433,7 +433,7 @@ export function InventoryPage() {
                             <span className={muted}>unidades</span>
                           </p>
                           <span className="rounded-lg border border-[var(--border-subtle)] px-2 py-1 text-xs">
-                            {p.onHand <= p.minQuantity ? "Repor estoque" : "Disponível"}
+                            {p.onHand - p.reservedQuantity <= p.minQuantity ? "Repor estoque" : "Disponível"}
                           </span>
                         </div>
                         <dl className="grid grid-cols-2 gap-2 text-sm">
@@ -446,6 +446,9 @@ export function InventoryPage() {
                             <dd>{money(p.saleCents, p.currency)}</dd>
                           </div>
                         </dl>
+                        {p.reservedQuantity > 0 && (
+                          <p className={muted}>{p.reservedQuantity} reservadas · {p.onHand - p.reservedQuantity} disponíveis</p>
+                        )}
                         <p className={muted}>Estoque mínimo: {p.minQuantity}</p>
                         <div className="flex flex-wrap gap-2">
                           <Button variant="outline" onClick={() => beginMove(p, "IN")}>
