@@ -114,7 +114,7 @@ let auditPage;
         continue;
       }
       assert(req.method() !== "POST", `Unexpected write ${name}`);
-      const data =
+      const data = name === "serviceQuotes.orderOrigin" ? null :
         {
           "session.me": {
             user: {
@@ -134,6 +134,7 @@ let auditPage;
           "dashboard.notificationCenter.list": { items: [], unreadCount: 0 },
           "customers.list": [fixture.customer],
           "serviceOrders.getById": order,
+          "serviceOrders.returns": { items: [], issues: [], pages: 1 },
           "serviceOrders.list": [order],
           "serviceOrders.page": {
             items: [order],
@@ -177,13 +178,22 @@ let auditPage;
     ctx.fillText("Registro local de execução", 60, 130);
     return c.toDataURL("image/png").split(",")[1];
   });
-  await modal
-    .getByLabel("Foto", { exact: true })
-    .setInputFiles({
-      name: "execucao.png",
-      mimeType: "image/png",
-      buffer: Buffer.from(png, "base64"),
-    });
+  const camera = modal.locator('input[type="file"][capture="environment"]');
+  assert.equal(await camera.getAttribute("accept"), "image/*");
+  const photoInput = width < 768
+    ? page.waitForEvent("filechooser")
+    : null;
+  if (photoInput) {
+    await modal.getByRole("button", { name: "Tirar foto", exact: true }).click();
+  }
+  await (photoInput
+    ? (await photoInput).element()
+    : modal.getByLabel("Escolher foto da galeria ou dos arquivos", { exact: true })
+  ).setInputFiles({
+    name: "execucao.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(png, "base64"),
+  });
   await modal
     .getByRole("img", { name: "Prévia da foto selecionada" })
     .waitFor();
