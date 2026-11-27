@@ -90,7 +90,7 @@ export function ServiceOrderMaterials({ serviceOrderId, status }: {
           </Button>
           <AppSelect ariaLabel="Peça para reservar" value={productId}
             onValueChange={id => { if (!lock.current) setProductId(id); }} options={(products.data?.items ?? [])
-              .filter(product => product.kind !== "PARENT" && product.onHand > product.reservedQuantity)
+              .filter(product => (product.kind === "SIMPLE" || product.kind === "VARIANT") && product.onHand > product.reservedQuantity)
               .map(product => ({
                 value: product.id,
                 label: `${product.sku} · ${product.name} (${product.onHand - product.reservedQuantity} disponíveis)`,

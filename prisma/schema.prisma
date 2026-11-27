@@ -1423,9 +1423,13 @@ enum InventoryProductKind {
   SIMPLE
   PARENT
   VARIANT
+  KIT
 }
 
 model InventoryProduct {
+  kitComponents InventoryKitComponent[] @relation("KitProduct")
+  usedInKits InventoryKitComponent[] @relation("KitComponent")
+  kitWithdrawals InventoryKitWithdrawal[]
   reservations StockReservation[]
   reservedQuantity Int @default(0)
   id          String          @id @default(uuid())
@@ -1452,6 +1456,34 @@ model InventoryProduct {
   @@index([orgId, parentId])
 }
 
+model InventoryKitComponent {
+  orgId       String
+  kitId       String
+  componentId String
+  quantity    Int
+  kit         InventoryProduct @relation("KitProduct", fields: [kitId, orgId], references: [id, orgId], onDelete: Restrict)
+  component   InventoryProduct @relation("KitComponent", fields: [componentId, orgId], references: [id, orgId], onDelete: Restrict)
+
+  @@id([orgId, kitId, componentId])
+  @@index([componentId, orgId])
+}
+
+model InventoryKitWithdrawal {
+  id          String @id @default(uuid())
+  orgId       String
+  kitId       String
+  quantity    Int
+  reason      String
+  actorUserId String
+  entryKey    String
+  createdAt   DateTime @default(now())
+  kit         InventoryProduct @relation(fields: [kitId, orgId], references: [id, orgId], onDelete: Restrict)
+  movements   StockMovement[]
+
+  @@unique([orgId, entryKey])
+  @@unique([id, orgId])
+}
+
 model StockReservation {
   id String @id @default(uuid())
   orgId String
@@ -1474,6 +1506,8 @@ model StockReservation {
 }
 
 model StockMovement {
+  kitWithdrawalId String?
+  kitWithdrawal InventoryKitWithdrawal? @relation(fields: [kitWithdrawalId, orgId], references: [id, orgId], onDelete: Restrict)
   reservationId  String? @unique
   reservation    StockReservation? @relation(fields: [reservationId], references: [id], onDelete: Restrict)
   id             String           @id @default(uuid())
@@ -1492,6 +1526,7 @@ model StockMovement {
 
   @@unique([orgId, entryKey])
   @@index([orgId, createdAt])
+  @@index([kitWithdrawalId, orgId])
 }
 
 model FiscalDraft {

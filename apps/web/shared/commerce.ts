@@ -24,7 +24,9 @@ export const productSchema = productInput
   .omit({ expectedCurrency: true, parentSku: true })
   .extend({
     id,
-    kind: productKind.default("SIMPLE"),
+    kind: z.enum(["SIMPLE", "PARENT", "VARIANT", "KIT"]).default("SIMPLE"),
+    availableKits: z.number().int().min(0).optional(),
+    components: z.array(z.object({ sku: z.string(), name: z.string(), quantity: z.number().int().positive() })).optional(),
     parentId: id.nullable().optional(),
     currency,
     barcode: z.string().nullable(),
@@ -38,6 +40,19 @@ export const productsSchema = z.object({
   total: z.number().int().min(0),
   page: z.number().int().positive(),
   pages: z.number().int().positive(),
+});
+export const kitInput = productInput.pick({ expectedCurrency: true, sku: true, name: true, saleCents: true })
+  .extend({
+    components: z.array(z.object({
+      sku: productInput.shape.sku,
+      quantity: z.number().int().min(1).max(1000000000),
+    })).min(1).max(30),
+  });
+export const kitWithdrawalInput = z.object({
+  kitId: id,
+  entryKey: key,
+  quantity: z.number().int().min(1).max(1000000000),
+  reason: z.string().trim().min(3).max(500),
 });
 export const reservationInput = z.object({
   productId: id,

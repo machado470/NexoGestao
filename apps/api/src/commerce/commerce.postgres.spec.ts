@@ -105,6 +105,8 @@ const url = "postgresql://nexo@127.0.0.1:55439/postgres";
         await db.fiscalDraft.deleteMany({ where });
         await db.stockMovement.deleteMany({ where });
         await db.stockReservation.deleteMany({ where });
+        await db.inventoryKitWithdrawal.deleteMany({ where });
+        await db.inventoryKitComponent.deleteMany({ where });
         await db.inventoryProduct.deleteMany({ where: { ...where, kind: "VARIANT" } });
         await db.inventoryProduct.deleteMany({ where });
         await db.paymentRefund.deleteMany({ where });
@@ -536,6 +538,41 @@ const url = "postgresql://nexo@127.0.0.1:55439/postgres";
         api("post", `reservations/${row.body.id}/consume`).expect(201)));
       expect(await db.inventoryProduct.findUnique({ where: { id: item.id } }))
         .toMatchObject({ onHand: 4, reservedQuantity: 0 });
+    });
+    it("derives kit availability from unreserved stock and rolls back an incomplete kit withdrawal", async () => {
+      const [first, second] = await Promise.all(["KIT-PECA-A", "KIT-PECA-B"].map(sku =>
+        db.inventoryProduct.create({ data: {
+          orgId: org, sku, name: sku, currency: "BRL", onHand: 4,
+        }})
+      ));
+      const payload = {
+        sku: "KIT-TESTE", name: "Kit de teste", expectedCurrency: "BRL", saleCents: 100,
+        components: [{ sku: first.sku, quantity: 2 }, { sku: second.sku, quantity: 1 }],
+      };
+      const kit = (await api("post", "kits").send(payload).expect(201)).body;
+      expect(kit).toMatchObject({ availableKits: 2, onHand: 0, kind: "KIT" });
+      expect((await api("post", "kits").send({ ...payload, components: [...payload.components].reverse() }).expect(201)).body.id).toBe(kit.id);
+      await api("post", "kits", "ADMIN", foreign).send({ ...payload, expectedCurrency: "USD" }).expect(400);
+      await api("post", "kits").send({ ...payload, components: [{ sku: kit.sku, quantity: 1 }] }).expect(400);
+      const componentIds = [first.id, second.id].sort();
+      const limiting = componentIds[1];
+      const orderForKit = await db.serviceOrder.create({ data: {
+        orgId: org, customerId: customer.id, title: "Reserva de componente",
+      }});
+      const reserved = (await api("post", "reservations").send({
+        productId: limiting, serviceOrderId: orderForKit.id, quantity: 4, entryKey: uuid(),
+      }).expect(201)).body;
+      expect((await api("get", "products?q=KIT-TESTE").expect(200)).body.items[0].availableKits).toBe(0);
+      const path = `kits/${kit.id}/withdrawals`;
+      const withdrawal = { entryKey: uuid(), reason: "Saída de kit", quantity: 2 };
+      await api("post", path).send(withdrawal).expect(409);
+      expect(await db.inventoryProduct.findUnique({ where: { id: componentIds[0] } })).toMatchObject({ onHand: 4 });
+      await api("post", `reservations/${reserved.id}/release`).expect(201);
+      const replies = await Promise.all(Array.from({ length: 3 }, () => api("post", path).send(withdrawal).expect(201)));
+      expect(new Set(replies.map(reply => reply.body.id)).size).toBe(1);
+      expect(await db.stockMovement.count({ where: { orgId: org, kitWithdrawalId: replies[0].body.id } })).toBe(2);
+      expect(await db.inventoryProduct.findUnique({ where: { id: first.id } })).toMatchObject({ onHand: 0 });
+      expect(await db.inventoryProduct.findUnique({ where: { id: second.id } })).toMatchObject({ onHand: 2 });
     });
   },
 );

@@ -4,6 +4,8 @@ import { nexoFetch } from "../_core/nexoClient";
 import { unwrapNexoApiResponse } from "../_core/nexoEnvelope";
 import {
   productInput,
+  kitInput,
+  kitWithdrawalInput,
   productSchema,
   productsSchema,
   movementInput,
@@ -52,6 +54,12 @@ export const commerceRouter = router({
     .mutation(async ({ ctx, input }) =>
       productSchema.parse(await write(ctx, "products", input))
     ),
+  createKit: adminProcedure.input(kitInput).mutation(async ({ ctx, input }) =>
+    productSchema.parse(await write(ctx, "kits", input))
+  ),
+  withdrawKit: adminProcedure.input(kitWithdrawalInput).mutation(async ({ ctx, input: { kitId, ...input } }) =>
+    z.object({ id: z.string() }).parse(await write(ctx, `kits/${encodeURIComponent(kitId)}/withdrawals`, input))
+  ),
   reservations: adminProcedure
     .input(z.object({ serviceOrderId: z.string().uuid() }))
     .query(async ({ ctx, input }) =>
