@@ -1591,7 +1591,7 @@ export default function ServiceOrdersPage() {
                       title="Histórico oficial da O.S."
                       subtitle="Evidências cronológicas retornadas pela Timeline."
                       events={serviceOrderTimelineEvents}
-                      fullTimelineLabel="Abrir Timeline completa"
+                      fullTimelineLabel="Abrir Timeline da O.S."
                       onFullTimeline={() =>
                         navigate(`/timeline?serviceOrderId=${selectedOrder.id}`)
                       }

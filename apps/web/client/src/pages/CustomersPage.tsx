@@ -1975,7 +1975,7 @@ export default function CustomersPage() {
                     title="Últimos eventos oficiais"
                     subtitle="Prova operacional do cliente e histórico oficial ligado ao cliente."
                     events={customerOfficialTimelineEvents}
-                    fullTimelineLabel="Abrir Timeline completa"
+                    fullTimelineLabel="Abrir Timeline do cliente"
                     onFullTimeline={() =>
                       navigate(`/timeline?customerId=${activeCustomerId}`)
                     }
