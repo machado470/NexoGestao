@@ -17,7 +17,7 @@ import { ServiceOrderTenantAccessGuard } from '../../service-orders/service-orde
 describe('canonical operational roles over HTTP', () => {
   let app: INestApplication
   const finance = { listCharges: jest.fn().mockResolvedValue({ items: [], meta: {} }), ensureChargeForServiceOrderDone: jest.fn().mockResolvedValue({ id: 'charge' }) }
-  const orders = { get: jest.fn().mockResolvedValue({ id: 'order', customerId: 'customer', amountCents: 100, status: 'DONE' }), list: jest.fn().mockResolvedValue([]), update: jest.fn().mockResolvedValue({ id: 'order' }) }
+  const orders = { listAssigned: jest.fn().mockResolvedValue({ items: [], nextPage: null }), get: jest.fn().mockResolvedValue({ id: 'order', customerId: 'customer', amountCents: 100, status: 'DONE' }), list: jest.fn().mockResolvedValue([]), update: jest.fn().mockResolvedValue({ id: 'order' }) }
   beforeAll(async () => {
     const module = await Test.createTestingModule({
       controllers: [FinanceController, ServiceOrdersController],
@@ -27,7 +27,7 @@ describe('canonical operational roles over HTTP', () => {
       ],
     }).overrideGuard(JwtAuthGuard).useValue({ canActivate: context => {
       const req = context.switchToHttp().getRequest()
-      req.user = { sub: 'user', userId: 'user', orgId: 'org', role: req.headers['x-test-role'] }
+      req.user = { sub: 'user', userId: 'user', orgId: 'org', personId: 'person', role: req.headers['x-test-role'] }
       return true
     } }).overrideGuard(OperationalStateGuard).useValue({ canActivate: () => true })
       .overrideGuard(ServiceOrderTenantAccessGuard).useValue({ canActivate: () => true }).compile()
@@ -49,6 +49,13 @@ describe('canonical operational roles over HTTP', () => {
   })
   it.each(['ADMIN', 'MANAGER', 'STAFF', 'VIEWER'])('preserves declared service-order reads for %s', async role => {
     await request(app.getHttpServer()).get('/service-orders').set('x-test-role', role).expect(200)
+  })
+  it('passes the session scope to the assigned list and denies the general list to contractors', async () => {
+    await request(app.getHttpServer()).get('/service-orders').set('x-test-role', 'CONTRACTOR').expect(403)
+    await request(app.getHttpServer()).get('/service-orders/assigned?page=2')
+      .set('x-test-role', 'CONTRACTOR').expect(200).expect('Cache-Control', 'private, no-store')
+    expect(orders.listAssigned).toHaveBeenCalledWith('org', 'person', 2)
+    expect(orders.list).not.toHaveBeenCalled()
   })
   it('permits STAFF to update an order while VIEWER remains read-only', async () => {
     await request(app.getHttpServer()).patch('/service-orders/order').set('x-test-role', 'STAFF').send({ title: 'Updated' }).expect(200)

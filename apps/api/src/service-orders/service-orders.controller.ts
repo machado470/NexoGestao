@@ -23,7 +23,6 @@ import { Roles } from '../auth/decorators/roles.decorator'
 import { Org } from '../auth/decorators/org.decorator'
 import { User } from '../auth/decorators/user.decorator'
 
-import { ServiceOrderReadService } from './service-order-read.service'
 import { ServiceOrdersService } from './service-orders.service'
 import { ServiceOrderPublicShapeInterceptor } from './service-order-public-shape.interceptor'
 import { ServiceOrderTenantAccessGuard } from './service-order-tenant-access.guard'
@@ -40,7 +39,6 @@ export class ServiceOrdersController {
     private readonly serviceOrders: ServiceOrdersService,
     private readonly quotas: QuotasService,
     private readonly finance: FinanceService,
-    private readonly readService: ServiceOrderReadService,
   ) {}
 
   @Get()
@@ -59,7 +57,7 @@ export class ServiceOrdersController {
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
   ) {
     if (!user.personId) throw new UnauthorizedException()
-    return this.readService.listAssigned(orgId, user.personId, page)
+    return this.serviceOrders.listAssigned(orgId, user.personId, page)
   }
 
   @Get('assigned/:id')
@@ -71,7 +69,7 @@ export class ServiceOrdersController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     if (!user.personId) throw new UnauthorizedException()
-    return this.readService.getAssigned(orgId, user.personId, id)
+    return this.serviceOrders.getAssigned(orgId, user.personId, id)
   }
 
   @Get(':id')
