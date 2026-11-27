@@ -67,9 +67,46 @@ function isStatus(v: any): v is ServiceOrderStatus {
   return ['OPEN', 'ASSIGNED', 'IN_PROGRESS', 'DONE', 'CANCELED'].includes(v)
 }
 
+const assignedOrderFields = {
+  id: true,
+  title: true,
+  status: true,
+  priority: true,
+  scheduledFor: true,
+} satisfies Prisma.ServiceOrderSelect
+
+const assignedPageSize = 25
+
 @Injectable()
 export class ServiceOrderReadService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async listAssigned(orgId: string, personId: string, page: number) {
+    if (!Number.isInteger(page) || page < 1 || page > 10_000) {
+      throw new BadRequestException('Página inválida.')
+    }
+    const orders = await this.prisma.serviceOrder.findMany({
+      where: { orgId, assignedToPersonId: personId },
+      select: assignedOrderFields,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      skip: (page - 1) * assignedPageSize,
+      take: assignedPageSize + 1,
+    })
+    return {
+      items: orders.slice(0, assignedPageSize),
+      nextPage: orders.length > assignedPageSize && page < 10_000 ? page + 1 : null,
+    }
+  }
+
+  async getAssigned(orgId: string, personId: string, id: string) {
+    const order = await this.prisma.serviceOrder.findFirst({
+      where: { id, orgId, assignedToPersonId: personId },
+      select: { ...assignedOrderFields, description: true },
+    })
+    if (!order) throw new NotFoundException('O.S. não encontrada')
+    return order
+  }
+
 
   private buildFinancialSummary(charge?: { id: string; status: 'PENDING' | 'PAID' | 'OVERDUE' | 'CANCELED'; amountCents: number; dueDate: Date; paidAt: Date | null } | null): FinancialSummary {
     if (!charge) return { hasCharge: false, chargeId: null, chargeStatus: null, chargeAmountCents: null, chargeDueDate: null, paidAt: null }

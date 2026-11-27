@@ -4,6 +4,7 @@ import {
   ConflictException,
   Controller,
   Get,
+  Header,
   Injectable,
   NotFoundException,
   Param,
@@ -43,25 +44,25 @@ const metadata = {
 @Injectable()
 export class ServiceOrderEvidenceService {
   constructor(private readonly db: PrismaService) {}
-  private async order(orgId: string, serviceOrderId: string) {
+  private async order(orgId: string, serviceOrderId: string, contractorId?: string) {
     const order = await this.db.serviceOrder.findFirst({
-      where: { id: serviceOrderId, orgId },
+      where: { id: serviceOrderId, orgId, ...(contractorId ? { assignedToPersonId: contractorId } : {}) },
       select: { id: true },
     });
     if (!order) throw new NotFoundException("O.S. não encontrada");
   }
-  async list(orgId: string, serviceOrderId: string) {
-    await this.order(orgId, serviceOrderId);
+  async list(orgId: string, serviceOrderId: string, contractorId?: string) {
+    await this.order(orgId, serviceOrderId, contractorId);
     return this.db.serviceOrderEvidence.findMany({
-      where: { orgId, serviceOrderId },
+      where: { orgId, serviceOrderId, ...(contractorId ? { serviceOrder: { assignedToPersonId: contractorId } } : {}) },
       select: metadata,
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: 12,
     });
   }
-  async image(orgId: string, serviceOrderId: string, id: string) {
+  async image(orgId: string, serviceOrderId: string, id: string, contractorId?: string) {
     const photo = await this.db.serviceOrderEvidence.findFirst({
-      where: { id, orgId, serviceOrderId },
+      where: { id, orgId, serviceOrderId, ...(contractorId ? { serviceOrder: { assignedToPersonId: contractorId } } : {}) },
       select: { content: true },
     });
     if (!photo) throw new NotFoundException("Foto não encontrada");
@@ -98,15 +99,18 @@ export class ServiceOrderEvidenceService {
     const sha256 = createHash("sha256").update(content).digest("hex");
     const actor = await this.db.user.findFirst({
       where: { id: userId, orgId, active: true },
-      select: { id: true, person: { select: { id: true, name: true } } },
+      select: { id: true, role: true, person: { select: { id: true, name: true, active: true } } },
     });
     if (!actor) throw new UnauthorizedException();
     return this.db.$transaction(async (tx) => {
       // Serialize additions per order: enforce the limit even with simultaneous uploads.
       const locked = await tx.$queryRaw<
-        Array<{ status: string; customerId: string }>
-      >`SELECT status, "customerId" FROM "ServiceOrder" WHERE id = ${serviceOrderId} AND "orgId" = ${orgId} FOR UPDATE`;
-      if (!locked.length) throw new NotFoundException("O.S. não encontrada");
+        Array<{ status: string; customerId: string; assignedToPersonId: string | null }>
+      >`SELECT status, "customerId", "assignedToPersonId" FROM "ServiceOrder" WHERE id = ${serviceOrderId} AND "orgId" = ${orgId} FOR UPDATE`;
+      if (!locked.length || (actor.role === "CONTRACTOR" &&
+        (!actor.person?.active || locked[0].assignedToPersonId !== actor.person.id))) {
+        throw new NotFoundException("O.S. não encontrada");
+      }
       const existing = await tx.serviceOrderEvidence.findUnique({
         where: {
           orgId_serviceOrderId_entryKey: {
@@ -198,21 +202,29 @@ export class ServiceOrderEvidenceService {
 export class ServiceOrderEvidenceController {
   constructor(private readonly service: ServiceOrderEvidenceService) {}
   @Get()
-  @Roles("ADMIN", "MANAGER", "STAFF", "VIEWER")
-  list(@Org() org: string, @Param("serviceOrderId") id: string) {
-    return this.service.list(org, id);
+  @Header("Cache-Control", "private, no-store")
+  @Roles("ADMIN", "MANAGER", "STAFF", "VIEWER", "CONTRACTOR")
+  list(@Org() org: string, @Param("serviceOrderId") id: string, @User() user: { role: string; personId?: string }) {
+    return this.service.list(org, id, this.contractorPersonId(user));
   }
   @Get(":id")
-  @Roles("ADMIN", "MANAGER", "STAFF", "VIEWER")
+  @Header("Cache-Control", "private, no-store")
+  @Roles("ADMIN", "MANAGER", "STAFF", "VIEWER", "CONTRACTOR")
   image(
     @Org() org: string,
     @Param("serviceOrderId") orderId: string,
     @Param("id") id: string,
+    @User() user: { role: string; personId?: string },
   ) {
-    return this.service.image(org, orderId, id);
+    return this.service.image(org, orderId, id, this.contractorPersonId(user));
+  }
+  private contractorPersonId(user: { role: string; personId?: string }) {
+    if (user.role !== "CONTRACTOR") return undefined;
+    if (!user.personId) throw new UnauthorizedException();
+    return user.personId;
   }
   @Post()
-  @Roles("ADMIN", "MANAGER", "STAFF")
+  @Roles("ADMIN", "MANAGER", "STAFF", "CONTRACTOR")
   add(
     @Org() org: string,
     @Param("serviceOrderId") id: string,

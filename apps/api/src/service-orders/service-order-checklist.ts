@@ -59,28 +59,29 @@ export class ServiceOrderChecklistService {
   private async actor(orgId: string, userId: string) {
     const actor = await this.db.user.findFirst({
       where: { id: userId, orgId, active: true },
-      select: { id: true, person: { select: { id: true, name: true } } },
+      select: { id: true, role: true, person: { select: { id: true, name: true, active: true } } },
     });
     if (!actor) throw new UnauthorizedException();
     return actor;
   }
   private async lock(tx: Prisma.TransactionClient, orgId: string, id: string) {
     const orders = await tx.$queryRaw<
-      Array<{ status: string; customerId: string }>
-    >`SELECT status, "customerId" FROM "ServiceOrder" WHERE id = ${id} AND "orgId" = ${orgId} FOR UPDATE`;
+      Array<{ status: string; customerId: string; assignedToPersonId: string | null }>
+    >`SELECT status, "customerId", "assignedToPersonId" FROM "ServiceOrder" WHERE id = ${id} AND "orgId" = ${orgId} FOR UPDATE`;
     if (!orders.length) throw new NotFoundException("O.S. não encontrada");
     return orders[0];
   }
-  async list(orgId: string, serviceOrderId: string) {
+  async list(orgId: string, serviceOrderId: string, contractorId?: string) {
+    const assignment = contractorId ? { assignedToPersonId: contractorId } : {};
     if (
       !(await this.db.serviceOrder.findFirst({
-        where: { id: serviceOrderId, orgId },
+        where: { id: serviceOrderId, orgId, ...assignment },
         select: { id: true },
       }))
     )
       throw new NotFoundException("O.S. não encontrada");
     return this.db.serviceOrderChecklistItem.findMany({
-      where: { orgId, serviceOrderId },
+      where: { orgId, serviceOrderId, serviceOrder: assignment },
       select: fields,
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
       take: 30,
@@ -189,6 +190,10 @@ export class ServiceOrderChecklistService {
     const actor = await this.actor(orgId, userId);
     return this.db.$transaction(async (tx) => {
       const order = await this.lock(tx, orgId, serviceOrderId);
+      if (actor.role === "CONTRACTOR" &&
+        (!actor.person?.active || order.assignedToPersonId !== actor.person.id)) {
+        throw new NotFoundException("O.S. não encontrada");
+      }
       const item = await tx.serviceOrderChecklistItem.findFirst({
         where: { id, orgId, serviceOrderId },
       });
@@ -261,9 +266,15 @@ export class ServiceOrderChecklistController {
     return String(id);
   }
   @Get()
-  @Roles("ADMIN", "MANAGER", "STAFF", "VIEWER")
-  list(@Org() org: string, @Param("serviceOrderId") id: string) {
-    return this.service.list(org, id);
+  @Roles("ADMIN", "MANAGER", "STAFF", "VIEWER", "CONTRACTOR")
+  list(
+    @Org() org: string,
+    @Param("serviceOrderId") id: string,
+    @User() user: { role: string; personId?: string },
+  ) {
+    const contractorId = user.role === "CONTRACTOR" ? user.personId : undefined;
+    if (user.role === "CONTRACTOR" && !contractorId) throw new UnauthorizedException();
+    return this.service.list(org, id, contractorId);
   }
   @Post()
   @Roles("ADMIN", "MANAGER", "STAFF")
@@ -276,7 +287,7 @@ export class ServiceOrderChecklistController {
     return this.service.create(org, id, this.actor(user), body);
   }
   @Post(":id/state")
-  @Roles("ADMIN", "MANAGER", "STAFF")
+  @Roles("ADMIN", "MANAGER", "STAFF", "CONTRACTOR")
   change(
     @Org() org: string,
     @Param("serviceOrderId") order: string,

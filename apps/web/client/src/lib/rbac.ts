@@ -1,4 +1,4 @@
-export type Role = 'ADMIN' | 'MANAGER' | 'STAFF' | 'VIEWER'
+export type Role = 'ADMIN' | 'MANAGER' | 'STAFF' | 'VIEWER' | 'CONTRACTOR'
 
 export type Permission =
   | 'catalog:read'
@@ -87,6 +87,7 @@ const rolePermissions: Record<Role, Permission[]> = {
     'orders:update',
     'reports:read',
   ],
+  CONTRACTOR: [],
   VIEWER: [
     'catalog:read',
     'customers:read',
@@ -115,6 +116,7 @@ export function getRoleLabel(role: Role): string {
     MANAGER: 'Gerente',
     STAFF: 'Equipe',
     VIEWER: 'Visualizador',
+    CONTRACTOR: 'Prestador terceirizado',
   }
 
   return labels[role]
@@ -125,6 +127,7 @@ export function getRoleColor(role: Role): string {
     ADMIN: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
     MANAGER: 'bg-orange-100 text-orange-800 dark:bg-orange-500/20 dark:text-orange-200',
     STAFF: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+    CONTRACTOR: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
     VIEWER: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
   }
 
@@ -138,7 +141,8 @@ export function normalizeRole(role: unknown): Role | null {
     value === 'ADMIN' ||
     value === 'MANAGER' ||
     value === 'STAFF' ||
-    value === 'VIEWER'
+    value === 'VIEWER' ||
+    value === 'CONTRACTOR'
   ) {
     return value
   }

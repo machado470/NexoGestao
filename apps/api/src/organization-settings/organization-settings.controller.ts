@@ -13,7 +13,7 @@ export class OrganizationSettingsController {
   constructor(private readonly organizationSettingsService: OrganizationSettingsService) {}
 
   @Get('display-preferences')
-  @Roles('ADMIN', 'MANAGER', 'STAFF', 'VIEWER', 'OPERADOR', 'FINANCEIRO')
+  @Roles('ADMIN', 'MANAGER', 'STAFF', 'VIEWER', 'OPERADOR', 'FINANCEIRO', 'CONTRACTOR')
   async getDisplayPreferences(@Request() req) {
     return this.organizationSettingsService.getDisplayPreferences(req.user.orgId);
   }

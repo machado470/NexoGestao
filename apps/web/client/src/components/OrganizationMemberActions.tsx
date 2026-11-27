@@ -61,7 +61,7 @@ export function OrganizationMemberActions({
         Para alterar seu próprio acesso, peça a outro administrador.
       </p>
     );
-  const save = (change: { role?: Role; active?: boolean }) => {
+  const save = (change: { role?: Exclude<Role, "CONTRACTOR">; active?: boolean }) => {
     if (update.isPending || !target?.updatedAt) return;
     update.mutate({
       id: target.id,
@@ -138,7 +138,7 @@ export function OrganizationMemberActions({
           id={`member-role-${member.id}`}
           onSubmit={event => {
             event.preventDefault();
-            if (role !== target?.role) save({ role });
+            if (role !== "CONTRACTOR" && role !== target?.role) save({ role });
           }}
         >
           <AppField label="Papel de acesso">

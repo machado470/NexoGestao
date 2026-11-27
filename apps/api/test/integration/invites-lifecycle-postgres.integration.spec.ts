@@ -44,6 +44,20 @@ describeRealIntegration('Invites lifecycle with real PostgreSQL', () => {
     expect(await prisma.person.count({ where: { orgId, userId: user.id } })).toBe(1)
   })
 
+  it('activates a contractor and carries its linked person into the session', async () => {
+    const address = `${randomUUID()}@invite.test`
+    const invite = await service.createInvite(orgId, address, 'Admin', 'CONTRACTOR')
+    expect(invite.role).toBe('CONTRACTOR')
+    const token = new URL(email.sendInvite.mock.calls[0][1]).searchParams.get('token')!
+    await expect(service.acceptInvite(address, token, 'Prestador', 'Password123!'))
+      .resolves.toMatchObject({ success: true })
+    const user = await prisma.user.findUniqueOrThrow({ where: { id: invite.id }, include: { person: true } })
+    expect(user).toMatchObject({ active: true, role: 'CONTRACTOR', person: { orgId, role: 'CONTRACTOR' } })
+    expect(auth.createSessionPayload).toHaveBeenCalledWith(
+      expect.objectContaining({ id: user.id, role: 'CONTRACTOR', person: expect.objectContaining({ id: user.person!.id }) }),
+    )
+  })
+
   it('revokes idempotently and rejects activation of the revoked link', async () => {
     const { user, rawToken } = await pending()
     await service.revokeInvite(orgId, user.id)

@@ -19,6 +19,7 @@ import { ConsentBanner } from "@/components/ConsentBanner";
 import { AppBootstrapGuard, type AppBootstrapState } from "./components/AppBootstrapGuard";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { AppLayout } from "./components/AppLayout";
+import { OrganizationLocaleProvider } from "./contexts/OrganizationLocaleContext";
 import { AppStartupFrame } from "./components/AppStartupFrame";
 import { PublicLayout } from "./components/PublicLayout";
 import { AuthLayout } from "./components/AuthLayout";
@@ -46,6 +47,8 @@ import RegisterPage from "./pages/Register";
 const Login = lazy(() => import("./pages/Login"));
 const CustomersPage = lazy(() => import("./pages/CustomersPage"));
 const AppointmentsPage = lazy(() => import("./pages/AppointmentsPage"));
+const AssignedServiceOrdersPage = lazy(() => import("./pages/AssignedServiceOrdersPage"));
+const assignedOrdersPath = "/service-orders/assigned";
 const ServiceOrdersPage = lazy(() => import("./pages/ServiceOrdersPage"));
 const PeoplePage = lazy(() => import("./pages/PeoplePage"));
 const GovernancePage = lazy(() => import("./pages/GovernancePage"));
@@ -308,6 +311,7 @@ function ProtectedRoute({
 
   const requiresOnboarding = getRequiresOnboarding(payload);
   const authBranch = resolveProtectedRouteAuthBranch(authState);
+  const contractorRedirect = role === "CONTRACTOR" && !requiredRoles?.includes("CONTRACTOR");
 
   useEffect(() => {
     if (authBranch === "pending_bootstrap") return;
@@ -317,6 +321,11 @@ function ProtectedRoute({
       // eslint-disable-next-line no-console
       console.info("[ROUTER] protected_route_redirect", { from: location, to: "login" });
       navigate(buildLoginRedirectPath(location), { replace: true });
+      return;
+    }
+
+    if (contractorRedirect) {
+      navigate(assignedOrdersPath, { replace: true });
       return;
     }
 
@@ -334,6 +343,7 @@ function ProtectedRoute({
     }
   }, [
     authBranch,
+    contractorRedirect,
     location,
     navigate,
     onboardingOnly,
@@ -363,6 +373,8 @@ function ProtectedRoute({
       <RedirectingScreen message="Sua sessão não está ativa. Você será enviado para o login." />
     );
   }
+
+  if (contractorRedirect) return <RedirectingScreen message="Abrindo suas ordens de serviço." />;
 
   if (requireCompletedOnboarding && requiresOnboarding) {
     return (
@@ -546,6 +558,17 @@ const AppointmentsRoute = lazyProtectedPage(AppointmentsPage, {
   requireCompletedOnboarding: true,
 });
 
+function AssignedServiceOrdersContent() {
+  return (
+    <OrganizationLocaleProvider>
+      <LazyPage component={AssignedServiceOrdersPage} fallback={<FullScreenLoader />} />
+    </OrganizationLocaleProvider>
+  );
+}
+
+function AssignedServiceOrdersRoute() {
+  return <ProtectedRoute component={AssignedServiceOrdersContent} requiredRoles={["CONTRACTOR"]} />;
+}
 const ServiceOrdersRoute = lazyProtectedPage(ServiceOrdersPage, {
   permissions: ["orders:read"],
   requireCompletedOnboarding: true,
@@ -725,6 +748,7 @@ function Router() {
       />
       <Route path="/customers" component={CustomersRoute} />
       <Route path="/appointments" component={AppointmentsRoute} />
+      <Route path={assignedOrdersPath} component={AssignedServiceOrdersRoute} />
       <Route path="/service-orders" component={ServiceOrdersRoute} />
       <Route
         path="/finance"

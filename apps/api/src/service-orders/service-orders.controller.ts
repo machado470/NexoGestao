@@ -2,12 +2,17 @@ import { Throttle } from '@nestjs/throttler'
 import {
   Body,
   Controller,
+  DefaultValuePipe,
+  Header,
   Get,
   HttpCode,
   Param,
+  ParseIntPipe,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
+  UnauthorizedException,
   UseGuards,
   UseInterceptors,
   Headers,
@@ -18,6 +23,7 @@ import { Roles } from '../auth/decorators/roles.decorator'
 import { Org } from '../auth/decorators/org.decorator'
 import { User } from '../auth/decorators/user.decorator'
 
+import { ServiceOrderReadService } from './service-order-read.service'
 import { ServiceOrdersService } from './service-orders.service'
 import { ServiceOrderPublicShapeInterceptor } from './service-order-public-shape.interceptor'
 import { ServiceOrderTenantAccessGuard } from './service-order-tenant-access.guard'
@@ -34,6 +40,7 @@ export class ServiceOrdersController {
     private readonly serviceOrders: ServiceOrdersService,
     private readonly quotas: QuotasService,
     private readonly finance: FinanceService,
+    private readonly readService: ServiceOrderReadService,
   ) {}
 
   @Get()
@@ -41,6 +48,30 @@ export class ServiceOrdersController {
   @Roles('ADMIN', 'MANAGER', 'STAFF', 'VIEWER')
   list(@Org() orgId: string, @Query() query: any) {
     return this.serviceOrders.list(orgId, query)
+  }
+
+  @Get('assigned')
+  @Roles('CONTRACTOR')
+  @Header('Cache-Control', 'private, no-store')
+  listAssigned(
+    @Org() orgId: string,
+    @User() user: { personId?: string },
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+  ) {
+    if (!user.personId) throw new UnauthorizedException()
+    return this.readService.listAssigned(orgId, user.personId, page)
+  }
+
+  @Get('assigned/:id')
+  @Roles('CONTRACTOR')
+  @Header('Cache-Control', 'private, no-store')
+  getAssigned(
+    @Org() orgId: string,
+    @User() user: { personId?: string },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    if (!user.personId) throw new UnauthorizedException()
+    return this.readService.getAssigned(orgId, user.personId, id)
   }
 
   @Get(':id')
