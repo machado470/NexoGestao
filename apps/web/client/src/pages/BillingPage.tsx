@@ -9,6 +9,8 @@ import {
   AppAlert,
   AppAlertDescription,
   AppAlertTitle,
+  AppField,
+  AppSelect,
   AppPageShell,
   AppSectionCard,
   AppStatusBadge,
@@ -109,6 +111,14 @@ export default function BillingPage() {
   const status = parseStatus(statusQuery.data?.status);
   const currentPlanName = parsePlanName(statusQuery.data?.plan);
   const currentPlan = catalog.find(plan => plan.name === currentPlanName) ?? null;
+  const [comparisonName, setComparisonName] = useState("");
+  const comparisonOptions = catalog.filter(plan => plan.name !== currentPlanName);
+  const currentPlanIndex = catalog.findIndex(plan => plan.name === currentPlanName);
+  const comparisonPlan = comparisonOptions.find(plan => plan.name === comparisonName)
+    ?? catalog[currentPlanIndex + 1] ?? comparisonOptions[0];
+  const comparisonKeys = currentPlan && comparisonPlan
+    ? [...new Set([...Object.keys(currentPlan.quotas), ...Object.keys(comparisonPlan.quotas)])]
+    : [];
   const checkoutOptions = catalog.filter(plan =>
     CHECKOUT_PLANS.includes(plan.name)
   );
@@ -312,6 +322,47 @@ export default function BillingPage() {
           />
         )}
       </AppSectionBlock>
+
+      {currentPlan && comparisonPlan && !plansQuery.isError && !statusQuery.isError ? (
+        <AppSectionBlock title="Comparar planos">
+          <div className="mb-4 max-w-xs">
+            <AppField label="Comparar com" htmlFor="billing-comparison">
+              <AppSelect
+                id="billing-comparison"
+                value={comparisonPlan.name}
+                onValueChange={setComparisonName}
+                options={comparisonOptions.map(plan => ({ value: plan.name, label: plan.displayName }))}
+              />
+            </AppField>
+          </div>
+          <table aria-label="Comparação de planos" className="w-full table-fixed break-words text-left text-xs sm:text-sm">
+            <thead className="border-b text-[var(--text-primary)]">
+              <tr>
+                <th scope="col" className="w-[30%] px-1 py-2 sm:px-2">Recurso</th>
+                <th scope="col" className="px-1 py-2 sm:px-2">Seu uso</th>
+                <th scope="col" className="px-1 py-2 sm:px-2">{currentPlan.displayName} (atual)</th>
+                <th scope="col" className="px-1 py-2 sm:px-2">
+                  {comparisonPlan.displayName}
+                  <div className="font-normal">{formatPlanPrice(comparisonPlan.priceCents)} · {formatPlanPeriod(comparisonPlan.billingInterval)}</div>
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {comparisonKeys.map(key => {
+                const used = limitsQuery.isError ? undefined : usage.find(([metric]) => metric === key)?.[1].used;
+                return (
+                  <tr key={key}>
+                    <th scope="row" className="px-1 py-2 font-medium sm:px-2">{USAGE_LABELS[key] ?? key}</th>
+                    <td className="px-1 py-2 sm:px-2">{typeof used === "number" ? used.toLocaleString("pt-BR") : "—"}</td>
+                    <td className="px-1 py-2 sm:px-2">{formatPlanQuota(currentPlan.quotas[key])}</td>
+                    <td className="px-1 py-2 sm:px-2">{formatPlanQuota(comparisonPlan.quotas[key])}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </AppSectionBlock>
+      ) : null}
 
       <AppAlert>
         <AppAlertTitle>Disponibilidade de automações</AppAlertTitle>
