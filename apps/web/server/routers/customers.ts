@@ -77,6 +77,8 @@ const workspaceAppointmentSchema = z
     customerId: z.string().uuid(),
     assignedToPersonId: optionalId,
     idempotencyKey: z.string().nullable(),
+    seriesId: z.string().uuid().nullable().optional(),
+    seriesPosition: z.number().int().min(0).max(11).nullable().optional(),
     startsAt: z.string().datetime(),
     endsAt: z.string().datetime(),
     status: z.enum(["SCHEDULED", "CONFIRMED", "CANCELED", "DONE", "NO_SHOW"]),
