@@ -4,9 +4,11 @@ const cents = z.number().int().min(0).max(2147483647);
 const money = z.number().int().safe();
 const currency = z.string().regex(/^[A-Z]{3}$/);
 const key = z.string().min(8).max(100);
-export const productKind = z.enum(["SIMPLE", "PARENT", "VARIANT"]);
+export const productKind = z.enum(["SIMPLE", "PARENT", "VARIANT", "RAW_MATERIAL"]);
+export const rawMaterialUnit = z.enum(["KG", "L", "M"]);
 export const productInput = z.object({
   kind: productKind.optional(),
+  rawMaterialUnit: rawMaterialUnit.optional(),
   parentSku: z.string().trim().regex(/^[a-z0-9][a-z0-9._-]{0,63}$/i).optional(),
   expectedCurrency: currency,
   sku: z
@@ -24,7 +26,8 @@ export const productSchema = productInput
   .omit({ expectedCurrency: true, parentSku: true })
   .extend({
     id,
-    kind: z.enum(["SIMPLE", "PARENT", "VARIANT", "KIT"]).default("SIMPLE"),
+    kind: z.enum(["SIMPLE", "PARENT", "VARIANT", "KIT", "RAW_MATERIAL"]).default("SIMPLE"),
+    rawMaterialUnit: rawMaterialUnit.nullable().optional(),
     availableKits: z.number().int().min(0).optional(),
     components: z.array(z.object({ sku: z.string(), name: z.string(), quantity: z.number().int().positive() })).optional(),
     parentId: id.nullable().optional(),
@@ -73,6 +76,7 @@ export const reservationListItem = reservationSchema.extend({
 });
 export const movementInput = z.object({
   productId: id,
+  quantityScale: z.literal("THOUSANDTHS").optional(),
   direction: z.enum(["IN", "OUT"]),
   quantity: z.number().int().min(1).max(1000000000),
   reason: z.string().trim().min(3).max(500),
@@ -87,7 +91,7 @@ export const movementSchema = z.object({
   reason: z.string(),
   serviceOrderId: id.nullable(),
   createdAt: z.string(),
-  product: z.object({ name: z.string(), sku: z.string() }).optional(),
+  product: z.object({ name: z.string(), sku: z.string(), rawMaterialUnit: rawMaterialUnit.nullable().optional() }).optional(),
 });
 export const fiscalInput = z.object({
   expectedCurrency: currency,

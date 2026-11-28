@@ -104,6 +104,12 @@ export class CommerceService {
         "A moeda da empresa mudou. Atualize a página antes de salvar.",
       );
     const kind = input.kind ?? "SIMPLE";
+    if ((kind === "RAW_MATERIAL") !== Boolean(input.rawMaterialUnit)) {
+      throw new BadRequestException("Informe a unidade de medida da matéria-prima.");
+    }
+    if (kind === "RAW_MATERIAL" && (input.variant?.trim() || input.saleCents)) {
+      throw new BadRequestException("Matéria-prima usa custo por unidade de medida.");
+    }
     const variant = input.variant?.trim() || null;
     if (kind === "VARIANT" ? !input.parentSku || !variant : Boolean(input.parentSku)) {
       throw new BadRequestException("Informe o SKU do produto pai e o nome da variação.");
@@ -127,6 +133,7 @@ export class CommerceService {
       variant,
       kind,
       parentId: parent?.id ?? null,
+      rawMaterialUnit: input.rawMaterialUnit ?? null,
       minQuantity: input.minQuantity,
       costCents: input.costCents,
       saleCents: input.saleCents,
@@ -240,7 +247,7 @@ export class CommerceService {
   async movements(orgId: string) {
     return this.db.stockMovement.findMany({
       where: { orgId },
-      include: { product: { select: { name: true, sku: true } } },
+      include: { product: { select: { name: true, sku: true, rawMaterialUnit: true } } },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: 50,
     });
@@ -370,17 +377,20 @@ export class CommerceService {
           `;
           if (!order) throw new NotFoundException("O.S. não encontrada nesta empresa");
         }
-        const [product] = await tx.$queryRaw<Array<{ reservedQuantity: number }>>`
-          SELECT "reservedQuantity" FROM "InventoryProduct"
-          WHERE id = ${values.productId} AND "orgId" = ${orgId} AND kind IN ('SIMPLE', 'VARIANT')
+        const [product] = await tx.$queryRaw<Array<{ reservedQuantity: number; kind: string }>>`
+          SELECT "reservedQuantity", kind FROM "InventoryProduct"
+          WHERE id = ${values.productId} AND "orgId" = ${orgId} AND kind IN ('SIMPLE', 'VARIANT', 'RAW_MATERIAL')
           FOR UPDATE
         `;
         if (!product) throw new NotFoundException("Produto não encontrado nesta empresa");
+        if ((product.kind === "RAW_MATERIAL") !== (input.quantityScale === "THOUSANDTHS")) {
+          throw new BadRequestException("A escala da quantidade não corresponde à unidade do produto.");
+        }
         const changed = await tx.inventoryProduct.updateMany({
           where: {
             id: values.productId,
             orgId,
-            kind: { in: ["SIMPLE", "VARIANT"] },
+            kind: { in: ["SIMPLE", "VARIANT", "RAW_MATERIAL"] },
             onHand:
               input.direction === "OUT"
                 ? { gte: input.quantity + product.reservedQuantity }

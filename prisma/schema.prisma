@@ -1424,6 +1424,13 @@ enum InventoryProductKind {
   PARENT
   VARIANT
   KIT
+  RAW_MATERIAL
+}
+
+enum RawMaterialUnit {
+  KG
+  L
+  M
 }
 
 model InventoryProduct {
@@ -1432,6 +1439,7 @@ model InventoryProduct {
   kitWithdrawals InventoryKitWithdrawal[]
   reservations StockReservation[]
   reservedQuantity Int @default(0)
+  rawMaterialUnit RawMaterialUnit?
   id          String          @id @default(uuid())
   orgId       String
   sku         String
