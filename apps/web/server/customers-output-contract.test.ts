@@ -122,6 +122,34 @@ describe("customers output contracts", () => {
     ).resolves.toEqual([customer]);
   });
 
+  it("aceita agendamentos antigos, avulsos e vinculados a uma série no workspace", async () => {
+    const visit = {
+      id: "30000000-0000-4000-8000-000000000001",
+      customerId,
+      assignedToPersonId: null,
+      idempotencyKey: null,
+      startsAt: "2026-11-30T12:00:00.000Z",
+      endsAt: "2026-11-30T13:00:00.000Z",
+      status: "SCHEDULED",
+      notes: null,
+      createdAt: customer.createdAt,
+      updatedAt: customer.updatedAt,
+    };
+    const appointments = [
+      visit,
+      { ...visit, id: "30000000-0000-4000-8000-000000000002", seriesId: null, seriesPosition: null },
+      { ...visit, id: "30000000-0000-4000-8000-000000000003",
+        seriesId: "40000000-0000-4000-8000-000000000001", seriesPosition: 0 },
+    ];
+    respond({ success: true, data: {
+      customer, appointments: appointments.map(item => ({ ...item, orgId })),
+      serviceOrders: [], charges: [], timeline: [], totalSpentCents: 0,
+    } });
+
+    await expect(appRouter.createCaller(context).customers.workspace({ id: customerId }))
+      .resolves.toMatchObject({ appointments });
+  });
+
   it("fecha o workspace composto e não expõe identidade tenant", async () => {
     const workspace = {
       customer: { ...customer, orgId },

@@ -1558,7 +1558,7 @@ export default function CustomersPage() {
             <AppPageLoadingState description="Carregando detalhe do cliente..." />
           ) : workspaceQuery.error ? (
             <AppPageErrorState
-              description={workspaceQuery.error.message}
+              description="Não foi possível consultar os dados deste cliente. Tente novamente."
               actionLabel="Tentar novamente"
               onAction={() => void workspaceQuery.refetch()}
             />
