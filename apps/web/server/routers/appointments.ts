@@ -11,6 +11,14 @@ const appointmentCreateInput = z.object({
   notes: z.string().optional(),
 });
 
+const appointmentSeriesPreviewInput = z.object({
+        startsAt: z.string().datetime({ offset: true }),
+        endsAt: z.string().datetime({ offset: true }).optional(),
+        assignedToPersonId: z.string().uuid().optional(),
+        cadence: z.enum(["WEEKLY", "BIWEEKLY"]),
+        count: z.number().int().min(2).max(12),
+      }).strict();
+
 const appointmentUpdateInput = z.object({
   id: z.string().min(1),
   assignedToPersonId: z.string().nullable().optional(),
@@ -55,6 +63,28 @@ export const appointmentsRouter = router({
       .query(async ({ ctx, input }) => {
         return authedGet(ctx as NexoContext, `/appointments/${input.id}`);
       }),
+
+    previewSeries: protectedProcedure
+      .input(appointmentSeriesPreviewInput)
+      .output(z.array(z.object({
+        startsAt: z.string().datetime(),
+        endsAt: z.string().datetime(),
+        conflict: z.boolean(),
+      })))
+      .mutation(({ ctx, input }) =>
+        authedPost(ctx as NexoContext, "/appointments/series/preview", input)
+      ),
+
+    createSeries: protectedProcedure
+      .input(appointmentSeriesPreviewInput.extend({
+        customerId: z.string().uuid(),
+        entryKey: z.string().trim().min(8).max(200),
+        notes: z.string().max(2000).optional(),
+      }))
+      .output(z.object({ seriesId: z.string().uuid(), visitIds: z.array(z.string().uuid()) }))
+      .mutation(({ ctx, input }) =>
+        authedPost(ctx as NexoContext, "/appointments/series", input)
+      ),
 
     create: protectedProcedure.input(appointmentCreateInput).mutation(async ({ ctx, input }) => {
       return authedPost(ctx as NexoContext, "/appointments", input);

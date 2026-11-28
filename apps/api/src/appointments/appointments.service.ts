@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import {
   BadRequestException,
   ConflictException,
@@ -16,6 +17,8 @@ import {
   ensureAppointmentTransition,
 } from '../common/domain/state-transitions'
 import { IdempotencyService } from '../common/idempotency/idempotency.service'
+import { previewAppointmentSeries } from './appointment-series-preview'
+import { AppointmentSeriesPreviewDto, CreateAppointmentSeriesDto } from './dto/appointment-series-preview.dto'
 
 const DEFAULT_DURATION_MIN = 30
 
@@ -259,6 +262,134 @@ export class AppointmentsService {
     })
     if (!appt) throw new NotFoundException('Agendamento não encontrado')
     return appt
+  }
+
+  async previewSeries(orgId: string, input: AppointmentSeriesPreviewDto) {
+    return (await this.planSeries(orgId, input)).visits
+  }
+
+  private async planSeries(orgId: string, input: AppointmentSeriesPreviewDto) {
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: orgId }, select: { timezone: true },
+    })
+    if (!organization) throw new NotFoundException('Empresa não encontrada')
+    const startsAt = parseISODate('startsAt', input.startsAt)
+    if (!startsAt) throw new BadRequestException('Informe o início da primeira visita.')
+    const endsAt = parseISODate('endsAt', input.endsAt) ?? addMinutes(startsAt, DEFAULT_DURATION_MIN)
+    const visits = previewAppointmentSeries(startsAt, endsAt, organization.timezone, input.cadence, input.count)
+    const personId = input.assignedToPersonId
+    if (!personId) return { timezone: organization.timezone, visits: visits.map(visit => ({ ...visit, conflict: false })) }
+
+    const person = await this.prisma.person.findFirst({
+      where: { id: personId, orgId }, select: { id: true },
+    })
+    if (!person) throw new BadRequestException('Responsável inválido para esta empresa.')
+    const overlaps = await this.prisma.appointment.findMany({
+      where: {
+        orgId, assignedToPersonId: personId, status: { not: 'CANCELED' },
+        OR: visits.map(visit => ({ startsAt: { lt: visit.endsAt }, endsAt: { gt: visit.startsAt } })),
+      },
+      select: { startsAt: true, endsAt: true },
+    })
+    const planned = visits.map(visit => ({
+      ...visit,
+      conflict: overlaps.some(existing => existing.startsAt < visit.endsAt && existing.endsAt > visit.startsAt)
+        || visits.some(other => other !== visit && other.startsAt < visit.endsAt && other.endsAt > visit.startsAt),
+    }))
+    return { timezone: organization.timezone, visits: planned }
+  }
+
+  async createSeries(
+    orgId: string,
+    actor: { userId: string | null; personId: string | null },
+    input: CreateAppointmentSeriesDto,
+    validateQuota: () => Promise<void>,
+  ) {
+    const entryKey = input.entryKey.trim()
+    if (entryKey.length < 8) throw new BadRequestException('Chave de tentativa inválida.')
+    const notes = normalizeNotes(input.notes)
+    const payloadHash = createHash('sha256').update(JSON.stringify([
+      input.customerId, input.assignedToPersonId ?? null, input.startsAt, input.endsAt ?? null,
+      input.cadence, input.count, notes,
+    ])).digest('hex')
+    const key = { orgId_entryKey: { orgId, entryKey } }
+    const select = {
+      id: true, payloadHash: true,
+      visits: { orderBy: { seriesPosition: 'asc' as const }, select: { id: true } },
+    }
+    const response = (series: { id: string; payloadHash: string; visits: Array<{ id: string }> }) => {
+      if (series.payloadHash !== payloadHash) {
+        throw new ConflictException('A chave desta tentativa já foi usada com outros dados.')
+      }
+      return { seriesId: series.id, visitIds: series.visits.map(visit => visit.id) }
+    }
+    const saved = await this.prisma.appointmentSeries.findUnique({ where: key, select })
+    if (saved) return response(saved)
+
+    await validateQuota()
+    const customer = await this.prisma.customer.findFirst({
+      where: { id: input.customerId, orgId }, select: { id: true, name: true },
+    })
+    if (!customer) throw new BadRequestException('Cliente inválido para esta empresa.')
+    const { timezone, visits } = await this.planSeries(orgId, input)
+    if (visits.some(visit => visit.conflict)) {
+      const existing = await this.prisma.appointmentSeries.findUnique({ where: key, select })
+      if (existing) return response(existing)
+      throw new ConflictException('Uma ou mais visitas conflitam com a agenda do responsável.')
+    }
+
+    try {
+      return await this.prisma.$transaction(async tx => {
+        if (input.assignedToPersonId) {
+          // Serialize competing series without blocking the foreign key's key-share lock.
+          const responsible = await tx.$queryRaw<Array<{ id: string }>>`
+            SELECT id FROM "Person"
+            WHERE id = ${input.assignedToPersonId} AND "orgId" = ${orgId}
+            FOR NO KEY UPDATE
+          `
+          if (!responsible.length) throw new BadRequestException('Responsável inválido para esta empresa.')
+        }
+        const series = await tx.appointmentSeries.create({
+          data: { orgId, entryKey, payloadHash, cadence: input.cadence, timezone },
+        })
+        const created = await tx.appointment.createManyAndReturn({
+          data: visits.map(({ startsAt, endsAt }, index) => ({
+            orgId, customerId: customer.id, notes,
+            assignedToPersonId: input.assignedToPersonId ?? null,
+            startsAt, endsAt, seriesId: series.id, seriesPosition: index,
+          })),
+          select: { id: true, seriesPosition: true, startsAt: true },
+        })
+        await tx.timelineEvent.createMany({
+          data: created.map(visit => ({
+            orgId, customerId: customer.id, appointmentId: visit.id, personId: actor.personId,
+            action: 'APPOINTMENT_CREATED', description: `Agendamento criado: ${customer.name}`,
+            metadata: { appointmentId: visit.id, seriesId: series.id, scheduledAt: visit.startsAt.toISOString() },
+          })),
+        })
+        await tx.auditEvent.create({
+          data: {
+            orgId, personId: actor.personId, actorPersonId: actor.personId, actorUserId: actor.userId,
+            action: AUDIT_ACTIONS.APPOINTMENT_CREATED, context: 'Série de agendamentos criada',
+            entityType: 'APPOINTMENT_SERIES', entityId: series.id,
+            metadata: { seriesId: series.id, visitCount: created.length, cadence: input.cadence },
+          },
+        })
+        return response({
+          id: series.id, payloadHash,
+          visits: created.sort((a, b) => (a.seriesPosition ?? 0) - (b.seriesPosition ?? 0)),
+        })
+      })
+    } catch (error) {
+      if (isUniqueConflict(error)) {
+        const existing = await this.prisma.appointmentSeries.findUnique({ where: key, select })
+        if (existing) return response(existing)
+      }
+      if (isOverlapDbViolation(error)) {
+        throw new ConflictException('Uma ou mais visitas conflitam com a agenda do responsável.')
+      }
+      throw error
+    }
   }
 
   async create(params: {
