@@ -13,7 +13,7 @@ import {
   Search,
   UserRound,
 } from "lucide-react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { trpc } from "@/lib/trpc";
@@ -133,15 +133,35 @@ export default function TimelinePage() {
   const { timezone } = useOrganizationLocale();
   const { isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
+  const routeSearch = useSearch();
+  const params = new URLSearchParams(routeSearch);
+  const customerId = params.get("customerId");
+  const serviceOrderId = params.get("serviceOrderId");
+  const isScoped = customerId !== null || serviceOrderId !== null;
+  const scopeLabel = serviceOrderId !== null ? "Histórico da O.S." : "Histórico do cliente";
+  const scopeId = serviceOrderId ?? customerId;
+  const invalidScope = isScoped && (
+    (customerId !== null && serviceOrderId !== null) ||
+    !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(scopeId ?? "")
+  );
   const [search, setSearch] = useState("");
   const [eventType, setEventType] = useState("all");
   const [module, setModule] = useState("all");
   const [actor, setActor] = useState("all");
 
-  const query = trpc.timeline.listByOrg.useQuery(
+  const orgQuery = trpc.timeline.listByOrg.useQuery(
     { limit: PAGE_SIZE },
-    { enabled: isAuthenticated, ...transientReadOptions }
+    { enabled: isAuthenticated && !isScoped, ...transientReadOptions }
   );
+  const customerQuery = trpc.timeline.listByCustomer.useQuery(
+    { customerId: customerId ?? "", limit: PAGE_SIZE },
+    { enabled: isAuthenticated && !invalidScope && customerId !== null, ...transientReadOptions }
+  );
+  const orderQuery = trpc.timeline.listByServiceOrder.useQuery(
+    { serviceOrderId: serviceOrderId ?? "", limit: PAGE_SIZE },
+    { enabled: isAuthenticated && !invalidScope && serviceOrderId !== null, ...transientReadOptions }
+  );
+  const query = serviceOrderId !== null ? orderQuery : customerId !== null ? customerQuery : orgQuery;
   const events = normalizeArrayPayload<OfficialTimelineEvent>(query.data);
 
   const eventTypes = useMemo(
@@ -188,7 +208,7 @@ export default function TimelinePage() {
 
   return (
     <AppPageShell className="operational-mobile-page mobile-module-page evidence-mobile-page">
-      <MobileModuleHeader title="Timeline" description="Histórico dos acontecimentos da operação." context={query.isSuccess ? `${filteredEvents.length} ${filteredEvents.length === 1 ? "evento" : "eventos"} neste recorte` : undefined} onRefresh={() => void query.refetch()} />
+      <MobileModuleHeader title="Timeline" description="Histórico dos acontecimentos da operação." context={query.isSuccess ? `${filteredEvents.length} ${filteredEvents.length === 1 ? "evento" : "eventos"} neste recorte` : undefined} onRefresh={invalidScope ? undefined : () => void query.refetch()} />
       <div className="hidden md:block">
       <AppOperationalHeader
         title="Timeline"
@@ -198,7 +218,7 @@ export default function TimelinePage() {
             variant="outline"
             size="sm"
             onClick={() => query.refetch()}
-            disabled={query.isFetching}
+            disabled={invalidScope || query.isFetching}
           >
             <RefreshCw
               className={`mr-2 size-3.5 ${query.isFetching ? "animate-spin" : ""}`}
@@ -226,6 +246,16 @@ export default function TimelinePage() {
       />
       </div>
 
+      {isScoped ? (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm font-medium" role="status">
+            {invalidScope ? "Referência inválida para a Timeline" : scopeLabel}
+          </p>
+          <Button variant="outline" size="sm" onClick={() => { clearFilters(); navigate("/timeline"); }}>
+            Ver Timeline geral
+          </Button>
+        </div>
+      ) : null}
       <AppFiltersBar className="module-filters gap-3 p-3 md:p-4">
         <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <div className="space-y-1.5 sm:col-span-2 xl:col-span-1">
@@ -295,7 +325,12 @@ export default function TimelinePage() {
         title="Trilha de auditoria"
         subtitle="A ordem relativa é exatamente a recebida da fonte oficial."
       >
-        {query.isLoading || (query.isFetching && query.isError) ? (
+        {invalidScope ? (
+          <AppPageEmptyState
+            title="Recorte indisponível"
+            description="Abra o histórico a partir de um cliente ou de uma ordem de serviço."
+          />
+        ) : query.isLoading || (query.isFetching && query.isError) ? (
           <AppPageLoadingState
             title="Carregando eventos"
             description="Consultando a trilha oficial sem interromper o restante da página."

@@ -1780,6 +1780,7 @@ export default function WhatsAppPage() {
     ""
   );
   const [activeFilter, setActiveFilter] = useState<ConversationFilter>("all");
+  const [onlyUnread, setOnlyUnread] = useState(false);
   const [priorityFilter, setPriorityFilter] = useState<
     "ALL" | WhatsAppPriority
   >("ALL");
@@ -1814,9 +1815,10 @@ export default function WhatsAppPage() {
 
   const filtersInput = useMemo(() => ({
     search: debouncedSearch || undefined,
+    onlyUnread: onlyUnread || undefined,
     status: activeFilter === "waiting_customer" ? "WAITING_CUSTOMER" as const : activeFilter === "resolved" ? "RESOLVED" as const : undefined,
     priority: priorityFilter === "ALL" ? undefined : priorityFilter as WhatsAppPriority,
-  }), [debouncedSearch, activeFilter, priorityFilter]);
+  }), [debouncedSearch, activeFilter, priorityFilter, onlyUnread]);
 
   const healthQuery = trpc.whatsapp.health.useQuery(undefined, {
     retry: false,
@@ -1957,7 +1959,7 @@ export default function WhatsAppPage() {
         .join(" ")
         .toLowerCase();
       const matchesSearch = !query || searchable.includes(query);
-      if (!matchesSearch) return false;
+      if (!matchesSearch || (onlyUnread && !(item.unreadCount && item.unreadCount > 0))) return false;
       if (priorityFilter !== "ALL" && item.priority !== priorityFilter)
         return false;
       if (responsibleFilter === "UNASSIGNED" && item.responsibleName)
@@ -1976,6 +1978,7 @@ export default function WhatsAppPage() {
     });
   }, [
     activeFilter,
+    onlyUnread,
     allInboxRows,
     debouncedSearch,
     priorityFilter,
@@ -2014,8 +2017,8 @@ export default function WhatsAppPage() {
     if (allInboxRows.length > 0 && filteredRows.length === 0)
       return "Nenhuma conversa corresponde aos filtros";
     if (debouncedSearch.trim()) return "Nenhum resultado para esta busca";
-    return "Inbox vazio";
-  }, [allInboxRows.length, debouncedSearch, filteredRows.length]);
+    return onlyUnread ? "Nenhuma conversa não lida" : "Inbox vazio";
+  }, [allInboxRows.length, debouncedSearch, filteredRows.length, onlyUnread]);
 
   const selectedConversation = useMemo(() => {
     const realConversation =
@@ -2765,6 +2768,15 @@ export default function WhatsAppPage() {
                 </option>
               ))}
             </select>
+            <Button
+              type="button"
+              variant={onlyUnread ? "default" : "outline"}
+              aria-pressed={onlyUnread}
+              className="min-h-11 md:min-h-9"
+              onClick={() => setOnlyUnread(value => !value)}
+            >
+              Não lidas
+            </Button>
           </ResponsiveDetails>
         </AppFiltersBar>
 
