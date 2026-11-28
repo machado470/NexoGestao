@@ -27,7 +27,6 @@ import {
   formatPlanPeriod,
   formatPlanQuota,
   normalizeBillingPlanCatalog,
-  type BillingPlanCatalogEntry,
   type BillingPlanName,
 } from "@/lib/billing-plan-catalog";
 import { trpc } from "@/lib/trpc";
@@ -80,13 +79,6 @@ function formatDate(value: unknown): string {
   return Number.isNaN(date.getTime())
     ? "Não informada"
     : new Intl.DateTimeFormat("pt-BR").format(date);
-}
-
-function planDescription(plan: BillingPlanCatalogEntry): string {
-  const quotas = Object.keys(plan.quotas)
-    .filter(key => key in plan.quotas)
-    .map(key => `${USAGE_LABELS[key] ?? key}: ${formatPlanQuota(plan.quotas[key])}`);
-  return quotas.join(" · ");
 }
 
 export default function BillingPage() {
@@ -293,17 +285,37 @@ export default function BillingPage() {
           />
         ) : usage.length ? (
           <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-            {usage.map(([key, item]) => (
-              <AppSectionCard
-                key={key}
-                className="min-w-0 p-4"
-              >
-                <dt className="text-xs text-[var(--text-muted)]">{USAGE_LABELS[key]}</dt>
-                <dd className="mt-1 break-words font-semibold text-[var(--text-primary)]">
-                  {String(item.used ?? "Não informado")} / {item.unlimited === true ? "Ilimitado" : formatPlanQuota(item.limit)}
-                </dd>
-              </AppSectionCard>
-            ))}
+            {usage.map(([key, item]) => {
+              const used = typeof item.used === "number" && Number.isFinite(item.used) && item.used >= 0 ? item.used : null;
+              const limit = typeof item.limit === "number" && Number.isFinite(item.limit) && item.limit >= 0 ? item.limit : null;
+              const unlimited = item.unlimited === true || (limit !== null && formatPlanQuota(limit) === "Ilimitado");
+              const remaining = !unlimited && used !== null && limit !== null ? Math.max(0, limit - used) : null;
+
+              return (
+                <AppSectionCard key={key} className="min-w-0 p-4">
+                  <dt className="text-xs text-[var(--text-muted)]">{USAGE_LABELS[key]}</dt>
+                  <dd className="mt-1 break-words font-semibold text-[var(--text-primary)]">
+                    {used === null ? "Uso não informado" : used.toLocaleString("pt-BR")} / {unlimited ? "Ilimitado" : limit === null ? "Limite não informado" : formatPlanQuota(limit)}
+                    {remaining !== null && limit !== null && used !== null ? (
+                      <>
+                        {limit > 0 ? (
+                          <meter
+                            aria-label={`Uso do limite de ${USAGE_LABELS[key]}`}
+                            min={0}
+                            max={limit}
+                            value={Math.min(used, limit)}
+                            className="mt-2 block w-full"
+                          />
+                        ) : null}
+                        <span className="mt-1 block text-sm font-normal text-[var(--text-secondary)]">
+                          {used > limit ? "Limite ultrapassado" : remaining === 0 ? "Limite atingido" : `${remaining.toLocaleString("pt-BR")} restantes`}
+                        </span>
+                      </>
+                    ) : null}
+                  </dd>
+                </AppSectionCard>
+              );
+            })}
           </dl>
         ) : (
           <AppPageEmptyState
@@ -350,10 +362,15 @@ export default function BillingPage() {
                     {formatPlanPrice(plan.priceCents)}
                   </p>
                   <p className="text-xs text-[var(--text-muted)]">{formatPlanPeriod(plan.billingInterval)}</p>
-                  {planDescription(plan) ? (
-                    <p className="mt-2 text-sm text-[var(--text-secondary)]">
-                      {planDescription(plan)}
-                    </p>
+                  {Object.keys(plan.quotas).length > 0 ? (
+                    <dl className="mt-3 divide-y divide-border text-sm">
+                      {Object.entries(plan.quotas).map(([key, limit]) => (
+                        <div key={key} className="flex justify-between gap-2 py-1.5">
+                          <dt className="text-[var(--text-secondary)]">{USAGE_LABELS[key] ?? key}</dt>
+                          <dd className="text-right font-medium">{formatPlanQuota(limit)}</dd>
+                        </div>
+                      ))}
+                    </dl>
                   ) : null}
                 </div>
                 <Button
