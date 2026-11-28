@@ -16,8 +16,10 @@ import {
   IsDateString,
 } from "class-validator";
 export class ProductDto {
-  @IsOptional() @IsIn(["SIMPLE", "PARENT", "VARIANT"])
-  kind?: "SIMPLE" | "PARENT" | "VARIANT";
+  @IsOptional() @IsIn(["SIMPLE", "PARENT", "VARIANT", "RAW_MATERIAL"])
+  kind?: "SIMPLE" | "PARENT" | "VARIANT" | "RAW_MATERIAL";
+  @IsOptional() @IsIn(["KG", "L", "M"])
+  rawMaterialUnit?: "KG" | "L" | "M";
   @IsOptional() @IsString() @Matches(/^[a-z0-9][a-z0-9._-]{0,63}$/i)
   parentSku?: string;
   @IsString() @Matches(/^[A-Z]{3}$/) expectedCurrency!: string;
@@ -55,6 +57,8 @@ export class ReserveStockDto extends EntryDto {
 }
 export class MovementDto extends EntryDto {
   @IsString() @MinLength(1) @MaxLength(100) productId!: string;
+  @IsOptional() @IsIn(["THOUSANDTHS"])
+  quantityScale?: "THOUSANDTHS";
   @IsIn(["IN", "OUT"]) direction!: "IN" | "OUT";
   @IsInt() @Min(1) @Max(1000000000) quantity!: number;
   @IsString() @MinLength(3) @MaxLength(500) reason!: string;

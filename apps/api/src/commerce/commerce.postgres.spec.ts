@@ -574,5 +574,33 @@ const url = "postgresql://nexo@127.0.0.1:55439/postgres";
       expect(await db.inventoryProduct.findUnique({ where: { id: first.id } })).toMatchObject({ onHand: 0 });
       expect(await db.inventoryProduct.findUnique({ where: { id: second.id } })).toMatchObject({ onHand: 2 });
     });
+    it("keeps raw material stock exact in thousandths and rejects fractional scale on whole items", async () => {
+      const input = {
+        kind: "RAW_MATERIAL", sku: "INSUMO-KG", name: "Insumo a granel",
+        expectedCurrency: "BRL", minQuantity: 250, costCents: 1500, saleCents: 0,
+      };
+      await api("post", "products").send(input).expect(400);
+      const material = (await api("post", "products").send({ ...input, rawMaterialUnit: "KG" }).expect(201)).body;
+      expect(material).toMatchObject({ rawMaterialUnit: "KG", minQuantity: 250, onHand: 0 });
+      const movement = {
+        productId: material.id, direction: "IN", quantity: 350,
+        reason: "Entrada fracionada", entryKey: uuid(),
+      };
+      await api("post", "movements").send(movement).expect(400);
+      await api("post", "movements").send({ ...movement, productId: product.id, quantityScale: "THOUSANDTHS" }).expect(400);
+      const first = await api("post", "movements").send({ ...movement, quantityScale: "THOUSANDTHS" }).expect(201);
+      const retry = await api("post", "movements").send({ ...movement, quantityScale: "THOUSANDTHS" }).expect(201);
+      expect(retry.body.id).toBe(first.body.id);
+      const withdrawal = {
+        ...movement, direction: "OUT", quantityScale: "THOUSANDTHS", entryKey: uuid(),
+      };
+      await api("post", "movements").send({ ...withdrawal, quantity: 351 }).expect(400);
+      await api("post", "movements").send({ ...withdrawal, quantity: 125 }).expect(201);
+      expect(await db.inventoryProduct.findUnique({ where: { id: material.id } })).toMatchObject({ onHand: 225 });
+      const history = await api("get", "movements").expect(200);
+      expect(history.body).toEqual(expect.arrayContaining([
+        expect.objectContaining({ id: first.body.id, quantity: 350, product: expect.objectContaining({ rawMaterialUnit: "KG" }) }),
+      ]));
+    });
   },
 );

@@ -37,7 +37,7 @@ import {
   AppPageLoadingState,
   AppPageErrorState,
 } from "@/components/internal-page-system";
-import type { Product } from "@shared/commerce";
+import { rawMaterialUnit, type Product } from "@shared/commerce";
 
 const money = (value: number | null, currency: string) =>
   formatRecordedMoney(value ?? undefined, currency, "Indisponível");
@@ -60,6 +60,22 @@ function integer(value: string, min = 0) {
     throw new Error(`Informe uma quantidade inteira a partir de ${min}.`);
   return n;
 }
+const materialUnitLabels = { KG: "kg", L: "L", M: "m" } as const;
+function materialQuantity(value: string, min = 0) {
+  const match = /^(\d+)(?:[,.](\d{1,3}))?$/.exec(value.trim());
+  const quantity = match
+    ? Number(match[1]) * 1000 + Number((match[2] ?? "").padEnd(3, "0"))
+    : NaN;
+  if (!Number.isSafeInteger(quantity) || quantity < min || quantity > 1000000000)
+    throw new Error("Informe uma quantidade válida, com até três casas decimais.");
+  return quantity;
+}
+
+function stockQuantity(count: number, unit?: Product["rawMaterialUnit"]) {
+  if (!unit) return String(count);
+  return new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 3 }).format(count / 1000);
+}
+
 function amount(value: string, allowZero = false) {
   if (allowZero && /^0([,.]0{1,2})?$/.test(value.trim())) return 0;
   const n = parseMoneyInputToCents(value);
@@ -299,6 +315,7 @@ export function InventoryPage() {
   const productDefaults = {
     kind: "SIMPLE",
     parentSku: "",
+    rawMaterialUnit: "KG",
     sku: "",
     name: "",
     barcode: "",
@@ -324,7 +341,7 @@ export function InventoryPage() {
           })),
         };
       }
-      const kind = v.kind === "PARENT" || v.kind === "VARIANT" ? v.kind : "SIMPLE";
+      const kind = v.kind === "PARENT" || v.kind === "VARIANT" || v.kind === "RAW_MATERIAL" ? v.kind : "SIMPLE";
       return {
         kind: kind as Exclude<Product["kind"], "KIT">,
         expectedCurrency: requiredCurrency(currency),
@@ -333,9 +350,10 @@ export function InventoryPage() {
         parentSku: kind === "VARIANT" ? v.parentSku.trim().toUpperCase() : undefined,
         barcode: kind === "PARENT" ? undefined : v.barcode.trim() || undefined,
         variant: kind === "VARIANT" ? text(v.variant, 1, "Variação") : undefined,
-        minQuantity: kind === "PARENT" ? 0 : integer(v.min),
+        rawMaterialUnit: kind === "RAW_MATERIAL" ? rawMaterialUnit.parse(v.rawMaterialUnit) : undefined,
+        minQuantity: kind === "PARENT" ? 0 : kind === "RAW_MATERIAL" ? materialQuantity(v.min) : integer(v.min),
         costCents: kind === "PARENT" ? 0 : amount(v.cost, true),
-        saleCents: kind === "PARENT" ? 0 : amount(v.sale, true),
+        saleCents: kind === "PARENT" || kind === "RAW_MATERIAL" ? 0 : amount(v.sale, true),
       };
     },
     payload => "components" in payload && payload.components ? createKit.mutateAsync(payload) : create.mutateAsync(payload),
@@ -345,10 +363,12 @@ export function InventoryPage() {
     { product: "", direction: "IN", quantity: "1", reason: "", order: "" },
     v => {
       if (!v.product) throw new Error("Selecione o produto.");
+      const material = movementOptions.find(p => p.id === v.product)?.rawMaterialUnit;
       return {
         productId: v.product,
         direction: v.direction as "IN" | "OUT",
-        quantity: integer(v.quantity, 1),
+        quantity: material ? materialQuantity(v.quantity, 1) : integer(v.quantity, 1),
+        quantityScale: material ? "THOUSANDTHS" as const : undefined,
         reason: text(v.reason, 3, "Motivo"),
         serviceOrderId: v.order.trim() || undefined,
       };
@@ -375,8 +395,11 @@ export function InventoryPage() {
   };
   const movementOptions = [
     ...(selectedProduct ? [selectedProduct] : []),
-    ...(products.data?.items ?? []).filter(p => (p.kind === "SIMPLE" || p.kind === "VARIANT") && p.id !== selectedProduct?.id),
+    ...(products.data?.items ?? []).filter(p => p.kind !== "PARENT" && p.kind !== "KIT" && p.id !== selectedProduct?.id),
   ];
+  const movementUnit = movementOptions.find(p => p.id === moveForm.values.product)?.rawMaterialUnit;
+  const materialForm = productForm.values.kind === "RAW_MATERIAL";
+  const formUnit = materialUnitLabels[rawMaterialUnit.parse(productForm.values.rawMaterialUnit)];
   return (
     <Workspace
       title="Estoque"
@@ -425,7 +448,7 @@ export function InventoryPage() {
                         {p.name}
                       </h2>
                       <p className={muted}>
-                        {p.kind === "KIT" ? "Kit" : p.kind === "PARENT" ? "Produto pai" : p.variant || "Produto simples"}
+                        {p.kind === "KIT" ? "Kit" : p.kind === "RAW_MATERIAL" ? "Matéria-prima" : p.kind === "PARENT" ? "Produto pai" : p.variant || "Produto simples"}
                         {p.barcode ? ` · ${p.barcode}` : ""}
                       </p>
                     </div>
@@ -469,9 +492,9 @@ export function InventoryPage() {
                         <div className="flex flex-wrap items-end justify-between gap-2">
                           <p>
                             <strong className="text-3xl tabular-nums">
-                              {p.onHand}
+                              {stockQuantity(p.onHand, p.rawMaterialUnit)}
                             </strong>{" "}
-                            <span className={muted}>unidades</span>
+                            <span className={muted}>{p.rawMaterialUnit ? materialUnitLabels[p.rawMaterialUnit] : "unidades"}</span>
                           </p>
                           <span className="rounded-lg border border-[var(--border-subtle)] px-2 py-1 text-xs">
                             {p.onHand - p.reservedQuantity <= p.minQuantity ? "Repor estoque" : "Disponível"}
@@ -479,18 +502,18 @@ export function InventoryPage() {
                         </div>
                         <dl className="grid grid-cols-2 gap-2 text-sm">
                           <div>
-                            <dt className={muted}>Custo unitário</dt>
+                            <dt className={muted}>{p.rawMaterialUnit ? `Custo por ${materialUnitLabels[p.rawMaterialUnit]}` : "Custo unitário"}</dt>
                             <dd>{money(p.costCents, p.currency)}</dd>
                           </div>
-                          <div>
+                          {!p.rawMaterialUnit && <div>
                             <dt className={muted}>Preço de venda</dt>
                             <dd>{money(p.saleCents, p.currency)}</dd>
-                          </div>
+                          </div>}
                         </dl>
                         {p.reservedQuantity > 0 && (
                           <p className={muted}>{p.reservedQuantity} reservadas · {p.onHand - p.reservedQuantity} disponíveis</p>
                         )}
-                        <p className={muted}>Estoque mínimo: {p.minQuantity}</p>
+                        <p className={muted}>Estoque mínimo: {stockQuantity(p.minQuantity, p.rawMaterialUnit)}{p.rawMaterialUnit ? ` ${materialUnitLabels[p.rawMaterialUnit]}` : ""}</p>
                         <div className="flex flex-wrap gap-2">
                           <Button variant="outline" onClick={() => beginMove(p, "IN")}>
                             <ArrowDownToLine className="mr-2 h-4 w-4" />
@@ -544,7 +567,7 @@ export function InventoryPage() {
                   <li key={m.id} className="space-y-1 py-3">
                     <strong className="break-words">
                       {m.direction === "IN" ? "+" : "−"}
-                      {m.quantity} · {m.product?.name ?? "Produto"}
+                      {stockQuantity(m.quantity, m.product?.rawMaterialUnit)}{m.product?.rawMaterialUnit ? ` ${materialUnitLabels[m.product.rawMaterialUnit]}` : ""} · {m.product?.name ?? "Produto"}
                     </strong>
                     <p className={`${muted} break-words`}>{m.reason}</p>
                     <p className={muted}>
@@ -562,7 +585,7 @@ export function InventoryPage() {
             )}
           </ReadState>
           <p className={muted}>
-            Até 50 movimentações recentes. Os saldos são exibidos em unidades inteiras.
+            Até 50 movimentações recentes.
           </p>
         </section>
       </div>
@@ -580,6 +603,7 @@ export function InventoryPage() {
             { value: "PARENT", label: "Produto pai com variações" },
             { value: "VARIANT", label: "Variação de um produto pai" },
             { value: "KIT", label: "Kit de produtos simples" },
+            { value: "RAW_MATERIAL", label: "Matéria-prima" },
           ]}
         />
         {productForm.values.kind === "VARIANT" && (
@@ -667,20 +691,33 @@ export function InventoryPage() {
                 onChange={e => productForm.edit("variant", e.target.value)}
               />
             )}
+            {materialForm && (
+              <AppSelect
+                ariaLabel="Unidade de medida"
+                value={productForm.values.rawMaterialUnit}
+                onValueChange={value => productForm.edit("rawMaterialUnit", value)}
+                options={[
+                  { value: "KG", label: "Quilograma (kg)" },
+                  { value: "L", label: "Litro (L)" },
+                  { value: "M", label: "Metro (m)" },
+                ]}
+              />
+            )}
             <Field
-              label="Estoque mínimo (unidades inteiras)"
+              label={materialForm ? `Estoque mínimo (${formUnit})` : "Estoque mínimo (unidades inteiras)"}
               required
-              inputMode="numeric"
+              inputMode={materialForm ? "decimal" : "numeric"}
               value={productForm.values.min}
               onChange={e => productForm.edit("min", e.target.value)}
             />
             <Field
-              label={`Custo unitário (${currency ?? "moeda da empresa"})`}
+              label={`${materialForm ? `Custo por ${formUnit}` : "Custo unitário"} (${currency ?? "moeda da empresa"})`}
               required
               inputMode="decimal"
               value={productForm.values.cost}
               onChange={e => productForm.edit("cost", e.target.value)}
             />
+            {!materialForm && (
             <Field
               label={`Preço de venda (${currency ?? "moeda da empresa"})`}
               required
@@ -688,6 +725,7 @@ export function InventoryPage() {
               value={productForm.values.sale}
               onChange={e => productForm.edit("sale", e.target.value)}
             />
+            )}
             <p className={muted}>
               O produto inicia sem saldo. Use Entrada para registrar a quantidade
               recebida.
@@ -734,9 +772,9 @@ export function InventoryPage() {
           />
         </label>
         <Field
-          label="Quantidade (unidades inteiras)"
+          label={movementUnit ? `Quantidade (${materialUnitLabels[movementUnit]})` : "Quantidade (unidades inteiras)"}
           required
-          inputMode="numeric"
+          inputMode={movementUnit ? "decimal" : "numeric"}
           value={moveForm.values.quantity}
           onChange={e => moveForm.edit("quantity", e.target.value)}
         />
