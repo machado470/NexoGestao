@@ -1,3 +1,4 @@
+import { AccountNavigation } from "@/components/AccountNavigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMemo, useState } from "react";
 import { ExternalLink, RefreshCw } from "lucide-react";
@@ -178,7 +179,7 @@ export default function BillingPage() {
             variant="outline"
             onClick={refresh}
             disabled={
-              statusQuery.isFetching || plansQuery.isFetching || limitsQuery.isFetching
+              availabilityQuery.isFetching || statusQuery.isFetching || plansQuery.isFetching || limitsQuery.isFetching
             }
           >
             <RefreshCw className="mr-2 size-4" aria-hidden="true" />
@@ -198,6 +199,8 @@ export default function BillingPage() {
         }
       />
 
+      <AccountNavigation current="/billing" />
+
       {!availability || availability.status !== "available" ? (
         <AppAlert role="status">
           <AppAlertTitle>{availability?.status === "simulation" ? "Contratação em demonstração" : "Contratação online indisponível"}</AppAlertTitle>
@@ -209,7 +212,7 @@ export default function BillingPage() {
 
       <AppSectionBlock
         title="Assinatura atual"
-        subtitle="Estado retornado pelo serviço de assinatura e preço vigente do catálogo comercial."
+        subtitle="Consulte o status, o preço e o período da sua assinatura."
       >
         {statusQuery.isLoading ? (
           <AppPageLoadingState
@@ -278,7 +281,7 @@ export default function BillingPage() {
 
       <AppSectionBlock
         title="Uso e limites"
-        subtitle="Métricas calculadas no backend para a organização autenticada."
+        subtitle="Veja quanto sua empresa já usou dos limites do plano."
       >
         {limitsQuery.isLoading ? (
           <AppPageLoadingState title="Carregando uso e limites" />
@@ -317,7 +320,7 @@ export default function BillingPage() {
 
       <AppSectionBlock
         title="Planos disponíveis"
-        subtitle="Checkout e cancelamento são executados pelo backend com a organização derivada da sessão autenticada."
+        subtitle="Compare preços e limites antes de escolher um plano."
       >
         {plansQuery.isLoading ? (
           <AppPageLoadingState title="Carregando opções de plano" />

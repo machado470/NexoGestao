@@ -1,3 +1,4 @@
+import { AccountNavigation } from "@/components/AccountNavigation";
 import { ResponsiveDetails } from "@/components/ResponsiveDetails";
 import { MobileModuleHeader } from "@/components/MobileModuleHeader";
 import { useOrganizationLocale } from "@/contexts/OrganizationLocaleContext";
@@ -152,6 +153,8 @@ export default function ProfilePage() {
           }
         />
       </div>
+
+      <AccountNavigation current="/profile" />
 
       <AppSectionBlock
         title="Identidade"
