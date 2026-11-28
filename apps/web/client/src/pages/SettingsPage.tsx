@@ -1,3 +1,4 @@
+import { AccountNavigation } from "@/components/AccountNavigation";
 import { MobileModuleHeader } from "@/components/MobileModuleHeader";
 import { useFormDiscardGuard } from "@/hooks/useFormDiscardGuard";
 import { FormEvent, useEffect, useReducer } from "react";
@@ -157,6 +158,8 @@ export default function SettingsPage() {
           }
         />
       </div>
+
+      <AccountNavigation current="/settings" />
 
       <AppSectionBlock
         title="Organização"

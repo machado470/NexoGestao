@@ -341,6 +341,7 @@ export function MainLayout({ children }: MainLayoutProps) {
           label: "Configurações",
           route: "/settings",
           icon: Settings,
+          requiredRoles: ["ADMIN"],
         },
       ],
     },
