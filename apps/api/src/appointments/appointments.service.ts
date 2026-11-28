@@ -421,7 +421,7 @@ export class AppointmentsService {
         const anchor = await tx.appointment.findFirst({
           where: { id, orgId, seriesId, startsAt: { gte: now }, status: { in: ['SCHEDULED', 'CONFIRMED'] } },
         })
-        if (!anchor || anchor.seriesPosition === null || anchor.updatedAt.getTime() !== expectedUpdatedAt?.getTime()) {
+        if (!anchor || !expectedUpdatedAt || anchor.seriesPosition === null || anchor.updatedAt.getTime() !== expectedUpdatedAt.getTime()) {
           throw new ConflictException('A visita foi alterada ou encerrada. Recarregue a agenda.')
         }
         const position = anchor.seriesPosition
@@ -432,6 +432,9 @@ export class AppointmentsService {
           },
           orderBy: { seriesPosition: 'asc' },
         })
+        if (!visits.some(visit => visit.id === id)) {
+          throw new ConflictException('A visita foi alterada ou encerrada. Recarregue a agenda.')
+        }
         const span = (visits.at(-1)?.seriesPosition ?? position) - position + 1
         const dates = span === 1 ? [{ startsAt, endsAt }]
           : previewAppointmentSeries(startsAt, endsAt, series.timezone, series.cadence, span)
@@ -445,7 +448,7 @@ export class AppointmentsService {
         // Each visit retains its assigned person when its final interval is written.
         for (const visit of visits) {
           const result = await tx.appointment.updateMany({
-            where: { id: visit.id, orgId, updatedAt: visit.updatedAt },
+            where: { id: visit.id, orgId, updatedAt: visit.id === id ? expectedUpdatedAt : visit.updatedAt },
             data: { assignedToPersonId: null },
           })
           if (result.count !== 1) throw new ConflictException('Uma visita mudou. Recarregue a agenda.')

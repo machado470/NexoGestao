@@ -99,5 +99,24 @@ describePostgres('appointment series with isolated PostgreSQL', () => {
     ])
     await expect(service.rescheduleSeries(orgId, selected, actor, replacement)).rejects.toMatchObject({ status: 409 })
     await expect(service.rescheduleSeries(randomUUID(), selected, actor, replacement)).rejects.toMatchObject({ status: 404 })
+    const current = rows[1]
+    const concurrentStartsAt = new Date('2031-03-17T15:00:00Z')
+    const racingDb = db.$extends({
+      query: { appointment: {
+        async findMany({ args, query }) {
+          await db.appointment.update({
+            where: { id: selected },
+            data: { startsAt: concurrentStartsAt, endsAt: new Date('2031-03-17T16:00:00Z') },
+          })
+          return query(args)
+        },
+      } },
+    })
+    const racingService = new AppointmentsService(racingDb as unknown as PrismaService, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any)
+    await expect(racingService.rescheduleSeries(orgId, selected, actor, {
+      ...replacement, expectedUpdatedAt: current.updatedAt.toISOString(),
+    })).rejects.toMatchObject({ status: 409 })
+    expect(await db.appointment.findUnique({ where: { id: selected } }))
+      .toMatchObject({ startsAt: concurrentStartsAt })
   })
 })

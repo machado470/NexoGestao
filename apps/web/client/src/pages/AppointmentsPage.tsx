@@ -355,8 +355,7 @@ export default function AppointmentsPage() {
 
   const recurring = !editing && form.cadence !== "SINGLE";
   const canRescheduleFollowing = Boolean(editing?.seriesId && editing.updatedAt &&
-    ["SCHEDULED", "CONFIRMED"].includes(editing.status ?? "") &&
-    (parseDate(editing.startsAt)?.getTime() ?? 0) >= Date.now());
+    ["SCHEDULED", "CONFIRMED"].includes(editing.status ?? ""));
   const reschedulingFollowing = Boolean(editing) && form.editScope === "FOLLOWING";
   const saving = createMutation.isPending || updateMutation.isPending || createSeries.isPending || rescheduleSeries.isPending;
   const seriesStart = recurring && localeReady
