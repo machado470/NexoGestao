@@ -9,6 +9,7 @@ import { AuditModule } from '../audit/audit.module'
 import { WhatsAppModule } from '../whatsapp/whatsapp.module'
 import { RiskModule } from '../risk/risk.module'
 import { AutomationModule } from '../automation/automation.module'
+import { OutboxModule } from '../outbox/outbox.module'
 import { QuotasModule } from '../quotas/quotas.module'
 
 @Module({
@@ -20,6 +21,7 @@ import { QuotasModule } from '../quotas/quotas.module'
     RiskModule,
     AutomationModule,
     QuotasModule,
+    OutboxModule,
   ],
   providers: [AppointmentsService],
   controllers: [AppointmentsController],

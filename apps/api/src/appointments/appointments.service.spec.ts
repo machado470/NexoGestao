@@ -14,6 +14,7 @@ function buildService(prisma: any) {
       complete: jest.fn(),
       fail: jest.fn(),
     } as any,
+    {} as any,
   )
 }
 
@@ -192,6 +193,7 @@ describe('AppointmentsService assignee persistence', () => {
         complete: jest.fn(),
         fail: jest.fn(),
       } as any,
+      {} as any,
     )
 
     await service.update({
