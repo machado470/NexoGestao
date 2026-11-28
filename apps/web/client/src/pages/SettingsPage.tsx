@@ -14,6 +14,7 @@ import {
   AppFormActions,
   AppInput,
   AppSelect,
+  AppStatusBadge,
 } from "@/components/app-system";
 import {
   AppOperationalHeader,
@@ -21,7 +22,6 @@ import {
   AppPageLoadingState,
   AppPageShell,
   AppSectionBlock,
-  AppStatusBadge,
 } from "@/components/internal-page-system";
 import { OrganizationAccessSection } from "@/components/OrganizationAccessSection";
 import { Button } from "@/components/ui/button";
@@ -195,7 +195,7 @@ export default function SettingsPage() {
               <>
                 <AppStatusBadge label={settings.name} />
                 {hasChanges ? (
-                  <AppStatusBadge label="Alterações não salvas" />
+                  <AppStatusBadge label="Alterações não salvas" tone="warning" />
                 ) : null}
               </>
             ) : undefined

@@ -1,3 +1,5 @@
+import { presentationLabel } from "@/lib/presentation-labels";
+import { getRoleLabel, normalizeRole } from "@/lib/rbac";
 import { AccountNavigation } from "@/components/AccountNavigation";
 import { ResponsiveDetails } from "@/components/ResponsiveDetails";
 import { MobileModuleHeader } from "@/components/MobileModuleHeader";
@@ -12,6 +14,7 @@ import {
   AppField,
   AppFieldGroup,
   AppInput,
+  AppStatusBadge,
 } from "@/components/app-system";
 import {
   AppOperationalHeader,
@@ -19,7 +22,6 @@ import {
   AppPageLoadingState,
   AppPageShell,
   AppSectionBlock,
-  AppStatusBadge,
 } from "@/components/internal-page-system";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
@@ -72,9 +74,20 @@ type OperationalProfile = {
   recommendedActionLabel: string | null;
   recommendedActionTarget: string | null;
   operationalSummaryText?: string | null;
-  capacitySummaryText?: string | null;
   riskSummaryText?: string | null;
   workloadNotes?: string | null;
+};
+
+const operationalLabels: Record<string, string> = {
+  ACTIVE: "Ativo",
+  INACTIVE: "Inativo",
+  NORMAL: "Normal",
+  IDLE: "Sem carga ativa",
+  BUSY: "Carga elevada",
+  OVERLOADED: "Sobrecarga",
+  "ATENÇÃO": "Em atenção",
+  RISCO: "Em risco",
+  "CRÍTICO": "Crítico",
 };
 
 function present(value: unknown) {
@@ -107,6 +120,8 @@ export default function ProfilePage() {
   const name = profile?.name ?? profile?.person?.name ?? null;
   const email = profile?.email ?? profile?.person?.email ?? null;
   const role = profile?.role ?? profile?.person?.role ?? null;
+  const normalizedRole = normalizeRole(role);
+  const roleLabel = normalizedRole ? getRoleLabel(normalizedRole) : role;
   const organizationName = profile?.organization?.name ?? null;
   const accountStatus = profile?.active ?? profile?.person?.active;
 
@@ -140,10 +155,10 @@ export default function ProfilePage() {
           contextChips={
             profile ? (
               <>
-                {role ? <AppStatusBadge label={role} /> : null}
+                {roleLabel ? <AppStatusBadge label={roleLabel} /> : null}
                 {accountStatus === undefined ||
                 accountStatus === null ? null : (
-                  <AppStatusBadge label={accountStatus ? "Ativo" : "Inativo"} />
+                  <AppStatusBadge label={accountStatus ? "Ativo" : "Inativo"} tone={accountStatus ? "success" : "neutral"} />
                 )}
                 {organizationName ? (
                   <AppStatusBadge label={organizationName} />
@@ -201,7 +216,7 @@ export default function ProfilePage() {
             <AppField label="Papel de acesso" htmlFor="profile-role">
               <AppInput
                 id="profile-role"
-                value={present(role)}
+                value={present(roleLabel)}
                 readOnly
                 aria-readonly="true"
               />
@@ -256,15 +271,18 @@ export default function ProfilePage() {
               className="flex flex-wrap gap-2"
               aria-label="Estados operacionais oficiais"
             >
-              <AppStatusBadge label={operationalProfile.status} />
-              <AppStatusBadge label={operationalProfile.operationalStatus} />
-              <AppStatusBadge label={operationalProfile.priority} />
-              {operationalProfile.availabilityStatus ? (
-                <AppStatusBadge label={operationalProfile.availabilityStatus} />
-              ) : null}
-              {operationalProfile.loadStatus ? (
-                <AppStatusBadge label={operationalProfile.loadStatus} />
-              ) : null}
+              {[
+                ["Situação", operationalProfile.status],
+                ["Operação", operationalProfile.operationalStatus],
+                ["Prioridade", operationalProfile.priority],
+                ["Disponibilidade", operationalProfile.availabilityStatus],
+                ["Carga", operationalProfile.loadStatus],
+              ].map(([label, value]) => value ? (
+                <AppStatusBadge
+                  key={label}
+                  label={`${label}: ${label === "Prioridade" ? value : operationalLabels[value] ?? presentationLabel(value)}`}
+                />
+              ) : null)}
             </div>
 
             <div className="grid min-w-0 grid-cols-2 gap-3 lg:grid-cols-4">
@@ -355,13 +373,13 @@ export default function ProfilePage() {
                 ],
                 [
                   "Uso da capacidade de O.S.",
-                  operationalProfile.serviceOrderCapacityUsagePct,
+                  operationalProfile.serviceOrderCapacityUsagePct == null ? null : `${operationalProfile.serviceOrderCapacityUsagePct}%`,
                 ],
                 [
                   "Uso da capacidade de agenda",
-                  operationalProfile.appointmentCapacityUsagePct,
+                  operationalProfile.appointmentCapacityUsagePct == null ? null : `${operationalProfile.appointmentCapacityUsagePct}%`,
                 ],
-                ["Estado de capacidade", operationalProfile.capacityStatus],
+                ["Estado de capacidade", presentationLabel(operationalProfile.capacityStatus)],
                 ["Observações de carga", operationalProfile.workloadNotes],
               ].map(([label, value]) => (
                 <div key={label} className="min-w-0">
@@ -374,11 +392,7 @@ export default function ProfilePage() {
                 </div>
               ))}
             </dl>
-            {operationalProfile.capacitySummaryText ? (
-              <p className="mt-4 break-words border-t border-[var(--border-subtle)] pt-4 text-sm text-[var(--text-secondary)]">
-                {operationalProfile.capacitySummaryText}
-              </p>
-            ) : null}
+
           </AppSectionBlock>
         </ResponsiveDetails>
       ) : null}
