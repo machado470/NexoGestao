@@ -1,7 +1,9 @@
+import { BaseModal } from "@/components/app-modal-system";
+import { formatOrganizationDate, formatRecordedMoney } from "@/lib/organization-locale";
 import { AccountNavigation } from "@/components/AccountNavigation";
 import { MobileModuleHeader } from "@/components/MobileModuleHeader";
 import { useFormDiscardGuard } from "@/hooks/useFormDiscardGuard";
-import { FormEvent, useEffect, useReducer } from "react";
+import { FormEvent, useEffect, useReducer, useState } from "react";
 import { Building2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
@@ -43,6 +45,9 @@ type OrganizationSettings = {
   currency: Currency;
 };
 
+const EXAMPLE_VISIT = "2027-01-12T13:00:00Z";
+const EXAMPLE_AMOUNT_CENTS = 12345;
+
 const currencyOptions = [
   { value: "BRL", label: "Real brasileiro (BRL)" },
   { value: "USD", label: "Dólar americano (USD)" },
@@ -63,6 +68,7 @@ export default function SettingsPage() {
     settingsDraftReducer,
     initialSettingsDraft
   );
+  const [reviewOpen, setReviewOpen] = useState(false);
   const { name, timezone, currency } = draft.values;
 
   useEffect(() => {
@@ -77,6 +83,7 @@ export default function SettingsPage() {
       utils.settings.get.setData(undefined, data);
       dispatch({ type: "confirmed", values: confirmed });
       void utils.settings.displayPreferences.invalidate();
+      setReviewOpen(false);
       toast.success("Configurações da organização salvas.");
     },
     onError: error => {
@@ -88,14 +95,36 @@ export default function SettingsPage() {
   const timezoneValid = isValidSettingsTimezone(timezone);
   const hasRequiredValues = name.trim() !== "" && timezoneValid;
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const saved = draft.baseline;
+  const timezoneChanged = Boolean(saved && timezone.trim() !== saved.timezone);
+  const currencyChanged = Boolean(saved && currency !== saved.currency);
+  const preferenceChanges = saved ? [
+    ...(timezoneChanged ? [
+      `Fuso horário de ${saved.timezone} para ${timezone.trim()}. A mesma visita de exemplo aparece como ${formatOrganizationDate(EXAMPLE_VISIT, saved.timezone)} no fuso atual e ${formatOrganizationDate(EXAMPLE_VISIT, timezone.trim())} no novo. Os horários gravados das visitas existentes e o fuso das séries já criadas são preservados.`,
+    ] : []),
+    ...(currencyChanged ? [
+      `Moeda de referência de ${saved.currency} para ${currency}. Exemplo de formato no novo padrão: ${formatRecordedMoney(EXAMPLE_AMOUNT_CENTS, currency)}. As cobranças existentes mantêm a moeda e o valor registrados.`,
+    ] : []),
+  ] : [];
+
+  const saveSettings = () => {
     if (!hasChanges || !hasRequiredValues || updateMutation.isPending) return;
+    setReviewOpen(false);
     updateMutation.mutate({
       name: name.trim(),
       timezone: timezone.trim(),
       currency,
     });
+  };
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!hasChanges || !hasRequiredValues || updateMutation.isPending) return;
+    if (timezoneChanged || currencyChanged) {
+      setReviewOpen(true);
+      return;
+    }
+    saveSettings();
   };
 
   const resetForm = () => {
@@ -115,6 +144,21 @@ export default function SettingsPage() {
   return (
     <AppPageShell className="operational-mobile-page mobile-module-page account-page gap-4 p-3 md:p-5">
       {discardGuard.confirmation}
+      <BaseModal
+        open={reviewOpen}
+        onOpenChange={setReviewOpen}
+        title="Confirmar preferências da empresa?"
+        size="lg"
+        intent="confirm"
+        footer={
+          <>
+            <Button type="button" variant="outline" onClick={() => setReviewOpen(false)}>Voltar para edição</Button>
+            <Button type="button" onClick={saveSettings}>Salvar preferências</Button>
+          </>
+        }
+      >
+        {preferenceChanges.map(change => <p key={change} className="mb-3 text-sm">{change}</p>)}
+      </BaseModal>
       <MobileModuleHeader
         title="Configurações"
         description="Preferências da sua organização."
