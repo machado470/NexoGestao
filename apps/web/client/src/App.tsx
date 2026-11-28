@@ -817,6 +817,7 @@ function Router() {
       />
       <Route path="/calendar" component={CalendarRoute} />
       <Route path="/settings" component={SettingsRoute} />
+      <Route path="/settings/access" component={SettingsRoute} />
       <Route path="/admin/ip-diagnostic" component={IpDiagnosticRoute} />
       <Route path="/profile" component={ProfileRoute} />
       <Route path="/timeline" component={TimelineRoute} />

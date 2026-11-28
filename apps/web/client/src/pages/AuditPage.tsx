@@ -1,3 +1,4 @@
+import { useSearch } from "wouter";
 import { transientReadOptions } from "@/lib/read-query-retry";
 import { organizationDayRange } from "@/lib/local-date-time";
 import { MobileModuleHeader } from "@/components/MobileModuleHeader";
@@ -136,8 +137,11 @@ export default function AuditPage() {
   const formatDateTime = (value: string) => formatOrganizationDate(value,timezone,"—",{dateStyle:"short",timeStyle:"medium"});
   const [filterError, setFilterError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [draftFilters, setDraftFilters] = useState({ from: "", to: "", actorPersonId: "", action: "" });
-  const [filters, setFilters] = useState<AuditFilters>({});
+  const search = useSearch();
+  const initialAction = new URLSearchParams(search).get("action") === "ORGANIZATION_SETTINGS_UPDATED"
+    ? "ORGANIZATION_SETTINGS_UPDATED" : "";
+  const [draftFilters, setDraftFilters] = useState({ from: "", to: "", actorPersonId: "", action: initialAction });
+  const [filters, setFilters] = useState<AuditFilters>(() => initialAction ? { action: initialAction } : {});
   const [selectedEvent, setSelectedEvent] = useState<AuditEvent | null>(null);
   const { isAuthenticated, role } = useAuth();
   const canLoadAudit = isAuthenticated && role === "ADMIN";

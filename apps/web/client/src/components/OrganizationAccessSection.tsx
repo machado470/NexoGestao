@@ -90,6 +90,7 @@ export function OrganizationAccessSection() {
     onError: error =>
       toast.error(error.message || "Não foi possível revogar o convite."),
   });
+  const activeAdminCount = Array.isArray(members?.users) ? members.users.filter(user => user.active && user.role === "ADMIN").length : 0;
   const isMutating = invite.isPending || resend.isPending || revoke.isPending;
   if (currentRole !== "ADMIN") return null;
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -99,7 +100,7 @@ export function OrganizationAccessSection() {
   };
   return (
     <AppSectionBlock
-      title="Acessos da organização"
+      title="Equipe e acessos"
       subtitle="Consulte os membros e convide usuários com o papel adequado."
     >
       <Button
@@ -164,6 +165,9 @@ export function OrganizationAccessSection() {
                           : member.active
                             ? "Ativo"
                             : "Inativo"}
+                      {member.active && member.role === "ADMIN" && activeAdminCount === 1
+                        ? <span className="ml-2 text-[var(--text-muted)]">Único administrador ativo</span>
+                        : null}
                     </span>
                     {!invitation ? (
                       <OrganizationMemberActions
