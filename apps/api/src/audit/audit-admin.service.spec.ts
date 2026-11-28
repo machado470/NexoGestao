@@ -96,3 +96,37 @@ describe('Audit date filters', () => {
     expect(db.auditEvent.groupBy).toHaveBeenCalledWith(expect.objectContaining({ where }))
   })
 })
+
+describe('Audit CSV export', () => {
+  it('applies the organization and filters, selects only export fields and protects spreadsheet cells', async () => {
+    const findMany = jest.fn().mockResolvedValue([{
+      id: 'event-id',
+      createdAt: new Date('2026-11-28T15:00:00Z'),
+      action: 'CUSTOMER_UPDATED',
+      entityType: 'CUSTOMER',
+      entityId: 'customer-id',
+      person: { name: '  =SUM("test",1)' },
+    }])
+    const service = new AuditAdminService({ auditEvent: { findMany } } as any)
+    const result = await service.exportEvents({
+      orgId: 'org-a', action: 'CUSTOMER_UPDATED', actorPersonId: 'actor-a', from: '2026-11-28T14:00:00Z',
+    })
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        orgId: 'org-a', action: 'CUSTOMER_UPDATED', actorPersonId: 'actor-a',
+        createdAt: { gte: new Date('2026-11-28T14:00:00Z') },
+      },
+      select: expect.not.objectContaining({ metadata: true, context: true }),
+      take: 5001,
+    }))
+    expect(result.csv.split('\r\n')[1]).toBe(
+      `"event-id","2026-11-28T15:00:00.000Z","CUSTOMER_UPDATED","CUSTOMER","customer-id","'  =SUM(""test"",1)"`,
+    )
+  })
+
+  it('rejects an oversized export without returning a partial CSV', async () => {
+    const findMany = jest.fn().mockResolvedValue(Array(5001).fill({}))
+    const service = new AuditAdminService({ auditEvent: { findMany } } as any)
+    await expect(service.exportEvents({ orgId: 'org-a' })).rejects.toThrow('Reduza o período')
+  })
+})

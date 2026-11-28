@@ -7,7 +7,7 @@ import { formatOrganizationDate } from "@/lib/organization-locale";
 import { buildAuditActorOptions } from "@/lib/audit-actor-options";
 import { presentationLabel } from "@/lib/presentation-labels";
 import { useMemo, useState } from "react";
-import { Eye, RefreshCw, Search, X } from "lucide-react";
+import { Download, Eye, RefreshCw, Search, X } from "lucide-react";
 
 import { BaseModal } from "@/components/app-modal-system";
 import {
@@ -133,6 +133,7 @@ export default function AuditPage() {
     { page, limit: AUDIT_PAGE_SIZE, ...filters },
     { enabled: canLoadAudit, ...transientReadOptions },
   );
+  const exportMutation = trpc.audit.exportEvents.useMutation();
   const summaryQuery = trpc.audit.getSummary.useQuery(
     { from: filters.from, to: filters.to },
     { enabled: canLoadAudit, ...transientReadOptions },
@@ -168,6 +169,19 @@ export default function AuditPage() {
     setFilters({});
     setPage(1);
   }
+  async function exportFilteredEvents() {
+    const { csv } = await exportMutation.mutateAsync(filters).catch(() => ({ csv: null }));
+    if (csv === null) return;
+    const url = URL.createObjectURL(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "auditoria-nexo.csv";
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
   function retry() { void listQuery.refetch(); void summaryQuery.refetch(); }
 
   return (
@@ -220,6 +234,15 @@ export default function AuditPage() {
       ) : null}
 
       <AppSectionBlock className="mobile-flat-section" title="Registros de auditoria" subtitle="Ordem oficial da API: eventos mais recentes primeiro. Selecione um registro para examinar sua evidência.">
+        {canLoadAudit && listQuery.isSuccess && pagination.total > 0 ? (
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <Button type="button" variant="neutral" disabled={exportMutation.isPending} onClick={() => void exportFilteredEvents()}>
+              <Download />{exportMutation.isPending ? "Exportando…" : "Exportar recorte em CSV"}
+            </Button>
+            <span className="text-sm text-[var(--text-muted)]">Inclui todas as páginas dos filtros aplicados.</span>
+          </div>
+        ) : null}
+        {exportMutation.error ? <p role="alert" className="mb-3 text-sm text-[var(--danger)]">{exportMutation.error.message}</p> : null}
         {listLoading ? <AppLoadingState label="Carregando registros de auditoria..." /> : listFailed ? <p role="status">Registros indisponíveis. Tente novamente acima.</p> : getAuditEmptyState(events, listLoading) ? (
           <AppEmptyState title={hasFilters ? "Nenhum registro corresponde aos filtros" : "Nenhum registro de auditoria"} description={hasFilters ? "Revise ou limpe os filtros para ampliar o recorte." : "Ainda não há fatos registrados para esta organização."} action={hasFilters ? <Button type="button" variant="neutral" onClick={clearFilters}>Limpar filtros</Button> : undefined} />
         ) : (
