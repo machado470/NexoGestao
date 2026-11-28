@@ -1,5 +1,24 @@
 import { Injectable, BadRequestException } from '@nestjs/common'
+import { Prisma } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
+
+type AuditEventFilters = {
+  orgId: string
+  entityType?: string
+  entityId?: string
+  action?: string
+  actorPersonId?: string
+  from?: string
+  to?: string
+}
+
+const MAX_EXPORT_ROWS = 5000
+
+function csvCell(value: string | null) {
+  const text = value ?? ''
+  const safe = /^[\s\p{Cf}]*[=+@-]|^[\t\r\n]/u.test(text) ? "'" + text : text
+  return '"' + safe.replace(/"/g, '""') + '"'
+}
 
 @Injectable()
 export class AuditAdminService {
@@ -17,19 +36,23 @@ export class AuditAdminService {
     return gte || lte ? { ...(gte ? { gte } : {}), ...(lte ? { lte } : {}) } : undefined
   }
 
-  async listEvents(params: {
-    orgId: string
-    entityType?: string
-    entityId?: string
-    action?: string
-    actorPersonId?: string
-    from?: string
-    to?: string
-    page?: number
-    limit?: number
-  }) {
+  private eventFilter(params: AuditEventFilters): Prisma.AuditEventWhereInput {
     if (!params.orgId) throw new BadRequestException('orgId é obrigatório')
+    const where: Prisma.AuditEventWhereInput = { orgId: params.orgId }
 
+    if (params.entityType) where.entityType = params.entityType
+    if (params.entityId) where.entityId = params.entityId
+    if (params.action) where.action = params.action
+    if (params.actorPersonId) where.actorPersonId = params.actorPersonId
+
+    const dateRange = this.getDateRange(params.from, params.to)
+    if (dateRange) where.createdAt = dateRange
+
+    return where
+  }
+
+  async listEvents(params: AuditEventFilters & { page?: number; limit?: number }) {
+    const where = this.eventFilter(params)
     const page = Number(params.page) || 1
     const requestedLimit = Number(params.limit) || 50
     if (!Number.isSafeInteger(page) || page < 1 || !Number.isSafeInteger(requestedLimit) || requestedLimit < 1) {
@@ -41,23 +64,13 @@ export class AuditAdminService {
       throw new BadRequestException('Página fora do intervalo permitido')
     }
 
-    const where: any = { orgId: params.orgId }
-
-    if (params.entityType) where.entityType = params.entityType
-    if (params.entityId) where.entityId = params.entityId
-    if (params.action) where.action = params.action
-    if (params.actorPersonId) where.actorPersonId = params.actorPersonId
-
-    const dateRange = this.getDateRange(params.from, params.to)
-    if (dateRange) where.createdAt = dateRange
-
     const [events, total] = await Promise.all([
       this.prisma.auditEvent.findMany({
         where,
         include: {
           person: { select: { id: true, name: true } },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         skip,
         take: limit,
       }),
@@ -70,6 +83,28 @@ export class AuditAdminService {
         actorName: event.person?.name ?? (event.actorPersonId || event.actorUserId ? 'Ator não identificado' : 'Sistema'),
       })),
       pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    }
+  }
+
+  async exportEvents(params: AuditEventFilters) {
+    const events = await this.prisma.auditEvent.findMany({
+      where: this.eventFilter(params),
+      select: {
+        id: true, createdAt: true, action: true, entityType: true, entityId: true,
+        actorPersonId: true, actorUserId: true, person: { select: { name: true } },
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: MAX_EXPORT_ROWS + 1,
+    })
+    if (events.length > MAX_EXPORT_ROWS) {
+      throw new BadRequestException('O recorte tem mais de 5.000 registros. Reduza o período ou aplique outros filtros.')
+    }
+    const rows = events.map(event => [
+      event.id, event.createdAt.toISOString(), event.action, event.entityType, event.entityId,
+      event.person?.name ?? (event.actorPersonId || event.actorUserId ? 'Ator não identificado' : 'Sistema'),
+    ].map(csvCell).join(','))
+    return {
+      csv: ['ID,Data e hora (UTC),Ação,Tipo de entidade,ID da entidade,Ator', ...rows].join('\r\n'),
     }
   }
 

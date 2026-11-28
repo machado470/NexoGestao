@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Header,
   Param,
   Query,
   UseGuards,
@@ -32,6 +33,21 @@ export class AuditAdminController {
       to: query.to,
       page: query.page,
       limit: query.limit,
+    })
+  }
+
+  @Get('events/export')
+  @Header('Cache-Control', 'no-store')
+  @Roles('ADMIN')
+  exportEvents(@Org() orgId: string, @Query() query: Record<string, string>) {
+    return this.auditAdmin.exportEvents({
+      orgId,
+      entityType: query.entityType,
+      entityId: query.entityId,
+      action: query.action,
+      actorPersonId: query.actorPersonId,
+      from: query.from,
+      to: query.to,
     })
   }
 
