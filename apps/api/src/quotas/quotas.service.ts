@@ -90,7 +90,7 @@ export class QuotasService {
     return count < limits.customers
   }
 
-  async canCreateAppointment(orgId: string): Promise<boolean> {
+  async canCreateAppointment(orgId: string, quantity = 1): Promise<boolean> {
     const plan = await this.getAdmissionPlan(orgId)
     if (plan === null) return false
     const limits = this.getQuotaLimits(plan)
@@ -101,7 +101,7 @@ export class QuotasService {
       where: { orgId },
     })
 
-    return count < limits.appointments
+    return count + quantity <= limits.appointments
   }
 
   async canCreateServiceOrder(orgId: string): Promise<boolean> {
@@ -239,6 +239,7 @@ export class QuotasService {
       | 'SEND_MESSAGE'
       | 'CREATE_SERVICE_ORDER'
       | 'ADD_STAFF_MEMBER',
+    quantity = 1,
   ): Promise<void> {
     const access = await this.getSubscriptionAccess(orgId)
     if (access.allowed === false) {
@@ -254,7 +255,7 @@ export class QuotasService {
         break
 
       case 'CREATE_APPOINTMENT':
-        canProceed = await this.canCreateAppointment(orgId)
+        canProceed = await this.canCreateAppointment(orgId, quantity)
         resourceName = 'agendamento'
         break
 

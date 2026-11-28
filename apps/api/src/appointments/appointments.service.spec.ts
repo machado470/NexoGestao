@@ -31,6 +31,30 @@ const baseAppointment = {
   assignedTo: { id: 'resp-1', name: 'Responsável' },
 }
 
+describe('AppointmentsService series preview', () => {
+  it('reports only collisions for the responsible person within this company', async () => {
+    const prisma = {
+      organization: { findUnique: jest.fn().mockResolvedValue({ timezone: 'America/Sao_Paulo' }) },
+      person: { findFirst: jest.fn().mockResolvedValue({ id: 'responsible' }) },
+      appointment: { findMany: jest.fn().mockResolvedValue([
+        { startsAt: new Date('2026-12-05T12:15:00Z'), endsAt: new Date('2026-12-05T13:00:00Z') },
+      ]) },
+    }
+    const service = buildService(prisma)
+    const visits = await service.previewSeries('org-1', {
+      startsAt: '2026-11-28T12:00:00Z', assignedToPersonId: 'responsible', cadence: 'WEEKLY', count: 2,
+    })
+    expect(visits.map(visit => visit.conflict)).toEqual([false, true])
+    expect(prisma.appointment.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ orgId: 'org-1', assignedToPersonId: 'responsible', status: { not: 'CANCELED' } }),
+    }))
+    prisma.person.findFirst.mockResolvedValue(null)
+    await expect(service.previewSeries('org-1', {
+      startsAt: '2026-11-28T12:00:00Z', assignedToPersonId: 'foreign', cadence: 'WEEKLY', count: 2,
+    })).rejects.toBeInstanceOf(BadRequestException)
+  })
+})
+
 describe('AppointmentsService assignee persistence', () => {
   it('bloqueia create com responsável de outra org', async () => {
     const prisma: any = {

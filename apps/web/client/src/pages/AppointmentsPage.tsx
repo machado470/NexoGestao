@@ -291,6 +291,13 @@ export default function AppointmentsPage() {
   const savingAppointment = useRef(false);
   const createMutation = trpc.appointments.create.useMutation();
   const updateMutation = trpc.appointments.update.useMutation();
+  const previewSeries = trpc.appointments.previewSeries.useMutation();
+  const createSeries = trpc.appointments.createSeries.useMutation();
+  const seriesAttempts = useRef(new Map<string, string>());
+  const [reviewedSeries, setReviewedSeries] = useState<{
+    fingerprint: string;
+    visits: { startsAt: string; endsAt: string; conflict: boolean }[];
+  } | null>(null);
   const assigneeWarningTelemetry = useAssigneeWarningTelemetry("APPOINTMENT");
   const [form, setForm] = useState({
     customerId: "",
@@ -300,6 +307,8 @@ export default function AppointmentsPage() {
     notes: "",
     assignedToPersonId: "unassigned",
     durationMinutes: "60",
+    cadence: "SINGLE" as "SINGLE" | "WEEKLY" | "BIWEEKLY",
+    visitCount: "2",
   });
 
   const initialForm = useRef(form);
@@ -308,6 +317,7 @@ export default function AppointmentsPage() {
       assigneeWarningTelemetry.reset();
       return;
     }
+    setReviewedSeries(null);
     const start = parseDate(editing?.startsAt);
     const end = parseDate(editing?.endsAt);
     const initial = {
@@ -332,22 +342,61 @@ export default function AppointmentsPage() {
               )
             )
           : "60",
+      cadence: "SINGLE" as const,
+      visitCount: "2",
     };
     initialForm.current = initial;
     setForm(initial);
   }, [assigneeWarningTelemetry.reset, editing, openModal, routeCustomerId, timezone]);
 
+  const recurring = !editing && form.cadence !== "SINGLE";
+  const saving = createMutation.isPending || updateMutation.isPending || createSeries.isPending;
+  const seriesStart = recurring && localeReady
+    ? parseLocalDateTimeInput(`${form.date}T${form.time}`, undefined, timezone)
+    : null;
+  const seriesDuration = Number(form.durationMinutes);
+  const visitCount = Number(form.visitCount);
+  const seriesInput = form.cadence !== "SINGLE" && seriesStart &&
+    Number.isInteger(seriesDuration) && seriesDuration >= 15 && seriesDuration < 10080 &&
+    Number.isInteger(visitCount) && visitCount >= 2 && visitCount <= 12
+    ? {
+        startsAt: seriesStart.toISOString(),
+        endsAt: new Date(seriesStart.getTime() + seriesDuration * 60000).toISOString(),
+        assignedToPersonId: form.assignedToPersonId === "unassigned" ? undefined : form.assignedToPersonId,
+        cadence: form.cadence,
+        count: visitCount,
+      }
+    : null;
+  const previewFingerprint = seriesInput ? JSON.stringify(seriesInput) : "";
+  const currentPreview = reviewedSeries?.fingerprint === previewFingerprint ? reviewedSeries : null;
+  const seriesReady = Boolean(currentPreview && !currentPreview.visits.some(visit => visit.conflict));
+
+  async function reviewSeries() {
+    if (!seriesInput || previewSeries.isPending || savingAppointment.current) return;
+    setReviewedSeries(null);
+    try {
+      const visits = await previewSeries.mutateAsync(seriesInput);
+      setReviewedSeries({ fingerprint: previewFingerprint, visits });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível consultar a série.");
+    }
+  }
+
   const discardGuard = useFormDiscardGuard({
     open: openModal,
     guardNavigation: true,
     dirty: JSON.stringify(form) !== JSON.stringify(initialForm.current),
-    blocked: savingAppointment.current || createMutation.isPending || updateMutation.isPending,
+    blocked: savingAppointment.current || saving || previewSeries.isPending,
     onDiscard: () => { setOpenModal(false); setEditing(null); },
   });
 
   async function saveAppointment(event: React.FormEvent) {
     event.preventDefault();
-    if (savingAppointment.current) return;
+    if (savingAppointment.current || previewSeries.isPending) return;
+    if (recurring && (!seriesInput || !seriesReady)) {
+      toast.error("Confira a prévia da série antes de salvar.");
+      return;
+    }
     if (!localeReady) { toast.error("Aguarde a confirmação do fuso da empresa."); return; }
     const startsAt = parseLocalDateTimeInput(
       `${form.date}T${form.time}`,
@@ -382,6 +431,13 @@ export default function AppointmentsPage() {
               : form.assignedToPersonId,
           expectedUpdatedAt: editing.updatedAt ?? undefined,
         });
+      } else if (recurring && seriesInput) {
+        const payload = { ...seriesInput, customerId: form.customerId, notes: form.notes.trim() || undefined };
+        const fingerprint = JSON.stringify(payload);
+        const entryKey = seriesAttempts.current.get(fingerprint) ?? crypto.randomUUID();
+        seriesAttempts.current.set(fingerprint, entryKey);
+        await createSeries.mutateAsync({ ...payload, entryKey });
+        seriesAttempts.current.delete(fingerprint);
       } else {
         await createMutation.mutateAsync({
           customerId: form.customerId,
@@ -395,7 +451,7 @@ export default function AppointmentsPage() {
       setSuccessMessage(
         editing
           ? "Agendamento atualizado com sucesso."
-          : "Agendamento criado com sucesso."
+          : recurring ? "Série de agendamentos criada." : "Agendamento criado com sucesso."
       );
       setOpenModal(false);
       setEditing(null);
@@ -975,13 +1031,13 @@ export default function AppointmentsPage() {
           onOpenChange={next => { if (!next) discardGuard.requestClose(); }}
           title={editing ? "Editar agendamento" : "Novo agendamento"}
           description={localeReady ? `Horários em ${timezone}.` : "Aguarde a confirmação do fuso da empresa para salvar."}
-          closeBlocked={createMutation.isPending || updateMutation.isPending}
+          closeBlocked={saving || previewSeries.isPending}
           footer={
             <>
               <Button
                 type="button"
                 variant="outline"
-                disabled={createMutation.isPending || updateMutation.isPending}
+                disabled={saving || previewSeries.isPending}
                 onClick={discardGuard.requestClose}
               >
                 Cancelar
@@ -991,12 +1047,12 @@ export default function AppointmentsPage() {
                 form="appointment-form"
                 disabled={
                   !localeReady ||
-                  createMutation.isPending ||
-                  updateMutation.isPending ||
+                  saving || previewSeries.isPending ||
+                  (recurring && !seriesReady) ||
                   (!editing && customersQuery.isError)
                 }
               >
-                {createMutation.isPending || updateMutation.isPending
+                {saving
                   ? "Salvando..."
                   : "Salvar"}
               </Button>
@@ -1052,26 +1108,49 @@ export default function AppointmentsPage() {
                 />
               </AppField>
             </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              <AppField label="Status" htmlFor={`${fieldId}-field-3`}>
-                <AppSelect
-                  id={`${fieldId}-field-3`}
-                  value={form.status}
-                  onValueChange={status =>
-                    setForm(value => ({
-                      ...value,
-                      status: status as AppointmentStatus,
-                    }))
-                  }
+            {!editing && (
+              <AppField label="Repetição" htmlFor={`${fieldId}-cadence`}>
+                <AppSelect id={`${fieldId}-cadence`} value={form.cadence}
+                  onValueChange={cadence => setForm(value => ({
+                    ...value, cadence: cadence as typeof value.cadence,
+                  }))}
                   options={[
-                    { value: "SCHEDULED", label: "Agendado" },
-                    { value: "CONFIRMED", label: "Confirmado" },
-                    { value: "DONE", label: "Concluído" },
-                    { value: "CANCELED", label: "Cancelado" },
-                    { value: "NO_SHOW", label: "Não compareceu" },
+                    { value: "SINGLE", label: "Uma visita" },
+                    { value: "WEEKLY", label: "Semanal" },
+                    { value: "BIWEEKLY", label: "Quinzenal" },
                   ]}
                 />
               </AppField>
+            )}
+            <div className="grid gap-3 md:grid-cols-2">
+              {recurring ? (
+                <AppField label="Número de visitas" htmlFor={`${fieldId}-visit-count`}>
+                  <AppInput id={`${fieldId}-visit-count`} type="number" min={2} max={12} step={1}
+                    value={form.visitCount}
+                    onChange={event => setForm(value => ({ ...value, visitCount: event.target.value }))}
+                  />
+                </AppField>
+              ) : (
+                <AppField label="Status" htmlFor={`${fieldId}-field-3`}>
+                  <AppSelect
+                    id={`${fieldId}-field-3`}
+                    value={form.status}
+                    onValueChange={status =>
+                      setForm(value => ({
+                        ...value,
+                        status: status as AppointmentStatus,
+                      }))
+                    }
+                    options={[
+                      { value: "SCHEDULED", label: "Agendado" },
+                      { value: "CONFIRMED", label: "Confirmado" },
+                      { value: "DONE", label: "Concluído" },
+                      { value: "CANCELED", label: "Cancelado" },
+                      { value: "NO_SHOW", label: "Não compareceu" },
+                    ]}
+                  />
+                </AppField>
+              )}
               <AppField label="Duração (min)" htmlFor={`${fieldId}-field-4`}>
                 <AppInput
                   id={`${fieldId}-field-4`}
@@ -1111,6 +1190,27 @@ export default function AppointmentsPage() {
                 onWarningShown={assigneeWarningTelemetry.trackShown}
               />
             </AppField>
+            {recurring && (
+              <section aria-label="Prévia da série" className="grid gap-2 rounded-xl border p-3">
+                <Button type="button" variant="outline" className="justify-self-start"
+                  disabled={!seriesInput || previewSeries.isPending || saving}
+                  onClick={() => void reviewSeries()}
+                >
+                  {previewSeries.isPending ? "Consultando..." : "Conferir datas da série"}
+                </Button>
+                {currentPreview && (
+                  <ol className="grid gap-1 text-sm">
+                    {currentPreview.visits.map(visit => (
+                      <li key={visit.startsAt}>
+                        {formatOrganizationDate(visit.startsAt, timezone)}
+                        {visit.conflict ? " · Conflito de horário" : ""}
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </section>
+            )}
+
             <AppField label="Observação" htmlFor={`${fieldId}-field-6`}>
               <AppTextarea
                 id={`${fieldId}-field-6`}

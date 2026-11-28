@@ -17,6 +17,7 @@ import { User } from '../auth/decorators/user.decorator'
 
 import { AppointmentsService } from './appointments.service'
 import { CreateAppointmentDto } from './dto/create-appointment.dto'
+import { AppointmentSeriesPreviewDto, CreateAppointmentSeriesDto } from './dto/appointment-series-preview.dto'
 import { UpdateAppointmentDto } from './dto/update-appointment.dto'
 import { Throttle } from '@nestjs/throttler'
 import { QuotasService } from '../quotas/quotas.service'
@@ -42,6 +43,21 @@ export class AppointmentsController {
   @Roles('ADMIN', 'MANAGER', 'STAFF', 'VIEWER')
   get(@Org() orgId: string, @Param('id') id: string) {
     return this.appointments.get(orgId, id)
+  }
+
+  @Post('series/preview')
+  @Roles('ADMIN', 'MANAGER', 'STAFF')
+  previewSeries(@Org() orgId: string, @Body() body: AppointmentSeriesPreviewDto) {
+    return this.appointments.previewSeries(orgId, body)
+  }
+
+  @Post('series')
+  @Roles('ADMIN', 'MANAGER', 'STAFF')
+  createSeries(@Org() orgId: string, @User() user: any, @Body() body: CreateAppointmentSeriesDto) {
+    return this.appointments.createSeries(
+      orgId, { userId: user?.userId ?? null, personId: user?.personId ?? null }, body,
+      () => this.quotas.validateQuota(orgId, 'CREATE_APPOINTMENT', body.count),
+    )
   }
 
   @Post()

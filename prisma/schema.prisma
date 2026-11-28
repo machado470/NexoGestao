@@ -8,6 +8,7 @@ datasource db {
 }
 
 model Organization {
+  appointmentSeries AppointmentSeries[]
   stockReservations StockReservation[]
   id                           String                        @id @default(uuid())
   name                         String
@@ -492,12 +493,30 @@ model Customer {
   @@index([orgId, email])
 }
 
+model AppointmentSeries {
+  id          String @id @default(uuid())
+  orgId       String
+  entryKey    String
+  payloadHash String
+  cadence     String
+  timezone    String
+  createdAt   DateTime @default(now())
+  org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  visits      Appointment[]
+
+  @@unique([orgId, entryKey])
+  @@unique([id, orgId])
+}
+
 model Appointment {
   id                 String            @id @default(uuid())
   orgId              String
   customerId         String
   assignedToPersonId String?
   idempotencyKey     String?           @unique
+  seriesId           String?
+  seriesPosition     Int?
+  series             AppointmentSeries? @relation(fields: [seriesId, orgId], references: [id, orgId], onDelete: Restrict)
   startsAt           DateTime
   endsAt             DateTime
   status             AppointmentStatus @default(SCHEDULED)
@@ -510,6 +529,7 @@ model Appointment {
   serviceOrder       ServiceOrder?
   timelineEvents     TimelineEvent[]
 
+  @@unique([seriesId, seriesPosition])
   @@index([orgId, startsAt])
   @@index([orgId, startsAt, endsAt])
   @@index([orgId, status, startsAt])
