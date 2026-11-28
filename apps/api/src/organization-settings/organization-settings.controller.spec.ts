@@ -14,9 +14,9 @@ describe('OrganizationSettingsController', () => {
     const controller = new OrganizationSettingsController(service)
     const payload = { name: 'Tenant Correto', timezone: 'UTC' }
 
-    await controller.updateSettings({ user: { orgId: 'org-authenticated' } }, payload)
+    await controller.updateSettings({ user: { orgId: 'org-authenticated', userId: 'actor-user', personId: 'actor-person' } }, payload)
 
-    expect(service.updateOrganizationSettings).toHaveBeenCalledWith('org-authenticated', payload)
+    expect(service.updateOrganizationSettings).toHaveBeenCalledWith('org-authenticated', payload, { userId: 'actor-user', personId: 'actor-person' })
   })
 })
 
@@ -25,7 +25,7 @@ describe('OrganizationSettingsController administrative summary', () => {
   it('deriva o tenant exclusivamente da sessão', async () => {
     const service = { getAdministrativeSummary: jest.fn().mockResolvedValue({ sections: [] }) } as any
     const controller = new OrganizationSettingsController(service)
-    await controller.getAdministrativeSummary({ user: { orgId: 'org-authenticated' } })
+    await controller.getAdministrativeSummary({ user: { orgId: 'org-authenticated', userId: 'actor-user', personId: 'actor-person' } })
     expect(service.getAdministrativeSummary).toHaveBeenCalledWith('org-authenticated')
   })
 })

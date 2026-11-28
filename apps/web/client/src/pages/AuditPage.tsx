@@ -115,7 +115,19 @@ export function getNextAuditPage(currentPage: number, totalPages: number): numbe
   return Math.min(currentPage + 1, Math.max(totalPages, 1));
 }
 
-function fieldLabel(key: string) {
+const settingsMetadataLabels: Record<string, string> = {
+  nameBefore: "Nome anterior",
+  nameAfter: "Nome atualizado",
+  timezoneBefore: "Fuso anterior",
+  timezoneAfter: "Fuso atualizado",
+  currencyBefore: "Moeda anterior",
+  currencyAfter: "Moeda atualizada",
+};
+
+function fieldLabel(key: string, action?: string) {
+  if (action === "ORGANIZATION_SETTINGS_UPDATED" && settingsMetadataLabels[key]) {
+    return settingsMetadataLabels[key];
+  }
   return key.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/_/g, " ");
 }
 
@@ -282,7 +294,7 @@ export default function AuditPage() {
           <dl className="grid gap-4 sm:grid-cols-2">
             {[["Evento", presentationLabel(selectedEvent.action)], ["Data e hora", formatDateTime(selectedEvent.createdAt)], ["Ator", selectedEvent.actorName || selectedEvent.actorPersonId || selectedEvent.actorUserId || "Sistema"], ["Entidade", presentationLabel(selectedEvent.entityType)], ["ID da entidade", selectedEvent.entityId || "—"], ["ID do registro", selectedEvent.id], ["Organização", selectedEvent.orgId], ["Contexto", selectedEvent.context || "—"]].map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-xs font-medium text-[var(--text-muted)]">{label}</dt><dd className="mt-1 break-words text-[var(--text-primary)]">{value}</dd></div>)}
           </dl>
-          <section aria-labelledby="audit-evidence-title"><h2 id="audit-evidence-title" className="font-semibold text-[var(--text-primary)]">Detalhes da evidência</h2>{metadataEntries.length ? <dl className="mt-3 grid gap-3 sm:grid-cols-2">{metadataEntries.map(([key, value]) => <div key={key} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3"><dt className="text-xs capitalize text-[var(--text-muted)]">{fieldLabel(key)}</dt><dd className="mt-1 break-all text-[var(--text-primary)]">{value}</dd></div>)}</dl> : <p className="mt-2 text-[var(--text-muted)]">Nenhum detalhe adicional disponível neste registro.</p>}</section>
+          <section aria-labelledby="audit-evidence-title"><h2 id="audit-evidence-title" className="font-semibold text-[var(--text-primary)]">Detalhes da evidência</h2>{metadataEntries.length ? <dl className="mt-3 grid gap-3 sm:grid-cols-2">{metadataEntries.map(([key, value]) => <div key={key} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] p-3"><dt className="text-xs capitalize text-[var(--text-muted)]">{fieldLabel(key, selectedEvent?.action)}</dt><dd className="mt-1 break-all text-[var(--text-primary)]">{value}</dd></div>)}</dl> : <p className="mt-2 text-[var(--text-muted)]">Nenhum detalhe adicional disponível neste registro.</p>}</section>
         </div> : null}
       </BaseModal>
     </AppPageShell>

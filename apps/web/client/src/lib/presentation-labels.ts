@@ -14,6 +14,7 @@ export const PRESENTATION_LABELS: Record<string, string> = {
   UNDER_CAPACITY: "Abaixo da capacidade", AT_CAPACITY: "Na capacidade", OVER_CAPACITY: "Acima da capacidade",
   CUSTOMERS_EXPORTED: "Clientes exportados", CHARGES_EXPORTED: "Cobranças exportadas",
   CUSTOMER_CREATED: "Cliente cadastrado", CUSTOMER_UPDATED: "Cliente atualizado", CUSTOMER_DELETED: "Cliente removido",
+  ORGANIZATION_SETTINGS_UPDATED: "Configurações da empresa atualizadas",
   APPOINTMENT_CREATED: "Agendamento criado", APPOINTMENT_UPDATED: "Agendamento atualizado", APPOINTMENT_CANCELED: "Agendamento cancelado",
   SERVICE_ORDER_CREATED: "O.S. criada", SERVICE_ORDER_UPDATED: "O.S. atualizada", SERVICE_ORDER_STARTED: "O.S. iniciada", SERVICE_ORDER_DONE: "O.S. concluída",
   CHARGE_CREATED: "Cobrança criada", CHARGE_UPDATED: "Cobrança atualizada", CHARGE_CANCELED: "Cobrança cancelada", PAYMENT_RECEIVED: "Pagamento recebido", PAYMENT_REFUNDED: "Pagamento estornado", PAYMENT_REFUND_REVERSED: "Estorno revertido",
