@@ -2,6 +2,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common'
 import { Test } from '@nestjs/testing'
 import { JwtService } from '@nestjs/jwt'
 import { randomUUID } from 'node:crypto'
+import { setTimeout as delay } from 'node:timers/promises'
 import request from 'supertest'
 import { AppModule } from '../../src/app.module'
 import { NotificationStreamHub } from '../../src/notifications/notification-stream-hub.service'
@@ -153,6 +154,14 @@ describeRealIntegration('Notifications SSE multi-instance (real PostgreSQL + Red
       expect(spy.mock.results[index].type).toBe('return')
       return spy.mock.results[index].value as Promise<unknown>
     }
+    const waitForRedisDelivery = async (eventId: string) => {
+      // Redis acknowledges PUBLISH before instance B necessarily processes the message.
+      const deadline = Date.now() + 8_000
+      while (!deliver.mock.calls.some(([event]) => event.eventId === eventId) && Date.now() < deadline) {
+        await delay(10)
+      }
+      return resultForEvent(deliver, eventId)
+    }
     const occurrences = (text: string, eventId: string) => text.split(`id: ${eventId}\n`).length - 1
     try {
       await stream.connection; await stream.waitUntilReady()
@@ -168,8 +177,8 @@ describeRealIntegration('Notifications SSE multi-instance (real PostgreSQL + Red
       const published = await resultForEvent(publish, recipient.id) as { status: string; subscriberCount: number }
       expect(published).toEqual({ status: 'published', subscriberCount: expect.any(Number) })
       expect(published.subscriberCount).toBeGreaterThanOrEqual(2)
+      const firstDelivery = await waitForRedisDelivery(recipient.id)
       expect(deliver).toHaveBeenCalledWith(envelope)
-      const firstDelivery = await resultForEvent(deliver, recipient.id)
       // [] significa que o evento chegou durante replay -> live e foi buffered; o frame abaixo prova o flush.
       expect([[], [true]]).toContainEqual(firstDelivery)
       const firstText = await stream.waitForEvent(`id: ${recipient.id}`)
@@ -187,8 +196,8 @@ describeRealIntegration('Notifications SSE multi-instance (real PostgreSQL + Red
       })
       const livePublished = await resultForEvent(publish, liveRecipient.id) as { status: string; subscriberCount: number }
       expect(livePublished.status).toBe('published'); expect(livePublished.subscriberCount).toBeGreaterThanOrEqual(2)
+      await expect(waitForRedisDelivery(liveRecipient.id)).resolves.toEqual([true])
       expect(deliver).toHaveBeenCalledWith(liveEnvelope)
-      await expect(resultForEvent(deliver, liveRecipient.id)).resolves.toEqual([true])
       const liveText = await stream.waitForEvent(`id: ${liveRecipient.id}`)
       expect(liveText).toContain(`id: ${liveRecipient.id}\nevent: notification.created`)
       expect(occurrences(liveText, recipient.id)).toBe(1); expect(occurrences(liveText, liveRecipient.id)).toBe(1)
