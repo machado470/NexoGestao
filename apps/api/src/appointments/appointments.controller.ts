@@ -17,7 +17,7 @@ import { User } from '../auth/decorators/user.decorator'
 
 import { AppointmentsService } from './appointments.service'
 import { CreateAppointmentDto } from './dto/create-appointment.dto'
-import { AppointmentSeriesPreviewDto, CreateAppointmentSeriesDto } from './dto/appointment-series-preview.dto'
+import { AppointmentSeriesPreviewDto, CreateAppointmentSeriesDto, RescheduleAppointmentSeriesDto } from './dto/appointment-series-preview.dto'
 import { UpdateAppointmentDto } from './dto/update-appointment.dto'
 import { Throttle } from '@nestjs/throttler'
 import { QuotasService } from '../quotas/quotas.service'
@@ -85,6 +85,14 @@ export class AppointmentsController {
       notes: body.notes,
       idempotencyKey: body.idempotencyKey ?? idempotencyKeyHeader,
     })
+  }
+
+  @Patch(':id/series/following')
+  @Roles('ADMIN', 'MANAGER', 'STAFF')
+  rescheduleSeries(@Org() orgId: string, @User() user: any, @Param('id') id: string, @Body() body: RescheduleAppointmentSeriesDto) {
+    return this.appointments.rescheduleSeries(
+      orgId, id, { userId: user?.userId ?? null, personId: user?.personId ?? null }, body,
+    )
   }
 
   @Patch(':id')

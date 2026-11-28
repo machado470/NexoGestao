@@ -65,6 +65,7 @@ type AppointmentRow = {
   startsAt?: string | null;
   endsAt?: string | null;
   updatedAt?: string | null;
+  seriesId?: string | null;
 };
 
 function parseDate(value?: string | null) {
@@ -293,6 +294,7 @@ export default function AppointmentsPage() {
   const updateMutation = trpc.appointments.update.useMutation();
   const previewSeries = trpc.appointments.previewSeries.useMutation();
   const createSeries = trpc.appointments.createSeries.useMutation();
+  const rescheduleSeries = trpc.appointments.rescheduleSeries.useMutation();
   const seriesAttempts = useRef(new Map<string, string>());
   const [reviewedSeries, setReviewedSeries] = useState<{
     fingerprint: string;
@@ -309,6 +311,7 @@ export default function AppointmentsPage() {
     durationMinutes: "60",
     cadence: "SINGLE" as "SINGLE" | "WEEKLY" | "BIWEEKLY",
     visitCount: "2",
+    editScope: "SINGLE" as "SINGLE" | "FOLLOWING",
   });
 
   const initialForm = useRef(form);
@@ -344,13 +347,17 @@ export default function AppointmentsPage() {
           : "60",
       cadence: "SINGLE" as const,
       visitCount: "2",
+      editScope: "SINGLE" as const,
     };
     initialForm.current = initial;
     setForm(initial);
   }, [assigneeWarningTelemetry.reset, editing, openModal, routeCustomerId, timezone]);
 
   const recurring = !editing && form.cadence !== "SINGLE";
-  const saving = createMutation.isPending || updateMutation.isPending || createSeries.isPending;
+  const canRescheduleFollowing = Boolean(editing?.seriesId && editing.updatedAt &&
+    ["SCHEDULED", "CONFIRMED"].includes(editing.status ?? ""));
+  const reschedulingFollowing = Boolean(editing) && form.editScope === "FOLLOWING";
+  const saving = createMutation.isPending || updateMutation.isPending || createSeries.isPending || rescheduleSeries.isPending;
   const seriesStart = recurring && localeReady
     ? parseLocalDateTimeInput(`${form.date}T${form.time}`, undefined, timezone)
     : null;
@@ -418,7 +425,12 @@ export default function AppointmentsPage() {
           ? undefined
           : form.assignedToPersonId;
       assigneeWarningTelemetry.trackConfirmed(assignedToPersonId, editing?.id);
-      if (editing?.id) {
+      if (editing?.id && reschedulingFollowing && editing.updatedAt) {
+        await rescheduleSeries.mutateAsync({
+          id: editing.id, startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString(),
+          expectedUpdatedAt: editing.updatedAt,
+        });
+      } else if (editing?.id) {
         await updateMutation.mutateAsync({
           id: editing.id,
           startsAt: startsAt.toISOString(),
@@ -450,7 +462,7 @@ export default function AppointmentsPage() {
       }
       setSuccessMessage(
         editing
-          ? "Agendamento atualizado com sucesso."
+          ? reschedulingFollowing ? "Próximas visitas reagendadas." : "Agendamento atualizado com sucesso."
           : recurring ? "Série de agendamentos criada." : "Agendamento criado com sucesso."
       );
       setOpenModal(false);
@@ -1072,6 +1084,23 @@ export default function AppointmentsPage() {
                 sem atribuição.
               </p>
             ) : null}
+            {canRescheduleFollowing && (
+              <AppField label="Aplicar mudança a" htmlFor={`${fieldId}-edit-scope`}>
+                <AppSelect id={`${fieldId}-edit-scope`} value={form.editScope}
+                  onValueChange={scope => setForm(value => ({ ...value, editScope: scope === "FOLLOWING" ? "FOLLOWING" : "SINGLE" }))}
+                  options={[
+                    { value: "SINGLE", label: "Só esta visita" },
+                    { value: "FOLLOWING", label: "Esta e as próximas visitas" },
+                  ]}
+                />
+              </AppField>
+            )}
+            {reschedulingFollowing && (
+              <p className="text-sm text-[var(--text-muted)]">
+                O novo horário e a duração serão aplicados a esta visita e às próximas visitas em aberto da série.
+              </p>
+            )}
+            {!reschedulingFollowing && (
             <AppField label="Cliente" htmlFor={`${fieldId}-field-0`}>
               <AppSelect
                 id={`${fieldId}-field-0`}
@@ -1086,6 +1115,7 @@ export default function AppointmentsPage() {
                 }))}
               />
             </AppField>
+            )}
             <div className="grid gap-3 md:grid-cols-2">
               <AppField label="Data" htmlFor={`${fieldId}-field-1`}>
                 <AppInput
@@ -1130,7 +1160,7 @@ export default function AppointmentsPage() {
                     onChange={event => setForm(value => ({ ...value, visitCount: event.target.value }))}
                   />
                 </AppField>
-              ) : (
+              ) : !reschedulingFollowing && (
                 <AppField label="Status" htmlFor={`${fieldId}-field-3`}>
                   <AppSelect
                     id={`${fieldId}-field-3`}
@@ -1166,6 +1196,7 @@ export default function AppointmentsPage() {
                 />
               </AppField>
             </div>
+            {!reschedulingFollowing && (
             <AppField label="Responsável" htmlFor={`${fieldId}-field-5`}>
               <AppSelect
                 id={`${fieldId}-field-5`}
@@ -1190,6 +1221,7 @@ export default function AppointmentsPage() {
                 onWarningShown={assigneeWarningTelemetry.trackShown}
               />
             </AppField>
+            )}
             {recurring && (
               <section aria-label="Prévia da série" className="grid gap-2 rounded-xl border p-3">
                 <Button type="button" variant="outline" className="justify-self-start"
@@ -1211,6 +1243,7 @@ export default function AppointmentsPage() {
               </section>
             )}
 
+            {!reschedulingFollowing && (
             <AppField label="Observação" htmlFor={`${fieldId}-field-6`}>
               <AppTextarea
                 id={`${fieldId}-field-6`}
@@ -1221,6 +1254,7 @@ export default function AppointmentsPage() {
                 rows={4}
               />
             </AppField>
+            )}
           </AppForm>
         </FormModal>
         {discardGuard.confirmation}
