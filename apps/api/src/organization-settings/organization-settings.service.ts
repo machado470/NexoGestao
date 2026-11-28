@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { AUDIT_ACTIONS } from '../audit/audit.actions'
 import { PrismaService } from '../prisma/prisma.service'
 import { UpdateOrganizationSettingsDto } from './dto/update-organization-settings.dto'
 
@@ -94,29 +95,46 @@ export class OrganizationSettingsService {
   async updateOrganizationSettings(
     orgId: string,
     data: UpdateOrganizationSettingsDto,
+    actor: { userId: string | null; personId: string | null },
   ) {
     try {
-      const organization = await this.prisma.organization.update({
-        where: { id: orgId },
-        data: {
-          ...(data.name !== undefined ? { name: data.name } : {}),
-          ...(data.timezone !== undefined ? { timezone: data.timezone } : {}),
-          ...(data.currency !== undefined ? { currency: data.currency } : {}),
-        },
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          timezone: true,
-          currency: true,
-        },
+      const organization = await this.prisma.$transaction(async tx => {
+        const [before] = await tx.$queryRaw<Array<{
+          id: string; name: string; slug: string; timezone: string; currency: string
+        }>>`
+          SELECT id, name, slug, timezone, currency
+          FROM "Organization" WHERE id = ${orgId} FOR NO KEY UPDATE
+        `
+        if (!before) throw new NotFoundException('Organização não encontrada.')
+
+        const changes: UpdateOrganizationSettingsDto = {}
+        const metadata: Record<string, string> = {}
+        for (const field of ['name', 'timezone', 'currency'] as const) {
+          const next = data[field]
+          if (next === undefined || next === before[field]) continue
+          Object.assign(changes, { [field]: next })
+          metadata[`${field}Before`] = before[field]
+          metadata[`${field}After`] = next
+        }
+        if (!Object.keys(changes).length) return before
+
+        const updated = await tx.organization.update({
+          where: { id: orgId },
+          data: changes,
+          select: { id: true, name: true, slug: true, timezone: true, currency: true },
+        })
+        await tx.auditEvent.create({
+          data: {
+            orgId, personId: actor.personId, actorPersonId: actor.personId, actorUserId: actor.userId,
+            action: AUDIT_ACTIONS.ORGANIZATION_SETTINGS_UPDATED,
+            entityType: 'ORGANIZATION', entityId: orgId,
+            context: 'Configurações da empresa atualizadas', metadata,
+          },
+        })
+        return updated
       })
 
-      return {
-        ...organization,
-        currentPlan: 'Nenhum',
-        membersCount: 0,
-      }
+      return { ...organization, currentPlan: 'Nenhum', membersCount: 0 }
     } catch (error) {
       this.logger.error(
         `Erro ao atualizar configurações da organização ${orgId}: ${

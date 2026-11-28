@@ -42,7 +42,7 @@ describe('organization settings HTTP validation', () => {
     const response = await request(app.getHttpServer()).patch('/organization-settings')
       .send({ name: '  Oficina  ', timezone: ' UTC ', currency: 'BRL' }).expect(200)
     expect(response.body).toEqual({ name: 'Oficina', timezone: 'UTC', currency: 'BRL' })
-    expect(update).toHaveBeenCalledWith('authenticated-org', expect.objectContaining(response.body))
+    expect(update).toHaveBeenCalledWith('authenticated-org', expect.objectContaining(response.body), { userId: null, personId: null })
   })
 
   it('preserves partial updates without inventing missing fields', async () => {

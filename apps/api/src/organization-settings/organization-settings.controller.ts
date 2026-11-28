@@ -32,6 +32,9 @@ export class OrganizationSettingsController {
   @Patch()
   async updateSettings(@Request() req, @Body() updateOrganizationSettingsDto: UpdateOrganizationSettingsDto) {
     const orgId = req.user.orgId;
-    return this.organizationSettingsService.updateOrganizationSettings(orgId, updateOrganizationSettingsDto);
+    return this.organizationSettingsService.updateOrganizationSettings(orgId, updateOrganizationSettingsDto, {
+      userId: req.user.userId ?? null,
+      personId: req.user.personId ?? null,
+    });
   }
 }
