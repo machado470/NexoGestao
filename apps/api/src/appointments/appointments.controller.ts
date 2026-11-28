@@ -17,7 +17,7 @@ import { User } from '../auth/decorators/user.decorator'
 
 import { AppointmentsService } from './appointments.service'
 import { CreateAppointmentDto } from './dto/create-appointment.dto'
-import { AppointmentSeriesPreviewDto, CreateAppointmentSeriesDto, RescheduleAppointmentSeriesDto } from './dto/appointment-series-preview.dto'
+import { AppointmentSeriesPreviewDto, CreateAppointmentSeriesDto, CancelAppointmentSeriesDto, RescheduleAppointmentSeriesDto } from './dto/appointment-series-preview.dto'
 import { UpdateAppointmentDto } from './dto/update-appointment.dto'
 import { Throttle } from '@nestjs/throttler'
 import { QuotasService } from '../quotas/quotas.service'
@@ -92,6 +92,14 @@ export class AppointmentsController {
   rescheduleSeries(@Org() orgId: string, @User() user: any, @Param('id') id: string, @Body() body: RescheduleAppointmentSeriesDto) {
     return this.appointments.rescheduleSeries(
       orgId, id, { userId: user?.userId ?? null, personId: user?.personId ?? null }, body,
+    )
+  }
+
+  @Patch(':id/series/following/cancel')
+  @Roles('ADMIN', 'MANAGER', 'STAFF')
+  cancelSeries(@Org() orgId: string, @User() user: any, @Param('id') id: string, @Body() body: CancelAppointmentSeriesDto) {
+    return this.appointments.cancelSeries(
+      orgId, id, { userId: user?.userId ?? null, personId: user?.personId ?? null }, body.expectedUpdatedAt,
     )
   }
 

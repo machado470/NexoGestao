@@ -38,7 +38,13 @@ export class CreateAppointmentSeriesDto extends AppointmentSeriesPreviewDto {
   notes?: string
 }
 
-export class RescheduleAppointmentSeriesDto {
+export class CancelAppointmentSeriesDto {
+  @IsISO8601({ strict: true })
+  @Matches(/T.*(?:Z|[+-]\d{2}:\d{2})$/i)
+  expectedUpdatedAt!: string
+}
+
+export class RescheduleAppointmentSeriesDto extends CancelAppointmentSeriesDto {
   @IsISO8601({ strict: true })
   @Matches(/T.*(?:Z|[+-]\d{2}:\d{2})$/i)
   startsAt!: string
@@ -46,8 +52,4 @@ export class RescheduleAppointmentSeriesDto {
   @IsISO8601({ strict: true })
   @Matches(/T.*(?:Z|[+-]\d{2}:\d{2})$/i)
   endsAt!: string
-
-  @IsISO8601({ strict: true })
-  @Matches(/T.*(?:Z|[+-]\d{2}:\d{2})$/i)
-  expectedUpdatedAt!: string
 }

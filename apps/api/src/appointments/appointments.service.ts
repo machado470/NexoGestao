@@ -38,7 +38,7 @@ function normalizeNotes(v?: string): string | null {
   return s ? s : null
 }
 
-function parseExpectedUpdatedAt(value?: string): Date | null {
+function parseExpectedUpdatedAt(value?: string): Date {
   if (!value) {
     throw new BadRequestException({
       code: 'EXPECTED_UPDATED_AT_REQUIRED',
@@ -308,7 +308,7 @@ export class AppointmentsService {
       customerId: string
       appointmentId: string
       personId: string | null
-      action: 'APPOINTMENT_CREATED' | 'APPOINTMENT_UPDATED'
+      action: 'APPOINTMENT_CREATED' | 'APPOINTMENT_UPDATED' | 'APPOINTMENT_CANCELLED'
       description: string
       metadata: Prisma.InputJsonObject
     }>,
@@ -424,6 +424,77 @@ export class AppointmentsService {
     }
   }
 
+  private async lockFollowingVisits(
+    tx: Prisma.TransactionClient, orgId: string, id: string, expectedUpdatedAt: Date, now: Date,
+  ) {
+    const candidate = await tx.appointment.findFirst({
+      where: { id, orgId }, select: { seriesId: true },
+    })
+    if (!candidate?.seriesId) throw new NotFoundException('Visita recorrente não encontrada.')
+    const seriesId = candidate.seriesId
+    const [series] = await tx.$queryRaw<Array<{ cadence: 'WEEKLY' | 'BIWEEKLY'; timezone: string }>>`
+      SELECT cadence, timezone FROM "AppointmentSeries"
+      WHERE id = ${seriesId} AND "orgId" = ${orgId} FOR UPDATE
+    `
+    if (!series) throw new NotFoundException('Série não encontrada.')
+    const anchor = await tx.appointment.findFirst({
+      where: { id, orgId, seriesId, startsAt: { gte: now }, status: { in: ['SCHEDULED', 'CONFIRMED'] } },
+    })
+    if (!anchor || anchor.seriesPosition === null || anchor.updatedAt.getTime() !== expectedUpdatedAt.getTime()) {
+      throw new ConflictException('A visita foi alterada ou encerrada. Recarregue a agenda.')
+    }
+    const position = anchor.seriesPosition
+    const visits = await tx.appointment.findMany({
+      where: {
+        orgId, seriesId, seriesPosition: { gte: position }, startsAt: { gte: now },
+        status: { in: ['SCHEDULED', 'CONFIRMED'] },
+      },
+      orderBy: { seriesPosition: 'asc' },
+    })
+    if (!visits.some(visit => visit.id === id)) {
+      throw new ConflictException('A visita foi alterada ou encerrada. Recarregue a agenda.')
+    }
+    return { seriesId, series, position, visits }
+  }
+
+  async cancelSeries(
+    orgId: string,
+    id: string,
+    actor: { userId: string | null; personId: string | null },
+    version: string,
+  ) {
+    const expectedUpdatedAt = parseExpectedUpdatedAt(version)
+    return this.prisma.$transaction(async tx => {
+      const { seriesId, visits } = await this.lockFollowingVisits(tx, orgId, id, expectedUpdatedAt, new Date())
+      for (const visit of visits) {
+        const changed = await tx.appointment.updateMany({
+          where: { id: visit.id, orgId, status: visit.status, updatedAt: visit.id === id ? expectedUpdatedAt : visit.updatedAt },
+          data: { status: 'CANCELED' },
+        })
+        if (changed.count !== 1) throw new ConflictException('Uma visita mudou. Recarregue a agenda.')
+      }
+
+      const visitIds = visits.map(visit => visit.id)
+      await this.publishSeriesTimeline(tx, visits.map(visit => ({
+        orgId, customerId: visit.customerId, appointmentId: visit.id, personId: actor.personId,
+        action: 'APPOINTMENT_CANCELLED', description: 'Visita cancelada em série',
+        metadata: {
+          seriesId, appointmentId: visit.id, customerId: visit.customerId,
+          scheduledAt: visit.startsAt.toISOString(), previousStatus: visit.status, nextStatus: 'CANCELED',
+        },
+      })), actor.userId)
+      await tx.auditEvent.create({
+        data: {
+          orgId, personId: actor.personId, actorPersonId: actor.personId, actorUserId: actor.userId,
+          action: AUDIT_ACTIONS.APPOINTMENT_UPDATED, context: 'Próximas visitas canceladas',
+          entityType: 'APPOINTMENT_SERIES', entityId: seriesId,
+          metadata: { seriesId, visitIds },
+        },
+      })
+      return { seriesId, visitIds }
+    })
+  }
+
   async rescheduleSeries(
     orgId: string,
     id: string,
@@ -440,33 +511,7 @@ export class AppointmentsService {
 
     try {
       return await this.prisma.$transaction(async tx => {
-        const candidate = await tx.appointment.findFirst({
-          where: { id, orgId }, select: { seriesId: true },
-        })
-        if (!candidate?.seriesId) throw new NotFoundException('Visita recorrente não encontrada.')
-        const seriesId = candidate.seriesId
-        const [series] = await tx.$queryRaw<Array<{ cadence: 'WEEKLY' | 'BIWEEKLY'; timezone: string }>>`
-          SELECT cadence, timezone FROM "AppointmentSeries"
-          WHERE id = ${seriesId} AND "orgId" = ${orgId} FOR UPDATE
-        `
-        if (!series) throw new NotFoundException('Série não encontrada.')
-        const anchor = await tx.appointment.findFirst({
-          where: { id, orgId, seriesId, startsAt: { gte: now }, status: { in: ['SCHEDULED', 'CONFIRMED'] } },
-        })
-        if (!anchor || !expectedUpdatedAt || anchor.seriesPosition === null || anchor.updatedAt.getTime() !== expectedUpdatedAt.getTime()) {
-          throw new ConflictException('A visita foi alterada ou encerrada. Recarregue a agenda.')
-        }
-        const position = anchor.seriesPosition
-        const visits = await tx.appointment.findMany({
-          where: {
-            orgId, seriesId, seriesPosition: { gte: position }, startsAt: { gte: now },
-            status: { in: ['SCHEDULED', 'CONFIRMED'] },
-          },
-          orderBy: { seriesPosition: 'asc' },
-        })
-        if (!visits.some(visit => visit.id === id)) {
-          throw new ConflictException('A visita foi alterada ou encerrada. Recarregue a agenda.')
-        }
+        const { seriesId, series, position, visits } = await this.lockFollowingVisits(tx, orgId, id, expectedUpdatedAt, now)
         const span = (visits.at(-1)?.seriesPosition ?? position) - position + 1
         const dates = span === 1 ? [{ startsAt, endsAt }]
           : previewAppointmentSeries(startsAt, endsAt, series.timezone, series.cadence, span)

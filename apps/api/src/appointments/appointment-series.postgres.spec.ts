@@ -129,4 +129,35 @@ describePostgres('appointment series with isolated PostgreSQL', () => {
     expect(await db.appointment.findUnique({ where: { id: selected } }))
       .toMatchObject({ startsAt: concurrentStartsAt })
   })
+
+  it('cancels the selected and following open visits once, with audit and outbox events', async () => {
+    const customer = await db.customer.create({ data: { orgId, name: 'Cliente cancelamento', phone: '11988887777' } })
+    const actor = { userId: null, personId: null }
+    const series = await service.createSeries(orgId, actor, {
+      customerId: customer.id, cadence: 'WEEKLY', startsAt: '2031-05-05T12:00:00Z',
+      count: 4, entryKey: randomUUID(),
+    }, async () => {})
+    const [earlier, selected, completed, last] = series.visitIds
+    await db.appointment.update({ where: { id: completed }, data: { status: 'DONE' } })
+    const anchor = await db.appointment.findUniqueOrThrow({ where: { id: selected } })
+    const version = anchor.updatedAt.toISOString()
+
+    await expect(service.cancelSeries(randomUUID(), selected, actor, version)).rejects.toMatchObject({ status: 404 })
+    const results = await Promise.allSettled([
+      service.cancelSeries(orgId, selected, actor, version),
+      service.cancelSeries(orgId, selected, actor, version),
+    ])
+    expect(results).toEqual(expect.arrayContaining([
+      { status: 'fulfilled', value: { seriesId: series.seriesId, visitIds: [selected, last] } },
+      { status: 'rejected', reason: expect.objectContaining({ status: 409 }) },
+    ]))
+    const visits = await db.appointment.findMany({ where: { orgId, seriesId: series.seriesId }, orderBy: { seriesPosition: 'asc' } })
+    expect(visits.map(visit => [visit.id, visit.status])).toEqual([
+      [earlier, 'SCHEDULED'], [selected, 'CANCELED'], [completed, 'DONE'], [last, 'CANCELED'],
+    ])
+    expect(await db.timelineEvent.count({ where: { orgId, action: 'APPOINTMENT_CANCELLED', appointmentId: { in: series.visitIds } } })).toBe(2)
+    expect(await db.operationalOutboxEvent.count({ where: { orgId, eventType: 'APPOINTMENT_CANCELLED', aggregateId: { in: series.visitIds } } })).toBe(2)
+    expect(await db.auditEvent.count({ where: { orgId, entityId: series.seriesId, context: 'Próximas visitas canceladas' } })).toBe(1)
+  })
+
 })

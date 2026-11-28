@@ -98,6 +98,16 @@ export const appointmentsRouter = router({
         authedPatch(ctx as NexoContext, `/appointments/${id}/series/following`, input)
       ),
 
+    cancelSeries: protectedProcedure
+      .input(z.object({
+        id: z.string().uuid(),
+        expectedUpdatedAt: z.string().datetime({ offset: true }),
+      }).strict())
+      .output(z.object({ seriesId: z.string().uuid(), visitIds: z.array(z.string().uuid()) }))
+      .mutation(({ ctx, input: { id, ...input } }) =>
+        authedPatch(ctx as NexoContext, `/appointments/${id}/series/following/cancel`, input)
+      ),
+
     create: protectedProcedure.input(appointmentCreateInput).mutation(async ({ ctx, input }) => {
       return authedPost(ctx as NexoContext, "/appointments", input);
     }),
