@@ -16,6 +16,7 @@ import { AutomationService } from '../automation/automation.service'
 import {
   ensureAppointmentTransition,
 } from '../common/domain/state-transitions'
+import { OutboxService } from '../outbox/outbox.service'
 import { IdempotencyService } from '../common/idempotency/idempotency.service'
 import { previewAppointmentSeries } from './appointment-series-preview'
 import { AppointmentSeriesPreviewDto, CreateAppointmentSeriesDto, RescheduleAppointmentSeriesDto } from './dto/appointment-series-preview.dto'
@@ -129,6 +130,7 @@ export class AppointmentsService {
     private readonly risk: RiskService,
     private readonly automation: AutomationService,
     private readonly idempotency: IdempotencyService,
+    private readonly outbox: OutboxService,
   ) {}
 
   private async enqueueAppointmentWorkflow(params: {
@@ -299,6 +301,38 @@ export class AppointmentsService {
     return { timezone: organization.timezone, visits: planned }
   }
 
+  private async publishSeriesTimeline(
+    tx: Prisma.TransactionClient,
+    events: Array<{
+      orgId: string
+      customerId: string
+      appointmentId: string
+      personId: string | null
+      action: 'APPOINTMENT_CREATED' | 'APPOINTMENT_UPDATED'
+      description: string
+      metadata: Prisma.InputJsonObject
+    }>,
+    actorUserId: string | null,
+  ) {
+    const timeline = await tx.timelineEvent.createManyAndReturn({ data: events })
+    for (const event of timeline) {
+      await this.outbox.enqueue(tx, {
+        orgId: event.orgId,
+        eventType: event.action,
+        aggregateType: 'Appointment',
+        aggregateId: event.appointmentId!,
+        actorId: actorUserId,
+        idempotencyKey: `appointment-series-timeline:${event.id}`,
+        payload: {
+          timelineEventId: event.id,
+          personId: event.personId,
+          description: event.description,
+          metadata: event.metadata ?? null,
+        },
+      })
+    }
+  }
+
   async createSeries(
     orgId: string,
     actor: { userId: string | null; personId: string | null },
@@ -360,13 +394,11 @@ export class AppointmentsService {
           })),
           select: { id: true, seriesPosition: true, startsAt: true },
         })
-        await tx.timelineEvent.createMany({
-          data: created.map(visit => ({
+        await this.publishSeriesTimeline(tx, created.map(visit => ({
             orgId, customerId: customer.id, appointmentId: visit.id, personId: actor.personId,
             action: 'APPOINTMENT_CREATED', description: `Agendamento criado: ${customer.name}`,
-            metadata: { appointmentId: visit.id, seriesId: series.id, scheduledAt: visit.startsAt.toISOString() },
-          })),
-        })
+            metadata: { appointmentId: visit.id, customerId: customer.id, seriesId: series.id, scheduledAt: visit.startsAt.toISOString() },
+          })), actor.userId)
         await tx.auditEvent.create({
           data: {
             orgId, personId: actor.personId, actorPersonId: actor.personId, actorUserId: actor.userId,
@@ -461,17 +493,17 @@ export class AppointmentsService {
           })
         }
 
-        await tx.timelineEvent.createMany({
-          data: visits.map(visit => ({
+        await this.publishSeriesTimeline(tx, visits.map(visit => ({
             orgId, customerId: visit.customerId, appointmentId: visit.id, personId: actor.personId,
             action: 'APPOINTMENT_UPDATED', description: 'Visita reagendada em série',
             metadata: {
               seriesId,
+              appointmentId: visit.id,
+              customerId: visit.customerId,
               previousStartsAt: visit.startsAt.toISOString(),
               scheduledAt: dates[visit.seriesPosition! - position].startsAt.toISOString(),
             },
-          })),
-        })
+          })), actor.userId)
         await tx.auditEvent.create({
           data: {
             orgId, personId: actor.personId, actorPersonId: actor.personId, actorUserId: actor.userId,

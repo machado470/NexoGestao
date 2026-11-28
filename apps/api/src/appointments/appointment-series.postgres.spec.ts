@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { PrismaClient } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
+import { OutboxService } from '../outbox/outbox.service'
 import { AppointmentsService } from './appointments.service'
 
 const url = 'postgresql://nexo@127.0.0.1:55439/postgres'
@@ -9,7 +10,8 @@ const describePostgres = process.env.APPOINTMENT_SERIES_TEST_DATABASE_URL === ur
 describePostgres('appointment series with isolated PostgreSQL', () => {
   const db = new PrismaClient({ datasources: { db: { url } } })
   const orgId = randomUUID()
-  const service = new AppointmentsService(db as PrismaService, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any)
+  const outbox = new OutboxService({} as any)
+  const service = new AppointmentsService(db as PrismaService, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, outbox)
 
   beforeAll(async () => {
     await db.organization.create({ data: { id: orgId, name: 'Agenda de teste', slug: orgId } })
@@ -18,6 +20,7 @@ describePostgres('appointment series with isolated PostgreSQL', () => {
   afterAll(async () => {
     try {
       const where = { orgId }
+      await db.operationalOutboxEvent.deleteMany({ where })
       await db.timelineEvent.deleteMany({ where })
       await db.auditEvent.deleteMany({ where })
       await db.appointment.deleteMany({ where })
@@ -51,11 +54,16 @@ describePostgres('appointment series with isolated PostgreSQL', () => {
     expect(await db.appointment.count({ where: { orgId } })).toBe(3)
     expect(await db.timelineEvent.count({ where: { orgId } })).toBe(3)
     expect(await db.auditEvent.count({ where: { orgId } })).toBe(1)
+    const createdEvents = await db.operationalOutboxEvent.findMany({ where: { orgId, eventType: 'APPOINTMENT_CREATED' } })
+    expect(createdEvents).toHaveLength(3)
+    expect(new Set(createdEvents.map(event => event.aggregateId)).size).toBe(3)
+    expect(createdEvents.every(event => event.status === 'PENDING')).toBe(true)
     const accepted = winner ? other : input
     const rejectQuota = jest.fn().mockRejectedValue(new Error('Sem cota'))
     await expect(service.createSeries(orgId, actor, accepted, rejectQuota))
       .resolves.toEqual((outcomes[winner] as PromiseFulfilledResult<unknown>).value)
     expect(rejectQuota).not.toHaveBeenCalled()
+    expect(await db.operationalOutboxEvent.count({ where: { orgId, eventType: 'APPOINTMENT_CREATED' } })).toBe(3)
     await expect(service.createSeries(orgId, actor, { ...accepted, count: 4 }, quota))
       .rejects.toMatchObject({ status: 409 })
   })
@@ -88,6 +96,8 @@ describePostgres('appointment series with isolated PostgreSQL', () => {
     await db.appointment.delete({ where: { id: conflict.id } })
     await expect(service.rescheduleSeries(orgId, selected, actor, replacement))
       .resolves.toEqual({ seriesId: series.seriesId, visitIds: [selected, last] })
+    const updatedEvents = await db.operationalOutboxEvent.findMany({ where: { orgId, eventType: 'APPOINTMENT_UPDATED' } })
+    expect(updatedEvents.map(event => event.aggregateId).sort()).toEqual([selected, last].sort())
     const rows = await db.appointment.findMany({
       where: { orgId, seriesId: series.seriesId }, orderBy: { seriesPosition: 'asc' },
     })
@@ -112,7 +122,7 @@ describePostgres('appointment series with isolated PostgreSQL', () => {
         },
       } },
     })
-    const racingService = new AppointmentsService(racingDb as unknown as PrismaService, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any)
+    const racingService = new AppointmentsService(racingDb as unknown as PrismaService, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, outbox)
     await expect(racingService.rescheduleSeries(orgId, selected, actor, {
       ...replacement, expectedUpdatedAt: current.updatedAt.toISOString(),
     })).rejects.toMatchObject({ status: 409 })
