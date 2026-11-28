@@ -9,7 +9,6 @@ import {
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { AuthCard } from "@/components/ui/context-cards";
 import { Input } from "@/components/ui/input";
@@ -102,7 +101,7 @@ export default function AcceptInvitePage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <main className="min-h-screen bg-background text-foreground">
       <div className="flex min-h-screen items-center justify-center p-6 sm:p-8">
         <div className="w-full max-w-md">
           <button
@@ -120,7 +119,7 @@ export default function AcceptInvitePage() {
                 Convite de equipe
               </Badge>
               <div>
-                <CardTitle className="text-2xl">Aceitar convite</CardTitle>
+                <h1 className="text-2xl font-semibold leading-none tracking-tight text-[var(--text-primary)]">Aceitar convite</h1>
                 <CardDescription className="mt-2 text-sm leading-6">
                   Defina seu acesso para entrar na plataforma.
                 </CardDescription>
@@ -184,7 +183,7 @@ export default function AcceptInvitePage() {
                 </div>
 
                 {errorText ? (
-                  <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
+                  <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
                     {errorText}
                   </div>
                 ) : null}
@@ -209,6 +208,6 @@ export default function AcceptInvitePage() {
           </AuthCard>
         </div>
       </div>
-    </div>
+    </main>
   );
 }
