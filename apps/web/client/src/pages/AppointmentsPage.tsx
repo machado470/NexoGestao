@@ -22,7 +22,7 @@ import { trpc } from "@/lib/trpc";
 import { normalizeArrayPayload } from "@/lib/query-helpers";
 import type { OperationalSeverity } from "@/lib/operations/operational-intelligence";
 import { Button } from "@/components/ui/button";
-import { FormModal } from "@/components/app-modal-system";
+import { ConfirmModal, FormModal } from "@/components/app-modal-system";
 import {
   AppField,
   AppForm,
@@ -129,6 +129,7 @@ export default function AppointmentsPage() {
   const [openModal, setOpenModal] = useState(false);
   useCreateFromRoute("appointments:create", setOpenModal);
   const createTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const [cancelFollowing, setCancelFollowing] = useState<AppointmentRow | null>(null);
   const [editing, setEditing] = useState<AppointmentRow | null>(null);
   const [openServiceOrderModal, setOpenServiceOrderModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -294,6 +295,7 @@ export default function AppointmentsPage() {
   const updateMutation = trpc.appointments.update.useMutation();
   const previewSeries = trpc.appointments.previewSeries.useMutation();
   const createSeries = trpc.appointments.createSeries.useMutation();
+  const cancelSeries = trpc.appointments.cancelSeries.useMutation();
   const rescheduleSeries = trpc.appointments.rescheduleSeries.useMutation();
   const seriesAttempts = useRef(new Map<string, string>());
   const [reviewedSeries, setReviewedSeries] = useState<{
@@ -496,6 +498,26 @@ export default function AppointmentsPage() {
       );
     } catch (error: any) {
       toast.error(error?.message ?? "Falha ao atualizar status.");
+    }
+  }
+
+  async function confirmCancelFollowing() {
+    if (!canEditAppointment || !cancelFollowing?.updatedAt || cancelSeries.isPending) return;
+    try {
+      const result = await cancelSeries.mutateAsync({
+        id: String(cancelFollowing.id),
+        expectedUpdatedAt: cancelFollowing.updatedAt,
+      });
+      setCancelFollowing(null);
+      setSuccessMessage(result.visitIds.length === 1
+        ? "Uma visita cancelada."
+        : `${result.visitIds.length} visitas canceladas.`);
+      void Promise.all([
+        utils.appointments.list.invalidate(),
+        utils.appointments.page.invalidate(),
+      ]).catch(() => toast.warning("Cancelamento salvo. Atualize a consulta para conferir os dados."));
+    } catch (error: any) {
+      toast.error(error?.message ?? "Falha ao cancelar as visitas da série.");
     }
   }
 
@@ -837,6 +859,12 @@ export default function AppointmentsPage() {
                                   !row.id ||
                                   row.status === "CANCELED",
                               },
+                              ...(row.item.seriesId && row.item.updatedAt &&
+                                ["SCHEDULED", "CONFIRMED"].includes(row.status) ? [{
+                                  label: "Cancelar esta e as próximas visitas",
+                                  onSelect: () => setCancelFollowing(row.item),
+                                  disabled: !canEditAppointment,
+                                }] : []),
                               {
                                 label: row.order?.id
                                   ? "Abrir O.S."
@@ -1259,6 +1287,17 @@ export default function AppointmentsPage() {
         </FormModal>
         {discardGuard.confirmation}
       </div>
+      <ConfirmModal
+        open={cancelFollowing !== null && canEditAppointment}
+        onOpenChange={open => { if (!open && !cancelSeries.isPending) setCancelFollowing(null); }}
+        title="Cancelar esta e as próximas visitas?"
+        description="O cancelamento afeta apenas as visitas futuras em aberto desta série. Visitas anteriores, visitas encerradas e ordens de serviço vinculadas serão preservadas."
+        confirmLabel="Cancelar visitas"
+        cancelLabel="Voltar"
+        onConfirm={confirmCancelFollowing}
+        isPending={cancelSeries.isPending}
+      />
+
       <CreateServiceOrderModal
         isOpen={openServiceOrderModal && canCreateOrder}
         onClose={() => setOpenServiceOrderModal(false)}
