@@ -1,3 +1,5 @@
+import { Link, useLocation } from "wouter";
+import { cn } from "@/lib/utils";
 import { BaseModal } from "@/components/app-modal-system";
 import { formatOrganizationDate, formatRecordedMoney } from "@/lib/organization-locale";
 import { AccountNavigation } from "@/components/AccountNavigation";
@@ -55,10 +57,12 @@ const currencyOptions = [
 ];
 
 export default function SettingsPage() {
+  const [location] = useLocation();
+  const teamSection = location === "/settings/access";
   const { isAuthenticated } = useAuth();
   const utils = trpc.useUtils();
   const settingsQuery = trpc.settings.get.useQuery(undefined, {
-    enabled: isAuthenticated,
+    enabled: isAuthenticated && !teamSection,
     retry: false,
   });
   const settings = normalizeObjectPayload<OrganizationSettings>(
@@ -134,7 +138,7 @@ export default function SettingsPage() {
   };
 
   const discardGuard = useFormDiscardGuard({
-    open: true,
+    open: !teamSection,
     dirty: hasChanges,
     blocked: updateMutation.isPending,
     onDiscard: resetForm,
@@ -160,15 +164,15 @@ export default function SettingsPage() {
         {preferenceChanges.map(change => <p key={change} className="mb-3 text-sm">{change}</p>)}
       </BaseModal>
       <MobileModuleHeader
-        title="Configurações"
-        description="Preferências da sua organização."
+        title="Configurações da empresa"
+        description={teamSection ? "Equipe e acessos." : "Dados e preferências."}
         context={hasChanges ? "Alterações não salvas" : settings?.name}
       />
       <div className="hidden md:block">
         <AppOperationalHeader
-          title="Configurações"
+          title="Configurações da empresa"
           description="Defina os dados que orientam o funcionamento desta organização."
-          primaryAction={
+          primaryAction={!teamSection ? (
             <Button
               type="submit"
               form="organization-settings-form"
@@ -178,8 +182,8 @@ export default function SettingsPage() {
             >
               {updateMutation.isPending ? "Salvando..." : "Salvar alterações"}
             </Button>
-          }
-          secondaryActions={
+          ) : undefined}
+          secondaryActions={!teamSection ? (
             <Button
               type="button"
               variant="outline"
@@ -189,7 +193,7 @@ export default function SettingsPage() {
               <RefreshCw className="mr-2 size-4" aria-hidden="true" />
               Atualizar
             </Button>
-          }
+          ) : undefined}
           contextChips={
             settings ? (
               <>
@@ -205,186 +209,207 @@ export default function SettingsPage() {
 
       <AccountNavigation current="/settings" />
 
-      <AppSectionBlock
-        title="Organização"
-        subtitle="Estas preferências se aplicam a toda a organização."
-      >
-        {settingsQuery.isError && settings ? (
-          <p role="alert" className="mb-4 text-sm text-destructive">
-            Não foi possível atualizar as configurações. Suas edições foram
-            preservadas.
-          </p>
-        ) : null}
-        {settingsQuery.isLoading ? (
-          <AppPageLoadingState
-            title="Carregando configurações"
-            description="Consultando os valores persistidos da organização."
-          />
-        ) : settingsQuery.isError && !settings ? (
-          <AppPageErrorState
-            title="Configurações indisponíveis"
-            description="A fonte oficial não respondeu. Nenhum valor padrão foi presumido."
-            actionLabel="Tentar novamente"
-            onAction={() => void settingsQuery.refetch()}
-          />
-        ) : !settings ? (
-          <AppPageErrorState
-            title="Configurações não retornadas"
-            description="A consulta terminou sem dados utilizáveis da organização."
-            actionLabel="Consultar novamente"
-            onAction={() => void settingsQuery.refetch()}
-          />
-        ) : (
-          <AppForm id="organization-settings-form" onSubmit={handleSubmit}>
-            <AppFieldGroup>
-              <AppField label="Nome da organização" htmlFor="settings-name">
-                <AppInput
-                  id="settings-name"
-                  name="name"
-                  autoComplete="organization"
-                  value={name}
-                  onChange={event => {
-                    dispatch({
-                      type: "edit",
-                      values: { name: event.target.value },
-                    });
-                    updateMutation.reset();
-                  }}
-                  aria-invalid={name.trim() === ""}
-                  aria-describedby={
-                    name.trim() === "" ? "settings-name-error" : undefined
-                  }
-                  disabled={updateMutation.isPending}
-                  required
-                />
-                {name.trim() === "" ? (
-                  <p
-                    id="settings-name-error"
-                    className="text-xs text-destructive"
-                  >
-                    Informe o nome da organização.
+      <div className="grid min-w-0 gap-4 lg:grid-cols-[14rem_minmax(0,1fr)]">
+        <nav aria-label="Configurações da empresa" className="flex flex-wrap content-start gap-1 border-b pb-3 lg:flex-col lg:border-b-0 lg:border-r lg:pb-0 lg:pr-3">
+          {[
+            { href: "/settings", label: "Dados e preferências", active: !teamSection },
+            { href: "/settings/access", label: "Equipe e acessos", active: teamSection },
+            { href: "/audit?action=ORGANIZATION_SETTINGS_UPDATED", label: "Histórico de alterações", active: false },
+          ].map(({ href, label, active }) => (
+            <Link key={href} href={href} aria-current={active ? "page" : undefined} className={cn(
+              "inline-flex min-h-11 items-center rounded-md border-l-2 px-3 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2",
+              active ? "border-primary bg-primary/10 text-foreground" : "border-transparent text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+            )}>
+              {label}
+            </Link>
+          ))}
+        </nav>
+        <div className="min-w-0">
+          {teamSection ? <OrganizationAccessSection /> : (
+            <>
+              <AppSectionBlock
+                title="Dados e preferências"
+                subtitle="Estas preferências se aplicam a toda a organização."
+              >
+                {settingsQuery.isError && settings ? (
+                  <p role="alert" className="mb-4 text-sm text-destructive">
+                    Não foi possível atualizar as configurações. Suas edições foram
+                    preservadas.
                   </p>
                 ) : null}
-              </AppField>
+                {settingsQuery.isLoading ? (
+                  <AppPageLoadingState
+                    title="Carregando configurações"
+                    description="Consultando os valores persistidos da organização."
+                  />
+                ) : settingsQuery.isError && !settings ? (
+                  <AppPageErrorState
+                    title="Configurações indisponíveis"
+                    description="A fonte oficial não respondeu. Nenhum valor padrão foi presumido."
+                    actionLabel="Tentar novamente"
+                    onAction={() => void settingsQuery.refetch()}
+                  />
+                ) : !settings ? (
+                  <AppPageErrorState
+                    title="Configurações não retornadas"
+                    description="A consulta terminou sem dados utilizáveis da organização."
+                    actionLabel="Consultar novamente"
+                    onAction={() => void settingsQuery.refetch()}
+                  />
+                ) : (
+                  <AppForm id="organization-settings-form" onSubmit={handleSubmit}>
+                    <AppFieldGroup>
+                      <AppField label="Nome da organização" htmlFor="settings-name">
+                        <AppInput
+                          id="settings-name"
+                          name="name"
+                          autoComplete="organization"
+                          value={name}
+                          onChange={event => {
+                            dispatch({
+                              type: "edit",
+                              values: { name: event.target.value },
+                            });
+                            updateMutation.reset();
+                          }}
+                          aria-invalid={name.trim() === ""}
+                          aria-describedby={
+                            name.trim() === "" ? "settings-name-error" : undefined
+                          }
+                          disabled={updateMutation.isPending}
+                          required
+                        />
+                        {name.trim() === "" ? (
+                          <p
+                            id="settings-name-error"
+                            className="text-xs text-destructive"
+                          >
+                            Informe o nome da organização.
+                          </p>
+                        ) : null}
+                      </AppField>
 
-              <AppField
-                label="Fuso horário"
-                htmlFor="settings-timezone"
-                hint="Usado para apresentar datas e horários da operação."
-              >
-                <AppInput
-                  id="settings-timezone"
-                  name="timezone"
-                  value={timezone}
-                  onChange={event => {
-                    dispatch({
-                      type: "edit",
-                      values: { timezone: event.target.value },
-                    });
-                    updateMutation.reset();
-                  }}
-                  placeholder="America/Sao_Paulo"
-                  aria-invalid={!timezoneValid}
-                  aria-describedby={
-                    !timezoneValid ? "settings-timezone-error" : undefined
-                  }
-                  disabled={updateMutation.isPending}
-                  required
-                />
-                {!timezoneValid ? (
-                  <p
-                    id="settings-timezone-error"
-                    className="text-xs text-destructive"
-                  >
-                    Informe um fuso horário válido, como America/Sao_Paulo ou
-                    UTC.
-                  </p>
-                ) : null}
-              </AppField>
+                      <AppField
+                        label="Fuso horário"
+                        htmlFor="settings-timezone"
+                        hint="Usado para apresentar datas e horários da operação."
+                      >
+                        <AppInput
+                          id="settings-timezone"
+                          name="timezone"
+                          value={timezone}
+                          onChange={event => {
+                            dispatch({
+                              type: "edit",
+                              values: { timezone: event.target.value },
+                            });
+                            updateMutation.reset();
+                          }}
+                          placeholder="America/Sao_Paulo"
+                          aria-invalid={!timezoneValid}
+                          aria-describedby={
+                            !timezoneValid ? "settings-timezone-error" : undefined
+                          }
+                          disabled={updateMutation.isPending}
+                          required
+                        />
+                        {!timezoneValid ? (
+                          <p
+                            id="settings-timezone-error"
+                            className="text-xs text-destructive"
+                          >
+                            Informe um fuso horário válido, como America/Sao_Paulo ou
+                            UTC.
+                          </p>
+                        ) : null}
+                      </AppField>
 
-              <AppField
-                label="Moeda operacional"
-                htmlFor="settings-currency"
-                hint="Moeda de referência da organização. Cada cobrança mantém sua moeda registrada; esta alteração não converte valores existentes."
-              >
-                <AppSelect
-                  id="settings-currency"
-                  value={currency}
-                  onValueChange={value => {
-                    if (updateMutation.isPending) return;
-                    dispatch({
-                      type: "edit",
-                      values: { currency: value as Currency },
-                    });
-                    updateMutation.reset();
-                  }}
-                  options={currencyOptions}
-                  ariaLabel="Moeda operacional"
-                />
-              </AppField>
+                      <AppField
+                        label="Moeda operacional"
+                        htmlFor="settings-currency"
+                        hint="Moeda de referência da organização. Cada cobrança mantém sua moeda registrada; esta alteração não converte valores existentes."
+                      >
+                        <AppSelect
+                          id="settings-currency"
+                          value={currency}
+                          onValueChange={value => {
+                            if (updateMutation.isPending) return;
+                            dispatch({
+                              type: "edit",
+                              values: { currency: value as Currency },
+                            });
+                            updateMutation.reset();
+                          }}
+                          options={currencyOptions}
+                          ariaLabel="Moeda operacional"
+                        />
+                      </AppField>
 
-              <AppField
-                label="Identificador da organização"
-                htmlFor="settings-slug"
-                hint="Informação somente leitura."
-              >
-                <AppInput
-                  id="settings-slug"
-                  value={settings.slug}
-                  readOnly
-                  aria-readonly="true"
-                />
-              </AppField>
-            </AppFieldGroup>
+                      <AppField
+                        label="Identificador da organização"
+                        htmlFor="settings-slug"
+                        hint="Informação somente leitura."
+                      >
+                        <AppInput
+                          id="settings-slug"
+                          value={settings.slug}
+                          readOnly
+                          aria-readonly="true"
+                        />
+                      </AppField>
+                    </AppFieldGroup>
 
-            {updateMutation.isError ? (
-              <p role="alert" className="text-sm text-destructive">
-                A alteração não foi salva. Revise os dados e tente novamente.
+                    {updateMutation.isError ? (
+                      <p role="alert" className="text-sm text-destructive">
+                        A alteração não foi salva. Revise os dados e tente novamente.
+                      </p>
+                    ) : null}
+                    {updateMutation.isSuccess && !hasChanges ? (
+                      <p role="status" className="text-sm text-[var(--success)]">
+                        Configurações salvas e confirmadas pela fonte oficial.
+                      </p>
+                    ) : null}
+
+                    <AppFormActions className="justify-between border-t border-[var(--border-subtle)] pt-4">
+                      <div className="flex min-w-0 items-center gap-2 text-xs text-[var(--text-muted)]">
+                        <Building2 className="size-4 shrink-0" aria-hidden="true" />
+                        <span className="truncate">{settings.slug}</span>
+                      </div>
+                      <div className="account-form-buttons flex flex-wrap justify-end gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={discardGuard.requestClose}
+                          disabled={!hasChanges || updateMutation.isPending}
+                        >
+                          Descartar alterações
+                        </Button>
+                        <Button
+                          type="submit"
+                          disabled={
+                            !hasChanges ||
+                            !hasRequiredValues ||
+                            updateMutation.isPending
+                          }
+                        >
+                          {updateMutation.isPending
+                            ? "Salvando..."
+                            : "Salvar alterações"}
+                        </Button>
+                      </div>
+                    </AppFormActions>
+                  </AppForm>
+                )}
+              </AppSectionBlock>
+              <p className="text-sm text-[var(--text-muted)] md:hidden" role="status">
+                {hasChanges
+                  ? "Suas alterações ainda não foram salvas."
+                  : "Tudo pronto. Nenhuma alteração pendente."}
               </p>
-            ) : null}
-            {updateMutation.isSuccess && !hasChanges ? (
-              <p role="status" className="text-sm text-[var(--success)]">
-                Configurações salvas e confirmadas pela fonte oficial.
-              </p>
-            ) : null}
-
-            <AppFormActions className="justify-between border-t border-[var(--border-subtle)] pt-4">
-              <div className="flex min-w-0 items-center gap-2 text-xs text-[var(--text-muted)]">
-                <Building2 className="size-4 shrink-0" aria-hidden="true" />
-                <span className="truncate">{settings.slug}</span>
-              </div>
-              <div className="account-form-buttons flex flex-wrap justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={discardGuard.requestClose}
-                  disabled={!hasChanges || updateMutation.isPending}
-                >
-                  Descartar alterações
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={
-                    !hasChanges ||
-                    !hasRequiredValues ||
-                    updateMutation.isPending
-                  }
-                >
-                  {updateMutation.isPending
-                    ? "Salvando..."
-                    : "Salvar alterações"}
-                </Button>
-              </div>
-            </AppFormActions>
-          </AppForm>
-        )}
-      </AppSectionBlock>
-      <p className="text-sm text-[var(--text-muted)] md:hidden" role="status">
-        {hasChanges
-          ? "Suas alterações ainda não foram salvas."
-          : "Tudo pronto. Nenhuma alteração pendente."}
-      </p>
-      <OrganizationAccessSection />
+            </>
+          )}
+        </div>
+      </div>
     </AppPageShell>
   );
 }
