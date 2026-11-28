@@ -18,7 +18,7 @@ import {
 } from '../common/domain/state-transitions'
 import { IdempotencyService } from '../common/idempotency/idempotency.service'
 import { previewAppointmentSeries } from './appointment-series-preview'
-import { AppointmentSeriesPreviewDto, CreateAppointmentSeriesDto } from './dto/appointment-series-preview.dto'
+import { AppointmentSeriesPreviewDto, CreateAppointmentSeriesDto, RescheduleAppointmentSeriesDto } from './dto/appointment-series-preview.dto'
 
 const DEFAULT_DURATION_MIN = 30
 
@@ -385,6 +385,101 @@ export class AppointmentsService {
         const existing = await this.prisma.appointmentSeries.findUnique({ where: key, select })
         if (existing) return response(existing)
       }
+      if (isOverlapDbViolation(error)) {
+        throw new ConflictException('Uma ou mais visitas conflitam com a agenda do responsável.')
+      }
+      throw error
+    }
+  }
+
+  async rescheduleSeries(
+    orgId: string,
+    id: string,
+    actor: { userId: string | null; personId: string | null },
+    input: RescheduleAppointmentSeriesDto,
+  ) {
+    const now = new Date()
+    const startsAt = parseISODate('startsAt', input.startsAt)
+    const endsAt = parseISODate('endsAt', input.endsAt)
+    const expectedUpdatedAt = parseExpectedUpdatedAt(input.expectedUpdatedAt)
+    if (!startsAt || !endsAt || endsAt <= startsAt || startsAt < now) {
+      throw new BadRequestException('Informe um novo horário futuro e uma duração válida.')
+    }
+
+    try {
+      return await this.prisma.$transaction(async tx => {
+        const candidate = await tx.appointment.findFirst({
+          where: { id, orgId }, select: { seriesId: true },
+        })
+        if (!candidate?.seriesId) throw new NotFoundException('Visita recorrente não encontrada.')
+        const seriesId = candidate.seriesId
+        const [series] = await tx.$queryRaw<Array<{ cadence: 'WEEKLY' | 'BIWEEKLY'; timezone: string }>>`
+          SELECT cadence, timezone FROM "AppointmentSeries"
+          WHERE id = ${seriesId} AND "orgId" = ${orgId} FOR UPDATE
+        `
+        if (!series) throw new NotFoundException('Série não encontrada.')
+        const anchor = await tx.appointment.findFirst({
+          where: { id, orgId, seriesId, startsAt: { gte: now }, status: { in: ['SCHEDULED', 'CONFIRMED'] } },
+        })
+        if (!anchor || anchor.seriesPosition === null || anchor.updatedAt.getTime() !== expectedUpdatedAt?.getTime()) {
+          throw new ConflictException('A visita foi alterada ou encerrada. Recarregue a agenda.')
+        }
+        const position = anchor.seriesPosition
+        const visits = await tx.appointment.findMany({
+          where: {
+            orgId, seriesId, seriesPosition: { gte: position }, startsAt: { gte: now },
+            status: { in: ['SCHEDULED', 'CONFIRMED'] },
+          },
+          orderBy: { seriesPosition: 'asc' },
+        })
+        const span = (visits.at(-1)?.seriesPosition ?? position) - position + 1
+        const dates = span === 1 ? [{ startsAt, endsAt }]
+          : previewAppointmentSeries(startsAt, endsAt, series.timezone, series.cadence, span)
+
+        const responsibleIds = [...new Set(visits.flatMap(visit => visit.assignedToPersonId ? [visit.assignedToPersonId] : []))].sort()
+        for (const personId of responsibleIds) {
+          await tx.$queryRaw`SELECT id FROM "Person" WHERE id = ${personId} AND "orgId" = ${orgId} FOR NO KEY UPDATE`
+        }
+
+        // Remove the old intervals from the exclusion constraint within this transaction.
+        // Each visit retains its assigned person when its final interval is written.
+        for (const visit of visits) {
+          const result = await tx.appointment.updateMany({
+            where: { id: visit.id, orgId, updatedAt: visit.updatedAt },
+            data: { assignedToPersonId: null },
+          })
+          if (result.count !== 1) throw new ConflictException('Uma visita mudou. Recarregue a agenda.')
+        }
+        for (const visit of visits) {
+          const date = dates[visit.seriesPosition! - position]
+          await tx.appointment.update({
+            where: { id: visit.id },
+            data: { ...date, assignedToPersonId: visit.assignedToPersonId },
+          })
+        }
+
+        await tx.timelineEvent.createMany({
+          data: visits.map(visit => ({
+            orgId, customerId: visit.customerId, appointmentId: visit.id, personId: actor.personId,
+            action: 'APPOINTMENT_UPDATED', description: 'Visita reagendada em série',
+            metadata: {
+              seriesId,
+              previousStartsAt: visit.startsAt.toISOString(),
+              scheduledAt: dates[visit.seriesPosition! - position].startsAt.toISOString(),
+            },
+          })),
+        })
+        await tx.auditEvent.create({
+          data: {
+            orgId, personId: actor.personId, actorPersonId: actor.personId, actorUserId: actor.userId,
+            action: AUDIT_ACTIONS.APPOINTMENT_UPDATED, context: 'Próximas visitas reagendadas',
+            entityType: 'APPOINTMENT_SERIES', entityId: seriesId,
+            metadata: { seriesId, visitIds: visits.map(visit => visit.id) },
+          },
+        })
+        return { seriesId, visitIds: visits.map(visit => visit.id) }
+      })
+    } catch (error) {
       if (isOverlapDbViolation(error)) {
         throw new ConflictException('Uma ou mais visitas conflitam com a agenda do responsável.')
       }

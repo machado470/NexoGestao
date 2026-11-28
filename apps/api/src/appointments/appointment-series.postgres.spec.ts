@@ -59,4 +59,45 @@ describePostgres('appointment series with isolated PostgreSQL', () => {
     await expect(service.createSeries(orgId, actor, { ...accepted, count: 4 }, quota))
       .rejects.toMatchObject({ status: 409 })
   })
+  it('moves this and following visits atomically while keeping canceled and previous visits', async () => {
+    const customer = await db.customer.create({ data: { orgId, name: 'Cliente reagendado', phone: '11999999997' } })
+    const person = await db.person.create({ data: { orgId, name: 'Responsável da série', role: 'STAFF' } })
+    const actor = { userId: null, personId: person.id }
+    const series = await service.createSeries(orgId, actor, {
+      customerId: customer.id, assignedToPersonId: person.id, cadence: 'WEEKLY',
+      startsAt: '2031-03-03T12:00:00Z', count: 4, entryKey: randomUUID(),
+    }, async () => {})
+    const [earlier, selected, canceled, last] = series.visitIds
+    await db.appointment.update({ where: { id: canceled }, data: { status: 'CANCELED' } })
+    const anchor = await db.appointment.findUniqueOrThrow({ where: { id: selected } })
+    const replacement = {
+      // This puts the first moved visit on the old slot of the next week.
+      startsAt: '2031-03-17T12:00:00Z', endsAt: '2031-03-17T13:00:00Z',
+      expectedUpdatedAt: anchor.updatedAt.toISOString(),
+    }
+    const conflict = await db.appointment.create({
+      data: {
+        orgId, customerId: customer.id, assignedToPersonId: person.id,
+        startsAt: new Date('2031-03-31T12:15:00Z'), endsAt: new Date('2031-03-31T13:00:00Z'),
+      },
+    })
+    await expect(service.rescheduleSeries(orgId, selected, actor, replacement)).rejects.toMatchObject({ status: 409 })
+    expect(await db.appointment.findUnique({ where: { id: selected } })).toMatchObject({
+      startsAt: anchor.startsAt, updatedAt: anchor.updatedAt, assignedToPersonId: person.id,
+    })
+    await db.appointment.delete({ where: { id: conflict.id } })
+    await expect(service.rescheduleSeries(orgId, selected, actor, replacement))
+      .resolves.toEqual({ seriesId: series.seriesId, visitIds: [selected, last] })
+    const rows = await db.appointment.findMany({
+      where: { orgId, seriesId: series.seriesId }, orderBy: { seriesPosition: 'asc' },
+    })
+    expect(rows.map(row => [row.id, row.status, row.startsAt.toISOString(), row.assignedToPersonId])).toEqual([
+      [earlier, 'SCHEDULED', '2031-03-03T12:00:00.000Z', person.id],
+      [selected, 'SCHEDULED', '2031-03-17T12:00:00.000Z', person.id],
+      [canceled, 'CANCELED', '2031-03-17T12:00:00.000Z', person.id],
+      [last, 'SCHEDULED', '2031-03-31T12:00:00.000Z', person.id],
+    ])
+    await expect(service.rescheduleSeries(orgId, selected, actor, replacement)).rejects.toMatchObject({ status: 409 })
+    await expect(service.rescheduleSeries(randomUUID(), selected, actor, replacement)).rejects.toMatchObject({ status: 404 })
+  })
 })
